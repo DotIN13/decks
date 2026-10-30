@@ -6,7 +6,7 @@ import { canvasHost, openInTab } from "../host.ts";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseLive, NO_LIVE_CARDS, sameLive, type LiveCards } from "../items/live-cards.ts";
 import type { StageBoardProps } from "../items/item-slot.tsx";
-import type { SceneBoard } from "../render/types.ts";
+import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
 import { CARDS, DEVICE } from "../render/device.ts";
@@ -173,14 +173,14 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		 * arrow, so those two are still sent at every step.
 		 */
 		const resize = editor.sheetResize((path) => live.has(path));
-		const sendBoards = (boards: SceneBoard[]) => {
+		const sendCards = (cards: SceneCard[]) => {
 			/*
-			 * The engine draws the boards' pictures, and hears of every board: an arrow follows the board it
-			 * ends on, and a drawn item over a board gets the click shape that lets it be pressed there.
+			 * The engine draws the cards' pictures, and hears of every card: an arrow follows the card it
+			 * ends on, and a drawn item over a card gets the click shape that lets it be pressed there.
 			 */
-			penLayer.setBoards(boards);
+			penLayer.setCards(cards);
 		};
-		sendBoards(
+		sendCards(
 			props.boards
 				.map((board) => {
 					const sized = resize?.path === board.path ? resize : undefined;
@@ -194,7 +194,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						live: board.item !== undefined || live.has(board.path),
 						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
-						// A board is always its picture: the canvas runs no board's page.
+						// A card not live is its picture.
 						picture: board.item ? "" : props.shots().picture(board, look),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
 					};

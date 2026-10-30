@@ -25,21 +25,22 @@ import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../camera/glide.ts";
-import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, TileFromWorker, ToWorker } from "./types.ts";
+import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { PICTURES, readGpuClass } from "./device.ts";
+import { upgrades } from "./picture-ladder.ts";
 import { noticeFor } from "./backends/notice.ts";
+
+/** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
+export const pictureKey = (path: string) => `card:${path}`;
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
-/**
- * How long the camera rests before the pictures are held to their budget (`fitPictures`), and a
- * shrunk board near the screen gets its whole picture back (`wantBoardPictures`).
- */
+/** How long the camera rests before the pictures are held to their budget (`fitPictures`). */
 const REST_MS = 250;
 
 /**
- * A board picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
+ * A card picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
  * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
  * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
  */
@@ -88,7 +89,7 @@ type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tile
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
-/** Board pictures copied to the GPU in one frame (`putPaced`). */
+/** Card pictures copied to the GPU in one frame (`putPaced`). */
 const PICTURES_PER_FRAME = 1;
 
 type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
@@ -185,15 +186,15 @@ export class StageEngine {
 	private hits: SVGSVGElement | undefined;
 	private hitWindow: Rect | undefined;
 	private bandZoom = 0;
-	private boardIndex = new BoxIndex([]);
-	/** The boards `boardIndex` answers for, in its order: `boards` when it is up to date with them. */
-	private indexed: readonly SceneBoard[] = [];
-	private boardBoxes = "";
+	private cardIndex = new BoxIndex([]);
+	/** The boards `cardIndex` answers for, in its order: `boards` when it is up to date with them. */
+	private indexed: readonly SceneCard[] = [];
+	private cardBoxes = "";
 	private size = { w: 0, h: 0 };
 	/** The stage rectangle the canvas was last drawn for: the window's, at the camera then. */
 	private drawnAt: { x: number; y: number; zoom: number } | undefined;
-	private boards: readonly SceneBoard[] = [];
-	private boardKey = "";
+	private placedCards: readonly SceneCard[] = [];
+	private cardKey = "";
 	private viewState: { hidden: string[]; mute: string[]; holes: string[]; scrolls: Record<string, number>; writer?: { name?: string; color: string } } = { hidden: [], mute: [], holes: [], scrolls: {} };
 	private viewKey = "";
 	private fontsAsked = new Set<string>();
@@ -302,9 +303,9 @@ export class StageEngine {
 	/** The widest and tallest a picture is kept (the device's limit, or 4096): bigger ones are resized. */
 	private maxPicture = 4096;
 	/**
-	 * Board pictures, by this device's GPU (`device.ts`, `readGpuClass`): each board's is fetched at
-	 * one width, copied to the GPU once, and drawn at any zoom from the smaller sizes the GPU makes of
-	 * it. Big until the adapter has been asked.
+	 * Card pictures, by this device's GPU (`device.ts`, `readGpuClass`): the ladder each card's is
+	 * fetched from, at the rung its drawn width needs (`picture-ladder.ts`), and drawn at any zoom from
+	 * the smaller sizes the GPU makes of it. Big until the adapter has been asked.
 	 */
 	private pictures = PICTURES.big;
 	/** What this browser draws with (`backends/detect.ts`), found once. */
@@ -415,8 +416,8 @@ export class StageEngine {
 		this.unwatch = found.backend.watch(over, { lost: () => this.lose(), restored: () => void this.restart(), isLost: () => this.page?.lost() ?? false });
 		this.viewKey = "";
 		this.sendView();
-		this.boardKey = "";
-		this.setBoards(this.boards);
+		this.cardKey = "";
+		this.setCards(this.placedCards);
 		this.laidOut();
 		this.draw();
 	}
@@ -621,13 +622,13 @@ export class StageEngine {
 		const gliding = this.settling && this.startGlide();
 		if (!gliding) this.draw();
 		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
-		if (this.boardsOnly && !this.carriedCount) this.landBoards();
-		else if (this.boardsOnly) this.boardsAnswered = true;
+		if (this.cardsOnly && !this.carriedCount) this.landCards();
+		else if (this.cardsOnly) this.cardsAnswered = true;
 		// A gesture let go: the drawing that answers it is here, so what it lifted goes back into the tiles.
 		if (this.settling) {
 			this.settling = false;
 			this.landing = undefined;
-			if (this.lifted.size && !this.boardsOnly) this.post({ type: "drop", ids: [...this.lifted] });
+			if (this.lifted.size && !this.cardsOnly) this.post({ type: "drop", ids: [...this.lifted] });
 		}
 	}
 
@@ -936,12 +937,12 @@ export class StageEngine {
 			}, FAST_HOLD_MS);
 		// A pan inside the sheet: the browser has scrolled it with the world, and there is nothing to draw (`drawRect`).
 		if (this.windowInSheet()) {
-			this.wantBoardPictures();
+			this.wantCardPictures();
 		} else {
 			this.sheet = undefined;
 			this.draw();
 			this.sendCamera();
-			this.wantBoardPictures();
+			this.wantCardPictures();
 		}
 		// The click shapes follow the window: written again once it leaves the area they cover.
 		const w = this.hitWindow;
@@ -964,7 +965,7 @@ export class StageEngine {
 		if (!moving) this.sheet = undefined;
 		this.sendCamera();
 		if (!moving) {
-			this.wantBoardPictures();
+			this.wantCardPictures();
 			// Drawn again where the camera came to rest, at the tiles' resting scale.
 			this.draw();
 			// And, a moment later, the pictures held to the budget, after a pan as after a zoom (`fitPictures`).
@@ -1266,7 +1267,7 @@ export class StageEngine {
 			sheetStats().settledAt = performance.now();
 		}
 		// Asked for in JSON only when the engine says they changed: most frames, nothing did.
-		const marks = this.page.boardMarks();
+		const marks = this.page.cardMarks();
 		if (marks !== this.marksSeen) {
 			this.marksSeen = marks;
 			const pictured = this.page.pictured();
@@ -1284,49 +1285,51 @@ export class StageEngine {
 		this.presented?.();
 	}
 
-	// --- boards --------------------------------------------------------------------------------
+	// --- cards ---------------------------------------------------------------------------------
 
-	setBoards(boards: readonly SceneBoard[]): void {
-		const was = this.boards;
-		this.boards = boards;
-		const key = JSON.stringify(boards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture]));
-		if (key === this.boardKey || !this.page) {
+	setCards(cards: readonly SceneCard[]): void {
+		const was = this.placedCards;
+		this.placedCards = cards;
+		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture]));
+		if (key === this.cardKey || !this.page) {
 			// The same boxes as the ones the index was made for: it answers for these too.
-			if (key === this.boardKey && this.indexed === was) this.indexed = boards;
+			if (key === this.cardKey && this.indexed === was) this.indexed = cards;
 			return;
 		}
-		this.boardKey = key;
-		this.page.setBoards(JSON.stringify(boards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow }))));
-		const boxes = boards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
-		if (boxes !== this.boardBoxes) {
-			this.boardBoxes = boxes;
-			this.boardIndex = new BoxIndex(boards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
+		this.cardKey = key;
+		this.page.setCards(JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow }))));
+		const boxes = cards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
+		if (boxes !== this.cardBoxes) {
+			this.cardBoxes = boxes;
+			this.cardIndex = new BoxIndex(cards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
 			this.writeHits();
 		}
-		this.indexed = boards;
+		this.indexed = cards;
 		/*
-		 * A board whose picture changed is asked for again, against the board's own address: the one
-		 * fetched carries a size (`&w=480`), and comparing that one forgot every server picture on each
-		 * change of the boards, such as the zoom crossing the live zoom, so each board went white until
-		 * it was fetched again. The old picture stays drawn until the new one replaces it.
+		 * A card whose picture changed (a new revision) is asked for again, against the card's own
+		 * address: the one fetched carries a rung (`&w=480`). The old picture stays drawn until the new
+		 * one replaces it.
 		 */
-		for (const board of boards) {
-			const asked = this.picturesAsked.get(`board:${board.path}`);
-			if (asked && board.picture && asked.source !== board.picture) this.picturesAsked.delete(`board:${board.path}`);
+		for (const card of cards) {
+			const key = pictureKey(card.path);
+			const asked = this.picturesAsked.get(key);
+			if (asked && card.picture && asked.source !== card.picture) {
+				this.picturesAsked.delete(key);
+				this.heldWidth.delete(key);
+			}
 		}
-		// A board taken off the canvas lets go of its picture on the GPU: nothing else ever did.
+		// A card taken off the canvas lets go of its picture on the GPU: nothing else ever did.
 		if (this.pictureBytes.size > 0) {
-			const here = new Set(boards.map((board) => `board:${board.path}`));
+			const here = new Set(cards.map((card) => pictureKey(card.path)));
 			for (const key of [...this.pictureBytes.keys()]) {
 				if (here.has(key)) continue;
 				this.pictureBytes.delete(key);
-				this.wholeBytes.delete(key);
-				this.shrunk.delete(key);
+				this.heldWidth.delete(key);
 				this.picturesAsked.delete(key);
 				this.page?.forgetPicture(key);
 			}
 		}
-		this.wantBoardPictures();
+		this.wantCardPictures();
 		this.draw();
 	}
 
@@ -1344,18 +1347,18 @@ export class StageEngine {
 		if (!this.page) return;
 		this.page.carry(JSON.stringify(paths), offset.dx, offset.dy);
 		if (paths.length) {
-			this.boardsAnswered = false;
+			this.cardsAnswered = false;
 			if (this.shown === undefined) {
-				this.boardsOnly = true;
-				clearTimeout(this.boardsLanding);
+				this.cardsOnly = true;
+				clearTimeout(this.cardsLanding);
 			}
 			this.lift(this.page.setPreview(this.shown ?? "[]"));
 			this.laidOut(this.shown === undefined || this.moveOnly);
-		} else if (this.boardsOnly && this.shown === undefined) {
-			clearTimeout(this.boardsLanding);
+		} else if (this.cardsOnly && this.shown === undefined) {
+			clearTimeout(this.cardsLanding);
 			// The drawing that answers the drop came while the boards were held where they were dropped (`editor/core/gesture.ts`, `holdBoards`): its arrows are routed already.
-			if (this.boardsAnswered) this.landBoards();
-			else this.boardsLanding = setTimeout(() => this.landBoards(), 2000);
+			if (this.cardsAnswered) this.landCards();
+			else this.cardsLanding = setTimeout(() => this.landCards(), 2000);
 		}
 		this.draw();
 	}
@@ -1365,14 +1368,14 @@ export class StageEngine {
 	/** The boards the last `carry` names (`__decksEngine.carried`). */
 	private carriedPaths: string[] = [];
 	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
-	private boardsOnly = false;
+	private cardsOnly = false;
 	/** A drawing came since the boards were last carried a step: the one that answers their drop, if they are let go of now. */
-	private boardsAnswered = false;
-	private boardsLanding: ReturnType<typeof setTimeout> | undefined;
-	private landBoards(): void {
-		clearTimeout(this.boardsLanding);
-		if (!this.boardsOnly) return;
-		this.boardsOnly = false;
+	private cardsAnswered = false;
+	private cardsLanding: ReturnType<typeof setTimeout> | undefined;
+	private landCards(): void {
+		clearTimeout(this.cardsLanding);
+		if (!this.cardsOnly) return;
+		this.cardsOnly = false;
 		if (this.shown !== undefined || !this.page) return;
 		this.page.setPreview("null");
 		if (this.lifted.size) this.post({ type: "drop", ids: [...this.lifted] });
@@ -1391,41 +1394,63 @@ export class StageEngine {
 	}
 
 	/**
-	 * Fetch the pictures of the boards near the window that have none, each once, at this device's one
-	 * width (`pictures`): the GPU makes its smaller sizes, so no zoom fetches or copies one again. At
-	 * rest, a board near the window that was shrunk to fit the budget (`fitPictures`) gets its whole
-	 * picture back.
+	 * Fetch the pictures of the cards near the window, each at the rung of this device's ladder its
+	 * drawn width needs (`picture-ladder.ts`). While the camera moves only a card with no picture is
+	 * fetched, at the bottom rung: nothing is fetched to sharpen a picture mid-gesture, and the GPU's
+	 * smaller sizes of what is held cover a zoom out. At rest each card wanting a higher rung than it
+	 * holds is fetched again, nearest the screen's middle first, while it fits the budget; the lower
+	 * picture stays drawn until the higher one replaces it.
 	 */
-	private wantBoardPictures(): void {
+	private wantCardPictures(): void {
 		if (!this.page || !this.view.width) return;
 		const w = this.view.width / this.camera.zoom;
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w;
 		const top = this.camera.y - h;
-		// The boards near the window, from the index `setBoards` keeps (built from these boards, in their order).
-		const near = this.indexed !== this.boards ? this.boards : this.boardIndex.search({ x: left, y: top, w: w * 2, h: h * 2 }).map((at) => this.boards[at]!);
-		for (const board of near) {
-			if (!board.picture || (board.live && !board.ready)) continue;
-			if (board.x + board.w < left || board.x > left + w * 2 || board.y + board.h < top || board.y > top + h * 2) continue;
-			const key = `board:${board.path}`;
-			if (this.picturesAsked.has(key)) {
-				// Whole again only if it fits: else the next rest would shrink it again, and copy it in at every rest.
-				if (this.moving || !this.shrunk.has(key) || this.heldBytes() - this.pictureBytes.get(key)! + this.wholeBytes.get(key)! > this.budgetBytes()) continue;
-				this.picturesAsked.delete(key);
-				this.shrunk.delete(key);
-			}
-			const size = /^(https?:|\/)/.test(board.picture) ? this.pictures.width : 0;
+		// The cards near the window, from the index `setCards` keeps (built from these cards, in their order).
+		const near = (this.indexed !== this.placedCards ? this.placedCards : this.cardIndex.search({ x: left, y: top, w: w * 2, h: h * 2 }).map((at) => this.placedCards[at]!)).filter(
+			(card) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture) && !(card.x + card.w < left || card.x > left + w * 2 || card.y + card.h < top || card.y > top + h * 2),
+		);
+		const ladder = this.pictures.ladder;
+		const byKey = new Map(near.map((card) => [pictureKey(card.path), card]));
+		// What a card holds or is fetching: the rung asked, or the width on the GPU, whichever is more.
+		const holds = (key: string) => Math.max(this.picturesAsked.get(key)?.size ?? 0, this.heldWidth.get(key) ?? 0);
+		const wanted = this.moving
+			? near.filter((card) => holds(pictureKey(card.path)) === 0).map((card) => ({ key: pictureKey(card.path), width: ladder[0]! }))
+			: upgrades(
+					near.map((card) => ({ key: pictureKey(card.path), x: card.x, y: card.y, w: card.w, h: card.h })),
+					holds,
+					this.camera,
+					globalThis.devicePixelRatio || 1,
+					ladder,
+				);
+		const budget = this.budgetBytes();
+		let total = this.heldBytes();
+		for (const { key, width } of wanted) {
+			const card = byKey.get(key)!;
+			// A higher rung only while it fits: else the next rest would shrink it again (`fitPictures`), and fetch it at every rest.
+			const now = this.pictureBytes.get(key) ?? 0;
+			const after = total - now + this.rungBytes(width, card);
+			if (now > 0 && after > budget) continue;
+			total = after;
+			this.picturesAsked.delete(key);
 			// Compressed for the GPU where it takes them (`putCompressedPicture`): written as it comes, a quarter of the memory.
-			const astc = size && this.page.compressedPictures() ? "&astc=1" : "";
-			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}${astc}` : board.picture;
-			this.fetchPicture(key, url, true, board.picture, size);
+			const astc = this.page.compressedPictures() ? "&astc=1" : "";
+			const source = card.picture!;
+			this.fetchPicture(key, `${source}${source.includes("?") ? "&" : "?"}w=${width}${astc}`, true, source, width);
 		}
 	}
 
-	/** Each board picture on the GPU: its bytes, its smaller sizes included (`fitPictures`). */
+	/** About what a card's picture at a rung holds on the GPU, its smaller sizes included: a byte a pixel compressed, four plain. */
+	private rungBytes(width: number, card: { w: number; h: number }): number {
+		const pixels = width * width * (card.h / Math.max(card.w, 1));
+		return Math.round(pixels * (this.page?.compressedPictures() ? 1 : 4) * (4 / 3));
+	}
+
+	/** Each card picture on the GPU: its bytes, its smaller sizes included (`fitPictures`). */
 	private pictureBytes = new Map<string, number>();
-	/** Each board picture's bytes as it was copied in, before any shrinking. */
-	private wholeBytes = new Map<string, number>();
+	/** Each card picture's width on the GPU, after any shrinking: the rung it holds (`wantCardPictures`). */
+	private heldWidth = new Map<string, number>();
 	private heldBytes(): number {
 		let total = 0;
 		for (const bytes of this.pictureBytes.values()) total += bytes;
@@ -1435,19 +1460,17 @@ export class StageEngine {
 	private budgetBytes(): number {
 		return ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? this.pictures.budgetMB) * 2 ** 20;
 	}
-	/** Board pictures put compressed (`putCompressedPicture`), for checks. */
+	/** Card pictures put compressed (`putCompressedPicture`), for checks. */
 	private compressedPut = 0;
-	/** Each compressed board picture's width and height, for checks. */
+	/** Each compressed card picture's width and height, for checks. */
 	private compressedSize = new Map<string, [number, number]>();
-	/** Boards whose picture was shrunk on the GPU to fit the budget, to get back whole when near the window again. */
-	private shrunk = new Set<string>();
 
 	/**
-	 * Board pictures within this device's budget (`device.ts`, `PICTURES`), at rest. Over it, the
-	 * pictures of the boards farthest from the window are shrunk on the GPU to their next size down,
-	 * a quarter of the memory each time, with no fetch and no copy from the page; boards in the window
-	 * only once every other is as small as it goes. Every board keeps a picture, so one coming back into
-	 * view shows at once.
+	 * Card pictures within this device's budget (`device.ts`, `PICTURES`), at rest. Over it, the
+	 * pictures of the cards farthest from the window are shrunk on the GPU to their next size down,
+	 * a quarter of the memory each time, with no fetch and no copy from the page; cards in the window
+	 * only once every other is as small as it goes. Every card keeps a picture, so one coming back into
+	 * view shows at once, and goes up its ladder again at the next rest if it fits (`wantCardPictures`).
 	 */
 	private fitPictures(): void {
 		if (!this.view.width || !this.page) return;
@@ -1458,26 +1481,27 @@ export class StageEngine {
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w / 2;
 		const top = this.camera.y - h / 2;
-		const far = (board: SceneBoard) => Math.hypot(Math.max(board.x - this.camera.x, 0, this.camera.x - (board.x + board.w)), Math.max(board.y - this.camera.y, 0, this.camera.y - (board.y + board.h)));
-		const seen = (board: SceneBoard) => board.x < left + w && board.x + board.w > left && board.y < top + h && board.y + board.h > top;
-		const held = this.boards.filter((board) => this.pictureBytes.has(`board:${board.path}`));
+		const far = (card: SceneCard) => Math.hypot(Math.max(card.x - this.camera.x, 0, this.camera.x - (card.x + card.w)), Math.max(card.y - this.camera.y, 0, this.camera.y - (card.y + card.h)));
+		const seen = (card: SceneCard) => card.x < left + w && card.x + card.w > left && card.y < top + h && card.y + card.h > top;
+		const held = this.placedCards.filter((card) => this.pictureBytes.has(pictureKey(card.path)));
 		held.sort((a, b) => Number(seen(a)) - Number(seen(b)) || far(b) - far(a));
+		let shrank = false;
 		// Round after round, each a size down, until the total fits or nothing has a smaller size.
-		for (let shrank = true; total > budget && shrank; ) {
-			shrank = false;
-			for (const board of held) {
+		for (let more = true; total > budget && more; ) {
+			more = false;
+			for (const card of held) {
 				if (total <= budget) break;
-				const key = `board:${board.path}`;
+				const key = pictureKey(card.path);
 				const size = this.page.shrinkPicture(key);
 				if (!size) continue;
-				const now = Math.round(size[0]! * size[1]! * 4 * (4 / 3));
+				const now = Math.round(size[0]! * size[1]! * (this.compressedSize.has(key) ? 1 : 4) * (4 / 3));
 				total -= this.pictureBytes.get(key)! - now;
 				this.pictureBytes.set(key, now);
-				this.shrunk.add(key);
-				shrank = true;
+				this.heldWidth.set(key, size[0]!);
+				more = shrank = true;
 			}
 		}
-		if (this.shrunk.size) this.draw();
+		if (shrank) this.draw();
 	}
 
 	/** `fitPictures` once the camera has rested `REST_MS`: a pan collects pictures as a zoom does. */
@@ -1529,21 +1553,21 @@ export class StageEngine {
 	};
 
 	/** Ask again for a picture the server answered with a stand-in while it makes it. */
-	private retryStandIn(key: string, url: string, board: boolean, asked: { source: string; size?: number | undefined }): void {
+	private retryStandIn(key: string, url: string, card: boolean, asked: { source: string; size?: number | undefined }): void {
 		if (this.disposed || this.picturesAsked.get(key) !== asked) return;
-		this.fetchPicture(key, url, board, asked.source, asked.size);
+		this.fetchPicture(key, url, card, asked.source, asked.size);
 	}
 
-	private fetchPicture(key: string, url: string, board: boolean, source = url, size?: number): void {
+	private fetchPicture(key: string, url: string, card: boolean, source = url, size?: number): void {
 		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0, size };
 		this.picturesAsked.set(key, asked);
 		if (this.fetching >= FETCHES) {
 			setTimeout(() => {
 				if (this.picturesAsked.get(key) !== asked) return;
 				this.picturesAsked.delete(key);
-				// A board's is asked for again with the boards in view; an image fill's by its address
+				// A card's is asked for again with the cards in view; an image fill's by its address
 				// (the worker's asking again for it may have come while this one waited, and been let go).
-				if (board) this.wantBoardPictures();
+				if (card) this.wantCardPictures();
 				else this.wantPictures([key]);
 			}, 200);
 			return;
@@ -1553,15 +1577,14 @@ export class StageEngine {
 			.then(async (response) => {
 				if (!response.ok) throw new Error(String(response.status));
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
-				if (board && response.headers.get("Content-Type")?.startsWith("application/vnd.decks.astc")) {
+				if (card && response.headers.get("Content-Type")?.startsWith("application/vnd.decks.astc")) {
 					const packed = readCompressed(new Uint8Array(await response.arrayBuffer()));
 					if (!packed || this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return;
 					this.putPaced(() => {
 						if (this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return;
 						if (!this.page.putCompressedPicture(key, packed.data, packed.width, packed.height, packed.spans)) return;
 						this.pictureBytes.set(key, packed.bytes);
-						this.wholeBytes.set(key, packed.bytes);
-						this.shrunk.delete(key);
+						this.heldWidth.set(key, packed.width);
 						this.picturesPut++;
 						this.compressedPut++;
 						this.compressedSize.set(key, [packed.width, packed.height]);
@@ -1570,20 +1593,19 @@ export class StageEngine {
 					return;
 				}
 				const blob = await response.blob();
-				// No wider than the device's width (`PICTURES`), even from a server that sends the whole picture whatever `w=` says (Studio's).
-				const { bitmap: forPage, width, height } = await this.picture(blob, board ? size : undefined);
-				// Asked again since (a sharper copy, an engine started again): this one is not wanted.
+				// No wider than the rung asked for, even from a server that sends the whole picture whatever `w=` says (Studio's).
+				const { bitmap: forPage, width, height } = await this.picture(blob, card ? size : undefined);
+				// Asked again since (a higher rung, an engine started again): this one is not wanted.
 				const wanted = () => !this.disposed && !!this.page && this.picturesAsked.get(key) === asked;
 				if (!wanted()) return forPage.close();
 				const put = () => {
 					if (!wanted()) return forPage.close();
 					// What it holds on the GPU, read before the engine closes the bitmap (`fitPictures`).
-					if (board) {
+					if (card) {
 						// With its smaller sizes, a third again.
-						const bytes = Math.round(forPage.width * forPage.height * 4 * (4 / 3));
-						this.pictureBytes.set(key, bytes);
-						this.wholeBytes.set(key, bytes);
-						this.shrunk.delete(key);
+						this.pictureBytes.set(key, Math.round(forPage.width * forPage.height * 4 * (4 / 3)));
+						this.heldWidth.set(key, forPage.width);
+						this.compressedSize.delete(key);
 					}
 					try {
 						this.page!.putPicture(key, forPage, width, height);
@@ -1595,10 +1617,10 @@ export class StageEngine {
 					this.picturesPut++;
 					this.draw();
 				};
-				// A board's picture waits its turn to the GPU (`putPaced`); an image fill is needed by the worker's tiles now.
-				if (board) {
+				// A card's picture waits its turn to the GPU (`putPaced`); an image fill is needed by the worker's tiles now.
+				if (card) {
 					this.putPaced(put);
-					if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, board, asked), STAND_IN_RETRY_MS);
+					if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, card, asked), STAND_IN_RETRY_MS);
 					return;
 				}
 				put();
@@ -1606,7 +1628,7 @@ export class StageEngine {
 				const { bitmap: forWorker } = await this.picture(blob);
 				this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
 				this.laidOut();
-				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, board, asked), STAND_IN_RETRY_MS);
+				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, card, asked), STAND_IN_RETRY_MS);
 			})
 			.catch(() => {
 				// Not reachable now (a shot that failed, the network): drawn without it, as an empty place,
@@ -1615,7 +1637,7 @@ export class StageEngine {
 				if (wait === undefined) return;
 				asked.failed = (asked.failed ?? 0) + 1;
 				setTimeout(() => {
-					if (!this.disposed && this.picturesAsked.get(key) === asked) this.fetchPicture(key, url, board, asked.source, asked.size);
+					if (!this.disposed && this.picturesAsked.get(key) === asked) this.fetchPicture(key, url, card, asked.source, asked.size);
 				}, wait);
 			})
 			.finally(() => {
@@ -1788,12 +1810,12 @@ export class StageEngine {
 			this.offset = { dx: first?.dx ?? 0, dy: first?.dy ?? 0 };
 			// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
 			this.shown = JSON.stringify(this.withOutlines(moving));
-			this.boardsOnly = false;
+			this.cardsOnly = false;
 			this.settling = false;
 			this.lift(this.page.setPreview(this.shown));
 		} else {
 			this.shown = undefined;
-			this.boardsOnly = false;
+			this.cardsOnly = false;
 			this.page.setPreview("null");
 			this.offset = { dx: 0, dy: 0 };
 			if (this.lifted.size) this.post({ type: "drop", ids: [...this.lifted] });
@@ -1956,7 +1978,7 @@ export class StageEngine {
 			while (top.parent) top = this.placed.get(top.parent) ?? top;
 			if (top.parent) continue;
 			const bounds = this.bounds.get(node.id) ?? box;
-			if (this.boardIndex.search(bounds).length === 0) continue;
+			if (this.cardIndex.search(bounds).length === 0) continue;
 			let shape: SVGElement;
 			if (node.type === "ellipse") {
 				shape = document.createElementNS(NS, "ellipse");

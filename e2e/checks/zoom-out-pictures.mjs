@@ -29,7 +29,7 @@ const counts = await canvas.evaluate(() => {
 	};
 	const put = page.putPicture.bind(page);
 	page.putPicture = (...args) => {
-		if (String(args[0]).startsWith("board:")) window.__put++;
+		if (String(args[0]).startsWith("card:")) window.__put++;
 		return put(...args);
 	};
 	return typeof page.forgetPicture === "function";

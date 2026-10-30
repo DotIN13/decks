@@ -1,6 +1,6 @@
 /**
  * What the backend checks share (`checks/backends.mjs`, `checks/context-loss.mjs`,
- * `checks/sharper-pictures.mjs`): the two browsers they run in, the APIs they take away, and how
+ * the picture checks): the two browsers they run in, the APIs they take away, and how
  * they tell the stage's canvas drew something.
  */
 import { join } from "node:path";

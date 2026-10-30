@@ -26,8 +26,8 @@ fn with_fonts(s: &mut Shooter) -> bool {
 	any
 }
 
-fn request(doc: &Value, area: Rect, scale: f64, boards: Vec<Board>) -> Request {
-	Request { doc: doc.to_string(), dark: false, area, scale, width: (area.w * scale).round() as u32, height: (area.h * scale).round() as u32, paper: [0.945, 0.945, 0.953], boards, writer: None }
+fn request(doc: &Value, area: Rect, scale: f64, boards: Vec<Card>) -> Request {
+	Request { doc: doc.to_string(), dark: false, area, scale, width: (area.w * scale).round() as u32, height: (area.h * scale).round() as u32, paper: [0.945, 0.945, 0.953], cards: boards, writer: None }
 }
 
 fn px(p: &Picture, x: u32, y: u32) -> [u8; 4] {
@@ -57,7 +57,7 @@ fn the_drawing_lies_over_the_boards_with_a_hole_for_each() {
 		{ "type": "rectangle", "id": "over", "x": 300, "y": 100, "width": 100, "height": 60, "fill": "#0000ff" },
 		{ "type": "rectangle", "id": "alone", "x": 20, "y": 160, "width": 80, "height": 30, "fill": "#222222" }
 	]});
-	let boards = vec![Board { rect: Rect { x: 200.0, y: 20.0, w: 160.0, h: 120.0 }, picture: Some(green_picture()) }];
+	let boards = vec![Card { rect: Rect { x: 200.0, y: 20.0, w: 160.0, h: 120.0 }, picture: Some(green_picture()) }];
 	for scale in [1.0, 0.5, 2.0] {
 		let area = Rect { x: 0.0, y: 0.0, w: 420.0, h: 210.0 };
 		let p = s.shoot(&request(&doc, area, scale, boards.clone())).unwrap().unwrap_or_else(|needs| panic!("needs {needs:?}"));
@@ -148,7 +148,7 @@ fn fixture_stages_match_their_goldens() {
 		}
 		let extent = Scene::new(&doc, false, &words).roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b)).unwrap();
 		let scale = (fixtures::STAGE_SIDE / extent.w.max(extent.h)).min(1.0);
-		let r = Request { doc: pen.clone(), dark: false, area: extent, scale, width: (extent.w * scale).ceil() as u32, height: (extent.h * scale).ceil() as u32, paper: [0.98, 0.98, 0.98], boards: Vec::new(), writer: None };
+		let r = Request { doc: pen.clone(), dark: false, area: extent, scale, width: (extent.w * scale).ceil() as u32, height: (extent.h * scale).ceil() as u32, paper: [0.98, 0.98, 0.98], cards: Vec::new(), writer: None };
 		let p = match s.shoot(&r).unwrap() {
 			Ok(p) => p,
 			Err(needs) => {

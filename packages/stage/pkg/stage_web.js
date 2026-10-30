@@ -196,29 +196,6 @@ export class PageEngine {
         return ret[0];
     }
     /**
-     * A number that goes up whenever `pictured` or `carrying` would answer differently.
-     * @returns {number}
-     */
-    boardMarks() {
-        const ret = wasm.pageengine_boardMarks(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-    /**
-     * @returns {string}
-     */
-    boards() {
-        let deferred1_0;
-        let deferred1_1;
-        try {
-            const ret = wasm.pageengine_boards(this.__wbg_ptr);
-            deferred1_0 = ret[0];
-            deferred1_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-        }
-    }
-    /**
      * An item's box on the stage, `[x, y, w, h]`, or `null`.
      * @param {string} id
      * @returns {string}
@@ -236,6 +213,14 @@ export class PageEngine {
         } finally {
             wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
         }
+    }
+    /**
+     * A number that goes up whenever `pictured` or `carrying` would answer differently.
+     * @returns {number}
+     */
+    cardMarks() {
+        const ret = wasm.pageengine_cardMarks(this.__wbg_ptr);
+        return ret >>> 0;
     }
     /**
      * Each markdown card's links and wide tables.
@@ -353,7 +338,7 @@ export class PageEngine {
         }
     }
     /**
-     * Forget a board's picture (it changed): asked for again when next drawn.
+     * Forget a card's picture (it changed): asked for again when next drawn.
      * @param {string} url
      */
     forgetPicture(url) {
@@ -601,6 +586,21 @@ export class PageEngine {
         }
     }
     /**
+     * @returns {string}
+     */
+    placed() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.pageengine_placed(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * A picture by its address that came compressed: ASTC 4 × 4 blocks for each of `levels` sizes,
      * size `n` at `data[at[n] .. at[n] + length[n]]` (`spans` is `[at, length, …]`), `width` × `height`
      * its first, each a multiple of 4. Written as it came, straight to the GPU, nothing decoded.
@@ -633,7 +633,7 @@ export class PageEngine {
         wasm.pageengine_putIcon(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
-     * A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
+     * A picture by its address (an image fill's `url`, or `card:<path>`). `width` × `height` is its
      * own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
      * `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
      * @param {string} url
@@ -702,13 +702,13 @@ export class PageEngine {
         }
     }
     /**
-     * The stage's boards: `[{ path, x, y, w, h, live, news?, glow? }]`.
-     * @param {string} boards
+     * The stage's cards: `[{ path, x, y, w, h, live, news?, glow? }]`.
+     * @param {string} cards
      */
-    setBoards(boards) {
-        const ptr0 = passStringToWasm0(boards, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    setCards(cards) {
+        const ptr0 = passStringToWasm0(cards, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.pageengine_setBoards(this.__wbg_ptr, ptr0, len0);
+        wasm.pageengine_setCards(this.__wbg_ptr, ptr0, len0);
     }
     /**
      * The colour scheme, dark or not.

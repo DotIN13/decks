@@ -1,21 +1,22 @@
 /**
- * Every board has one picture, fetched once at one width for the device's GPU (`device.ts`,
- * `PICTURES`: 480 px on a big one, 192 on a small one) and copied to the GPU once; the GPU makes
- * its smaller sizes and draws it at any zoom from the nearest (`stage/engine.ts`, `wantBoardPictures`).
- * A zoom out and back in fetches nothing. Over the budget, pictures shrink on the GPU (`fitPictures`),
- * with no request either. Chromium (a big GPU) and WebKit as an iPhone (a small one).
+ * Every card's picture is fetched at the rung of the device's ladder its drawn width needs
+ * (`device.ts`, `PICTURES`: 192 / 480 / 800 on a big GPU, 192 / 480 on a small one;
+ * `picture-ladder.ts`), and the GPU makes its smaller sizes. Zooming in at rest fetches a higher rung,
+ * only for cards that need one; zooming back out fetches nothing. Over the budget, pictures shrink on
+ * the GPU (`fitPictures`), with no request either. Chromium (a big GPU) and WebKit as an iPhone (a
+ * small one).
  */
 import { canvasFrame, open, resetStage, say, settle } from "../harness.mjs";
 import { TARGETS, noGpu, outOfLive, zoomStep } from "../backends-kit.mjs";
 
-/** The board pictures asked for: `{ board, w }`, `w` 0 for the whole picture. */
+/** The card pictures asked for: `{ card, w }`, `w` 0 for the whole picture. */
 function watchCopies(page) {
 	const asked = [];
 	page.on("request", (request) => {
 		const url = new URL(request.url());
-		// The server's picture of a board (`canvas/shots/adaptors.ts`): `whole=1`, and `w=` for a copy.
+		// The server's picture of a card (`/thumb/…`): `whole=1`, and `w=` for a rung.
 		if (!url.searchParams.has("whole")) return;
-		asked.push({ board: url.searchParams.get("path") ?? url.pathname, w: Number(url.searchParams.get("w") ?? 0), astc: url.searchParams.get("astc") === "1" });
+		asked.push({ card: decodeURIComponent(url.pathname).replace(/^.*\/thumb\//, ""), w: Number(url.searchParams.get("w") ?? 0), astc: url.searchParams.get("astc") === "1" });
 	});
 	return asked;
 }
@@ -23,16 +24,36 @@ function watchCopies(page) {
 function asIPhone() {
 	Object.defineProperty(Navigator.prototype, "platform", { get: () => "iPhone" });
 }
-const held = (frame) => frame.evaluate(() => Object.fromEntries([...window.__decksRust.picturesAsked.entries()].filter(([key]) => key.startsWith("board:")).map(([key, one]) => [key, one.size ?? 0])));
+/** Each card's rung, as asked or held, whichever is more. */
+const held = (frame) =>
+	frame.evaluate(() => {
+		const engine = window.__decksRust;
+		const out = {};
+		for (const [key, one] of engine.picturesAsked) if (key.startsWith("card:")) out[key] = Math.max(one.size ?? 0, engine.heldWidth.get(key) ?? 0);
+		return out;
+	});
+/** The rung each card wants at this zoom, the way `rungFor` chooses it. */
+const wanted = (frame) =>
+	frame.evaluate(() => {
+		const engine = window.__decksRust;
+		const ladder = engine.pictures.ladder;
+		const out = {};
+		for (const card of engine.placedCards) {
+			const drawn = card.w * engine.camera.zoom * (devicePixelRatio || 1);
+			out[`card:${card.path}`] = ladder.find((width) => width * 1.25 >= drawn) ?? ladder[ladder.length - 1];
+		}
+		return out;
+	});
 
 for (const target of TARGETS) {
 	const name = target.label;
-	const width = target.slug === "chromium" ? 480 : 192;
+	const ladder = target.slug === "chromium" ? [192, 480, 800] : [192, 480];
 	await resetStage();
 	const { browser, page, errors } = await open({ ...target.open, boards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
 	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+	say(`${name}: the device's ladder is ${ladder.join(" / ")}`, JSON.stringify(await canvas.evaluate(() => window.__decksRust.pictures.ladder)) === JSON.stringify(ladder));
 	const asked = watchCopies(page);
 	await outOfLive(page);
 	for (let i = 0; i < 6; i++) {
@@ -41,48 +62,61 @@ for (const target of TARGETS) {
 	}
 	await settle(page, 2500);
 	const first = await held(canvas);
-	say(`${name}: every board's picture is fetched at ${width} px`, Object.keys(first).length > 0 && Object.values(first).every((w) => w === width), JSON.stringify(first));
-	const before = asked.length;
+	const want = await wanted(canvas);
+	say(`${name}: zoomed out, every card holds at least the rung its drawn width needs, never a width off the ladder`, Object.keys(first).length > 0 && Object.entries(first).every(([key, w]) => ladder.includes(w) && w >= want[key]), JSON.stringify({ first, want }).slice(0, 300));
+	say(`${name}: …and only the ladder's widths are asked for`, asked.every((one) => ladder.includes(one.w)), JSON.stringify(asked.slice(0, 4)));
 	// Compressed wherever the GPU takes ASTC: WebGPU with the feature, or WebGL 2 with `WEBGL_compressed_texture_astc` (any Mac's).
 	if (await canvas.evaluate(() => window.__decksRust.page.compressedPictures())) {
-		// Compressed: asked for so, sent so, and a byte a pixel on the GPU (four, as RGBA, before).
-		// A first look gets the server's stand-in for a size it has not made yet, asked again until it has.
-		const boards = Object.keys(first).length;
+		// A first look gets the server's stand-in for a rung it has not made yet, asked again until it has.
+		const cards = Object.keys(first).length;
 		const put = () => canvas.evaluate(() => window.__decksRust.compressedPut);
-		for (let i = 0; i < 40 && (await put()) < boards; i++) await settle(page, 500);
+		for (let i = 0; i < 40 && (await put()) < cards; i++) await settle(page, 500);
 		const perPixel = await canvas.evaluate(() => {
 			const engine = window.__decksRust;
 			const each = [...engine.compressedSize].map(([key, [w, h]]) => engine.pictureBytes.get(key) / (w * h));
 			return each.length ? Math.max(...each) : 0;
 		});
 		say(`${name}: pictures are asked for compressed, for the GPU`, asked.every((one) => one.astc), JSON.stringify(asked.slice(0, 3)));
-		say(`${name}: …and come compressed, every board`, (await put()) >= boards, `${await put()} put compressed for ${boards} boards`);
+		say(`${name}: …and come compressed, every card`, (await put()) >= cards, `${await put()} put compressed for ${cards} cards`);
 		say(`${name}: …about a byte a pixel on the GPU, its smaller sizes included`, perPixel > 1 && perPixel < 1.6, perPixel.toFixed(2));
 	} else say(`${name}: where the GPU takes no ASTC, pictures are not asked for compressed`, asked.every((one) => !one.astc), JSON.stringify(asked.slice(0, 3)));
 
-	// In and back out, in steps a pinch would make, below the live zoom, resting between.
-	for (const delta of [-30, -30, -30, -30, 80, 80, 80, 80]) {
-		if (delta < 0 && (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true"))) continue;
-		await zoomStep(page, delta);
+	// In, below the live zoom, resting between: only higher rungs are fetched.
+	const before = asked.length;
+	for (let i = 0; i < 4; i++) {
+		if (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) break;
+		await zoomStep(page, -30);
 		await settle(page, 400);
 	}
 	await settle(page, 1500);
-	const zoomed = asked.slice(before).filter((one) => Object.keys(first).some((key) => key.endsWith(one.board)));
-	say(`${name}: zooming in and out fetches no board again`, zoomed.length === 0, JSON.stringify(zoomed.slice(0, 6)));
-	say(`${name}: and each still holds its one picture`, JSON.stringify(await held(canvas)) === JSON.stringify(first), JSON.stringify(await held(canvas)));
+	const inward = asked.slice(before);
+	const rungOf = (card) => first[`card:${card}`] ?? 0;
+	say(`${name}: zooming in fetches only a higher rung than a card held`, inward.every((one) => one.w > rungOf(one.card)), JSON.stringify(inward.slice(0, 6)));
+	const near = await held(canvas);
+	// And back out: nothing is fetched, and nothing goes down a rung.
+	const back = asked.length;
+	for (let i = 0; i < 4; i++) {
+		await zoomStep(page, 80);
+		await settle(page, 400);
+	}
+	await settle(page, 1500);
+	say(`${name}: zooming back out fetches nothing`, asked.length === back, JSON.stringify(asked.slice(back, back + 6)));
+	say(`${name}: …and each card keeps the rung it had`, JSON.stringify(await held(canvas)) === JSON.stringify(near), JSON.stringify(await held(canvas)).slice(0, 300));
 
 	// A budget far too small: the pictures shrink on the GPU, with no request.
 	const sent = asked.length;
 	const shrunk = await canvas.evaluate(async () => {
+		const engine = window.__decksRust;
+		const was = engine.heldBytes();
 		window.__decksPictureMB = 0.05;
-		window.__decksRust.fitPictures();
+		engine.fitPictures();
 		await new Promise((done) => setTimeout(done, 300));
-		return { shrunk: window.__decksRust.shrunk.size, bytes: window.__decksRust.heldBytes() };
+		return { was, bytes: engine.heldBytes() };
 	});
 	const backend = await canvas.evaluate(() => window.__decksEngine?.stats?.().backend);
-	// WebGL 2 keeps one size of a WebP picture (`Gpu::picture_texture`), and cannot copy a compressed one's smaller sizes (`Gpu::shrink`), so nothing shrinks.
-	if (backend === "webgl2") say(`${name}: on WebGL 2 nothing shrinks`, shrunk.shrunk === 0, JSON.stringify({ backend, ...shrunk }));
-	else say(`${name}: over the budget, pictures shrink on the GPU`, shrunk.shrunk > 0, JSON.stringify({ backend, ...shrunk }));
+	// WebGL 2 cannot copy a compressed picture's smaller sizes (`Gpu::shrink`), so a compressed one does not shrink there.
+	if (backend === "webgl2") say(`${name}: on WebGL 2 compressed pictures do not shrink`, shrunk.bytes <= shrunk.was, JSON.stringify({ backend, ...shrunk }));
+	else say(`${name}: over the budget, pictures shrink on the GPU`, shrunk.bytes < shrunk.was, JSON.stringify({ backend, ...shrunk }));
 	say(`${name}: …with no picture fetched for it`, asked.length === sent, JSON.stringify(asked.slice(sent, sent + 4)));
 	await canvas.evaluate(() => delete window.__decksPictureMB);
 	say(`${name}: no errors on the page`, errors.length === 0, errors.join(" | "));

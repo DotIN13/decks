@@ -32,8 +32,8 @@ export interface DrawingWriter {
 	color: string;
 }
 
-/** A board as the stage places it: its box, whether its page is showing, and its picture. */
-export interface SceneBoard {
+/** A card as the stage places it: its box, whether its page is showing, and its picture. */
+export interface SceneCard {
 	path: string;
 	x: number;
 	y: number;
@@ -43,9 +43,9 @@ export interface SceneBoard {
 	live: boolean;
 	/** Where its picture is, when it is not live: an absolute URL. */
 	picture?: string;
-	/** Have the picture ready while the board is live, so a drag can carry it at once. */
+	/** Have the picture ready while the card is live, so a drag can carry it at once. */
 	ready?: boolean;
-	/** The writer's colour, when the board is news. */
+	/** The writer's colour, when the card is news. */
 	news?: string;
 	/** Draw the news mark as an outline: the board has no page to draw its glow. */
 	glow?: boolean;

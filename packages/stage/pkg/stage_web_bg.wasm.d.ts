@@ -21,9 +21,8 @@ export const openStage: (a: any, b: number, c: number, d: number, e: number, f: 
 export const pageengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const pageengine_apply: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const pageengine_applyEdits: (a: number, b: number, c: number) => [number, number];
-export const pageengine_boardMarks: (a: number) => number;
-export const pageengine_boards: (a: number) => [number, number];
 export const pageengine_boxOf: (a: number, b: number, c: number) => [number, number];
+export const pageengine_cardMarks: (a: number) => number;
 export const pageengine_cards: (a: number) => [number, number];
 export const pageengine_carry: (a: number, b: number, c: number, d: number, e: number) => void;
 export const pageengine_carrying: (a: number) => [number, number];
@@ -51,6 +50,7 @@ export const pageengine_newId: (a: number) => [number, number];
 export const pageengine_pick: (a: number, b: number, c: number, d: number) => [number, number];
 export const pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
 export const pageengine_pictured: (a: number) => [number, number];
+export const pageengine_placed: (a: number) => [number, number];
 export const pageengine_putCompressedPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number, h: number, i: number) => number;
 export const pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
 export const pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
@@ -58,7 +58,7 @@ export const pageengine_putTile: (a: number, b: number, c: number, d: number, e:
 export const pageengine_putTilePixels: (a: number, b: number, c: number, d: number, e: any, f: number) => void;
 export const pageengine_redo: (a: number) => [number, number];
 export const pageengine_roots: (a: number) => [number, number];
-export const pageengine_setBoards: (a: number, b: number, c: number) => void;
+export const pageengine_setCards: (a: number, b: number, c: number) => void;
 export const pageengine_setDark: (a: number, b: number) => void;
 export const pageengine_setDocument: (a: number, b: number, c: number) => [number, number];
 export const pageengine_setGpu: (a: number, b: number) => void;

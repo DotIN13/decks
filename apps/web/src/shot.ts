@@ -5,7 +5,7 @@ import { StageEngine } from "@decks/canvas/host";
  * One stage, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
  * and the drawing's Export (`server/stage/shots.ts`).
  *
- * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its
+ * The same pieces as the canvas, and nothing else: the stage's engine (`render/engine.ts`) on its
  * canvas, over the boards as live frames, framed on the box in the address. No socket, no chrome,
  * no camera to move. When the boards say they are ready and the drawing has stopped redrawing for
  * fonts, icons and images, `window.__shotReady` is set and the picture is taken.
@@ -78,8 +78,8 @@ async function main(): Promise<void> {
 	const writerName = query.get("writerName");
 	engine.setWriter({ color: writerColor ?? (getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6"), ...(writerName ? { name: writerName } : {}) });
 	engine.attachCanvas(document.querySelector("canvas.over") as HTMLCanvasElement);
-	// Every board is a live frame here, so the engine leaves a hole over each and fetches no pictures.
-	engine.setBoards(boards.map((board) => ({ ...board, live: true })));
+	// Every card is live here, so the engine leaves a hole over each and fetches no pictures.
+	engine.setCards(boards.map((board) => ({ ...board, live: true })));
 	engine.setDoc(doc, base);
 	engine.setCamera(camera);
 

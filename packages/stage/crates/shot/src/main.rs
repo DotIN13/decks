@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! { "id": 1, "doc": "<.pen text>", "dark": false, "box": [x1, y1, x2, y2], "scale": 1, "width": 800,
-//!   "height": 600, "paper": [0.945, 0.945, 0.953], "boards": [{ "x", "y", "w", "h", "picture": "/abs.webp" }],
+//!   "height": 600, "paper": [0.945, 0.945, 0.953], "cards": [{ "x", "y", "w", "h", "picture": "/abs.webp" }],
 //!   "out": "/abs/out.png", "format": "png" | "jpeg", "quality": 90, "fontNeeds": true,
 //!   "fonts": [{ "key", "family", "path", "fallback" }], "cards": [{ "dark", "source", "blocks" }],
 //!   "pictures": [{ "url", "path" | null }], "icons": [{ "key", "shape" | null }] }

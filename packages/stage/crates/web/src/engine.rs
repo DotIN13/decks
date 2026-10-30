@@ -21,7 +21,7 @@ pub struct Camera {
 	pub zoom: f64,
 }
 
-/// Pictures by address (an image fill's `url`, or `board:<id>` for a board's picture): texture,
+/// Pictures by address (an image fill's `url`, or `card:<path>` for a card's picture): texture,
 /// width and height, and the addresses asked for that have not arrived.
 #[derive(Default)]
 pub struct Pictures {
@@ -70,7 +70,7 @@ pub struct Page {
 	/// The stroke still under the pen.
 	pub ink: Vec<LiveInk>,
 	/// The stage's boards, as the app places them; and the ones a drag carries, and how far.
-	pub boards: Vec<BoardPlace>,
+	pub cards: Vec<CardPlace>,
 	pub carry: (HashSet<String>, f64, f64),
 	/// The boards drawn as their picture in the last frame, and the live ones carried as one.
 	pub pictured: Vec<String>,
@@ -116,7 +116,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
+		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -398,7 +398,7 @@ impl Page {
 	}
 
 	/// The boards on the stage: where each goes, for the page to place its picture or its page.
-	pub fn boards(&self) -> Value {
+	pub fn cards(&self) -> Value {
 		let mut out = Vec::new();
 		for root in &self.scene.roots {
 			for (item, place) in root.tree.items.iter().zip(&root.placed) {
@@ -502,8 +502,8 @@ impl Page {
 		let mut pictured = Vec::new();
 		let mut carrying = Vec::new();
 		// A drag's ghost is the lifted items alone: no boards.
-		let boards: &[BoardPlace] = if self.only_lifted { &[] } else { &self.boards };
-		for board in boards {
+		let cards: &[CardPlace] = if self.only_lifted { &[] } else { &self.cards };
+		for board in cards {
 			let carried = self.carry.0.contains(&board.path);
 			let picture = self.pictures.get(&board.picture);
 			if board.live && !(carried && picture.is_some()) {
@@ -700,7 +700,7 @@ impl Page {
 				}
 				return Some(rect);
 			}
-			let board = self.boards.iter().find(|b| b.path == id)?;
+			let board = self.cards.iter().find(|b| b.path == id)?;
 			let (dx, dy) = if self.carry.0.contains(id) { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
 			Some(Rect { x: board.x + dx, y: board.y + dy, w: board.w, h: board.h })
 		};
@@ -772,7 +772,7 @@ impl Page {
 	pub fn picture_unlaid(&mut self, url: &str, texture: u32, width: u32, height: u32) {
 		self.pictures.held.insert(url.to_owned(), (texture, width, height));
 		// Only a card that shows it is laid out differently for it (`Text::picture`).
-		if !url.starts_with("board:") && self.text.picture(url, width as f32, height as f32) {
+		if !url.starts_with("card:") && self.text.picture(url, width as f32, height as f32) {
 			self.pictures_unlaid = true;
 		}
 	}
@@ -1509,7 +1509,7 @@ mod tests {
 		assert!(worker.landed().is_empty());
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
 		assert_eq!(worker.landed(), vec!["a".to_owned()]);
-		assert_eq!(page.boards()[0]["id"], "board");
+		assert_eq!(page.cards()[0]["id"], "board");
 	}
 
 	#[test]
@@ -1517,9 +1517,9 @@ mod tests {
 		let mut page = Page::new(STAGE, false, "s").unwrap();
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
-		page.pictures.held.insert("board:boards/x.html".into(), (900, 400, 300));
-		let board = |live| BoardPlace { path: "boards/x.html".into(), picture: "board:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
-		page.boards = vec![board(false)];
+		page.pictures.held.insert("card:boards/x.html".into(), (900, 400, 300));
+		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
+		page.cards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
 		let tile = over.ops.iter().position(|op| matches!(op, Op::Picture { .. }));
@@ -1530,7 +1530,7 @@ mod tests {
 		page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert_eq!(page.marks, marks);
 		// Live: its page shows through the tiles' hole, with nothing of the board drawn.
-		page.boards = vec![board(true)];
+		page.cards = vec![board(true)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		assert!(page.pictured.is_empty());
@@ -1729,11 +1729,11 @@ impl ViewState {
 	}
 }
 
-/// A board as the app places it (`SceneBoard`).
+/// A card as the app places it (`SceneCard`).
 #[derive(Clone, Debug, Default)]
-pub struct BoardPlace {
+pub struct CardPlace {
 	pub path: String,
-	/// The address its picture is held under (`board:<path>`), made once with the place.
+	/// The address its picture is held under (`card:<path>`), made once with the place.
 	pub picture: String,
 	pub x: f64,
 	pub y: f64,

@@ -297,8 +297,8 @@ impl PageEngine {
 		self.page.within(stage_scene::Rect { x, y, w, h }).to_string()
 	}
 
-	pub fn boards(&self) -> String {
-		self.page.boards().to_string()
+	pub fn placed(&self) -> String {
+		self.page.cards().to_string()
 	}
 
 	/// Every top-level item: `[{ id, type, x, y, w, h }]`, its box as laid out.
@@ -362,7 +362,7 @@ impl PageEngine {
 		gpu.write_pixels(pixels, stride, &texture, TILE_SIZE, TILE_SIZE);
 	}
 
-	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
+	/// A picture by its address (an image fill's `url`, or `card:<path>`). `width` × `height` is its
 	/// own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
 	/// `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
 	#[wasm_bindgen(js_name = putPicture)]
@@ -466,17 +466,17 @@ impl PageEngine {
 		self.page.view = view_state(view);
 	}
 
-	/// The stage's boards: `[{ path, x, y, w, h, live, news?, glow? }]`.
-	#[wasm_bindgen(js_name = setBoards)]
-	pub fn set_boards(&mut self, boards: &str) {
-		let list: Vec<serde_json::Value> = serde_json::from_str(boards).unwrap_or_default();
-		self.page.boards = list
+	/// The stage's cards: `[{ path, x, y, w, h, live, news?, glow? }]`.
+	#[wasm_bindgen(js_name = setCards)]
+	pub fn set_cards(&mut self, cards: &str) {
+		let list: Vec<serde_json::Value> = serde_json::from_str(cards).unwrap_or_default();
+		self.page.cards = list
 			.iter()
 			.filter_map(|b| {
 				let n = |k: &str| b.get(k).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
 				let path = b.get("path")?.as_str()?.to_owned();
-				Some(crate::engine::BoardPlace {
-					picture: format!("board:{path}"),
+				Some(crate::engine::CardPlace {
+					picture: format!("card:{path}"),
 					path,
 					x: n("x"),
 					y: n("y"),
@@ -496,8 +496,8 @@ impl PageEngine {
 	}
 
 	/// A number that goes up whenever `pictured` or `carrying` would answer differently.
-	#[wasm_bindgen(js_name = boardMarks)]
-	pub fn board_marks(&self) -> u32 {
+	#[wasm_bindgen(js_name = cardMarks)]
+	pub fn card_marks(&self) -> u32 {
 		self.page.marks
 	}
 
@@ -517,7 +517,7 @@ impl PageEngine {
 		serde_json::to_string(&self.page.carrying).unwrap_or_else(|_| "[]".into())
 	}
 
-	/// Forget a board's picture (it changed): asked for again when next drawn.
+	/// Forget a card's picture (it changed): asked for again when next drawn.
 	#[wasm_bindgen(js_name = forgetPicture)]
 	pub fn forget_picture(&mut self, url: &str) {
 		if let Some((texture, _, _)) = self.page.pictures.held.remove(url) {

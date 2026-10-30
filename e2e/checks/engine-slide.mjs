@@ -2,7 +2,7 @@
  * A pan is the browser scrolling a sheet already drawn.
  *
  * The stage scrolls natively (`camera/scroll-area.ts`), so the engine's canvas is a sheet: the window
- * and a quarter of it on each side (`stage/engine.ts`, `SHEET_MARGIN`, `drawRect`), drawn round the
+ * and a quarter of it on each side (`render/engine.ts`, `SHEET_MARGIN`, `drawRect`), drawn round the
  * camera and scrolled with the world. A pan inside the sheet draws nothing; the sheet is drawn again
  * only when the window reaches its edge, the zoom changes, or the camera rests, where it is centred
  * again. What this holds: the sheet's size, no draws for a short pan, a draw when a long one leaves the

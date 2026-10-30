@@ -70,14 +70,13 @@ export class PageEngine {
      */
     apply(changes: string, mine: boolean): number;
     /**
-     * A number that goes up whenever `pictured` or `carrying` would answer differently.
-     */
-    boardMarks(): number;
-    boards(): string;
-    /**
      * An item's box on the stage, `[x, y, w, h]`, or `null`.
      */
     boxOf(id: string): string;
+    /**
+     * A number that goes up whenever `pictured` or `carrying` would answer differently.
+     */
+    cardMarks(): number;
     /**
      * Each markdown card's links and wide tables.
      */
@@ -111,7 +110,7 @@ export class PageEngine {
      */
     fontNeeds(): string;
     /**
-     * Forget a board's picture (it changed): asked for again when next drawn.
+     * Forget a card's picture (it changed): asked for again when next drawn.
      */
     forgetPicture(url: string): void;
     /**
@@ -181,6 +180,7 @@ export class PageEngine {
      * The boards drawn as their picture in the last frame.
      */
     pictured(): string;
+    placed(): string;
     /**
      * A picture by its address that came compressed: ASTC 4 × 4 blocks for each of `levels` sizes,
      * size `n` at `data[at[n] .. at[n] + length[n]]` (`spans` is `[at, length, …]`), `width` × `height`
@@ -192,7 +192,7 @@ export class PageEngine {
      */
     putIcon(key: string, json: string): void;
     /**
-     * A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
+     * A picture by its address (an image fill's `url`, or `card:<path>`). `width` × `height` is its
      * own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
      * `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
      */
@@ -213,9 +213,9 @@ export class PageEngine {
      */
     roots(): string;
     /**
-     * The stage's boards: `[{ path, x, y, w, h, live, news?, glow? }]`.
+     * The stage's cards: `[{ path, x, y, w, h, live, news?, glow? }]`.
      */
-    setBoards(boards: string): void;
+    setCards(cards: string): void;
     /**
      * The colour scheme, dark or not.
      */
@@ -447,9 +447,8 @@ export interface InitOutput {
     readonly pageengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly pageengine_apply: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly pageengine_applyEdits: (a: number, b: number, c: number) => [number, number];
-    readonly pageengine_boardMarks: (a: number) => number;
-    readonly pageengine_boards: (a: number) => [number, number];
     readonly pageengine_boxOf: (a: number, b: number, c: number) => [number, number];
+    readonly pageengine_cardMarks: (a: number) => number;
     readonly pageengine_cards: (a: number) => [number, number];
     readonly pageengine_carry: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_carrying: (a: number) => [number, number];
@@ -477,6 +476,7 @@ export interface InitOutput {
     readonly pageengine_pick: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pictured: (a: number) => [number, number];
+    readonly pageengine_placed: (a: number) => [number, number];
     readonly pageengine_putCompressedPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number, h: number, i: number) => number;
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
@@ -484,7 +484,7 @@ export interface InitOutput {
     readonly pageengine_putTilePixels: (a: number, b: number, c: number, d: number, e: any, f: number) => void;
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
-    readonly pageengine_setBoards: (a: number, b: number, c: number) => void;
+    readonly pageengine_setCards: (a: number, b: number, c: number) => void;
     readonly pageengine_setDark: (a: number, b: number) => void;
     readonly pageengine_setDocument: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setGpu: (a: number, b: number) => void;

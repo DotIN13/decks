@@ -41,9 +41,9 @@ pub struct Font {
 	pub fallback: bool,
 }
 
-/// A board in the box: where it is, and its picture's file (`None`: drawn as its paper).
+/// A card in the box: where it is, and its picture's file (`None`: drawn as its paper).
 #[derive(Clone, Debug)]
-pub struct Board {
+pub struct Card {
 	pub rect: Rect,
 	pub picture: Option<String>,
 }
@@ -62,7 +62,7 @@ pub struct Request {
 	pub height: u32,
 	/// The stage's paper, straight RGB 0 to 1.
 	pub paper: [f32; 3],
-	pub boards: Vec<Board>,
+	pub cards: Vec<Card>,
 	/// Who last wrote the drawing, as its placeholder frames are marked, as on the page; none: the accent, no name.
 	pub writer: Option<stage_paint::painter::Writer>,
 }
@@ -129,7 +129,7 @@ pub struct Shooter {
 	pictures: HashMap<String, Option<(u32, u32, u32)>>,
 	pictures_generation: u64,
 	/// Boards' pictures by file: texture, width, height; the most recent few.
-	board_pictures: Vec<(String, u32, u32, u32)>,
+	card_pictures: Vec<(String, u32, u32, u32)>,
 	icons: HashMap<String, Option<IconShape>>,
 	laid: Option<Laid>,
 	atlas: RefCell<Atlas>,
@@ -137,7 +137,7 @@ pub struct Shooter {
 }
 
 /// Boards' pictures kept decoded on the card between requests.
-const BOARD_PICTURES: usize = 48;
+const CARD_PICTURES: usize = 48;
 
 impl Shooter {
 	/// On this machine's own graphics card; `None` when it has none to give.
@@ -157,7 +157,7 @@ impl Shooter {
 			card_asked: Rc::default(),
 			pictures: HashMap::new(),
 			pictures_generation: 0,
-			board_pictures: Vec::new(),
+			card_pictures: Vec::new(),
 			icons: HashMap::new(),
 			laid: None,
 			atlas: RefCell::new(Atlas::new()),
@@ -232,18 +232,18 @@ impl Shooter {
 		self.next_texture
 	}
 
-	/// A board's picture by file, from the card when it was decoded before.
-	fn board_picture(&mut self, file: &str) -> Result<(u32, u32, u32), String> {
-		if let Some(at) = self.board_pictures.iter().position(|(f, ..)| f == file) {
-			let hit = self.board_pictures.remove(at);
-			self.board_pictures.push(hit.clone());
+	/// A card's picture by file, from the card when it was decoded before.
+	fn card_picture(&mut self, file: &str) -> Result<(u32, u32, u32), String> {
+		if let Some(at) = self.card_pictures.iter().position(|(f, ..)| f == file) {
+			let hit = self.card_pictures.remove(at);
+			self.card_pictures.push(hit.clone());
 			return Ok((hit.1, hit.2, hit.3));
 		}
 		let bytes = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
 		let made = self.upload(&bytes).map_err(|e| format!("{file}: {e}"))?;
-		self.board_pictures.push((file.to_owned(), made.0, made.1, made.2));
-		if self.board_pictures.len() > BOARD_PICTURES {
-			let (_, t, ..) = self.board_pictures.remove(0);
+		self.card_pictures.push((file.to_owned(), made.0, made.1, made.2));
+		if self.card_pictures.len() > CARD_PICTURES {
+			let (_, t, ..) = self.card_pictures.remove(0);
 			self.gpu.forget(t);
 		}
 		Ok(made)
@@ -393,14 +393,14 @@ impl Shooter {
 		};
 		let radius = (BOARD_RADIUS * s) as f32;
 		let shape = |w: f32, h: f32| Shape { w, h, radii: [radius; 4], ellipse: false };
-		for board in &request.boards {
+		for board in &request.cards {
 			if !board.rect.meets(&area) {
 				continue;
 			}
 			let (x, y, bw, bh) = snap(&board.rect);
 			laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: Paint::Solid(Color(board_paper)), stroke: None });
 			if let Some(file) = &board.picture {
-				let (texture, pw, ph) = self.board_picture(file)?;
+				let (texture, pw, ph) = self.card_picture(file)?;
 				// At the box's width, from its top, as the stage draws it (`web/src/engine.rs`): cut at its foot if taller, its last row drawn on to the box's foot if shorter.
 				let tall = (ph as f32 / pw.max(1) as f32 * bw).round();
 				let image = |uv: [f32; 4]| Paint::Image { texture, opacity: 1.0, uv };
@@ -514,7 +514,7 @@ pub fn encode(picture: &Picture, format: &str, quality: u8) -> Result<Vec<u8>, S
 	Ok(out)
 }
 
-/// A request from its JSON (`{ doc, dark, box: [x1, y1, x2, y2], scale, width, height, paper, boards }`).
+/// A request from its JSON (`{ doc, dark, box: [x1, y1, x2, y2], scale, width, height, paper, cards }`).
 pub fn request_of(v: &Value) -> Result<Request, String> {
 	let n = |k: &str| v.get(k).and_then(Value::as_f64).ok_or_else(|| format!("{k} is missing"));
 	let b: Vec<f64> = v.get("box").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
@@ -522,14 +522,14 @@ pub fn request_of(v: &Value) -> Result<Request, String> {
 		return Err("box is [x1, y1, x2, y2]".into());
 	}
 	let paper: Vec<f32> = v.get("paper").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).map(|c| c as f32).collect()).unwrap_or_default();
-	let boards = v
-		.get("boards")
+	let cards = v
+		.get("cards")
 		.and_then(Value::as_array)
 		.map(|list| {
 			list.iter()
 				.map(|b| {
 					let n = |k: &str| b.get(k).and_then(Value::as_f64).unwrap_or(0.0);
-					Board { rect: Rect { x: n("x"), y: n("y"), w: n("w"), h: n("h") }, picture: b.get("picture").and_then(Value::as_str).map(str::to_owned) }
+					Card { rect: Rect { x: n("x"), y: n("y"), w: n("w"), h: n("h") }, picture: b.get("picture").and_then(Value::as_str).map(str::to_owned) }
 				})
 				.collect()
 		})
@@ -542,7 +542,7 @@ pub fn request_of(v: &Value) -> Result<Request, String> {
 		width: n("width")? as u32,
 		height: n("height")? as u32,
 		paper: if paper.len() >= 3 { [paper[0], paper[1], paper[2]] } else { [0.945, 0.945, 0.953] },
-		boards,
+		cards,
 		writer: v.get("writer").and_then(|w| {
 			let color = w.get("color").and_then(Value::as_str).and_then(stage_scene::values::parse_color)?;
 			let name = w.get("name").and_then(Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
