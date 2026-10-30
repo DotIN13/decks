@@ -198,6 +198,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 			open: (name: string) => end.emit("open-app", { name }),
 		},
+		// So is any other tab a link opens: this sandbox may not open one.
+		openLink: (href) => end.emit("open-link", { href }),
 		// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
 		cardCall: cardCalls({
 			canvas: start.canvas.name,

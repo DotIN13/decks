@@ -24,7 +24,7 @@ import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { cancelOps, cardInner as cardInnerOf, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
-import { pictureAddress } from "../../host.ts";
+import { openInTab, pictureAddress } from "../../host.ts";
 
 export type TextHost = {
 	scene: SceneQuery;
@@ -101,7 +101,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		const file = fileOf(doc(), id);
 		if (!file) return false;
 		editor.select([file.id]);
-		window.open(new URL(file.metadata.path, new URL(host.pen()?.base || "/", location.origin)).href, "_blank", "noopener");
+		openInTab(new URL(file.metadata.path, new URL(host.pen()?.base || "/", location.origin)).href);
 		return true;
 	};
 	// While a card is typed into its toolbar is the panel, so the properties stand aside.

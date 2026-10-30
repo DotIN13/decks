@@ -1,7 +1,7 @@
 import { createEffect, on, onCleanup, untrack } from "solid-js";
 import { INTERACTIVE, mountCard, scrollsInside, type MountedCard } from "./card.ts";
 import { scheme } from "../lib/theme.ts";
-import { canvasHost } from "../host.ts";
+import { canvasHost, openInTab } from "../host.ts";
 
 /**
  * A card's surface in its slot on the stage (`item-slot.tsx`): a host element whose shadow root holds the
@@ -171,12 +171,20 @@ export function CardSurface(props: {
 		} catch {
 			return;
 		}
+		const board = /\.(?:html?|md)$/i.test(url.pathname) ? boardOf(url) : undefined;
+		if (board && props.onOpenBoard) return props.onOpenBoard(board);
+		if (/^https?:$/.test(url.protocol)) openInTab(url.href);
+	};
+
+	/**
+	 * The deck path a link names: under the app's `/api/board/` on this page's origin, or, in the canvas
+	 * frame, under its ticketed address (`/api/t/<ticket>/board/`), which only its host knows.
+	 */
+	const boardOf = (url: URL): string | undefined => {
 		const at = url.pathname.indexOf("/api/board/");
-		if (url.origin === location.origin && at >= 0 && /\.(?:html?|md)$/i.test(url.pathname) && props.onOpenBoard) {
-			const path = decodeURIComponent(url.pathname.slice(at + "/api/board/".length)).replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
-			if (!path.split("/").some((part) => part === "" || part === "." || part === "..")) return props.onOpenBoard(path);
-		}
-		if (/^https?:$/.test(url.protocol)) window.open(url.href, "_blank", "noopener");
+		const named = url.origin === location.origin && at >= 0 ? decodeURIComponent(url.pathname.slice(at + "/api/board/".length)) : canvasHost().boardLink(url.href, location.href);
+		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
+		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
 	};
 
 	return <div class="card-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%" }} />;

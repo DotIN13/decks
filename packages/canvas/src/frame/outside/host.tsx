@@ -158,6 +158,15 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		page.on("panel", (data) => options.frame.panel?.(data.name));
 		page.on("open-app", (data) => options.frame.openApp?.(data.name));
+		// A link the frame may not open: an http(s) address alone, in a tab that cannot reach back to this page.
+		page.on("open-link", (data) => {
+			try {
+				const url = new URL(data.href);
+				if (url.protocol === "http:" || url.protocol === "https:") window.open(url.href, "_blank", "noopener");
+			} catch {
+				/* not an address */
+			}
+		});
 		page.on("camera", (data) => {
 			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera);
 			fromFrame.camera = data.camera;

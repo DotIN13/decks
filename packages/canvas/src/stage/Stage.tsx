@@ -6,7 +6,7 @@ import { boxOf, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoo
 import { canvasBox } from "../camera/insets.ts";
 import { createCameraController } from "../camera/controller.ts";
 import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "../camera/scroll-area.ts";
-import { canvasHost } from "../host.ts";
+import { canvasHost, openInTab } from "../host.ts";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import type { StageBoardProps } from "../items/item-slot.tsx";
@@ -1672,7 +1672,7 @@ export function Stage(props: {
 		for (let at = index?.get(id); at && !node; at = at.parent ? index?.get(at.parent.id) : undefined) if (isLiveFile(at.node)) node = at.node;
 		if (!node || typeof node.metadata?.file !== "string") return false;
 		editor.select([node.id]);
-		window.open(canvasHost().fileUrl(node.metadata.file), "_blank", "noopener");
+		openInTab(canvasHost().fileUrl(node.metadata.file));
 		return true;
 	};
 	/*

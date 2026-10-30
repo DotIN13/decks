@@ -49,6 +49,8 @@ export interface CanvasHost {
 		status(name: string): Promise<{ title?: string; status?: string } | undefined>;
 		open(name: string): void;
 	};
+	/** Open an address in a tab of its own, for a canvas that may not open one (the frame's sandbox has no popups). Absent: `window.open`. */
+	openLink?(href: string): void;
 }
 
 const fallback: CanvasHost = {
@@ -67,6 +69,12 @@ export function setCanvasHost(next: Partial<CanvasHost>): void {
 
 /** The host's answers, read at the moment they are needed. */
 export const canvasHost = (): CanvasHost => current;
+
+/** An address in a tab of its own: the host's way, or the window's. */
+export function openInTab(href: string): void {
+	if (current.openLink) current.openLink(href);
+	else window.open(href, "_blank", "noopener,noreferrer");
+}
 
 /** A picture the drawing names, as the address to fetch: the host's answer, or the address against `base`. */
 export function pictureAddress(url: string, base: string): string {

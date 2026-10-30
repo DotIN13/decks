@@ -5,7 +5,7 @@
  * sized, and when the camera was last dragged.
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
-import { canvasHost } from "../../host.ts";
+import { canvasHost, openInTab } from "../../host.ts";
 import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
@@ -156,7 +156,7 @@ export function createEffects(host: EffectHost) {
 			return;
 		}
 		if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") return;
-		window.open(url.href, "_blank", "noopener,noreferrer");
+		openInTab(url.href);
 	};
 
 	const run = (effect: Effect) => {
