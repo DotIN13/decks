@@ -32,6 +32,20 @@ export class PathRefused extends Error {
 }
 
 /**
+ * A path the routes would serve, with nothing there: 404, not a refusal (`PathRefused`, 403), so a
+ * missing picture reads as missing and not as a permission problem.
+ */
+export class NotFound extends Error {
+	constructor(
+		readonly requested: string,
+		reason = "not a file",
+	) {
+		super(`Not found ${requested}: ${reason}`);
+		this.name = "NotFound";
+	}
+}
+
+/**
  * The real path of `target`, even when it does not exist yet.
  *
  * A write goes to a file that is not there, so `realpathSync` on it throws; what

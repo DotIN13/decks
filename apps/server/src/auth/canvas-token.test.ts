@@ -240,3 +240,20 @@ test("a document or an app item is placed by the person, not the frame, and the 
 		cleanup();
 	}
 });
+
+test("on the canvas's folder ticket, a file that is not there answers 404, and a hidden one is still refused", async () => {
+	const { app, one, origin, post, bearer, cleanup } = await open();
+	try {
+		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		const made = await post("/api/tickets", person, { paths: [`/api/board/canvases/${one}/`] });
+		const ticket = Object.values(made.body.tickets as Record<string, string>)[0]!;
+		const at = (path: string) => fetch(`${origin}/api/t/${ticket}/board/canvases/${one}/${path}`);
+		assert.equal((await at("assets/not-here.png")).status, 404, "a missing picture");
+		assert.equal((await at("cards/not-here/index.html?raw=1")).status, 404, "a missing card");
+		assert.equal((await at("cards/not-here@1/index.m0.js")).status, 404, "a missing card's module");
+		assert.notEqual((await at(".decks/x")).status, 200, "a hidden file");
+		assert.notEqual((await at(".decks/x")).status, 404);
+	} finally {
+		cleanup();
+	}
+});

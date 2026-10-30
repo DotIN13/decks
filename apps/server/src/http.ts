@@ -13,7 +13,7 @@ import { SDK_FILE } from "./apps/service.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
-import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
+import { fileUrl, NotFound, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isCardPath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
 import { cardModules, cardPage, readDeckImports } from "./boards/cards.ts";
 import { unstampCard } from "@decks/board-host";
@@ -562,10 +562,10 @@ export function createHttpApp(app: App): Express {
 			const cardModule = /^(.+\.html?)\.m(\d+)\.js$/i.exec(requested);
 			if (cardModule && isCardPath(cardModule[1]!)) {
 				const file = resolveServed(app.deck.path, cardModule[1]!);
-				if (!existsSync(file) || !statSync(file).isFile()) throw new PathRefused(requested, "not a file");
+				if (!existsSync(file) || !statSync(file).isFile()) throw new NotFound(requested);
 				if (isSharedCanvas(canvasOfPath(asked)?.name ?? "")) throw new PathRefused(requested, "a card shared with you runs no scripts");
 				const source = cardModules(await readFile(file, "utf8"))[Number(cardModule[2])];
-				if (source === undefined) throw new PathRefused(requested, "the card has no such script");
+				if (source === undefined) throw new NotFound(requested, "the card has no such script");
 				boardHeaders(res);
 				res.setHeader("Cache-Control", "no-cache");
 				res.type("text/javascript").send(source);
@@ -575,7 +575,7 @@ export function createHttpApp(app: App): Express {
 			const versioned = requested.startsWith("lib/") ? splitLibVersion(requested.slice(4)) : undefined;
 			if (versioned) requested = `lib/${versioned.file}`;
 			const target = resolveServed(app.deck.path, requested);
-			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
+			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(requested);
 			// A friend's canvas: every page and file of it sandboxed, whatever frame it is in.
 			if (isSharedCanvas(canvasOfPath(asked)?.name ?? "")) sharedHeaders(res);
 			/*
@@ -908,7 +908,7 @@ export function createHttpApp(app: App): Express {
 		asyncRoute(async (req, res) => {
 			const versioned = splitLibVersion(wildcard(req));
 			const target = resolveServed(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
-			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(wildcard(req), "not a file");
+			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(wildcard(req));
 			boardHeaders(res);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 			await sendFile(res, target);
@@ -932,7 +932,7 @@ export function createHttpApp(app: App): Express {
 		const path = typeof req.query.path === "string" ? req.query.path : "";
 		const from = typeof req.query.from === "string" ? req.query.from : undefined;
 		const target = resolveFileRequest(app.deck.roots, { path, from });
-		if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(path, "not a file");
+		if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(path);
 		// 302 rather than 301: which file a relative path resolves to depends on the
 		// deck that is open, and that changes. A board that is the page asks for the bridge, and still does there.
 		res.redirect(302, `${fileUrl(target)}${req.query.guest === undefined ? "" : "?guest=1"}`);
@@ -944,7 +944,7 @@ export function createHttpApp(app: App): Express {
 		asyncRoute(async (req, res) => {
 			const requested = `/${wildcard(req)}`;
 			const target = resolveFileRequest(app.deck.roots, { path: requested });
-			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
+			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(requested);
 			quarantine(res, target);
 			// A web page outside the deck that is its board, with the bridge in it, as one inside the deck gets (`/board/*path`).
 			if (req.query.guest !== undefined && /\.html?$/i.test(target)) {
@@ -967,7 +967,7 @@ export function createHttpApp(app: App): Express {
 		asyncRoute(async (req, res) => {
 			const id = String(req.params.id).replace(/[^\w-]/g, "");
 			const target = resolveInDeck(app.deck.path, join(".decks", "avatars", `${id}.svg`));
-			if (!existsSync(target)) throw new PathRefused(id, "no avatar for that agent");
+			if (!existsSync(target)) throw new NotFound(id, "no avatar for that agent");
 			quarantine(res, target);
 			await sendFile(res, target);
 		}),
@@ -1335,6 +1335,10 @@ export function createHttpApp(app: App): Express {
 	// One error handler, because a refusal should read the same wherever it came
 	// from: 403 for a path we would not serve, 404 for one that is not there.
 	server.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+		if (error instanceof NotFound) {
+			res.status(404).type("text/plain").send(error.message);
+			return;
+		}
 		if (error instanceof PathRefused) {
 			res.status(403).type("text/plain").send(error.message);
 			return;
