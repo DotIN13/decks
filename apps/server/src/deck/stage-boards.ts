@@ -46,19 +46,3 @@ export function boardFolders(deck: string): string[] {
 	}
 	return folders;
 }
-
-const depth = (folder: string) => folder.split("/").filter(Boolean).length;
-
-/**
- * A board's text with its relative links re-pointed for a move between folders of different
- * depth: `../lib/board.css` from `boards/` is `../../../lib/board.css` from a stage's `boards/`.
- * Every quoted or `url(` value that starts with `../` is shifted, which covers the stylesheet,
- * `board.js`, the import map, assets and embeds; a link to a sibling board has no `../` and is
- * left alone.
- */
-export function relink(text: string, fromFolder: string, toFolder: string): string {
-	const extra = depth(toFolder) - depth(fromFolder);
-	if (extra === 0) return text;
-	if (extra > 0) return text.replace(/(["'(])((?:\.\.\/)+)/g, (_all, lead: string, ups: string) => `${lead}${"../".repeat(extra)}${ups}`);
-	return text.replace(/(["'(])((?:\.\.\/)+)/g, (_all, lead: string, ups: string) => `${lead}${ups.slice(Math.min(ups.length - 3, -extra * 3))}`);
-}

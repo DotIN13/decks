@@ -98,13 +98,12 @@ export class Deck {
 	}
 
 	/**
-	 * Create a deck in an empty (or new) directory: `deck.json`, `boards/`,
-	 * `assets/`, and the primitives copied in so its boards work offline and
-	 * keep working if this app is not running.
+	 * Create a deck in an empty (or new) directory: `deck.json`, `assets/`, and the
+	 * primitives copied in so its pages work offline and keep working if this app is not
+	 * running. No `boards/`: nothing makes boards any more, and a canvas keeps its cards.
 	 */
 	static create(path: string, runtimeLib: string, name?: string): Deck {
 		const absolute = resolve(path);
-		mkdirSync(join(absolute, "boards"), { recursive: true });
 		mkdirSync(join(absolute, "assets"), { recursive: true });
 		syncRuntimeLib(runtimeLib, join(absolute, "lib"));
 		const deckFile = join(absolute, "deck.json");

@@ -1,18 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
-import { relink } from "../deck/stage-boards.ts";
-import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import type { Board, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "./snapshots.ts";
 import { Authors, Seen } from "./authors.ts";
-import {
-	renderBlank,
-	renderWebBoard,
-	renderDocBoard,
-	renderAppBoard, renderFileBoard,
-	slugFor,
-	WEB_BOARD_SIZE,
-} from "./templates.ts";
 import type { Deck } from "../deck/loader.ts";
 import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
 
@@ -48,7 +39,7 @@ export interface BoardHooks {
  * It is a service for three reasons that showed up separately:
  *
  * - **A board write and its revision are one act.** Every path that writes a board also
- *   records it — `newBoard` and `newWebBoard` — and the one
+ *   records it — `writeBoard` — and the one
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
@@ -246,8 +237,7 @@ export class BoardService {
 	}
 
 	/**
-	 * Write a board's file and tell everyone — the path a *changed* board takes, as
-	 * `newBoard` is the path a new one takes.
+	 * Write a board's file and tell everyone — the path a changed board or a new card takes.
 	 *
 	 * Deliberately not left to the watcher. The watcher would get there in 80ms and the
 	 * caller would have to wait to see its own write; refreshing here means a `decks.canvas.update` with a size
@@ -317,132 +307,6 @@ export class BoardService {
 		const sized = before !== undefined && onlySizeChanged(path, before, html);
 		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;
-	}
-
-	/**
-	 * Write a new board, blank, and return its deck-relative path (§2).
-	 *
-	 * The name is minted from the title and made unique by suffixing, so an agent answering
-	 * three questions about the same thing gets `-2` and `-3` rather than an error.
-	 */
-	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string {
-		/*
-		 * Always `.html`, and always blank when it is created — there are no templates any more.
-		 */
-		const extension = ".html";
-		const base = slugFor(options.title);
-		// `boards/`, or a canvas's own board folder (`deck/stage-boards.ts`).
-		const folder = options.folder ?? "boards";
-		let path = `${folder}/${base}${extension}`;
-		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {
-			path = `${folder}/${base}-${suffix}${extension}`;
-			if (suffix > 200) throw new Error(`Too many boards called ${base}`);
-		}
-
-		const file = this.deck.fileOf(path);
-		// Written for `boards/`, so re-pointed when it is made deeper.
-		const html = relink(renderBlank(options.title, options.size), "boards", folder);
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, html);
-		this.revisions.record(path, html);
-
-		// The watcher would find it in 80ms; refreshing now means the caller can attach
-		// and show it in the same turn without a race.
-		const board = this.deck.refresh(path);
-		if (board) {
-			this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-		}
-		return path;
-	}
-
-	/**
-	 * The status board for the shared Chrome: one per deck, made when first asked for.
-	 *
-	 * A stub — `data-live="web"` and nothing else — fed from the `web.status`
-	 * the browser already holds. Asking again hands back the board that exists.
-	 */
-	newWebBoard(): string {
-		const path = "boards/your-chrome.html";
-		const file = this.deck.fileOf(path);
-		if (existsSync(file) && readFileSync(file, "utf8").includes('data-live="web"')) return path;
-		const html = renderWebBoard(WEB_BOARD_SIZE);
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, html);
-		this.revisions.record(path, html);
-		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-		return path;
-	}
-
-	/**
-	 * A board that opens a document as a page you type into (`renderDocBoard`), in
-	 * `boards/documents/`. `file` is the document, absolute; inside the deck the board names it
-	 * relative to itself, so the deck can move. Asking again for the same file hands back the
-	 * board that already opens it.
-	 */
-	newDocBoard(file: string, title?: string): string {
-		const name = slugFor(title ?? basename(file, extname(file)), "document");
-		const inDeck = !relative(this.deck.path, file).startsWith("..") && !isAbsolute(relative(this.deck.path, file));
-		for (let n = 1; ; n++) {
-			const path = `boards/documents/${name}${n === 1 ? "" : `-${n}`}.html`;
-			const target = this.deck.fileOf(path);
-			const dataPath = inDeck ? relative(dirname(target), file).split("\\").join("/") : file;
-			if (existsSync(target)) {
-				if (readFileSync(target, "utf8").includes(`data-path="${dataPath}"`)) return path;
-				continue;
-			}
-			const html = renderDocBoard(title ?? basename(file), dataPath);
-			mkdirSync(dirname(target), { recursive: true });
-			writeFileSync(target, html);
-			this.revisions.record(path, html);
-			const board = this.deck.refresh(path);
-			if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-			return path;
-		}
-	}
-
-	/**
-	 * A board that is one file, edge to edge (`renderFileBoard`): a PDF or a web page put on the
-	 * canvas. In `boards/files/`, named for the file; the file is referred to where it is, from the
-	 * board's folder when it is in the deck. The same file asked for again is the board it already has.
-	 */
-	newFileBoard(file: string, size: { w: number; h: number }, title?: string): string {
-		const full = isAbsolute(file) ? file : join(this.deck.path, file);
-		const name = slugFor(basename(full).replace(/\./g, "-"), "file");
-		const inDeck = !relative(this.deck.path, full).startsWith("..") && !isAbsolute(relative(this.deck.path, full));
-		for (let n = 1; ; n++) {
-			const path = `boards/files/${name}${n === 1 ? "" : `-${n}`}.html`;
-			const target = this.deck.fileOf(path);
-			const src = inDeck ? relative(dirname(target), full).split("\\").join("/") : full;
-			if (existsSync(target)) {
-				if (readFileSync(target, "utf8").includes(`data-embed="${src}"`)) return path;
-				continue;
-			}
-			const html = renderFileBoard(title ?? basename(full), src, size);
-			mkdirSync(dirname(target), { recursive: true });
-			writeFileSync(target, html);
-			this.revisions.record(path, html);
-			const board = this.deck.refresh(path);
-			if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-			return path;
-		}
-	}
-
-	/**
-	 * The board that shows an app (`renderAppBoard`, `apps/service.ts`): `boards/apps/<name>.html`.
-	 * One per app, so asking again hands back the board it already has, wherever it was put.
-	 */
-	newAppBoard(name: string, title: string, size?: { w?: number; h?: number }): string {
-		const path = `boards/apps/${name}.html`;
-		const target = this.deck.fileOf(path);
-		if (existsSync(target)) return path;
-		const html = renderAppBoard(name, title, size);
-		mkdirSync(dirname(target), { recursive: true });
-		writeFileSync(target, html);
-		this.revisions.record(path, html);
-		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-		return path;
 	}
 
 	/**
