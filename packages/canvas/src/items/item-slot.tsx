@@ -24,6 +24,12 @@ export interface StageBoardProps {
 	mounted: boolean;
 	/** Whether the item is on screen or within a window of it. */
 	visible: boolean;
+	/**
+	 * Mounted but asleep: a card let go lately, kept with its root so waking it again is instant
+	 * (`items/live-cards.ts`, `kept`). Hidden, and drawn by the sheet as its picture; it takes a press as
+	 * a sleeping card's slot does. Its scripts go on running: a card has no way to be paused.
+	 */
+	asleep?: boolean | undefined;
 	selected: boolean;
 	/**
 	 * Its surface is showing, or has stopped showing. Until it says so the sheet keeps the item's
@@ -151,14 +157,15 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 		said = on;
 		props.onLive?.(on);
 	};
-	createEffect(() => say(awake() && shown()));
+	createEffect(() => say(awake() && shown() && !props.asleep));
 	onCleanup(() => say(false));
 	return (
 		<div
 			class="board-node plain-board"
 			data-path={props.board.path}
 			data-selected={props.selected}
-			data-inert={!shown()}
+			data-inert={!shown() || props.asleep}
+			data-asleep={props.asleep ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
@@ -177,7 +184,7 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 				</div>
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
-			<Show when={shown() && (hovered() || props.selected)}>
+			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>
 				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
 			</Show>
 			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
@@ -186,7 +193,7 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 					Scripts off · Turn on
 				</button>
 			</Show>
-			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !shown() && press(event)}>
+			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => (!shown() || props.asleep) && press(event)}>
 				<Show when={awake() && props.board.card}>
 					<CardSurface
 						page={props.page!}

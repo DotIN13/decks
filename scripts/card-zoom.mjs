@@ -176,8 +176,8 @@ const pinch = async (factor, ms = 900) => {
 					if (t >= 1) break;
 					await new Promise((done) => requestAnimationFrame(done));
 				}
-				__cz.recording = false;
-				__cz.down = { mounts: __cz.mounts, unmounts: __cz.unmounts };
+				__cz.down = { mounts: __cz.mounts, unmounts: __cz.unmounts, frames: __cz.frames };
+				__cz.frames = [];
 				fire("gestureend", factor);
 			},
 			[factor, ms, middle.x, middle.y],
@@ -203,8 +203,8 @@ const pinch = async (factor, ms = 900) => {
 	}
 	// What happened while the fingers were down, read before they lift: the lift itself ends the gesture.
 	await canvas.evaluate(() => {
-		__cz.recording = false;
-		__cz.down = { mounts: __cz.mounts, unmounts: __cz.unmounts };
+		__cz.down = { mounts: __cz.mounts, unmounts: __cz.unmounts, frames: __cz.frames };
+		__cz.frames = [];
 	});
 	await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 };
@@ -228,13 +228,15 @@ const heap = async () => {
 };
 const live = () =>
 	canvas.evaluate(() => {
-		const hosts = [...document.querySelectorAll(".card-host")];
+		const all = [...document.querySelectorAll(".card-host")];
+		// A card kept asleep with its root (`items/live-cards.ts`, `kept`) is not live.
+		const hosts = all.filter((host) => !host.closest("[data-asleep]"));
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		const shown = hosts.filter((host) => {
 			const b = host.getBoundingClientRect();
 			return getComputedStyle(host).visibility !== "hidden" && b.right > r.left && b.left < r.right && b.bottom > r.top && b.top < r.bottom;
 		});
-		return { live: hosts.length, onScreen: shown.length, cards: (globalThis.__decksBoards?.() ?? []).length };
+		return { live: hosts.length, kept: all.length - hosts.length, onScreen: shown.length, cards: (globalThis.__decksBoards?.() ?? []).length };
 	});
 
 // Settle after the open, then go to the middle of the cards: the stage scrolls (a pan), then pinches to 100%.
@@ -282,13 +284,19 @@ const gesture = async (name, factor) => {
 	const t0 = Date.now();
 	await pinch(factor);
 	const ms = Date.now() - t0;
-	const during = await canvas.evaluate(() => ({ ...__cz.down, frames: __cz.frames }));
+	const during = await canvas.evaluate(() => __cz.down);
 	const traced = tracing ? paintWork(JSON.parse(String(await browser.stopTracing()))) : undefined;
 	const w1 = await work();
 	const busy = Object.fromEntries(Object.keys(w1).map((key) => [key, Math.round(w1[key] - w0[key])]));
 	await atRest();
 	await settled();
-	const after = await canvas.evaluate(() => ({ mounts: __cz.mounts, unmounts: __cz.unmounts }));
+	const w2 = await work();
+	// From the lift until the cards stopped coming and going: what waking them cost the frames.
+	const after = await canvas.evaluate(() => {
+		__cz.recording = false;
+		return { mounts: __cz.mounts, unmounts: __cz.unmounts, frames: __cz.frames };
+	});
+	const afterSorted = [...after.frames].sort((p, q) => p - q);
 	const frames = during.frames;
 	const sorted = [...frames].sort((p, q) => p - q);
 	runs.push({
@@ -303,6 +311,10 @@ const gesture = async (name, factor) => {
 		...(traced ? { paintMs: traced } : {}),
 		mounts: during.mounts - before.mounts,
 		unmounts: during.unmounts - before.unmounts,
+		// After the lift, until the cards are still: late frames and the worst, which is what one wake costs at most.
+		droppedAfter: after.frames.filter((f) => f > 20).length,
+		busyAfterMs: engine === "chromium" ? Math.round(w2.task - w1.task) : undefined,
+		worstAfterMs: Math.round(afterSorted.at(-1) ?? 0),
 		mountsAfter: after.mounts - during.mounts,
 		unmountsAfter: after.unmounts - during.unmounts,
 		zoom: Math.round((await zoomNow()) * 1000) / 1000,
@@ -337,6 +349,9 @@ const report = {
 		pinches: runs.length,
 		droppedPerPinch: Math.round((sum("dropped") / runs.length) * 10) / 10,
 		droppedShare: Math.round((sum("dropped") / Math.max(1, sum("frames"))) * 1000) / 1000,
+		droppedAfterPerPinch: Math.round((sum("droppedAfter") / runs.length) * 10) / 10,
+		worstAfterMs: Math.max(...runs.map((run) => run.worstAfterMs)),
+		wakesPerPinchIn: Math.round((sum("mountsAfter", runs.filter((run) => run.name === "in")) / Math.max(1, runs.filter((run) => run.name === "in").length)) * 10) / 10,
 		mountsPerPinch: Math.round(((sum("mounts") + sum("unmounts")) / runs.length) * 10) / 10,
 		liveAt100: Math.max(...runs.filter((run) => run.name === "in").map((run) => run.live)),
 		liveAtLow: Math.max(...runs.filter((run) => run.name === "out").map((run) => run.live)),

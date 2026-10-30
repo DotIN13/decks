@@ -312,9 +312,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const next = chooseLive({ index: boardIndex(), items: props.boards, rest: ctl.rest(), view: v, selected: props.selected, budget: CARD_BUDGET, was });
 		return sameLive(was, next) ? was : next;
 	}, NO_LIVE_CARDS);
+	/** For the browser checks and `scripts/card-zoom.mjs`: the cards chosen awake and kept asleep. */
+	(globalThis as { __decksLiveCards?: () => LiveCards }).__decksLiveCards = () => untrack(cardChoice);
 	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});
+	/** Cards let go lately and kept with their roots, asleep (`cardChoice().kept`): waking one again is instant. */
+	const keptPaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().kept), new Set(), {
+		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
+	});
+	const isKept = createSelector(keptPaths, (path: string, paths) => paths.has(path));
 	/** Whether a card is awake: each slot is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
 	/**
@@ -353,6 +360,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		for (const path of liveBoards().keys()) keep(path);
 		keep(props.selected);
 		for (const path of livePaths()) keep(path);
+		for (const path of keptPaths()) keep(path);
 		for (const path of editor.heldBoards()) keep(path);
 		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
 		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
@@ -364,9 +372,17 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 
 	/** `rendered`, as a set to look a board up in. */
-	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+	const slotPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
 	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
-	const isRendered = createSelector(renderedPaths, (path: string, paths) => paths.has(path));
+	const isRendered = createSelector(slotPaths, (path: string, paths) => paths.has(path));
+	/**
+	 * The items whose node takes a press: those in `rendered` but a kept card asleep, which is its picture
+	 * on the sheet as any sleeping card is, so the stage finds it under a press itself (`pictureUnder`).
+	 */
+	const renderedPaths = createMemo<ReadonlySet<string>>(() => {
+		const kept = keptPaths();
+		return kept.size === 0 ? slotPaths() : new Set([...slotPaths()].filter((path) => !kept.has(path)));
+	});
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter((board) => ((board.card && !cardsHidden()) || board.item) && isVisible(board)).length <= LAYER_BUDGET);
 
@@ -450,7 +466,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		<Frame
 			board={board}
 			zoom={ctl.zoom()}
-			mounted={board.item !== undefined || isLive(board.path)}
+			mounted={board.item !== undefined || isLive(board.path) || isKept(board.path)}
+			asleep={isKept(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}

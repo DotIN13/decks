@@ -359,6 +359,13 @@
 .stage[data-card-pictures="true"] .board-node .card-host {
 	will-change: auto;
 }
+/*
+ * A card let go lately and kept asleep with its root (`items/live-cards.ts`, `kept`): not laid out, painted
+ * or pressed, while the sheet draws its picture over it; shown again at once when it wakes.
+ */
+.board-node[data-asleep] .card-surface {
+	content-visibility: hidden;
+}
 	/*
  * While the camera moves at one zoom, the world is one layer the compositor slides: without it,
  * every live page in it was painted and layered again on every pan step (726 ms of 2.7 s of
