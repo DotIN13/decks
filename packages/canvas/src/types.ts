@@ -28,6 +28,8 @@ export interface StageComment {
 	component?: string;
 	items?: string[];
 	anchor: () => DOMRect | undefined;
+	/** From a pill's Comment: the box opens at once. Words selected show only the small button first. */
+	open?: boolean;
 }
 
 /** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */

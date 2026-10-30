@@ -1979,6 +1979,7 @@ export function Stage(props: {
 											title: board.title,
 											// Under the pill, which follows the board as the camera moves.
 											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+											open: true,
 										}),
 								}
 							: {})}
@@ -2009,6 +2010,7 @@ export function Stage(props: {
 														quote: items().words,
 														title: items().name,
 														anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+														open: true,
 													}),
 											}
 										: {}),
@@ -2057,6 +2059,7 @@ export function Stage(props: {
 											quote: "",
 											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
 											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+											open: true,
 										}),
 								}
 							: {})}
