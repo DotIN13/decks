@@ -1,4 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Tickets: one page's admission, for another site that holds a site token (`tokens.ts`).
@@ -14,8 +16,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * needs no ticket.
  *
  * A ticket is `<payload>.<mac>`, both base64url: the payload is `{ p: path, e: expires, k: token id }`
- * and the mac its HMAC-SHA256 under a secret made when the server starts and never written down, so
- * a restart ends every ticket. `k` is the id of the token it was made with (`TokenStore.issue`): a ticket
+ * and the mac its HMAC-SHA256 under a secret made once and kept in the harness's data folder
+ * (`<dataDir>/ticket-secret`, readable by this user alone, never in the deck, which syncs), so a
+ * restart ends no ticket: a page left open across one keeps reading its files. `k` is the id of the token it was made with (`TokenStore.issue`): a ticket
  * works only while that token does, so revoking the token ends its tickets too.
  */
 
@@ -128,11 +131,42 @@ export function decodedPath(url: string | undefined): string | undefined {
 	}
 }
 
-export class Tickets {
-	private readonly secret = randomBytes(32);
+/**
+ * The secret tickets are signed with, kept in `<dataDir>/ticket-secret` (mode 0600): made the first
+ * time, read every time after, so a ticket made before a restart still admits its page after it.
+ * A file that is not 32 bytes of hex is made again (every ticket made on it ends).
+ */
+export function ticketSecret(dataDir: string): Buffer {
+	const file = join(dataDir, "ticket-secret");
+	try {
+		if (existsSync(file)) {
+			const kept = readFileSync(file, "utf8").trim();
+			if (/^[0-9a-f]{64}$/.test(kept)) return Buffer.from(kept, "hex");
+		}
+	} catch {
+		/* made again below */
+	}
+	const made = randomBytes(32);
+	try {
+		mkdirSync(dataDir, { recursive: true });
+		writeFileSync(file, made.toString("hex"), { mode: 0o600 });
+		chmodSync(file, 0o600);
+	} catch (error) {
+		// Not kept: tickets work until the next restart, as they did before.
+		console.warn(`[decks] the ticket secret could not be kept in ${file}: ${(error as Error).message}`);
+	}
+	return made;
+}
 
-	/** `live(id)`: whether the token with that id still works (`TokenStore.live`). */
-	constructor(private readonly live: (id: string) => boolean) {}
+export class Tickets {
+	/**
+	 * `live(id)`: whether the token with that id still works (`TokenStore.live`). `secret`: what tickets
+	 * are signed with (`ticketSecret`); left out, one made now and kept nowhere, so a restart ends them.
+	 */
+	constructor(
+		private readonly live: (id: string) => boolean,
+		private readonly secret: Buffer = randomBytes(32),
+	) {}
 
 	/** A ticket for one path (`ticketPath`), made with the token whose id is `id`. */
 	make(path: string, id: string, now = Date.now()): string {

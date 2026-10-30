@@ -18,7 +18,7 @@ import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
-import { HARNESS_TICKET, Tickets } from "./auth/tickets.ts";
+import { HARNESS_TICKET, ticketSecret, Tickets } from "./auth/tickets.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
@@ -148,7 +148,7 @@ export class App {
 		this.tokens = new TokenStore(join(deck.path, ".decks", "tokens.json"));
 		this.codes = new PairCodes(this.tokens, { required: codeRequired() });
 		// A ticket made by the harness for its own pages (`HARNESS_TICKET`) works as long as the harness does.
-		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id));
+		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id), ticketSecret(config.dataDir));
 		this.bridge = new StageBridge(this.tokens);
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {

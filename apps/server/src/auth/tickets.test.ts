@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { TokenStore } from "./tokens.ts";
-import { covers, isFolderTicket, TICKET_MS, ticketPath, Tickets } from "./tickets.ts";
+import { covers, isFolderTicket, TICKET_MS, ticketPath, ticketSecret, Tickets } from "./tickets.ts";
 
 /** A token store in a fresh folder, a token in it, and tickets that ask it whether the token still works. */
 function setUp() {
@@ -63,7 +63,7 @@ test("a ticket that was changed, or made by another server, is refused", () => {
 		// The same mac on a payload for another path.
 		const other = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString()), p: "/api/board/boards/b.html" })).toString("base64url");
 		assert.ok(!tickets.admits(`${other}.${mac}`, "/api/board/boards/b.html"), "a payload for another path");
-		const longer = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString()), e: Date.now() + 86_400_000 })).toString("base64url");
+		const longer = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString()), e: Date.now() + 7 * 86_400_000 })).toString("base64url");
 		assert.ok(!tickets.admits(`${longer}.${mac}`, "/api/board/boards/a.html"), "a later expiry");
 		assert.ok(!tickets.admits(`${payload}.${mac.slice(0, -2)}AA`, "/api/board/boards/a.html"), "a changed mac");
 		assert.ok(!tickets.admits(`${payload}.`, "/api/board/boards/a.html"), "no mac");
@@ -130,4 +130,24 @@ test("a canvas frame's ticket admits its own canvas's folder and pictures, and n
 	assert.ok(!covers(folder!, "/api/thumb/canvases/other/boards/x.html"), "not another canvas's pictures");
 	assert.ok(!covers(folder!, "/api/board/canvases/plan/.decks/x"), "not a hidden part");
 	assert.ok(!covers(folder!, "/api/v1/canvas.read"), "not the API");
+});
+
+test("the ticket secret is kept in the data folder, so a ticket made before a restart admits its page after it", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-ticket-secret-"));
+	try {
+		const live = () => true;
+		const before = new Tickets(live, ticketSecret(dir));
+		const ticket = before.make("/api/board/canvases/main/", "k1");
+		assert.equal(statSync(join(dir, "ticket-secret")).mode & 0o777, 0o600, "readable by this user alone");
+		// A restart: the secret read back from the file.
+		const after = new Tickets(live, ticketSecret(dir));
+		assert.ok(after.admits(ticket, "/api/board/canvases/main/cards/a/index.html"));
+		assert.ok(ticketSecret(dir).equals(ticketSecret(dir)), "made once, the same every time after");
+		// A spoilt file is made again, and what was made on the old secret ends.
+		writeFileSync(join(dir, "ticket-secret"), "nonsense");
+		assert.ok(!new Tickets(live, ticketSecret(dir)).admits(ticket, "/api/board/canvases/main/cards/a/index.html"));
+		assert.ok(!new Tickets(live).admits(ticket, "/api/board/canvases/main/cards/a/index.html"), "a secret kept nowhere is another server's");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
