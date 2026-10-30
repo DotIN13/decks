@@ -301,3 +301,41 @@ test("events read with fetch and the token, opened again when the stream ends, u
 	assert.equal(seen[0].headers.authorization, "Bearer dk_s_site");
 	assert.match(seen[0].url, /\/api\/v1\/events\?types=agent\.state$/);
 });
+
+test("a canvas pass kept while shown is asked for again at half its life, and thirty seconds after one that failed", async (t) => {
+	t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000_000 });
+	let asked = 0;
+	let fail = false;
+	const { fetch } = fakeFetch(() => {
+		asked++;
+		if (fail) return json({ error: "no" }, 500);
+		return json({ pass: `dk_cp_${asked}.x`, role: "edit", expires: Date.now() + 3_600_000 });
+	});
+	const decks = connect({ url: "http://127.0.0.1:4830", token: "dk_h_t", fetch });
+	const heard = [];
+	const keeper = decks.keepCanvasPass("plan", (got) => heard.push(got.pass));
+	const settle = async () => {
+		for (let i = 0; i < 10; i++) await Promise.resolve();
+		await new Promise((done) => setImmediate(done));
+	};
+	await settle();
+	assert.deepEqual(heard, ["dk_cp_1.x"], "asked at once");
+	t.mock.timers.tick(30 * 60_000 - 1);
+	await settle();
+	assert.equal(asked, 1, "not before half its life");
+	t.mock.timers.tick(1);
+	await settle();
+	assert.deepEqual(heard, ["dk_cp_1.x", "dk_cp_2.x"], "renewed at half its life");
+	fail = true;
+	t.mock.timers.tick(30 * 60_000);
+	await settle();
+	assert.equal(asked, 3);
+	fail = false;
+	t.mock.timers.tick(30_000);
+	await settle();
+	assert.deepEqual(heard.at(-1), "dk_cp_4.x", "thirty seconds after a failure");
+	keeper.stop();
+	t.mock.timers.tick(3_600_000);
+	await settle();
+	assert.equal(asked, 4, "stopped");
+});

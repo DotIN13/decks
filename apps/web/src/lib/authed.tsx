@@ -43,7 +43,10 @@ export function authedSrc(url: string): Promise<string> {
 	return got;
 }
 
-/** An `<img>` of the harness's picture: read with this tab's token; `onError` when it cannot be. */
+/**
+ * An `<img>` of the harness's picture: read with this tab's token; `onError` when it cannot be. The
+ * harness's address it shows stays on it as `data-src`, for whoever looks at what it is of.
+ */
 export function AuthedImg(props: JSX.ImgHTMLAttributes<HTMLImageElement> & { src: string }): JSX.Element {
 	const [own, rest] = splitProps(props, ["src", "onError"]);
 	const [src] = createResource(
@@ -56,8 +59,8 @@ export function AuthedImg(props: JSX.ImgHTMLAttributes<HTMLImageElement> & { src
 			}),
 	);
 	return (
-		<Show when={!src.error && src()}>
-			{(url) => <img {...rest} src={url()} onError={own.onError} />}
+		<Show when={!src.error}>
+			<img {...rest} data-src={own.src} src={src.loading ? undefined : src()} onError={own.onError} />
 		</Show>
 	);
 }

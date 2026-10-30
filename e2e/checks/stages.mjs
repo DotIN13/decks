@@ -80,7 +80,8 @@ const cards = () =>
 			name: card.dataset.name,
 			title: card.querySelector(".row-label")?.textContent?.trim() ?? null,
 			here: card.dataset.here ?? null,
-			shot: card.querySelector(".stage-shot")?.getAttribute("src") ?? null,
+			// The harness's address: the page reads it with its token and shows it from memory (`lib/authed.tsx`).
+			shot: card.querySelector(".stage-shot")?.getAttribute("data-src") ?? card.querySelector(".stage-shot")?.getAttribute("src") ?? null,
 			empty: !!card.querySelector(".stage-empty"),
 		})),
 	);

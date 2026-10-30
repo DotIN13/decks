@@ -1,15 +1,15 @@
 /**
- * This tab's person token: what makes this page the person to the harness (`server/src/auth/`).
+ * This tab's harness token: what makes this page the person to the harness (`server/src/auth/`).
  *
  * Every request to the harness carries a token, and who is calling is that token alone. The harness
- * writes a fresh person token into this page only when a person opened it in a tab of its own
+ * writes a fresh harness token into this page only when a person opened it in a tab of its own
  * (`server/src/auth/issue.ts`); a frame's copy of the page or a script's fetch of it gets none. It
- * lasts twelve hours unused.
+ * lasts a day unused.
  *
  * Read once, before anything else on the page runs, and the tag taken out of the document straight
  * away, so a script that looks later finds nothing there. From then on this page sends it on every
  * request of its own to the harness, `Authorization: Bearer`, and on its socket (`decks_token`). A
- * card is not given this one: the canvas frame has a token for its one canvas (`board/canvas-frame.ts`).
+ * card is not given this one: the canvas frame has a canvas pass for its one canvas (`board/canvas-frame.ts`).
  */
 const tag = typeof document === "undefined" ? null : document.querySelector<HTMLMetaElement>('meta[name="decks-session"]');
 const token = tag?.content || undefined;
@@ -56,8 +56,8 @@ export async function tokenDigest(): Promise<string | undefined> {
 /**
  * Every `fetch` this page makes to its own harness carries the token: the API (`/api/…`) and another
  * server passed through this one (`/c/…`), unless the request already says who it is. A picture or a
- * frame cannot carry a header; the harness lets those in by what they are until boards and files
- * move to their own address (`server/src/auth/guard.ts`).
+ * new tab cannot carry a header, so this page reads those with fetch too and shows them from memory
+ * (`lib/authed.tsx`): the harness reads no file or picture without a credential (`server/src/auth/guard.ts`).
  */
 function carryToken(): void {
 	if (!token || typeof window === "undefined" || typeof window.fetch !== "function") return;
