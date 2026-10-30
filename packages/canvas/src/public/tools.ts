@@ -11,3 +11,5 @@ export * from "../model/card-frame.ts";
 export * from "../model/file-drop.ts";
 // The drawing's top-level items as a layers list, for a sidebar.
 export { canvasItems, type CanvasItem, type ItemKind } from "../model/layers.ts";
+// The insert panel (shapes and icons), for a host that opens it standalone; the stage draws it itself whenever `insertPanel()` is set.
+export { Insert } from "../ui/Insert.tsx";
