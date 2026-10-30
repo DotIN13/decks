@@ -58,11 +58,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 *     40 documents in view  126 on layers · 181 without
 	 *    120 documents in view  700 on layers · 523 without   ← the trade has reversed
 	 *
-	 * 48 is inside the measured win and well short of the measured loss. Past it the canvas
-	 * is slow either way — a hundred live documents at once is its own problem — so the
-	 * budget is there to stop this making that case worse, not to rescue it.
+	 * Those documents were boards' iframes, which the canvas no longer runs. What goes on a layer now
+	 * is an awake card's root, a document's editor or an app's window (`canvas.css`, `data-scaling`),
+	 * a few elements each, and only those are counted: a board is its picture on the sheet and has no
+	 * layer to make. Measured on a canvas of 65 cards, all on screen below 25%, a ctrl-wheel zoom
+	 * across 2%–400% in headed Chrome: with the cards over the old 48 and so off layers, Chrome drew
+	 * every card again at every step and a third of the frames were late (97 of 300 over 16.7 ms,
+	 * p95 35 ms); on layers, 0–6 of 495, and a frame mid-zoom as sharp as at rest. 128 is twice what
+	 * was measured.
 	 */
-	const LAYER_BUDGET = 48;
+	const LAYER_BUDGET = 128;
 
 	/**
 	 * Cards whose surfaces are showing, by how many of their slots say so: the sheet is a hole over each
@@ -320,7 +325,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
 	const isRendered = createSelector(renderedPaths, (path: string, paths) => paths.has(path));
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
-	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
+	const layered = createMemo(() => scaling() && rendered().filter((board) => (board.card || board.item) && isVisible(board)).length <= LAYER_BUDGET);
 
 	/** The camera as of its last rest. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
