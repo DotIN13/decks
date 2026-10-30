@@ -392,6 +392,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			buttons: event.buttons,
 			tool: host.tool(),
 			target: pressTarget(host.element(), event.target),
+			hand: host.spaceHeld(),
 		});
 		if (decided.do === "none") return;
 		if (decided.do === "clear") {

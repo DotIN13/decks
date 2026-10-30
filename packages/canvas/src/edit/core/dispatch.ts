@@ -106,6 +106,17 @@ export function decidePress(facts: PressFacts): PressAction {
 	return { do: "pan", deselect: empty, middle };
 }
 
+/**
+ * Whether a press is the hand's: with the hand tool (or Space held), a press with the main button
+ * pans the camera wherever it lands on the stage, whatever is selected: on an item, its bar or edge,
+ * a handle, a block's grip or an anchor, which would otherwise move, size or join it. A control
+ * (`control`: a button, a field, the words being typed) keeps its press, and a finger pans on its
+ * own (`touch`). Asked before anything under the press hears it.
+ */
+export function handPans(facts: { hand: boolean; pointer: PointerKind; button: number; control: boolean }): boolean {
+	return facts.hand && facts.pointer !== "touch" && facts.button === 0 && !facts.control;
+}
+
 /** What the page knows about a pointer moving over the stage with nothing in hand. */
 export type HoverFacts = {
 	pointer: PointerKind;
@@ -122,6 +133,8 @@ export type HoverFacts = {
 	buttons: number;
 	tool: PenTool;
 	target: PressTarget;
+	/** The hand tool, or Space held: a press pans, so nothing under the pointer lights up for it. */
+	hand?: boolean;
 };
 
 /**
@@ -135,7 +148,7 @@ export type HoverAction = { do: "none" } | { do: "clear"; block: boolean } | { d
 export function decideHover(facts: HoverFacts): HoverAction {
 	if (facts.pointer === "touch" || !facts.editable || facts.drawing) return { do: "none" };
 	if (facts.onGrip) return { do: "none" };
-	if (facts.buttons !== 0 || facts.tool !== "select" || !onCanvas(facts.target)) return { do: "clear", block: facts.buttons === 0 };
+	if (facts.hand || facts.buttons !== 0 || facts.tool !== "select" || !onCanvas(facts.target)) return { do: "clear", block: facts.hand || facts.buttons === 0 };
 	return { do: "track", outlines: facts.editing };
 }
 

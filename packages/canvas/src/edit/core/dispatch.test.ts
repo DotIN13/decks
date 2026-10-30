@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decideHover, decidePress, isBareSecondTap, isSecondTap, type HoverAction, type HoverFacts, type PressAction, type PressFacts } from "./dispatch.ts";
+import { decideHover, decidePress, handPans, isBareSecondTap, isSecondTap, type HoverAction, type HoverFacts, type PressAction, type PressFacts } from "./dispatch.ts";
 
 /** A mouse's main button on bare stage, the drawing editable, the select tool, nothing under it. */
 const base: PressFacts = { pointer: "mouse", button: 0, target: "stage", editable: true, drawing: false, tool: "select", space: false, fingers: 0, onItem: () => false, picture: () => undefined };
@@ -76,6 +76,8 @@ const hovers: Array<[string, Partial<HoverFacts>, HoverAction]> = [
 	["a button held: cleared, the grip kept", { buttons: 1 }, { do: "clear", block: false }],
 	["a tool armed: cleared, the grip too", { tool: "rectangle" }, { do: "clear", block: true }],
 	["over a board: cleared, the grip too", { target: "other" }, { do: "clear", block: true }],
+	["the hand: cleared, the grip too, browsing or editing", { hand: true }, { do: "clear", block: true }],
+	["the hand browsing over a drawn card: the same", { hand: true, editing: false, target: "drawn" }, { do: "clear", block: true }],
 ];
 for (const [name, over, want] of hovers) test(`hover: ${name}`, () => assert.deepEqual(decideHover({ ...hoverBase, ...over }), want));
 
@@ -93,4 +95,17 @@ test("taps: two on bare canvas within 350 ms and 30 px", () => {
 	assert.equal(isBareSecondTap(first, { x: 100, y: 100 }, 1350), false);
 	assert.equal(isBareSecondTap(first, { x: 130, y: 100 }, 1100), false);
 	assert.equal(isBareSecondTap(first, { x: 129, y: 100 }, 1100), true);
+});
+
+test("the hand: a press anywhere pans, whatever it lands on, but a control keeps its press and a finger pans its own way", () => {
+	assert.equal(handPans({ hand: true, pointer: "mouse", button: 0, control: false }), true);
+	assert.equal(handPans({ hand: true, pointer: "pen", button: 0, control: false }), true);
+	assert.equal(handPans({ hand: true, pointer: "mouse", button: 0, control: true }), false);
+	assert.equal(handPans({ hand: true, pointer: "touch", button: 0, control: false }), false);
+	assert.equal(handPans({ hand: true, pointer: "mouse", button: 2, control: false }), false);
+	assert.equal(handPans({ hand: false, pointer: "mouse", button: 0, control: false }), false);
+	// And on the stage's own path, a press on a drawn item with the hand pans rather than picking it up.
+	const facts: PressFacts = { pointer: "mouse", button: 0, target: "drawn", editable: true, drawing: false, tool: "select", space: true, fingers: 0, onItem: () => true, picture: () => undefined };
+	assert.deepEqual(decidePress(facts), { do: "pan", deselect: true, middle: false });
+	assert.deepEqual(decidePress({ ...facts, target: "other" }), { do: "pan", deselect: false, middle: false });
 });

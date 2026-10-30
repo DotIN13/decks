@@ -7,6 +7,7 @@ import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
+import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
 import type { StageBoardProps } from "../items/item-slot.tsx";
@@ -62,10 +63,27 @@ export function createStageInput(deps: StageInputDeps) {
 		};
 		const release = () => setPressHeld(false);
 		element.addEventListener("pointerdown", press, { capture: true, passive: true });
+		/*
+		 * The hand (or Space held) pans from a press anywhere on the stage, whatever is selected: on an
+		 * item's bar or edge, a handle, a grip or an anchor too, which otherwise would carry, size or join
+		 * it (`core/dispatch.ts`, `handPans`). Taken here, before any of them hears the press. A press on
+		 * bare stage goes on to the editor, which pans it already. A card's page is a frame of its own and
+		 * never sends its presses here, so words in it still select.
+		 */
+		const hand = (event: PointerEvent) => {
+			const target = event.target as Element | null;
+			if (target === element) return;
+			const control = !!target?.closest?.("button, input, textarea, select, a[href], [contenteditable]:not([contenteditable='false']), [role=button], [role=menu], .pen-text");
+			if (!handPans({ hand: grabbing(), pointer: event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse", button: event.button, control })) return;
+			event.stopPropagation();
+			panFrom(event, { deselect: false, middle: false });
+		};
+		element.addEventListener("pointerdown", hand, { capture: true });
 		window.addEventListener("pointerup", release, true);
 		window.addEventListener("pointercancel", release, true);
 		onCleanup(() => {
 			element.removeEventListener("pointerdown", press, { capture: true });
+			element.removeEventListener("pointerdown", hand, { capture: true });
 			window.removeEventListener("pointerup", release, true);
 			window.removeEventListener("pointercancel", release, true);
 		});
