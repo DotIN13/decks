@@ -1,6 +1,6 @@
 /**
  * Every board has one picture, fetched once at one width for the device's GPU (`device.ts`,
- * `PICTURES`: 1024 px on a big one, 512 on a small one) and copied to the GPU once; the GPU makes
+ * `PICTURES`: 480 px on a big one, 192 on a small one) and copied to the GPU once; the GPU makes
  * its smaller sizes and draws it at any zoom from the nearest (`stage/engine.ts`, `wantBoardPictures`).
  * A zoom out and back in fetches nothing. Over the budget, pictures shrink on the GPU (`fitPictures`),
  * with no request either. Chromium (a big GPU) and WebKit as an iPhone (a small one).
@@ -27,7 +27,7 @@ const held = (frame) => frame.evaluate(() => Object.fromEntries([...window.__dec
 
 for (const target of TARGETS) {
 	const name = target.label;
-	const width = target.slug === "chromium" ? 1024 : 512;
+	const width = target.slug === "chromium" ? 480 : 192;
 	await resetStage();
 	const { browser, page, errors } = await open({ ...target.open, boards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
 	// The stage and its engine are in the canvas frame.
@@ -43,7 +43,8 @@ for (const target of TARGETS) {
 	const first = await held(canvas);
 	say(`${name}: every board's picture is fetched at ${width} px`, Object.keys(first).length > 0 && Object.values(first).every((w) => w === width), JSON.stringify(first));
 	const before = asked.length;
-	if (target.slug === "chromium") {
+	// Compressed wherever the GPU takes ASTC: WebGPU with the feature, or WebGL 2 with `WEBGL_compressed_texture_astc` (any Mac's).
+	if (await canvas.evaluate(() => window.__decksRust.page.compressedPictures())) {
 		// Compressed: asked for so, sent so, and a byte a pixel on the GPU (four, as RGBA, before).
 		// A first look gets the server's stand-in for a size it has not made yet, asked again until it has.
 		const boards = Object.keys(first).length;
@@ -57,7 +58,7 @@ for (const target of TARGETS) {
 		say(`${name}: pictures are asked for compressed, for the GPU`, asked.every((one) => one.astc), JSON.stringify(asked.slice(0, 3)));
 		say(`${name}: …and come compressed, every board`, (await put()) >= boards, `${await put()} put compressed for ${boards} boards`);
 		say(`${name}: …about a byte a pixel on the GPU, its smaller sizes included`, perPixel > 1 && perPixel < 1.6, perPixel.toFixed(2));
-	} else say(`${name}: on WebGL 2 pictures are not asked for compressed`, asked.every((one) => !one.astc), JSON.stringify(asked.slice(0, 3)));
+	} else say(`${name}: where the GPU takes no ASTC, pictures are not asked for compressed`, asked.every((one) => !one.astc), JSON.stringify(asked.slice(0, 3)));
 
 	// In and back out, in steps a pinch would make, below the live zoom, resting between.
 	for (const delta of [-30, -30, -30, -30, 80, 80, 80, 80]) {
@@ -79,8 +80,8 @@ for (const target of TARGETS) {
 		return { shrunk: window.__decksRust.shrunk.size, bytes: window.__decksRust.heldBytes() };
 	});
 	const backend = await canvas.evaluate(() => window.__decksEngine?.stats?.().backend);
-	// WebGL 2 keeps one size of a picture (`Gpu::picture_texture`), so it has nothing smaller to shrink to.
-	if (backend === "webgl2") say(`${name}: on WebGL 2 a picture has one size, so nothing shrinks`, shrunk.shrunk === 0, JSON.stringify({ backend, ...shrunk }));
+	// WebGL 2 keeps one size of a WebP picture (`Gpu::picture_texture`), and cannot copy a compressed one's smaller sizes (`Gpu::shrink`), so nothing shrinks.
+	if (backend === "webgl2") say(`${name}: on WebGL 2 nothing shrinks`, shrunk.shrunk === 0, JSON.stringify({ backend, ...shrunk }));
 	else say(`${name}: over the budget, pictures shrink on the GPU`, shrunk.shrunk > 0, JSON.stringify({ backend, ...shrunk }));
 	say(`${name}: …with no picture fetched for it`, asked.length === sent, JSON.stringify(asked.slice(sent, sent + 4)));
 	await canvas.evaluate(() => delete window.__decksPictureMB);

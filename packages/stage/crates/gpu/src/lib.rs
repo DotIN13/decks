@@ -174,6 +174,10 @@ impl Gpu {
 		}
 		let (w, h) = ((tex.width / 2).max(1), (tex.height / 2).max(1));
 		let format = tex.texture.format();
+		// WebGL 2 copies between textures through a framebuffer, which a compressed one cannot be: kept as it is.
+		if self.api == Api::WebGl2 && format.is_compressed() {
+			return None;
+		}
 		// A compressed texture is whole blocks wide and tall: one that would not be is kept as it is.
 		let (bw, bh) = format.block_dimensions();
 		if w % bw != 0 || h % bh != 0 {

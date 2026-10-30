@@ -53,7 +53,10 @@ pub async fn open(canvas: Canvas, width: u32, height: u32, short_of_memory: bool
 	let surface = instance.create_surface(canvas.target()).map_err(|e| format!("no WebGL 2 on this canvas: {e}"))?;
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(|e| format!("WebGL 2 has no adapter: {e}"))?;
 	let required_limits = wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
-	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits, ..Default::default() }).await.map_err(|e| e.to_string())?;
+	// Compressed pictures where the context has `WEBGL_compressed_texture_astc` (Apple's GPUs, most phones):
+	// their every size comes made, so nothing is drawn into a level of a texture while reading another.
+	let required_features = adapter.features() & wgpu::Features::TEXTURE_COMPRESSION_ASTC;
+	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits, required_features, ..Default::default() }).await.map_err(|e| e.to_string())?;
 	let max_samples = canvas.context().and_then(|gl| gl.get_parameter(Gl::MAX_SAMPLES).ok()?.as_f64()).map(|n| n as u32);
 	let samples = stage_render::limits::samples(max_samples, short_of_memory);
 	let mut gpu = Gpu::on(device, queue, Api::WebGl2, samples);

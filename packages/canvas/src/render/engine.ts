@@ -1570,7 +1570,8 @@ export class StageEngine {
 					return;
 				}
 				const blob = await response.blob();
-				const { bitmap: forPage, width, height } = await this.picture(blob);
+				// No wider than the device's width (`PICTURES`), even from a server that sends the whole picture whatever `w=` says (Studio's).
+				const { bitmap: forPage, width, height } = await this.picture(blob, board ? size : undefined);
 				// Asked again since (a sharper copy, an engine started again): this one is not wanted.
 				const wanted = () => !this.disposed && !!this.page && this.picturesAsked.get(key) === asked;
 				if (!wanted()) return forPage.close();
@@ -1641,10 +1642,10 @@ export class StageEngine {
 	 * A picture's bitmap, premultiplied, no bigger across than the device keeps one, and its own size
 	 * (`width` × `height`, which lays it out).
 	 */
-	private async picture(blob: Blob): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+	private async picture(blob: Blob, wide?: number): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
 		const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
 		const { width, height } = bitmap;
-		const fit = Math.min(1, this.maxPicture / Math.max(width, height, 1));
+		const fit = Math.min(1, this.maxPicture / Math.max(width, height, 1), wide ? wide / Math.max(width, 1) : 1);
 		if (fit >= 1) return { bitmap, width, height };
 		const resizeWidth = Math.max(1, Math.floor(width * fit));
 		const resizeHeight = Math.max(1, Math.floor(height * fit));

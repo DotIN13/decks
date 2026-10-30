@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { promisify } from "node:util";
+import { brotliCompress, gzip, constants as zlib } from "node:zlib";
 import type { Board } from "@decks/protocol";
 import { compress, encoder, type Level } from "./astc.ts";
 
@@ -183,21 +185,25 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
 export const PICTURE_LOOK = 3;
 
 /**
- * The rungs a whole picture is also kept at (`ThumbService.smaller`), each a quarter of the pixels of
- * the next, the whole picture (up to 2048 px, `wholeScale`) the top one. The canvas fetches the
- * smallest at least as wide as the board on screen (`stage/engine.ts`): with only 192, 480 and the
- * whole, a board drawn 700 px wide on an iPad was sent its 2,000 px picture, 10 MB of the GPU's
- * memory for what a 2.6 MB one shows. A zoomed-out canvas draws a board a few dozen pixels wide, and
- * the whole picture made a first look at 400 boards a download of 118 MB; at 256 px it is a few MB.
+ * The widths a whole picture is also kept at (`ThumbService.smaller`), the ones the canvas fetches:
+ * 480 px on a big GPU and 192 on a small one (`PICTURES` in the canvas's `render/device.ts`), each
+ * fetched once and drawn at any zoom from the smaller sizes the GPU makes of it. A picture is drawn
+ * only below the live zoom, a card a few hundred pixels wide at most. A request for another width
+ * (an older canvas's 256, 512 or 1024) is sent the nearest of these (`smallWidthFor`), so no other
+ * width is ever made; copies at the old widths already on disk are left to go with their revision.
  */
-export const SMALL_WIDTHS: readonly number[] = [256, 512, 1024];
+export const SMALL_WIDTHS: readonly number[] = [192, 480];
+/** The width kept for a request's `w=`: the narrowest at least that wide, else the widest. */
+export function smallWidthFor(width: number): number | undefined {
+	if (!Number.isFinite(width) || width <= 0) return undefined;
+	return SMALL_WIDTHS.find((one) => one >= width) ?? SMALL_WIDTHS[SMALL_WIDTHS.length - 1];
+}
 /**
  * The width the background takes a board at (`ThumbKind` "small"), straight from the page: a
  * screenshot at 480 px took 163 ms where the whole one at twice the board's size took 1,522. The
- * 256 px copy is cut from it; the 1024 from the whole picture, taken only when a board is asked for
- * that wide.
+ * 192 px copy is cut from it.
  */
-export const SMALL_TAKEN = 512;
+export const SMALL_TAKEN = 480;
 /** The rungs the background makes for every board ahead of being asked: the ones cut from `SMALL_TAKEN`. */
 export const AHEAD_WIDTHS: readonly number[] = SMALL_WIDTHS.filter((width) => width <= SMALL_TAKEN);
 
@@ -356,6 +362,38 @@ export function compressedName(picture: string): string {
 	return picture.replace(/\.(webp|jpg)$/, ".astc");
 }
 
+/**
+ * The compressed sizes squeezed for the wire, beside them: ASTC is a byte a pixel and blocks of plain
+ * paper repeat, so brotli takes a board's file to a third or a half (480 px ones of 154 to 174 KB
+ * went to 52 to 84 KB) and gzip nearly as far, and the browser undoes it as it reads. Still three to
+ * five times its WebP (14 to 19 KB): ASTC saves the GPU's memory and the page's decoding, not network
+ * bytes. Brotli (`.astc.br`) is made with the compressed file; gzip (`.astc.gz`), for a browser that
+ * takes no brotli (Safari over plain http), the first time one asks.
+ */
+export type WireEncoding = "br" | "gzip";
+export function wireName(packed: string, encoding: WireEncoding): string {
+	return `${packed}.${encoding === "br" ? "br" : "gz"}`;
+}
+const squeeze = { br: promisify(brotliCompress), gzip: promisify(gzip) };
+/** A compressed picture squeezed for the wire (`wireName`), made once and kept; undefined if it could not be. */
+export async function squeezed(packed: string, encoding: WireEncoding): Promise<string | undefined> {
+	const target = wireName(packed, encoding);
+	if (existsSync(target)) return target;
+	try {
+		const bytes = readFileSync(packed);
+		const out = encoding === "br" ? await squeeze.br(bytes, { params: { [zlib.BROTLI_PARAM_QUALITY]: 11, [zlib.BROTLI_PARAM_SIZE_HINT]: bytes.length } }) : await squeeze.gzip(bytes, { level: 9 });
+		writeFileSync(target, out);
+		return target;
+	} catch {
+		return undefined;
+	}
+}
+/** The squeeze a request's `Accept-Encoding` takes, brotli first. */
+export function wireEncoding(accept: string | undefined): WireEncoding | undefined {
+	const takes = (name: string) => new RegExp(`(^|,)\\s*${name}\\s*(;\\s*q=(?!0(\\.0*)?\\s*(,|$))[\\d.]+)?\\s*(,|$)`, "i").test(accept ?? "");
+	return takes("br") ? "br" : takes("gzip") ? "gzip" : undefined;
+}
+
 export class ThumbService {
 	private browser: Promise<Browser> | undefined;
 	private idle: ReturnType<typeof setTimeout> | undefined;
@@ -439,6 +477,39 @@ export class ThumbService {
 	/** Compressed pictures being made, by the file they will be. */
 	private compressing = new Map<string, Promise<string | undefined>>();
 
+	/** Whether a canvas has asked for compressed pictures (`wantCompressed`), or this server kept some before. */
+	private packedWanted: boolean | undefined;
+	/** A canvas asked for a picture compressed (`astc=1`): from now on every copy is compressed as it is made, in the background. */
+	wantCompressed(): void {
+		this.packedWanted = true;
+	}
+	private compressedWanted(): boolean {
+		if (!encoder()) return false;
+		return (this.packedWanted ??= this.listDir().some((name) => name.endsWith(".astc")));
+	}
+
+	/**
+	 * A board's copies a canvas draws zoomed out (`AHEAD_WIDTHS`), and, once a canvas takes them, their
+	 * compressed sizes, made now if missing: the first request for a compressed picture finds it on
+	 * disk instead of waiting for the encoder (about 80 ms a 480 px board, 40 to 100 a 192, with the
+	 * server's Chrome up; more while it starts).
+	 */
+	private async ahead(board: Board, scheme: ThumbScheme): Promise<void> {
+		const files: string[] = [];
+		for (const width of [...AHEAD_WIDTHS].sort((a, b) => b - a)) files.push(await this.picture(board, scheme, width, () => false, true));
+		if (!this.compressedWanted()) return;
+		for (const file of files) if (!(await this.compressed(file))) throw new Error(`${file} could not be compressed`);
+	}
+
+	/** The copies of a picture just taken (`SMALL_WIDTHS`), and their compressed sizes when a canvas takes them, in the background. */
+	private async copiesOf(job: Job, whole: string): Promise<void> {
+		for (const width of SMALL_WIDTHS) {
+			if (job.kind === "small" && width > SMALL_TAKEN) continue;
+			const copy = job.kind === "small" && width === SMALL_TAKEN ? job.file : await this.smaller(job.file, width, true, smallName(whole, width));
+			if (typeof copy === "string" && this.compressedWanted()) await this.compressed(copy);
+		}
+	}
+
 	/**
 	 * A picture's every size compressed for the GPU (`astc.ts`), made once from its WebP by the
 	 * server's Chrome (the sizes) and `astcenc` (the blocks), and kept beside it. Undefined when this
@@ -467,6 +538,7 @@ export class ThumbService {
 			const packed = await compress(levels);
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(target, packed);
+			await squeezed(target, "br");
 			return target;
 		})
 			.catch((error: unknown) => {
@@ -514,7 +586,7 @@ export class ThumbService {
 						const { board, scheme } = next;
 						try {
 							// The sizes a canvas draws when zoomed out; the whole picture is taken when a board is asked for at it.
-							for (const width of [...AHEAD_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
+							await this.ahead(board, scheme);
 						} catch {
 							this.failures.add(`${board.path}:${scheme}`);
 						}
@@ -580,7 +652,8 @@ export class ThumbService {
 		for (const scheme of this.indexSchemes()) {
 			for (const board of boards) {
 				const whole = thumbName(board.path, board.rev, scheme, "whole");
-				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
+				const packed = this.compressedWanted();
+				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)) && (!packed || have.has(compressedName(smallName(whole, width)))))) continue;
 				// A picture this sweep could not take is not missing again until the board changes.
 				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
 				out.push({ board, scheme });
@@ -626,8 +699,8 @@ export class ThumbService {
 
 	/**
 	 * A board's picture at a size, made if it is missing: `"whole"`, or a copy's width (`SMALL_WIDTHS`).
-	 * A copy is cut from the whole picture when there is one; otherwise the 256 from the 512, the 512
-	 * taken straight from the page (`SMALL_TAKEN`), and the 1024 from the whole picture, taken for it. `ahead` is the background's: a browser's
+	 * A copy is cut from the whole picture when there is one; otherwise the 192 from the 480, and the
+	 * 480 taken straight from the page (`SMALL_TAKEN`). `ahead` is the background's: a browser's
 	 * request is taken before it.
 	 */
 	async picture(board: Board, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
@@ -705,9 +778,7 @@ export class ThumbService {
 				const [scheme, kind] = want.split("/") as [ThumbScheme, ThumbKind | undefined];
 				// A whole picture is retaken as its small sizes; the whole one when somebody asks for it.
 				if (kind === "whole") {
-					void (async () => {
-						for (const width of [...AHEAD_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
-					})().catch(() => {});
+					void this.ahead(board, scheme).catch(() => {});
 				} else this.ask(board, scheme, () => false, true, kind ?? "card").catch(() => {});
 			}
 		}, this.host.settleMs ?? SETTLE_MS);
@@ -880,8 +951,7 @@ export class ThumbService {
 			this.forgetOlder(job);
 			// The smaller sizes now, while the browser is up, so a canvas zoomed out never waits for one.
 			const whole = join(this.host.dir, thumbName(job.board.path, job.board.rev, job.scheme, "whole"));
-			if (job.kind === "whole") for (const width of SMALL_WIDTHS) void this.smaller(job.file, width).catch(() => {});
-			if (job.kind === "small") for (const width of SMALL_WIDTHS) if (width < SMALL_TAKEN) void this.smaller(job.file, width, true, smallName(whole, width)).catch(() => {});
+			if (job.kind !== "card") void this.copiesOf(job, whole).catch(() => {});
 		} finally {
 			clearTimeout(watchdog);
 			if (lease && !given) this.release(lease);
@@ -919,7 +989,7 @@ export class ThumbService {
 		// A whole or small picture replaces the small ones of earlier revisions; its own revision's stay.
 		const small = job.kind !== "card" ? smallOf(job.board.path, job.scheme) : undefined;
 		// And their compressed sizes (`compressedName`), which no stand-in ever is.
-		const packed = small ? new RegExp(small.source.replace("\\.webp$", "\\.astc$")) : undefined;
+		const packed = small ? new RegExp(small.source.replace("\\.webp$", "\\.astc(\\.br|\\.gz)?$")) : undefined;
 		try {
 			for (const name of readdirSync(this.host.dir)) {
 				if (job.kind !== "small" && name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });

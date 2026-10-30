@@ -24,7 +24,7 @@ import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { boardOnCanvas, verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
-import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
+import { pictureType, smallWidthFor, squeezed, wireEncoding } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
@@ -702,9 +702,10 @@ export function createHttpApp(app: App): Express {
 			try {
 				const scheme = req.query.scheme === "dark" ? "dark" : "light";
 				const kind = req.query.whole === "1" ? "whole" : "card";
-				// A smaller copy of a whole picture, for a canvas zoomed out (`SMALL_WIDTHS`).
-				const width = Number(req.query.w);
-				const small = kind === "whole" && SMALL_WIDTHS.includes(width) ? width : undefined;
+				// A smaller copy of a whole picture, for a canvas zoomed out (`SMALL_WIDTHS`): another width is sent the nearest kept.
+				const small = kind === "whole" ? smallWidthFor(Number(req.query.w)) : undefined;
+				const wantsPacked = req.query.astc === "1" && small !== undefined;
+				if (wantsPacked) app.thumbs.wantCompressed();
 				const send = async (file: string) => {
 					res.type(file.endsWith(".webp") ? "webp" : "jpeg");
 					await sendFile(res, file);
@@ -735,15 +736,24 @@ export function createHttpApp(app: App): Express {
 				}
 				const file = near?.file ?? (await app.thumbs.picture(board, scheme, size, () => gone));
 				if (gone) return;
-				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
+				const kept = req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache";
 				// Compressed for the GPU, when the canvas takes it (`astc=1`) and this machine can make it; else the WebP.
-				const packed = req.query.astc === "1" && small !== undefined ? await app.thumbs.compressed(file) : undefined;
+				const packed = wantsPacked ? await app.thumbs.compressed(file) : undefined;
 				if (gone) return;
 				if (packed) {
+					res.setHeader("Cache-Control", kept);
+					res.setHeader("Vary", "Accept-Encoding");
 					res.type("application/vnd.decks.astc");
-					await sendFile(res, packed);
+					// Squeezed on disk (`wireName`), a third to a half of the bytes, for a browser that undoes brotli or gzip.
+					const encoding = wireEncoding(req.headers["accept-encoding"]);
+					const wire = encoding ? await squeezed(packed, encoding) : undefined;
+					if (gone) return;
+					if (wire) res.setHeader("Content-Encoding", encoding!);
+					await sendFile(res, wire ?? packed);
 					return;
 				}
+				// Asked for compressed and sent the WebP (no encoder, or it failed): not kept, so a later look can have the compressed one.
+				res.setHeader("Cache-Control", wantsPacked ? "no-cache" : kept);
 				await send(file);
 			} catch (error) {
 				if (!gone) res.status(503).type("text").send((error as Error).message);

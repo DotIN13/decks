@@ -30,7 +30,9 @@ test("a phone or tablet has a small GPU, and so has a computer with little memor
 	assert.equal(gpuClass({ kind: "computer", deviceMemory: 4 }), "small");
 	assert.equal(gpuClass({ kind: "computer", deviceMemory: 8, maxBufferSize: 2 ** 32 }), "big");
 	assert.equal(gpuClass({ kind: "computer", maxBufferSize: 256 * 2 ** 20 }), "small");
+	assert.equal(gpuClass({ kind: "mobile", forced: "480" }), "big");
+	assert.equal(gpuClass({ kind: "computer", forced: "192" }), "small");
 	assert.equal(gpuClass({ kind: "mobile", forced: "1024" }), "big");
 	assert.equal(gpuClass({ kind: "computer", forced: "512" }), "small");
-	assert.deepEqual(PICTURES, { big: { width: 1024, budgetMB: 512 }, small: { width: 512, budgetMB: 128 } });
+	assert.deepEqual(PICTURES, { big: { width: 480, budgetMB: 256 }, small: { width: 192, budgetMB: 64 } });
 });

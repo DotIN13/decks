@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import { compress, encoder, MAGIC, type Level } from "./astc.ts";
-import { compressedName } from "./thumbs.ts";
+import { compressedName, SMALL_WIDTHS, smallWidthFor, squeezed, wireEncoding, wireName } from "./thumbs.ts";
 
 /** A picture's sizes, top half red and bottom half blue, each half the one before down to one pixel. */
 function levels(width: number, height: number): Level[] {
@@ -30,4 +34,39 @@ test("a picture's sizes compress into one file: its size, its count of sizes, an
 
 test("a picture's compressed sizes sit beside it", () => {
 	assert.equal(compressedName("/d/ab-3-light-2-whole-w1024.webp"), "/d/ab-3-light-2-whole-w1024.astc");
+});
+
+test("pictures are kept at 192 and 480 px only, and another width asked for is sent the nearest", () => {
+	assert.deepEqual(SMALL_WIDTHS, [192, 480]);
+	assert.equal(smallWidthFor(192), 192);
+	assert.equal(smallWidthFor(256), 480);
+	assert.equal(smallWidthFor(480), 480);
+	assert.equal(smallWidthFor(1024), 480);
+	assert.equal(smallWidthFor(100), 192);
+	assert.equal(smallWidthFor(Number("")), undefined);
+	assert.equal(smallWidthFor(Number.NaN), undefined);
+});
+
+test("a compressed picture is squeezed for the wire once, beside it, and comes back the same", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "astc-wire-"));
+	const packed = join(dir, "ab-3-light-2-whole-w480-l3.astc");
+	// Blocks of plain paper repeat: what a board's picture mostly is.
+	writeFileSync(packed, Buffer.alloc(64 * 1024, 7));
+	const br = await squeezed(packed, "br");
+	assert.equal(br, wireName(packed, "br"));
+	assert.ok(statSync(br!).size < 1024);
+	assert.deepEqual(brotliDecompressSync(readFileSync(br!)), readFileSync(packed));
+	const gz = await squeezed(packed, "gzip");
+	assert.equal(gz, `${packed}.gz`);
+	assert.deepEqual(gunzipSync(readFileSync(gz!)), readFileSync(packed));
+	rmSync(dir, { recursive: true, force: true });
+});
+
+test("brotli is sent where the browser takes it, else gzip (Safari over plain http), else neither", () => {
+	assert.equal(wireEncoding("gzip, deflate, br, zstd"), "br");
+	assert.equal(wireEncoding("gzip, deflate"), "gzip");
+	assert.equal(wireEncoding("br;q=0, gzip"), "gzip");
+	assert.equal(wireEncoding("identity"), undefined);
+	assert.equal(wireEncoding(undefined), undefined);
+	assert.equal(wireEncoding("brx"), undefined);
 });
