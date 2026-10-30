@@ -493,14 +493,15 @@ await canvas.evaluate(({ x, y }) => {
 }, { x: onCard.x + onCard.width / 2, y: onCard.y + 40 });
 const filed = await until(() => (cardNode()?.children ?? []).find((n) => n.metadata?.type === "decks.file" && /itinerary-2\.pdf$/.test(n.metadata.path)), 12000);
 say("a file dropped on a card goes into it as a file's chip", !!filed && (cardNode()?.children ?? []).length === before + 1, JSON.stringify(filed && { name: filed.name, path: filed.metadata.path, kids: filed.children?.map((c) => c.type) }));
-// What the page asks to open, rather than a real tab: a headless browser need not show one.
-await canvas.evaluate(() => {
+// What the page asks to open, rather than a real tab: a headless browser need not show one. The frame may not open
+// a tab, so it is the page's window.open that a chip's double-click ends in (`open-link`).
+await page.evaluate(() => {
 	globalThis.__opened = [];
 	window.open = (url) => (globalThis.__opened.push(String(url)), null);
 });
 const chip = await until(() => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), filed?.id));
 if (chip) await page.mouse.dblclick(chip.x + chip.width / 2, chip.y + chip.height / 2);
-const opened = await until(() => canvas.evaluate(() => globalThis.__opened?.[0]), 3000);
+const opened = await until(() => page.evaluate(() => globalThis.__opened?.[0]), 3000);
 say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test(opened ?? ""), opened);
 
 // A block's grip, in the card's margin, drags the block out of the card, and a drag puts it back.
