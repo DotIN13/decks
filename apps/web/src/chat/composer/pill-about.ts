@@ -40,7 +40,7 @@ export function commentName(comment: WaitingComment, titleOf: TitleOf = none, it
 
 /**
  * A comment's pill: the start of its quote, or the name of what it is on when it quotes nothing. A
- * comment from the canvas is as short as yours, with a dashed edge (`from`); all of it is in its card.
+ * comment from the canvas is as short as yours (`from` marks it, and its card names it in amber); all of it is in its card.
  */
 export function commentPill(comment: WaitingComment, titleOf?: TitleOf, itemName?: ItemName): DraftMention {
 	const name = commentName(comment, titleOf, itemName);
@@ -58,13 +58,14 @@ export function commentPill(comment: WaitingComment, titleOf?: TitleOf, itemName
 export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleOf = none, itemName: ItemName = none): PillAbout {
 	const drawn = !!comment.items?.length;
 	const name = commentName(comment, titleOf, itemName);
-	const where = drawn ? `on ${pathName(comment.board.replace(/\/canvas\.pen$/, ""))}` : `on “${name}”${comment.component ? `, #${comment.component}` : ""}`;
+	// Where on it, never its name again: the tooltip and the card name it already.
+	const where = drawn ? `, on ${pathName(comment.board.replace(/\/canvas\.pen$/, ""))}` : comment.component ? `, #${comment.component}` : "";
 	return {
 		name,
 		of: drawn ? "shape" : "card",
 		...(comment.quote ? { quote: comment.quote } : {}),
 		note: comment.text,
-		source: comment.from === "canvas" ? `From the canvas: a card handed this over, ${where}` : `Your comment, ${where}`,
+		source: comment.from === "canvas" ? `From the canvas${where}` : `Your comment${where}`,
 		exact: commentItem(comment, n),
 		...(comment.from === "canvas" ? { canvas: true } : {}),
 	};

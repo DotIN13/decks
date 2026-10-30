@@ -41,7 +41,7 @@ const chip = await page
 	.waitForSelector('.composer-box [data-component="mention-pill"][data-kind="comment"]', { timeout: 4000 })
 	.then((el) => el.evaluate((pill) => ({ text: pill.textContent?.trim() ?? "", from: pill.dataset.from ?? "", name: pill.dataset.mentionName ?? "" })))
 	.catch(() => null);
-// A comment from the canvas is as short as any comment's pill: the board's name, a dashed edge (`data-from`), its note in its card.
+// A comment from the canvas is as short as any comment's pill: the board's name, marked `data-from`, its note in its card.
 say("…and Enter puts it over the input bar, named by its board", !!chip && chip.from === "canvas" && chip.text.length <= 30 && !chip.text.includes("Shorter") && chip.name !== "", JSON.stringify(chip));
 await page.evaluate(() => localStorage.removeItem("decks.comments"));
 

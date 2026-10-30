@@ -214,14 +214,6 @@
 	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"]:is(:hover, [aria-expanded="true"]) {
 		background: color-mix(in srgb, var(--pill, #f2b200) 36%, transparent);
 	}
-	/*
-	 * A comment from the canvas is as short as any comment's pill (`pillWords`); a dashed amber edge says a
-	 * card handed it over rather than you (`data-from`, kept with the sent message in its parts).
-	 */
-	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-from="canvas"] {
-		outline: 1.5px dashed #d97706;
-		outline-offset: -1px;
-	}
 	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"] [data-slot="pill-icon"] {
 		display: inline;
 		margin-inline-end: 3px;

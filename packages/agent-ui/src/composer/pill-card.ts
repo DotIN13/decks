@@ -23,7 +23,7 @@ export interface PillAbout {
 	source: string;
 	/** The words the agent receives for this pill, from the same code that writes the message. */
 	exact: string;
-	/** Handed over by the canvas (a card's script can): the amber name and the dashed edge say so. */
+	/** Handed over by the canvas (a card's script can): the card's amber name says so. */
 	canvas?: boolean;
 }
 
@@ -56,7 +56,7 @@ const PILL_ICONS: Record<MentionKind, string> = {
 };
 
 /** The most of a name a pill shows: a long board title would otherwise wrap a sent message over lines. */
-export const PILL_LIMIT = 30;
+export const PILL_LIMIT = 20;
 
 /** A pill's words, cut to `PILL_LIMIT` with an ellipsis. The whole name is in its tooltip and its card. */
 export function pillWords(label: string): string {
@@ -77,7 +77,7 @@ export function pillElement(node: DraftMention): HTMLElement {
 	span.dataset.mentionId = node.id;
 	span.dataset.mentionLabel = node.label;
 	if (node.name) span.dataset.mentionName = node.name;
-	// A comment the canvas handed over: `ink.css` gives it a dashed edge.
+	// A comment the canvas handed over: its card names it in amber.
 	if (node.from === "canvas") span.dataset.from = "canvas";
 	span.textContent = pillWords(draftLabel(node));
 	// In front of the label, and no part of it: an icon contributes no text.
@@ -92,11 +92,18 @@ const clip = (words: string) => {
 	return flat.length > TIP_LIMIT ? `${flat.slice(0, TIP_LIMIT - 1).trimEnd()}…` : flat;
 };
 
-/** The tooltip's words for a pill: the quote and the note, then its whole name and where it came from. */
+/** The most of a name the tooltip shows; the card names it on one line, and its whole name shows there. */
+const TIP_NAME_LIMIT = 32;
+const clipName = (name: string) => {
+	const flat = name.replace(/\s+/g, " ").trim();
+	return flat.length > TIP_NAME_LIMIT ? `${flat.slice(0, TIP_NAME_LIMIT - 1).trimEnd()}…` : flat;
+};
+
+/** The tooltip's words for a pill: the quote and the note, then its name, cut short, and where it came from. */
 export function pillTip(about: PillAbout): { tip: string; sub: string } {
 	const said = [about.quote ? `“${clip(about.quote)}”` : "", clip(about.note ?? "")].filter(Boolean).join(" · ");
-	if (!said) return { tip: about.name, sub: `${about.source} · click to read all` };
-	return { tip: said, sub: `${about.name} · ${about.source} · click to read all` };
+	if (!said) return { tip: clipName(about.name), sub: `${about.source} · click to read all` };
+	return { tip: said, sub: `${clipName(about.name)} · ${about.source} · click to read all` };
 }
 
 let open: { pill: HTMLElement; card: HTMLElement; close: () => void } | undefined;

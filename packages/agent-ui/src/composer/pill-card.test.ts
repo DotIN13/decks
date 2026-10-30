@@ -12,10 +12,13 @@ test("a pill's words are cut to fit a sentence, a quotation keeping its closing 
 	assert.equal(pillWords("two\nlines"), "two lines");
 });
 
-test("the tooltip names the thing in full, and cuts a long note", () => {
+test("the tooltip names the thing, cut short, and cuts a long note", () => {
 	const name = "The chrome choice is who owns the canvas's behaviour rules";
-	assert.deepEqual(pillTip({ name, of: "card", source: "On the canvas", exact: "@x" }), { tip: name, sub: "On the canvas · click to read all" });
+	const bare = pillTip({ name, of: "card", source: "On the canvas", exact: "@x" });
+	assert.ok(bare.tip.length <= 32 && bare.tip.endsWith("…") && name.startsWith(bare.tip.slice(0, -1)), bare.tip);
+	assert.equal(bare.sub, "On the canvas · click to read all");
 	const tip = pillTip({ name, of: "card", quote: "q", note: "word ".repeat(100), source: "Your comment", exact: "1. x" });
 	assert.ok(tip.tip.length < 200 && tip.tip.endsWith("…"));
-	assert.ok(tip.sub.startsWith(name));
+	assert.ok(tip.sub.startsWith(bare.tip));
+	assert.equal(pillTip({ name: "plan.pdf", of: "file", source: "File", exact: "@plan.pdf" }).tip, "plan.pdf");
 });
