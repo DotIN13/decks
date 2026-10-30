@@ -84,25 +84,8 @@ const TOOL_KEYS: Record<string, "select"> = { v: "select" };
  * finger on the canvas moves the canvas unless it landed on something that says
  * otherwise, which on a board means a title bar or a component already selected.
  */
-/** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
-export interface StageShots {
-	/** The picture of a board or a card, as an address the sheet can fetch. */
-	picture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string;
-}
-
-/** What a comment is about (`Stage`'s `onComment`). */
-export interface StageComment {
-	path: string;
-	title: string;
-	quote: string;
-	/** The `data-id` of the block the selected words are in, for a comment on words in a board. */
-	component?: string;
-	items?: string[];
-	anchor: () => DOMRect | undefined;
-}
-
-/** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */
-export type InkRequest = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
+export type { InkRequest, StageComment, StageShots } from "../types.ts";
+import type { InkRequest, StageComment, StageShots } from "../types.ts";
 
 export function Stage(props: {
 	/**

@@ -60,8 +60,6 @@ export interface Start {
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
 	stored: Record<string, string>;
-	/** The tools' state as the app's chrome has it (`ui-sync.ts`). */
-	tools?: Record<string, unknown>;
 }
 
 /** A card or a board on the canvas, as the frame draws it. */
@@ -84,8 +82,6 @@ export interface PageToFrame {
 	step: { direction: "undo" | "redo" };
 	/** Who writes on the drawing now: what it is drawing is shown in their colour, with their name. */
 	busy: { writer?: { name?: string; color: string } };
-	/** The tools' state, what changed of it (`ui-sync.ts`). */
-	ui: Record<string, unknown>;
 }
 
 /** The calls the page makes of the frame, and what each answers. */
@@ -121,8 +117,6 @@ export interface FrameToPage {
 	export: { ids: string[] };
 	store: { key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
-	/** The tools' state, what changed of it (`ui-sync.ts`), for a frame with no chrome of its own. */
-	ui: Record<string, unknown>;
 }
 
 /** The calls the frame makes of the page, and what each answers. */

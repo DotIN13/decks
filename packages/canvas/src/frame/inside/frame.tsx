@@ -2,13 +2,12 @@ import { baseTheme, placements, serialize, type PenEdit } from "@decks/pen";
 import { createSignal, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
-import { createEditor, type Editor } from "../../mount.tsx";
+import { createEditor } from "../../mount.tsx";
+import type { Editor, StageComment } from "../../types.ts";
 import { setCanvasHost } from "../../host.ts";
 import { drawing, setDrawing } from "../../edit/ink.ts";
-import type { StageComment } from "../../stage/Stage.tsx";
 import type { Camera } from "@decks/protocol";
 import type { FrameChromeView } from "../chrome.ts";
-import { syncTools } from "./ui-sync.ts";
 import { canvasBox, useInsets } from "../../camera/insets.ts";
 import { fitInto } from "../../camera/camera.ts";
 import { cardCalls } from "./card-calls.ts";
@@ -17,6 +16,8 @@ import type { ViewOffer } from "../chrome.ts";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import { isNews } from "../../items/news.ts";
 import { boardsOf } from "../../model/drawing.ts";
+import { pageItems, placedItems } from "../../model/boxes.ts";
+import { handsOn } from "../../camera/touched.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "../protocol.ts";
@@ -79,8 +80,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
 	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
-	let touched = 0;
-	for (const type of ["pointerdown", "wheel", "keydown"]) addEventListener(type, () => (touched = performance.now()), { capture: true, passive: true });
 	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
 	let made: Editor | undefined;
 	const items = () => {
@@ -102,13 +101,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	function placeCards(): void {
 		const doc = made?.handle.drawn();
 		if (!doc) return;
-		const placed = placements(doc, { theme: baseTheme(doc, "light") });
-		const boxes = new Map<string, { x: number; y: number; w: number; h: number }>();
-		for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string; type?: string } }>) {
-			const path = child.metadata?.path;
-			const box = child.id ? placed.get(child.id)?.box : undefined;
-			if (path && box && (child.metadata?.type === "decks.card" || child.metadata?.type === "decks.board")) boxes.set(path, { x: box.x, y: box.y, w: box.w, h: box.h });
-		}
+		const boxes = new Map(pageItems(doc).map((item) => [item.path!, item.box]));
 		const now = untrack(pages);
 		const same = now.length === boxes.size && now.every((page) => boxes.has(page.path));
 		// Studio keeps no records of cards: the drawing is all there is of them.
@@ -160,6 +153,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const folder = `canvases/${start.canvas.name}/`;
 	// On Studio the address is the canvas's own folder already.
 	const inFolder = (path: string) => (studio || path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
+	/*
+	 * A document item's editor, on this frame's line (`item-surfaces.tsx`): what it sends goes to the harness,
+	 * which answers only for files a document item on this canvas names, down this frame's own stream.
+	 */
+	const docListeners = new Set<(message: unknown) => void>();
+	const hearDoc = (message: unknown) => {
+		for (const listener of docListeners) listener(message);
+	};
 	setCanvasHost({
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
 		canWrite: () => start.canvas.role !== "view" && !start.look.readOnly,
@@ -171,6 +172,43 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				return undefined;
 			}
 		},
+		...(studio
+			? {}
+			: {
+					documents: {
+						send: (message: unknown) => void backend.post("doc", { frame: backend.frame, message }).then((answer) => answer.ok === false && console.warn(answer.error)),
+						listen: (listener: (message: unknown) => void) => {
+							docListeners.add(listener);
+							return () => docListeners.delete(listener);
+						},
+						// The canvas's own `lib/`, beside its cards, as a card reads it.
+						lib: address(inFolder("lib/")),
+					},
+				}),
+		// An app opens in a tab, which the page opens, outside this sandbox; the frame only asks what it is.
+		apps: {
+			status: async (name: string) => {
+				if (studio) return undefined;
+				try {
+					const response = await fetch(`${start.backend.api.replace(/\/+$/, "")}/apps/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${backendToken()}` } });
+					return response.ok ? ((await response.json()) as { title?: string; status?: string }) : undefined;
+				} catch {
+					return undefined;
+				}
+			},
+			open: (name: string) => end.emit("open-app", { name }),
+		},
+		// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
+		cardCall: cardCalls({
+			canvas: start.canvas.name,
+			camera: () => untrack(camera),
+			move: (next, glide) => (glide ? handle.glide(next, glide) : handle.setCamera(next)),
+			focus: (targets) => focus(targets),
+			viewport: () => ({ width: innerWidth, height: innerHeight }),
+			reload: (path) => handle.reloadBoard(path),
+			harness: (verb, args) => (studio ? Promise.resolve({ ok: false, error: `${verb}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.call(verb, args)),
+			page: (verb, args, card) => end.call("agent", { verb, args, card }),
+		}),
 	});
 
 	const editor: Editor = createEditor({
@@ -279,66 +317,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	/** Frame these items, by id or by a card's path, as `view.focus` does. */
 	const focus = (targets: string[]) => {
 		const doc = handle.drawn();
-		const placed = placements(doc, { theme: baseTheme(doc, "light") });
-		const byPath = new Map<string, string>();
-		for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>) if (child.id && child.metadata?.path) byPath.set(child.metadata.path, child.id);
+		const items = placedItems(doc);
 		const boxes = targets
-			.map((target) => placed.get(target)?.box ?? placed.get(byPath.get(target) ?? [...byPath].find(([path]) => target.endsWith(path) || path.endsWith(target))?.[1] ?? "")?.box)
-			.filter((box): box is NonNullable<typeof box> => !!box)
-			.map((box) => ({ x: box.x, y: box.y, w: box.w, h: box.h }));
+			.map((target) => (items.find((item) => item.id === target) ?? items.find((item) => item.path && (item.path === target || target.endsWith(item.path) || item.path.endsWith(target))))?.box)
+			.filter((box): box is NonNullable<typeof box> => !!box);
 		if (!boxes.length) throw new Error(`Nothing on this canvas is ${targets.join(", ")}.`);
 		const view = { width: innerWidth, height: innerHeight };
 		handle.glide(fitInto(boxes, view, canvasBox(view)), 400);
 	};
-	/*
-	 * A document item's editor, on this frame's line (`item-surfaces.tsx`): what it sends goes to the harness,
-	 * which answers only for files a document item on this canvas names, down this frame's own stream.
-	 */
-	const docListeners = new Set<(message: unknown) => void>();
-	const hearDoc = (message: unknown) => {
-		for (const listener of docListeners) listener(message);
-	};
-	setCanvasHost({
-		...(studio
-			? {}
-			: {
-					documents: {
-						send: (message: unknown) => void backend.post("doc", { frame: backend.frame, message }).then((answer) => answer.ok === false && console.warn(answer.error)),
-						listen: (listener: (message: unknown) => void) => {
-							docListeners.add(listener);
-							return () => docListeners.delete(listener);
-						},
-						// The canvas's own `lib/`, beside its cards, as a card reads it.
-						lib: address(inFolder("lib/")),
-					},
-				}),
-		// An app opens in a tab, which the page opens, outside this sandbox; the frame only asks what it is.
-		apps: {
-			status: async (name: string) => {
-				if (studio) return undefined;
-				try {
-					const response = await fetch(`${start.backend.api.replace(/\/+$/, "")}/apps/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${backendToken()}` } });
-					return response.ok ? ((await response.json()) as { title?: string; status?: string }) : undefined;
-				} catch {
-					return undefined;
-				}
-			},
-			open: (name: string) => end.emit("open-app", { name }),
-		},
-	});
-	// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
-	setCanvasHost({
-		cardCall: cardCalls({
-			canvas: start.canvas.name,
-			camera: () => untrack(camera),
-			move: (next, glide) => (glide ? handle.glide(next, glide) : handle.setCamera(next)),
-			focus,
-			viewport: () => ({ width: innerWidth, height: innerHeight }),
-			reload: (path) => handle.reloadBoard(path),
-			harness: (verb, args) => (studio ? Promise.resolve({ ok: false, error: `${verb}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.call(verb, args)),
-			page: (verb, args, card) => end.call("agent", { verb, args, card }),
-		}),
-	});
 
 	/*
 	 * The drawing as the harness changes it, from its stream: each change is said once per agent on the
@@ -393,7 +379,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				focused: () => untrack(agent),
 				stageOnScreen: () => start.canvas.name,
 				setCamera: (to, options) => moveTo(to, options?.animate),
-				handsOn: () => performance.now() - touched < 3000,
+				handsOn,
 				offerView: (from, to, selected, what) => setOffer({ agent: from, what, go: () => {
 					moveTo(to, true);
 					selectCard(selected);
@@ -560,14 +546,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		return;
 	}
 
-	// No chrome of its own: the tools as the app's page has them, kept in step both ways.
-	let applyTools: ((patch: Record<string, unknown>) => void) | undefined;
-	syncTools((patch) => end.emit("ui", patch), (apply) => {
-		applyTools = apply;
-		end.on("ui", apply);
-	});
-	if (start.tools) applyTools?.(start.tools);
-
+	/*
+	 * No chrome of its own (Studio, until it brings one): the editor's own bars, or none. Nothing of the
+	 * tools crosses the frame line: an app's chrome lives in the frame beside the canvas.
+	 */
 	render(() => (
 		<>
 			{start.look.toolbar ? editor.root() : editor.surface()}
@@ -578,14 +560,5 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 
 /** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
 function cardsOf(doc: import("@decks/pen").PenDocument, trust: (path: string) => Page["trust"]): Page[] {
-	const placed = placements(doc, { theme: baseTheme(doc, "light") });
-	const cards: Page[] = [];
-	for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; name?: string; metadata?: { path?: string; type?: string } }>) {
-		const path = child.metadata?.path;
-		const type = child.metadata?.type;
-		const box = child.id ? placed.get(child.id)?.box : undefined;
-		if (!path || !box || (type !== "decks.card" && type !== "decks.board")) continue;
-		cards.push({ path, title: child.name ?? path.split("/").slice(-2).join("/"), rev: 0, x: box.x, y: box.y, w: box.w, h: box.h, inContext: [], ...(type === "decks.card" ? { card: true as const } : {}), trust: trust(path) });
-	}
-	return cards;
+	return pageItems(doc).map((item) => ({ path: item.path!, title: item.name ?? item.path!.split("/").slice(-2).join("/"), rev: 0, ...item.box, inContext: [], ...(item.type === "decks.card" ? { card: true as const } : {}), trust: trust(item.path!) }));
 }

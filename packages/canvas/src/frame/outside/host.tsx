@@ -1,9 +1,8 @@
 import { serialize, type PenDocument } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
-import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../../mount.tsx";
+import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../../types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
-import { syncTools, toolsNow } from "../inside/ui-sync.ts";
 import { insets } from "../../camera/insets.ts";
 import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type PageEnd, type Rect, type Start } from "../protocol.ts";
 
@@ -60,8 +59,6 @@ export function createFramedEditor(options: Options): Editor {
 	/** The last of each the frame said, so this end does not say it back. */
 	let fromFrame: { camera?: Camera; selected?: string; mode?: "edit" | "browse" } = {};
 	let drawn: PenDocument | undefined;
-	/** What keeps the tools in step with the frame on screen (`ui-sync.ts`). */
-	let stopTools: (() => void) | undefined;
 	let tool: PenTool = "select";
 	let localCamera: Camera = untrack(() => state?.camera?.[0]()) ?? options.camera ?? { x: 0, y: 0, zoom: 1 };
 	let darkNow = options.dark === true;
@@ -102,7 +99,6 @@ export function createFramedEditor(options: Options): Editor {
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
 			stored,
-			tools: toolsNow(),
 		};
 		const onHello = (event: MessageEvent) => {
 			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
@@ -139,8 +135,6 @@ export function createFramedEditor(options: Options): Editor {
 
 	/** What the frame says, as the host's own callbacks and state. */
 	const wire = (page: PageEnd, canvas: string) => {
-		stopTools?.();
-		stopTools = syncTools((patch) => page.emit("ui", patch), (apply) => page.on("ui", apply));
 		/*
 		 * Drafts for the composer: shown there, never sent from here. Anything in the frame can say these,
 		 * a card's script too, so what reaches an agent is only what you send yourself.
@@ -275,8 +269,6 @@ export function createFramedEditor(options: Options): Editor {
 					let cancelled = false;
 					onCleanup(() => {
 						cancelled = true;
-						stopTools?.();
-						stopTools = undefined;
 						end()?.close();
 						setEnd(undefined);
 						setFrameAt(undefined);
