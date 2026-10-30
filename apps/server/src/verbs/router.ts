@@ -3,6 +3,7 @@ import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
+import { bearerOf } from "../auth/guard.ts";
 import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
 import { penEditBy } from "../stage/pens.ts";
@@ -54,10 +55,21 @@ export function verbRoutes(app: App): express.Router {
 		// A canvas frame hears its own canvas and nothing else (`onCanvas`), and what was said to it alone (`frame`).
 		const own = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
 		const frameId = typeof req.query.frame === "string" ? req.query.frame : undefined;
+		/*
+		 * A canvas pass is checked on every use, and a stream is used for as long as it is open: before each
+		 * message and each beat, so a pass run out, signed out or unshared ends it at once. The frame comes
+		 * back on the pass it holds now (`backend.ts`), and reads again what it missed.
+		 */
+		const pass = own !== undefined ? bearerOf(req.headers) : undefined;
+		const still = () => pass === undefined || app.passes.openCanvas(pass)?.canvas === own;
 		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
 		res.write(": decks events\n\n");
 		if (own !== undefined) app.canvasFrames += 1;
 		const stop = app.listen((message) => {
+			if (!still()) {
+				res.end();
+				return;
+			}
 			const to = (message as { frameTo?: string }).frameTo;
 			if (to !== undefined) {
 				if (own === undefined || to !== frameId) return;
@@ -69,13 +81,18 @@ export function verbRoutes(app: App): express.Router {
 			if (own !== undefined && !onCanvas(app, message, own)) return;
 			res.write(`event: ${message.type}\ndata: ${JSON.stringify(message)}\n\n`);
 		});
-		const beat = setInterval(() => res.write(": still here\n\n"), 25_000);
+		const beat = setInterval(() => (still() ? res.write(": still here\n\n") : res.end()), pass === undefined ? 25_000 : 5_000);
 		beat.unref?.();
-		req.on("close", () => {
+		let closed = false;
+		const close = () => {
+			if (closed) return;
+			closed = true;
 			clearInterval(beat);
 			if (own !== undefined) app.canvasFrames -= 1;
 			stop();
-		});
+		};
+		req.on("close", close);
+		res.on("close", close);
 	});
 
 	/**

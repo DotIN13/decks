@@ -74,10 +74,10 @@ export interface ShotHost {
 	/** Where the web app is served, as the server can reach it: `shot.html` is part of it. */
 	webOrigin: () => string;
 	/**
-	 * A ticket for one of the harness's own reads (`auth/tickets.ts`): `shot.html` reads the stage it
-	 * draws with one, since the page carries no one's token.
+	 * A canvas pass the harness makes for its own page (`auth/passes.ts`): `shot.html` reads the canvas it
+	 * draws with one, since the page carries no one's token. `""` for a saved frame on no canvas.
 	 */
-	ticket?: (path: string) => string;
+	pass?: (canvas: string) => string;
 	borrow: <T>(use: (browser: Browser) => Promise<T>) => Promise<T>;
 	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
 	native?: NativeShots;
@@ -175,8 +175,7 @@ export class StageShots {
 		}
 
 		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage };
-		const read = drawn.pen !== undefined ? "/api/pen-file" : `/api/stage-pen/${drawn.stage}`;
-		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.ticket ? { ticket: this.host.ticket(read) } : {}) });
+		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.pass ? { pass: this.host.pass(drawn.stage ?? "") } : {}) });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
 		const bytes = await this.host.borrow(async (browser) => {

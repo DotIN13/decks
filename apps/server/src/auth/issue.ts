@@ -5,7 +5,7 @@ import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
 import { FOLDER_TICKET_MS, isFolderTicket, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
-import { CANVAS_IDLE_MS, TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
+import { TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
 import { bearerOf, originOf } from "./guard.ts";
 
 /**
@@ -23,8 +23,8 @@ import { bearerOf, originOf } from "./guard.ts";
  *   can place, for a site token, bound to the page's site.
  * - **A board**: `POST /api/tokens { kind: "board", path, stage? }`, asked by the person or a site for
  *   a board it is about to show.
- * - **A canvas frame**: `POST /api/tokens { kind: "canvas", canvas }`, asked by the person or a site for
- *   the sandboxed editor it is about to show, and again every few minutes to renew it.
+ * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
+ *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **A page**: `POST /api/tickets`, five-minute tickets for another site's frames and tabs.
  */
 
@@ -348,8 +348,28 @@ export function doorRoutes(app: App): express.Router {
 	});
 
 	/**
-	 * A token for a board the person or a site is about to show: `{ kind: "board", path, stage? }`; or for
-	 * the canvas frame it shows, `{ kind: "canvas", canvas }`, with the person's role on that canvas.
+	 * A canvas pass for the canvas frame the person or a site is about to show (`passes.ts`):
+	 * `{ canvas }`, and back `{ pass, role, expires }`, the pass bound to the token that asked and with
+	 * the person's role on that canvas. The page asks again at half its life.
+	 */
+	api.post("/passes", (req, res) => {
+		if (!actsAsPerson(req.principal) || !req.tokenId) {
+			res.status(403).json({ error: "Only the person, or a front end paired with this harness, asks for a canvas pass, with its own token." });
+			return;
+		}
+		const pens = app.stage.pens;
+		const canvas = String(((req.body ?? {}) as { canvas?: unknown }).canvas ?? "");
+		if (!canvas || !pens || !pens.has(canvas)) {
+			res.status(404).json({ error: `There is no canvas called ${canvas || "that"}.` });
+			return;
+		}
+		const role = pens.sharing(canvas)?.role === "view" ? "view" : "edit";
+		const { pass, expires } = app.passes.canvas(canvas, role, req.tokenId);
+		res.set("cache-control", "no-store").json({ pass, role, expires });
+	});
+
+	/**
+	 * A token for a board the person or a site is about to show: `{ kind: "board", path, stage? }`.
 	 * Its calls act as that board, and the person is asked once before it may use the stage
 	 * (`verbs/router.ts`).
 	 */
@@ -358,19 +378,7 @@ export function doorRoutes(app: App): express.Router {
 			res.status(403).json({ error: "Only the person, or a front end paired with this harness, makes a board's token." });
 			return;
 		}
-		const body = (req.body ?? {}) as { kind?: unknown; path?: unknown; stage?: unknown; canvas?: unknown };
-		if (body.kind === "canvas") {
-			const pens = app.stage.pens;
-			const canvas = typeof body.canvas === "string" ? body.canvas : "";
-			if (!pens || !pens.has(canvas)) {
-				res.status(404).json({ error: `There is no canvas called ${canvas || "that"}.` });
-				return;
-			}
-			const role = pens.sharing(canvas)?.role === "view" ? "view" : "edit";
-			const { token } = app.tokens.issue({ kind: "canvas", canvas, role });
-			res.set("cache-control", "no-store").json({ token, role, idle: CANVAS_IDLE_MS });
-			return;
-		}
+		const body = (req.body ?? {}) as { kind?: unknown; path?: unknown; stage?: unknown };
 		if (body.kind !== "board" || typeof body.path !== "string" || !body.path) {
 			res.status(400).json({ error: 'Ask for { kind: "board", path, stage? }.' });
 			return;

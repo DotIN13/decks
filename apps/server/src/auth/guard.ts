@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { Principal } from "./principal.ts";
 import type { Refusal, TokenStore, Verified } from "./tokens.ts";
 import { decodedPath, splitPathTicket, ticketOf, type Tickets } from "./tickets.ts";
+import { HARNESS_ID, isCanvasPass, passCovers, type Passes } from "./passes.ts";
 
 /**
  * The one gate: every request to the harness, and every socket, is let in on its token, and who is
@@ -138,7 +139,7 @@ export function boardMay(method: string, path: string): boolean {
 }
 
 /**
- * What a canvas frame's token may ask for: the verbs (`POST /api/v1/<verb>`, which the router keeps
+ * What a canvas pass may ask for (`passes.ts`): the verbs (`POST /api/v1/<verb>`, which the router keeps
  * to that canvas's own calls, `verbs/router.ts`), their list, the canvas's stream (`/api/v1/events`,
  * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, and the
  * pages anyone's frame may read. Nothing of the person's, no other canvas, nothing passed on.
@@ -162,8 +163,8 @@ function decodedSegment(segment: string): string | undefined {
 	}
 }
 
-/** What a canvas frame's token is told when it asks for anything else. */
-export const CANVAS_ONLY = "A canvas frame's token reads and changes its one canvas, and nothing else.";
+/** What a canvas pass is told when it asks for anything else. */
+export const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing else.";
 
 /** What a board's token is told when it asks for anything else. */
 export const BOARD_ONLY = "A board's token calls verbs as that board, and nothing else: not the person's routes, and not another token.";
@@ -177,7 +178,13 @@ export function relayedBoardToken(path: string, token: string): boolean {
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
 	tickets: Pick<Tickets, "admits">;
+	passes: Pick<Passes, "openCanvas">;
+	/** Whether a card or board at this deck path is placed on a canvas (`verbs/router.ts`, `boardOnCanvas`): a canvas pass reads it too. */
+	placedOn?(path: string, canvas: string): boolean;
 }
+
+/** What a request with a canvas pass that does not check out is told. */
+export const PASS_REFUSED = "This canvas pass has run out, was signed out, or no longer reaches this canvas. The page asks for a new one; reload the canvas if it does not.";
 
 /**
  * Who a token is, from the request it came on: refused when another site sends a token that is not
@@ -186,7 +193,7 @@ export interface Gate {
  */
 export function verifyOn(gate: Pick<Gate, "tokens">, token: string | undefined, headers: Record<string, string | string[] | undefined>): Verified | { ok: false; reason: "kind" } {
 	const seen = gate.tokens.verify(token, { origin: originOf(headers) });
-	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site" && seen.principal.kind !== "board" && seen.principal.kind !== "canvas") return { ok: false, reason: "kind" };
+	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site" && seen.principal.kind !== "board") return { ok: false, reason: "kind" };
 	return seen;
 }
 
@@ -217,15 +224,32 @@ export function guard(gate: Gate) {
 		}
 		const door = isDoor(req.path);
 		const token = bearerOf(req.headers);
+		/*
+		 * A canvas pass (`passes.ts`): the canvas frame's calls, its stream and its drawing, checked on
+		 * every use against the token it was made with and the role on the canvas now. From the frame's
+		 * own sandboxed page, which has no origin of its own, so from another site as far as the browser says.
+		 */
+		if (isCanvasPass(token)) {
+			const pass = gate.passes.openCanvas(token);
+			if (!pass) {
+				res.status(401).type("text").send(PASS_REFUSED);
+				return;
+			}
+			// The harness's own picture-taking page draws a saved frame by its file too (`stage/shots.ts`).
+			const ownShot = pass.by === HARNESS_ID && (req.method === "GET" || req.method === "HEAD") && req.path === "/api/pen-file";
+			if (!ownShot && !canvasMay(req.method, req.path, pass.canvas)) {
+				res.status(403).type("text").send(CANVAS_ONLY);
+				return;
+			}
+			req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
+			next();
+			return;
+		}
 		if (token) {
 			const seen = verifyOn(gate, token, req.headers);
 			if (seen.ok) {
 				if (seen.principal.kind === "board" && !boardMay(req.method, req.path)) {
 					res.status(403).type("text").send(BOARD_ONLY);
-					return;
-				}
-				if (seen.principal.kind === "canvas" && !canvasMay(req.method, req.path, seen.principal.canvas)) {
-					res.status(403).type("text").send(CANVAS_ONLY);
 					return;
 				}
 				req.principal = seen.principal;
@@ -257,7 +281,21 @@ export function guard(gate: Gate) {
 		const carried = splitPathTicket(req.url);
 		if (carried && (req.method === "GET" || req.method === "HEAD")) {
 			const path = decodedPath(carried.rest);
-			if (path !== undefined && gate.tickets.admits(carried.ticket, path)) {
+			/*
+			 * A canvas pass in the address: one of its canvas's files or pictures, or a card placed on it,
+			 * for an image, a module or a sheet that cannot send a header. Checked as a header's would be.
+			 */
+			const pass = isCanvasPass(carried.ticket) ? gate.passes.openCanvas(carried.ticket) : undefined;
+			if (pass && path !== undefined && passCovers(pass.canvas, path, (deckPath) => gate.placedOn?.(deckPath, pass.canvas) ?? false)) {
+				req.url = carried.rest;
+				req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
+				res.setHeader("Referrer-Policy", "no-referrer");
+				res.setHeader("Access-Control-Allow-Origin", "*");
+				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
+				next();
+				return;
+			}
+			if (path !== undefined && !isCanvasPass(carried.ticket) && gate.tickets.admits(carried.ticket, path)) {
 				req.url = carried.rest;
 				req.principal = { kind: "page", path } satisfies Principal;
 				res.setHeader("Referrer-Policy", "no-referrer");

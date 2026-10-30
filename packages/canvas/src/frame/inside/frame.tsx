@@ -4,7 +4,7 @@ import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
 import { createEditor } from "../../mount.tsx";
 import type { Editor, StageComment } from "../../types.ts";
-import { setCanvasHost } from "../../host.ts";
+import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
 import { drawing, setDrawing } from "../../edit/ink.ts";
 import type { Camera } from "@decks/protocol";
 import type { FrameChromeView } from "../chrome.ts";
@@ -59,10 +59,18 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
 	let currentToken = start.backend.token;
 	const backendToken = () => currentToken;
+	/*
+	 * Where the canvas's files and pictures are read, with the pass in the address: renewed with the pass
+	 * (`token`), so what is read from then on carries the new one. What is already loaded stays as it is.
+	 */
+	let filesBase = start.files.base;
+	let picturesAt = start.pictures;
 	end.on("token", (data) => {
 		currentToken = data.token;
 		backend.setToken(data.token);
 		studio?.setToken(data.token);
+		if (data.files) filesBase = data.files.base;
+		if (data.pictures) picturesAt = data.pictures;
 	});
 	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Board[] } : await backend.drawing();
 	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
@@ -158,7 +166,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		},
 	};
 	/** A deck path's address, read on the canvas's ticket. */
-	const address = (path: string) => `${start.files.base}${path.split("/").map(encodeURIComponent).join("/")}`;
+	const address = (path: string) => `${filesBase}${path.split("/").map(encodeURIComponent).join("/")}`;
 	let restUntil: ReturnType<typeof setTimeout> | undefined;
 	/*
 	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
@@ -179,10 +187,18 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	setCanvasHost({
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
 		canWrite: () => start.canvas.role !== "view" && !start.look.readOnly,
+		// A card loaded on an older pass reads its files on the current one.
+		freshAddress: (url) => {
+			const pass = passOf(filesBase);
+			return pass ? withPass(url, pass) : url;
+		},
 		boardLink: (href, base) => {
 			try {
 				const url = new URL(href, base);
-				return url.href.startsWith(start.files.base) ? decodeURIComponent(url.href.slice(start.files.base.length).split(/[?#]/)[0]!) : undefined;
+				// Against any pass the canvas has had: a card loaded before a renewal links on the pass it was loaded with.
+				const at = passless(url.href);
+				const folder = passless(filesBase);
+				return at.startsWith(folder) ? decodeURIComponent(at.slice(folder.length).split(/[?#]/)[0]!) : undefined;
 			} catch {
 				return undefined;
 			}
@@ -288,9 +304,9 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			picture: (path, scheme) => {
 				const page = untrack(pages).find((one) => one.path === path);
 				const at = path.split("/").map(encodeURIComponent).join("/");
-				if (start.pictures.includes("{path}")) return start.pictures.replace("{path}", at).replace("{scheme}", scheme);
+				if (picturesAt.includes("{path}")) return picturesAt.replace("{path}", at).replace("{scheme}", scheme);
 				// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
-				return `${start.pictures}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&whole=1`;
+				return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&whole=1`;
 			},
 			cardScripts: (path) => trust(path) !== "friend",
 			// How a card measured, kept by the harness for `decks canvas fit` to report.

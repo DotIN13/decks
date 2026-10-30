@@ -7,12 +7,13 @@ import type { Insets } from "../camera/insets.ts";
  * The canvas frame: the canvas, its engine and every card on it, in one sandboxed page of its own,
  * and the app's page around it as its broker.
  *
- * The frame keeps nothing and holds one credential: a token for its canvas alone, with your role on it,
- * lasting minutes and renewed by the page (`backend.ts`, `server/src/auth`, kind `canvas`). On it the
- * frame reads its drawing, follows the canvas's stream and makes your edits itself; the page never
- * relays the drawing. It is sandboxed (`allow-scripts`, an origin of its own), so a card's script there
- * cannot reach the app's page or your own token, and it reads its canvas's files on a ticket for that
- * canvas alone (`server/src/auth/tickets.ts`).
+ * The frame keeps nothing and holds one credential: a canvas pass for its canvas alone, with your role
+ * on it, lasting an hour and renewed by the page unseen (`server/src/auth/passes.ts`). On it the frame
+ * reads its drawing, follows the canvas's stream and makes your edits itself, the pass in the
+ * `Authorization` header; the page never relays the drawing. It reads its canvas's files and pictures
+ * with the same pass in their address (`/api/t/<pass>/…`), since an image or a module cannot send a
+ * header. It is sandboxed (`allow-scripts`, an origin of its own), so a card's script there cannot
+ * reach the app's page or your own token.
  *
  * The two talk on one `MessagePort`. The frame says `hello` to its parent once; the page answers on
  * that window alone with `start` and the port, and after that no window message is read again.
@@ -45,15 +46,15 @@ export interface StartMessage {
 export interface Start {
 	protocol: number;
 	canvas: { name: string; title?: string; role: "owner" | "edit" | "view" };
-	/** The harness, as the frame reaches it: its `/api` address and the canvas token, which lapses after `idle` unused. */
 	/**
 	 * Who keeps the canvas, as the frame reaches it: a harness (`kind` left out), on its `/api` address,
-	 * or Decks Studio (`studio`), on its own; and the token for this one canvas, which lapses after `idle` unused.
+	 * or Decks Studio (`studio`), on its own; and the pass for this one canvas, which runs out at `expires`
+	 * unless the page sends the next (`token`).
 	 */
-	backend: { api: string; token: string; idle: number; kind?: "harness" | "studio" };
-	/** The address the canvas's files are read at, with its ticket in it: `…/api/t/<ticket>/board/canvases/<name>/`. */
+	backend: { api: string; token: string; expires: number; kind?: "harness" | "studio" };
+	/** The address the canvas's files are read at, with the pass in it: `…/api/t/<pass>/board/canvases/<name>/`. */
 	files: { base: string; expires: number };
-	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
+	/** Where the canvas's pictures are, by the same pass: `…/api/t/<pass>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;
 	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }> };
 	camera?: Camera;
@@ -74,8 +75,11 @@ export type CardSlot = { card: string; index: number; inner: number };
 
 /** What the page sends the frame: events, and the calls it makes of it. */
 export interface PageToFrame {
-	/** The canvas token, renewed before it lapses. */
-	token: { token: string };
+	/**
+	 * The canvas pass, renewed before it runs out: the token for calls, and the addresses of the files
+	 * and pictures with the new pass in them.
+	 */
+	token: { token: string; files?: { base: string; expires: number }; pictures?: string };
 	reload: { path: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
 	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number; /** Where the page's composer is on the frame's screen (null: not shown): a drag let go over it mentions what it carries. */ composer?: Rect | null };

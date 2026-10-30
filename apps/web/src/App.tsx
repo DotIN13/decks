@@ -38,7 +38,7 @@ import { addComment, adoptFormerComments, cleanFrameComment, cleanFrameInk, clea
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { createFramedEditor, type CanvasHandle } from "@decks/canvas";
-import { canvasBackend, canvasTicket, cardAgentCall } from "./board/canvas-frame.ts";
+import { canvasPass, cardAgentCall } from "./board/canvas-frame.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Stream } from "./chat/Stream.tsx";
@@ -1284,8 +1284,7 @@ export function App() {
 					...(state.focused ? { agentId: state.focused } : {}),
 				}),
 			frame: {
-				ticket: canvasTicket,
-				backend: canvasBackend,
+				pass: canvasPass,
 				comment: frameComment,
 				ink: frameInk,
 				panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),

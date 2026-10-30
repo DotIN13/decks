@@ -1,4 +1,5 @@
 import { readingOfCard } from "./card-reading.ts";
+import { freshAddress, passless } from "../host.ts";
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.
@@ -223,15 +224,19 @@ const cardSheets = new WeakSet<CSSStyleSheet>();
 /** Whether a sheet is the one every card adopts (board.css as the card's): a card's snapshot loads board.css instead (`card-snapshot.ts`). */
 export const isCardSheet = (sheet: CSSStyleSheet): boolean => cardSheets.has(sheet);
 const fontsSaid = new Set<string>();
+/** A response's text, or a failure for one refused or missing. */
+const textOf = (response: Response): Promise<string> => (response.ok ? response.text() : Promise.reject(new Error(`${response.url}: ${response.status}`)));
 function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
-	let made = sheets.get(lib);
+	// One sheet whatever pass `lib` was read on (`host.ts`).
+	const key = passless(lib);
+	let made = sheets.get(key);
 	if (made) return made;
 	made = (async () => {
 		try {
-			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then((r) => r.text()), fetch(new URL("board.css", lib)).then((r) => r.text())]);
+			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("board.css", lib)).then(textOf)]);
 			const fonts = (theme.match(/@font-face\s*\{[^}]*\}/g) ?? []).map((rule) => rule.replace(/url\(\s*["']?(?!data:)([^"')]+)["']?\s*\)/g, (_all, file: string) => `url("${new URL(file, lib).href}")`));
-			if (!fontsSaid.has(lib) && fonts.length) {
-				fontsSaid.add(lib);
+			if (!fontsSaid.has(key) && fonts.length) {
+				fontsSaid.add(key);
 				const style = document.createElement("style");
 				style.dataset.cardFonts = lib;
 				style.textContent = fonts.join("\n");
@@ -256,10 +261,12 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 			cardSheets.add(sheet);
 			return sheet;
 		} catch {
+			// Asked for again by the next card: a pass run out or a restart is not the end of the card's look.
+			sheets.delete(key);
 			return undefined;
 		}
 	})();
-	sheets.set(lib, made);
+	sheets.set(key, made);
 	return made;
 }
 
@@ -291,13 +298,32 @@ function asDocument(root: ShadowRoot, body: HTMLElement): Document {
  * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
  */
 const loaded = new Map<string, Promise<unknown>>();
-function once<T>(key: string, make: () => Promise<T>): Promise<T> {
+function once<T>(given: string, make: () => Promise<T>): Promise<T> {
+	// Kept by the address without its pass: a renewed pass is the same file, not a second copy (`host.ts`).
+	const key = passless(given);
 	let got = loaded.get(key) as Promise<T> | undefined;
 	if (!got) {
 		got = make();
 		loaded.set(key, got);
+		// One that failed (a pass run out, the server restarting) is tried again by the next card that asks.
+		got.catch(() => {
+			if (loaded.get(key) === got) loaded.delete(key);
+		});
 	}
 	return got;
+}
+
+/**
+ * A card's module by the address it was first imported at: a module runs once per address, and the
+ * same file on a renewed pass is a new address, so it would run a second time beside the first.
+ */
+const modules = new Map<string, string>();
+async function importOnce<T>(address: string): Promise<T> {
+	const key = passless(address);
+	const first = modules.get(key) ?? address;
+	const module = (await import(/* @vite-ignore */ first)) as T;
+	modules.set(key, first);
+	return module;
 }
 /** A classic script from `lib/`, put in the page once: the UMD builds set a global. */
 const pageScript = (lib: string, name: string) =>
@@ -550,7 +576,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		document: asDocument(root, body),
 		signal: controller.signal,
 		url: source.url,
-		file: (name: string) => new URL(name, source.url).href,
+		// On the canvas's pass now: a card reads a file long after it was loaded.
+		file: (name: string) => freshAddress(new URL(name, source.url).href),
 		theme: source.theme,
 		size: { ...source.size },
 		elements: registry ?? customElements,
@@ -574,7 +601,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 				if (controller.signal.aborted) return;
 				const address = script.src ?? `${base}.m${script.n}.js`;
 				try {
-					const module = (await import(/* @vite-ignore */ address)) as { default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> };
+					const module = await importOnce<{ default?: (card: CardContext) => CardCleanup | Promise<CardCleanup> }>(address);
 					if (controller.signal.aborted || typeof module.default !== "function") continue;
 					const done = await module.default(context);
 					if (typeof done === "function") {

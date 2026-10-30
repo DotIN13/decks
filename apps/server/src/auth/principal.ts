@@ -15,7 +15,8 @@
  * - `board`: one board's own code, by path, acting on the canvas it is on (`stage`).
  * - `page`: one page's GET and nothing else: a ticket for another site's frame or tab (`tickets.ts`).
  * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
- *   role there (`view` reads only): the editor in its sandboxed page, and the cards it runs.
+ *   role there now (`view` reads only): the editor in its sandboxed page, and the cards it runs. From a
+ *   canvas pass (`passes.ts`), not a token.
  */
 export type Principal =
 	| { kind: "person" }

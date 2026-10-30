@@ -389,6 +389,16 @@ export function connect(options = {}) {
 			return said.token;
 		},
 		/**
+		 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to
+		 * this connection's token. Its calls send it as the bearer; its files are read at
+		 * `pageUrl("/api/t/<pass>/board/<deck path>", "")`. Ask again at half its life.
+		 */
+		async canvasPass(canvas) {
+			const said = await request("/api/passes", { body: { canvas } });
+			if (typeof said?.pass !== "string") throw new DecksError(`Decks gave no pass for the canvas ${canvas}.`);
+			return { pass: said.pass, role: said.role === "view" ? "view" : "edit", expires: Number(said.expires) };
+		},
+		/**
 		 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's
 		 * own `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck
 		 * path back. In the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.

@@ -21,13 +21,13 @@ const frameAddress = (): string => {
 
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
-	/** A ticket for one canvas's folder: the address its files are read at, and its pictures'. */
-	ticket(canvas: string): Promise<{ files: string; pictures: string; expires: number }>;
 	/**
-	 * The harness as the frame reaches it, and a token for this one canvas (`kind: "canvas"`), asked for
-	 * again before it lapses: the frame reads, follows and edits its canvas on it.
+	 * A pass for one canvas (`server/src/auth/passes.ts`): the harness as the frame reaches it (`api`), the
+	 * pass for its calls (`token`), the addresses its files and pictures are read at with the pass in them,
+	 * and when it runs out. Asked for again at half its life, unseen: the frame reads, follows and edits
+	 * its canvas on it.
 	 */
-	backend(canvas: string): Promise<{ api: string; token: string; idle: number; kind?: "harness" | "studio" }>;
+	pass(canvas: string): Promise<CanvasPass>;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
@@ -55,6 +55,19 @@ export interface FrameHostOptions {
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(drop: { files: File[]; at: { x: number; y: number }; card?: CardSlot }): void;
 }
+
+/** One canvas's pass, as the frame is given it. */
+export interface CanvasPass {
+	api: string;
+	token: string;
+	files: string;
+	pictures: string;
+	expires: number;
+	kind?: "harness" | "studio";
+}
+
+/** How long after a failed renewal it is asked for again. */
+const RETRY_MS = 30_000;
 
 type Options = CanvasOptions & { state?: EditorState; frame: FrameHostOptions };
 
@@ -128,10 +141,11 @@ export function createFramedEditor(options: Options): Editor {
 		});
 	}
 
-	/** Start the frame on the canvas on screen: the ticket first, then everything it begins with. */
+	/** Start the frame on the canvas on screen: the pass first, then everything it begins with. */
 	const startFrame = async (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean) => {
-		const [ticket, backend] = await Promise.all([options.frame.ticket(canvas), options.frame.backend(canvas)]);
+		const pass = await options.frame.pass(canvas);
 		if (cancelled()) return;
+		const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
 		const pen = untrack(() => state?.pen?.());
 		const doc = pen?.doc;
 		drawn = doc;
@@ -152,8 +166,8 @@ export function createFramedEditor(options: Options): Editor {
 			protocol: PROTOCOL,
 			canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
 			backend,
-			files: { base: ticket.files, expires: ticket.expires },
-			pictures: ticket.pictures,
+			files: { base: pass.files, expires: pass.expires },
+			pictures: pass.pictures,
 			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
@@ -169,7 +183,7 @@ export function createFramedEditor(options: Options): Editor {
 			fromFrame = selected ? { selected } : {};
 			wire(page, canvas);
 			setEnd(page);
-			renew(page, canvas, backend.idle, cancelled);
+			renew(page, canvas, pass.expires, cancelled);
 			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
 			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
 			// The camera as it is now: the page may have landed while the frame was loading.
@@ -180,24 +194,47 @@ export function createFramedEditor(options: Options): Editor {
 	};
 
 	/**
-	 * The canvas token, asked for again at a third of its life and at least every five minutes, for as
-	 * long as the frame is there: a harness keeps it in memory, so one restarted forgets it, and a day's
-	 * token renewed at a third of a day left the frame without its canvas for hours.
+	 * The canvas pass, asked for again unseen at half its life, for as long as the frame is there; and
+	 * at once when the tab is shown again past that, since a hidden tab's timers are held back. One
+	 * that fails is asked for again in thirty seconds. The frame takes the new pass for its calls and
+	 * the new addresses for its files and pictures (`token`); what it already loaded stays loaded.
 	 */
-	const renew = (page: PageEnd, canvas: string, idle: number, cancelled: () => boolean) => {
-		const every = Math.min(5 * 60_000, Math.max(30_000, Math.floor(idle / 3)));
-		const timer = setInterval(() => {
-			if (cancelled()) return clearInterval(timer);
+	const renew = (page: PageEnd, canvas: string, firstExpires: number, cancelled: () => boolean) => {
+		let expires = firstExpires;
+		let since = Date.now();
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let asking = false;
+		const due = () => since + (expires - since) / 2;
+		const schedule = (ms: number) => {
+			clearTimeout(timer);
+			timer = setTimeout(ask, Math.max(1000, ms));
+		};
+		const stop = () => {
+			clearTimeout(timer);
+			if (typeof document !== "undefined") document.removeEventListener("visibilitychange", shown);
+		};
+		const ask = () => {
+			if (cancelled()) return stop();
+			if (asking) return;
+			asking = true;
 			options.frame
-				.backend(canvas)
+				.pass(canvas)
 				.then((next) => {
-					if (!cancelled()) page.emit("token", { token: next.token });
+					if (cancelled()) return stop();
+					since = Date.now();
+					expires = next.expires;
+					page.emit("token", { token: next.token, files: { base: next.files, expires: next.expires }, pictures: next.pictures });
+					schedule(due() - Date.now());
 				})
-				.catch(() => {
-					/* tried again next time; the old one lasts its idle time */
-				});
-		}, every);
-		onCleanup(() => clearInterval(timer));
+				.catch(() => schedule(RETRY_MS))
+				.finally(() => (asking = false));
+		};
+		schedule(due() - Date.now());
+		function shown() {
+			if (cancelled()) return stop();
+			if (typeof document !== "undefined" && document.visibilityState === "visible" && Date.now() >= due()) ask();
+		}
+		if (typeof document !== "undefined") document.addEventListener("visibilitychange", shown);
 	};
 
 	/** What the frame says, as the host's own callbacks and state. */

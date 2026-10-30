@@ -9,7 +9,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * lives, and whether it has been taken back.
  *
  * A token is 32 random bytes with a prefix that says its kind (`dk_p_` the person, `dk_s_` a paired
- * site, `dk_a_` an agent, `dk_x_` an app, `dk_b_` a board, `dk_c_` a canvas frame), so one found in a log can be told apart.
+ * site, `dk_a_` an agent, `dk_x_` an app, `dk_b_` a board), so one found in a log can be told apart.
  * Only its sha256 is kept. Tokens that should outlive this process (the person's, a site's, a
  * board's) are written to `<deck>/.decks/tokens.json`, readable by this user alone; an agent's or an
  * app's lives in memory, is made when its process starts and is taken back when it stops, so it
@@ -17,7 +17,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  *
  * Most tokens slide: each use pushes back the moment they stop working, and one left unused that long
  * is forgotten. A terminal's or a paired site's lasts `DECKS_TOKEN_DAYS` (30 unless set) unused; a
- * Decks tab's, a board's and a canvas frame's a day. Page tickets are not here: they are signed, last a
+ * Decks tab's and a board's a day. Page tickets are not here: they are signed, last a
  * day and are kept nowhere (`tickets.ts`).
  *
  * The pairing tokens from before (`.decks/pairing.json`) are read in once, as site tokens with the
@@ -33,14 +33,7 @@ export function tokenDays(env: NodeJS.ProcessEnv = process.env): number {
 /** How long a Decks tab's token and a board's may go unused: a day. */
 export const TAB_IDLE_MS = 24 * 3_600_000;
 export const BOARD_IDLE_MS = 24 * 3_600_000;
-/**
- * How long a canvas frame's token may go unused: a day, as every token of the app's. A card's script
- * beside it can read it, and it reaches its one canvas and nothing else. The page that made the frame
- * renews it well before (`@decks/canvas/frame`); it lives in memory.
- */
-export const CANVAS_IDLE_MS = 24 * 3_600_000;
-
-const PREFIX: Record<Exclude<PrincipalKind, "page">, string> = { person: "dk_p_", site: "dk_s_", agent: "dk_a_", app: "dk_x_", board: "dk_b_", canvas: "dk_c_" };
+const PREFIX: Record<Exclude<PrincipalKind, "page" | "canvas">, string> = { person: "dk_p_", site: "dk_s_", agent: "dk_a_", app: "dk_x_", board: "dk_b_" };
 
 /** One token as kept: its hash, who it is, and its life. */
 interface Stored {
@@ -97,12 +90,12 @@ export class TokenStore {
 	 */
 	issue(principal: Principal, options: { label?: string; idle?: number; now?: number } = {}): { token: string; id: string } {
 		if (principal.kind === "page") throw new Error("A page is let in by a ticket, not a token.");
+		if (principal.kind === "canvas") throw new Error("A canvas frame holds a canvas pass (`passes.ts`), not a token.");
 		const now = options.now ?? Date.now();
 		const token = `${PREFIX[principal.kind]}${randomBytes(32).toString("base64url")}`;
 		const hash = hashOf(token);
 		const processBound = principal.kind === "agent" || principal.kind === "app";
-		const fleeting = principal.kind === "canvas";
-		const idle = processBound ? undefined : (options.idle ?? (principal.kind === "board" ? BOARD_IDLE_MS : fleeting ? CANVAS_IDLE_MS : this.idleMs));
+		const idle = processBound ? undefined : (options.idle ?? (principal.kind === "board" ? BOARD_IDLE_MS : this.idleMs));
 		const stored: Stored = {
 			id: hash.slice(0, 10),
 			hash,
@@ -111,7 +104,7 @@ export class TokenStore {
 			at: now,
 			last: now,
 			...(idle !== undefined ? { idle } : {}),
-			kept: !processBound && !fleeting,
+			kept: !processBound,
 		};
 		this.byHash.set(hash, stored);
 		if (stored.kept) this.save(now);

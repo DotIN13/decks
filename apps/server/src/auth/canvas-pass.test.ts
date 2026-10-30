@@ -9,8 +9,9 @@ import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
 
 /**
- * The canvas frame's token: made for the person's own page, one canvas and their role on it, and
- * good for that canvas's calls, its drawing and its stream from a sandboxed page, and nothing else.
+ * The canvas pass (`passes.ts`): made for the person's own page, one canvas and their role on it, and
+ * good for that canvas's calls, its drawing, its stream and its files from a sandboxed page, and
+ * nothing else; checked on every use against the token that asked and the role now.
  */
 
 async function open() {
@@ -38,7 +39,10 @@ async function open() {
 		return { status: response.status, text, body: parsed, headers: response.headers };
 	};
 	const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+	/** A pass for a canvas, made with a fresh person token, as a Decks tab asks for one. */
+	const passFor = (canvas: string, role: "edit" | "view" = "edit") => app.passes.canvas(canvas, role, app.tokens.issue({ kind: "person" }).id).pass;
 	return {
+		passFor,
 		app,
 		origin,
 		one,
@@ -54,29 +58,126 @@ async function open() {
 	};
 }
 
-test("a canvas frame's token is the person's to make, for one canvas, with their role on it", async () => {
+test("a canvas pass is the person's to ask for, for one canvas, with their role on it, for an hour", async () => {
 	const { app, one, post, bearer, cleanup } = await open();
 	try {
-		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		const person = app.tokens.issue({ kind: "person" });
 		const agent = bearer(app.bridge.issue(app.agents.focused().id));
-		assert.equal((await post("/api/tokens", agent, { kind: "canvas", canvas: one })).status, 403, "not an agent's");
-		assert.equal((await post("/api/tokens", person, { kind: "canvas", canvas: "nowhere" })).status, 404);
-		const made = await post("/api/tokens", person, { kind: "canvas", canvas: one });
+		assert.equal((await post("/api/passes", agent, { canvas: one })).status, 403, "not an agent's");
+		assert.equal((await post("/api/passes", bearer(person.token), { canvas: "nowhere" })).status, 404);
+		const before = Date.now();
+		const made = await post("/api/passes", bearer(person.token), { canvas: one });
 		assert.equal(made.status, 200, made.text);
-		assert.match(String(made.body.token), /^dk_c_/);
+		assert.match(String(made.body.pass), /^dk_cp_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
 		assert.equal(made.body.role, "edit");
-		const seen = app.tokens.verify(String(made.body.token));
-		assert.ok(seen.ok);
-		assert.deepEqual(seen.principal, { kind: "canvas", canvas: one, role: "edit" });
+		const expires = Number(made.body.expires);
+		assert.ok(expires >= before + 3_600_000 - 1000 && expires <= Date.now() + 3_600_000, "an hour");
+		const seen = app.passes.openCanvas(String(made.body.pass));
+		assert.deepEqual(seen && { canvas: seen.canvas, role: seen.role, by: seen.by }, { canvas: one, role: "edit", by: person.id });
+		assert.equal(app.tokens.verify(String(made.body.pass)).ok, false, "a pass is not a token");
 	} finally {
 		cleanup();
 	}
 });
 
-test("from a sandboxed page, the token edits, undoes and reads its own canvas, and no other", async () => {
-	const { app, origin, one, two, post, bearer, sandboxed, cleanup } = await open();
+test("a pass dies with the token that asked for it, and runs out after its hour", async () => {
+	const { app, origin, one, post, bearer, sandboxed, cleanup } = await open();
 	try {
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const person = app.tokens.issue({ kind: "person" });
+		const pass = String((await post("/api/passes", bearer(person.token), { canvas: one })).body.pass);
+		const frame = { ...bearer(pass), ...sandboxed };
+		assert.equal((await post("/api/v1/canvas.read", frame)).status, 200);
+		assert.equal((await fetch(`${origin}/api/t/${pass}/board/canvases/${one}/not-here.png`)).status, 404, "its files, by address");
+		app.tokens.revoke(person.id);
+		assert.equal((await post("/api/v1/canvas.read", frame)).status, 401, "signed out: its calls end at once");
+		assert.equal((await fetch(`${origin}/api/t/${pass}/board/canvases/${one}/not-here.png`)).status, 401, "and its files");
+		const later = app.tokens.issue({ kind: "person" });
+		const made = app.passes.canvas(one, "edit", later.id, Date.now() - 3_600_000 - 1);
+		assert.equal(app.passes.openCanvas(made.pass), undefined, "run out");
+		assert.equal((await post("/api/v1/canvas.read", { ...bearer(made.pass), ...sandboxed })).status, 401);
+		// A pass made by a different secret, or changed, is nobody's.
+		const forged = made.pass.replace(/\.[^.]+$/, ".AAAA");
+		assert.equal(app.passes.openCanvas(forged), undefined);
+	} finally {
+		cleanup();
+	}
+});
+
+test("a stream opened on a pass ends when the pass stops working, at the next message", async () => {
+	const { app, origin, one, bearer, sandboxed, cleanup } = await open();
+	try {
+		const person = app.tokens.issue({ kind: "person" });
+		const pass = app.passes.canvas(one, "edit", person.id).pass;
+		const response = await fetch(`${origin}/api/v1/events`, { headers: { ...bearer(pass), ...sandboxed } });
+		assert.equal(response.status, 200);
+		const reader = response.body!.getReader();
+		await reader.read();
+		app.tokens.revoke(person.id);
+		app.stage.pens!.edit(one, [{ op: "insert", node: { type: "note", id: "after", content: "x" } }] as never);
+		const ended = await Promise.race([
+			(async () => {
+				for (;;) {
+					const { done, value } = await reader.read();
+					if (done) return true;
+					if (new TextDecoder().decode(value).includes('"after"')) return false;
+				}
+			})(),
+			new Promise<boolean>((done) => setTimeout(() => done(false), 3000)),
+		]);
+		assert.equal(ended, true, "closed, and nothing said after the sign-out");
+	} finally {
+		cleanup();
+	}
+});
+
+test("every use reads the role on the canvas now: shared to view, a pass for editing reads only; unshared, it ends", async () => {
+	const { app, one, post, bearer, passFor, sandboxed, cleanup } = await open();
+	try {
+		let role: "edit" | "view" | undefined = "edit";
+		const checks = (app.passes as unknown as { checks: { role(canvas: string): "edit" | "view" | undefined } }).checks;
+		const real = checks.role;
+		checks.role = (canvas) => (canvas === one ? role : real(canvas));
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
+		const insert = () => post("/api/v1/canvas.insert", frame, { args: [{ type: "note", content: "x" }, { at: { x1: 0, y1: 0 } }] });
+		assert.equal((await insert()).status, 200);
+		role = "view";
+		const refused = await insert();
+		assert.equal(refused.status, 403, "downgraded to view: refused on the next use");
+		assert.match(refused.text, /view/);
+		assert.equal((await post("/api/v1/canvas.read", frame)).status, 200, "still reads");
+		role = undefined;
+		assert.equal((await post("/api/v1/canvas.read", frame)).status, 401, "no longer shared: nothing");
+		role = "edit";
+		assert.equal((await insert()).status, 200, "shared to edit again");
+	} finally {
+		cleanup();
+	}
+});
+
+test("files read on a pass are sent with no referrer, readable by the sandboxed frame, and only its canvas's", async () => {
+	const { app, one, two, origin, post, bearer, passFor, cleanup } = await open();
+	try {
+		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		const mine = String(((await post("/api/v1/card.create", person, { args: [{ title: "Mine", canvas: one }] })).body.value as { path: string }).path);
+		const theirs = String(((await post("/api/v1/card.create", person, { args: [{ title: "Theirs", canvas: two }] })).body.value as { path: string }).path);
+		const pass = passFor(one);
+		const at = (path: string) => fetch(`${origin}/api/t/${pass}/board/${path.split("/").map(encodeURIComponent).join("/")}?raw=1`);
+		const read = await at(mine);
+		assert.equal(read.status, 200);
+		assert.equal(read.headers.get("referrer-policy"), "no-referrer");
+		assert.equal(read.headers.get("access-control-allow-origin"), "*");
+		assert.equal((await at(theirs)).status, 401, "another canvas's card");
+		assert.equal((await fetch(`${origin}/api/t/${pass}/f/etc/passwd`)).status, 401, "nothing but its canvas's files and pictures");
+		assert.equal((await fetch(`${origin}/api/t/${pass}/board/canvases/${one}/x.png`, { method: "POST" })).status, 401, "reads only");
+	} finally {
+		cleanup();
+	}
+});
+
+test("from a sandboxed page, the pass edits, undoes and reads its own canvas, and no other", async () => {
+	const { app, origin, one, two, post, bearer, sandboxed, passFor, cleanup } = await open();
+	try {
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		// A preflight for the edit's name is answered, for the opaque origin.
 		const preflight = await fetch(`${origin}/api/v1/canvas.batch`, { method: "OPTIONS", headers: { ...sandboxed, "access-control-request-method": "POST", "access-control-request-headers": "authorization, content-type, x-decks-edit" } });
 		assert.equal(preflight.status, 204);
@@ -105,8 +206,8 @@ test("from a sandboxed page, the token edits, undoes and reads its own canvas, a
 			const refused = await post(`/api/v1/${verb}`, frame, { args: [] });
 			assert.equal(refused.status, 403, `${verb}: ${refused.text}`);
 		}
-		for (const path of ["/api/tokens", "/api/tickets", "/api/deck", "/api/agents", "/api/settings"]) {
-			const refused = await post(path, frame, { kind: "canvas", canvas: one });
+		for (const path of ["/api/tokens", "/api/passes", "/api/tickets", "/api/deck", "/api/agents", "/api/settings"]) {
+			const refused = await post(path, frame, { canvas: one });
 			assert.equal(refused.status, 403, `${path}: ${refused.text}`);
 		}
 	} finally {
@@ -114,10 +215,10 @@ test("from a sandboxed page, the token edits, undoes and reads its own canvas, a
 	}
 });
 
-test("a canvas shared to view gets a token that reads only", async () => {
-	const { app, one, post, bearer, sandboxed, cleanup } = await open();
+test("a pass for a canvas shared to view reads only", async () => {
+	const { app, one, post, bearer, sandboxed, passFor, cleanup } = await open();
 	try {
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "view" }).token), ...sandboxed };
+		const frame = { ...bearer(passFor(one, "view")), ...sandboxed };
 		assert.equal((await post("/api/v1/canvas.read", frame)).status, 200);
 		const refused = await post("/api/v1/canvas.insert", frame, { args: [{ type: "note", content: "x" }, { at: { x1: 0, y1: 0 } }] });
 		assert.equal(refused.status, 403);
@@ -128,9 +229,9 @@ test("a canvas shared to view gets a token that reads only", async () => {
 });
 
 test("its stream carries its own canvas's drawing and nothing else", async () => {
-	const { app, origin, one, two, bearer, sandboxed, cleanup } = await open();
+	const { app, origin, one, two, bearer, sandboxed, passFor, cleanup } = await open();
 	try {
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		const controller = new AbortController();
 		const response = await fetch(`${origin}/api/v1/events`, { headers: frame, signal: controller.signal });
 		assert.equal(response.status, 200);
@@ -164,14 +265,14 @@ test("its stream carries its own canvas's drawing and nothing else", async () =>
 });
 
 test("an agent's view of its canvas reaches the frame on its stream, and the frame's answer settles it", async () => {
-	const { app, origin, one, post, bearer, sandboxed, cleanup } = await open();
+	const { app, origin, one, post, bearer, sandboxed, passFor, cleanup } = await open();
 	const controller = new AbortController();
 	try {
 		const agent = app.agents.focused();
 		// A view of this canvas by name: the frame following it is the one to answer.
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
 		assert.equal((await post("/api/v1/canvas.insert", person, { args: [{ type: "note", id: "n", content: "x" }, { canvas: one, at: { x1: 0, y1: 0 } }] })).status, 200);
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		const response = await fetch(`${origin}/api/v1/events?types=stage.call`, { headers: frame, signal: controller.signal });
 		const reader = response.body!.getReader();
 		const decoder = new TextDecoder();
@@ -201,12 +302,12 @@ test("an agent's view of its canvas reaches the frame on its stream, and the fra
 });
 
 test("the frame says a card on its canvas was read and how it measured, and gets an old board's token, for its own canvas only", async () => {
-	const { app, one, two, origin, post, bearer, sandboxed, cleanup } = await open();
+	const { app, one, two, origin, post, bearer, sandboxed, passFor, cleanup } = await open();
 	try {
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
 		const mine = String(((await post("/api/v1/card.create", person, { args: [{ title: "Mine", canvas: one }] })).body.value as { path: string }).path);
 		const theirs = String(((await post("/api/v1/card.create", person, { args: [{ title: "Theirs", canvas: two }] })).body.value as { path: string }).path);
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		assert.equal((await post("/api/v1/board-seen", frame, { path: mine })).status, 200);
 		assert.equal((await post("/api/v1/board-extent", frame, { path: mine, rev: 1, w: 400, h: 300, words: 12 })).status, 200);
 		const token = await post("/api/v1/board-token", frame, { path: mine });
@@ -222,10 +323,10 @@ test("the frame says a card on its canvas was read and how it measured, and gets
 });
 
 test("a document or an app item is placed by the person, not the frame, and the frame opens only the files document items name", async () => {
-	const { app, one, post, bearer, sandboxed, cleanup } = await open();
+	const { app, one, post, bearer, sandboxed, passFor, cleanup } = await open();
 	try {
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
-		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		const doc = { type: "browser", id: "paper", width: 800, height: 600, metadata: { type: "decks.document", path: "notes.md" } };
 		assert.equal((await post("/api/v1/canvas.insert", frame, { args: [doc, { at: { x1: 0, y1: 0 } }] })).status, 403, "the frame may not place one");
 		assert.equal((await post("/api/v1/canvas.batch", frame, { args: [[{ op: "insert", item: { ...doc, id: "p2", metadata: { type: "decks.app", name: "terminal" } }, at: { x1: 0, y1: 0 } }]] })).status, 403, "nor an app, in a batch");
@@ -241,12 +342,10 @@ test("a document or an app item is placed by the person, not the frame, and the 
 	}
 });
 
-test("on the canvas's folder ticket, a file that is not there answers 404, and a hidden one is still refused", async () => {
-	const { app, one, origin, post, bearer, cleanup } = await open();
+test("on the canvas's pass, a file that is not there answers 404, and a hidden one is still refused", async () => {
+	const { one, origin, passFor, cleanup } = await open();
 	try {
-		const person = bearer(app.tokens.issue({ kind: "person" }).token);
-		const made = await post("/api/tickets", person, { paths: [`/api/board/canvases/${one}/`] });
-		const ticket = Object.values(made.body.tickets as Record<string, string>)[0]!;
+		const ticket = passFor(one);
 		const at = (path: string) => fetch(`${origin}/api/t/${ticket}/board/canvases/${one}/${path}`);
 		assert.equal((await at("assets/not-here.png")).status, 404, "a missing picture");
 		assert.equal((await at("cards/not-here/index.html?raw=1")).status, 404, "a missing card");

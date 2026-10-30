@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { bearerOf, fromAnotherSite, isDoor, isPageRead, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
 import { fromPrivateNetwork, isPrivateAddress, isTopNavigation, PairCodes, pairWithoutCode, withSession } from "./issue.ts";
 import { Tickets } from "./tickets.ts";
-import { BOARD_IDLE_MS, CANVAS_IDLE_MS, TAB_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
+import { BOARD_IDLE_MS, TAB_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
 
 const DAY = 86_400_000;
 
@@ -53,14 +53,13 @@ test("a site's token works only from its own site or from a caller that sends no
 	assert.deepEqual(tokens.verify(token, { origin: "https://evil.test" }), { ok: false, reason: "elsewhere" });
 });
 
-test("tokens slide: a person's and a site's last their days unused, a tab's, a board's and a canvas frame's a day, an agent's until taken back", () => {
+test("tokens slide: a person's and a site's last their days unused, a tab's and a board's a day, an agent's until taken back", () => {
 	const t0 = Date.now();
 	const { file, tokens } = store("tokens.json", { days: 30, now: t0 });
 	const kept = tokens.issue({ kind: "site", label: "A" }, { now: t0 });
 	const left = tokens.issue({ kind: "site", label: "B" }, { now: t0 });
 	const tab = tokens.issue({ kind: "person" }, { idle: TAB_IDLE_MS, now: t0 });
 	const board = tokens.issue({ kind: "board", path: "boards/a.html" }, { now: t0 });
-	const frame = tokens.issue({ kind: "canvas", canvas: "main", role: "edit" }, { now: t0 });
 	const agent = tokens.issue({ kind: "agent", id: "a1" }, { now: t0 });
 	assert.ok(tokens.verify(kept.token, { now: t0 + 20 * DAY }).ok, "used on day 20");
 	assert.ok(tokens.verify(kept.token, { now: t0 + 45 * DAY }).ok, "45 days in, 25 since it was last used");
@@ -68,13 +67,10 @@ test("tokens slide: a person's and a site's last their days unused, a tab's, a b
 	assert.deepEqual(tokens.verify(left.token, { now: t0 }), { ok: false, reason: "unknown" }, "and forgotten");
 	assert.equal(TAB_IDLE_MS, DAY);
 	assert.equal(BOARD_IDLE_MS, DAY);
-	assert.equal(CANVAS_IDLE_MS, DAY);
 	assert.ok(tokens.verify(tab.token, { now: t0 + 23 * 3_600_000 }).ok);
 	assert.ok(!tokens.verify(tab.token, { now: t0 + 23 * 3_600_000 + DAY + 1 }).ok, "a tab's token left a day");
 	assert.ok(tokens.verify(board.token, { now: t0 + 23 * 3_600_000 }).ok);
 	assert.ok(!tokens.verify(board.token, { now: t0 + 23 * 3_600_000 + DAY + 1 }).ok);
-	assert.ok(tokens.verify(frame.token, { now: t0 + 23 * 3_600_000 }).ok, "a canvas frame's token lasts a day unused");
-	assert.ok(!tokens.verify(frame.token, { now: t0 + 23 * 3_600_000 + DAY + 1 }).ok);
 	assert.ok(tokens.verify(agent.token, { now: t0 + 400 * DAY }).ok, "an agent's lives as long as its agent");
 	assert.equal(tokenDays({}), 30);
 	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "7" }), 7);

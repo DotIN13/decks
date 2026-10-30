@@ -19,6 +19,8 @@ import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_TICKET, ticketSecret, Tickets } from "./auth/tickets.ts";
+import { HARNESS_ID, Passes } from "./auth/passes.ts";
+import { boardOnCanvas } from "./verbs/router.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
@@ -111,8 +113,14 @@ export class App {
 	readonly codes: PairCodes;
 	/** One page's admission for another site's frame or tab (`auth/tickets.ts`). */
 	readonly tickets: Tickets;
+	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
+	readonly passes: Passes;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
+	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
+	placedOn(path: string, canvas: string): boolean {
+		return boardOnCanvas(this, path, canvas);
+	}
 	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
 	get port(): number {
 		return this.config.port;
@@ -148,7 +156,20 @@ export class App {
 		this.tokens = new TokenStore(join(deck.path, ".decks", "tokens.json"));
 		this.codes = new PairCodes(this.tokens, { required: codeRequired() });
 		// A ticket made by the harness for its own pages (`HARNESS_TICKET`) works as long as the harness does.
-		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id), ticketSecret(config.dataDir));
+		const secret = ticketSecret(config.dataDir);
+		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id), secret);
+		this.passes = new Passes(
+			{
+				live: (id) => this.tokens.live(id),
+				// The person's role on a canvas now: none for one that is not there (any more), view for one shared to view.
+				role: (canvas) => {
+					const pens = this.stage?.pens;
+					if (!pens?.has(canvas)) return undefined;
+					return pens.sharing(canvas)?.role === "view" ? "view" : "edit";
+				},
+			},
+			secret,
+		);
 		this.bridge = new StageBridge(this.tokens);
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
@@ -316,7 +337,7 @@ export class App {
 			deck: deck.path,
 			pens: this.pens,
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
-			ticket: (path) => this.tickets.make(path, HARNESS_TICKET),
+			pass: (canvas) => this.passes.canvas(canvas, "view", HARNESS_ID).pass,
 			borrow: (use) => this.thumbs.borrow(use),
 			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
 			writer: (stage) => {

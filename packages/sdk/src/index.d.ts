@@ -588,6 +588,12 @@ export interface Decks extends Verbs {
 	/** A board's own token for its frame, on canvas `stage`: its calls act as that board. */
 	boardToken(path: string, stage?: string): Promise<string>;
 	/**
+	 * A canvas pass for one canvas (`POST /api/passes`): an hour, bound to this connection's token, with
+	 * your role there. A frame's calls send it as the bearer; its files are read at
+	 * `/api/t/<pass>/board/<deck path>`. Ask again at half its life.
+	 */
+	canvasPass(canvas: string): Promise<{ pass: string; role: "edit" | "view"; expires: number }>;
+	/**
 	 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's own
 	 * `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck path. In
 	 * the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.

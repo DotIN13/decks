@@ -17,4 +17,4 @@ export type { DocEdits, DrawingWriter } from "./render/types.ts";
 export { bootFrame } from "./frame/inside/frame.tsx";
 export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
 export { CallRefused, PROTOCOL, peer, type FrameCalls, type FrameToPage, type Message, type Page as FramePage, type PageCalls, type PageEnd, type PageToFrame, type Start as FrameStart } from "./frame/protocol.ts";
-export { createFramedEditor, type FrameHostOptions } from "./frame/outside/host.tsx";
+export { createFramedEditor, type CanvasPass, type FrameHostOptions } from "./frame/outside/host.tsx";
