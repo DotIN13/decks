@@ -665,6 +665,8 @@ export function Stage(props: StageProps) {
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
 			data-scaling={items.layered()}
+			/* A pinch on pictures (`?card-pictures=1`): the awake cards are hidden and the sheet draws their pictures (`items-layer.tsx`). */
+			data-card-pictures={items.cardsHidden() ? "true" : undefined}
 			data-gliding={gliding()}
 			/* The camera rests at or above this device's live zoom: items near the window have their slots. */
 			data-live={items.liveNow() ? "true" : undefined}

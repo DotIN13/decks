@@ -3,7 +3,7 @@
  * Pinch a card-heavy canvas in a simulated iPad and print what the pinches cost, as one JSON object.
  *
  *   node scripts/card-zoom.mjs [--url http://127.0.0.1:4876] [--canvas studio-cards] [--engine chromium|webkit]
- *                              [--device "iPad Pro 11"] [--throttle 4] [--pinches 3] [--out file.json]
+ *                              [--device "iPad Pro 11"] [--throttle 4] [--pinches 3] [--low 0.2] [--trace] [--out file.json]
  *
  * Opens the harness at `url` (its web root: a new browser lands on the conversation focused last,
  * so focus one on a card-heavy canvas first) in Playwright with an iPad's descriptor (its user agent,
@@ -90,7 +90,9 @@ if (canvasName) {
 	await sleep(600);
 	link.close();
 }
-await page.goto(`${url}/`, { waitUntil: "load" });
+// `--query card-pictures=0`: added to the page's address (the canvas frame reads the app's own).
+const query = arg("query");
+await page.goto(`${url}/${query ? `?${query}` : ""}`, { waitUntil: "load" });
 const findFrame = async () => {
 	for (let i = 0; i < 300; i++) {
 		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame"));
@@ -252,6 +254,22 @@ await atRest();
 await settled(2000, 30000);
 const start = { zoom: await zoomNow(), heapMB: await heap(), ...(await live()) };
 
+/*
+ * `--trace`: Chromium's trace of each pinch, for the work off the main thread a pinch costs (painting,
+ * rasterising tiles, compositing layers), summed by kind in ms: what a layer per card or a card painted
+ * at each step costs, which the main thread's own work does not show.
+ */
+const tracing = engine === "chromium" && process.argv.includes("--trace");
+const PAINT_KINDS = { Paint: "paint", RasterTask: "raster", "TileManager::FlushAndIssueSignals": "raster", "LayerTreeHostImpl::PrepareToDraw": "composite", "DisplayScheduler::DrawAndSwap": "composite", UpdateLayerTree: "layers", Layerize: "layers", "PaintArtifactCompositor::Update": "layers" };
+const paintWork = (trace) => {
+	const sums = {};
+	for (const event of trace.traceEvents ?? []) {
+		const kind = PAINT_KINDS[event.name];
+		if (!kind || event.ph !== "X" || typeof event.dur !== "number") continue;
+		sums[kind] = (sums[kind] ?? 0) + event.dur / 1000;
+	}
+	return Object.fromEntries(Object.entries(sums).map(([kind, ms]) => [kind, Math.round(ms)]));
+};
 const runs = [];
 const gesture = async (name, factor) => {
 	const before = await canvas.evaluate(() => {
@@ -260,10 +278,12 @@ const gesture = async (name, factor) => {
 		return { mounts: __cz.mounts, unmounts: __cz.unmounts };
 	});
 	const w0 = await work();
+	if (tracing) await browser.startTracing(page, { categories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "cc", "gpu"] });
 	const t0 = Date.now();
 	await pinch(factor);
 	const ms = Date.now() - t0;
 	const during = await canvas.evaluate(() => ({ ...__cz.down, frames: __cz.frames }));
+	const traced = tracing ? paintWork(JSON.parse(String(await browser.stopTracing()))) : undefined;
 	const w1 = await work();
 	const busy = Object.fromEntries(Object.keys(w1).map((key) => [key, Math.round(w1[key] - w0[key])]));
 	await atRest();
@@ -280,6 +300,7 @@ const gesture = async (name, factor) => {
 		p95Ms: Math.round(sorted[Math.floor(sorted.length * 0.95)] ?? 0),
 		// The main thread's work while the fingers were down (Chromium), in ms: a slowed CPU at 4× does not always show it as late frames headless.
 		busyMs: busy,
+		...(traced ? { paintMs: traced } : {}),
 		mounts: during.mounts - before.mounts,
 		unmounts: during.unmounts - before.unmounts,
 		mountsAfter: after.mounts - during.mounts,
@@ -289,9 +310,11 @@ const gesture = async (name, factor) => {
 		...(await live()),
 	});
 };
+// `--low 0.5`: pinch to 50% and back instead, where the awake cards stay awake the whole way.
+const low = Number(arg("low", "0.2"));
 for (let i = 0; i < pinches; i++) {
-	await gesture("out", 0.2);
-	await gesture("in", 5);
+	await gesture("out", low);
+	await gesture("in", 1 / low);
 }
 
 // Live cards at rest at a few zooms between: where the most cards are near enough to wake.
@@ -316,10 +339,11 @@ const report = {
 		droppedShare: Math.round((sum("dropped") / Math.max(1, sum("frames"))) * 1000) / 1000,
 		mountsPerPinch: Math.round(((sum("mounts") + sum("unmounts")) / runs.length) * 10) / 10,
 		liveAt100: Math.max(...runs.filter((run) => run.name === "in").map((run) => run.live)),
-		liveAt20: Math.max(...runs.filter((run) => run.name === "out").map((run) => run.live)),
+		liveAtLow: Math.max(...runs.filter((run) => run.name === "out").map((run) => run.live)),
 		heapMB: Math.max(...runs.map((run) => run.heapMB ?? 0)),
 		liveMost: Math.max(...stops.map((stop) => stop.live), ...runs.map((run) => run.live)),
 		busyMsPerPinch: engine === "chromium" ? Math.round(runs.reduce((n, run) => n + run.busyMs.task, 0) / runs.length) : undefined,
+		...(tracing ? { paintMsPerPinch: Object.fromEntries(["paint", "raster", "composite", "layers"].map((kind) => [kind, Math.round(runs.reduce((n, run) => n + (run.paintMs?.[kind] ?? 0), 0) / runs.length)])) } : {}),
 		scriptMsPerPinch: engine === "chromium" ? Math.round(runs.reduce((n, run) => n + run.busyMs.script, 0) / runs.length) : undefined,
 	},
 	runs,

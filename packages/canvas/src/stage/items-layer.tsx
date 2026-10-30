@@ -49,6 +49,40 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
 	/** How many cards are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
 	const CARD_BUDGET = CARDS[DEVICE];
+	/**
+	 * A pinch on pictures: while the scale moves, the awake cards are hidden and the sheet draws each as
+	 * its picture, so the page stretches one sheet and lays out, paints and layers no card.
+	 *
+	 * Off unless `?card-pictures=1` is in the page's address. Meant for an iPad or a phone, and measured
+	 * there in a simulated iPad (`scripts/card-zoom.mjs`, Playwright's iPad Pro 11, CPU 4×, 3 cards awake):
+	 * it changed nothing a pinch costs. Late frames in WebKit 2.0 and 2.0 per pinch off against 2.0 and
+	 * 0.2 on, noise either way; Chromium's paint, raster and layer work 4, 15 and 7 ms per pinch off, 5,
+	 * 14 and 7 on; the main thread's 71–98 ms off, 84–117 on, since each pinch tells the engine twice
+	 * that its cards changed. With at most three cards awake and each on a layer the compositor stretches,
+	 * there is little left for it to save. Kept for a measure on the real device.
+	 */
+	const PINCH_ON_PICTURES = typeof location !== "undefined" && new URLSearchParams(location.search).get("card-pictures") === "1";
+	/** The awake cards are hidden: from the first step of a scale until it rests (`canvas.css`, `data-card-pictures`). */
+	const cardsHidden = createMemo(() => PINCH_ON_PICTURES && scaling());
+	/**
+	 * The sheet draws the awake cards as pictures rather than holes: from the first step of a scale, and
+	 * two frames past its rest, so a card shown again has painted under its picture before the hole
+	 * opens over it, and no frame shows it blank.
+	 */
+	const [cardPictures, setCardPictures] = createSignal(false);
+	{
+		let raf: number | undefined;
+		createEffect(
+			on(cardsHidden, (hidden) => {
+				if (raf !== undefined) cancelAnimationFrame(raf);
+				raf = undefined;
+				if (hidden) return setCardPictures(true);
+				if (!untrack(cardPictures)) return;
+				raf = requestAnimationFrame(() => (raf = requestAnimationFrame(() => ((raf = undefined), setCardPictures(false)))));
+			}),
+		);
+		onCleanup(() => raf !== undefined && cancelAnimationFrame(raf));
+	}
 
 	/**
 	 * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.
@@ -130,6 +164,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	createEffect(() => {
 		const live = liveBoards();
 		const look = scheme();
+		const pictures = cardPictures();
 		/*
 		 * An awake card being sized is its surface, drawn over the sheet at the new box, so the sheet
 		 * keeps it where it was until the file has the size: each step otherwise painted the whole
@@ -333,7 +368,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
 	const isRendered = createSelector(renderedPaths, (path: string, paths) => paths.has(path));
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
-	const layered = createMemo(() => scaling() && rendered().filter((board) => (board.card || board.item) && isVisible(board)).length <= LAYER_BUDGET);
+	const layered = createMemo(() => scaling() && rendered().filter((board) => ((board.card && !cardsHidden()) || board.item) && isVisible(board)).length <= LAYER_BUDGET);
 
 	/** The camera as of its last rest. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
@@ -580,5 +615,5 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		</>
 	);
 
-	return { isLive, renderedPaths, boardIndex, liveNow, layered, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
+	return { isLive, renderedPaths, boardIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
 }
