@@ -54,6 +54,8 @@ export interface ItemSlotExtras {
 	reload?: number | undefined;
 	/** False when a card's scripts may not run here: a friend's card, on a canvas shared with the person. */
 	cardScripts?: boolean | undefined;
+	/** With its scripts off, a card the person may turn them on for (one pasted from a friend's canvas): a button on it does. */
+	onScriptsOn?: (() => void) | undefined;
 }
 
 /**
@@ -177,6 +179,12 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && (hovered() || props.selected)}>
 				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
+			</Show>
+			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
+			<Show when={props.onScriptsOn && props.board.card}>
+				<button type="button" class="card-scripts-off" title="This card came from a friend's canvas, so its scripts do not run until you turn them on" onPointerDown={(event) => event.stopPropagation()} onClick={() => props.onScriptsOn?.()}>
+					Scripts off · Turn on
+				</button>
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !shown() && press(event)}>
 				<Show when={awake() && props.board.card}>

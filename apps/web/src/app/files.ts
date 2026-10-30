@@ -493,7 +493,7 @@ export function createFileDrops() {
 	 * conversation, in the gap between boards — and a drop the app does not handle would be
 	 * the browser opening the file, which unloads the app: socket, camera and all.
 	 */
-	const install = (deps: { preview(): unknown }) => {
+	const install = (deps: { preview(): unknown; /** A copy of canvas items, or words, handed to the canvas (its frame's `clipboard.ts`); false when there is no canvas to take it. */ forward?(data: { clip?: string; text?: string }): boolean }) => {
 		onMount(() => {
 			const onPaste = (event: ClipboardEvent) => {
 				// `closest` is asked for rather than assumed: a paste with nothing focused
@@ -501,7 +501,15 @@ export function createFileDrops() {
 				const target = event.target as HTMLElement | null;
 				if (target?.closest?.("input, textarea, [contenteditable]")) return;
 				const files = Array.from(event.clipboardData?.files ?? []);
-				if (files.length === 0) return;
+				if (files.length === 0) {
+					// Items copied on a canvas, or words: the canvas's, as a paste with the focus in it would be.
+					const clip = event.clipboardData?.getData("application/x-decks-clip") || event.clipboardData?.getData("text/html") || "";
+					const text = event.clipboardData?.getData("text/plain") ?? "";
+					const isClip = clip.includes('"v":1') || clip.includes("decks-clip");
+					if ((!isClip && !text.trim()) || !deps.forward) return;
+					if (deps.forward({ ...(isClip ? { clip } : {}), text })) event.preventDefault();
+					return;
+				}
 				event.preventDefault();
 				paste(files);
 			};

@@ -1906,6 +1906,21 @@
 		/* A finger on the bar carries the board, as its edge does: never a native scroll of the stage. */
 		touch-action: none;
 	}
+	/* A card whose scripts are off here (pasted from a friend's canvas), and the button that turns them on: above it, at its right. */
+	.card-scripts-off {
+		position: absolute;
+		right: 0;
+		bottom: calc(100% + 2px);
+		z-index: 2;
+		padding: 2px 8px;
+		font: inherit;
+		font-size: 12px;
+		color: var(--fg);
+		background: var(--panel);
+		border: 1px solid var(--line-strong);
+		border-radius: 6px;
+		cursor: pointer;
+	}
 }
 
 /* ---- a document or an app item, in a board's place (`item-surfaces.tsx`) ------------------- */

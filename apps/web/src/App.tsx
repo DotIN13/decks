@@ -711,7 +711,16 @@ export function App() {
 
 
 	// A paste, and a drop on the canvas, over a board or not (`app/files.ts`).
-	files.install({ preview });
+	files.install({
+		preview,
+		// A paste with the focus on this page: items copied on a canvas, or words, go to the canvas on screen.
+		forward: (data) => {
+			const handle = editorHandle();
+			if (!handle?.paste) return false;
+			handle.paste(data);
+			return true;
+		},
+	});
 	// The window's own facts: the on-screen keyboard, the page-zoom block, the dock's height.
 	installViewport();
 

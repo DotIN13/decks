@@ -239,7 +239,7 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={moveBoard}
-			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false } : {})} />}
+			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.boards.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.boards!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
 			shots={() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK })}
 			{...commenting}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
@@ -310,6 +310,12 @@ export function createEditor(
 			if (page === undefined) return;
 			setSelected(page);
 			options.onSelect?.(page);
+		},
+		selection: () => {
+			const ids = [...untrack(penSelection)];
+			const page = untrack(selected);
+			const item = page ? (untrack(doc).children ?? []).find((one) => (one.metadata as { path?: unknown } | undefined)?.path === page || one.id === page.replace(/^item:/, "")) : undefined;
+			return item && !ids.includes(item.id) ? [...ids, item.id] : ids;
 		},
 		fit: () => putCamera(fitAll(untrack(doc), size(), look())),
 		edit,

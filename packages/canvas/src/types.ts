@@ -64,6 +64,8 @@ export interface CanvasOptions {
 		 * says no here instead.
 		 */
 		cardScripts?(path: string): boolean;
+		/** Turn on the scripts of a card whose scripts are off here (a card pasted from a friend's canvas): a button on it says so. */
+		onScriptsOn?(path: string): void;
 		/**
 		 * The host's own records of the boards (their revision, format and title), as its server keeps
 		 * them, in place of the ones read off the drawing. Read reactively.
@@ -194,6 +196,13 @@ export interface CanvasHandle {
 	fit(): void;
 	/** Select these drawn items (a host's list of layers), or none; with `page`, that card or board is the one selected, as a press on it makes it. */
 	select(ids: readonly string[], page?: string): void;
+	/** What is selected, by id: the drawn items, and the card or board selected by a press on it. */
+	selection?(): string[];
+	/**
+	 * Paste what the page's clipboard had, when the page had the focus: a copy of items (`@decks/pen`'s
+	 * clip, as JSON) or words, put in where the pointer is over the canvas, else in the middle of the view.
+	 */
+	paste?(data: { clip?: string; text?: string }): void;
 	/** Apply pen operations as the person's edit (`@decks/pen`'s `Op`s): `onEdits` hears it. */
 	edit(ops: unknown[]): void;
 	undo(): void;

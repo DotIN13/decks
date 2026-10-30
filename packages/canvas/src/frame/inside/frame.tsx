@@ -22,6 +22,7 @@ import { pageItems, placedItems } from "../../model/boxes.ts";
 import { handsOn } from "../../camera/touched.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
+import { installClipboard, sayer } from "./clipboard.ts";
 import { PROTOCOL, peer, type CardSlot, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "../protocol.ts";
 
 /**
@@ -324,7 +325,15 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
 				return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&whole=1`;
 			},
-			cardScripts: (path) => trust(path) !== "friend",
+			// A friend's card, on their canvas or pasted from it with its scripts off until you turn them on (`canvas.paste`).
+			cardScripts: (path) => trust(path) !== "friend" && cardItem(path)?.metadata?.scripts !== false,
+			onScriptsOn: (path) => {
+				const item = cardItem(path);
+				if (!item?.metadata) return;
+				const { scripts: _scripts, from: _from, ...rest } = item.metadata;
+				handle.edit([{ op: "update", id: item.id, set: { metadata: rest } }]);
+				setTimeout(() => handle.reloadBoard(path), 300);
+			},
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
 			onExtent: (path, extent) => void (studio ? undefined : backend.post("board-extent", { path, ...extent })),
 			onOpenLink: (path, from) => {
@@ -370,7 +379,33 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
 	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
 	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => news();
+	(globalThis as { __decksFrameSelect?: (ids: string[]) => void }).__decksFrameSelect = (ids) => handle.select(ids);
+	(globalThis as { __decksFrameCamera?: () => unknown }).__decksFrameCamera = () => handle.camera();
 	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: dock(), agents: Object.keys(agents()).length, agent: agent(), cursor: cursor(), pages: pages().length });
+	/** A card's item on the drawing, by its path. */
+	function cardItem(path: string): { id: string; metadata?: { path?: string; scripts?: unknown; from?: unknown; [key: string]: unknown } } | undefined {
+		return ((made?.handle.drawn().children ?? []) as unknown as Array<{ id: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
+	}
+
+	/*
+	 * Copy, cut and paste of items (`clipboard.ts`): on a harness through it, which holds the copy and
+	 * copies the files a paste needs; on Studio, what needs no file.
+	 */
+	const harness = studio ? `studio:${start.backend.api}` : ((first as { harness?: string }).harness ?? `harness:${start.backend.api}`);
+	const clipboard = installClipboard({
+		handle,
+		canvas: start.canvas.name,
+		harness: () => harness,
+		canWrite,
+		...(studio ? {} : { call: (verb: string, args: unknown[]) => backend.call(verb, args) }),
+		upload: (files, at) =>
+			void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
+				end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
+			),
+		say: sayer(root),
+	});
+	end.on("paste", (data) => clipboard.paste(data));
+
 	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
 	function takeOff(path: string): boolean {
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);

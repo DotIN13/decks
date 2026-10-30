@@ -495,6 +495,7 @@ export function createFramedEditor(options: Options): Editor {
 			end()?.emit("camera", { camera });
 		},
 		reloadBoard: (path) => end()?.emit("reload", { path }),
+		paste: (data) => end()?.emit("paste", data),
 		restored: false,
 		dispose: () => {
 			end()?.close();

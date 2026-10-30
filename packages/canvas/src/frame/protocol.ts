@@ -92,6 +92,8 @@ export interface PageToFrame {
 	busy: { writer?: { name?: string; color: string } };
 	/** A press or Escape on the page, which the frame does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
 	away: Record<string, never>;
+	/** A paste the page heard, with the focus on the page: a copy of items (a clip's JSON) or words, for the canvas (`frame/inside/clipboard.ts`). */
+	paste: { clip?: string; text?: string };
 }
 
 /** The calls the page makes of the frame, and what each answers. */
