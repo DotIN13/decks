@@ -270,8 +270,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 			news: () => news(),
 			onRead: (path) => void (studio ? undefined : backend.post("board-seen", { path })),
-			// Hidden is the card taken off the drawing, as canvas.delete does.
-			onHide: (path) => (studio ? takeOff(path) : void backend.call("canvas.delete", [path])),
+			// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
+			onHide: (path) => {
+				if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path]);
+			},
 		},
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.
 		onCamera: (moved) => {
