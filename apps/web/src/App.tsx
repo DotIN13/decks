@@ -1213,8 +1213,7 @@ export function App() {
 
 	/**
 	 * A file of any kind, chosen in the file picker and placed in the middle of the view by what it is:
-	 * the tool column's "Add a file" when the canvas was drawn in this page. The frame's tool column
-	 * (`frame/chrome.tsx`) has no way to ask for it yet, so nothing calls it until it does.
+	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
 	 */
 	const openFileAtMiddle = () => {
 		const stage = document.querySelector(".stage, iframe.canvas-frame");
@@ -1297,7 +1296,7 @@ export function App() {
 				backend: canvasBackend,
 				comment: frameComment,
 				ink: frameInk,
-				panel: () => openAppsPanel(),
+				panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),
 				agent: cardAgentCall,
 				dock: dockCover,
 				openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"),

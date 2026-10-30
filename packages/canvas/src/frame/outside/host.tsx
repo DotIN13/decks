@@ -25,8 +25,8 @@ export interface FrameHostOptions {
 	comment?(comment: NonNullable<ComposerPart["comment"]>): void;
 	/** A sketch to turn into something: a draft for the composer, never sent from here. */
 	ink?(ink: NonNullable<ComposerPart["ink"]>): void;
-	/** Open one of the app's panels. */
-	panel?(name: "apps"): void;
+	/** Open one of the app's panels: the apps list, or the file picker (`files`), whose file is put in the middle of the frame's view. */
+	panel?(name: "apps" | "files"): void;
 	/** Open an app in a tab of its own (`decks.app`), outside the canvas's sandbox. */
 	openApp?(name: string): void;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */

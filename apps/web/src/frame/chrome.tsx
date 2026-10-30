@@ -49,10 +49,10 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
 			<Show
 				when={chrome.narrow()}
-				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
+				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
 			>
 				<div class="frame-tool-row" style={{ bottom: `${chrome.dock() + 8}px` }}>
-					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
+					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
 				</div>
 			</Show>
 			<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />

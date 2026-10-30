@@ -34,7 +34,7 @@ export interface FrameChrome {
 	/** A picture of these items to download, taken by the page (it holds the token that can). */
 	exportPicture(ids: string[]): void;
 	/** Open one of the app's own panels. */
-	panel(name: "apps"): void;
+	panel(name: "apps" | "files"): void;
 	/** Whether the frame is a phone's width: the tools are a row then, above the page's dock. */
 	narrow: Accessor<boolean>;
 	/** How far up from the bottom the page's dock reaches, in pixels. */

@@ -108,8 +108,8 @@ export interface FrameToPage {
 	composer: ComposerPart;
 	/** Open an app in a tab of its own: the page's, outside the canvas's sandbox (`decks.app`). */
 	"open-app": { name: string };
-	/** Open one of the app's own panels, beside the canvas (the apps list). */
-	panel: { name: "apps" };
+	/** Open one of the app's own panels, beside the canvas (the apps list), or its file picker (`files`): the file chosen there is put in the middle of the view. */
+	panel: { name: "apps" | "files" };
 	/** Once the camera rests; or a view kept for another conversation (`agent`), for the harness to answer that agent's `view.camera` by. */
 	camera: { camera: Camera; agent?: string };
 	viewport: { width: number; height: number };
