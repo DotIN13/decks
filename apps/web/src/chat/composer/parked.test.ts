@@ -10,9 +10,28 @@ const memory = () => {
 const words = (text: string): Draft => [{ type: "text", text }];
 const pill = (id: string) => ({ type: "mention" as const, kind: "comment" as const, id, label: `“${id}”` });
 
-test("each agent's stage is one page", () => {
-	assert.equal(pageKey("a1"), "agent:a1");
+test("each agent's stage on each canvas is one page", () => {
+	assert.equal(pageKey("a1", "main"), "agent:a1@main");
+	assert.equal(pageKey("a1"), "agent:a1", "before its canvas is known");
 	assert.equal(pageKey(undefined), "agent:none");
+});
+
+test("an agent moved to another canvas finds an empty bar there, and its words again back home", () => {
+	const drafts = parkedDrafts(memory());
+	drafts.set(pageKey("a1", "x"), words("for x"));
+	assert.equal(drafts.get(pageKey("a1", "y")), undefined);
+	assert.deepEqual(drafts.get(pageKey("a1", "x")), words("for x"));
+});
+
+test("a draft kept under the agent alone is taken once, by the canvas it is on, and dropped", () => {
+	const store = memory();
+	store.setItem(DRAFTS_KEY, JSON.stringify({ "agent:a1": { draft: words("old words"), at: 5 } }));
+	const drafts = parkedDrafts(store);
+	assert.deepEqual(drafts.get(pageKey("a1", "x")), words("old words"), "the upgrade loses nothing");
+	assert.equal(drafts.get(pageKey("a1", "y")), undefined, "and it does not follow the agent to another canvas");
+	assert.equal(drafts.get(pageKey("a1")), undefined, "the old key is gone");
+	assert.deepEqual(Object.keys(JSON.parse(store.getItem(DRAFTS_KEY)!)), ["agent:a1@x"]);
+	assert.deepEqual(parkedDrafts(store).get(pageKey("a1", "x")), words("old words"), "and it stays after a reload");
 });
 
 test("each page keeps its own draft, and a reload reads them back", () => {

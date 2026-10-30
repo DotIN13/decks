@@ -15,6 +15,26 @@ import type { BoardComment } from "@decks/canvas/comments";
 
 // --- kept between reloads ------------------------------------------------------------
 
+/**
+ * Whose waiting comments these are: an agent on a canvas, the stage they were made on. A comment is
+ * about a board on that canvas, so it waits there and not on the next canvas the agent is moved to.
+ */
+export function commentsKey(agentId: string, canvas: string | undefined): string {
+	return canvas ? `${agentId}@${canvas}` : agentId;
+}
+
+/**
+ * Comments kept under the agent alone, before canvases were part of the key, moved to the canvas it
+ * is on now and dropped from the old key; the same record when there is nothing to move.
+ */
+export function adoptComments(all: Record<string, BoardComment[]>, agentId: string, canvas: string | undefined): Record<string, BoardComment[]> {
+	const former = all[agentId];
+	if (!canvas || !former?.length) return all;
+	const { [agentId]: _, ...rest } = all;
+	const key = commentsKey(agentId, canvas);
+	return { ...rest, [key]: [...(all[key] ?? []), ...former] };
+}
+
 export const COMMENTS_KEY = "decks.comments";
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;

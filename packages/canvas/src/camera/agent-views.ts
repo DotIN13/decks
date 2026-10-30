@@ -63,8 +63,20 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 	};
 
 	return {
-		// Only the key asked for: a view kept before canvases were part of the key no longer stands in for every canvas.
-		of: (agentId, stage) => read()[keyOf(agentId, stage)],
+		/*
+		 * Only the key asked for. A view kept before canvases were part of the key is taken once, by the
+		 * first canvas this agent is asked about (the one it is on as the upgrade lands), and dropped: it
+		 * comes back where it was left and no longer stands in for every canvas.
+		 */
+		of: (agentId, stage) => {
+			const views = read();
+			const key = keyOf(agentId, stage);
+			if (views[key] || !stage || !views[agentId]) return views[key];
+			views[key] = views[agentId]!;
+			delete views[agentId];
+			write();
+			return views[key];
+		},
 		keep: (agentId, stage, view) => {
 			const views = read();
 			views[keyOf(agentId, stage)] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };

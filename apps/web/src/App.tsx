@@ -34,7 +34,7 @@ import { isNews } from "./panel/board-news.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
 import { commentBlock, withComments } from "./markup/comments.ts";
-import { addComment, cleanFrameComment, cleanFrameInk, cleanFramePills, removeComment, takeComments, waitingComments } from "./state/comments.ts";
+import { addComment, adoptFormerComments, cleanFrameComment, cleanFrameInk, cleanFramePills, removeComment, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { createFramedEditor, type CanvasHandle } from "@decks/canvas";
@@ -111,6 +111,15 @@ export function App() {
 	 * reload and belongs to this browser alone.
 	 */
 	const views = createMemo(() => agentViews(state.deck?.path ?? ""));
+
+	/** The canvas the conversation on screen is on: with the agent, what its draft and its waiting comments are kept under. */
+	const focusedCanvas = () => stageOf(state.focused)?.name;
+	// Comments an earlier build kept under the agent alone wait on the canvas it is on now (`adoptComments`).
+	createEffect(() => {
+		const agent = state.focused;
+		const canvas = focusedCanvas();
+		if (agent && canvas) untrack(() => adoptFormerComments(agent, canvas));
+	});
 
 	/**
 	 * Views of agents that are gone are dropped.
@@ -197,7 +206,7 @@ export function App() {
 		 * on, which is the focused one: the only place a comment can be made is its stage.
 		 */
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
-		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused) : [];
+		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused, focusedCanvas()) : [];
 		const notes = commentIds.flatMap((id) => held.filter((note) => note.id === id));
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
@@ -534,6 +543,22 @@ export function App() {
 		}, 400);
 		onCleanup(() => clearTimeout(timer));
 	});
+	/*
+	 * And again whenever this browser is come back to: the harness answers an agent's `view.camera` with
+	 * the newest reading of its canvas from any device (`deck/cameras.ts`), and the device the person is
+	 * on now is the one whose view that should be, even before they pan.
+	 */
+	onMount(() => {
+		const again = () => {
+			if (document.visibilityState === "visible" && state.focused) reportCamera(camera(), state.focused);
+		};
+		window.addEventListener("focus", again);
+		document.addEventListener("visibilitychange", again);
+		onCleanup(() => {
+			window.removeEventListener("focus", again);
+			document.removeEventListener("visibilitychange", again);
+		});
+	});
 
 	onMount(() => {
 		start(() => {
@@ -837,11 +862,12 @@ export function App() {
 	const frameComment = (handed: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
 		const agentId = state.focused;
 		if (!agentId) return;
+		const canvas = focusedCanvas();
 		const comment = cleanFrameComment(handed);
 		const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 		if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });
 		else {
-			addComment(agentId, note);
+			addComment(agentId, canvas, note);
 			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
 		}
 	};
@@ -1746,7 +1772,7 @@ export function App() {
 					<Composer
 						draft={draft()}
 						agentId={state.focused}
-						page={pageKey(state.focused)}
+						page={pageKey(state.focused, focusedCanvas())}
 						usage={state.focused ? state.agents[state.focused!]?.usage : undefined}
 						onUsage={() => openUsage(state.focused)}
 						busy={busy()}
@@ -1764,9 +1790,9 @@ export function App() {
 							const id = state.focused;
 							if (id) send({ type: "agent.queue", id, action, ...(item ? { item } : {}) });
 						}}
-						comments={waitingComments(state.focused)}
+						comments={waitingComments(state.focused, focusedCanvas())}
 						onCommentsGone={(ids) => {
-							for (const id of ids) if (state.focused) removeComment(state.focused, id);
+							for (const id of ids) if (state.focused) removeComment(state.focused, focusedCanvas(), id);
 						}}
 						onText={setBarText}
 						destination={destinationLabel(destination(barText(), barContext()))}

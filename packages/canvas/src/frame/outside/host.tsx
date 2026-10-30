@@ -27,7 +27,7 @@ export interface FrameHostOptions {
 	 * The harness as the frame reaches it, and a token for this one canvas (`kind: "canvas"`), asked for
 	 * again before it lapses: the frame reads, follows and edits its canvas on it.
 	 */
-	backend(canvas: string): Promise<{ api: string; token: string; idle: number }>;
+	backend(canvas: string): Promise<{ api: string; token: string; idle: number; kind?: "harness" | "studio" }>;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
@@ -80,6 +80,8 @@ export function createFramedEditor(options: Options): Editor {
 	let modeNow: "edit" | "browse" = options.mode ?? "edit";
 	const storage = options.frame.storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
 	const storeKey = (canvas: string) => `decks.frame:${canvas}:`;
+	/** What the frame's own views were kept under in that store (`createAgentViews`'s key "frame"). */
+	const FRAME_VIEWS = "decks.views:frame";
 
 	/** A rectangle on the frame's screen, on this page's. */
 	const onPage = (at: Rect | undefined): DOMRect | undefined => {
@@ -139,6 +141,11 @@ export function createFramedEditor(options: Options): Editor {
 			for (let i = 0; i < (storage as Storage).length; i++) {
 				const key = (storage as Storage).key(i);
 				if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = storage.getItem(key) ?? "";
+			}
+			// A harness's frame keeps no view of its own any more (the page keeps one per agent and canvas): what one kept is dropped.
+			if (backend.kind !== "studio" && FRAME_VIEWS in stored) {
+				delete stored[FRAME_VIEWS];
+				storage.removeItem(prefix + FRAME_VIEWS);
 			}
 		}
 		const start: Start = {

@@ -246,7 +246,12 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		readOnly: start.look.readOnly,
 		toolbar: start.look.toolbar,
 		...(start.camera ? { camera: start.camera } : {}),
-		views: { scope: () => start.canvas.name, storage, key: "frame" },
+		/*
+		 * Studio's view is the canvas's, kept here on this device. A harness's page keeps one per agent and
+		 * canvas itself (`camera/landing.ts`) and hands it in as `start.camera`: a view kept here per canvas
+		 * alone would open every agent on the last one's.
+		 */
+		...(studio ? { views: { scope: () => start.canvas.name, storage, key: "frame" } } : {}),
 		canvasName: () => start.canvas.name,
 		/*
 		 * On Studio the editor keeps the drawing and its undo, as Studio's own page does, and each edit is

@@ -1,12 +1,13 @@
 import { createSignal } from "solid-js";
-import { loadComments, saveComments, type BoardComment } from "../markup/comments.ts";
+import { adoptComments, commentsKey, loadComments, saveComments, type BoardComment } from "../markup/comments.ts";
 
 /**
  * Comments on boards: whether the one being written has words in it, and the ones waiting for the next message.
  *
- * Waiting comments are kept per agent, because a comment is said *to* somebody: it was made
- * on that agent's canvas and goes with the next thing sent to that agent. They are in
- * localStorage so a reload between writing a comment and sending it does not lose it.
+ * Waiting comments are kept per agent and canvas, because a comment is said *to* somebody about
+ * something: it was made on that agent's canvas and goes with the next thing sent to that agent
+ * from there. They are in localStorage (this device's) so a reload between writing a comment and
+ * sending it does not lose it.
  */
 
 /**
@@ -39,23 +40,32 @@ const write = (next: Record<string, BoardComment[]>) => {
 	saveComments(storage(), next);
 };
 
-export function waitingComments(agentId: string | undefined): WaitingComment[] {
-	return agentId ? waiting()[agentId] ?? [] : [];
+export function waitingComments(agentId: string | undefined, canvas: string | undefined): WaitingComment[] {
+	return agentId ? waiting()[commentsKey(agentId, canvas)] ?? [] : [];
 }
 
-export function addComment(agentId: string, comment: WaitingComment): void {
-	write({ ...waiting(), [agentId]: [...(waiting()[agentId] ?? []), comment] });
+export function addComment(agentId: string, canvas: string | undefined, comment: WaitingComment): void {
+	const key = commentsKey(agentId, canvas);
+	write({ ...waiting(), [key]: [...(waiting()[key] ?? []), comment] });
 }
 
-export function removeComment(agentId: string, id: string): void {
-	write({ ...waiting(), [agentId]: (waiting()[agentId] ?? []).filter((comment) => comment.id !== id) });
+export function removeComment(agentId: string, canvas: string | undefined, id: string): void {
+	const key = commentsKey(agentId, canvas);
+	write({ ...waiting(), [key]: (waiting()[key] ?? []).filter((comment) => comment.id !== id) });
 }
 
 /** The waiting comments, handed over: they are about to be sent, so they stop waiting. */
-export function takeComments(agentId: string): BoardComment[] {
-	const taken = waiting()[agentId] ?? [];
-	if (taken.length > 0) write({ ...waiting(), [agentId]: [] });
+export function takeComments(agentId: string, canvas: string | undefined): BoardComment[] {
+	const key = commentsKey(agentId, canvas);
+	const taken = waiting()[key] ?? [];
+	if (taken.length > 0) write({ ...waiting(), [key]: [] });
 	return taken;
+}
+
+/** Comments kept under this agent alone, by an earlier build, moved to the canvas it is on now (`adoptComments`). */
+export function adoptFormerComments(agentId: string, canvas: string | undefined): void {
+	const next = adoptComments(waiting(), agentId, canvas);
+	if (next !== waiting()) write(next);
 }
 
 // --- what the canvas frame hands over -------------------------------------------------

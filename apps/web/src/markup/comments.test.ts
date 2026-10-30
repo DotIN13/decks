@@ -65,3 +65,15 @@ test("a comment on drawn items names the canvas file, the items by id, and their
 	assert.match(block, /^A comment on items drawn on a canvas:/);
 	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);
 });
+
+test("waiting comments are kept per agent and canvas, and ones kept under the agent alone move to its canvas once", async () => {
+	const { adoptComments, commentsKey } = await import("./comments.ts");
+	const note = { id: "c1", board: "boards/a.html", quote: "q", text: "t", at: 1 };
+	assert.equal(commentsKey("a1", "x"), "a1@x");
+	assert.equal(commentsKey("a1", undefined), "a1");
+	const moved = adoptComments({ a1: [note], "a1@x": [] }, "a1", "x");
+	assert.deepEqual(moved, { "a1@x": [note] });
+	assert.deepEqual(adoptComments(moved, "a1", "y"), moved, "nothing left to follow the agent to another canvas");
+	const none = { "a1@x": [note] };
+	assert.equal(adoptComments(none, "a1", "x"), none, "the same record when there is nothing to move");
+});

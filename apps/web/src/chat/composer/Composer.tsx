@@ -156,8 +156,8 @@ export function Composer(props: {
 	 */
 	agentId: string | undefined;
 	/**
-	 * The page the bar is on, `agent:<id>` (`parked.ts`). What is typed is kept per page, so
-	 * leaving a page never loses a message.
+	 * The page the bar is on, `agent:<id>@<canvas>` (`parked.ts`). What is typed is kept per page,
+	 * so leaving a page never loses a message, and another canvas starts with its own.
 	 */
 	page: string;
 	/**
@@ -204,7 +204,7 @@ export function Composer(props: {
 	};
 
 	/**
-	 * What you had typed on each agent's stage (`parked.ts`).
+	 * What you had typed on each agent's stage, per canvas, on this device (`parked.ts`).
 	 *
 	 * Written on every change rather than only on a switch, so a draft outlives a change of
 	 * page and a reload. `held` is the page the field is showing.

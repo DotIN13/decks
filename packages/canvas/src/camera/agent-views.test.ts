@@ -114,10 +114,19 @@ test("one agent has a view per canvas, and one canvas's view is not another's", 
 	assert.deepEqual(createAgentViews("/decks/one", store).of("ada", "sketches"), other, "retain keeps every canvas of a living agent");
 });
 
-test("a view kept before canvases were in the key answers for no canvas", () => {
+test("a view kept before canvases were in the key is taken once, by the canvas the agent is on, and dropped", () => {
 	const store = fake();
 	store.setItem("decks.views:/decks/one", JSON.stringify({ ada: view }));
 	const views = createAgentViews("/decks/one", store);
-	assert.equal(views.of("ada", "main"), undefined, "it would stand in for every canvas, which is how one agent got another's camera");
-	assert.deepEqual(views.of("ada", undefined), view, "a host keyed by scope alone, as Studio is, still reads it");
+	assert.deepEqual(views.of("ada", "main"), view, "the upgrade does not lose where you were");
+	assert.equal(views.of("ada", "sketches"), undefined, "and it stands in for no other canvas");
+	assert.equal(views.of("ada", undefined), undefined, "the old key is gone");
+	assert.deepEqual(JSON.parse(store.written.get("decks.views:/decks/one")!), { "ada@main": view }, "moved in the store too");
+	assert.deepEqual(createAgentViews("/decks/one", store).of("ada", "main"), view, "and it stays after a reload");
+});
+
+test("a host keyed by scope alone, as Studio is, still reads its views", () => {
+	const store = fake();
+	store.setItem("decks.views:/decks/one", JSON.stringify({ ada: view }));
+	assert.deepEqual(createAgentViews("/decks/one", store).of("ada", undefined), view);
 });

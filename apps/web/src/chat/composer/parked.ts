@@ -3,8 +3,9 @@ import { draftIsEmpty, normalize, parseDraft, type Draft } from "./draft.ts";
 /**
  * What was being typed on each page, so that leaving a page never loses a message.
  *
- * **Keyed by the page.** Each agent's stage is one page, and that is what a person means by
- * "where I was typing".
+ * **Keyed by the page.** Each agent's stage on one canvas is one page, and that is what a person
+ * means by "where I was typing": an agent moved to another canvas finds an empty bar there, and its
+ * words again when it comes back. The device is the store's own: this browser's localStorage.
  *
  * Kept in localStorage as well as in memory, so a reload, a crash or a closed tab keeps the
  * half-written message too. Every change is written, because the moment a draft is lost is
@@ -16,10 +17,13 @@ export const DRAFTS_KEY = "decks.drafts";
 /** Pages remembered at once. An agent that was closed leaves its draft behind; this is what clears it out. */
 export const DRAFTS_LIMIT = 40;
 
-/** The page a bar is on: one agent's stage. */
-export function pageKey(agentId: string | undefined): string {
-	return `agent:${agentId ?? "none"}`;
+/** The page a bar is on: one agent's stage, on the canvas it is on (when it is known yet). */
+export function pageKey(agentId: string | undefined, canvas?: string): string {
+	return `agent:${agentId ?? "none"}${canvas ? `@${canvas}` : ""}`;
 }
+
+/** The key a page was kept under before canvases were part of it: the agent alone. */
+const formerKey = (page: string) => (page.includes("@") ? page.slice(0, page.indexOf("@")) : undefined);
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 interface Parked {
@@ -61,7 +65,23 @@ export function parkedDrafts(store: Store | undefined): ParkedDrafts {
 	};
 
 	return {
-		get: (page) => pages.get(page)?.draft,
+		/*
+		 * A draft kept under the agent alone, before canvases were part of the key, is taken once by the
+		 * first of its canvases the bar arrives at, and dropped: the upgrade loses nobody's words, and they
+		 * do not follow the agent onto every canvas.
+		 */
+		get(page) {
+			const own = pages.get(page);
+			const former = formerKey(page);
+			if (own || !former) return own?.draft;
+			read();
+			const old = pages.get(former);
+			if (!old) return undefined;
+			pages.delete(former);
+			pages.set(page, old);
+			persist();
+			return old.draft;
+		},
 		set(page, draft, now = Date.now()) {
 			const next = normalize(draft);
 			// The store is shared by every tab and written whole, so it is read before it is written.
