@@ -47,7 +47,7 @@ export interface SyncOptions {
 	log?: (line: string) => void;
 	/**
 	 * This harness's own address (`http://127.0.0.1:4329`), for a picture of each canvas: Studio
-	 * shows it on the canvas's card. Absent: no canvas pictures, only boards'.
+	 * shows it on the canvas's card. Absent: no canvas pictures, only cards'.
 	 */
 	harness?: string;
 	/** A person token for this harness, read per call: what its screenshot call carries (`auth/guard.ts`). */
@@ -184,7 +184,7 @@ export class HarnessSync {
 	private latest = new Map<string, number>();
 	/** Edits that came inside live messages and are not applied yet, by canvas id. */
 	private inbox = new Map<string, { base: number; rev: number; changes: PenEdit[] }[]>();
-	/** Canvases (by id) Studio says changed; canvases (by name) whose drawing, files or board pictures changed here. */
+	/** Canvases (by id) Studio says changed; canvases (by name) whose drawing, files or card pictures changed here. */
 	private pull = new Set<string>();
 	private dirtyPens = new Set<string>();
 	private dirtyFiles = new Set<string>();
@@ -937,7 +937,10 @@ export class HarnessSync {
 		}
 	}
 
-	/** Each board's newest whole picture, so Studio can show it when no harness can serve the page. */
+	/**
+	 * Each card's newest picture, so Studio can draw it when the card is not live: the whole one when
+	 * the harness has taken it, else its widest rung (800, then 480, which every card on a canvas has).
+	 */
 	private async syncPictures(name: string, id: string, remote?: Map<string, SyncFile>) {
 		const there = remote ?? new Map<string, SyncFile>(((await this.call("GET", `/sync/v1/canvases/${id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
 		if (!there.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
@@ -946,13 +949,19 @@ export class HarnessSync {
 		const thumbs = readdirSync(dir);
 		const folder = canvasFolder(name);
 		for (const path of this.bundle(name).keys()) {
-			if (!path.startsWith("boards/") || !path.endsWith(".html")) continue;
+			if (!/^cards\/[^/]+\/index\.html$/.test(path) && !/^boards\/.+\.html$/.test(path)) continue;
 			const prefix = createHash("sha1").update(`${folder}/${path}`).digest("hex").slice(0, 16);
 			this.thumbOwner.set(prefix, name);
 			for (const scheme of ["light", "dark"]) {
-				const re = new RegExp(`^${prefix}-\\d+-${scheme}-\\d+-whole-l\\d+\\.webp$`);
-				const newest = thumbs.filter((t) => re.test(t)).map((t) => ({ t, at: statSync(join(dir, t)).mtimeMs })).sort((a, b) => b.at - a.at)[0];
-				if (!newest) continue;
+				const re = new RegExp(`^${prefix}-(\\d+)-${scheme}-\\d+-whole(?:-w(800|480))?-l\\d+\\.webp$`);
+				const found = thumbs.flatMap((t) => {
+					const m = re.exec(t);
+					return m ? [{ t, rev: m[1]!, width: m[2] ? Number(m[2]) : Number.POSITIVE_INFINITY, at: statSync(join(dir, t)).mtimeMs }] : [];
+				});
+				if (found.length === 0) continue;
+				// The newest revision's, its widest.
+				const rev = found.reduce((a, b) => (b.at > a.at ? b : a)).rev;
+				const newest = found.filter((one) => one.rev === rev).sort((a, b) => b.width - a.width)[0]!;
 				const target = `${PICTURES}/${path}.${scheme}.webp`;
 				const full = join(dir, newest.t);
 				const got = this.hashes.hash(full);
@@ -1154,7 +1163,7 @@ export class HarnessSync {
 	}
 }
 
-/** Board pictures the harness keeps, watched so a new one goes up with its canvas. */
+/** Card pictures the harness keeps, watched so a new one goes up with its canvas. */
 const THUMBS = ".decks/thumbs";
 
 /**
