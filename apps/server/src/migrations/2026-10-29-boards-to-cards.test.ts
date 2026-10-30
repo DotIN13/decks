@@ -16,7 +16,7 @@ const BOARD = `<!doctype html>
 </head>
 <body class="board">
 	<div class="doc"><h1>Sales rose a fifth</h1><img src="../files/a.png" /><a href="next.html#top">next</a><a href="gone.html">gone</a>
-	<button data-eval="pick" data-value="yes">Yes</button></div>
+	<button data-eval="pick" data-value="yes">Yes</button><div data-embed="../files/paper.pdf" data-pages="1-2"></div></div>
 	<script type="text/decks-eval" data-for="pick">await stage.send("Shard", { task: event.value });</script>
 	<script>setInterval(() => { document.getElementById("t").textContent = "../files/x.json"; }, 1000);</script>
 	<script src="../lib/board.js"></script>
@@ -37,6 +37,7 @@ test("a board's page becomes a card: styles for its root, scripts as modules sco
 	assert.match(card, /const blocksOf = \(card\) => \(\{\n\t"pick": async \(stage, event\) => \{\nawait stage\.send/);
 	assert.match(card, /send: "agent\.queue"/, "old names mapped");
 	assert.doesNotMatch(card, /text\/decks-eval/);
+	assert.doesNotMatch(card, /data-embed|paper\.pdf/, "an embedded file is dropped");
 });
 
 test("pages that are not a board's are told apart", () => {

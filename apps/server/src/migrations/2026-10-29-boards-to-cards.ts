@@ -18,7 +18,8 @@ import { dirname, join, posix } from "node:path";
  *   board did, with `stage` the card's SDK (`card.decks`, old names such as `stage.send` mapped) and
  *   `event` what was pressed;
  * - every relative address gains one `../`, the card's folder being one deeper; a link to a board that
- *   became a card points at the card.
+ *   became a card points at the card;
+ * - an embedded file (`data-embed`) is dropped: cards show none.
  *
  * A board whose page is not a board's (an app's, a document's, the shared Chrome tab's, or a page with
  * no `.board` body) is left as it is and listed. A friend's canvas is theirs and is left alone; so is
@@ -186,7 +187,10 @@ export function boardToCard(html: string, links: Map<string, string>, placed?: {
 		const kept = take(script[0]).trim();
 		if (kept) parts.push(kept);
 	}
-	const content = take(body).replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_all, attrs: string, css: string) => `<style${attrs}>${restyle(css)}</style>`);
+	const content = take(body)
+		.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_all, attrs: string, css: string) => `<style${attrs}>${restyle(css)}</style>`)
+		// An embedded file (`data-embed`, a PDF's pages) was the board runtime's; cards show none, so the box goes.
+		.replace(/<([a-z][\w-]*)\b[^>]*\bdata-embed\s*=[^>]*>[\s\S]*?<\/\1\s*>|<[a-z][\w-]*\b[^>]*\bdata-embed\s*=[^>]*\/>/gi, "");
 	parts.push(content.trim(), ...modules);
 	if (blocks.size) parts.push(`<script type="module">\n${evalModule(blocks)}</script>`);
 	// A folder of its own, one deeper than the board was: every `../` gains one more.
