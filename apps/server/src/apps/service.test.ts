@@ -148,12 +148,12 @@ test("names are checked, and a starter will not write over an app", () => {
 	}
 });
 
-test("a server app is told where Decks is, its own token, and where the SDK is; the token ends with the process", async () => {
-	const { TokenStore } = await import("../auth/tokens.ts");
+test("a server app is told where Decks is, its own app pass, and where the SDK is; the pass ends with that run", async () => {
+	const { Passes } = await import("../auth/passes.ts");
 	await withDeck(async ({ deck, apps, get }) => {
-		const tokens = new TokenStore(join(deck, ".decks", "tokens.json"));
+		const passes = new Passes({ live: () => false, role: () => undefined, appRun: (name) => apps.runOf(name) });
 		apps.decksPort = 4999;
-		apps.tokens = tokens;
+		apps.passes = passes;
 		const folder = join(deck, "apps", "teller");
 		mkdirSync(folder, { recursive: true });
 		writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
@@ -165,12 +165,17 @@ test("a server app is told where Decks is, its own token, and where the SDK is; 
 		assert.equal(seen.url, "http://127.0.0.1:4999");
 		assert.equal(seen.app, "teller");
 		assert.equal(seen.agent, null, "an app never calls as the agent whose shell started Decks");
-		const verified = tokens.verify(seen.token);
-		assert.ok(verified.ok);
-		assert.deepEqual(verified.principal, { kind: "app", name: "teller" }, "its token is the app's");
+		assert.match(seen.token, /^dk_ap_/);
+		assert.deepEqual(passes.openApp(seen.token), { app: "teller", holder: "server" }, "its pass is the app's");
 		assert.ok(existsSync(seen.sdk) && seen.sdk.endsWith("packages/sdk/src/index.js"), "and where the SDK is, to import");
 		apps.stop("teller");
-		assert.equal(tokens.verify(seen.token).ok, false, "stopped, its token is taken back");
+		assert.equal(passes.openApp(seen.token), undefined, "stopped, its pass ends");
+		// Started again, it is a new run, with a new pass; the old one stays ended.
+		const again = (await (await get("/app/teller/")).json()) as { token: string };
+		assert.notEqual(again.token, seen.token);
+		assert.ok(passes.openApp(again.token));
+		assert.equal(passes.openApp(seen.token), undefined);
+		apps.stop("teller");
 	});
 });
 

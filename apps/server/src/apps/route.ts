@@ -18,11 +18,11 @@ import { APP_NAME, type Apps } from "./service.ts";
  * `prefix` (a framework told its base path, which Decks also passes as `BASE_PATH`).
  *
  * An app is this server's own page, so another site is not let in (`fromAnotherSite`) unless it
- * carries a pairing token, as for `/api/`, or a GET carries a ticket for the app (`decks_ticket`,
- * `share/tickets.ts`), which is how another site opens one in a frame or a tab: an app has no
+ * carries a pairing token, as for `/api/`, or a GET carries an app pass for a tab (`decks_pass`,
+ * `auth/passes.ts`), which is how another site opens one in a frame or a tab: an app has no
  * sign-in of its own, and without this any page the person opened could call it. What Decks itself
  * uses to let a request in never reaches the app: the pairing token, in the `Authorization` header
- * or as `decks_token`, a ticket, and `X-Decks-*`.
+ * or as `decks_token`, a pass or a ticket, and `X-Decks-*`.
  */
 
 /**
@@ -31,8 +31,11 @@ import { APP_NAME, type Apps } from "./service.ts";
  */
 export type PairedCheck = (token: string | undefined, origin?: string) => boolean;
 
-/** Whether a ticket admits a GET of this decoded path (`Tickets.admits`). */
-export type TicketCheck = (ticket: string | undefined, path: string | undefined) => boolean;
+/**
+ * Whether what a GET carries in its address opens this app: an app pass for a tab, for this app
+ * (`decks_pass`, `auth/passes.ts`), or a ticket from before for its path (`decks_ticket`).
+ */
+export type TicketCheck = (ticket: string | undefined, path: string | undefined, app?: { pass: string | undefined; name: string }) => boolean;
 
 const ROUTE = /^\/app\/([^/?]+)(\/[^?]*)?(\?.*)?$/;
 
@@ -49,7 +52,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 	const url = req.url ?? "/";
 	const at = target(url);
 	if (!at) return false;
-	if (byTicket(req, ticketed)) {
+	if (byTicket(req, at.name, ticketed)) {
 		// The page's address holds its ticket, which is not sent on as the Referer of what it loads.
 		res.setHeader("Referrer-Policy", "no-referrer");
 	} else if (refusedSite(req, paired)) {
@@ -166,19 +169,31 @@ function refusedSite(req: IncomingMessage, paired: PairedCheck | undefined): boo
 	return !(paired?.(bearerOf(req.headers) ?? queryTokenOf(req.url), originOf(req.headers)) ?? false);
 }
 
-/** Another site's GET let in by a ticket for this app (`auth/tickets.ts`). */
-function byTicket(req: IncomingMessage, ticketed: TicketCheck | undefined): boolean {
+/** Another site's GET let in by an app pass for this app (`decks_pass`), or a ticket for it (`auth/tickets.ts`). */
+function byTicket(req: IncomingMessage, name: string, ticketed: TicketCheck | undefined): boolean {
 	if (!ticketed || req.method !== "GET" || !fromAnotherSite(req.headers)) return false;
+	const pass = passOf(req.url);
+	if (pass !== undefined) return ticketed(undefined, decodedPath(req.url), { pass, name });
 	const ticket = ticketOf(req.url);
 	return ticket !== undefined && ticketed(ticket, decodedPath(req.url));
 }
 
-/** A query string (`?a=1&decks_token=…`) without the pairing token or a ticket, which are Decks', not the app's. */
+/** The app pass a tab's address carries (`decks_pass`), if any. */
+function passOf(url: string | undefined): string | undefined {
+	try {
+		return new URL(url ?? "/", "http://decks").searchParams.get("decks_pass") ?? undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/** A query string (`?a=1&decks_token=…`) without the pairing token, a pass or a ticket, which are Decks', not the app's. */
 export function withoutToken(query: string): string {
-	if (!query.includes("decks_token") && !query.includes("decks_ticket")) return query;
+	if (!query.includes("decks_token") && !query.includes("decks_ticket") && !query.includes("decks_pass")) return query;
 	const params = new URLSearchParams(query.slice(1));
 	params.delete("decks_token");
 	params.delete("decks_ticket");
+	params.delete("decks_pass");
 	const rest = params.toString();
 	return rest ? `?${rest}` : "";
 }

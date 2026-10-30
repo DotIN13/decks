@@ -23,7 +23,7 @@ test("a harness token is one kind whoever its subject, is kept only as its hash,
 	assert.match(person.token, /^dk_h_[\w-]{43}$/);
 	assert.match(site.token, /^dk_h_/);
 	assert.match(tokens.issue({ kind: "agent", id: "a1" }).token, /^dk_h_/);
-	assert.match(tokens.issue({ kind: "app", name: "notes" }).token, /^dk_x_/);
+	assert.throws(() => tokens.issue({ kind: "app", name: "notes" }), /app pass/);
 	assert.match(tokens.issue({ kind: "board", path: "boards/a.html" }).token, /^dk_b_/);
 	const text = readFileSync(file, "utf8");
 	assert.ok(!text.includes(person.token) && !text.includes(site.token), "no token in the clear");

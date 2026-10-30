@@ -399,6 +399,15 @@ export function connect(options = {}) {
 			return { pass: said.pass, role: said.role === "view" ? "view" : "edit", expires: Number(said.expires) };
 		},
 		/**
+		 * An app's address for a tab of its own, with an app pass in it (`POST /api/passes { app }`): what
+		 * another site opens an app with. The pass is good for a day, while this connection's token is.
+		 */
+		async appUrl(name) {
+			const said = await request("/api/passes", { body: { app: name } });
+			if (typeof said?.url !== "string") throw new DecksError(`Decks would not open the app ${name}.`);
+			return `${base}${said.url}`;
+		},
+		/**
 		 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's
 		 * own `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck
 		 * path back. In the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.

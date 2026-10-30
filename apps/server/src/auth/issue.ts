@@ -18,14 +18,16 @@ import { bearerOf, originOf } from "./guard.ts";
  * - **`decks login`**, in a terminal: `POST /api/login { code }`, the code from `decks pair code` on
  *   the harness's own machine (`PairCodes`), for a harness token that lasts `DECKS_TOKEN_DAYS` unused
  *   (30 days unless set), the one token that lasts longer than a day.
- * - **Agents and app servers**: made when their process starts and taken back when it stops, by the
- *   agent (`stage/bridge.ts`) and the apps (`apps/service.ts`); no request asks for them.
+ * - **Agents**: made when the agent first starts and taken back when it stops (`stage/bridge.ts`); no
+ *   request asks for one.
  * - **Pairing**: `POST /api/pair` and `POST /api/studio/connect` trade a code, or a site this harness
  *   can place, for a harness token as that site, bound to the page's site, lasting a day unused.
  * - **A board**: `POST /api/tokens { kind: "board", path, stage? }`, asked by the person or a site for
  *   a board it is about to show.
  * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
+ * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
+ *   opens an app in, `POST /api/passes { app }`, for a day.
  * - **A page**: `POST /api/tickets`, five-minute tickets for another site's frames and tabs.
  */
 
@@ -356,11 +358,23 @@ export function doorRoutes(app: App): express.Router {
 	 */
 	api.post("/passes", (req, res) => {
 		if (!actsAsPerson(req.principal) || !req.tokenId) {
-			res.status(403).json({ error: "Only the person, or a front end paired with this harness, asks for a canvas pass, with its own token." });
+			res.status(403).json({ error: "Only the person, or a front end paired with this harness, asks for a pass, with its own token." });
+			return;
+		}
+		const body = (req.body ?? {}) as { canvas?: unknown; app?: unknown };
+		// An app pass for a tab another site opens the app in: `/app/<name>/?decks_pass=…`, a day.
+		if (body.app !== undefined) {
+			const name = String(body.app);
+			if (!app.apps.exists(name)) {
+				res.status(404).json({ error: `There is no app called ${name || "that"}.` });
+				return;
+			}
+			const { pass, expires } = app.passes.appTab(name, req.tokenId);
+			res.set("cache-control", "no-store").json({ pass, expires, url: `/app/${encodeURIComponent(name)}/?decks_pass=${encodeURIComponent(pass)}` });
 			return;
 		}
 		const pens = app.stage.pens;
-		const canvas = String(((req.body ?? {}) as { canvas?: unknown }).canvas ?? "");
+		const canvas = String(body.canvas ?? "");
 		if (!canvas || !pens || !pens.has(canvas)) {
 			res.status(404).json({ error: `There is no canvas called ${canvas || "that"}.` });
 			return;

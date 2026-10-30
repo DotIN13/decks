@@ -213,10 +213,17 @@ test("each principal calls as itself: an app as the app, a board as the board, a
 		app.evalTrust.allow("apps/notes");
 		app.evalTrust.allow("boards/tall.html");
 
-		const asApp = await call("boards", [], bearer(app.tokens.issue({ kind: "app", name: "notes" }).token));
+		// An app's server holds a pass for its run; a run that is not the app's (it stopped) is nobody.
+		const runs: Record<string, string> = { notes: "run1", nothing: "run2" };
+		app.apps.runOf = (name: string) => runs[name];
+		const asApp = await call("boards", [], bearer(app.passes.appServer("notes", "run1")));
 		assert.equal(asApp.status, 200, asApp.body.error);
-		const gone = await call("boards", [], bearer(app.tokens.issue({ kind: "app", name: "nothing" }).token));
+		const gone = await call("boards", [], bearer(app.passes.appServer("nothing", "run2")));
 		assert.equal(gone.status, 404);
+		const stopped = await call("boards", [], bearer(app.passes.appServer("notes", "run0")));
+		assert.equal(stopped.status, 401, "an earlier run's pass");
+		const tab = await call("boards", [], bearer(app.passes.appTab("notes", app.tokens.issue({ kind: "person" }).id).pass));
+		assert.equal(tab.status, 401, "a tab's pass opens the app's page, and calls nothing");
 
 		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/tall.html" }).token);
 		assert.equal((await call("boards", [], board)).status, 200);

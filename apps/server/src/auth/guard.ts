@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { Principal } from "./principal.ts";
 import type { Refusal, TokenStore, Verified } from "./tokens.ts";
 import { decodedPath, splitPathTicket, ticketOf, type Tickets } from "./tickets.ts";
-import { HARNESS_ID, isCanvasPass, passCovers, type Passes } from "./passes.ts";
+import { HARNESS_ID, isAppPass, isCanvasPass, passCovers, type Passes } from "./passes.ts";
 
 /**
  * The one gate: every request to the harness, and every socket, is let in on its token, and who is
@@ -178,7 +178,7 @@ export function relayedBoardToken(path: string, token: string): boolean {
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
 	tickets: Pick<Tickets, "admits">;
-	passes: Pick<Passes, "openCanvas">;
+	passes: Pick<Passes, "openCanvas" | "openApp">;
 	/** Whether a card or board at this deck path is placed on a canvas (`verbs/router.ts`, `boardOnCanvas`): a canvas pass reads it too. */
 	placedOn?(path: string, canvas: string): boolean;
 }
@@ -242,6 +242,20 @@ export function guard(gate: Gate) {
 				return;
 			}
 			req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
+			next();
+			return;
+		}
+		/*
+		 * An app's server, on the pass it was started with (`passes.ts`): that app, while that run of it
+		 * goes. A program on this machine, never a page: one sent from another site was copied out.
+		 */
+		if (isAppPass(token)) {
+			const pass = gate.passes.openApp(token);
+			if (!pass || pass.holder !== "server" || cross) {
+				res.status(401).type("text").send("This app pass is not one this harness's app holds now: the app stopped, or this is a tab's. An app's server is given its own as DECKS_TOKEN when it starts.");
+				return;
+			}
+			req.principal = { kind: "app", name: pass.app };
 			next();
 			return;
 		}

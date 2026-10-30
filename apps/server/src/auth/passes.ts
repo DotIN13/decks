@@ -12,6 +12,12 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * canvas no longer shared, or shared now to view, is refused or read only at once. It lives an hour,
  * and the page that holds it asks for the next one unseen (`@decks/canvas/frame`).
  *
+ * An **app pass** (`dk_ap_`) reaches one app. Its server holds one while it runs (`DECKS_TOKEN`, sent as
+ * the bearer), made when that run starts and good while that run is the app's (`Apps.runOf`), so it
+ * ends when the app stops or exits. A tab another site opens the app in carries one in its address
+ * (`/app/<name>/?decks_pass=…`, the GET that opens it, `apps/route.ts`), asked for with a harness
+ * token, bound to it, for a day.
+ *
  * A pass is `<prefix><payload>.<mac>`, the payload base64url JSON and the mac its HMAC-SHA256, over
  * the prefix and the payload, under the harness's ticket secret (`<dataDir>/ticket-secret`,
  * `tickets.ts`), so a restart ends no pass. Nothing about it is stored: it is taken back by taking
@@ -19,6 +25,10 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  */
 
 export const CANVAS_PASS = "dk_cp_";
+export const APP_PASS = "dk_ap_";
+
+/** How long an app pass for a tab lives: a day. An app's server's lives as long as that run of it. */
+export const APP_TAB_MS = 24 * 3_600_000;
 
 /** How long a canvas pass lives: an hour. A card's script beside the frame can read it, so it is short. */
 export const CANVAS_PASS_MS = 3_600_000;
@@ -49,10 +59,30 @@ export interface PassChecks {
 	live(id: string): boolean;
 	/** The person's role on a canvas now, or undefined when there is no such canvas (any more). */
 	role(canvas: string): "edit" | "view" | undefined;
+	/** The id of the run of an app's server going now, or undefined when it is not running. */
+	appRun?(name: string): string | undefined;
+}
+
+interface AppPayload {
+	a: string;
+	/** The run of its server it was made for. */
+	r?: string;
+	/** Or the harness token it was asked for with, for a tab, and when it runs out. */
+	k?: string;
+	e?: number;
+}
+
+/** An app pass as it is read: which app, and whether it is its server's or a tab's. */
+export interface AppPassOf {
+	app: string;
+	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it. */
+	holder: "server" | "tab";
 }
 
 /** Whether a string looks like a canvas pass, before it is checked. */
 export const isCanvasPass = (value: string | undefined): value is string => typeof value === "string" && value.startsWith(CANVAS_PASS);
+/** Whether a string looks like an app pass, before it is checked. */
+export const isAppPass = (value: string | undefined): value is string => typeof value === "string" && value.startsWith(APP_PASS);
 
 export class Passes {
 	private readonly canvasMs: number;
@@ -86,6 +116,27 @@ export class Passes {
 		if (!current) return undefined;
 		const role = payload.r === "view" || current === "view" ? "view" : "edit";
 		return { canvas: payload.c, role, by: payload.k, expires: payload.e };
+	}
+
+	/** The pass an app's server holds for one run of it (`run`), good while that run is the app's. */
+	appServer(name: string, run: string): string {
+		return this.sign(APP_PASS, { a: name, r: run } satisfies AppPayload);
+	}
+
+	/** A pass for a tab opening an app, bound to the harness token whose id is `by`, for a day. */
+	appTab(name: string, by: string, now = Date.now()): { pass: string; expires: number } {
+		const expires = now + APP_TAB_MS;
+		return { pass: this.sign(APP_PASS, { a: name, k: by, e: expires } satisfies AppPayload), expires };
+	}
+
+	/** An app pass read and checked: a server's while its run goes on, a tab's while its token works and its day lasts. */
+	openApp(pass: string | undefined, now = Date.now()): AppPassOf | undefined {
+		if (!isAppPass(pass)) return undefined;
+		const payload = this.open(APP_PASS, pass) as Partial<AppPayload> | undefined;
+		if (!payload || typeof payload.a !== "string") return undefined;
+		if (typeof payload.r === "string") return this.checks.appRun?.(payload.a) === payload.r ? { app: payload.a, holder: "server" } : undefined;
+		if (typeof payload.k !== "string" || typeof payload.e !== "number" || payload.e <= now || !this.checks.live(payload.k)) return undefined;
+		return { app: payload.a, holder: "tab" };
 	}
 
 	private sign(prefix: string, payload: object): string {

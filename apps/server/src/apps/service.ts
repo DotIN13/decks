@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statS
 import { createServer, connect } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { TokenStore } from "../auth/tokens.ts";
+import { randomBytes } from "node:crypto";
 
 /** The SDK a server app imports to call Decks' verbs (`packages/sdk`), told to it as `DECKS_SDK`. */
 export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/src/index.js");
@@ -101,8 +101,8 @@ interface Running {
 	child: ChildProcess;
 	port: number;
 	ready: Promise<boolean>;
-	/** The id of the token it was started with, taken back when it stops (`auth/tokens.ts`). */
-	token?: string;
+	/** Which run of it this is: its app pass is good while this run is the app's (`auth/passes.ts`). */
+	run: string;
 }
 
 /** An install, a build or a start in progress, which a second call joins rather than repeating. */
@@ -116,11 +116,11 @@ export class Apps {
 	private readonly writes = new Map<string, number>();
 	private sweep: ReturnType<typeof setInterval> | undefined;
 	/**
-	 * The harness's tokens (`auth/tokens.ts`), set by `app.ts`: a server app is given an `app` token as
-	 * `DECKS_TOKEN` when it starts, and it is taken back when the app stops or exits. Build and install
-	 * commands are given none.
+	 * The harness's passes (`auth/passes.ts`), set by `app.ts`: a server app is given an app pass as
+	 * `DECKS_TOKEN` when it starts, good for that run of it, so it ends when the app stops or exits.
+	 * Build and install commands are given none.
 	 */
-	tokens: Pick<TokenStore, "issue" | "revoke"> | undefined;
+	passes: { appServer(name: string, run: string): string } | undefined;
 	/** Decks' own port, set by `app.ts`, so a server app is told where to call back for stage code. */
 	decksPort: number | undefined;
 
@@ -352,14 +352,19 @@ export class Apps {
 		return this.within(name, job, waitMs);
 	}
 
+	/** The run of an app's server going now, whose pass is good: none when it is not running. */
+	runOf(name: string): string | undefined {
+		return this.running.get(name)?.run;
+	}
+
 	stop(name: string, status: AppStatus = "stopped"): boolean {
 		const live = this.running.get(name);
 		if (!live) {
 			if (this.states.get(name)?.status === "asleep" && status === "stopped") this.set(name, { status });
 			return false;
 		}
+		// Its pass ends with this: it is good only while this run is the app's (`runOf`).
 		this.running.delete(name);
-		if (live.token) this.tokens?.revoke(live.token);
 		this.set(name, { status, port: undefined, warning: undefined });
 		this.kill(live.child);
 		this.write(name, status === "asleep" ? "— asleep: not seen for a while; the next request starts it again" : "— stopped");
@@ -510,8 +515,9 @@ export class Apps {
 		const port = await freePort();
 		this.set(name, { status: "starting", port, error: undefined, warning: undefined, seenAt: Date.now() });
 		this.write(name, `$ ${command}    (PORT=${port})`);
-		// Its own token, for the SDK's calls: who it is comes from this alone, and it ends with the process.
-		const minted = this.tokens?.issue({ kind: "app", name });
+		// Its own pass, for the SDK's calls: who it is comes from this alone, and it ends with this run.
+		const run = randomBytes(12).toString("base64url");
+		const minted = this.passes?.appServer(name, run);
 		const child = spawn("bash", ["-lc", command], {
 			cwd: this.folder(name),
 			env: this.env({
@@ -521,7 +527,7 @@ export class Apps {
 				BASE_PATH: `/app/${name}`,
 				// Where Decks is, for the SDK's verbs (`/api/v1`), and the app they are called as.
 				...(this.decksPort ? { DECKS_URL: `http://127.0.0.1:${this.decksPort}` } : {}),
-				...(minted ? { DECKS_TOKEN: minted.token } : {}),
+				...(minted ? { DECKS_TOKEN: minted } : {}),
 				// Which app this is, for a log line; who is calling is the token's to say.
 				DECKS_APP: name,
 				// `const { decks } = await import(process.env.DECKS_SDK)` reads DECKS_URL and DECKS_TOKEN; see packages/sdk.
@@ -539,14 +545,13 @@ export class Apps {
 		});
 		child.on("exit", (code, signal) => {
 			exited = true;
-			if (minted) this.tokens?.revoke(minted.id);
 			if (this.running.get(name)?.child !== child) return;
 			this.running.delete(name);
 			const error = `exited with ${signal ?? `code ${code}`}`;
 			this.write(name, `— ${error}`);
 			this.set(name, { status: "broken", error, port: undefined, warning: undefined, at: Date.now() });
 		});
-		this.running.set(name, { child, port, ready, ...(minted ? { token: minted.id } : {}) });
+		this.running.set(name, { child, port, ready, run });
 		const ok = await ready;
 		if (!ok) {
 			if (this.running.get(name)?.child === child) {

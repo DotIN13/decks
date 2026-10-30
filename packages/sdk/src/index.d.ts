@@ -593,6 +593,8 @@ export interface Decks extends Verbs {
 	 * `/api/t/<pass>/board/<deck path>`. Ask again at half its life.
 	 */
 	canvasPass(canvas: string): Promise<{ pass: string; role: "edit" | "view"; expires: number }>;
+	/** An app's address for a tab of its own, with an app pass in it (`POST /api/passes { app }`), good for a day. */
+	appUrl(name: string): Promise<string>;
 	/**
 	 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's own
 	 * `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck path. In

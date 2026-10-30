@@ -11,12 +11,11 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * A **harness token** (`dk_h_`) is whoever acts on the harness as a whole: the person, in a Decks
  * tab, in a terminal (`decks login`, and the file `decks login` reads on this machine) or through
  * Studio's sync; a site the person paired (Decks Studio, a second Decks), bound to that site's
- * origin; or one agent, with that agent's reach. Its subject is the principal it is issued for. An
- * app's server (`dk_x_`) and a board (`dk_b_`) still have tokens of their own here until they move to
- * passes. A token is 32 random bytes after its prefix, so one found in a log can be told apart. Only
+ * origin; or one agent, with that agent's reach. Its subject is the principal it is issued for. A
+ * board (`dk_b_`) still has a token of its own here. A token is 32 random bytes after its prefix, so one found in a log can be told apart. Only
  * its sha256 is kept. The person's and a site's are written to `<deck>/.decks/tokens.json`, readable
- * by this user alone, and outlive a restart; an agent's or an app's lives in memory, made when its
- * process starts and taken back when it stops, so it ends with the harness too.
+ * by this user alone, and outlive a restart; an agent's lives in memory, made when the agent starts
+ * and taken back when it stops, so it ends with the harness too. An app's server holds an app pass.
  *
  * Tokens slide: each use pushes back the moment they stop working, and one left unused that long is
  * forgotten. Every one lasts a day unused, except the `decks` command's own in a terminal, which
@@ -46,7 +45,7 @@ export const HARNESS_PREFIX = "dk_h_";
 /** The prefixes harness tokens had before (a tab's or a terminal's, a site's, an agent's), still read by their hash. */
 export const OLD_PREFIXES = ["dk_p_", "dk_s_", "dk_a_"] as const;
 
-const PREFIX: Record<Exclude<PrincipalKind, "page" | "canvas">, string> = { person: HARNESS_PREFIX, site: HARNESS_PREFIX, agent: HARNESS_PREFIX, app: "dk_x_", board: "dk_b_" };
+const PREFIX: Record<Exclude<PrincipalKind, "page" | "canvas" | "app">, string> = { person: HARNESS_PREFIX, site: HARNESS_PREFIX, agent: HARNESS_PREFIX, board: "dk_b_" };
 
 /** The labels of the person's tokens that are not a terminal's: a tab's, Studio's sync, the file `decks login` reads. */
 const NOT_A_TERMINAL = new Set(["Decks tab", "Studio sync", "decks login on this machine"]);
@@ -114,10 +113,11 @@ export class TokenStore {
 	issue(principal: Principal, options: { label?: string; idle?: number; terminal?: boolean; now?: number } = {}): { token: string; id: string } {
 		if (principal.kind === "page") throw new Error("A page is let in by a ticket, not a token.");
 		if (principal.kind === "canvas") throw new Error("A canvas frame holds a canvas pass (`passes.ts`), not a token.");
+		if (principal.kind === "app") throw new Error("An app holds an app pass (`passes.ts`), not a token.");
 		const now = options.now ?? Date.now();
 		const token = `${PREFIX[principal.kind]}${randomBytes(32).toString("base64url")}`;
 		const hash = hashOf(token);
-		const processBound = principal.kind === "agent" || principal.kind === "app";
+		const processBound = principal.kind === "agent";
 		const terminal = options.terminal === true && principal.kind === "person";
 		const idle = processBound ? undefined : (options.idle ?? (principal.kind === "board" ? BOARD_IDLE_MS : terminal ? this.terminalMs : TOKEN_IDLE_MS));
 		const stored: Stored = {
