@@ -5,7 +5,10 @@
 Every item on a canvas is one of the types below, with the fields its type has. A field an item's
 type does not have is kept in the file and does nothing; the canvas calls say so in their notes.
 Every number, colour, string and boolean can also be a variable, `"$name"`, set with
-`decks canvas variables`.
+`decks canvas variables`. A colour is best one with a light and a dark value: Decks's own
+(`$decks-ink`, `$decks-muted`, `$decks-line`, `$decks-shape`, `$decks-frame`, `$decks-red`,
+`$decks-blue`, … listed in canvas-authoring) are defined by any edit that uses them; a hex stays
+the same in light and dark.
 
 ## Values
 

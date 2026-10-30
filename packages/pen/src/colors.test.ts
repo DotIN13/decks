@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { apply, baseTheme, DECKS_COLORS, emptyDocument, makeShape, resolve, shapeKind, toHtml, withDecksColors, type PenDocument } from "./index.ts";
+import { apply, baseTheme, DECKS_COLORS, decksColorOf, reroute, layout, emptyDocument, makeShape, resolve, shapeKind, toHtml, withDecksColors, type PenDocument } from "./index.ts";
 
 const rect = (id: string) => ({ op: "insert", node: { type: "rectangle", id, fill: "$decks-shape", width: 100, height: 60 }, box: { x1: 0, y1: 0 } });
 
@@ -42,4 +43,32 @@ test("an exported page carries the Decks colours, dark under prefers-color-schem
 test("an edit that already carries its Decks colours (run twice, by the canvas and then the server) gets nothing more", () => {
 	const once = withDecksColors(emptyDocument(), [rect("r")]);
 	assert.deepEqual(withDecksColors(emptyDocument(), once), once);
+});
+
+test("decksColorOf names a Decks colour and nothing else", () => {
+	assert.equal(decksColorOf("$decks-red"), "decks-red");
+	assert.equal(decksColorOf("$brand"), undefined);
+	assert.equal(decksColorOf("#e5484d"), undefined);
+	assert.equal(decksColorOf("$decks-nope"), undefined);
+});
+
+test("an arrow given no colour is drawn in the drawing's $decks-line when it has it, its light grey when not", () => {
+	const arrow = { type: "path", id: "ab", metadata: { type: "decks.arrow", from: "a", to: "b" } };
+	const box = (id: string, x: number) => ({ type: "rectangle", id, x, y: 0, width: 50, height: 50 });
+	for (const has of [false, true]) {
+		const doc = { version: "2.6", children: [box("a", 0), box("b", 200), structuredClone(arrow)], ...(has ? { variables: { "decks-line": { type: "color", value: "#8a8f98" } } } : {}) } as unknown as PenDocument;
+		reroute(doc, layout(doc, doc.children, { theme: {} }));
+		assert.equal(doc.children[2]!.stroke, has ? "$decks-line" : "#8a8f98");
+	}
+});
+
+test("the canvas skills teach every Decks colour, with its light and dark values", () => {
+	const skill = readFileSync(new URL("../../../runtime/skills/canvas-authoring/SKILL.md", import.meta.url), "utf8");
+	for (const [name, color] of Object.entries(DECKS_COLORS)) {
+		const line = skill.split("\n").find((one) => one.includes(`\`$${name}\``));
+		assert.ok(line, `canvas-authoring names $${name}`);
+		assert.ok(line.includes(color.light) && line.includes(color.dark), `$${name}'s line gives ${color.light} and ${color.dark}`);
+	}
+	const design = readFileSync(new URL("../../../runtime/skills/canvas-design/SKILL.md", import.meta.url), "utf8");
+	assert.match(design, /\$decks-/, "canvas-design points at the Decks colours");
 });

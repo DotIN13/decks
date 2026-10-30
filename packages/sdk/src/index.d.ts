@@ -180,7 +180,13 @@ export interface Verbs {
 		 * corner; `beside` or `below` (an item's id or a card's path) puts it 160 px clear of that item,
 		 * tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no
 		 * `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children
-		 * too; the answer has every id.
+		 * too; the answer has every id. Colour it with Decks's adaptive colours so it reads in light and
+		 * dark: "$decks-ink" (words, icons), "$decks-muted", "$decks-line" (arrows), "$decks-shape",
+		 * "$decks-shape-2", "$decks-frame" and "$decks-frame-line", "$decks-figure" and
+		 * "$decks-figure-line", "$decks-card" and "$decks-card-line", "$decks-red", "$decks-blue",
+		 * "$decks-green", "$decks-yellow"; the insert defines any the canvas lacks. A hex stays the same in
+		 * both; a top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools'
+		 * $decks-* colours.
 		 */
 		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
@@ -201,8 +207,11 @@ export interface Verbs {
 		copy(id: string, options?: { canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null }): Promise<Item>;
 		/**
 		 * Set the canvas's colour tokens, per theme such as light and dark: { accent: { type: "color",
-		 * value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }; null removes
-		 * one.
+		 * value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }, with { themes:
+		 * { mode: ["light", "dark"] } } when the canvas has no light/dark axis yet (one it has, such as
+		 * Mode: ["Light", "Dark"], is keyed as it is); then use it as "$accent". null removes one. Decks's
+		 * own adaptive colours ($decks-ink, $decks-line, … see canvas.insert) need no call: an edit that
+		 * uses one defines it.
 		 */
 		variables(set: Record<string, unknown>, options?: { canvas?: string; frame?: string; themes?: Record<string, string[]> | null }): Promise<{ variables: Record<string, unknown>; themes?: Record<string, unknown> }>;
 		/**

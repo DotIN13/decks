@@ -214,16 +214,43 @@ heading or a list. Keep it short: a note is read on the canvas, and a long docum
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",
 colors: [{ color, position }], rotation }`, `{ type: "image", url: "./pic.png", mode: "fill" }`).
-The stage is light or dark with the app: a colour that must read on both is a variable with two
-values —
+The stage is light or dark with the app, and a hex is the same in both. **Prefer Decks's adaptive
+colours** for fills, strokes and words: variables with a light and a dark value, the ones the
+canvas's own tools use, so what you draw reads in both. Write `fill: "$decks-ink"`; every edit
+defines any `$decks-*` it uses that the canvas lacks (a canvas's own value of one is kept).
+
+| colour | for | light | dark |
+|---|---|---|---|
+| `$decks-ink` | words, icons, a shape's label, a dark line | `#1f2328` | `#e6e6e6` |
+| `$decks-muted` | quieter words, captions | `#6b7280` | `#a3a3a3` |
+| `$decks-line` | arrows, connectors, rules | `#8a8f98` | `#9ba1a9` |
+| `$decks-shape` | a box's fill | `#dbe4f0` | `#34404f` |
+| `$decks-shape-2` | a second fill: circles, a highlight | `#c7ddf7` | `#2b4766` |
+| `$decks-frame` | a frame's paper | `#ffffff` | `#2b2b2b` |
+| `$decks-frame-line` | a frame's edge | `#d0d7de` | `#ffffff29` |
+| `$decks-figure` | a library shape's fill | `#ffffff` | `#2e2e2e` |
+| `$decks-figure-line` | a library shape's outline | `#1f2328` | `#d4d4d4` |
+| `$decks-card` | a file card's paper | `#ffffff` | `#2e2e2e` |
+| `$decks-card-line` | a file card's edge | `#0000001f` | `#ffffff24` |
+| `$decks-red` | an accent: a warning, a no | `#e5484d` | `#ff6369` |
+| `$decks-blue` | an accent: a link, a step | `#3b82f6` | `#60a5fa` |
+| `$decks-green` | an accent: done, a yes | `#2f9e62` | `#3dd68c` |
+| `$decks-yellow` | an accent: a caution, a highlight | `#f2b200` | `#ffc53d` |
+
+A rectangle, an ellipse, an icon, an empty frame or an arrow you insert at the top level with no
+colour at all gets these too. For a colour the palette lacks, define it once with both values, then
+use `"$brand"` everywhere:
 
 ```ts
-{ op: "variables", themes: { Mode: ["Light", "Dark"] }, set: {
-  ink: { type: "color", value: [{ value: "#1f2328" }, { value: "#e6e6e6", theme: { Mode: "Dark" } }] },
-} }
+await decks.canvas.variables({
+  brand: { type: "color", value: [{ value: "#4f46e5" }, { value: "#818cf8", theme: { mode: "dark" } }] },
+}, { themes: { mode: ["light", "dark"] } });
 ```
 
-— and then `fill: "$ink"`. Mid-tone accents (`#3b82f6`, `#e8590c`, `#2f9e44`) read on both.
+Key the dark value to the canvas's own light/dark axis when `read()` shows one in `themes` (an
+older canvas has `Mode: ["Light", "Dark"]`: then `theme: { Mode: "Dark" }` and no `themes`). A hex
+does not change with the scheme: use one only for a colour that must not change (a brand mark, a
+photo's backdrop, a sticky note's paper).
 
 **Stroke.** `stroke` is a colour (or fills), `strokeWidth` a number or `{ top, right, bottom, left }`,
 `strokeAlignment` `"inner" | "center" | "outer"`, `strokeLinecap` `"butt" | "round" | "square"`.
@@ -280,9 +307,9 @@ the path's box alone. Fill and line go on the outline.
   alignItems: "center", padding: 10, clip: false, metadata: { type: "decks.shape", kind: "Decision" },
   children: [
     { type: "path", id: "check-o", layoutPosition: "absolute", x: 0, y: 0, viewBox: [0, 0, 100, 100],
-      geometry: "M50 0L100 50L50 100L0 50Z", fill: "#fde68a", stroke: "#1f2328", strokeWidth: 1.5, strokeAlignment: "center" },
+      geometry: "M50 0L100 50L50 100L0 50Z", fill: "$decks-figure", stroke: "$decks-figure-line", strokeWidth: 1.5, strokeAlignment: "center" },
     { type: "text", id: "check-t", content: "Signed in?", fontSize: 14, fontWeight: 500,
-      textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "#1f2328" },
+      textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "$decks-ink" },
   ] } }
 ```
 
@@ -331,7 +358,7 @@ line. `bend` moves an arrow off its automatic route and is kept when things move
 its turn sits from start (0) to end (1), `bend: 0.3`; on a curve, how far its middle is pulled in
 stage pixels, `bend: [0, -40]`. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
 the path is redrawn for you. Set `stroke` and `strokeWidth` if you want a colour or weight other
-than the grey default. Words on the line — "yes", "no", "then" — are `label` in its metadata,
+than the grey default (`$decks-line`). Words on the line — "yes", "no", "then" — are `label` in its metadata,
 drawn on the middle of the line.
 
 ## Look at it

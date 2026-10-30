@@ -106,8 +106,9 @@ children have new ids, and a size after layout is in each item's `box`.
 
 ## Colour and themes
 
-Put the palette in variables once, then use `$name` everywhere, so a change is one edit and the
-design follows light and dark:
+Never leave a colour as a bare hex unless it must stay the same in light and dark: a hex does not
+change with the scheme. Put the palette in variables once, each with a light and a dark value, then
+use `$name` everywhere, so a change is one edit and the design follows light and dark:
 
 ```json
 { "op": "variables", "themes": { "mode": ["light", "dark"] }, "set": {
@@ -118,6 +119,12 @@ design follows light and dark:
   "accent": { "type": "color", "value": "#4f46e5" },
   "space":  { "type": "number", "value": 16 } } }
 ```
+
+Decks's own adaptive colours are already there to use, `$decks-ink`, `$decks-muted`, `$decks-line`,
+`$decks-frame`, `$decks-shape`, `$decks-red`, `$decks-blue`, `$decks-green` and the rest (the table
+in canvas-authoring gives each one's light and dark values): any edit that uses one defines it. Use
+them for what sits around a design (notes, labels, arrows, a frame round a set of screens), and the
+design's own variables for the design.
 
 Check what a variable comes to with `decks canvas read --of <item> --resolve.variables true
 --theme.mode dark`. Keep one accent for what can be pressed; text needs clear contrast on its
