@@ -77,7 +77,18 @@ export interface Verb {
 	result?: Schema;
 	/** Set on an old name: the new call (or calls) it maps onto, in words. */
 	alias?: string;
+	/**
+	 * Where a card's call to it goes, from the canvas frame a card is drawn in (`@decks/canvas`,
+	 * `frame/inside/card-calls.ts`): `frame`, answered there, the person's view of that canvas; `canvas`,
+	 * by the harness on the frame's canvas token, the canvas's own calls, made as the person on that
+	 * canvas and no other (`verbs/router.ts` refuses the token anything else); `page`, by the app's page
+	 * with the person's own token, asking them before a card's words go to an agent. Absent: nowhere, it
+	 * reaches past the canvas.
+	 */
+	card?: CardRoute;
 }
+
+export type CardRoute = "frame" | "canvas" | "page";
 
 const p = (name: string, schema: Schema, more: Partial<Param> = {}): Param => ({ name, schema, ...more });
 const o = (name: string, schema: Schema, more: Partial<Param> = {}): Param => ({ name, schema, optional: true, ...more });
@@ -102,6 +113,7 @@ export const VERBS: readonly Verb[] = [
 	// --- canvas: everything on one canvas, cards included --------------------------------------
 	{
 		name: "canvas.read",
+		card: "canvas",
 		group: "canvas",
 		...deckRead,
 		summary:
@@ -111,6 +123,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.space",
+		card: "canvas",
 		group: "canvas",
 		...deckRead,
 		summary:
@@ -120,6 +133,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.insert",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary:
@@ -129,6 +143,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.update",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "Change an item's fields (`set`), its place (`at`) or its size (`size`). A card can be named by its path; its size here is its size on this canvas.",
@@ -137,6 +152,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.replace",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "Swap a whole item for another, keeping its id and its place unless the new one says otherwise.",
@@ -145,6 +161,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.delete",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "Take an item off the canvas. A card's folder stays in the deck.",
@@ -153,6 +170,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.move",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
@@ -161,6 +179,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.copy",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`.",
@@ -169,6 +188,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.variables",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: 'Set the canvas\'s colour tokens, per theme such as light and dark: { accent: { type: "color", value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }; null removes one.',
@@ -177,6 +197,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.batch",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary:
@@ -186,6 +207,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.step",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: 'Take back the person\'s last edit to the drawing, or put it back ("undo" or "redo"); refused, with why, when an agent or the file changed the drawing since. Answers whether a step is left each way.',
@@ -194,6 +216,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.fit",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary:
@@ -203,6 +226,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.save",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: 'Save an item as a reusable frame in frames/ ("frames/ui/card"), and put a ref to it in its place (`replace: false` leaves the canvas alone).',
@@ -211,6 +235,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.screenshot",
+		card: "canvas",
 		group: "canvas",
 		...deckRead,
 		summary:
@@ -220,6 +245,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.export",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary:
@@ -229,6 +255,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "canvas.rename",
+		card: "canvas",
 		group: "canvas",
 		...deckChange,
 		summary: "What the person calls this canvas: a few words for what is on it, that a person would look for. The folder never changes.",
@@ -248,6 +275,7 @@ export const VERBS: readonly Verb[] = [
 	{ name: "card.list", group: "board", ...deckRead, summary: "Every card in the deck, placed or not.", params: [], result: arr(Board) },
 	{
 		name: "card.create",
+		card: "canvas",
 		group: "board",
 		...deckChange,
 		summary:
@@ -255,9 +283,9 @@ export const VERBS: readonly Verb[] = [
 		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
 		result: Board,
 	},
-	{ name: "card.get", group: "board", ...deckRead, summary: "A card's path and title (the finding it states), and who last wrote it.", params: [p("card", str())], result: Board },
-	{ name: "card.canvases", group: "board", ...deckRead, summary: "The canvas this card is on, with its place and size there.", params: [p("card", str())], result: arr(Placement) },
-	{ name: "card.url", group: "board", ...deckRead, summary: "The card's address as a page of its own, for a browser such as Playwright.", params: [p("card", str())], result: str() },
+	{ name: "card.get", card: "canvas", group: "board", ...deckRead, summary: "A card's path and title (the finding it states), and who last wrote it.", params: [p("card", str())], result: Board },
+	{ name: "card.canvases", card: "canvas", group: "board", ...deckRead, summary: "The canvas this card is on, with its place and size there.", params: [p("card", str())], result: arr(Placement) },
+	{ name: "card.url", card: "canvas", group: "board", ...deckRead, summary: "The card's address as a page of its own, for a browser such as Playwright.", params: [p("card", str())], result: str() },
 	{ name: "canvas.list", group: "board", ...deckRead, summary: "Every canvas in the deck, and which agents have it open.", params: [], result: arr(Canvas) },
 	{
 		name: "canvas.create",
@@ -278,16 +306,17 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "frame.create",
+		card: "canvas",
 		group: "board",
 		...deckChange,
 		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in your canvas\'s own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck\'s own frames/ placed on a canvas is copied into it.',
 		params: [p("path", str()), o("item", PenItem)],
 		result: obj({ file: str(), ref: opt(str()), id: str() }),
 	},
-	{ name: "file.url", group: "board", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
+	{ name: "file.url", card: "canvas", group: "board", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
 
 	// --- agent: who works --------------------------------------------------------------------
-	{ name: "agent.me", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
+	{ name: "agent.me", card: "page", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
 	{
 		name: "agent.update",
 		group: "agent",
@@ -299,6 +328,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "here",
+		card: "frame",
 		group: "agent",
 		...agentsRead,
 		summary: "The canvas a call means when it names none: your home canvas for an agent, the card's canvas for a card's button, the canvas on screen for the person. Asked, never set.",
@@ -306,18 +336,20 @@ export const VERBS: readonly Verb[] = [
 		result: Canvas,
 	},
 	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these cards carry your work, without showing them: you become their writer.", params: [paths("boards")], result: arr(str()) },
-	{ name: "agent.inbox", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
+	{ name: "agent.inbox", card: "page", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
 	{
 		name: "agent.list",
+		card: "page",
 		group: "agent",
 		...agentsRead,
 		summary: "Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits for it.",
 		params: [o("options", obj({ workspace: opt(str()) }))],
 		result: arr(Agent),
 	},
-	{ name: "agent.get", group: "agent", ...agentsRead, summary: "Another agent, by name or id: kind, workspace, tags, state, home canvas.", params: [p("name", str())], result: Agent },
+	{ name: "agent.get", card: "page", group: "agent", ...agentsRead, summary: "Another agent, by name or id: kind, workspace, tags, state, home canvas.", params: [p("name", str())], result: Agent },
 	{
 		name: "agent.send",
+		card: "page",
 		group: "agent",
 		...agentsChange,
 		summary:
@@ -327,6 +359,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "agent.queue",
+		card: "page",
 		group: "agent",
 		...agentsChange,
 		summary: "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
@@ -335,6 +368,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "agent.create",
+		card: "page",
 		group: "agent",
 		...agentsChange,
 		summary:
@@ -346,6 +380,7 @@ export const VERBS: readonly Verb[] = [
 	// --- view: what the person is looking at, moved only on purpose ----------------------------
 	{
 		name: "view.goto",
+		card: "page",
 		group: "view",
 		...screenChange,
 		summary: "Bring the person's screen to a canvas. Only the view moves; nobody's home canvas changes.",
@@ -354,25 +389,28 @@ export const VERBS: readonly Verb[] = [
 	},
 	{
 		name: "view.focus",
+		card: "frame",
 		group: "view",
 		...screenChange,
 		summary: "Move the camera to a card or a drawn item on a canvas (a list frames them all), optionally outlining one data-id block inside a card. `animate: true` glides.",
 		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, onCanvas({ highlight: opt(str()), animate: opt(bool()) })],
 		result: obj({ canvas: str(), target: union(str(), arr(str())), deferred: opt(str()) }),
 	},
-	{ name: "view.camera", group: "view", ...screenRead, summary: "Where the person's screen is looking, and its zoom.", params: [], result: Camera },
+	{ name: "view.camera", card: "frame", group: "view", ...screenRead, summary: "Where the person's screen is looking, and its zoom.", params: [], result: Camera },
 	{
 		name: "view.move",
+		card: "frame",
 		group: "view",
 		...screenChange,
 		summary: "Move the person's camera outright: { x, y, zoom }, zoom 1 is life size.",
 		params: [p("camera", obj({ x: num(), y: num(), zoom: num(), animate: opt(bool()) }))],
 		result: Camera,
 	},
-	{ name: "view.viewport", group: "view", ...screenRead, summary: "The room the screen has, in CSS pixels, or null when no screen has said.", params: [], result: union(obj({ width: num(), height: num() }), nul) },
-	{ name: "view.cursor", group: "view", ...screenChange, summary: "A labelled dot on a card, at the card's coordinates; null removes it.", params: [p("board", str()), p("at", union(Point, nul))] },
+	{ name: "view.viewport", card: "frame", group: "view", ...screenRead, summary: "The room the screen has, in CSS pixels, or null when no screen has said.", params: [], result: union(obj({ width: num(), height: num() }), nul) },
+	{ name: "view.cursor", card: "frame", group: "view", ...screenChange, summary: "A labelled dot on a card, at the card's coordinates; null removes it.", params: [p("board", str()), p("at", union(Point, nul))] },
 	{
 		name: "view.reload",
+		card: "frame",
 		group: "view",
 		...screenChange,
 		summary:
@@ -492,7 +530,7 @@ export const VERBS: readonly Verb[] = [
 	},
 	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, and with which.", params: [], result: obj({ connected: bool(), url: opt(str()) }) },
 	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Stop syncing with Decks Studio and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
-	{ name: "now", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
+	{ name: "now", card: "frame", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];
 
 /**
@@ -683,4 +721,9 @@ export function aliasNote(verb: Verb): string | undefined {
 /** The command-line name of a call: `canvas.insert` -> `canvas insert`, `newBoard` -> `new-board`. */
 export function commandOf(verb: Verb): string[] {
 	return verb.name.split(".").map((part) => part.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`));
+}
+
+/** The calls a card may make that go to `route` (`Verb.card`). */
+export function cardCalls(route: CardRoute): ReadonlySet<string> {
+	return new Set(VERBS.filter((verb) => verb.card === route).map((verb) => verb.name));
 }

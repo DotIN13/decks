@@ -1,4 +1,4 @@
-import { ALL_VERBS, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
+import { ALL_VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
@@ -297,14 +297,12 @@ async function boardCaller(app: App, path: string, stage: string | undefined, al
 
 /**
  * The calls a canvas frame may make, on its one canvas: reading and changing it, its cards, its
- * frames and files, undo and redo, and the time. Never another canvas, an agent, an app, the
- * person's tab, or anything that reaches past this canvas; a canvas shared to view reads only.
+ * frames and files, undo and redo (the verb table's `card: "canvas"`, what a card's call goes to the
+ * harness for), and `here` and `now`, which a card's call has answered in the frame. Never another
+ * canvas, an agent, an app, the person's tab, or anything that reaches past this canvas; a canvas
+ * shared to view reads only.
  */
-export const CANVAS_FRAME_VERBS = new Set([
-	"canvas.read", "canvas.space", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy",
-	"canvas.variables", "canvas.batch", "canvas.step", "canvas.fit", "canvas.save", "canvas.screenshot", "canvas.export", "canvas.rename",
-	"card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url", "here", "now",
-]);
+export const CANVAS_FRAME_VERBS: ReadonlySet<string> = new Set([...cardCalls("canvas"), "here", "now"]);
 
 /** What a document item's editor may send (`@decks/docs`'s `DocClientMessage`). */
 const DOC_CALLS = new Set(["doc.open", "doc.close", "doc.patch", "doc.review", "doc.versions", "doc.version", "doc.compile", "doc.restore", "doc.git", "doc.gstyle", "doc.gcomment"]);

@@ -1,29 +1,26 @@
 import type { Camera } from "@decks/protocol";
+import { cardCalls as cardCallsTo } from "@decks/api";
 import { CallRefused } from "../protocol.ts";
 
 /**
- * Where a card's `card.decks` call is answered, in the canvas frame (`card.ts`, `CanvasHost.cardCall`).
+ * Where a card's `card.decks` call is answered, in the canvas frame (`card.ts`, `CanvasHost.cardCall`):
+ * the verb table's `card` column (`@decks/api`, `Verb.card`), which the harness and the app's page
+ * read too.
  *
- * - **In the frame**: the person's view of this canvas (`view.*` but `goto`), `here` and `now`. No
- *   round trip, nothing to ask.
- * - **By the harness**, on the frame's canvas token: the canvas's own calls (reading and changing it,
- *   its cards, frames and files, undo), made as the person on this canvas and no other. The harness
- *   keeps the same list (`verbs/router.ts`, `CANVAS_FRAME_VERBS`) and refuses anything else.
- * - **By the app's page**: the agent calls and showing another canvas, the only ones that need the
- *   person's own token. The page asks the person before a card's message goes to an agent.
+ * - **In the frame** (`frame`): the person's view of this canvas (`view.*` but `goto`), `here` and
+ *   `now`. No round trip, nothing to ask.
+ * - **By the harness** (`canvas`), on the frame's canvas token: the canvas's own calls (reading and
+ *   changing it, its cards, frames and files, undo), made as the person on this canvas and no other.
+ *   The harness refuses the token anything else (`verbs/router.ts`, `CANVAS_FRAME_VERBS`).
+ * - **By the app's page** (`page`): the agent calls and showing another canvas, the only ones that
+ *   need the person's own token. The page asks the person before a card's message goes to an agent.
  * - **Nowhere**: everything that reaches past the canvas (apps, the shared Chrome tab, pairing, ports,
  *   changing who an agent is, other canvases).
  */
-export const IN_FRAME = new Set(["view.camera", "view.viewport", "view.move", "view.focus", "view.cursor", "view.reload", "here", "now"]);
-
-export const ON_CANVAS = new Set([
-	"canvas.read", "canvas.space", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy",
-	"canvas.variables", "canvas.batch", "canvas.step", "canvas.fit", "canvas.save", "canvas.screenshot", "canvas.export", "canvas.rename",
-	"card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url",
-]);
-
+export const IN_FRAME = cardCallsTo("frame");
+export const ON_CANVAS = cardCallsTo("canvas");
 /** The page's, with your token: the agents, and moving your screen to another canvas. */
-export const BY_THE_PAGE = new Set(["agent.me", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create", "view.goto"]);
+export const BY_THE_PAGE = cardCallsTo("page");
 
 /** What the frame lends its card calls. */
 export interface CardCallDeps {

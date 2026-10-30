@@ -1,4 +1,5 @@
 import { api } from "../connections/connection.ts";
+import { cardCalls } from "@decks/api";
 import { connect } from "@decks/sdk";
 import { authHeaders } from "../lib/session.ts";
 import { ask } from "../state/confirm.ts";
@@ -35,8 +36,8 @@ export async function canvasBackend(canvas: string): Promise<{ api: string; toke
 	return { api: new URL(api("/"), location.href).href.replace(/\/$/, ""), token: answer.token, idle: answer.idle ?? 15 * 60_000 };
 }
 
-/** A card's calls the page answers (`@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
-const FOR_CARDS = new Set(["agent.me", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create", "view.goto"]);
+/** A card's calls the page answers (`@decks/api`, a verb's `card: "page"`; `@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
+const FOR_CARDS = cardCalls("page");
 /** The ones that put words in front of an agent, or make one: each waits for your OK. */
 const ASKS_FIRST: Record<string, (args: unknown[]) => string> = {
 	"agent.send": (args) => `send ${String(args[0] ?? "an agent")} this message now: “${clip((args[1] as { task?: unknown } | undefined)?.task)}”`,

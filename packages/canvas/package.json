@@ -23,6 +23,7 @@
 		"build:lib": "node ../../scripts/build-solid-lib.mjs ."
 	},
 	"dependencies": {
+		"@decks/api": "*",
 		"@decks/board-kit": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
