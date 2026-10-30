@@ -63,10 +63,10 @@ import { ICON_LIBRARIES } from "../render/icon-index.ts";
 /*
  * The quick swatches. The neutrals, and the accents that have a dark twin, are the drawing's own
  * light/dark colours (`@decks/pen` `DECKS_COLORS`, drawn split light over dark), so what is picked
- * here reads on a dark canvas too; the pastels are fixed, as a sticky note's paper is.
+ * here reads on a dark canvas too, the soft fills included: a pastel in light, a deep tint in dark.
  */
-const SWATCHES = ["$decks-frame", "$decks-shape", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#e9d5ff", "$decks-ink"];
-const LINES = ["$decks-ink", "$decks-muted", "$decks-line", "$decks-blue", "$decks-green", "$decks-yellow", "$decks-red", "$decks-frame"];
+const SWATCHES = ["$decks-frame", "$decks-shape", "$decks-yellow-fill", "$decks-green-fill", "$decks-blue-fill", "$decks-red-fill", "$decks-purple-fill", "$decks-ink"];
+const LINES = ["$decks-ink", "$decks-muted", "$decks-line", "$decks-blue", "$decks-green", "$decks-yellow", "$decks-orange", "$decks-red", "$decks-purple", "$decks-frame"];
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 const FONTS = ["Inter", "JetBrains Mono", "Source Serif 4", "Merriweather", "Caveat", "Space Grotesk", "IBM Plex Sans", "Noto Sans SC"];
 const WEIGHTS = [300, 400, 500, 600, 700, 800];

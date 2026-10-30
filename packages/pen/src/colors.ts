@@ -33,6 +33,19 @@ export const DECKS_COLORS: Readonly<Record<string, { light: string; dark: string
 	"decks-blue": { light: "#3b82f6", dark: "#60a5fa", name: "Blue" },
 	"decks-green": { light: "#2f9e62", dark: "#3dd68c", name: "Green" },
 	"decks-yellow": { light: "#f2b200", dark: "#ffc53d", name: "Yellow" },
+	"decks-orange": { light: "#f97316", dark: "#fb923c", name: "Orange" },
+	"decks-purple": { light: "#8b5cf6", dark: "#a78bfa", name: "Purple" },
+	/**
+	 * Soft fills for shapes, frames and areas: a pastel on the light ground, a deep tint of the same hue
+	 * on the dark one, each with the ink's words still readable on it.
+	 */
+	"decks-yellow-fill": { light: "#fde68a", dark: "#4a3f14", name: "Yellow fill" },
+	"decks-orange-fill": { light: "#fed7aa", dark: "#5a3517", name: "Orange fill" },
+	"decks-red-fill": { light: "#fecaca", dark: "#5a2626", name: "Red fill" },
+	"decks-purple-fill": { light: "#e9d5ff", dark: "#3f2d5c", name: "Purple fill" },
+	"decks-blue-fill": { light: "#bfdbfe", dark: "#1e3a5f", name: "Blue fill" },
+	"decks-green-fill": { light: "#bbf7d0", dark: "#1f4730", name: "Green fill" },
+	"decks-gray-fill": { light: "#e5e7eb", dark: "#3a3d42", name: "Grey fill" },
 };
 
 /** Whether a colour value is a Decks colour (`"$decks-ink"`), and which. */

@@ -55,7 +55,11 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 }
 
 /** The adaptive colours on offer, by name: one of each look, without the tools' near-twins (figure, card). */
-export const ADAPTIVE = ["decks-ink", "decks-muted", "decks-line", "decks-frame-line", "decks-frame", "decks-shape", "decks-shape-2", "decks-red", "decks-yellow", "decks-green", "decks-blue"];
+export const ADAPTIVE = [
+	"decks-ink", "decks-muted", "decks-line", "decks-frame-line", "decks-frame", "decks-shape", "decks-shape-2",
+	"decks-red", "decks-orange", "decks-yellow", "decks-green", "decks-blue", "decks-purple",
+	"decks-red-fill", "decks-orange-fill", "decks-yellow-fill", "decks-green-fill", "decks-blue-fill", "decks-purple-fill", "decks-gray-fill",
+];
 
 /** A swatch's paint: an adaptive colour split corner to corner, light over dark; any other colour as it is. */
 export function swatchPaint(color: string): string {

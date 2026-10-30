@@ -120,11 +120,9 @@ use `$name` everywhere, so a change is one edit and the design follows light and
   "space":  { "type": "number", "value": 16 } } }
 ```
 
-Decks's own adaptive colours are already there to use, `$decks-ink`, `$decks-muted`, `$decks-line`,
-`$decks-frame`, `$decks-shape`, `$decks-red`, `$decks-blue`, `$decks-green` and the rest (the table
-in canvas-authoring gives each one's light and dark values): any edit that uses one defines it. Use
-them for what sits around a design (notes, labels, arrows, a frame round a set of screens), and the
-design's own variables for the design.
+Decks's adaptive colours (`$decks-ink`, `$decks-line`, …; see canvas-authoring's
+[colors.md](../canvas-authoring/colors.md)) are for what sits around a design; the design's own
+variables are for the design.
 
 Check what a variable comes to with `decks canvas read --of <item> --resolve.variables true
 --theme.mode dark`. Keep one accent for what can be pressed; text needs clear contrast on its
