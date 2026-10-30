@@ -10,7 +10,7 @@ import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
 import { installDir } from "@decks/runtime";
 import { Hub } from "./ws.ts";
-import { startStudio } from "./studio/index.ts";
+import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
 
 const config = loadConfig();
@@ -50,7 +50,17 @@ const studioToken = () => {
 	if (!syncToken || !app.tokens.verify(syncToken).ok) syncToken = app.tokens.issue({ kind: "person" }, { label: "Studio sync" }).token;
 	return syncToken;
 };
-const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list(), studioToken);
+// Studio's browsers reach it on tokens Studio asks for over the key's socket, an hour each, taken back when the key goes.
+const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list(), studioToken, {
+	issueToken: (ask) => {
+		const given = studioGives(app.tokens, ask);
+		app.send(app.pairingMessage());
+		return given;
+	},
+	unlinked: (why) => {
+		if (revokeStudioTokens(app.tokens, { paired: why === "revoked" })) app.send(app.pairingMessage());
+	},
+});
 
 /*
  * One upgrade listener, two websockets.

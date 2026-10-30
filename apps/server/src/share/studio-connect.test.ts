@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
+import { revokeStudioTokens, STUDIO_TOKEN_MS, studioToken } from "../studio/index.ts";
 
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
 const STUDIO = { origin: "https://studio.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
@@ -261,6 +262,58 @@ test("a token works only from the site it was given to, or from a caller that se
 		assert.equal((await post("/v1/now", { args: [] }, { "content-type": "application/json", "x-decks-person": "studio", authorization: `Bearer ${token}` })).status, 200, "a program, with no Origin");
 		const hello = (await (await fetch(`${base}/hello`, { headers: { ...evil, authorization: `Bearer ${token}` } })).json()) as { paired: boolean };
 		assert.equal(hello.paired, false, "hello does not call the copied token paired");
+	} finally {
+		cleanup();
+	}
+}));
+
+test("Studio's ask over its key gives a browser at Studio's origin an hour's token as Studio, which works there and nowhere else", () => listing("https://studio.test", async () => {
+	const { app, post, cleanup } = await open(false);
+	try {
+		const now = Date.now();
+		const given = studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "https://studio.test/" }, now);
+		assert.equal(given.expires, now + STUDIO_TOKEN_MS);
+		assert.equal(STUDIO_TOKEN_MS, 3_600_000, "an hour");
+		assert.match(given.token, /^dk_h_/, "an ordinary harness token");
+		const row = app.tokens.paired().find((one) => one.label === "Studio: Ada");
+		assert.deepEqual(row && { origin: row.origin, studio: row.studio }, { origin: "https://studio.test", studio: true });
+		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, authorization: `Bearer ${given.token}` });
+		assert.equal(allowed.status, 200, "it opens the harness's verbs from Studio's pages");
+		const elsewhere = await post("/v1/now", { args: [] }, { ...STUDIO, origin: "https://evil.test", authorization: `Bearer ${given.token}` });
+		assert.equal(elsewhere.status, 401, "and not from another site's");
+		// An hour unused and it lapses; used within the hour, it slides.
+		assert.ok(app.tokens.verify(given.token, { now: now + STUDIO_TOKEN_MS - 1000 }).ok);
+		assert.equal(app.tokens.verify(given.token, { now: now + 2 * STUDIO_TOKEN_MS }).ok, false);
+		assert.throws(() => studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "javascript:alert(1)" }), /http or https/);
+	} finally {
+		cleanup();
+	}
+}));
+
+test("unpairing Studio in Settings deletes its key and takes back every token given through it and its pages' pairings, and nobody else's", () => listing("https://studio.test", async () => {
+	const { app, post, linked, cleanup } = await open(false);
+	try {
+		const first = await post("/pair", { studio: "https://studio.test", key: KEY, label: "Decks Studio" });
+		assert.equal(first.status, 200);
+		assert.ok(linked());
+		const ada = studioToken(app.tokens, { user: { id: "u1", name: "Ada" }, origin: "https://studio.test" });
+		const bob = studioToken(app.tokens, { user: { id: "u2", name: "Bob" }, origin: "https://studio.test" });
+		const other = app.tokens.issue({ kind: "site", label: "Another Decks", origin: "https://other.test" }).token;
+		const shown: unknown[] = [];
+		const before = app.pairingMessage() as { studio?: { url: string } };
+		assert.equal(before.studio?.url, "https://studio.test", "Settings shows the link");
+		app.handle({ type: "studio.unpair" }, (frame) => shown.push(frame));
+		assert.ok(!linked(), "the key is gone");
+		for (const token of [first.body.token as string, ada.token, bob.token]) assert.equal(app.tokens.verify(token).ok, false);
+		assert.ok(app.tokens.verify(other).ok, "another Decks keeps its pairing");
+		assert.equal((app.pairingMessage() as { studio?: unknown }).studio, undefined);
+		assert.equal(shown.length, 0, "nothing went wrong");
+		// A key replaced by another takes back only what the old one gave, not the new connect's own pairing.
+		const again = await post("/pair", { studio: "https://studio.test", key: KEY, label: "Decks Studio" });
+		const carol = studioToken(app.tokens, { user: { id: "u3", name: "Carol" }, origin: "https://studio.test" });
+		assert.equal(revokeStudioTokens(app.tokens), 1);
+		assert.equal(app.tokens.verify(carol.token).ok, false);
+		assert.ok(app.tokens.verify(again.body.token as string).ok);
 	} finally {
 		cleanup();
 	}

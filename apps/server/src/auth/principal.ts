@@ -9,7 +9,8 @@
  *
  * - `person`: the person, from a Decks tab they opened or a terminal they logged in from.
  * - `site`: another front end the person paired with this harness (Decks Studio, a second Decks), which
- *   acts as the person. `origin` is the site it was given to, when there was one.
+ *   acts as the person. `origin` is the site it was given to, when there was one; `studio` marks one
+ *   given through Decks Studio's key (`studio/index.ts`), which goes when that key does.
  * - `agent`: one agent, by id: what its shell's `decks` command and its tools carry.
  * - `app`: one app's server, by name, from its app pass (`passes.ts`).
  * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
@@ -18,7 +19,7 @@
  */
 export type Principal =
 	| { kind: "person" }
-	| { kind: "site"; origin?: string; label: string }
+	| { kind: "site"; origin?: string; label: string; studio?: true }
 	| { kind: "agent"; id: string }
 	| { kind: "app"; name: string }
 	| { kind: "canvas"; canvas: string; role: "edit" | "view" };

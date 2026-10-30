@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import type { BackendInfo, PairedRow } from "@decks/protocol";
+import type { BackendInfo, PairedRow, StudioLinkRow } from "@decks/protocol";
 
 /**
  * What the backend on the other end can do, from the first frame of its greeting (`backend`).
@@ -20,6 +20,8 @@ export interface PairingState {
 	code?: string;
 	expires?: number;
 	paired: PairedRow[];
+	/** The link to Decks Studio, its key, when this harness has one. */
+	studio?: StudioLinkRow;
 }
 
 const [pairing, setPairing] = createSignal<PairingState>({ paired: [] });

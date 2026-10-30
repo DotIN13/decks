@@ -129,6 +129,8 @@ export class TokenStore {
 			...(terminal ? { terminal: true as const } : {}),
 		};
 		this.byHash.set(hash, stored);
+		// What lapsed unused goes when another is made: a Studio's browsers are given one an hour.
+		this.sweep(now);
 		if (stored.kept) this.save(now);
 		return { token, id: stored.id };
 	}
@@ -191,14 +193,19 @@ export class TokenStore {
 		return gone;
 	}
 
-	/** The front ends paired with this harness, for Settings and Studio's harness page. */
-	paired(): PairedRow[] {
+	/** The front ends paired with this harness, for Settings and Studio's harness page: those whose tokens still work. */
+	paired(now = Date.now()): PairedRow[] {
 		return [...this.byHash.values()]
-			.filter((one) => one.principal.kind === "site")
+			.filter((one) => one.principal.kind === "site" && (one.idle === undefined || now - one.last <= one.idle))
 			.map((one) => {
 				const site = one.principal as Extract<Principal, { kind: "site" }>;
-				return { id: one.id, label: site.label, origin: site.origin ?? "", at: one.at, last: one.last };
+				return { id: one.id, label: site.label, origin: site.origin ?? "", at: one.at, last: one.last, ...(site.studio ? { studio: true as const } : {}) };
 			});
+	}
+
+	/** Forget the tokens that went unused past their idle time. */
+	private sweep(now: number): void {
+		for (const [hash, one] of this.byHash) if (one.idle !== undefined && now - one.last > one.idle) this.byHash.delete(hash);
 	}
 
 	/** How many tokens of a kind are live: for tests and a status line. */
@@ -262,7 +269,7 @@ export class TokenStore {
 function clean(principal: Principal): Principal {
 	switch (principal.kind) {
 		case "site":
-			return { kind: "site", label: principal.label.slice(0, 80) || "Another Decks", ...(principal.origin ? { origin: principal.origin.slice(0, 200) } : {}) };
+			return { kind: "site", label: principal.label.slice(0, 80) || "Another Decks", ...(principal.origin ? { origin: principal.origin.slice(0, 200) } : {}), ...(principal.studio ? { studio: true as const } : {}) };
 		default:
 			return { ...principal };
 	}

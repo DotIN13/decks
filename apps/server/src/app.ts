@@ -21,6 +21,7 @@ import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./verbs/router.ts";
 import { TokenStore } from "./auth/tokens.ts";
+import { studioLink } from "./studio/index.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -834,7 +835,8 @@ export class App {
 	/** The code on show and every front end holding a token, for Settings. */
 	pairingMessage(): ServerMessage {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
-		return { type: "pairing", paired: this.tokens.paired() };
+		const studio = studioLink(this.deck.path);
+		return { type: "pairing", paired: this.tokens.paired(), ...(studio ? { studio } : {}) };
 	}
 
 	settingsMessage(): ServerMessage {

@@ -23,6 +23,15 @@ import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts
  * Both are read off the server's own records rather than the file, because a stage nobody has
  * opened is still a stage and has to be listed.
  */
+/**
+ * The link to Decks Studio, when this harness has one: Studio's address, and whether its key came by
+ * environment (`DECKS_STUDIO_KEY`), which Settings cannot unpair.
+ */
+export interface StudioLinkRow {
+	url: string;
+	env?: true;
+}
+
 /** Another Decks front end this server has given a token to (`server/src/share/pairing.ts`). */
 export interface PairedRow {
 	id: string;
@@ -33,6 +42,8 @@ export interface PairedRow {
 	at: number;
 	/** When it last used its token, to the minute. */
 	last?: number;
+	/** Given through Decks Studio's key, to a browser signed in there: it goes when the key does. */
+	studio?: true;
 }
 
 /**
@@ -289,7 +300,9 @@ export type ClientMessage =
 	/** Take a token back: that front end can no longer reach this server. */
 	/** A document page: the messages are `@decks/docs`'s, carried on this socket as they are. */
 	| DocClientMessage
-	| { type: "pair.revoke"; id: string };
+	| { type: "pair.revoke"; id: string }
+	/** Unpair Decks Studio: its key is deleted, so the deck stops syncing, and every token given through it is taken back. Answered with `pairing`. */
+	| { type: "studio.unpair" };
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
@@ -460,7 +473,7 @@ export type ServerMessage =
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
 	| { type: "settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
 	/** The code being shown, if any, and every front end holding a token. */
-	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[] }
+	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[]; studio?: StudioLinkRow }
 	/** Who is answering, and what it can do: the first frame of every greeting. */
 	| { type: "backend"; backend: BackendInfo }
 	/** A document page's answers and news (`@decks/docs`); its `notice` is this union's own. */
