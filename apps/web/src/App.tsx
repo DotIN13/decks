@@ -53,7 +53,11 @@ import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
 import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
-import type { CanvasItem } from "@decks/canvas/tools";
+import { canvasItems, type CanvasItem } from "@decks/canvas/tools";
+import { setMineReader } from "@decks/agent-ui/chat";
+import { aboutSent, readSent, rememberFromCanvas } from "./chat/composer/pill-about.ts";
+import type { DraftMention } from "./chat/composer/draft.ts";
+import type { WaitingComment } from "./state/comments.ts";
 import { boxOf, fitInto } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
 import { createLanding, type CameraOwner } from "@decks/canvas/camera";
@@ -195,6 +199,7 @@ export function App() {
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
 		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused) : [];
 		const notes = commentIds.flatMap((id) => held.filter((note) => note.id === id));
+		rememberFromCanvas(typeof localStorage === "undefined" ? undefined : localStorage, notes);
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
 			case "prompt": {
@@ -1132,6 +1137,30 @@ export function App() {
 		const cy = item.box.y + item.box.h / 2;
 		moveCamera({ zoom, x: cx - (region.x + region.width / 2 - view.width / 2) / zoom, y: cy - (region.y + region.height / 2 - view.height / 2) / zoom }, { animate: true });
 	};
+	/** A board's or card's title by its path, for the name on a pill's card. */
+	const titleOf = (path: string) => state.boards.find((one) => one.path === path)?.title;
+	/**
+	 * Show what a pill is about (its card's name): a file opens in a new tab; a board, a card or a drawn
+	 * item, or what a comment is on, is found on the canvas and framed as the side panel's rows do.
+	 */
+	const showPill = (node: DraftMention, comment?: WaitingComment) => {
+		if (node.kind === "file") return void window.open(api(`/file?path=${encodeURIComponent(node.id)}`), "_blank", "noopener");
+		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
+		const name = stageOf(state.focused)?.name;
+		const item = canvasItems(stagePen()?.doc).items.find(
+			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
+		);
+		if (item) return pickItem(item);
+		const board = state.boards.find((one) => one.path === target);
+		if (board) return flyTo(board);
+		notice("info", "That is not on this canvas.");
+	};
+	// A message you sent, read back into its pills: from the stored text, so history after a reload has them too.
+	setMineReader((text) => {
+		const reading = readSent(text, typeof localStorage === "undefined" ? undefined : localStorage, titleOf);
+		return reading && { draft: reading.draft, pills: { about: (node) => aboutSent(reading, node, titleOf), show: (node) => showPill(node, node.kind === "comment" ? reading.comments.get(node.id) : undefined) } };
+	});
+	onCleanup(() => setMineReader(undefined));
 	// The app's scheme, to the editor at each switch: it draws ink, cards and board pages in it.
 	createEffect(() => {
 		const dark = scheme() === "dark";
@@ -1780,7 +1809,7 @@ export function App() {
 						onAccountsOpen={() => send({ type: "claude.accounts", limits: true })}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
-						 * what it hands back is a deck path — so what it inserts is an `@` mention
+						 * what it hands back is a deck path — so what it inserts is a file pill, which the agent reads as an `@` mention
 						 * of a file, which is the one thing in this app a message can point at.
 						 */
 						onAttach={() => {
@@ -1790,11 +1819,13 @@ export function App() {
 							// nothing to the agent reading it.
 							const agentId = state.focused;
 							void pickFile().then((path) => {
-								if (path) setDraft({ text: `@${path}`, at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
+								if (path) setDraft({ text: "", files: [path], at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
 							});
 						}}
 						onDraftTaken={() => setDraft(undefined)}
 						onDropFiles={(files) => void intoComposer(files)}
+						titleOf={titleOf}
+						onShowPill={showPill}
 					/>
 				</div>
 

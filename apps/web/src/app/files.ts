@@ -158,7 +158,7 @@ export function createFileDrops() {
 			const path = await addFile(file);
 			if (path) paths.push(path);
 		}
-		if (paths.length > 0) setDraft({ text: paths.map((path) => `@${path}`).join(" "), at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
+		if (paths.length > 0) setDraft({ text: "", files: paths, at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
 	};
 
 	/**

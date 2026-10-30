@@ -15,7 +15,9 @@ import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../board/file-drop.ts";
 import type { WaitingComment } from "../../state/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
-import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftText, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
+import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
+import { aboutAddress, aboutComment, commentPill, type TitleOf } from "./pill-about.ts";
+import type { PillHost } from "@decks/agent-ui/composer";
 import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
@@ -26,8 +28,8 @@ import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
 import { filterMentionables, MentionMenu, type Mentionable } from "./MentionMenu.tsx";
 import { Recipient, type RecipientProps } from "./Recipient.tsx";
 
-/** What a pill for a comment from the canvas starts with (`pillFor`); `ink.css` lets such a pill wrap. */
-export const FROM_CANVAS = "from the canvas ·";
+/** What a pill for a comment from the canvas starts with (`commentPill`); `ink.css` lets such a pill wrap and dashes its edge. */
+export { FROM_CANVAS } from "@decks/agent-ui/composer";
 
 /**
  * The input bar, floating over the canvas.
@@ -105,7 +107,7 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string }> } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string }>; files?: string[] } | undefined;
 	/**
 	 * The draft above has been put in the field: forget it. A handover happens once — a draft
 	 * still held after it was taken is one that can be put back by anything that re-reads it,
@@ -114,6 +116,10 @@ export function Composer(props: {
 	onDraftTaken?: () => void;
 	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
 	onDropFiles?: (files: File[]) => void;
+	/** A board's or card's title by its path, for the name on a pill's card. */
+	titleOf?: TitleOf;
+	/** Show what a pill is about: the board, card or item on the canvas, the file. */
+	onShowPill?: (pill: DraftMention, comment?: WaitingComment) => void;
 	/**
 	 * Where a line will land, in a word: "to Sable", "note on risk-model".
 	 * A label and not a control. It is read from where you are and what you typed, so the
@@ -178,20 +184,20 @@ export function Composer(props: {
 		props.onText?.(draftText(next));
 		if (held !== undefined) parked.set(held, next);
 	};
+	const pillFor = commentPill;
+	const commentOf = (id: string) => props.comments?.find((candidate) => candidate.id === id);
 	/*
-	 * A comment from the canvas shows its whole text in its pill, not only on hover, marked as from the
-	 * canvas: anything there can hand one over, a card's script too, and it goes with your next message,
-	 * so you read all of what goes (`state/comments.ts`, `cleanFrameComment`, cut it at 2,000 characters).
+	 * What each pill is about: the tooltip and the card a press opens (`pill-about.ts`). A comment's
+	 * number is its place among the comment pills, which is the number the message gives it.
 	 */
-	const pillFor = (comment: WaitingComment): DraftMention => {
-		const where = comment.quote ? commentLabel(comment.quote) : comment.board.split("/").pop() ?? comment.board;
-		if (comment.from !== "canvas") return { type: "mention", kind: "comment", id: comment.id, label: where };
-		const quote = comment.quote ? `“${comment.quote}”` : where;
-		return { type: "mention", kind: "comment", id: comment.id, label: `${FROM_CANVAS} ${quote}${comment.text ? ` — ${comment.text}` : ""}` };
-	};
-	const describe = (node: DraftMention) => {
-		const comment = props.comments?.find((candidate) => candidate.id === node.id);
-		return comment ? (comment.quote ? `“${comment.quote}”\n${comment.text}` : `${comment.board}\n${comment.text}`) : undefined;
+	const pills: PillHost = {
+		about: (node) => {
+			if (node.kind !== "comment") return aboutAddress(node, props.titleOf);
+			const comment = commentOf(node.id);
+			return comment ? aboutComment(comment, draftComments(nodes()).indexOf(node.id) + 1, props.titleOf) : undefined;
+		},
+		show: (node) => props.onShowPill?.(node, node.kind === "comment" ? commentOf(node.id) : undefined),
+		remove: (node) => field?.remove(node),
 	};
 
 	/**
@@ -254,10 +260,11 @@ export function Composer(props: {
 			if (handed.agentId === undefined || handed.agentId === props.agentId) {
 				const kept = handed.comment ? props.comments?.find((candidate) => candidate.id === handed.comment) : undefined;
 				// A comment kept on a board arrives as a pill, and so does a board or an item dragged
-				// onto the bar; a dropped file as its `@path`, spaced from its neighbours; anything
+				// onto the bar, and a file attached or dropped; plain words go in at the caret; anything
 				// else replaces what is there.
 				if (kept) field?.append(pillFor(kept));
 				else if (handed.pills?.length) for (const pill of handed.pills) field?.append({ type: "mention", ...pill });
+				else if (handed.files?.length) for (const path of handed.files) field?.insertPill(fileMention(path));
 				else if (handed.insert) field?.insertText(handed.text);
 				else put(textDraft(handed.text));
 				field?.focus();
@@ -644,7 +651,7 @@ export function Composer(props: {
 				<DraftField
 					ref={(api) => (field = api)}
 					draft={nodes()}
-					describe={describe}
+					pills={pills}
 					// The field had no accessible name at all; the placeholder is not one.
 					label="Message this agent"
 					/* A turn in progress does not stop you talking to it. Text sent now steers this turn rather than
