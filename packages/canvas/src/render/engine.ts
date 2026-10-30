@@ -2136,8 +2136,12 @@ function startWorker(url: string): Worker {
 	try {
 		return new Worker(url, { type: "module" });
 	} catch {
+		/*
+		 * A page of opaque origin (the canvas frame's sandbox) may not start a worker from its server's
+		 * address, and a `blob:` worker made there fails to load its import too; a `data:` module worker,
+		 * which takes an origin of its own, imports the real file as any cross-origin module.
+		 */
 		const absolute = new URL(url, location.href).href;
-		const shim = URL.createObjectURL(new Blob([`import ${JSON.stringify(absolute)};`], { type: "text/javascript" }));
-		return new Worker(shim, { type: "module" });
+		return new Worker(`data:text/javascript,${encodeURIComponent(`import ${JSON.stringify(absolute)};`)}`, { type: "module" });
 	}
 }
