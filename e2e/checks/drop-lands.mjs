@@ -86,7 +86,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	}
 	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
 	const from = await canvas.evaluate((path) => {
-		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		const board = globalThis.__decksRust.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	await canvas.evaluate((path) => {
@@ -95,7 +95,7 @@ async function boardStaysDropped(page, label, { picture }) {
 		globalThis.__boardSampling = true;
 		const sample = () => {
 			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-			const box = engine.boards.find((one) => one.path === path);
+			const box = engine.placedCards.find((one) => one.path === path);
 			const carried = engine.carriedCount > 0;
 			globalThis.__boardFrames.push({
 				t: performance.now(),
@@ -125,7 +125,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	});
 	const after = frames.filter((f) => f.t > dropAt);
 	const to = await canvas.evaluate((path) => {
-		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		const board = globalThis.__decksRust.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	say(`${label}: the board moved`, Math.abs(to.x - from.x) > 20 && Math.abs(to.y - from.y) > 10, JSON.stringify({ from, to }));

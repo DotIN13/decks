@@ -436,6 +436,10 @@ export class StageEngine {
 		this.page?.free();
 		this.page = undefined;
 		this.picturesAsked.clear();
+		// What the GPU held went with the context: the cards' pictures are fetched again from the bottom rung.
+		this.pictureBytes.clear();
+		this.heldWidth.clear();
+		this.compressedSize.clear();
 		this.iconsAsked.clear();
 		this.lifted.clear();
 		this.picturedKey = "";

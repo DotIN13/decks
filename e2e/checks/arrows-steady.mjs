@@ -160,7 +160,7 @@ async function run(engine, lags) {
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 
 	// Bare canvas right of the boards, at 100%.
-	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.placedCards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);

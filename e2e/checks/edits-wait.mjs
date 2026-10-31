@@ -95,7 +95,7 @@ const SAMPLER = () => {
 			}
 			if (probe.count) out.count = String([...e.placed.values()].filter((p) => !p.parent).length);
 			for (const path of probe.boards ?? []) {
-				const b = e.boards.find((one) => one.path === path);
+				const b = e.placedCards.find((one) => one.path === path);
 				const carrying = e.carriedCount > 0 ? e.carriedBy : { dx: 0, dy: 0 };
 				out[`board ${path}`] = b ? JSON.stringify([r(b.x + carrying.dx), r(b.y + carrying.dy), r(b.w), r(b.h)]) : "absent";
 			}
@@ -337,7 +337,7 @@ async function run(engine, { all }) {
 	const person = await asPerson();
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 	const home = (await call("view.camera", [])).value;
-	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.placedCards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		const asked = await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);

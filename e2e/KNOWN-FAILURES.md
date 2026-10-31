@@ -40,7 +40,7 @@ edits-wait.
 
 - edits-wait (named, Chromium): "a board hidden from its pill: no frame shows it as it was" — 1 or 2 of ~145 frames
   after the click still have the board (two runs out of two). The frame takes it off at once (`frame.tsx`, `takeOff`, a
-  local delete edit), but the engine's boards (`__decksRust.boards`) lag the edit by a frame or two. Small, visible for
+  local delete edit), but the engine's boards (`__decksRust.placedCards`) lag the edit by a frame or two. Small, visible for
   ~15–30 ms. WebKit's "a note made by a double-click … 1 of 92 frames old (count)" was seen once alone and passed in the
   run beside the others: left as a timing flake.
 
@@ -57,7 +57,6 @@ edits-wait.
 - context-loss waited on the page for `__decksEngine`, which is in the frame (check bug).
 - focus expected a comment's pill to read only the board's name; it shows the whole comment, marked "from the canvas"
   since d0c7ffaa (check out of date).
-- tiers' "the hide button takes a board off the stage" failed once in the full run and passed twice alone: load flake.
 - stage-shot, placeholder, tile-pixels, note-edges, backends, pen-stage pass (they failed only on the render worker).
 
 ### Still worth knowing
@@ -71,3 +70,18 @@ edits-wait.
   target into view first): press by coordinates.
 - The frame probe (`?probe=<collector>`, `apps/web/src/perf/probe.ts`) runs in the canvas frame; the page passes the
   parameter on and keeps `__probeEval` for an inspector (`scripts/ipad-profile.mjs`).
+
+## After the board-leftovers steps 1–2 (2026-10-30)
+
+A full run (3 workers) failed tiers, pen-stage, context-loss and drop-lands; all four failed the same way on 30df5333,
+before the steps.
+
+- pen-stage, drop-lands (and the named arrows-steady, nudge, edits-wait) read `__decksRust.boards`, which the card
+  rename (262d23c2) made `placedCards`: check bug, fixed.
+- context-loss: a lost WebGL context did not drop the engine's record of the pictures the GPU held (`pictureBytes`,
+  `heldWidth`, `compressedSize`), so after the restart the picture ladder (262d23c2) thought every card still had its
+  picture and fetched none: nothing was drawn. `lose()` (`render/engine.ts`) clears them now. App bug, fixed.
+- tiers' "the hide button takes a board off the stage" fails under load (the full run, four checks at once) and passes
+  alone (three runs out of three). The board leaves the frame, is drawn again for a moment, and is gone by the time the
+  message is written: the first read of `__decksBoards` still had it, the second did not. Likely the same lag as
+  edits-wait's hidden board (an echo of the stage from before the hide), not fixed.

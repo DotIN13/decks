@@ -175,7 +175,7 @@ if (inView) {
 // On bare canvas right of every board, at 100%, where the camera is moved (`view.move`).
 {
 	const person = await asPerson();
-	const right = await canvas.evaluate(() => Math.max(0, ...globalThis.__decksRust.boards.map((b) => b.x + b.w)));
+	const right = await canvas.evaluate(() => Math.max(0, ...globalThis.__decksRust.placedCards.map((b) => b.x + b.w)));
 	for (let i = 0; i < 4; i++) {
 		await fetch(`${API}/api/v1/view.move`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args: [{ x: right + 3000, y: 0, zoom: 1 }] }) });
 		if (await until(() => canvas.evaluate((x) => Math.abs(globalThis.__decksRust.camera.x - x) < 50 && Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01, right + 3000), 4000)) break;
