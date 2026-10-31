@@ -434,7 +434,7 @@ export function LeftPanel(props: {
 	/* The Canvas tab's rows: the drawing on screen, as Studio's editor lists its layers. */
 	const items = createMemo(() => canvasItems(props.canvasDoc, query()));
 	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
-	const boardItems = () => items().items.filter((item) => item.board !== undefined);
+	const cardItems = () => items().items.filter((item) => item.board !== undefined);
 	const drawnItems = () => items().items.filter((item) => item.board === undefined);
 	const itemRow = (item: CanvasItem) => (
 		<button
@@ -987,13 +987,13 @@ export function LeftPanel(props: {
 
 					<Show when={tab() === "canvas"}>
 						<div class="panel-section v3-items" data-kind="canvas">
-							<Show when={boardItems().length > 0}>
+							<Show when={cardItems().length > 0}>
 								<div class="v3-sec">
 									<span>Cards</span>
 									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{boardItems().length}</span>
+									<span class="v3-sec-n tabular-nums">{cardItems().length}</span>
 								</div>
-								<For each={boardItems()}>{(item) => itemRow(item)}</For>
+								<For each={cardItems()}>{(item) => itemRow(item)}</For>
 							</Show>
 							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
 								<div class="v3-sec">

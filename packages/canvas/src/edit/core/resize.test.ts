@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
-import { BOARD_MIN, boardResizeEnd, boardResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, shownBoardResize, sizeFloor, sizeNarrowest, CARD_MIN_W } from "./resize.ts";
+import { PAGE_MIN, pageResizeEnd, pageResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, shownPageResize, sizeFloor, sizeNarrowest, CARD_MIN_W } from "./resize.ts";
 
 const node = (fields: Record<string, unknown>) => ({ id: "n", type: "frame", ...fields }) as unknown as PenNode;
 const card = (fields: Record<string, unknown> = {}) => node({ metadata: { type: "decks.card" }, ...fields });
@@ -104,22 +104,22 @@ test("two presses on a frame's top or bottom handle hug again, with the floor it
 });
 
 test("a board stops at 320 × 200 at the edge being dragged; the other stays put", () => {
-	assert.deepEqual(BOARD_MIN, { w: 320, h: 200 });
+	assert.deepEqual(PAGE_MIN, { w: 320, h: 200 });
 	const start = { x: 0, y: 0, w: 800, h: 600 };
-	assert.deepEqual(boardResizeStep(start, "w", { x: 700, y: 0 }, {}, none).box, { x: 480, y: 0, w: 320, h: 600 });
-	assert.deepEqual(boardResizeStep(start, "n", { x: 0, y: 500 }, {}, none).box, { x: 0, y: 400, w: 800, h: 200 });
-	assert.deepEqual(boardResizeStep(start, "se", { x: -900, y: -900 }, {}, none).box, { x: 0, y: 0, w: 320, h: 200 });
-	assert.deepEqual(boardResizeStep(start, "se", { x: 400, y: 0 }, { shift: true }, none).box, { x: 0, y: 0, w: 1200, h: 900 });
-	const snapped = boardResizeStep(start, "e", { x: 97, y: 0 }, {}, { targets: [{ x: 900, y: 700, w: 100, h: 100 }], threshold: 6 });
+	assert.deepEqual(pageResizeStep(start, "w", { x: 700, y: 0 }, {}, none).box, { x: 480, y: 0, w: 320, h: 600 });
+	assert.deepEqual(pageResizeStep(start, "n", { x: 0, y: 500 }, {}, none).box, { x: 0, y: 400, w: 800, h: 200 });
+	assert.deepEqual(pageResizeStep(start, "se", { x: -900, y: -900 }, {}, none).box, { x: 0, y: 0, w: 320, h: 200 });
+	assert.deepEqual(pageResizeStep(start, "se", { x: 400, y: 0 }, { shift: true }, none).box, { x: 0, y: 0, w: 1200, h: 900 });
+	const snapped = pageResizeStep(start, "e", { x: 97, y: 0 }, {}, { targets: [{ x: 900, y: 700, w: 100, h: 100 }], threshold: 6 });
 	assert.deepEqual(snapped.box, { x: 0, y: 0, w: 900, h: 600 });
 	assert.equal(snapped.guides.length, 1);
 });
 
 test("a board's lift moves it only when its corner moved, and sizes it only when its size changed", () => {
 	const start = { x: 0, y: 0, w: 800, h: 600 };
-	assert.deepEqual(boardResizeEnd(start, start), {});
-	assert.deepEqual(boardResizeEnd(start, { x: 0, y: 0, w: 900, h: 600 }), { size: { w: 900, h: 600 } });
-	assert.deepEqual(boardResizeEnd(start, { x: -100, y: 0, w: 900, h: 600 }), { move: { x: -100, y: 0 }, size: { w: 900, h: 600 } });
+	assert.deepEqual(pageResizeEnd(start, start), {});
+	assert.deepEqual(pageResizeEnd(start, { x: 0, y: 0, w: 900, h: 600 }), { size: { w: 900, h: 600 } });
+	assert.deepEqual(pageResizeEnd(start, { x: -100, y: 0, w: 900, h: 600 }), { move: { x: -100, y: 0 }, size: { w: 900, h: 600 } });
 });
 
 test("the radius follows the nearer reach along the diagonal, from 0 to half the shorter side", () => {
@@ -151,9 +151,9 @@ test("a radius is written as pen's cornerRadius, or a library shape's metadata.r
 });
 
 test("a document's resize shows it no shorter than its content, while the drag's own height is what is written", () => {
-	assert.deepEqual(shownBoardResize({ x: 0, y: 100, w: 760, h: 300 }, 642), { x: 0, y: 100, w: 760, h: 642 });
-	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 900 }, 642), { x: 0, y: 0, w: 760, h: 900 });
-	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 300 }, undefined), { x: 0, y: 0, w: 760, h: 300 });
+	assert.deepEqual(shownPageResize({ x: 0, y: 100, w: 760, h: 300 }, 642), { x: 0, y: 100, w: 760, h: 642 });
+	assert.deepEqual(shownPageResize({ x: 0, y: 0, w: 760, h: 900 }, 642), { x: 0, y: 0, w: 760, h: 900 });
+	assert.deepEqual(shownPageResize({ x: 0, y: 0, w: 760, h: 300 }, undefined), { x: 0, y: 0, w: 760, h: 300 });
 });
 
 test("a card is never narrower than 48, its least height, and the edge not dragged stays put", () => {
@@ -170,7 +170,7 @@ test("a card is never narrower than 48, its least height, and the edge not dragg
 
 test("Shift on a board with no size to keep does not divide by it", () => {
 	const flat = { x: 0, y: 0, w: 0, h: 0 };
-	const step = boardResizeStep(flat, "se", { x: 500, y: 300 }, { shift: true }, none);
+	const step = pageResizeStep(flat, "se", { x: 500, y: 300 }, { shift: true }, none);
 	assert.deepEqual(step.box, { x: 0, y: 0, w: 500, h: 300 });
 	assert.ok(Object.values(step.box).every(Number.isFinite));
 });

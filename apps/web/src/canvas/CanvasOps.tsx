@@ -24,7 +24,7 @@ import { tokens } from "@decks/canvas/host";
  *
  * Every row is checked against the code that implements it: `Stage.shortcut` and
  * `TOOL_KEYS` for the camera and the tools, `Editor.ts` for selection and editing,
- * `file-drop.ts` for the drop, `BoardFrame.tsx` for the board's own chrome, `InkLayer.tsx`
+ * `file-drop.ts` for the drop, `PageFrame.tsx` for the board's own chrome, `InkLayer.tsx`
  * and `comment-select.ts` for reading a board. A cheat sheet
  * that lies is worse than none, so where the two disagree this file is the one that is
  * wrong.

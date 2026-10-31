@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW } from "@decks/pen";
-import { arrowHandles, arrowLine, arrowOp, bendAt, bendStart, boardAt, droppedEnd, endOf, joinAt, nearSide, newArrowEnds, onSide, pointEnd, resetBendOp, resetEndOp, routeDraft, sideNear, slideAt, slideJoin } from "./arrows.ts";
+import { arrowHandles, arrowLine, arrowOp, bendAt, bendStart, pageAt, droppedEnd, endOf, joinAt, nearSide, newArrowEnds, onSide, pointEnd, resetBendOp, resetEndOp, routeDraft, sideNear, slideAt, slideJoin } from "./arrows.ts";
 import { fakeScene, type FakeItem } from "./fake-scene.ts";
 
 const board = { path: "boards/x.html", x: 0, y: 200, w: 400, h: 300 };
@@ -45,7 +45,7 @@ test("an end joins the item picked there, else the board, never an arrow or the 
 	assert.deepEqual(joinAt(s, { x: 200, y: 25 }, { zoom: 1 }), undefined);
 	assert.deepEqual(joinAt(s, { x: 50, y: 300 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 } });
 	assert.deepEqual(joinAt(s, { x: 200, y: 200 }, { zoom: 1 }), { name: "boards/x.html", box: { x: 0, y: 200, w: 400, h: 300 }, side: "top" });
-	assert.equal(boardAt(s, { x: 50, y: 1000 }), undefined);
+	assert.equal(pageAt(s, { x: 50, y: 1000 }), undefined);
 });
 
 test("a join is written as an item, or an item and its side; a point to a tenth", () => {

@@ -11,7 +11,7 @@
 import type { Op } from "@decks/pen";
 import { PEN_TOOL_KEYS, type PenTool } from "./model.ts";
 import { childrenOf, parentOf } from "./pick.ts";
-import { boardMoves, deleteOps, duplicateOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
+import { pageMoves, deleteOps, duplicateOps, moveOps, type PageMove, type NextId } from "./ops.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /** A key as it was pressed: `KeyboardEvent.key` and the modifiers held. */
@@ -25,9 +25,9 @@ export type KeyContext = {
 	boards: readonly string[];
 	tool: PenTool;
 	/** Whether a board is selected as the page's own selection: its letters are the board's, not tools. */
-	boardSelected: boolean;
+	pageSelected: boolean;
 	/** That board, which the arrows move with the rest of what is selected. */
-	selectedBoard?: string | undefined;
+	selectedPage?: string | undefined;
 	/** Whether the page can step through edits (undo, redo). */
 	canStep: boolean;
 	scene: SceneQuery;
@@ -46,7 +46,7 @@ export type KeyAct =
 	| { handled: true; do: "escape"; select: []; boards: [] }
 	/** Copies of the selection, selected in its place once they arrive. */
 	| { handled: true; do: "duplicate"; ops: Op[]; select: string[] }
-	| { handled: true; do: "nudge"; ops: Op[]; boards: BoardMove[] }
+	| { handled: true; do: "nudge"; ops: Op[]; boards: PageMove[] }
 	/** Another selection: the parents of what is selected (⇧Enter), or its children (Enter). */
 	| { handled: true; do: "select"; select: string[] }
 	| { handled: true; do: "arm"; tool: PenTool };
@@ -79,12 +79,12 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	}
 	const nudge = NUDGES[key];
 	// The boards picked with the drawing, and the board selected on its own (a press on it).
-	const moving = context.selectedBoard && !boards.includes(context.selectedBoard) ? [...boards, context.selectedBoard] : boards;
+	const moving = context.selectedPage && !boards.includes(context.selectedPage) ? [...boards, context.selectedPage] : boards;
 	if ((selection.length || moving.length) && nudge && !command && !alt) {
 		const step = press.shift ? NUDGE_SHIFT : 1;
 		const dx = nudge[0] * step;
 		const dy = nudge[1] * step;
-		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), boards: boardMoves(context.scene.boards(), moving, dx, dy) };
+		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), boards: pageMoves(context.scene.boards(), moving, dx, dy) };
 	}
 	/*
 	 * The letters that arm a tool: from the app's own document only — never forwarded from a
@@ -94,7 +94,7 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	 * selecting what was under it. With a board selected the keys are the board's; a press on
 	 * bare canvas lets it go, and then they are the drawing's.
 	 */
-	const armed = !command && !alt && !context.boardSelected ? PEN_TOOL_KEYS[key] : undefined;
+	const armed = !command && !alt && !context.pageSelected ? PEN_TOOL_KEYS[key] : undefined;
 	if (armed) return { handled: true, do: "arm", tool: armed };
 	return { handled: false };
 }

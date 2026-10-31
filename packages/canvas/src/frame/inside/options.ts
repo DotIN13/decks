@@ -64,7 +64,7 @@ export function installHost(ctx: FrameContext): void {
 			const pass = passOf(ctx.filesBase());
 			return pass ? withPass(url, pass) : url;
 		},
-		boardLink: (href, base) => {
+		cardLink: (href, base) => {
 			try {
 				const url = new URL(href, base);
 				// Against any pass the canvas has had: a card loaded before a renewal links on the pass it was loaded with.
@@ -261,7 +261,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
 		inkAgent: () => ctx.busy().writer?.name,
 		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
-		onDeleteBoard: async (path) => {
+		onDeleteCard: async (path) => {
 			if (studio) return takeOff(path);
 			const answer = await backend.call("canvas.delete", [path]);
 			return answer.ok;

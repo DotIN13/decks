@@ -28,7 +28,7 @@ const GAP = 10;
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
  * actions (a new tab, hide) are not offered.
  */
-export function BoardCallout(props: {
+export function PageCallout(props: {
 	board?: Board;
 	/** What the pill sits over, on the stage: the board's box, or the drawn items' together. */
 	box: { x: number; y: number; w: number; h: number };

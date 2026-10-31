@@ -1,6 +1,6 @@
 /** A scene built by hand for core's tests: no engine, no document file, just boxes. */
 import type { PenNode, Placed } from "@decks/pen";
-import type { BoardBox, Rect } from "./model.ts";
+import type { PageBox, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
 export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown>; line?: boolean; undrawn?: boolean };
@@ -8,7 +8,7 @@ export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; 
 /** How far round its box a fake item is found under a point, as a press's reach is in the engine. */
 export const FAKE_REACH = 4;
 
-export function fakeScene(list: FakeItem[], boards: BoardBox[] = []): SceneQuery {
+export function fakeScene(list: FakeItem[], boards: PageBox[] = []): SceneQuery {
 	const nodes = new Map<string, PenNode>();
 	for (const one of list) nodes.set(one.id, { id: one.id, type: one.type ?? "rectangle", layout: one.layout, padding: one.padding, children: [], ...one.extra } as unknown as PenNode);
 	for (const one of list) if (one.parent) (nodes.get(one.parent)!.children as PenNode[]).push(nodes.get(one.id)!);

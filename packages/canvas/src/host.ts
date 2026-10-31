@@ -18,7 +18,7 @@ export interface CanvasHost {
 	 * A link on a drawn item: the board it names, when it names one this host can open on the
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
-	boardLink(href: string, base: string): string | undefined;
+	cardLink(href: string, base: string): string | undefined;
 	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
 	iconUrl?: IconSource;
 	/**
@@ -98,7 +98,7 @@ export function passOf(url: string): string | undefined {
 const fallback: CanvasHost = {
 	fileUrl: (path) => path,
 	canWrite: () => true,
-	boardLink: () => undefined,
+	cardLink: () => undefined,
 };
 
 let current: CanvasHost = fallback;

@@ -100,7 +100,7 @@ export function Settings(props: {
 			<Switch>
 				<Match when={section() === "general"}>
 					<TimeSettings />
-					<BoardSettings />
+					<CanvasSettings />
 				</Match>
 				<Match when={section() === "notifications"}>
 					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
@@ -292,7 +292,7 @@ function TimeSettings() {
 }
 
 /** The frame-rate meter (`perf/fps.tsx`). */
-function BoardSettings() {
+function CanvasSettings() {
 	return (
 		<SetGroup label="Canvas" group="renderer">
 			<SetRow title="Frame rate" sub="A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.">

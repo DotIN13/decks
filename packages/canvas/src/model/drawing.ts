@@ -39,10 +39,10 @@ export interface Drawing {
 	/** The edits that made `doc` from the drawing before it, when it is the drawing now and they are known: the stage applies them. */
 	editsTo(doc: PenDocument): DocEdits | undefined;
 	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
-	moveBoard(path: string, x: number, y: number): void;
-	resizeBoard(path: string, size: { w: number; h: number }): void;
+	movePage(path: string, x: number, y: number): void;
+	resizePage(path: string, size: { w: number; h: number }): void;
 	/** A board taken off the drawing (its file is the host's business): its item deleted. */
-	removeBoard(path: string): void;
+	removePage(path: string): void;
 }
 
 export interface DrawingOptions {
@@ -89,9 +89,9 @@ export const itemKind = (node: PenNode): "document" | "app" | undefined => {
 	const type = (node.metadata as { type?: string } | undefined)?.type;
 	return type === "decks.document" ? "document" : type === "decks.app" ? "app" : undefined;
 };
-export const isBoard = (node: PenNode) => node.type === "browser" && PAGE_TAGS.has(String((node.metadata as { type?: string } | undefined)?.type));
+export const isPage = (node: PenNode) => node.type === "browser" && PAGE_TAGS.has(String((node.metadata as { type?: string } | undefined)?.type));
 export const isCardItem = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.card";
-export const boardPath = (node: PenNode) => {
+export const pagePath = (node: PenNode) => {
 	const kind = itemKind(node);
 	// An item is its own: its path is its id, so two of one file or app are two places.
 	if (kind) return `item:${String(node.id)}`;
@@ -100,13 +100,13 @@ export const boardPath = (node: PenNode) => {
 const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 
 /** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
-export function boardsOf(doc: PenDocument): Board[] {
+export function pagesOf(doc: PenDocument): Board[] {
 	const boards: Board[] = [];
 	for (const node of doc.children ?? []) {
-		if (!isBoard(node)) continue;
+		if (!isPage(node)) continue;
 		boards.push({
-			path: boardPath(node),
-			title: typeof node.name === "string" && node.name ? node.name : itemTitle(node) ?? boardPath(node),
+			path: pagePath(node),
+			title: typeof node.name === "string" && node.name ? node.name : itemTitle(node) ?? pagePath(node),
 			x: num(node.x, 0),
 			y: num(node.y, 0),
 			w: num(node.width, 960),
@@ -126,9 +126,9 @@ export function boardsOf(doc: PenDocument): Board[] {
  * until the host's drawing (`given`) and so its list have it too. Boards the edits do not touch, and
  * fields the drawing does not hold (a height the page raised), are the list's.
  */
-export function boardsAhead(list: Board[], given: PenDocument, shown: PenDocument): Board[] {
+export function pagesAhead(list: Board[], given: PenDocument, shown: PenDocument): Board[] {
 	if (given === shown) return list;
-	const byPath = (doc: PenDocument) => new Map(boardsOf(doc).map((board) => [board.path, board]));
+	const byPath = (doc: PenDocument) => new Map(pagesOf(doc).map((board) => [board.path, board]));
 	const was = byPath(given);
 	const now = byPath(shown);
 	const out: Board[] = [];
@@ -193,7 +193,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	};
 	const boardsBy = (doc: PenDocument, placed: ReadonlyMap<string, Placed>) => {
 		const byPath = new Map<string, string>();
-		for (const node of walk(doc.children ?? [])) if (isBoard(node)) byPath.set(boardPath(node), node.id);
+		for (const node of walk(doc.children ?? [])) if (isPage(node)) byPath.set(pagePath(node), node.id);
 		return (name: string): Frame | undefined => {
 			const id = byPath.get(name);
 			return id ? placed.get(id)?.box : undefined;
@@ -211,7 +211,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		const placed = layoutOf(next);
 		const before = layoutOf(prev);
 		const prevBoard = boardsBy(prev, before);
-		const nextBoard = boardsBy(next, placed);
+		const nextPage = boardsBy(next, placed);
 		const prevNodes = new Map<string, PenNode>();
 		for (const node of walk(prev.children ?? [])) prevNodes.set(node.id, node);
 		const parents = new Map<string, string>();
@@ -230,9 +230,9 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			if (JSON.stringify(was.metadata) !== JSON.stringify(arrow.metadata)) return true;
 			const meta = arrow.metadata as { from?: unknown; to?: unknown };
 			const names = [arrowEndItem(meta.from), arrowEndItem(meta.to), parents.get(arrow.id)];
-			return names.some((name) => name !== undefined && !same(before.get(name)?.box ?? prevBoard(name), placed.get(name)?.box ?? nextBoard(name)));
+			return names.some((name) => name !== undefined && !same(before.get(name)?.box ?? prevBoard(name), placed.get(name)?.box ?? nextPage(name)));
 		};
-		reroute(next, placed, nextBoard, undefined, touched);
+		reroute(next, placed, nextPage, undefined, touched);
 		return next;
 	};
 	/** `ops` applied to `prev` as the server applies them, arrows routed again; throws when refused. */
@@ -522,7 +522,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		commit(now, target);
 	};
 
-	const boardId = (path: string) => untrack(doc).children?.find((node) => isBoard(node) && boardPath(node) === path)?.id;
+	const pageId = (path: string) => untrack(doc).children?.find((node) => isPage(node) && pagePath(node) === path)?.id;
 
 	return {
 		doc,
@@ -562,16 +562,16 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		editsTo(at) {
 			return made && made.to === at ? { from: made.from, edits: made.edits } : undefined;
 		},
-		moveBoard(path, x, y) {
-			const id = boardId(path);
+		movePage(path, x, y) {
+			const id = pageId(path);
 			if (id) edit([{ op: "update", id, set: { x: Math.round(x), y: Math.round(y) } }]);
 		},
-		removeBoard(path) {
-			const id = boardId(path);
+		removePage(path) {
+			const id = pageId(path);
 			if (id) edit([{ op: "delete", id }]);
 		},
-		resizeBoard(path, size) {
-			const id = boardId(path);
+		resizePage(path, size) {
+			const id = pageId(path);
 			if (id) edit([{ op: "update", id, set: { width: Math.round(size.w), height: Math.round(size.h) } }]);
 		},
 	};

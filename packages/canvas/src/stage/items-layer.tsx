@@ -5,7 +5,7 @@ import type { CameraController } from "../camera/controller.ts";
 import { canvasHost, openInTab } from "../host.ts";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseLive, NO_LIVE_CARDS, sameLive, type LiveCards } from "../items/live-cards.ts";
-import type { StageBoardProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
@@ -22,7 +22,7 @@ import type { StageProps } from "./Stage.tsx";
 export type ItemsLayerDeps = {
 	props: StageProps;
 	/** The host's slot for one placed item (`props.frame`, read once). */
-	Frame: Component<StageBoardProps>;
+	Frame: Component<ItemSlotProps>;
 	/** The stage element, set once it is mounted. */
 	element: () => HTMLDivElement | undefined;
 	ctl: CameraController;
@@ -36,7 +36,7 @@ export type ItemsLayerDeps = {
 	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
 	/** What an item's slot asks of the stage's fingers (`input.ts`). */
-	gestures: StageBoardProps["gestures"];
+	gestures: ItemSlotProps["gestures"];
 };
 
 /**
@@ -112,9 +112,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * of them, and the card's picture everywhere else. A count and not a set, so a slot that goes as
 	 * another comes for the same card never leaves it wrongly unmarked.
 	 */
-	const [liveBoards, setLiveBoards] = createSignal<ReadonlyMap<string, number>>(new Map());
+	const [liveCards, setLiveCards] = createSignal<ReadonlyMap<string, number>>(new Map());
 	const markLive = (path: string, on: boolean) =>
-		setLiveBoards((was) => {
+		setLiveCards((was) => {
 			const next = new Map(was);
 			const count = (next.get(path) ?? 0) + (on ? 1 : -1);
 			if (count > 0) next.set(path, count);
@@ -162,7 +162,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * layer and the page slides that with the pointer (`carry` below), so a move redraws nothing.
 	 */
 	createEffect(() => {
-		const live = liveBoards();
+		const live = liveCards();
 		const look = scheme();
 		const pictures = cardPictures();
 		/*
@@ -210,8 +210,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).
 	 */
 	const draggedAsPicture = createMemo<ReadonlySet<string>>(() => {
-		const paths = [...(editor.boardDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
-		const live = liveBoards();
+		const paths = [...(editor.pageDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
+		const live = liveCards();
 		return new Set(paths.filter((path) => !live.has(path)));
 	});
 
@@ -268,7 +268,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 
 	/** The camera boards and their bookkeeping see: the settled one (`camera/controller.ts`). */
-	const boardCamera = ctl.settled;
+	const pageCamera = ctl.settled;
 	/**
 	 * The boards and cards within a window of the screen, by path, from the R-tree, as of the settled
 	 * camera. A new set only when one enters or leaves it, so what reads it through `isNear` hears only
@@ -278,7 +278,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		() => {
 			if (view().width === 0) return new Set();
 			const boards = props.boards;
-			return new Set(boardIndex().search(reach()).map((at) => boards[at]!.path));
+			return new Set(pageIndex().search(reach()).map((at) => boards[at]!.path));
 		},
 		new Set(),
 		{ equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)) },
@@ -290,12 +290,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/** At or above this device's live zoom (`INTERACT_ZOOM`): items near the window have their slots, title and all. */
 	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
-	const boardIndex = createMemo(() => new BoxIndex(props.boards));
-	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
+	const pageIndex = createMemo(() => new BoxIndex(props.boards));
+	const pageSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
 	const reach = () => {
 		const v = view();
-		const cam = boardCamera();
+		const cam = pageCamera();
 		const corner = toWorld(cam, v, { x: -v.width, y: -v.height });
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
@@ -309,7 +309,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const cardChoice = createMemo<LiveCards>((was) => {
 		const v = view();
 		if (v.width === 0) return was;
-		const next = chooseLive({ index: boardIndex(), items: props.boards, rest: ctl.rest(), view: v, selected: props.selected, budget: CARD_BUDGET, was });
+		const next = chooseLive({ index: pageIndex(), items: props.boards, rest: ctl.rest(), view: v, selected: props.selected, budget: CARD_BUDGET, was });
 		return sameLive(was, next) ? was : next;
 	}, NO_LIVE_CARDS);
 	/** For the browser checks and `scripts/card-zoom.mjs`: the cards chosen awake and kept asleep. */
@@ -346,22 +346,22 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const found = new Set(
 			moved
 				? was.flatMap((board) => {
-						const at = boardSlot().get(board.path);
+						const at = pageSlot().get(board.path);
 						return at === undefined ? [] : [at];
 					})
 				: liveNow()
-					? boardIndex().search(reach())
+					? pageIndex().search(reach())
 					: [],
 		);
 		const keep = (path: string | undefined) => {
-			const at = path === undefined ? undefined : boardSlot().get(path);
+			const at = path === undefined ? undefined : pageSlot().get(path);
 			if (at !== undefined) found.add(at);
 		};
-		for (const path of liveBoards().keys()) keep(path);
+		for (const path of liveCards().keys()) keep(path);
 		keep(props.selected);
 		for (const path of livePaths()) keep(path);
 		for (const path of keptPaths()) keep(path);
-		for (const path of editor.heldBoards()) keep(path);
+		for (const path of editor.heldPages()) keep(path);
 		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
 		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
 		const next = [...found]
@@ -462,7 +462,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	};
 
 	/** One placed item's slot: the host's, told where it is and what it may do. */
-	const boardNode = (board: Board) => (
+	const pageNode = (board: Board) => (
 		<Frame
 			board={board}
 			zoom={ctl.zoom()}
@@ -473,8 +473,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
 			gestures={gestures}
-			{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
-			view={editor.boardView(board.path)}
+			{...(props.onOpenPage ? { onOpenPage: props.onOpenPage } : {})}
+			view={editor.pageView(board.path)}
 			{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 			onMove={(x, y) => props.onMove(board.path, x, y)}
 			onOpen={() => pushCamera(frame([boxOf(board)]))}
@@ -494,7 +494,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * Boards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
 	 * measured taller): for `SIZE_MS` their box, title bar and outline ease to the new size rather
 	 * than jump (`canvas.css`, `[data-sizing]`). A size the person drags is never eased: it follows
-	 * the pointer, and the board takes it while `boardResize` still holds it, so nothing changes here.
+	 * the pointer, and the board takes it while `pageResize` still holds it, so nothing changes here.
 	 */
 	const SIZE_MS = 280;
 	const [sizingPaths, setSizingPaths] = createSignal<ReadonlySet<string>>(new Set());
@@ -556,7 +556,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				<For each={props.boards} fallback={null}>
 					{(board) => (
 						<div class="board-slot">
-							<Show when={isRendered(board.path)}>{boardNode(board)}</Show>
+							<Show when={isRendered(board.path)}>{pageNode(board)}</Show>
 						</div>
 					)}
 				</For>
@@ -632,5 +632,5 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		</>
 	);
 
-	return { isLive, renderedPaths, boardIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
+	return { isLive, renderedPaths, pageIndex, liveNow, layered, cardsHidden, sizingPaths, toggleMedia, openLiveFile, presented, slots, fileNodes, player };
 }

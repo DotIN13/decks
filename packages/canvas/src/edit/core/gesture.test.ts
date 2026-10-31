@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene, type FakeItem } from "./fake-scene.ts";
-import { BOARD_HOLD_MS, initialState, landBoardDrag, landBoardResize, RADIUS_HOLD_MS, SETTLE_MS, step, withSelection, type Effect, type GestureContext, type Input, type PointerInput, type Step } from "./gesture.ts";
+import { PAGE_HOLD_MS, initialState, landPageDrag, landPageResize, RADIUS_HOLD_MS, SETTLE_MS, step, withSelection, type Effect, type GestureContext, type Input, type PointerInput, type Step } from "./gesture.ts";
 import type { EditorState, Mods } from "./model.ts";
 
 /**
@@ -28,7 +28,7 @@ const ctx = (over: Partial<GestureContext> = {}): GestureContext => {
 		view: { x: -5000, y: -5000, w: 1, h: 1 },
 		generation: 1,
 		nextIds: () => () => `new${++n}`,
-		boardRev: () => 7,
+		pageRev: () => 7,
 		linkAt: () => undefined,
 		overComposer: () => false,
 		...over,
@@ -233,7 +233,7 @@ test("a board pressed is the app's selected board, and a drag carries it, moves 
 	]);
 	assert.deepEqual(steps[0]!.state.selection, { items: [], boards: [], awaited: [] });
 	assert.deepEqual(steps[0]!.effects, [{ do: "select-board", path: "boards/one.html" }, { do: "ghost-take", ids: [] }]);
-	assert.deepEqual(steps[1]!.state.boardDrag, { paths: ["boards/one.html"], dx: 50, dy: 60 });
+	assert.deepEqual(steps[1]!.state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60 });
 	// Boards alone: the drawn items' offset and preview are not touched.
 	assert.deepEqual(steps[1]!.state.drag, { dx: 0, dy: 0 });
 	assert.equal(steps[1]!.preview, undefined);
@@ -241,11 +241,11 @@ test("a board pressed is the app's selected board, and a drag carries it, moves 
 	assert.ok(!kinds(steps[2]!.effects).includes("settle"));
 	// Still carried where it was dropped until the boards have it there, or the hold runs out.
 	const until = steps[2]!.effects.find((effect) => effect.do === "wake");
-	assert.deepEqual(state.boardDrag, { paths: ["boards/one.html"], dx: 50, dy: 60, released: { to: [{ path: "boards/one.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
-	assert.equal(landBoardDrag(state, [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }]).boardDrag, state.boardDrag);
-	assert.equal(landBoardDrag(state, [{ path: "boards/one.html", x: 1050, y: 60, w: 400, h: 300 }]).boardDrag, undefined);
-	assert.equal(landBoardDrag(state, []).boardDrag, undefined);
-	assert.equal(step(state, { type: "tick", time: (until as { at: number }).at }, scene, ctx()).state.boardDrag, undefined);
+	assert.deepEqual(state.pageDrag, { paths: ["boards/one.html"], dx: 50, dy: 60, released: { to: [{ path: "boards/one.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
+	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }]).pageDrag, state.pageDrag);
+	assert.equal(landPageDrag(state, [{ path: "boards/one.html", x: 1050, y: 60, w: 400, h: 300 }]).pageDrag, undefined);
+	assert.equal(landPageDrag(state, []).pageDrag, undefined);
+	assert.equal(step(state, { type: "tick", time: (until as { at: number }).at }, scene, ctx()).state.pageDrag, undefined);
 	// Shift takes the board into the picks, or out, and carries nothing.
 	const shift = step(initialState("edit"), { type: "press-board", path: "boards/one.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
 	assert.deepEqual(shift.state.selection.boards, ["boards/one.html"]);
@@ -266,10 +266,10 @@ test("a board dragged near another settles 160 from it, the reading gap, and say
 	go({ type: "press-board", path: "boards/two.html", ...at(1000, 100) });
 	// Dragged 343 left puts its left edge at 557, 157 from the first board: it settles at 560.
 	const moved = go({ type: "move", ...at(657, 140) });
-	assert.deepEqual(moved.state.boardDrag, { paths: ["boards/two.html"], dx: -340, dy: 40 });
+	assert.deepEqual(moved.state.pageDrag, { paths: ["boards/two.html"], dx: -340, dy: 40 });
 	assert.deepEqual(moved.state.guides.find((guide) => guide.label), { kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" });
 	// ⌘ lets it go anywhere.
-	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.boardDrag, { paths: ["boards/two.html"], dx: -343, dy: 40 });
+	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.pageDrag, { paths: ["boards/two.html"], dx: -343, dy: 40 });
 });
 
 test("a document's bottom handle writes the height dragged, a floor, and shows it no shorter than its content", () => {
@@ -281,10 +281,10 @@ test("a document's bottom handle writes the height dragged, a floor, and shows i
 		return result;
 	};
 	go({ type: "press-board-handle", handle: "s", box: { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
-	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.boardResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
+	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.pageResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
 	const lifted = go({ type: "release", ...at(380, 342, {}, 2000) });
 	assert.deepEqual(lifted.effects.find((one) => one.do === "board-size"), { do: "board-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
-	assert.equal(lifted.state.boardResize?.h, 642);
+	assert.equal(lifted.state.pageResize?.h, 642);
 });
 
 test("a corner handle with Shift keeps the shape; the lift writes the size and waits for the drawing", () => {
@@ -340,18 +340,18 @@ test("a board's handle sizes it with Shift keeping its shape; the box is held un
 		{ type: "move", ...at(1600, 310, { shift: true }) },
 		{ type: "release", ...at(1600, 310, { shift: true }, 5000) },
 	]);
-	assert.deepEqual(steps[1]!.state.boardResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450 });
+	assert.deepEqual(steps[1]!.state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450 });
 	assert.deepEqual(steps[2]!.effects, [
 		{ do: "board-size", path: "boards/one.html", size: { w: 600, h: 450 } },
-		{ do: "wake", at: 5000 + BOARD_HOLD_MS },
+		{ do: "wake", at: 5000 + PAGE_HOLD_MS },
 	]);
-	assert.deepEqual(state.boardResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, released: { rev: 7, until: 5000 + BOARD_HOLD_MS } });
+	assert.deepEqual(state.pageResize, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, released: { rev: 7, until: 5000 + PAGE_HOLD_MS } });
 	// The write has not come back (same revision): held. It has, at the size: let go.
-	assert.equal(landBoardResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300, rev: 7 }), state);
-	assert.equal(landBoardResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, rev: 8 }).boardResize, undefined);
+	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300, rev: 7 }), state);
+	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 450, rev: 8 }).pageResize, undefined);
 	// Its content made it taller than the box: that is the board at it too.
-	assert.equal(landBoardResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 520, rev: 8 }).boardResize, undefined);
-	assert.equal(step(state, { type: "tick", time: 5000 + BOARD_HOLD_MS }, scene, ctx()).state.boardResize, undefined);
+	assert.equal(landPageResize(state, { path: "boards/one.html", x: 1000, y: 0, w: 600, h: 520, rev: 8 }).pageResize, undefined);
+	assert.equal(step(state, { type: "tick", time: 5000 + PAGE_HOLD_MS }, scene, ctx()).state.pageResize, undefined);
 });
 
 test("a radius drag previews the radius and holds it after the lift until the drawing has it", () => {

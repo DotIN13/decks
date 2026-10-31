@@ -20,9 +20,9 @@ export type KeysHost = {
 	drawing: () => boolean;
 	tool: () => PenTool;
 	/** Whether a board is the app's selection: its letters are the board's. */
-	boardSelected: () => boolean;
+	pageSelected: () => boolean;
 	/** That board's path: the arrows move it too. */
-	selectedBoard?: () => string | undefined;
+	selectedPage?: () => string | undefined;
 	/** Step through the person's own edits, when the page can (`Stage`'s `onPenStep`). */
 	canStep: () => boolean;
 	step: (direction: "undo" | "redo") => void;
@@ -44,7 +44,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 		let ids: (() => string) | undefined;
 		const act: KeyAct = penKeyOf(
 			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
-			{ selection: selected, boards: editor.boardPicks(), tool: host.tool(), boardSelected: host.boardSelected(), selectedBoard: host.selectedBoard?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
+			{ selection: selected, boards: editor.pagePicks(), tool: host.tool(), pageSelected: host.pageSelected(), selectedPage: host.selectedPage?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
 		);
 		if (!act.handled) return false;
 		switch (act.do) {
@@ -58,7 +58,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				if ("tool" in act) host.setTool(act.tool);
 				else {
 					editor.select(act.select);
-					editor.pickBoards(act.boards);
+					editor.pickPages(act.boards);
 				}
 				break;
 			case "duplicate":
@@ -70,7 +70,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				for (const move of act.boards) host.onMove(move.path, move.x, move.y);
 				break;
 			case "select":
-				editor.pickBoards([]);
+				editor.pickPages([]);
 				editor.select(act.select);
 				break;
 			case "arm":

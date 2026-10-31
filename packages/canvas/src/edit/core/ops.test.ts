@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW, makeShape, MARKDOWN, shapeKind, type PenNode } from "@decks/pen";
 import { fakeScene, type FakeItem } from "./fake-scene.ts";
-import { arrowInsertOp, boardMoves, copyOps, deleteOps, drawnOp, duplicateOps, FRAME_RADIUS, idMaker, madeNode, madeSize, makeAtOp, movedBy, moveOps, type MakeOptions } from "./ops.ts";
+import { arrowInsertOp, pageMoves, copyOps, deleteOps, drawnOp, duplicateOps, FRAME_RADIUS, idMaker, madeNode, madeSize, makeAtOp, movedBy, moveOps, type MakeOptions } from "./ops.ts";
 
 /** Ids as a counter hands them out: the same call writes the same ops. */
 const counter = (prefix = "n") => {
@@ -108,7 +108,7 @@ test("delete is one op per item", () => {
 });
 
 test("boards move to their own rounded corners; a board not on the stage is left out", () => {
-	assert.deepEqual(boardMoves(boards, ["boards/one.html", "boards/gone.html"], 10.6, -1), [{ path: "boards/one.html", x: 1011, y: -1 }]);
+	assert.deepEqual(pageMoves(boards, ["boards/one.html", "boards/gone.html"], 10.6, -1), [{ path: "boards/one.html", x: 1011, y: -1 }]);
 });
 
 test("new ids are none of the taken ones and none of each other", () => {

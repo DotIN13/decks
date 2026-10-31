@@ -12,7 +12,7 @@ const scene = fakeScene(
 );
 const context = (fields: Partial<KeyContext> = {}): KeyContext => {
 	let n = 0;
-	return { selection: ["a"], boards: [], tool: "select", boardSelected: false, canStep: true, scene, nextId: () => `n${++n}`, ...fields };
+	return { selection: ["a"], boards: [], tool: "select", pageSelected: false, canStep: true, scene, nextId: () => `n${++n}`, ...fields };
 };
 const key = (name: string, mods: Omit<KeyPress, "key"> = {}): KeyPress => ({ key: name, ...mods });
 const none = { handled: false };
@@ -84,22 +84,22 @@ test("the arrows nudge items 1 px and boards with them; Shift makes it 10", () =
 });
 
 test("the board selected on its own moves with the arrows, alone or with the items and boards picked, once", () => {
-	assert.deepEqual(penKey(key("ArrowRight"), context({ selection: [], boardSelected: true, selectedBoard: "boards/one.html" })), { handled: true, do: "nudge", ops: [], boards: [{ path: "boards/one.html", x: 1001, y: 0 }] });
-	assert.deepEqual(penKey(key("ArrowDown", { shift: true }), context({ boardSelected: true, selectedBoard: "boards/one.html" })), {
+	assert.deepEqual(penKey(key("ArrowRight"), context({ selection: [], pageSelected: true, selectedPage: "boards/one.html" })), { handled: true, do: "nudge", ops: [], boards: [{ path: "boards/one.html", x: 1001, y: 0 }] });
+	assert.deepEqual(penKey(key("ArrowDown", { shift: true }), context({ pageSelected: true, selectedPage: "boards/one.html" })), {
 		handled: true,
 		do: "nudge",
 		ops: [{ op: "update", id: "a", set: { x: 10, y: 30 } }],
 		boards: [{ path: "boards/one.html", x: 1000, y: 10 }],
 	});
-	assert.deepEqual(penKey(key("ArrowLeft"), context({ selection: [], boards: ["boards/one.html"], selectedBoard: "boards/one.html" })), { handled: true, do: "nudge", ops: [], boards: [{ path: "boards/one.html", x: 999, y: 0 }] });
+	assert.deepEqual(penKey(key("ArrowLeft"), context({ selection: [], boards: ["boards/one.html"], selectedPage: "boards/one.html" })), { handled: true, do: "nudge", ops: [], boards: [{ path: "boards/one.html", x: 999, y: 0 }] });
 	// A selected board not on the stage moves nothing.
-	assert.deepEqual(penKey(key("ArrowLeft"), context({ selection: [], selectedBoard: "boards/gone.html" })), { handled: true, do: "nudge", ops: [], boards: [] });
+	assert.deepEqual(penKey(key("ArrowLeft"), context({ selection: [], selectedPage: "boards/gone.html" })), { handled: true, do: "nudge", ops: [], boards: [] });
 });
 
 test("a letter arms its tool, unless a board is selected or a modifier is held", () => {
 	const arms: Record<string, string> = { n: "note", s: "note", c: "card", t: "text", r: "rectangle", o: "ellipse", f: "frame", a: "arrow" };
 	for (const [letter, tool] of Object.entries(arms)) assert.deepEqual(penKey(key(letter), context({ selection: [] })), { handled: true, do: "arm", tool });
-	assert.deepEqual(penKey(key("r"), context({ boardSelected: true })), none);
+	assert.deepEqual(penKey(key("r"), context({ pageSelected: true })), none);
 	assert.deepEqual(penKey(key("r", { meta: true }), context()), none);
 	assert.deepEqual(penKey(key("r", { alt: true }), context()), none);
 	// Capitals and other letters are not tools.

@@ -20,7 +20,7 @@ import { send } from "../state/socket.ts";
  * out how the board you are now looking at relates to the one you were. a fit stays
  * instant, because a keyboard shortcut is a hand and a chat switch is a change of context.
  */
-export const flyToBoards = (boards: Board[], options?: { animate?: boolean }) => {
+export const flyToPages = (boards: Board[], options?: { animate?: boolean }) => {
 	if (boards.length === 0) return;
 	const stage = document.querySelector(".stage, iframe.canvas-frame");
 	if (!stage) return;
@@ -30,7 +30,7 @@ export const flyToBoards = (boards: Board[], options?: { animate?: boolean }) =>
 
 export const flyTo = (board: Board) => {
 	setSelected(board.path);
-	flyToBoards([board], { animate: true });
+	flyToPages([board], { animate: true });
 };
 
 const move = (path: string, x: number, y: number) => {
@@ -54,7 +54,7 @@ const move = (path: string, x: number, y: number) => {
  * So the flight waits for two frames from the server, in the order they are sent: the deck
  * state, which carries the new place, and the context, which says the board is on the canvas.
  */
-export function createFraming(stageBoards: () => Board[]) {
+export function createFraming(stagePages: () => Board[]) {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
@@ -71,7 +71,7 @@ export function createFraming(stageBoards: () => Board[]) {
 			setFraming(undefined);
 			return;
 		}
-		if (!stageBoards().some((one) => one.path === wanted.path)) return;
+		if (!stagePages().some((one) => one.path === wanted.path)) return;
 		const board = state.boards.find((one) => one.path === wanted.path);
 		if (!board) return;
 		setFraming(undefined);
@@ -99,7 +99,7 @@ export function createFraming(stageBoards: () => Board[]) {
  * lands too small to read and too small to click into. Where it sits is answerable by
  * zooming out; text too small to read is not answerable at all.
  */
-export const openLinkedBoard = (path: string, from: string): boolean => {
+export const openLinkedPage = (path: string, from: string): boolean => {
 	if (!state.boards.some((one) => one.path === path)) {
 		notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
 		return false;
@@ -119,7 +119,7 @@ export const openLinkedBoard = (path: string, from: string): boolean => {
 		if (opening && source) move(at, source.x + source.w + 32, source.y);
 		setSelected(at);
 		const placed = state.boards.find((one) => one.path === at) ?? board;
-		if (placed) flyToBoards([placed], { animate: true });
+		if (placed) flyToPages([placed], { animate: true });
 	};
 	const there = onCanvas();
 	if (there) {

@@ -15,7 +15,7 @@ export type Rect = Frame;
  * board that reads top to bottom needs for its content: what it is drawn at, at least, and what a
  * drag of its height cannot go under, since its height is a floor its content raises.
  */
-export type BoardBox = { path: string; x: number; y: number; w: number; h: number; least?: number };
+export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number };
 /**
  * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
  * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).
@@ -41,8 +41,8 @@ export type Corners = { x1: number; y1: number; x2: number; y2: number };
 export type ResizeBox = Rect & { id: string; given?: Pt };
 /** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
 /** A board drag let go: where each board was asked to go, and when it is let go of anyway. */
-export type BoardDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
-export type BoardResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
+export type PageDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
+export type PageResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
 /** A shape being drawn with a tool, corner to corner. */
 export type DraftBox = Corners & { tool: PenTool };
 /** A side an arrow end can keep to on what it would join, and the one it is near. */
@@ -72,16 +72,16 @@ export type EditorState = {
 	drag: Offset;
 	/**
 	 * The boards a drag carries. Once let go (`released`), held where they were dropped until the
-	 * boards are at the places the move asked for (`landBoardDrag`), or `until` passes: the move goes
+	 * boards are at the places the move asked for (`landPageDrag`), or `until` passes: the move goes
 	 * to the server, and until its answer the boards would otherwise be drawn back where they were.
 	 */
-	boardDrag?: { paths: readonly string[]; dx: number; dy: number; released?: BoardDragLanding } | undefined;
-	/** A board moving itself, by a finger on its edge (`BoardFrame`'s own drag). */
+	pageDrag?: { paths: readonly string[]; dx: number; dy: number; released?: PageDragLanding } | undefined;
+	/** A board moving itself, by a finger on its edge (`PageFrame`'s own drag). */
 	ownDrag?: { path: string; x: number; y: number } | undefined;
 	/** An item being resized as the pointer has it, and as the sheet has drawn it (a frame behind). */
 	resize?: ResizeBox | undefined;
 	shownResize?: ResizeBox | undefined;
-	boardResize?: BoardResizeBox | undefined;
+	pageResize?: PageResizeBox | undefined;
 	/** A corner radius dragged; `done` once let go, held until the drawing has it or `until`. */
 	radius?: { id: string; radius: number; done?: true; until?: number } | undefined;
 	marquee?: Corners | undefined;

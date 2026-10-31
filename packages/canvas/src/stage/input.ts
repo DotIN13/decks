@@ -10,7 +10,7 @@ import { handTool } from "../edit/pen-tools.ts";
 import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
-import type { StageBoardProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { StageProps } from "./Stage.tsx";
 
 
@@ -544,7 +544,7 @@ export function createStageInput(deps: StageInputDeps) {
 	});
 
 	/** What an item's slot asks of the stage's fingers: a finger its bar or edge took carries the item, and the camera does not pan with it. */
-	const gestures: StageBoardProps["gestures"] = {
+	const gestures: ItemSlotProps["gestures"] = {
 		claimTouch: (id) => {
 			claimed.add(id);
 			keptTouches.add(id);

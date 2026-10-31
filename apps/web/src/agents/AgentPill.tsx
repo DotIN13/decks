@@ -589,8 +589,8 @@ export function AgentPill(props: {
 	drawing: boolean;
 	onDrawing: (drawing: boolean) => void;
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
-	boardsOpen: boolean;
-	onToggleBoards: () => void;
+	panelOpen: boolean;
+	onTogglePanel: () => void;
 	/** The agents, for the switcher: a face and a name, one button, opening the agent list. */
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
@@ -665,11 +665,11 @@ export function AgentPill(props: {
 			<button
 				type="button"
 				class="icon-button"
-				data-on={props.boardsOpen ? "soft" : undefined}
-				aria-pressed={props.boardsOpen}
+				data-on={props.panelOpen ? "soft" : undefined}
+				aria-pressed={props.panelOpen}
 				title="Side panel (⌘\)"
-				aria-label={props.boardsOpen ? "Hide the side panel" : "Show the side panel"}
-				onClick={() => props.onToggleBoards()}
+				aria-label={props.panelOpen ? "Hide the side panel" : "Show the side panel"}
+				onClick={() => props.onTogglePanel()}
 			>
 				<Icon of={PanelLeft} size={15} />
 			</button>

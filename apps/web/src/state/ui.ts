@@ -12,7 +12,7 @@ import { send } from "./socket.ts";
  *
  * ### Three decisions worth reading before changing anything here
  *
- * **The initial width is read through a function, not inline.** `boardsOpen` starts from the
+ * **The initial width is read through a function, not inline.** `panelOpen` starts from the
  * window's width, and a module-scope `window.innerWidth` runs at *import* — so importing this
  * module in Node, which is what a unit test does, would throw before a single assertion ran.
  * `lib/media.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
@@ -59,7 +59,7 @@ function createUi() {
 	 * there is one panel now — and a plain signal rather than that module's persisted pair,
 	 * since what it was mostly doing was closing one panel when the other opened.
 	 */
-	const [boardsOpen, setBoardsOpen] = createSignal(panelOpensWith());
+	const [panelOpen, setPanelOpen] = createSignal(panelOpensWith());
 
 	/** Settings: the Claude subscriptions this install can use (`settings/Settings.tsx`). */
 	const [settings, setSettings] = createSignal(false);
@@ -201,7 +201,7 @@ function createUi() {
 	 * first, or after a few seconds whatever happened, so a history that never comes cannot keep
 	 * the list short.
 	 */
-	const [boardsStarted, setBoardsStarted] = createSignal(false);
+	const [pagesStarted, setPagesStarted] = createSignal(false);
 
 	/**
 	 * Release the gate above, once.
@@ -215,17 +215,17 @@ function createUi() {
 	 * reach it without a hook.
 	 */
 	let opened = false;
-	const releaseBoards = () => {
+	const releasePages = () => {
 		if (opened) return;
 		opened = true;
-		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsStarted(true)));
+		requestAnimationFrame(() => requestAnimationFrame(() => setPagesStarted(true)));
 	};
 
 	return {
 		picking,
 		setPicking,
-		boardsOpen,
-		setBoardsOpen,
+		panelOpen,
+		setPanelOpen,
 		settings,
 		setSettings,
 		draft,
@@ -242,9 +242,9 @@ function createUi() {
 		openUsage,
 		unread,
 		setUnread,
-		boardsStarted,
-		setBoardsStarted,
-		releaseBoards,
+		pagesStarted,
+		setPagesStarted,
+		releasePages,
 	};
 }
 
@@ -257,8 +257,8 @@ export const ui = createUi();
 export const {
 	picking,
 	setPicking,
-	boardsOpen,
-	setBoardsOpen,
+	panelOpen,
+	setPanelOpen,
 	settings,
 	setSettings,
 	draft,
@@ -275,7 +275,7 @@ export const {
 	openUsage,
 	unread,
 	setUnread,
-	boardsStarted,
-	setBoardsStarted,
-	releaseBoards,
+	pagesStarted,
+	setPagesStarted,
+	releasePages,
 } = ui;

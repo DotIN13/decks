@@ -136,7 +136,7 @@ export interface CanvasOptions {
 	 * A board's file to delete, from the board pill's Delete: the host deletes it (asking first, if it
 	 * likes) and says whether it did; the board then leaves the drawing. Absent: no Delete on the pill.
 	 */
-	onDeleteBoard?: (path: string) => boolean | void | Promise<boolean | void>;
+	onDeleteCard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/**
 	 * Ink selected, and the pill's Make a drawing, Make a board or Send pressed (`Stage`'s `onInk`): the host
 	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.

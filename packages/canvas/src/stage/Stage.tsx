@@ -5,7 +5,7 @@ import { canvasBox } from "../camera/insets.ts";
 import { createCameraController } from "../camera/controller.ts";
 import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "../camera/scroll-area.ts";
 import { stagePoint } from "../camera/coords.ts";
-import type { StageBoardProps } from "../items/item-slot.tsx";
+import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { StageInk } from "../edit/StageInk.tsx";
@@ -107,7 +107,7 @@ export type StageProps = {
 	 * What draws one placed item's slot: the stage says where it is and what it may do, the host adds
 	 * what it knows of its file (`item-slot.tsx`, `editor.tsx`).
 	 */
-	frame: Component<StageBoardProps>;
+	frame: Component<ItemSlotProps>;
 	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
 	shots: () => StageShots;
 	/**
@@ -128,7 +128,7 @@ export type StageProps = {
 	onInk?: (request: InkRequest) => void;
 	inkAgent?: string;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
-	onDeleteBoard?: (path: string) => void;
+	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
 	stageName?: string | undefined;
 	/** The boards that are news, by path, each with the colour its glow is drawn in (`board/glow.ts`). */
@@ -145,7 +145,7 @@ export type StageProps = {
 	 * A link on a card or in the drawing pointing at a board or card of the deck — `true` once the
 	 * deck has opened it. `false` is a path this deck does not hold, which the app has already said.
 	 */
-	onOpenBoard?: (path: string, from: string) => boolean;
+	onOpenPage?: (path: string, from: string) => boolean;
 	/**
 	 * Dropped on the composer: talk about it rather than move it.
 	 *
@@ -329,10 +329,10 @@ export function Stage(props: StageProps) {
 	penLayer.failed = (notice) => setEngineNotice(notice);
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
-	const sceneBoards = createMemo(() =>
+	const scenePages = createMemo(() =>
 		props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })),
 	);
-	const scene = tsScene(penLayer, () => props.pen?.doc, sceneBoards);
+	const scene = tsScene(penLayer, () => props.pen?.doc, scenePages);
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
@@ -383,8 +383,8 @@ export function Stage(props: StageProps) {
 			get onRefer() {
 				return props.onRefer;
 			},
-			get onOpenBoard() {
-				return props.onOpenBoard;
+			get onOpenPage() {
+				return props.onOpenPage;
 			},
 			onSelect: (path) => props.onSelect(path),
 			onMove: (path, x, y) => props.onMove(path, x, y),
@@ -401,7 +401,7 @@ export function Stage(props: StageProps) {
 			tool: penTool,
 			spaceHeld: () => grabbing(),
 			boardsNear: (at) =>
-				items.boardIndex()
+				items.pageIndex()
 					.search({ x: at.x, y: at.y, w: 0, h: 0 })
 					.sort((a, b) => a - b)
 					.map((index) => props.boards[index]!),
@@ -415,15 +415,15 @@ export function Stage(props: StageProps) {
 			pan: (event, how) => input.panFrom(event, how),
 			toggleMedia: (id, media) => items.toggleMedia(id, media),
 			open: { liveFile: (id) => items.openLiveFile(id) },
-			handles: { item: () => selection.penHandles(), board: () => selection.boardHandles(), radius: () => selection.radiusHandle(), arrow: () => selection.arrowEnds() },
+			handles: { item: () => selection.penHandles(), board: () => selection.pageHandles(), radius: () => selection.radiusHandle(), arrow: () => selection.arrowEnds() },
 		},
 		// The drawing's keys (`editor/dom/keys.ts`).
 		keys: {
 			editable: () => !!props.onPenEdit,
 			drawing: () => !!props.drawing,
 			tool: penTool,
-			boardSelected: () => !!props.selected,
-			selectedBoard: () => props.selected,
+			pageSelected: () => !!props.selected,
+			selectedPage: () => props.selected,
 			canStep: () => !!props.onPenStep,
 			step: (direction) => props.onPenStep?.(direction),
 			deleteSelected: (selected, ops) => selection.penDeleteSelected(selected, ops),
@@ -448,7 +448,7 @@ export function Stage(props: StageProps) {
 		},
 	});
 	/*
-	 * Boards picked up with the drawing (`editor.boardPicks`): by a marquee, or Shift and a press on a
+	 * Boards picked up with the drawing (`editor.pagePicks`): by a marquee, or Shift and a press on a
 	 * title bar. They move with the selected items as one selection. The app's own selected board is
 	 * a different thing — the one board whose page takes the keys — and a single press on a board is
 	 * still only that.
@@ -517,7 +517,7 @@ export function Stage(props: StageProps) {
 	createEffect(() => {
 		if (props.drawing) {
 			editor.select([]);
-			editor.pickBoards([]);
+			editor.pickPages([]);
 			editor.setText(undefined);
 			setPenTool("select");
 		}
@@ -737,7 +737,7 @@ export function Stage(props: StageProps) {
 					onArrowBend={editor.onArrowBend}
 					onHandle={editor.onHandle}
 					onRadius={editor.onRadius}
-					onBoardHandle={editor.onBoardHandle}
+					onPageHandle={editor.onPageHandle}
 				>
 					{items.player()}
 				</OverlayLayer>

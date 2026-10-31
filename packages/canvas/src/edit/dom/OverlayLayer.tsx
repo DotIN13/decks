@@ -9,7 +9,7 @@
 import { ARROW_SIDES, sidePoint, type ArrowSide } from "@decks/pen";
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
-import { anchorAt, boardHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
+import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
 import { HANDLES, type Handle } from "../core/resize.ts";
 
 /** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
@@ -29,7 +29,7 @@ export type OverlayHandlers = {
 	onArrowBend: (event: PointerEvent) => void;
 	onHandle: (event: PointerEvent, handle: Handle) => void;
 	onRadius: (event: PointerEvent) => void;
-	onBoardHandle: (event: PointerEvent, handle: Handle) => void;
+	onPageHandle: (event: PointerEvent, handle: Handle) => void;
 };
 
 export function OverlayLayer(
@@ -382,9 +382,9 @@ export function OverlayLayer(
 					);
 				}}
 			</Show>
-			<Show when={o().boardHandles}>
+			<Show when={o().pageHandles}>
 				{(box) => (
-					<For each={boardHandleList()}>
+					<For each={pageHandleList()}>
 						{(handle) => {
 							const size = () => HANDLE_PX / props.zoom;
 							const at = () => handleAt(box(), handle, size());
@@ -394,7 +394,7 @@ export function OverlayLayer(
 									data-handle={handle}
 									data-board={box().path}
 									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
-									onPointerDown={(event) => props.onBoardHandle(event, handle)}
+									onPointerDown={(event) => props.onPageHandle(event, handle)}
 								/>
 							);
 						}}

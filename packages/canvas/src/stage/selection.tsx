@@ -2,7 +2,7 @@ import type { Camera } from "@decks/protocol";
 import { Show, createEffect, createMemo, type Accessor } from "solid-js";
 import { boxOf, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { BoardCallout } from "../ui/Callout.tsx";
+import { PageCallout } from "../ui/Callout.tsx";
 import { isInk } from "../model/ink.ts";
 import { inkSelection, setInkSelection } from "../edit/ink.ts";
 import { setPenBoxes } from "../edit/pen-tools.ts";
@@ -15,7 +15,7 @@ import {
 	ANCHOR_PX,
 	arrowAnchors,
 	arrowEnds as arrowEndsOf,
-	boardHandles as boardHandlesOf,
+	pageHandles as pageHandlesOf,
 	deleteOps,
 	distances as distancesOf,
 	dropBox as dropBoxOf,
@@ -65,9 +65,9 @@ export function createSelection(deps: SelectionDeps) {
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
 
 	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
-	const groupPicked = () => editor.boardPicks().length + editor.items().length > 1;
+	const groupPicked = () => editor.pagePicks().length + editor.items().length > 1;
 	// After the editor, which it reads: a stage made with a board already selected reads it at once.
-	const calloutBoard = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
+	const calloutPage = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
 
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
 	const selectMade = (made: string[]) => editor.selectMade(made);
@@ -83,11 +83,11 @@ export function createSelection(deps: SelectionDeps) {
 				glide: editor.glide(),
 				resize: editor.shownResize(),
 				boards: scene.boards(),
-				boardPicks: editor.boardPicks(),
-				boardDrag: editor.boardDrag(),
+				pagePicks: editor.pagePicks(),
+				pageDrag: editor.pageDrag(),
 				ownDrag: editor.ownDrag(),
 				selected: props.selected,
-				boardResize: editor.boardResize(),
+				pageResize: editor.pageResize(),
 				marquee: editor.marquee(),
 			},
 			scene,
@@ -116,7 +116,7 @@ export function createSelection(deps: SelectionDeps) {
 		setPenBoxes(boxes);
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
+	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
 
 	/**
 	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
@@ -137,7 +137,7 @@ export function createSelection(deps: SelectionDeps) {
 	 */
 
 	/**
-	 * What the pill should not sit on (`BoardCallout`): every board and drawn item but those touching the
+	 * What the pill should not sit on (`PageCallout`): every board and drawn item but those touching the
 	 * box it is for, which are the selection itself, what is in it and what holds it.
 	 */
 	const pillObstacles = (box: { x: number; y: number; w: number; h: number }) => {
@@ -212,7 +212,7 @@ export function createSelection(deps: SelectionDeps) {
 		const all = penOutlines().filter((one) => one.id);
 		const outlines = all.filter((one) => !one.id.startsWith("board:"));
 		const boards = all.length - outlines.length;
-		if (outlines.length !== editor.items().length || boards !== editor.boardPicks().length || !all.length) return undefined;
+		if (outlines.length !== editor.items().length || boards !== editor.pagePicks().length || !all.length) return undefined;
 		const x = Math.min(...all.map((one) => one.x));
 		const y = Math.min(...all.map((one) => one.y));
 		const box = { x, y, w: Math.max(...all.map((one) => one.x + one.w)) - x, h: Math.max(...all.map((one) => one.y + one.h)) - y };
@@ -232,13 +232,13 @@ export function createSelection(deps: SelectionDeps) {
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
 	const arrowEnds = createMemo(() => {
 		penDrawn();
-		return arrowEndsOf({ selection: editor.items(), boardPicks: editor.boardPicks(), drag: shownDrag() }, scene);
+		return arrowEndsOf({ selection: editor.items(), pagePicks: editor.pagePicks(), drag: shownDrag() }, scene);
 	});
 
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
 	const gripBox = createMemo(() => {
 		penDrawn();
-		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.boardDrag() || panning(), editing: props.mode === "edit" }, scene, (id, node) => {
+		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.pageDrag() || panning(), editing: props.mode === "edit" }, scene, (id, node) => {
 			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
 			const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
 			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
@@ -249,7 +249,7 @@ export function createSelection(deps: SelectionDeps) {
 	const hoverBox = createMemo(() => {
 		penDrawn();
 		return hoverBoxOf(
-			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverBoard() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.boardDrag() || panning(), boards: scene.boards(), glide: editor.glide() },
+			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverPage() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.pageDrag() || panning(), boards: scene.boards(), glide: editor.glide() },
 			scene,
 		);
 	});
@@ -258,7 +258,7 @@ export function createSelection(deps: SelectionDeps) {
 	const kinBoxes = createMemo(() => {
 		penDrawn();
 		return kinOutlines(
-			{ selection: editor.items(), drag: shownDrag(), glide: editor.glide(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.boardDrag() || panning() || !!editor.gesture() },
+			{ selection: editor.items(), drag: shownDrag(), glide: editor.glide(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.pageDrag() || panning() || !!editor.gesture() },
 			scene,
 		);
 	});
@@ -268,9 +268,9 @@ export function createSelection(deps: SelectionDeps) {
 	const penDistances = createMemo(() => {
 		const over = hoverBox();
 		// A board picked up with the selection is part of it, not something to measure to.
-		const path = editor.hoverBoard() ?? editor.hoverPicture();
-		const picked = !!over?.board && !!path && editor.boardPicks().includes(path);
-		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.boardDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
+		const path = editor.hoverPage() ?? editor.hoverPicture();
+		const picked = !!over?.board && !!path && editor.pagePicks().includes(path);
+		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.pageDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
 	});
 
 	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
@@ -285,7 +285,7 @@ export function createSelection(deps: SelectionDeps) {
 		outlines: penOutlines(),
 		handles: penHandles(),
 		anchors: penAnchors(),
-		boardHandles: boardHandles(),
+		pageHandles: pageHandles(),
 		radius: radiusHandle(),
 		radiusDrag: editor.radius(),
 		arrow: arrowEnds(),
@@ -313,12 +313,12 @@ export function createSelection(deps: SelectionDeps) {
 
 			{/*
 				Boards have no title bars: the selected board's name and actions are a pill over it
-				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
+				(`PageCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
-			<Show when={!props.drawing ? calloutBoard() : undefined} keyed>
+			<Show when={!props.drawing ? calloutPage() : undefined} keyed>
 				{(board) => (
-					<BoardCallout
+					<PageCallout
 						board={board}
 						box={boxOf(board)}
 						obstacles={() => pillObstacles(boxOf(board))}
@@ -328,7 +328,7 @@ export function createSelection(deps: SelectionDeps) {
 						view={view()}
 						onOpen={() => pushCamera(frame([boxOf(board)]))}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-						{...(props.onDeleteBoard ? { onDelete: () => props.onDeleteBoard?.(board.path) } : {})}
+						{...(props.onDeleteCard ? { onDelete: () => props.onDeleteCard?.(board.path) } : {})}
 						{...(props.onComment
 							? {
 									onComment: () =>
@@ -347,7 +347,7 @@ export function createSelection(deps: SelectionDeps) {
 			</Show>
 			<Show when={calloutItems()}>
 				{(items) => (
-					<BoardCallout
+					<PageCallout
 						box={items().box}
 						obstacles={() => pillObstacles(items().box)}
 						label={`${items().name}: actions`}
@@ -392,7 +392,7 @@ export function createSelection(deps: SelectionDeps) {
 			</Show>
 			<Show when={lassoItems()}>
 				{(held) => (
-					<BoardCallout
+					<PageCallout
 						box={held().box}
 						obstacles={() => pillObstacles(held().box)}
 						label={`${held().ids.length} strokes: actions`}
@@ -435,5 +435,5 @@ export function createSelection(deps: SelectionDeps) {
 		</>
 	);
 
-	return { penHandles, boardHandles, radiusHandle, arrowEnds, penDeleteSelected, overlay, pills };
+	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, overlay, pills };
 }

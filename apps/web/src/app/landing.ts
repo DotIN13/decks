@@ -15,7 +15,7 @@ export interface LandingInputs {
 	views: () => AgentViews;
 	/** The drawing on screen: its doc and the canvas it is (`stagePen`). */
 	stagePen: () => { doc: Parameters<typeof placements>[0]; scope?: string } | undefined;
-	stageBoards: () => Board[];
+	stagePages: () => Board[];
 	/** How many deck frames have arrived. */
 	deckSeen: () => number;
 }
@@ -27,13 +27,13 @@ export interface LandingInputs {
  * drawing is on screen. An agent with no canvas waits for a deck frame sent after it began, since
  * its boards are the deck's.
  */
-export function createCameraLanding({ views, stagePen, stageBoards, deckSeen }: LandingInputs) {
+export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
 	/**
 	 * Everything on the canvas in view, for framing it: its boards and every item drawn round them
 	 * (notes, shapes, arrows, ink, frames), so a canvas that is mostly drawing is framed on its drawing.
 	 */
 	const canvasBoxes = (): Array<{ x: number; y: number; w: number; h: number }> => {
-		const boxes = stageBoards().map(boxOf);
+		const boxes = stagePages().map(boxOf);
 		const doc = stagePen()?.doc;
 		if (doc) {
 			const placed = placements(doc, { theme: baseTheme(doc, scheme() === "dark" ? "dark" : "light") });
@@ -61,7 +61,7 @@ export function createCameraLanding({ views, stagePen, stageBoards, deckSeen }: 
 			 * switch to a canvas waits for nothing more: a switch by `agent.update` is followed by no deck frame.
 			 */
 			const deckAt = first ? 0 : untrack(deckSeen);
-			return () => (to.canvas && !first ? true : untrack(deckSeen) > deckAt) && (!first || untrack(stageBoards).length > 0);
+			return () => (to.canvas && !first ? true : untrack(deckSeen) > deckAt) && (!first || untrack(stagePages).length > 0);
 		},
 		land: (next, to) => {
 			moveCamera(next);

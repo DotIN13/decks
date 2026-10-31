@@ -8,13 +8,13 @@
  * the tests), so the same call writes the same ops.
  */
 import { ARROW, arrowEndItem, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
-import type { BoardBox, MakingTool, Pt, Rect } from "./model.ts";
+import type { PageBox, MakingTool, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /** Where a new id comes from: each call one not used before. */
 export type NextId = () => string;
 /** A board moved to its own new corner, as `onMove` takes it. */
-export type BoardMove = { path: string; x: number; y: number };
+export type PageMove = { path: string; x: number; y: number };
 
 /** Ids for several new items at once, none the same as another or as any already taken. */
 export function idMaker(taken: Iterable<string>): NextId {
@@ -198,7 +198,7 @@ export function deleteOps(ids: readonly string[], scene?: SceneQuery): Op[] {
 }
 
 /** Boards moved by `dx dy`, each to its own new corner, rounded; a path not on the stage is left out. */
-export function boardMoves(boards: readonly BoardBox[], paths: readonly string[], dx: number, dy: number): BoardMove[] {
+export function pageMoves(boards: readonly PageBox[], paths: readonly string[], dx: number, dy: number): PageMove[] {
 	return paths.flatMap((path) => {
 		const board = boards.find((candidate) => candidate.path === path);
 		return board ? [{ path, x: Math.round(board.x + dx), y: Math.round(board.y + dy) }] : [];

@@ -7,7 +7,7 @@ import { topBoxes } from "./model/boxes.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox } from "./camera/insets.ts";
-import { boardsAhead, boardsOf, createDrawing } from "./model/drawing.ts";
+import { pagesAhead, pagesOf, createDrawing } from "./model/drawing.ts";
 import { stageMeasure } from "./render/measure.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
 import { InkBar } from "./ui/InkBar.tsx";
@@ -88,7 +88,7 @@ export function createEditor(
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
 	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
 	let glides = 0;
-	const { doc, edit, step, moveBoard, resizeBoard, removeBoard } = drawing;
+	const { doc, edit, step, movePage, resizePage, removePage } = drawing;
 
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
@@ -154,12 +154,12 @@ export function createEditor(
 	const editing = editable
 		? {
 				onPenEdit: edit,
-				onResize: resizeBoard,
-				onHide: (path: string) => (options.boards?.onHide ? options.boards.onHide(path) : removeBoard(path)),
-				...(options.onDeleteBoard
+				onResize: resizePage,
+				onHide: (path: string) => (options.boards?.onHide ? options.boards.onHide(path) : removePage(path)),
+				...(options.onDeleteCard
 					? {
-							onDeleteBoard: (path: string) => {
-								void Promise.resolve(options.onDeleteBoard!(path)).then((deleted) => deleted !== false && removeBoard(path));
+							onDeleteCard: (path: string) => {
+								void Promise.resolve(options.onDeleteCard!(path)).then((deleted) => deleted !== false && removePage(path));
 							},
 						}
 					: {}),
@@ -194,9 +194,9 @@ export function createEditor(
 	 * show only when something else happened to run this again.
 	 */
 	createComputed(() => {
-		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : boardsOf(doc());
+		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : pagesOf(doc());
 		// The host's own list is its server's: a board the person moved, sized or took off is shown so until the server has it.
-		setBoards(reconcile(options.boards?.list && drawing.waiting() ? boardsAhead(given, drawing.given(), doc()) : given, { key: "path" }));
+		setBoards(reconcile(options.boards?.list && drawing.waiting() ? pagesAhead(given, drawing.given(), doc()) : given, { key: "path" }));
 	});
 	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
@@ -204,7 +204,7 @@ export function createEditor(
 		<Stage
 			mode={mode()}
 			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
-			{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
+			{...(options.boards?.onOpenLink ? { onOpenPage: options.boards.onOpenLink } : {})}
 			news={options.boards?.news?.() ?? {}}
 			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
 			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
@@ -229,7 +229,7 @@ export function createEditor(
 			/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
-			onMove={moveBoard}
+			onMove={movePage}
 			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.boards.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.boards!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
 			shots={() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK })}
 			{...(options.onComment ? { onComment: options.onComment } : {})}

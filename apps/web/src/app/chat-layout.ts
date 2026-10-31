@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { boardsOpen, setBoardsOpen } from "../state/ui.ts";
+import { panelOpen, setPanelOpen } from "../state/ui.ts";
 
 /**
  * The layout's own state.
@@ -49,10 +49,10 @@ export function createChatLayout() {
 		}, 260);
 	};
 	/** Whether the conversation is on screen: the panel's lower half, or the phone's sheet. */
-	const chatShown = () => (phone() ? phoneChat() : boardsOpen() && !chatFolded());
+	const chatShown = () => (phone() ? phoneChat() : panelOpen() && !chatFolded());
 	const openChat = () => {
 		if (phone()) return void setPhoneChat(true);
-		setBoardsOpen(true);
+		setPanelOpen(true);
 		setChatFolded(false);
 		holdHistory();
 	};

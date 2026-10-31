@@ -24,7 +24,7 @@ document.documentElement.dataset.colorScheme = scheme;
 
 /** How long the drawing must go without a redraw before it counts as finished. */
 const QUIET_MS = 500;
-const BOARD_MS = 10_000;
+const PAGE_MS = 10_000;
 
 async function main(): Promise<void> {
 	// The harness's canvas pass for the canvas this page draws (`server/src/auth/passes.ts`).
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
 				const started = performance.now();
 				const wait = () => {
 					const ready = (frame.contentWindow as (Window & { __boardReady?: boolean }) | null)?.__boardReady;
-					if (ready || performance.now() - started > BOARD_MS) resolve();
+					if (ready || performance.now() - started > PAGE_MS) resolve();
 					else setTimeout(wait, 100);
 				};
 				frame.addEventListener("load", wait, { once: true });
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
 		if (failed) throw new Error(`the stage engine did not start: ${failed}`);
 		const drawingShown = doc.children.length === 0 || engine.tileCount() > 0;
 		if (drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
-		if (performance.now() - started > BOARD_MS) break;
+		if (performance.now() - started > PAGE_MS) break;
 	}
 	// Two frames, so the last picture is on the screen and not only recorded.
 	await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));

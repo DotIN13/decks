@@ -5,7 +5,7 @@ import type { Editor, StageComment } from "../../types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { isNews } from "../../items/news.ts";
-import { boardsOf } from "../../model/drawing.ts";
+import { pagesOf } from "../../model/drawing.ts";
 import { pageItems } from "../../model/boxes.ts";
 import { createBackend } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
@@ -77,7 +77,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const items = () => {
 		revision();
 		const doc = made?.handle.drawn();
-		return doc ? boardsOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
+		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
 	};
 	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
 	const places = () => [...pages(), ...items()];

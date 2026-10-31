@@ -35,7 +35,7 @@ type Metadata = Record<string, unknown>;
 const copy = (box: Rect): Rect => ({ x: box.x, y: box.y, w: box.w, h: box.h });
 
 /** The board under a stage point, the last on top: an arrow may start or end on it. */
-export function boardAt(scene: SceneQuery, point: Pt): string | undefined {
+export function pageAt(scene: SceneQuery, point: Pt): string | undefined {
 	return scene.boards().findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
 }
 
@@ -84,7 +84,7 @@ export function joinAt(scene: SceneQuery, point: Pt, options: { zoom: number; no
 	const found = hit
 		? { name: hit.id, box: hit.box }
 		: (() => {
-				const path = boardAt(scene, point);
+				const path = pageAt(scene, point);
 				const board = path ? scene.boards().find((candidate) => candidate.path === path) : undefined;
 				return board ? { name: board.path, box: copy(board) } : undefined;
 			})();

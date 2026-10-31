@@ -5,10 +5,10 @@
 import type { PenDocument } from "@decks/pen";
 import { docIndex } from "../model/doc-index.ts";
 import type { StageEngine } from "../render/engine.ts";
-import type { BoardBox } from "./core/model.ts";
+import type { PageBox } from "./core/model.ts";
 import type { EngineSeam, SceneQuery } from "./core/scene.ts";
 
-export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine">, doc: () => PenDocument | undefined, boards: () => readonly BoardBox[]): SceneQuery {
+export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {
 		const current = doc();
 		return current ? docIndex(current).get(id) : undefined;

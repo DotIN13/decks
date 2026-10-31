@@ -6,7 +6,7 @@
  * same core tests run against both.
  */
 import type { PenDocument, PenNode, Placed } from "@decks/pen";
-import type { BoardBox, Pt, Rect } from "./model.ts";
+import type { PageBox, Pt, Rect } from "./model.ts";
 
 export interface SceneQuery {
 	/** Every placed item, in paint order. */
@@ -24,7 +24,7 @@ export interface SceneQuery {
 	/** The node an item sits in, in the document; `undefined` at the top. */
 	parent(id: string): PenNode | undefined;
 	/** The boards on the stage, as placed, in file order. */
-	boards(): readonly BoardBox[];
+	boards(): readonly PageBox[];
 	/**
 	 * Every item under a stage point, topmost first, unfiltered: raw geometry, with a press's
 	 * reach round each so a thin line can be hit. Which of them a press means is `pick.ts`'s.

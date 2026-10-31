@@ -17,7 +17,7 @@ import { emptyAgent, type AgentRecord } from "./agent.ts";
  * ### What is here and what is not
  *
  * The four derived below are plain functions, so they need no owner and live here beside
- * what they read. The memos — `focusedChat`, `transcript`, `busy`, `stageBoards` — stay in
+ * what they read. The memos — `focusedChat`, `transcript`, `busy`, `stagePages` — stay in
  * `App.tsx`: a memo is a computation and
  * needs a reactive owner, which module scope does not have. They read this store by import
  * instead of by closure, which is the only thing that changed for them.

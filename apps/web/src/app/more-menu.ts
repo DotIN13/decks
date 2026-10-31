@@ -16,13 +16,13 @@ import { setOps, setSettings } from "../state/ui.ts";
  * a flow board shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
  * up and everything still moves, sizes and snaps.
  */
-export const moreItems = (stageBoards: () => Board[]) => [
+export const moreItems = (stagePages: () => Board[]) => [
 	{
 		label: "Clear the canvas",
 		icon: Eraser,
-		disabled: stageBoards().length === 0,
+		disabled: stagePages().length === 0,
 		onPick: () => {
-			const paths = stageBoards().map((board) => board.path);
+			const paths = stagePages().map((board) => board.path);
 			if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
 		},
 	},

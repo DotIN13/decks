@@ -5,7 +5,7 @@ import { ask } from "../state/confirm.ts";
 import { act } from "../state/decks.ts";
 
 /** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
-export function createAppsPanel(stageBoards: () => Board[], frameWhenPlaced: (path: string) => void) {
+export function createAppsPanel(stagePages: () => Board[], frameWhenPlaced: (path: string) => void) {
 	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
 	const loadApps = () =>
 		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
@@ -15,7 +15,7 @@ export function createAppsPanel(stageBoards: () => Board[], frameWhenPlaced: (pa
 		const running = app.status === "running" || app.status === "asleep";
 		/* The item that shows it: the one on the canvas already, or a new one beside the newest thing there. */
 		const show = async () => {
-			const here = stageBoards().find((one) => one.app === app.name);
+			const here = stagePages().find((one) => one.app === app.name);
 			if (here) return frameWhenPlaced(here.path);
 			const placed = await act<{ id?: string }>("canvas.insert", [{ type: "app", app: app.name }]);
 			if (placed?.id) frameWhenPlaced(`item:${placed.id}`);

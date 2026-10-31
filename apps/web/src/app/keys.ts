@@ -8,7 +8,7 @@ import { onCleanup, onMount } from "solid-js";
  */
 export function installKeys(deps: {
 	/** Show the boards panel, and put the cursor in its search field. */
-	openBoards(): void;
+	openPanel(): void;
 	/** A token that changes to say "search now" — `Date.now()`, for the field to key on. */
 	find(at: number): void;
 }) {
@@ -27,7 +27,7 @@ export function installKeys(deps: {
 		const keys = (event: KeyboardEvent) => {
 			if (event.key !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
 			event.preventDefault();
-			deps.openBoards();
+			deps.openPanel();
 			deps.find(Date.now());
 		};
 		window.addEventListener("keydown", keys);

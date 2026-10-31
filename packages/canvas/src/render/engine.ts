@@ -262,7 +262,7 @@ export class StageEngine {
 	carrying: ((paths: ReadonlySet<string>) => void) | undefined;
 	private picturedKey = "";
 	private carryingKey = "";
-	/** The engine's `boardMarks` when `pictured` and `carrying` were last read: read again only when it moves. */
+	/** The engine's `pageMarks` when `pictured` and `carrying` were last read: read again only when it moves. */
 	private marksSeen = -1;
 
 	/** Every item as laid out, by id, with its node; and what each item covers. */
@@ -1359,7 +1359,7 @@ export class StageEngine {
 			this.laidOut(this.shown === undefined || this.moveOnly);
 		} else if (this.cardsOnly && this.shown === undefined) {
 			clearTimeout(this.cardsLanding);
-			// The drawing that answers the drop came while the boards were held where they were dropped (`editor/core/gesture.ts`, `holdBoards`): its arrows are routed already.
+			// The drawing that answers the drop came while the boards were held where they were dropped (`editor/core/gesture.ts`, `holdPages`): its arrows are routed already.
 			if (this.cardsAnswered) this.landCards();
 			else this.cardsLanding = setTimeout(() => this.landCards(), 2000);
 		}

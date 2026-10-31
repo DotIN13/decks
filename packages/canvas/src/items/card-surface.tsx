@@ -39,8 +39,8 @@ export function CardSurface(props: {
 	selected: boolean;
 	onSelect: () => void;
 	onShown: () => void;
-	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenBoard`), by its deck path. */
-	onOpenBoard?: ((path: string) => void) | undefined;
+	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenPage`), by its deck path. */
+	onOpenPage?: ((path: string) => void) | undefined;
 	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
 	/** Words selected in the card, when a press or a key ends a selection: what to quote, the block they are in, and where they are. */
@@ -203,8 +203,8 @@ export function CardSurface(props: {
 		} catch {
 			return;
 		}
-		const board = /\.(?:html?|md)$/i.test(url.pathname) ? boardOf(url) : undefined;
-		if (board && props.onOpenBoard) return props.onOpenBoard(board);
+		const board = /\.(?:html?|md)$/i.test(url.pathname) ? pageOf(url) : undefined;
+		if (board && props.onOpenPage) return props.onOpenPage(board);
 		if (/^https?:$/.test(url.protocol)) openInTab(url.href);
 	};
 
@@ -212,9 +212,9 @@ export function CardSurface(props: {
 	 * The deck path a link names: under the app's `/api/card/` (or `/api/board/`, its old prefix) on this
 	 * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
 	 */
-	const boardOf = (url: URL): string | undefined => {
+	const pageOf = (url: URL): string | undefined => {
 		const prefix = /\/api\/(?:card|board)\//.exec(url.pathname);
-		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().boardLink(url.href, location.href);
+		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().cardLink(url.href, location.href);
 		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
 		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
 	};

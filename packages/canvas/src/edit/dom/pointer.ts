@@ -9,14 +9,14 @@
  * hands this its finger pool and its pan (`PointerHost`), and tells it when the camera moves
  * (`cameraMoved`) and when it was dragged (`panned`).
  *
- * A board's frame reads what the editor says about it through `boardView(path)`, and nothing else.
+ * A board's frame reads what the editor says about it through `pageView(path)`, and nothing else.
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
 import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
-import type { BoardBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
-import type { BoardHandles, Outline, RadiusHandle } from "../core/overlay.ts";
+import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
+import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
 import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
 import type { Handle } from "../core/resize.ts";
 import type { SceneQuery } from "../core/scene.ts";
@@ -25,8 +25,8 @@ import { pointerInput, type Editor } from "./controller.ts";
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
 
-/** What the editor reads of a board, and says back about it: all a board's frame (`BoardFrame`) knows of the editor. */
-export type BoardView = {
+/** What the editor reads of a board, and says back about it: all a board's frame (`PageFrame`) knows of the editor. */
+export type PageView = {
 	/** How far a drag of the selection carries this board, while it does. */
 	shift: () => Offset | undefined;
 	/** The box the stage's handles are asking for, drawn before the file has it. */
@@ -75,7 +75,7 @@ export type PointerHost = {
 	tool: () => PenTool;
 	spaceHeld: () => boolean;
 	/** The boards near a stage point, in file order (the stage's spatial index): candidates for the picture under it. */
-	boardsNear: (at: Pt) => readonly BoardBox[];
+	boardsNear: (at: Pt) => readonly PageBox[];
 	/** The boards that have a node of their own to take a press. */
 	rendered: () => ReadonlySet<string>;
 	/** The item open for typing, whose blocks have no grip. */
@@ -102,7 +102,7 @@ export type PointerHost = {
 	/** The handles the overlay draws, as drawn, for the presses on them. */
 	handles: {
 		item: () => Outline | undefined;
-		board: () => BoardHandles | undefined;
+		board: () => PageHandles | undefined;
 		radius: () => RadiusHandle | undefined;
 		arrow: () => ArrowHandles | undefined;
 	};
@@ -257,7 +257,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (tool !== "select") {
 			event.preventDefault();
 			host.onSelect(undefined);
-			editor.pickBoards([]);
+			editor.pickPages([]);
 			host.make(event, tool, at);
 			return true;
 		}
@@ -267,11 +267,11 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	};
 
 	/**
-	 * A press on a board's title bar (`BoardFrame`), with a mouse or a pen: the stage moves it, so it
+	 * A press on a board's title bar (`PageFrame`), with a mouse or a pen: the stage moves it, so it
 	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
 	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
 	 */
-	const dragBoard = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
+	const dragPage = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
 		if (event.button !== 0) return false;
 		event.stopPropagation();
 		event.preventDefault();
@@ -279,10 +279,10 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		return true;
 	};
 
-	/** A board selected by a press on it, as `BoardFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
-	const selectBoard = (path: string) => {
-		if (!untrack(editor.boardPicks).includes(path) && (untrack(editor.boardPicks).length || untrack(editor.items).length)) {
-			editor.pickBoards([]);
+	/** A board selected by a press on it, as `PageFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
+	const selectPage = (path: string) => {
+		if (!untrack(editor.pagePicks).includes(path) && (untrack(editor.pagePicks).length || untrack(editor.items).length)) {
+			editor.pickPages([]);
 			editor.select([]);
 		}
 		host.onSelect(path);
@@ -317,9 +317,9 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
 	 * to not snap, Shift to keep the shape. The board is drawn at the new box at once; letting go
 	 * moves it if a left or top edge was dragged, and writes the size to its file, and the box is held
-	 * until the board is at it (`editor/core/gesture.ts`, `landBoardResize`).
+	 * until the board is at it (`editor/core/gesture.ts`, `landPageResize`).
 	 */
-	const resizeBoard = (event: PointerEvent, handle: Handle) => {
+	const resizePage = (event: PointerEvent, handle: Handle) => {
 		const box = host.handles.board();
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
@@ -373,7 +373,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * what a press there would select, and a card block's grip. The outline is edit mode's
 	 * (`decideHover`): browsing selects and edits the drawing all the same, and before a press only
 	 * the hand over a link and a card block's grip answer the pointer. A mouse or a pen with no button down, over the drawing; a
-	 * board says when it is under the pointer (`BoardFrame`), and anything else clears the item's.
+	 * board says when it is under the pointer (`PageFrame`), and anything else clears the item's.
 	 * Once per frame at most.
 	 */
 	let hoverFrame: number | undefined;
@@ -468,7 +468,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			if (pinched || travelled || performance.now() - since > TAP_MS) return;
 			batch(() => {
 				editor.select([]);
-				editor.pickBoards([]);
+				editor.pickPages([]);
 			});
 			// A second tap close by, soon after: a note there, as a double-click is with a mouse.
 			const now = performance.now();
@@ -542,7 +542,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 				lastTap = undefined;
 				host.toggleMedia(playable.id, media);
 				host.onSelect(undefined);
-				editor.pickBoards([]);
+				editor.pickPages([]);
 				editor.select([hit.id]);
 				return;
 			}
@@ -567,7 +567,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			// A second tap on the one thing selected keeps it selected.
 			if (selected.length === 1 && selected[0] === hit.id) return;
 			host.onSelect(undefined);
-			editor.pickBoards([]);
+			editor.pickPages([]);
 			editor.select([hit.id]);
 		};
 		const cancel = (e: PointerEvent) => {
@@ -672,14 +672,14 @@ export function createPointer(editor: Editor, host: PointerHost) {
 				penPress(event);
 				return;
 			case "picture":
-				if (!act.carry || !dragBoard(act.path, event, element)) selectBoard(act.path);
+				if (!act.carry || !dragPage(act.path, event, element)) selectPage(act.path);
 				return;
 			case "touch":
 				// The touch first: it clears the selection for a finger on bare stage, which a board's picture lies on,
 				// so selecting the board before it was undone by the same press.
 				host.beginTouch(event);
 				if (act.picture) {
-					selectBoard(act.picture);
+					selectPage(act.picture);
 					return;
 				}
 				if (act.then === "drawing") touchOnDrawing(event);
@@ -693,17 +693,17 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		}
 	};
 
-	/** What a board's frame reads of the editor and says back to it (`BoardView`). */
-	const boardView = (path: string): BoardView => ({
-		shift: () => (editor.boardDrag()?.paths.includes(path) ? editor.boardDrag() : undefined),
-		resized: () => (editor.boardResize()?.path === path ? editor.boardResize() : undefined),
+	/** What a board's frame reads of the editor and says back to it (`PageView`). */
+	const pageView = (path: string): PageView => ({
+		shift: () => (editor.pageDrag()?.paths.includes(path) ? editor.pageDrag() : undefined),
+		resized: () => (editor.pageResize()?.path === path ? editor.pageResize() : undefined),
 		hover: (on) => {
 			if (on) editor.hover({ board: path });
-			else if (untrack(editor.hoverBoard) === path) editor.hover({ board: undefined });
+			else if (untrack(editor.hoverPage) === path) editor.hover({ board: undefined });
 		},
-		press: (event) => (host.editable() ? dragBoard(path, event) : false),
+		press: (event) => (host.editable() ? dragPage(path, event) : false),
 		dragging: (at) => editor.setOwnDrag(at ? { path, ...at } : undefined),
-		select: () => selectBoard(path),
+		select: () => selectPage(path),
 	});
 
 	return {
@@ -724,11 +724,11 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		onGrip: dragBlock,
 		onHandle: resizeFrom,
 		onRadius: radiusFrom,
-		onBoardHandle: resizeBoard,
+		onPageHandle: resizePage,
 		onArrowEnd: dragArrowEnd,
 		onArrowBend: dragArrowBend,
-		selectBoard,
-		boardView,
+		selectPage,
+		pageView,
 		pictureUnder,
 	};
 }

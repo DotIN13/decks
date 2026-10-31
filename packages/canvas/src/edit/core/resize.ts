@@ -1,6 +1,6 @@
 /**
  * Resizing by the handles: an item's eight, a board's eight, and an item's corner radius. Each
- * move of the pointer is one call here (`resizeStep`, `boardResizeStep`, `radiusAt`), with the
+ * move of the pointer is one call here (`resizeStep`, `pageResizeStep`, `radiusAt`), with the
  * box the drag started from and how far the pointer has gone; letting go is an op builder
  * (`resizeOp`, `hugAgainOp`, `radiusOp`). The pointer loop itself is the page's.
  */
@@ -21,7 +21,7 @@ export type ResizeMods = { shift?: boolean; free?: boolean };
 export type SnapOptions = { targets: readonly Rect[]; threshold: number };
 
 /** Never smaller than a board can be. */
-export const BOARD_MIN = { w: 320, h: 200 };
+export const PAGE_MIN = { w: 320, h: 200 };
 
 /** The edges a handle drags. */
 export function handleEdges(handle: Handle): Edge[] {
@@ -116,21 +116,21 @@ export function resizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeM
 }
 
 /**
- * One move of a board's handle. As an item's, but the edge being dragged stops at `BOARD_MIN`
+ * One move of a board's handle. As an item's, but the edge being dragged stops at `PAGE_MIN`
  * (the other stays put) rather than flipping.
  */
-export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions): { box: Rect; guides: Guide[] } {
+export function pageResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions): { box: Rect; guides: Guide[] } {
 	// Shift on a corner keeps the shape, and snaps after it (`snappedShape`); never for a board with no size to keep.
 	const shaping = mods.shift && handle.length === 2 && start.w > 0 && start.h > 0;
 	const moved = shaping ? snappedShape(dragged(start, handle, delta), start, handle, mods, options) : snapped(dragged(start, handle, delta), handleEdges(handle), mods, options);
 	let { x1, y1, x2, y2 } = moved.box;
-	if (x2 - x1 < BOARD_MIN.w) {
-		if (handle.includes("w")) x1 = x2 - BOARD_MIN.w;
-		else x2 = x1 + BOARD_MIN.w;
+	if (x2 - x1 < PAGE_MIN.w) {
+		if (handle.includes("w")) x1 = x2 - PAGE_MIN.w;
+		else x2 = x1 + PAGE_MIN.w;
 	}
-	if (y2 - y1 < BOARD_MIN.h) {
-		if (handle.includes("n")) y1 = y2 - BOARD_MIN.h;
-		else y2 = y1 + BOARD_MIN.h;
+	if (y2 - y1 < PAGE_MIN.h) {
+		if (handle.includes("n")) y1 = y2 - PAGE_MIN.h;
+		else y2 = y1 + PAGE_MIN.h;
 	}
 	return { box: { x: Math.round(x1), y: Math.round(y1), w: Math.round(x2 - x1), h: Math.round(y2 - y1) }, guides: moved.guides };
 }
@@ -141,12 +141,12 @@ export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: Re
  * once that floor is written. Its top is where the drag has it, by whichever handle: a document
  * dragged shorter by its top moves down and still holds all of its words.
  */
-export function shownBoardResize(box: Rect, least: number | undefined): Rect {
+export function shownPageResize(box: Rect, least: number | undefined): Rect {
 	return least && box.h < least ? { ...box, h: least } : box;
 }
 
 /** What a board's resize changed, on the lift: where it moved to, if a left or top edge was dragged, and its new size. */
-export function boardResizeEnd(start: Rect, next: Rect): { move?: Pt; size?: { w: number; h: number } } {
+export function pageResizeEnd(start: Rect, next: Rect): { move?: Pt; size?: { w: number; h: number } } {
 	return {
 		...(next.x !== start.x || next.y !== start.y ? { move: { x: next.x, y: next.y } } : {}),
 		...(next.w !== start.w || next.h !== start.h ? { size: { w: next.w, h: next.h } } : {}),

@@ -15,15 +15,15 @@ import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type Pen
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { feedSelection, keptSelection } from "../pen-tools.ts";
 import { glideShift } from "../core/overlay.ts";
-import { initialState, landBoardDrag, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
-import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
+import { initialState, landPageDrag, landPageResize, prunePages, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
+import type { PageBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
 import type { TextSession } from "../core/text.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 
 /** A board as the editor needs it from the app: where it is and its revision. */
-export type HostBoard = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
+export type HostPage = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
 
 export type EditorHost = {
 	scene: SceneQuery;
@@ -34,7 +34,7 @@ export type EditorHost = {
 	/** The window, in stage pixels. */
 	view: () => Rect;
 	nextIds: () => NextId;
-	boards: () => readonly HostBoard[];
+	boards: () => readonly HostPage[];
 	onPenEdit: (ops: Op[]) => void;
 	/** The page's side of the effects, but for the three the controller does itself. */
 	effects: Omit<EffectHost, "settle" | "wake" | "awaitFrame" | "boards"> & { toggleMedia: (id: string, media: MediaItem) => void };
@@ -94,7 +94,7 @@ export function createEditor(host: EditorHost) {
 		view: host.view(),
 		generation,
 		nextIds: host.nextIds,
-		boardRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
+		pageRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
 		linkAt: (point) => host.engine.linkAt(point),
 		overComposer: effects.overComposer,
 	});
@@ -132,35 +132,35 @@ export function createEditor(host: EditorHost) {
 	// Boards picked up that are no longer on the canvas are let go.
 	createEffect(() => {
 		const present = new Set(host.boards().map((board) => board.path));
-		update((now) => pruneBoards(now, present));
+		update((now) => prunePages(now, present));
 	});
 
 	const part = <T>(pick: (now: EditorState) => T): Accessor<T> => createMemo(() => pick(state()));
 	const items = part((now) => now.selection.items);
-	const boardPicks = part((now) => now.selection.boards);
-	const boardResize = part((now) => now.boardResize);
-	const boardDrag = part((now) => now.boardDrag);
+	const pagePicks = part((now) => now.selection.boards);
+	const pageResize = part((now) => now.pageResize);
+	const pageDrag = part((now) => now.pageDrag);
 	const ownDrag = part((now) => now.ownDrag);
 
 	/*
-	 * A board size let go of is held until the board is at it (`landBoardResize`): asked again
+	 * A board size let go of is held until the board is at it (`landPageResize`): asked again
 	 * whenever the boards change, and once as it is let go.
 	 */
 	createEffect(() => {
-		const held = boardResize();
+		const held = pageResize();
 		if (!held?.released) return;
 		const board = host.boards().find((candidate) => candidate.path === held.path);
-		update((now) => landBoardResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
+		update((now) => landPageResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
 	});
-	/* Boards a drag let go of are held where they were dropped until the boards are there (`landBoardDrag`): asked again whenever the boards change. */
+	/* Boards a drag let go of are held where they were dropped until the boards are there (`landPageDrag`): asked again whenever the boards change. */
 	createEffect(() => {
-		if (!boardDrag()?.released) return;
+		if (!pageDrag()?.released) return;
 		const boards = host.boards();
-		update((now) => landBoardDrag(now, boards));
+		update((now) => landPageDrag(now, boards));
 	});
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {
-		const drag = boardDrag();
+		const drag = pageDrag();
 		const held = ownDrag();
 		const board = held ? host.boards().find((one) => one.path === held.path) : undefined;
 		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
@@ -189,9 +189,9 @@ export function createEditor(host: EditorHost) {
 	return {
 		state,
 		items,
-		boardPicks,
+		pagePicks,
 		hoverItem: part((now) => now.hover.item),
-		hoverBoard: part((now) => now.hover.board),
+		hoverPage: part((now) => now.hover.board),
 		hoverPicture: part((now) => now.hover.picture),
 		hoverBlock: part((now) => now.hover.block),
 		overLink: part((now) => now.hover.link),
@@ -200,11 +200,11 @@ export function createEditor(host: EditorHost) {
 		gesture: part((now) => now.gesture),
 		drag: part((now) => now.drag),
 		shownDrag: shown,
-		boardDrag,
+		pageDrag,
 		ownDrag,
 		resize: part((now) => now.resize),
 		shownResize,
-		boardResize,
+		pageResize,
 		radius: part((now) => now.radius),
 		marquee: part((now) => now.marquee),
 		guides: part((now) => now.guides),
@@ -221,21 +221,21 @@ export function createEditor(host: EditorHost) {
 		typing: part((now) => now.text?.id),
 
 		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
-		carrying: createMemo(() => !!boardDrag() || !!boardResize() || !!ownDrag()),
+		carrying: createMemo(() => !!pageDrag() || !!pageResize() || !!ownDrag()),
 		/** The boards a gesture holds, which keep their nodes wherever the camera goes. */
-		heldBoards: (): readonly string[] => {
-			const sized = boardResize()?.path;
-			return [...(boardDrag()?.paths ?? []), ...(sized === undefined ? [] : [sized])];
+		heldPages: (): readonly string[] => {
+			const sized = pageResize()?.path;
+			return [...(pageDrag()?.paths ?? []), ...(sized === undefined ? [] : [sized])];
 		},
 		/** The board whose size is being dragged, if one is. */
-		resizingBoard: () => boardResize()?.path,
+		resizingBoard: () => pageResize()?.path,
 		/**
 		 * The board size the sheet should draw, while one is dragged: a board shown as a picture
 		 * (not `live`) is drawn by the sheet, and one an arrow ends on is followed by the arrow. A
 		 * live board's page is drawn over the sheet at the new box, so the sheet keeps it where it was.
 		 */
 		sheetResize: (live: (path: string) => boolean) => {
-			const held = boardResize();
+			const held = pageResize();
 			return held && (!live(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
 		},
 		/** A drop's glide in hand: how far each gliding item is still drawn from where it lands. */
@@ -260,7 +260,7 @@ export function createEditor(host: EditorHost) {
 			return !!read().gesture;
 		},
 		select,
-		pickBoards: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { boards: typeof next === "function" ? next(now.selection.boards) : next })),
+		pickPages: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { boards: typeof next === "function" ? next(now.selection.boards) : next })),
 		/** Select what was just asked for, which the drawing does not have until the server answers. */
 		selectMade: (made: readonly string[]) => update((now) => selectMade(now, made)),
 		hover: (next: Partial<EditorState["hover"]>) =>
@@ -301,4 +301,4 @@ export function createEditor(host: EditorHost) {
 }
 
 export type Editor = ReturnType<typeof createEditor>;
-export type { BoardBox };
+export type { PageBox };

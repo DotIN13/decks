@@ -4,7 +4,7 @@
  */
 import { isCard, isMarkdownText, isShape, type PenNode, type Placed } from "@decks/pen";
 import { isFile, isLiveFile } from "../../model/file-kinds.ts";
-import type { BoardBox, Pt, Rect } from "./model.ts";
+import type { PageBox, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /**
@@ -32,7 +32,7 @@ export type PickOptions = {
 /** What a press found: the item, its node, and the box it covers (a copy). */
 export type Picked = { id: string; node: PenNode; box: Rect };
 
-const isBoard = (node: PenNode) => node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type));
+const isPage = (node: PenNode) => node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type));
 const contains = (box: Rect, point: Pt) => point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
 
 /**
@@ -46,7 +46,7 @@ function topAt(scene: SceneQuery, point: Pt, skip?: (node: PenNode) => boolean):
 		if (!placed) continue;
 		const { node } = placed;
 		if (node.id.includes("/") || node.type === "group") continue;
-		if (isBoard(node)) continue;
+		if (isPage(node)) continue;
 		if (skip?.(node)) continue;
 		if (node.type === "path") {
 			if (scene.onLine(id, point) === false) continue;
@@ -96,7 +96,7 @@ export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}):
 export function parentOf(scene: SceneQuery, id: string): string | undefined {
 	const up = scene.item(id)?.parent;
 	const node = up ? scene.item(up)?.node : undefined;
-	return node && !isBoard(node) && !node.id.includes("/") ? node.id : undefined;
+	return node && !isPage(node) && !node.id.includes("/") ? node.id : undefined;
 }
 
 /**
@@ -105,7 +105,7 @@ export function parentOf(scene: SceneQuery, id: string): string | undefined {
  */
 export function childrenOf(scene: SceneQuery, id: string): string[] {
 	const node = scene.item(id)?.node ?? scene.node(id);
-	if (!node || id.includes("/") || isBoard(node) || isShape(node) || isFile(node) || isLiveFile(node) || isCard(node)) return [];
+	if (!node || id.includes("/") || isPage(node) || isShape(node) || isFile(node) || isLiveFile(node) || isCard(node)) return [];
 	if (node.type !== "group" && node.type !== "frame") return [];
 	return (scene.node(id)?.children ?? node.children ?? []).map((child) => child.id).filter((child) => !child.includes("/") && !!scene.item(child));
 }
@@ -133,7 +133,7 @@ export function blockAt(scene: SceneQuery, point: Pt, typing?: string): string |
  * one not in `rendered`. The last in file order, as the sheet draws it on top.
  * `boards` may be only the candidates a spatial index found near the point, as long as they keep file order.
  */
-export function pictureAt(boards: readonly BoardBox[], point: Pt, rendered: ReadonlySet<string>): string | undefined {
+export function pictureAt(boards: readonly PageBox[], point: Pt, rendered: ReadonlySet<string>): string | undefined {
 	let top: string | undefined;
 	for (const board of boards) {
 		if (rendered.has(board.path)) continue;
@@ -156,7 +156,7 @@ export function marqueePick(scene: SceneQuery, r: Rect): { items: string[]; boar
 	for (const placed of scene.items()) {
 		const { node } = placed;
 		const id = node.id;
-		if (id.includes("/") || isBoard(node)) continue;
+		if (id.includes("/") || isPage(node)) continue;
 		if (placed.parent && isShape(scene.item(placed.parent)?.node)) continue;
 		if (wholly(scene.box(id) ?? placed.box, r)) inside.add(id);
 	}

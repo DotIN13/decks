@@ -65,7 +65,7 @@ export function destination(text: string, context: BarContext): Destination {
 }
 
 /** The board's own name: the last path segment without its `.html`. */
-function boardName(board: string): string {
+function pageName(board: string): string {
 	const last = board.split("/").filter(Boolean).at(-1) ?? board;
 	return last.endsWith(".html") ? last.slice(0, -".html".length) : last;
 }
@@ -74,7 +74,7 @@ function boardName(board: string): string {
 export function destinationLabel(dest: Destination): string {
 	switch (dest.kind) {
 		case "note":
-			return `note on ${boardName(dest.board)}`;
+			return `note on ${pageName(dest.board)}`;
 		case "prompt":
 			return `to ${dest.name}`;
 		case "nowhere":

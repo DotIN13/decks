@@ -13,7 +13,7 @@ import { reportCameraSoon } from "./camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer } from "./frame-handoffs.ts";
 import type { createFileDrops } from "./files/drops.ts";
 import { rememberView } from "./socket-messages.ts";
-import { openLinkedBoard } from "./links.ts";
+import { openLinkedPage } from "./links.ts";
 
 /** What the canvas host needs of the page around it. */
 export interface CanvasHostInputs {
@@ -67,7 +67,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			inking: drawing,
 		},
 		canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
-		boards: { onOpenLink: openLinkedBoard },
+		boards: { onOpenLink: openLinkedPage },
 		onViewport: () => reportCameraSoon(camera()),
 		onExport: exportPicture,
 		onRefer: frameRefer,

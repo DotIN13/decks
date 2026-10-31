@@ -21,7 +21,7 @@ import { Icon } from "./ui/icons.tsx";
 import {clearDialog, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { pens } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
-import { boardsOpen, boardsStarted, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
+import { panelOpen, pagesStarted, releasePages, draft, ops, openUsage, picking, readUsage, setPanelOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
 import { destination, destinationLabel } from "./app/send-from-bar.ts";
 import { FilePicker } from "./app/files/FilePicker.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
@@ -197,7 +197,7 @@ export function App() {
 			forgetAskedResults();
 		});
 		// Whatever arrives or does not, the canvas is not held empty for longer than this.
-		setTimeout(releaseBoards, 2500);
+		setTimeout(releasePages, 2500);
 		// The chip knows the row; the conversation it is in is found here.
 		setToolResultSender((itemId) => {
 			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
@@ -265,7 +265,7 @@ export function App() {
 	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
 	 * loading it again.
 	 */
-	const [shownBoards, setShownBoards] = createStore<Board[]>([]);
+	const [shownPages, setShownPages] = createStore<Board[]>([]);
 	createComputed(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		const list = state.boards
@@ -274,9 +274,9 @@ export function App() {
 				// A copy of its own: the merge below writes into this store's objects, never into the deck's.
 				return JSON.parse(JSON.stringify(board)) as Board;
 			});
-		setShownBoards(reconcile(list, { key: "path", merge: true }));
+		setShownPages(reconcile(list, { key: "path", merge: true }));
 	});
-	const stageBoards = (): Board[] => shownBoards;
+	const stagePages = (): Board[] => shownPages;
 
 	/*
 	 * What `handleFrame` may touch (`app/socket-messages.ts`). **Three fields**, and each has a reason
@@ -325,7 +325,7 @@ export function App() {
 	/** Bumped to say "put the cursor in the search field" — the panel watches it. */
 	const [findAt, setFindAt] = createSignal(0);
 	// The two app-wide shortcuts: `⌘K` to find a board, Escape to drop a selection.
-	installKeys({ openBoards: () => showBoards(true), find: setFindAt });
+	installKeys({ openPanel: () => showPanel(true), find: setFindAt });
 
 
 	/*
@@ -344,11 +344,11 @@ export function App() {
 
 
 	/** Open the panel. */
-	const showBoards = (open: boolean) => setBoardsOpen(open);
+	const showPanel = (open: boolean) => setPanelOpen(open);
 	/** The Agents tab of the panel, asked for by the agent list's overflow row. */
 	const [panelAsk, setPanelAsk] = createSignal<{ tab: PanelTab; at: number } | undefined>();
 	const openAgentsPanel = () => {
-		showBoards(true);
+		showPanel(true);
 		setPanelAsk({ tab: "agents", at: Date.now() });
 	};
 
@@ -360,10 +360,10 @@ export function App() {
 	onMount(() => onCleanup(syncRings()));
 	const { presenting, present } = createPresenting();
 	/** The deck's apps, for the panel's Apps tab (`app/apps-panel.ts`). */
-	const { apps, loadApps, onApp, onAppLogs } = createAppsPanel(stageBoards, (path) => frameWhenPlaced(path));
+	const { apps, loadApps, onApp, onAppLogs } = createAppsPanel(stagePages, (path) => frameWhenPlaced(path));
 
 	const openAppsPanel = () => {
-		showBoards(true);
+		showPanel(true);
 		setPanelAsk({ tab: "apps", at: Date.now() });
 	};
 	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
@@ -414,7 +414,7 @@ export function App() {
 	const closeAgent = (id: string) => send({ type: "agent.remove", id });
 
 	/* A board put on the canvas is flown to once the server has placed it (`app/links.ts`). */
-	const { frameWhenPlaced, playAndFrame } = createFraming(stageBoards);
+	const { frameWhenPlaced, playAndFrame } = createFraming(stagePages);
 
 
 	/** Move the conversation to a canvas: the stage manager's pick, and the panel's Open. The camera follows when the server says the agent is there (the canvas effect below). */
@@ -454,7 +454,7 @@ export function App() {
 	};
 
 	/* The camera, and whose it is (`app/landing.ts`). */
-	const { park, personMoved } = createCameraLanding({ views, stagePen, stageBoards, deckSeen });
+	const { park, personMoved } = createCameraLanding({ views, stagePen, stagePages, deckSeen });
 
 
 	/** The editor on screen (`createFramedEditor`), for what this app asks of it from outside: the scheme, a selection. */
@@ -518,9 +518,9 @@ export function App() {
 				*/}
 				<TopBar
 					/* On a desktop the deck is in the panel's head; folded, the top bar holds only the button that brings the panel back. */
-					panelOpen={boardsOpen() && !phone()}
+					panelOpen={panelOpen() && !phone()}
 					desktop={!phone()}
-					onTogglePanel={() => showBoards(!boardsOpen())}
+					onTogglePanel={() => showPanel(!panelOpen())}
 					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}
@@ -574,7 +574,7 @@ export function App() {
 								onPresent={present}
 								usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 								onContext={() => openUsage(state.focused)}
-								more={moreItems(stageBoards)}
+								more={moreItems(stagePages)}
 							/>
 						</span>
 					}
@@ -588,7 +588,7 @@ export function App() {
 						onPresent={present}
 						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 						onContext={() => openUsage(state.focused)}
-						more={moreItems(stageBoards)}
+						more={moreItems(stagePages)}
 					/>
 <Show when={showFps()}>
 	<FpsMeter />
@@ -659,16 +659,16 @@ export function App() {
 						const at = camera();
 						if (agentId) void editDrawing(agentId, [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }]);
 					}}
-					listMayGrow={boardsStarted()}
+					listMayGrow={pagesStarted()}
 					current={selected()}
-					/* `stageBoards` is the same answer the stage draws from, so the panel's "on the
+					/* `stagePages` is the same answer the stage draws from, so the panel's "on the
 					   stage" section and the boards on screen cannot disagree. */
-					inPlay={stageBoards().map((board) => board.path)}
+					inPlay={stagePages().map((board) => board.path)}
 					/* What the focused agent holds and has taken off its stage. */
 					kept={state.focused ? (state.contexts[state.focused] ?? []) : []}
 					focused={state.focused}
-					open={boardsOpen()}
-					onOpenChange={showBoards}
+					open={panelOpen()}
+					onOpenChange={showPanel}
 					findAt={findAt()}
 					/*
 					 * The Agents tab. The same three signals the corner and the dropdown already
@@ -817,7 +817,7 @@ export function App() {
 					</Show>
 
 					{/* Only while nothing else says it: the panel's folded foot does, while the panel is open. */}
-					<Show when={!chatShown() && (phone() || !boardsOpen())}>
+					<Show when={!chatShown() && (phone() || !panelOpen())}>
 						<StatusPill chat={focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={openChat} />
 					</Show>
 

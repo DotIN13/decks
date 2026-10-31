@@ -17,7 +17,7 @@ import { setTimeZone } from "../lib/time.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
-import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
+import { accountChanged, releasePages, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
 import { forgetPen, receivePen, receivePenDelta } from "../state/pens.ts";
@@ -213,7 +213,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					}
 					ensureHistory(focused);
 					// No chat to wait for: the deck is all there is to open.
-					if (!focused) releaseBoards();
+					if (!focused) releasePages();
 					return;
 				}
 
@@ -320,7 +320,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.agentId, "transcript", message.items);
 					setState("agents", message.agentId, "moreHistory", message.more ?? false);
 					scratch.of(message.agentId).historyHeld = true;
-					if (message.agentId === state.focused) releaseBoards();
+					if (message.agentId === state.focused) releasePages();
 					scratch.of(message.agentId).historyAsked = false;
 					return;
 

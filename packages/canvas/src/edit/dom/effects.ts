@@ -30,7 +30,7 @@ export type EffectHost = {
 	pen: () => { doc: PenDocument; base: string } | undefined;
 	boards: () => ReadonlyArray<{ path: string; title?: string | undefined }>;
 	onRefer?: ((pills: ReferPill[]) => void) | undefined;
-	onOpenBoard?: ((path: string, hash: string) => boolean | void) | undefined;
+	onOpenPage?: ((path: string, hash: string) => boolean | void) | undefined;
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	onResize?: ((path: string, size: { w: number; h: number }) => void) | undefined;
@@ -159,8 +159,8 @@ export function createEffects(host: EffectHost) {
 	 */
 	const openLink = (href: string) => {
 		const base = host.pen()?.base ?? "";
-		const board = canvasHost().boardLink(href, base);
-		if (board && host.onOpenBoard?.(board, "")) return;
+		const board = canvasHost().cardLink(href, base);
+		if (board && host.onOpenPage?.(board, "")) return;
 		let url: URL;
 		try {
 			url = new URL(href, new URL(base || "/", location.href));

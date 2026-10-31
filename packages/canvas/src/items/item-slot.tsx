@@ -1,6 +1,6 @@
 import type { Board } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import type { BoardView } from "../edit/index.ts";
+import type { PageView } from "../edit/index.ts";
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 
@@ -16,7 +16,7 @@ const EDGE_IN_PX = COARSE ? 6 : 4;
  * The stage decides where it is, whether it is awake and what its gestures do; the host adds what it
  * knows of the item's file (`ItemSlotExtras`).
  */
-export interface StageBoardProps {
+export interface ItemSlotProps {
 	board: Board;
 	/** The camera's zoom: an edge band is sized in screen pixels. */
 	zoom: number;
@@ -39,13 +39,13 @@ export interface StageBoardProps {
 	/** A drag carries this item's picture (`PenLayer.carry`): its surface waits, unseen, for the move to land. */
 	carried?: boolean;
 	onMove: (x: number, y: number) => void;
-	/** The stage's editor, as far as this item goes (`editor/dom/pointer.ts`, `BoardView`). */
-	view: BoardView;
+	/** The stage's editor, as far as this item goes (`editor/dom/pointer.ts`, `PageView`). */
+	view: PageView;
 	onOpen: () => void;
 	/** How much room a card's content took, for `decks.canvas.fit`, with the revision it was measured at. */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** A link on a card to another board or card of the deck: `true` once the host has opened it. */
-	onOpenBoard?: (path: string, from: string) => boolean;
+	onOpenPage?: (path: string, from: string) => boolean;
 	/** Words selected in a card, to comment on: the stage gives this while you may. */
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
 	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
@@ -71,7 +71,7 @@ export interface ItemSlotExtras {
  * A board (`decks.board`) is drawn as its picture by the stage's sheet and nothing else: its slot has
  * the title and is pressed and moved as any item, but holds no page.
  */
-export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
+export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
 		return { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
@@ -204,7 +204,7 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 						size={size}
 						selected={props.selected}
 						onSelect={() => props.view.select()}
-						onOpenBoard={(path) => props.onOpenBoard?.(path, props.board.path)}
+						onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}
 						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
 						onShown={() => setShown(true)}
 						{...(props.onWords ? { onWords: props.onWords } : {})}

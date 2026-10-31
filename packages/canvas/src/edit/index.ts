@@ -49,12 +49,12 @@ export function createStageEditor(host: StageEditorHost) {
 }
 export type StageEditor = ReturnType<typeof createStageEditor>;
 
-export type { BoardView, Openers } from "./dom/pointer.ts";
+export type { PageView, Openers } from "./dom/pointer.ts";
 export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";
 export { TextEditor } from "./dom/TextEditing.tsx";
 export { InsertMenu } from "../ui/InsertMenu.tsx";
 export { tsScene, tsSeam } from "./scene-ts.ts";
 export { dropSlot, frameUnder } from "./core/drop.ts";
 export { deleteOps, duplicateOps, idMaker, moveOps } from "./core/ops.ts";
-export { arrowAnchors, arrowEnds, boardHandles, distances, dropBox, glideShift, gripBox, gripHidden, hoverBox, itemHandles, kinOutlines, radiusHandle, selectionFrame, selectionOutlines, type Overlay } from "./core/overlay.ts";
+export { arrowAnchors, arrowEnds, pageHandles, distances, dropBox, glideShift, gripBox, gripHidden, hoverBox, itemHandles, kinOutlines, radiusHandle, selectionFrame, selectionOutlines, type Overlay } from "./core/overlay.ts";
 export type { PenTool } from "./core/model.ts";
