@@ -427,6 +427,7 @@ export function Stage(props: StageProps) {
 			canStep: () => !!props.onPenStep,
 			step: (direction) => props.onPenStep?.(direction),
 			deleteSelected: (selected, ops) => selection.penDeleteSelected(selected, ops),
+			...(props.onDeleteCard ? { deletePages: (paths: readonly string[]) => paths.forEach((path) => props.onDeleteCard?.(path)) } : {}),
 			setTool: (tool) => setPenTool(tool),
 			arm: (tool) => armPenTool(tool),
 			onMove: (path, x, y) => props.onMove(path, x, y),

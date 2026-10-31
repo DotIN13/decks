@@ -270,7 +270,8 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
 		onDeleteCard: async (path) => {
 			if (studio) return takeOff(path);
-			const answer = await backend.call("canvas.delete", [path]);
+			// An item with no file of its own (an app, a document) is named by its id, which its page path carries (`item:<id>`).
+			const answer = await backend.call("canvas.delete", [path.startsWith("item:") ? path.slice(5) : path]);
 			return answer.ok;
 		},
 	};

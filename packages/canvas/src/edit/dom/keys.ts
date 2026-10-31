@@ -29,6 +29,8 @@ export type KeysHost = {
 	edit: (ops: Op[]) => void;
 	/** Take the selected items off the canvas, with these ops (`Stage`'s `penDeleteSelected`). */
 	deleteSelected: (selected: readonly string[], ops: Op[]) => void;
+	/** Take the chosen cards, apps and documents off the canvas, as the pill's Delete does (`onDeleteCard`). */
+	deletePages?: (paths: readonly string[]) => void;
 	setTool: (tool: PenTool) => void;
 	/** Arm a tool from its key: the board palette's tool goes down first. */
 	arm: (tool: PenTool) => void;
@@ -40,6 +42,14 @@ export function createKeys(editor: Editor, host: KeysHost) {
 	/** The keys of the drawing, in edit mode (`editor/core/keys.ts` decides, this does it); true when the key was one of them. */
 	const penKey = (event: KeyboardEvent): boolean => {
 		const selected = editor.items();
+		// Delete with only cards, apps or documents chosen: they go, as from the pill (the drawing's keys know only its items).
+		if ((event.key === "Delete" || event.key === "Backspace") && !event.metaKey && !event.ctrlKey && !event.altKey && selected.length === 0 && host.deletePages) {
+			const pages = editor.pagePicks().length ? editor.pagePicks() : host.selectedPage?.() ? [host.selectedPage()!] : [];
+			if (pages.length) {
+				host.deletePages(pages);
+				return true;
+			}
+		}
 		// The document's ids are gathered only for a key that makes something (⌘D).
 		let ids: (() => string) | undefined;
 		const act: KeyAct = penKeyOf(
