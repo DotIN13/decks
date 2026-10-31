@@ -241,6 +241,17 @@ const under = await canvas.evaluate(({ x, y }) => {
 	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
 }, clickAt);
 say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
+// Selected, it comes to the front: last in the drawing's order, so it is drawn over every other item.
+const { readFileSync } = await import("node:fs");
+const { join } = await import("node:path");
+const front = await until(() => {
+	const pen = JSON.parse(readFileSync(join(deck.path, "canvases", CANVAS, "canvas.pen"), "utf8"));
+	const last = [...pen.children].reverse().find((n) => n.type === "browser");
+	return last && `item:${last.id}` === under.selected[0] ? last.id : undefined;
+}, 6000);
+say("…and comes to the front: the last placed item in the drawing's order", !!front, `last placed item ${front ?? "?"}, selected ${under.selected[0]}`);
+const stillLive = await canvas.evaluate(() => [...document.querySelectorAll('.card-node[data-state="live"] .app-surface[data-live]')].length);
+say("…without its window reloading: its surface is still live", stillLive >= 1, `${stillLive} live app windows`);
 // --- one press in a document selects it and acts ----------------------------------------------------------
 at("document press");
 const docCentre = await canvas.evaluate((path) => {

@@ -12,7 +12,8 @@ import { StageInk } from "../edit/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setPenLive, setPenTool, type PenTool } from "../edit/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
+import { isCard, ids as penIds, newId, type PenDocument, type PenNode } from "@decks/pen";
+import { isPage, pagePath } from "../model/drawing.ts";
 import { StageEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
 import {
@@ -293,6 +294,25 @@ export function Stage(props: StageProps) {
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
+	/*
+	 * A card, document or app selected comes to the front of the canvas: moved to the end of the
+	 * drawing's order, where it is drawn over every other item, as the one being worked on should be.
+	 * An edit of the drawing, so it stays that way and reaches everyone; nothing when it is there already.
+	 */
+	createEffect(
+		on(
+			() => props.selected,
+			(path) => {
+				const children = (props.pen?.doc.children ?? []) as PenNode[];
+				if (!path || children.length < 2) return;
+				const at = children.findIndex((node) => isPage(node) && pagePath(node) === path);
+				if (at < 0 || at === children.length - 1) return;
+				const id = children[at]!.id;
+				if (typeof id !== "string") return;
+				penEdit([{ op: "move", id, parent: null, index: children.length - 1 }]);
+			},
+		),
+	);
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
