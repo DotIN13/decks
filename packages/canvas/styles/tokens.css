@@ -66,7 +66,7 @@
 /*
  * The app's own tokens.
  *
- * The same ramp `card-host/lib/board.css` uses, so a board on the stage and the
+ * The same ramp `card-host/lib/card.css` uses, so a board on the stage and the
  * chrome around it are visibly one piece of software. Boards cannot import this —
  * they are standalone documents — so the two files carry the same values on
  * purpose, and the comment in each says so.

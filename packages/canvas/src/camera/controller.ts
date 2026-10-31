@@ -394,8 +394,7 @@ export function createCameraController(host: CameraHost) {
 	 * the screen, which may load a page, where a pill goes) looks a whole window past the screen or
 	 * waits for a rest anyway: so each pan step reaches none of it. A zoom reaches it at once.
 	 *
-	 * `__decksExactCamera = true` hands every camera through, for measuring (`__decksExactBoardCamera`,
-	 * its old name, too, until 2026-11-30).
+	 * `__decksExactCamera = true` hands every camera through, for measuring.
 	 */
 	const settled = createMemo<Camera>(
 		() => {
@@ -411,8 +410,8 @@ export function createCameraController(host: CameraHost) {
 				if (was === next) return true;
 				if (was.zoom !== next.zoom) return false;
 				const still = !untrack(moving) && !untrack(gliding) && !untrack(panning);
-				const exact = globalThis as { __decksExactCamera?: boolean; __decksExactBoardCamera?: boolean };
-				if (still || exact.__decksExactCamera || exact.__decksExactBoardCamera) return was.x === next.x && was.y === next.y;
+				const exact = globalThis as { __decksExactCamera?: boolean };
+				if (still || exact.__decksExactCamera) return was.x === next.x && was.y === next.y;
 				const v = untrack(host.view);
 				return Math.abs(was.x - next.x) * was.zoom < v.width / 8 && Math.abs(was.y - next.y) * was.zoom < v.height / 8;
 			},

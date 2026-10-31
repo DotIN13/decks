@@ -233,11 +233,11 @@
 
 	/*
 	 * A colour per kind, so pills in one sentence are told apart before they are read: amber for a
-	 * comment, the app's own blue for a board, violet for something drawn on the stage, a plainer
+	 * comment, the app's own blue for a card, violet for something drawn on the stage, a plainer
 	 * blue for a file. The icon in front of each says the same thing again, for anyone who cannot use
 	 * the difference in colour.
 	 */
-	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-kind="board"] {
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-kind="card"] {
 		--pill: var(--color-accent);
 	}
 

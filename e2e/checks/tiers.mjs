@@ -1,8 +1,8 @@
 /**
  * The three tiers (DESIGN §2), driven the way a user drives them.
  *
- * `board.play` attaches as well as showing, so the whole thing can be set up over the
- * socket — no model needed. The agent-side half (`show`/`hide` from the `decks` command) is
+ * `card.play` attaches as well as showing, so the whole thing can be set up over the
+ * socket — no model needed. The agent-side half (`view focus` and `canvas delete` from the `decks` command) is
  * checked in stage-api.mjs, which does need one.
  */
 import { canvasFrame, deckState, emptyCanvas, freshAgent, nameOf, open, openPanel, pressCardAction, say, selectCard, settle, socket } from "../harness.mjs";
@@ -102,7 +102,7 @@ await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksCard
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not
- * detach it (`wire/boards.ts`, `board.play`'s note), so it stays in the agent's context and out
+ * detach it (`wire/boards.ts`, `card.play`'s note), so it stays in the agent's context and out
  * of its in-play list. The server says so in `context.changed`.
  */
 const told = async () => {

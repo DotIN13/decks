@@ -21,7 +21,7 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
  * out of the last block.
  *
  * `scrollHeight` answers this, with one catch that is the reason for the lines around it:
- * `board.js` gives the body the height in the board's `<meta>` tag, or when there is none a
+ * `card.js` gives the body the height in the board's `<meta>` tag, or when there is none a
  * `min-height` of the frame itself (`100vh`), so asking a body that is already that tall how
  * tall it is answers the tag or the frame rather than the content, and the board could then
  * never shrink. A new board starts at the frame's size, so every board an agent wrote came
@@ -48,7 +48,7 @@ export function documentHeight(doc: Document): number | undefined {
 	 */
 	const view = doc.defaultView;
 	if (view?.getComputedStyle(body).display === "block") body.style.display = "flow-root";
-	// And the body's own margins, which a page without `board.css` keeps (8 px): the page is as tall as the body's margin box.
+	// And the body's own margins, which a page without `card.css` keeps (8 px): the page is as tall as the body's margin box.
 	const box = body.getBoundingClientRect?.();
 	const below = Number.parseFloat(view?.getComputedStyle(body).marginBottom ?? "0") || 0;
 	const measured = Math.max(body.scrollHeight, box ? box.bottom + (view?.scrollY ?? 0) + below : 0);
@@ -59,14 +59,14 @@ export function documentHeight(doc: Document): number | undefined {
 }
 
 /**
- * Measure the document inside a frame, once it has finished mounting: `__boardReady` is the board's
+ * Measure the document inside a frame, once it has finished mounting: `__cardReady` is the page's
  * own signal that markdown, maths, diagrams and embeds have all rendered, and before it this answers
  * `undefined` and the caller waits.
  */
 export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
 	const doc = frame?.contentDocument;
-	const view = frame?.contentWindow as (Window & { __boardReady?: boolean }) | null | undefined;
-	if (!doc || !view?.__boardReady) return undefined;
+	const view = frame?.contentWindow as (Window & { __cardReady?: boolean }) | null | undefined;
+	if (!doc || !view?.__cardReady) return undefined;
 	const page = documentHeight(doc);
 	if (page === undefined) return undefined;
 	const h = Math.ceil(page);

@@ -199,8 +199,6 @@ export interface CanvasHandle {
 	setCamera(camera: Camera): void;
 	/** A card's file changed where it comes from (a drop, an agent's edit): it loads again. */
 	reloadCard(path: string): void;
-	/** @deprecated `reloadCard`, its old name, kept until 2026-11-30. */
-	reloadBoard(path: string): void;
 	/** The canvas opened on the view kept for its scope (`views`), rather than on a fit. */
 	readonly restored: boolean;
 	dispose(): void;

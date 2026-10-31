@@ -103,11 +103,11 @@ export function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
 }
 
 type FrameComment = { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
-/** A pill as the frame hands it: a card (`board`, its old name, from a frame of before 2026-11-30) or a drawn item. */
-type FramePill = { kind: "card" | "board" | "item"; id: string; label: string; name?: string };
-/** A pill for the composer: its mention kind is still `board` for a card, what a sent message's parts say. */
-type ComposerPill = { kind: "board" | "item"; id: string; label: string; name?: string };
-type FrameInk = { action: "drawing" | "card" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
+/** A pill as the frame hands it: a card or a drawn item. */
+type FramePill = { kind: "card" | "item"; id: string; label: string; name?: string };
+/** A pill for the composer, of the mention kind a sent message's parts say. */
+type ComposerPill = { kind: "card" | "item"; id: string; label: string; name?: string };
+type FrameInk = { action: "drawing" | "card" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
 /** A comment from the frame, every text in it cleaned and cut. */
 export function cleanFrameComment(comment: FrameComment): FrameComment {
@@ -128,14 +128,14 @@ export function cleanFrameComment(comment: FrameComment): FrameComment {
 export function cleanFramePills(pills: readonly FramePill[]): ComposerPill[] {
 	return pills
 		.slice(0, FRAME_IDS_LIMIT)
-		.filter((pill) => pill && (pill.kind === "card" || pill.kind === "board" || pill.kind === "item"))
-		.map((pill): ComposerPill => ({ kind: pill.kind === "item" ? "item" : "board", id: frameText(pill.id), label: frameText(pill.label), ...(pill.name ? { name: frameText(pill.name) } : {}) }))
+		.filter((pill) => pill && (pill.kind === "card" || pill.kind === "item"))
+		.map((pill): ComposerPill => ({ kind: pill.kind, id: frameText(pill.id), label: frameText(pill.label), ...(pill.name ? { name: frameText(pill.name) } : {}) }))
 		.filter((pill) => pill.id !== "");
 }
 
 /** A sketch from the frame, its ids and canvas cleaned and cut, its box plain numbers. */
 export function cleanFrameInk<T extends FrameInk>(ink: T): Omit<T, "action"> & { action: "drawing" | "card" | "send" } {
 	const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
-	const action = ink.action === "drawing" ? "drawing" : ink.action === "card" || ink.action === "board" ? "card" : "send";
+	const action = ink.action === "drawing" ? "drawing" : ink.action === "card" ? "card" : "send";
 	return { ...ink, action, ids: frameTexts(ink.ids), canvas: frameText(ink.canvas), box: { x: num(ink.box?.x), y: num(ink.box?.y), w: num(ink.box?.w), h: num(ink.box?.h) } };
 }

@@ -10,7 +10,7 @@ test("an address on a canvas pass is kept by the address without it, so a renewe
 	const b = `http://h/api/t/${now}/card/canvases/one/cards/a/index.m0.js`;
 	assert.notEqual(a, b);
 	assert.equal(passless(a), passless(b));
-	assert.equal(passless("http://h/api/board/x.html"), "http://h/api/board/x.html", "an address with no pass stays");
+	assert.equal(passless("http://h/api/card/x.html"), "http://h/api/card/x.html", "an address with no pass stays");
 });
 
 test("a card loaded on an older pass reads on the current one", () => {

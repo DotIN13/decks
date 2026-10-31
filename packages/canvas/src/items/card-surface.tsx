@@ -200,7 +200,7 @@ export function CardSurface(props: {
 
 	/*
 	 * A link in a card never takes the app's own page away. A link to a board or card of the deck opens it
-	 * beside this one, as on a board (`board.js`); any other opens in a tab of its own.
+	 * beside this one, as on a board (`card.js`); any other opens in a tab of its own.
 	 */
 	const followLink = (event: MouseEvent) => {
 		if (event.defaultPrevented || event.button !== 0) return;
@@ -221,11 +221,11 @@ export function CardSurface(props: {
 	};
 
 	/**
-	 * The deck path a link names: under the app's `/api/card/` (or `/api/board/`, its old prefix) on this
+	 * The deck path a link names: under the app's `/api/card/` on this
 	 * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
 	 */
 	const pageOf = (url: URL): string | undefined => {
-		const prefix = /\/api\/(?:card|board)\//.exec(url.pathname);
+		const prefix = /\/api\/card\//.exec(url.pathname);
 		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().cardLink(url.href, location.href);
 		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
 		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;

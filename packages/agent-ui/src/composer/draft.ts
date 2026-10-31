@@ -11,7 +11,7 @@
  *
  * - a **comment** on words selected on a board (`markup/comments.ts`), whose id is the
  *   comment's;
- * - a **board**, whose id is its path;
+ * - a **card**, whose id is its path;
  * - an **item** drawn on the stage, whose id is its id in `canvas.pen`.
  *
  * - a **file** in the deck, attached with the paperclip or dropped on the bar, whose id is its path.
@@ -25,9 +25,9 @@
  */
 
 /** What a pill stands for. Each has its own colour and icon in the field. */
-export type MentionKind = "comment" | "board" | "item" | "file";
+export type MentionKind = "comment" | "card" | "item" | "file";
 
-const KINDS: readonly string[] = ["comment", "board", "item", "file"];
+const KINDS: readonly string[] = ["comment", "card", "item", "file"];
 /** Whether a string names a kind of pill: what a draft read back from the DOM or the clipboard is checked by. */
 export function isMentionKind(kind: unknown): kind is MentionKind {
 	return typeof kind === "string" && KINDS.includes(kind);
@@ -94,12 +94,12 @@ export function commentLabel(quote: string): string {
 /**
  * How the agent reads a pill that stands for a thing with an address.
  *
- * A board is `@boards/plan.html`, and a file `@assets/plan.pdf`, as an attached file has always
+ * A card is `@canvases/plan/cards/a/index.html`, and a file `@assets/plan.pdf`, as an attached file has always
  * been spelled, because the path is what an agent opens it by. A drawn item has no file, so it is the same
  * spelling with the kind said: its id on the stage, which is what `decks.canvas.read()` lists.
  */
 export function mentionAddress(node: DraftMention): string {
-	return node.kind === "board" || node.kind === "file" ? `@${node.id}` : `@item:${node.id}`;
+	return node.kind === "card" || node.kind === "file" ? `@${node.id}` : `@item:${node.id}`;
 }
 
 /**

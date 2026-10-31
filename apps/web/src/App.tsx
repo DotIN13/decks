@@ -258,7 +258,7 @@ export function App() {
 	 *
 	 * **A board is as tall as the stage file says, and no taller.** Its height is what a drag, a
 	 * `decks.canvas.fit` or `decks.canvas.update` gave it; what its page measures in this browser is
-	 * sent to the harness for `fit` to report (`board.extent`) and never grows the board by itself,
+	 * sent to the harness for `fit` to report (`card.extent`) and never grows the board by itself,
 	 * for a board and a card alike. A page taller than its board is cut at the board's foot.
 	 *
 	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or

@@ -10,7 +10,7 @@ import { decksSounds } from "@decks/agent-ui/vite";
 /**
  * The dev server proxies to the API rather than talking to it cross-origin.
  *
- * That is not only convenience: boards are served from `/api/board/...` into
+ * That is not only convenience: cards and documents are served from `/api/card/...` into
  * same-origin frames (DESIGN §4), and "same origin" has to be true of the origin
  * the browser actually loaded, which in development is Vite's.
  */

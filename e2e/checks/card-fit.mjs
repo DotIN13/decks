@@ -4,7 +4,7 @@
  * A card nobody is looking at is measured by the server's own Chromium (`apps/web/measure.html`); one on
  * screen by the frame that shows it. The two must agree on a card whose height its own script sets and
  * whose `@container card` rule changes with its width, which is what a card in a plain page got wrong when
- * the page was not mounted as the frame mounts it (a shadow root, the module handed `card`, board.css adopted).
+ * the page was not mounted as the frame mounts it (a shadow root, the module handed `card`, card.css adopted).
  */
 import { API, CANVAS, asPerson, card, canvasFrame, deckState, open, resetStage, say, settle, write } from "../harness.mjs";
 
@@ -59,7 +59,7 @@ say("placed on the canvas", placed.ok !== false && !placed.error, JSON.stringify
 const away = await call("canvas.fit", [path, { margin: 0 }], agent);
 const awayH = away.value?.h;
 say("fit with no canvas open answers a height", Number.isFinite(awayH), JSON.stringify(away).slice(0, 300));
-// The doc's 24 + 32 + 24 and its rows (~8 px of board.css spacing), plus 260 from the container rule (100 without it) and 333 from the script.
+// The doc's 24 + 32 + 24 and its rows (~8 px of card.css spacing), plus 260 from the container rule (100 without it) and 333 from the script.
 say("…which counts the script's late height and the container rule", (awayH ?? 0) > 660 && (awayH ?? 0) < 700, String(awayH));
 
 // Now the frame shows it: its own measurement is the one fit reads.

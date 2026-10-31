@@ -10,7 +10,7 @@
  * drawn by one is not drawn a second time. Styles a script made without markup (a sheet built in script
  * and adopted, rules inserted into an empty `<style>`) are written out as `<style>`.
  *
- * The page is shaped as the server's own page of a card (`cardPage`, `boards/cards.ts`): board.css from
+ * The page is shaped as the server's own page of a card (`cardPage`, `boards/cards.ts`): card.css from
  * the canvas's `lib/`, `body.board` at the card's width, the card in `#decks-card`. It is loaded at the
  * card's own address, so the card's relative addresses resolve as they do there.
  *
@@ -25,7 +25,7 @@ export interface CardShotOptions {
 	scheme: "light" | "dark";
 	/** The card's address: absolute addresses on its origin are made relative to the site, for the server's Chrome. */
 	url: string;
-	/** A sheet not to write out: the card sheet every card adopts (board.css as `:host`), which the page loads as board.css. */
+	/** A sheet not to write out: the card sheet every card adopts (card.css as `:host`), which the page loads as card.css. */
 	skip?: (sheet: CSSStyleSheet) => boolean;
 }
 
@@ -70,7 +70,7 @@ export function snapshotOfCard(root: ShadowRoot, options: CardShotOptions): Card
 <head>
 <meta charset="utf-8" />
 <meta name="board" content='${JSON.stringify({ w })}' />
-<link rel="stylesheet" href="../../lib/board.css" />
+<link rel="stylesheet" href="../../lib/card.css" />
 ${head.join("\n")}
 </head>
 <body class="board" style="width:${w}px">

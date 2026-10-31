@@ -186,7 +186,7 @@ test("while the person is using the canvas, the agent on screen is offered a but
 	assert.deepEqual(selected, [], "and nothing was selected under them");
 	assert.deepEqual(remembered, [], "nothing parked: it is their conversation already");
 	assert.match(shown.deferred ?? "", /using the canvas/);
-	assert.deepEqual(offered.map((one) => [one.agentId, one.what, one.selected]), [["A", "board", "boards/risks.html"]]);
+	assert.deepEqual(offered.map((one) => [one.agentId, one.what, one.selected]), [["A", "card", "boards/risks.html"]]);
 
 	const camera = runStageCall(call("A", "camera", { x: 10, y: 20, zoom: 1 }), api) as { deferred?: string };
 	assert.equal(moved.length, 0, "a camera move waits the same way");

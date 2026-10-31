@@ -221,7 +221,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const LIVE_FILES = 12;
 	/**
 	 * For the browser checks: every card (and old board) on the canvas and where it is on screen, node or
-	 * picture (`rendered`). `__decksBoards` is its old name, kept until 2026-11-30.
+	 * picture (`rendered`).
 	 */
 	const cardsOnScreen = () => {
 		const element = deps.element();
@@ -235,8 +235,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				return { path: board.path, node: nodes.has(board.path), rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
-	(globalThis as { __decksCards?: typeof cardsOnScreen; __decksBoards?: typeof cardsOnScreen }).__decksCards = cardsOnScreen;
-	(globalThis as { __decksBoards?: typeof cardsOnScreen }).__decksBoards = cardsOnScreen;
+	(globalThis as { __decksCards?: typeof cardsOnScreen }).__decksCards = cardsOnScreen;
 
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.

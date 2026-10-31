@@ -30,8 +30,7 @@ trying — `npx playwright install-deps chromium`, as root, is the fix.
 ## The loop
 
 `decks card url <path>` is the address: the card in a page of its own. Wait for
-`window.__cardReady`, the card page's ready signal (`lib/board.js` sets it, and
-`window.__boardReady`, its name from before cards, beside it): it goes true after fonts, markdown, maths and diagrams have finished,
+`window.__cardReady`, the card page's ready signal (`lib/card.js` sets it): it goes true after fonts, markdown, maths and diagrams have finished,
 and a screenshot taken before it is a picture of a card still loading.
 
 Two things in the preamble are worth keeping when you adapt this. `createRequire`

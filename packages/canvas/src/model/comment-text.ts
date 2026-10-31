@@ -31,9 +31,6 @@ export interface CardComment {
 	title?: string;
 }
 
-/** @deprecated `CardComment`, its old name, kept until 2026-11-30. */
-export type BoardComment = CardComment;
-
 export const QUOTE_LIMIT = 400;
 
 /** A selection as it is quoted: one line, and not the whole page. */

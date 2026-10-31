@@ -9,7 +9,7 @@ import { boxOf, fit } from "./camera.ts";
  * boards exist, what one says) never gets here.
  *
  * Highlighting reaches into the board's own document and sets `data-selected` on the
- * component, which `board.css` already styles. That is the same-origin decision
+ * component, which `card.css` already styles. That is the same-origin decision
  * (DESIGN §4) doing real work: no message protocol, no cooperation from the board,
  * three lines.
  */
@@ -39,7 +39,7 @@ export interface StageOpsHost {
 	/** The person has used the canvas in the last few seconds (`camera/touched.ts`): the view is theirs. */
 	handsOn?(): boolean;
 	/** Offer the held view instead: a notice whose button moves there (`state/notices.ts`, `offer`). */
-	offerView?(agentId: string, camera: Camera, selected: string | undefined, what: "board" | "view"): void;
+	offerView?(agentId: string, camera: Camera, selected: string | undefined, what: "card" | "view"): void;
 	/**
 	 * Keep a view for an agent that is not the one on screen.
 	 *
@@ -65,7 +65,7 @@ export interface StageOpsHost {
  * it to you when you open that chat. Returns the sentence to put in the agent's result, or
  * nothing when the agent asking is the one on screen and the op should simply happen.
  */
-function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "board" | "view" = "view"): { deferred: string } | undefined {
+function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
 	/*
 	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
 	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
@@ -107,7 +107,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
 			const fitAll = args.fit === "all" || boxes.length > 1;
 			const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
-			const waiting = defer(call, host, wanted, boards[0]?.path, "board");
+			const waiting = defer(call, host, wanted, boards[0]?.path, "card");
 			if (waiting) return { shown, ...waiting };
 			host.setCamera(wanted, { animate: args.animate === true });
 			if (boards[0]) host.select(boards[0].path);

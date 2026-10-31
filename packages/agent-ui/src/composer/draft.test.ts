@@ -47,7 +47,7 @@ test("in the sent words a pill stands as [comment n], and pills alone send no wo
  * is — the thing is carried inside, not read back off a label — but unlike a comment they have
  * an address the agent can use, so that is what they read as.
  */
-const BOARD = { type: "mention", kind: "board", id: "boards/plan.html", label: "The plan" } as const;
+const BOARD = { type: "mention", kind: "card", id: "boards/plan.html", label: "The plan" } as const;
 const ITEM = { type: "mention", kind: "item", id: "plan-note", label: "Check the margin" } as const;
 
 test("a board and an item read as their address, where a comment reads as a number", () => {

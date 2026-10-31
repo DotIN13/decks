@@ -214,14 +214,14 @@ function cssInDeck(css: string, base: string): boolean {
 }
 
 /*
- * board.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
+ * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
  * `body.board` turned into the card's own host and element. One sheet for every card on the page,
  * adopted by each root, and the fonts declared once in the page itself, since a shadow root's
  * `@font-face` is not used.
  */
 const sheets = new Map<string, Promise<CSSStyleSheet | undefined>>();
 const cardSheets = new WeakSet<CSSStyleSheet>();
-/** Whether a sheet is the one every card adopts (board.css as the card's): a card's snapshot loads board.css instead (`card-snapshot.ts`). */
+/** Whether a sheet is the one every card adopts (card.css as the card's): a card's snapshot loads card.css instead (`card-snapshot.ts`). */
 export const isCardSheet = (sheet: CSSStyleSheet): boolean => cardSheets.has(sheet);
 const fontsSaid = new Set<string>();
 /** A response's text, or a failure for one refused or missing. */
@@ -233,7 +233,7 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 	if (made) return made;
 	made = (async () => {
 		try {
-			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("board.css", lib)).then(textOf)]);
+			const [theme, board] = await Promise.all([fetch(new URL("theme.css", lib)).then(textOf), fetch(new URL("card.css", lib)).then(textOf)]);
 			const fonts = (theme.match(/@font-face\s*\{[^}]*\}/g) ?? []).map((rule) => rule.replace(/url\(\s*["']?(?!data:)([^"')]+)["']?\s*\)/g, (_all, file: string) => `url("${new URL(file, lib).href}")`));
 			if (!fontsSaid.has(key) && fonts.length) {
 				fontsSaid.add(key);
@@ -250,7 +250,7 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				.replace(/html\[data-decks-focus\]\s*/g, ":host([data-decks-focus]) ")
 				.replace(/body\.board/g, ".card-body")
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
-				// The card is as wide as its box, and as tall as the box at least: board.css sizes a board's body by its meta.
+				// The card is as wide as its box, and as tall as the box at least: card.css sizes a board's body by its meta.
 				/*
 				 * As tall as what is in it, so the card can be measured (`onHeight`, what `decks canvas fit` reads);
 				 * the paper is the host's, so a card shorter than its box still fills it, and what does not fit in the
@@ -294,7 +294,7 @@ function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 }
 
 /*
- * What `board.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
+ * What `card.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
  * `.doc`, `[data-mermaid]` as a diagram, and code in `<pre>` coloured. From the same vendored files in
  * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
  */
@@ -445,7 +445,7 @@ async function cardMermaid(host: HTMLElement, target: HTMLElement, lib: string, 
 	}
 }
 
-/** Draw a card's markdown, maths, diagrams and code, as `board.js` draws a board's. Never throws: a part that fails says so in place. */
+/** Draw a card's markdown, maths, diagrams and code, as `card.js` draws a board's. Never throws: a part that fails says so in place. */
 async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
 	const work: Promise<unknown>[] = [];
 	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
@@ -511,7 +511,7 @@ const registryPerRoot = (() => {
 })();
 
 /**
- * Put a card into `host`: its own closed root, board.css adopted, its HTML (cleaned first when it is
+ * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
  * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
  * they arrive.
  */
@@ -589,12 +589,12 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		path: source.path,
 	};
 	const cleanups: Array<() => void> = [];
-	// Its markdown, maths, diagrams and code drawn, after board.css so a diagram takes the card's colours.
+	// Its markdown, maths, diagrams and code drawn, after card.css so a diagram takes the card's colours.
 	const partsDrawn = sheetReady.then(() => drawParts(host, root, body, lib));
 	if (source.trusted && scripts.length) {
 		const base = source.url.replace(/[?#].*$/, "");
 		void (async () => {
-			// After board.css and the parts it draws, so a script that measures its card measures it as it shows.
+			// After card.css and the parts it draws, so a script that measures its card measures it as it shows.
 			await sheetReady;
 			await partsDrawn;
 			await deckImports(source.url);

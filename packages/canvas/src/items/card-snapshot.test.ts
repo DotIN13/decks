@@ -83,10 +83,10 @@ describe("snapshotOfCard", () => {
 		assert.doesNotMatch(html, /<script/);
 	});
 
-	it("is a card's page: board.css, body.board at the card's width, the card in #decks-card, the scheme", async (t) => {
+	it("is a card's page: card.css, body.board at the card's width, the card in #decks-card, the scheme", async (t) => {
 		if (!page) return t.skip(why);
 		const { html, w, h } = await shoot(`<p>hello</p>`, ``);
-		assert.match(html, /<link rel="stylesheet" href="..\/..\/lib\/board.css"/);
+		assert.match(html, /<link rel="stylesheet" href="..\/..\/lib\/card.css"/);
 		assert.match(html, /<html lang="en" data-theme="dark">/);
 		assert.match(html, /<body class="board" style="width:400px">/);
 		assert.match(html, /<div class="card-body" id="decks-card"><p>hello<\/p><\/div>/);

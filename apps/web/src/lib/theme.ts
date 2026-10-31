@@ -10,7 +10,7 @@ export type { Scheme };
  * not sit around three white pages. No bridge, no message, no cooperation needed
  * from the board — three lines, because the frame is ours.
  *
- * A board that names its own theme keeps it. `board.js` writes `data-theme` only
+ * A board that names its own theme keeps it. `card.js` writes `data-theme` only
  * when the board's `<meta>` asked for one, so the presence of the attribute is
  * exactly the question "did the author decide this?" and the answer is respected.
  */

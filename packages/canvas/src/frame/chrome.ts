@@ -48,7 +48,7 @@ export interface FrameChrome {
 /** A view an agent asked for while the person was at the canvas: theirs to take (`go`) or leave. */
 export interface ViewOffer {
 	agent: string;
-	what: "board" | "view";
+	what: "card" | "view";
 	go(): void;
 }
 

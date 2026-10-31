@@ -557,7 +557,7 @@ function sizeOf(bytes: number | undefined): string {
 /**
  * What kind of thing a row is: an icon, a word and a tint.
  *
- * The families are the ones `board.js` sorts an embed into — prose, picture, markup, PDF,
+ * The families are the ones `card.js` sorts an embed into — prose, picture, markup, PDF,
  * plain text and source — plus the kinds a document page opens, so a row answers "what will
  * this be" rather than naming a filetype.
  */
@@ -583,7 +583,7 @@ function kindOf(entry: BrowseEntry): { icon: LucideIcon; label: string; tone: st
 	return { icon: File, label: extension ? extension.toUpperCase() : "File", tone: "grey" };
 }
 
-/** The extensions `board.js` renders as preformatted text; see its `TEXTUAL` list. */
+/** The extensions `card.js` renders as preformatted text; see its `TEXTUAL` list. */
 const PREFORMATTED = new Set([
 	"txt", "text", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
 	"ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "h", "cc", "cpp", "hpp",

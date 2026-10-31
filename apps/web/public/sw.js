@@ -10,7 +10,7 @@
  * - a **bundle** connection is read from the files unpacked into Cache Storage when it was opened,
  *   laid out the way a server would lay them out (`server/src/share/bundle.ts`).
  *
- * An absolute `/api/...` that a page under `/c/<id>/` asks for (board.js does) is routed the same way,
+ * An absolute `/api/...` that a page under `/c/<id>/` asks for (card.js does) is routed the same way,
  * by the address of the page that asked. Everything else, which is everything when only this
  * server is in use, is not touched.
  *
@@ -173,8 +173,8 @@ async function fromBundle(id, rest) {
 	const path = url.pathname;
 	const after = (prefix) => normalize(decoded(path.slice(prefix.length)));
 	if (path === "/api/hello") return Response.json({ decks: true, name: manifest.stage.title, bundle: true });
-	if (path.startsWith("/api/board/")) {
-		const file = after("/api/board/");
+	if (path.startsWith("/api/card/")) {
+		const file = after("/api/card/");
 		if (!file) return plain(404, "Outside the canvas.");
 		if (!url.searchParams.has("raw") && manifest.served.includes(file)) return entryOf(id, `served/${file}`);
 		return entryOf(id, `deck/${file}`);

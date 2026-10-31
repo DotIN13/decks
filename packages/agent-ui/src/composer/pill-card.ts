@@ -51,7 +51,7 @@ const BODIES = {
 };
 const PILL_ICONS: Record<MentionKind, string> = {
 	comment: svg(BODIES.comment, 11, "pill-icon"),
-	board: svg(BODIES.card, 11, "pill-icon"),
+	card: svg(BODIES.card, 11, "pill-icon"),
 	item: svg(BODIES.shape, 11, "pill-icon"),
 	file: svg(BODIES.file, 11, "pill-icon"),
 };

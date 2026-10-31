@@ -96,7 +96,7 @@ await page.goto(`${url}/${query ? `?${query}` : ""}`, { waitUntil: "load" });
 const findFrame = async () => {
 	for (let i = 0; i < 300; i++) {
 		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame"));
-		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage") && (globalThis.__decksBoards?.().length ?? 0) > 0).catch(() => false))) return frame;
+		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage") && (globalThis.__decksCards?.().length ?? 0) > 0).catch(() => false))) return frame;
 		await sleep(100);
 	}
 	throw new Error("the canvas frame never showed its stage with items on it");
@@ -236,14 +236,14 @@ const live = () =>
 			const b = host.getBoundingClientRect();
 			return getComputedStyle(host).visibility !== "hidden" && b.right > r.left && b.left < r.right && b.bottom > r.top && b.top < r.bottom;
 		});
-		return { live: hosts.length, kept: all.length - hosts.length, onScreen: shown.length, cards: (globalThis.__decksBoards?.() ?? []).length };
+		return { live: hosts.length, kept: all.length - hosts.length, onScreen: shown.length, cards: (globalThis.__decksCards?.() ?? []).length };
 	});
 
 // Settle after the open, then go to the middle of the cards: the stage scrolls (a pan), then pinches to 100%.
 await atRest();
 await settled(2500, 30000);
 await canvas.evaluate(() => {
-	const rects = (globalThis.__decksBoards?.() ?? []).map((one) => one.rect);
+	const rects = (globalThis.__decksCards?.() ?? []).map((one) => one.rect);
 	const xs = rects.map((r) => r.left + r.width / 2).sort((p, q) => p - q);
 	const ys = rects.map((r) => r.top + r.height / 2).sort((p, q) => p - q);
 	const stage = document.querySelector(".stage");

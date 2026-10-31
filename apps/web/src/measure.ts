@@ -8,7 +8,7 @@ import { measureFrame } from "./measure/page.ts";
  * A card is measured where it is drawn, and a card nobody is looking at is drawn nowhere: an agent
  * writing on its own canvas while the person looks at another was told "nothing has measured" on most
  * fits. This page draws it instead, in the server's own Chromium, and draws it the way the canvas
- * frame does (`card-surface.tsx`): `mountCard` in a closed shadow root at the card's width, board.css
+ * frame does (`card-surface.tsx`): `mountCard` in a closed shadow root at the card's width, card.css
  * adopted, its modules handed the card (`CardContext`), and its height heard as it changes. A card in a
  * plain frame got none of that: a script that asked its card for `on` or `file` threw, a height set a
  * moment after waking was never seen, and fit read the card without its script.

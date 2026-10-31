@@ -9,7 +9,7 @@ import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messag
 const mine: WaitingComment = { id: "c1", board: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };
 const handed: WaitingComment = { id: "c2", board: "canvases/md/cards/sdk/index.html", quote: "SDK; each", text: "test note\nsecond line", at: 2, from: "canvas" };
 const drawn: WaitingComment = { id: "c3", board: "canvases/md/canvas.pen", items: ["note-4", "arrow-7"], quote: "hello", text: "", at: 3 };
-const board: DraftMention = { type: "mention", kind: "board", id: "canvases/x/boards/the-chrome-choice.html", label: "The chrome choice" };
+const board: DraftMention = { type: "mention", kind: "card", id: "canvases/x/boards/the-chrome-choice.html", label: "The chrome choice" };
 const item: DraftMention = { type: "mention", kind: "item", id: "rect-9", label: "a square", name: "a square" };
 
 test("a pill's exact text is what the message carries for it", () => {
@@ -52,7 +52,7 @@ test("a sent message reads back into the pills it was written with", () => {
 		" and look at ",
 		`comment:${commentPill(handed).label}`,
 		" before you move ",
-		`board:${board.id}`,
+		`card:${board.id}`,
 		" and ",
 		"item:rect-9",
 		". The numbers are in ",
@@ -127,7 +127,7 @@ test("a sent message keeps its parts: names, who put each in, what its card show
 		[
 			["comment", "SDK redesign decisions", "you"],
 			["comment", "SDK redesign decisions", "canvas"],
-			["board", longTitle, "you"],
+			["card", longTitle, "you"],
 			["item", "a square", "you"],
 			["file", "plan.pdf", "you"],
 		],
@@ -151,6 +151,9 @@ test("a sent message keeps its parts: names, who put each in, what its card show
 	assert.equal(aboutSent(reading, pills[1]!)!.name, "SDK redesign decisions");
 	assert.equal(aboutSent(reading, pills[3]!)!.name, "a square");
 	assert.equal(aboutSent(reading, pills[2]!)!.name, longTitle);
+	// A message saved before cards says "board" for a card: its pill is a card's.
+	const old = readParts([{ type: "mention", kind: "board" as "card", id: "boards/plan.html", name: "The plan", from: "you" }])!;
+	assert.equal((old.draft[0] as DraftMention).kind, "card");
 	// A comment the message did not carry (its pill was there, its comment was not sent) is left out.
 	assert.equal(messageParts([commentPill(drawn)], notes).length, 0);
 });

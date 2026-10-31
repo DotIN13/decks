@@ -8,7 +8,7 @@ import type { Page } from "@decks/protocol";
  * write it* is not on the wire and cannot be, because it is about a screen, and screens are here.
  *
  * So the browser answers it at the moment the act arrives, and answers it by reading the board:
- * `board.seen`. That clears the mark everywhere the person is signed in, which is the same rule
+ * `card.seen`. That clears the mark everywhere the person is signed in, which is the same rule
  * reading a board in the focus view already follows.
  */
 export function watchedBeingNamed(

@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "266fe6f2dcdfcfbfc1c9ef4470a11024e31feace84357f9c6a6f6a6d9a0e06f5",
+	"hash": "a4dbcc700129ee362850155d913772621d84ef8149b5114bea1f371559d0d05c",
 	"rules": 1861,
 	"sheets": 21,
 	"ties": 23,
@@ -990,7 +990,7 @@
 		["packages/canvas/styles/ink.css","@layer components ▸ .stream-bubble [data-component=\"mention-pill\"]{-webkit-user-select:text;user-select:text}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"]:is(:hover,[aria-expanded=\"true\"]){background:color-mix(in srgb, var(--pill, #f2b200) 36%, transparent)}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"] [data-slot=\"pill-icon\"]{display:inline;margin-inline-end:3px;vertical-align:-0.1em;opacity:0.7}"],
-		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"][data-kind=\"board\"]{--pill:var(--color-accent)}"],
+		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"][data-kind=\"card\"]{--pill:var(--color-accent)}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"][data-kind=\"item\"]{--pill:#8b5cf6}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ :is([data-slot=\"composer-input\"],.stream-bubble) [data-component=\"mention-pill\"][data-kind=\"file\"]{--pill:#2563eb}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ .floatcard.pill-card{width:340px;max-width:calc(100vw - 16px);padding:10px 12px;border-radius:10px;font-size:var(--type-body);line-height:1.45}"],

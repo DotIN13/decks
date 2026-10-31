@@ -102,7 +102,7 @@ test("a window folds from where it starts", () => {
 
 // A message kept with its parts (`MessagePart`) carries them to its card, for its pills; an older one has none.
 test("your message's card carries the parts it was kept with", () => {
-	const parts = [{ type: "mention" as const, kind: "board" as const, id: "boards/plan.html", name: "The plan", from: "you" as const }];
+	const parts = [{ type: "mention" as const, kind: "card" as const, id: "boards/plan.html", name: "The plan", from: "you" as const }];
 	const cards = turnCards([
 		{ kind: "user", id: "u1", text: "@boards/plan.html", at: 1, parts },
 		{ kind: "user", id: "u2", text: "plain", at: 2 },

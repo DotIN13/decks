@@ -317,7 +317,6 @@ export function createEditor(
 		setCamera: putCamera,
 		restored: firstView !== undefined,
 		reloadCard: reload,
-		reloadBoard: reload,
 		dispose() {
 			disposeViews?.();
 			tools();

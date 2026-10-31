@@ -86,7 +86,7 @@ function createUi() {
 				 * label worked out again at the other end would be a second answer to the same
 				 * question (`chat/composer/draft.ts`).
 				 */
-				pills?: Array<{ kind: "board" | "item"; id: string; label: string }>;
+				pills?: Array<{ kind: "card" | "item"; id: string; label: string }>;
 				/** Files attached or dropped, by their path in the deck: each a pill where the caret is. */
 				files?: string[];
 		  }

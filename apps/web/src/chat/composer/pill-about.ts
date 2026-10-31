@@ -171,7 +171,9 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 			draft.push(commentPill(comment));
 			continue;
 		}
-		draft.push({ type: "mention", kind: part.kind, id: part.id, label: part.label || shortLabel(name), name });
+		// A message saved before cards says "board" for a card.
+		const kind = (part.kind as string) === "board" ? "card" : part.kind;
+		draft.push({ type: "mention", kind, id: part.id, label: part.label || shortLabel(name), name });
 	}
 	return draft.some((node) => node.type === "mention") ? { draft, comments, exact } : undefined;
 }
@@ -276,7 +278,7 @@ export function readSent(text: string, titleOf: TitleOf = none): SentReading | u
 		} else {
 			const address = mark.address!;
 			if (address.startsWith("item:")) draft.push({ type: "mention", kind: "item", id: address.slice(5), label: address.slice(5) });
-			else draft.push({ type: "mention", kind: /\.html?$/.test(address) ? "board" : "file", id: address, label: /\.html?$/.test(address) ? titleOf(address) ?? pathName(address) : address.split("/").pop() || address });
+			else draft.push({ type: "mention", kind: /\.html?$/.test(address) ? "card" : "file", id: address, label: /\.html?$/.test(address) ? titleOf(address) ?? pathName(address) : address.split("/").pop() || address });
 		}
 		from = mark.at + mark.length;
 	}

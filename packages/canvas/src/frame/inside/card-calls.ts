@@ -57,9 +57,7 @@ export function cardCalls(deps: CardCallDeps): (verb: string, args: unknown[], c
 				return { canvas: deps.canvas, target };
 			}
 			case "view.reload": {
-				// `board` is `card`'s old name, taken until 2026-11-30.
-				const asked = (args[0] ?? {}) as { card?: unknown; board?: unknown };
-				const card = asked.card ?? asked.board;
+				const card = ((args[0] ?? {}) as { card?: unknown }).card;
 				if (typeof card !== "string") throw new CallRefused('view.reload names a card: { card: "<path>" }.', "refused");
 				deps.reload(card);
 				return { reloaded: 1 };

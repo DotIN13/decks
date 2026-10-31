@@ -52,7 +52,7 @@ async function main(): Promise<void> {
 				world.append(frame);
 				const started = performance.now();
 				const wait = () => {
-					const ready = (frame.contentWindow as (Window & { __boardReady?: boolean }) | null)?.__boardReady;
+					const ready = (frame.contentWindow as (Window & { __cardReady?: boolean }) | null)?.__cardReady;
 					if (ready || performance.now() - started > PAGE_MS) resolve();
 					else setTimeout(wait, 100);
 				};

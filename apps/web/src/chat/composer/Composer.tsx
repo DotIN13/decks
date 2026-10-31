@@ -108,7 +108,7 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>; files?: string[] } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>; files?: string[] } | undefined;
 	/**
 	 * The draft above has been put in the field: forget it. A handover happens once — a draft
 	 * still held after it was taken is one that can be put back by anything that re-reads it,

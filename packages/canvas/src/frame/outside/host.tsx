@@ -129,8 +129,6 @@ export interface FramedHandle {
 	setCamera(camera: Camera): void;
 	/** A card's file changed: it loads again. */
 	reloadCard(path: string): void;
-	/** @deprecated `reloadCard`, its old name, kept until 2026-11-30. */
-	reloadBoard(path: string): void;
 	/** Always false: the page keeps the views, not the frame. */
 	readonly restored: boolean;
 	dispose(): void;
@@ -578,7 +576,6 @@ export function createFramedEditor(options: Options): FramedEditor {
 			end()?.emit("camera", { camera });
 		},
 		reloadCard: (path) => end()?.emit("reload", { path }),
-		reloadBoard: (path) => end()?.emit("reload", { path }),
 		paste: (data) => end()?.emit("paste", data),
 		restored: false,
 		dispose: () => {
