@@ -56,7 +56,7 @@ const app = (n) => `<!doctype html>
 <head>
 	<meta charset="utf-8" />
 	<title>Awake app ${n}</title>
-	<script src="decks-storage.js"></script>
+	<script src="decks-canvas.js"></script>
 	<style>
 		:root { color-scheme: light dark; font-family: system-ui, sans-serif }
 		body { margin: 0; padding: 24px; line-height: 1.5 }

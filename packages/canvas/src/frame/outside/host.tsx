@@ -165,7 +165,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 	/**
 	 * Where an app inside a canvas keeps its browser storage on this page: by the app, not the canvas, so
 	 * the same app on another canvas reads the same values; the same keys its own tab uses on this origin
-	 * (`decks-storage.js`, `server/src/apps/storage-script.ts`).
+	 * (`decks-canvas.js`, `server/src/apps/canvas-guest.ts`).
 	 */
 	const APP_STORE = "decks.app:";
 	/** What the frame's own views were kept under in that store (`createAgentViews`'s key "frame"). */

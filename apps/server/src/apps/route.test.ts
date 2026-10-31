@@ -175,7 +175,7 @@ test("an app inside a canvas frame is reached on the pass in its path: any metho
 		assert.equal(preflight.headers["access-control-allow-headers"], "content-type");
 		const refused = await ask(`/app/t/dk_ap_wrong.pass/review/`);
 		assert.equal(refused.status, 401);
-		const script = await ask(`/app/t/${good}/review/decks-storage.js`);
+		const script = await ask(`/app/t/${good}/review/decks-canvas.js`);
 		assert.equal(script.status, 200);
 		assert.match(script.body, /decks\.app:review:/, "the storage script keeps the app's values under its name");
 	} finally {

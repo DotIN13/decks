@@ -1,17 +1,25 @@
 /**
- * `decks-canvas.js`: what an app's page needs on the canvas, put in every page the canvas frame
- * serves (`route.ts`), beside the browser storage stand-in (`storage-script.ts`) and apart from it.
+ * `decks-canvas.js`: what an app's page needs on the canvas, in one script, put first into every page
+ * the canvas frame serves (`route.ts`) unless the page has it. An app may ask for it itself with
+ * `<script src="decks-canvas.js"></script>`, which also works in a tab of its own.
  *
- * Today it is one thing: a wheel inside the app, as inside a card on the canvas. What something under
- * the pointer can still scroll is scrolled here, natively; the rest, and every pinch, is handed up to
- * the canvas (`decks-wheel`), which pans or zooms with it (`items/item-surfaces.tsx`). Only inside the
- * canvas frame: a page opened in a tab of its own keeps every wheel. A page that has the tag keeps it.
+ * - **Browser storage.** A sandboxed frame has no `localStorage`: this stands one in. Values ride the
+ *   page's address after `#` when it opens and go up to the canvas as messages (`decks-storage`) when
+ *   they change, so the page keeps them under the app's name (`frame/inside/options.ts`).
+ * - **Wheels.** A wheel inside the app, as inside a card on the canvas: what something under the pointer
+ *   can still scroll is scrolled here, natively; the rest, and every pinch, is handed up (`decks-wheel`),
+ *   and the canvas pans or zooms with it (`items/item-surfaces.tsx`). Only inside the canvas frame.
+ *
+ * `decks-storage.js`, the storage stand-in's old name, is served as this script still, for a page that
+ * asks for it by that name.
  */
 export const GUEST_SCRIPT = "decks-canvas.js";
+/** The old name of the storage stand-in, which was the whole script: served as `GUEST_SCRIPT`, and a page asking for it needs no second tag. */
+export const OLD_STORAGE_SCRIPT = "decks-storage.js";
 
-/** The page with the guest script's tag put first in its head, unless it has one. */
+/** The page with the guest script's tag put first in its head, unless it has one (by either name). */
 export function withGuest(html: string, src: string): string {
-	if (html.includes(GUEST_SCRIPT)) return html;
+	if (html.includes(GUEST_SCRIPT) || html.includes(OLD_STORAGE_SCRIPT)) return html;
 	const tag = `<script src="${src}"></script>`;
 	const head = /<head\b[^>]*>/i.exec(html);
 	if (head) return html.slice(0, head.index + head[0].length) + tag + html.slice(head.index + head[0].length);
@@ -20,7 +28,60 @@ export function withGuest(html: string, src: string): string {
 }
 
 export function guestScript(name: string): string {
-	return `/* Decks: the app ${name} on the canvas (decks-canvas.js): a wheel it cannot use goes to the canvas. */
+	return `/* Decks: the app ${name} on the canvas (decks-canvas.js): browser storage, and a wheel it cannot use goes to the canvas. */
+(() => {
+	const PREFIX = ${JSON.stringify(`decks.app:${name}:`)};
+	let real = null;
+	try {
+		real = window.localStorage;
+		real.getItem(PREFIX);
+	} catch {
+		real = null;
+	}
+	const values = new Map();
+	let write;
+	if (real) {
+		for (let i = 0; i < real.length; i++) {
+			const key = real.key(i);
+			if (key && key.startsWith(PREFIX)) values.set(key.slice(PREFIX.length), real.getItem(key) ?? "");
+		}
+		write = (key, value) => (value === null ? real.removeItem(PREFIX + key) : real.setItem(PREFIX + key, value));
+	} else {
+		const hash = location.hash.slice(1);
+		const params = new URLSearchParams(hash);
+		const carried = params.get("decks-storage");
+		if (carried) {
+			try {
+				const text = new TextDecoder().decode(Uint8Array.from(atob(carried.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
+				for (const [key, value] of Object.entries(JSON.parse(text))) values.set(key, String(value));
+			} catch {}
+			params.delete("decks-storage");
+			const rest = params.toString();
+			try {
+				history.replaceState(history.state, "", location.pathname + location.search + (rest ? "#" + rest : ""));
+			} catch {}
+		}
+		write = (key, value) => parent.postMessage({ type: "decks-storage", key, value }, "*");
+	}
+	const api = {
+		get length() { return values.size; },
+		key: (i) => [...values.keys()][i] ?? null,
+		getItem: (key) => (values.has(String(key)) ? values.get(String(key)) : null),
+		setItem: (key, value) => { key = String(key); value = String(value); values.set(key, value); write(key, value); },
+		removeItem: (key) => { key = String(key); if (values.delete(key)) write(key, null); },
+		clear: () => { for (const key of [...values.keys()]) { values.delete(key); write(key, null); } },
+	};
+	// Read and written as properties too, as many apps do (\`localStorage.theme = "dark"\`).
+	const storage = new Proxy(api, {
+		get: (target, prop) => (typeof prop === "symbol" || prop in target ? Reflect.get(target, prop) : target.getItem(prop)),
+		set: (target, prop, value) => (typeof prop === "symbol" || prop in target ? false : (target.setItem(prop, value), true)),
+		deleteProperty: (target, prop) => (typeof prop === "symbol" ? false : (target.removeItem(prop), true)),
+		has: (target, prop) => (typeof prop === "symbol" || prop in target ? prop in target : values.has(prop)),
+		ownKeys: () => [...values.keys()],
+		getOwnPropertyDescriptor: (target, prop) => (typeof prop === "string" && values.has(prop) ? { value: values.get(prop), writable: true, enumerable: true, configurable: true } : undefined),
+	});
+	Object.defineProperty(window, "localStorage", { value: storage, configurable: true });
+})();
 (() => {
 	if (window.parent === window) return;
 	const canTake = (el, dx, dy) => {

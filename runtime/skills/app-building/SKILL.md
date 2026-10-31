@@ -28,9 +28,11 @@ change a file, finish a build or restart the server.
   makes it a **server** app.
 - **State that is only about this browser** (the last tab open, a panel's width, a draft in
   progress): `localStorage`, with this line at the top of the page, before your own scripts:
-  `<script src="decks-storage.js"></script>`. Decks answers that address itself. On the canvas the
-  app runs in a sandboxed frame where the browser's `localStorage` throws; the script stands one in,
-  kept by the page in this browser. In a tab it uses the browser's own. Calls and properties both work
+  `<script src="decks-canvas.js"></script>`. Decks answers that address itself, and puts the script
+  into the page on the canvas whether or not it asked. On the canvas the app runs in a sandboxed frame
+  where the browser's `localStorage` throws; the script stands one in, kept by the page in this
+  browser, and hands the canvas any wheel the page cannot scroll with, so panning and zooming work
+  over the app. In a tab it uses the browser's own storage and keeps every wheel. Calls and properties both work
   (`localStorage.getItem("t")`, `localStorage.t = "dark"`); IndexedDB and cookies do not, on the canvas.
 - When unsure, the server: losing data hurts more than syncing it.
 

@@ -4,8 +4,7 @@ import type { Duplex } from "node:stream";
 import type { Response } from "express";
 import { bearerOf, fromAnotherSite, originOf, queryTokenOf } from "../auth/guard.ts";
 import { APP_NAME, type Apps } from "./service.ts";
-import { STORAGE_SCRIPT, storageScript, withStorage } from "./storage-script.ts";
-import { GUEST_SCRIPT, guestScript, withGuest } from "./canvas-guest.ts";
+import { GUEST_SCRIPT, OLD_STORAGE_SCRIPT, guestScript, withGuest } from "./canvas-guest.ts";
 import { readFile } from "node:fs/promises";
 
 /**
@@ -127,14 +126,8 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 		return true;
 	}
 	apps.seen(at.name);
-	// The browser storage an app asks for with one script tag (`storage-script.ts`): Decks', not the app's.
-	if (at.inner === `/${STORAGE_SCRIPT}`) {
-		res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
-		res.end(storageScript(at.name));
-		return true;
-	}
-	// What a page needs on the canvas (`canvas-guest.ts`): its wheels, apart from its storage.
-	if (at.inner === `/${GUEST_SCRIPT}`) {
+	// What a page needs on the canvas (`canvas-guest.ts`): browser storage and its wheels, in one script; its old name answers the same.
+	if (at.inner === `/${GUEST_SCRIPT}` || at.inner === `/${OLD_STORAGE_SCRIPT}`) {
 		res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
 		res.end(guestScript(at.name));
 		return true;
@@ -146,12 +139,12 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			plain(res, 404, `apps/${at.name} has no file at ${at.inner}.${built}`);
 			return true;
 		}
-		// In the canvas frame a page gets the browser storage stand-in whether or not it asked (`withStorage`).
+		// In the canvas frame a page gets the canvas guest, storage and wheels, whether or not it asked (`withGuest`).
 		if (inFrame && /\.html?$/i.test(file)) {
 			void readFile(file, "utf8").then(
 				(html) => {
 					res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
-					res.end(withGuest(withStorage(html, `${base}/${STORAGE_SCRIPT}`), `${base}/${GUEST_SCRIPT}`));
+					res.end(withGuest(html, `${base}/${GUEST_SCRIPT}`));
 				},
 				(error: Error) => plain(res, 500, error.message),
 			);
@@ -173,7 +166,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 		}
 		const path = manifest.prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`;
 		const sent = forwarded(req, base, paired);
-		// A page read whole to add the storage stand-in to (`withStorage`) comes plain, not compressed.
+		// A page read whole to add the canvas guest to (`withGuest`) comes plain, not compressed.
 		if (inFrame) delete sent["accept-encoding"];
 		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: sent }, (answer) => {
 			const headers = { ...answer.headers };
@@ -186,7 +179,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 				const parts: Buffer[] = [];
 				answer.on("data", (part: Buffer) => parts.push(part));
 				answer.on("end", () => {
-					const html = withGuest(withStorage(Buffer.concat(parts).toString("utf8"), `${base}/${STORAGE_SCRIPT}`), `${base}/${GUEST_SCRIPT}`);
+					const html = withGuest(Buffer.concat(parts).toString("utf8"), `${base}/${GUEST_SCRIPT}`);
 					delete headers["content-length"];
 					res.writeHead(answer.statusCode ?? 502, headers);
 					res.end(html);

@@ -1,7 +1,7 @@
 /**
  * An app placed on your own canvas runs inside the canvas frame, as a sandboxed iframe on the app pass in
  * its path (`server/src/routes/apps.ts`, `apps/route.ts`), and keeps what it saves in this browser through
- * `decks-storage.js`: the page keeps it, and the app reads it back after a reload.
+ * `decks-canvas.js`: the page keeps it, and the app reads it back after a reload.
  *
  * - the app item's body is the app itself, at `/app/t/<pass>/<name>/`, not the bar and Open alone;
  * - before the item is selected the app takes no pointer, and after it does;
@@ -32,7 +32,7 @@ const agentId = await until(async () => link.last("agents")?.focused);
 const stageName = await until(async () => link.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 
 const made = await call("apps.create", ["e2e-counter", { title: "E2E counter", starter: "static" }]);
-say("a static app is made from the starter, which asks for decks-storage.js", made.ok && /decks-storage\.js/.test(readFileSync(join(deck.path, "apps", "e2e-counter", "index.html"), "utf8")), JSON.stringify(made.error ?? ""));
+say("a static app is made from the starter, which asks for decks-canvas.js", made.ok && /decks-canvas\.js/.test(readFileSync(join(deck.path, "apps", "e2e-counter", "index.html"), "utf8")), JSON.stringify(made.error ?? ""));
 const placed = await call("canvas.insert", [made.value?.item, { canvas: stageName, at: { x1: 0, y1: 0 } }]);
 const id = placed.value?.id;
 await call("view.focus", [id, { canvas: stageName }]);

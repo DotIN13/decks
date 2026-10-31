@@ -52,7 +52,7 @@ export interface CanvasHost {
 		open(name: string): void;
 		/**
 		 * The address the app loads at inside the canvas, its pass in the path and its saved browser values
-		 * after `#` (`decks-storage.js`); or why it must open in a tab instead. Absent: apps open in a tab.
+		 * after `#` (`decks-canvas.js`); or why it must open in a tab instead. Absent: apps open in a tab.
 		 */
 		inCanvas?(name: string): Promise<{ url: string } | { tab: string }>;
 		/** A value the app saved in its browser storage, kept by the page under the app's name. */

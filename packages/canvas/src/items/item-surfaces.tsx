@@ -103,7 +103,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		if (!ask || address()) return;
 		void ask(props.app).then(setAddress);
 	});
-	// What the app's own iframe says: what it saved in its browser storage (`decks-storage.js`), and a wheel it had no use for (`decks-canvas.js`).
+	// What the app's own iframe says: what it saved in its browser storage, and a wheel it had no use for (`decks-canvas.js`).
 	const onMessage = (event: MessageEvent) => {
 		if (!frame || event.source !== frame.contentWindow) return;
 		const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
