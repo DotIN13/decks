@@ -9,7 +9,7 @@
  * - a pinch mounts nothing mid-gesture: nodes come and go only at rest;
  * - a press in an app selects it first, and only then does its window take the pointer (the person's choice).
  */
-import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
+import { canvasFrame, deckState, nameOf, open, say, socket } from "../harness.mjs";
 import { writeAwakeCanvas } from "../awake-canvas.mjs";
 
 const CANVAS = "awake-small";
@@ -36,6 +36,12 @@ say("the small awake canvas is written", written.cards === 3 && written.apps ===
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 const { page, errors } = await open({ width: 1400, height: 900, cards: false });
+/** Picture requests and their answers, for a failure to explain itself. */
+const pictureLog = [];
+page.on("response", (response) => {
+	const url = response.url();
+	if (/\/thumb\//.test(url)) pictureLog.push(`${response.status()} ${response.headers()["x-decks-picture"] ?? ""} ${decodeURIComponent(url.replace(/^.*\/thumb\//, "")).slice(0, 90)}`);
+});
 link.send({ type: "agent.stage", id: agentId, stage: CANVAS });
 setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1000);
 await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
@@ -275,6 +281,38 @@ const appsPictured = await until(async () => {
 	return appPaths.every((path) => pictured.includes(path)) ? pictured : undefined;
 }, 10000);
 say("zoomed out to 30%, every app, the ones that ran included, is drawn as its picture, as a card is", !!appsPictured, JSON.stringify(await canvas.evaluate(() => (globalThis.__decksPictured?.() ?? []).filter((p) => p.startsWith("item:")))));
+// --- below 40%, a press on a picture wakes it, and a press elsewhere puts it back to sleep: a card and an app alike ----
+at("wake by press");
+const pressPicture = async (path, label) => {
+	// Centred first, so the press is clear of the page's panels.
+	const centre = await canvas.evaluate((path) => {
+		const c = globalThis.__decksCards().find((one) => one.path === path);
+		const cam = globalThis.__decksRust.camera;
+		const r = document.querySelector(".stage").getBoundingClientRect();
+		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
+	}, path);
+	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.3, y - 900 / 2 / 0.3), centre);
+	await rest();
+	const asleep = await canvas.evaluate((path) => ({ pictured: (globalThis.__decksPictured?.() ?? []).includes(path), live: globalThis.__decksAwake?.().live.includes(path) }), path);
+	say(`${label}: asleep at 30%, its picture on the sheet`, asleep.pictured && !asleep.live, JSON.stringify(asleep));
+	const r = await canvas.evaluate((path) => { const c = globalThis.__decksCards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, path);
+	await page.mouse.click(frameBox.x + r[0] + r[2] / 2, frameBox.y + r[1] + r[3] * 0.7);
+	const woke = await until(async () => {
+		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksAwake?.().selected, live: globalThis.__decksAwake?.().live.includes(path), node: [...document.querySelectorAll('.card-node[data-state="live"]')].some((n) => n.dataset.path === path) }), path);
+		return got.selected === path && got.live && got.node ? got : undefined;
+	}, 8000);
+	say(`${label}: a press on its picture selects it and it goes live, below 40% too`, !!woke, JSON.stringify(woke ?? (await canvas.evaluate(() => globalThis.__decksAwake?.()))));
+	// A press on bare canvas, far from it, lets it go.
+	await page.mouse.click(frameBox.x + 1300, frameBox.y + 100);
+	const slept = await until(async () => {
+		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksAwake?.().selected, live: globalThis.__decksAwake?.().live.includes(path), pictured: (globalThis.__decksPictured?.() ?? []).includes(path) }), path);
+		return got.selected !== path && !got.live && got.pictured ? got : undefined;
+	}, 8000);
+	const why = slept ?? (await canvas.evaluate((path) => { const n = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path); const e = globalThis.__decksRust; const placed = e?.placedCards?.find((c) => c.path === path); return { awake: globalThis.__decksAwake?.(), pictured: (globalThis.__decksPictured?.() ?? []).includes(path), node: n && { ...n.dataset }, placed: placed && { live: placed.live, ready: placed.ready, picture: placed.picture?.slice(-40) }, held: e?.heldWidth?.get(`card:${path}`), bytes: e?.pictureBytes?.get(`card:${path}`), rustPictured: e?.page?.pictured?.(), liveKey: e?.liveKey }; }, path));
+	say(`${label}: unselected below 40%, it sleeps and is its picture again`, !!slept, `${JSON.stringify(why)} pictures: ${JSON.stringify(pictureLog.filter((l) => l.includes(nameOf(path))).slice(-6))}`);
+};
+await pressPicture(cardPaths[0], "card");
+await pressPicture(appPaths[0], "app");
 say("no page errors", errors.length === 0, errors.join(" | "));
 await page.close().catch(() => {});
 // The harness's socket would keep the process alive.

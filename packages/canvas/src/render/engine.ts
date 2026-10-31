@@ -1315,6 +1315,9 @@ export class StageEngine {
 				this.cardsSent.calls++;
 				this.cardsSent.bytes += live.length;
 				this.page.setLive(live);
+				// An item let go wants its picture drawn now, and one gone live its hole: a frame, as the whole list gets one.
+				this.wantCardPictures();
+				this.draw();
 			}
 			return;
 		}
