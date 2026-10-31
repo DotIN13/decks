@@ -230,6 +230,10 @@ export class PageEngine {
      */
     setInk(strokes: string): void;
     /**
+     * Which of the stage's cards are live now (`["path", …]`): the rest is as `setCards` last said.
+     */
+    setLive(live: string): void;
+    /**
      * Read cards with the app's own reader: `(source) => JSON of blocks`.
      */
     setMarkdownReader(read: Function): void;
@@ -489,6 +493,7 @@ export interface InitOutput {
     readonly pageengine_setDocument: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setGpu: (a: number, b: number) => void;
     readonly pageengine_setInk: (a: number, b: number, c: number) => void;
+    readonly pageengine_setLive: (a: number, b: number, c: number) => void;
     readonly pageengine_setMarkdownReader: (a: number, b: any) => void;
     readonly pageengine_setMath: (a: number, b: any) => void;
     readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number, number, number];
@@ -538,8 +543,8 @@ export interface InitOutput {
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__107: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__108: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__109: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

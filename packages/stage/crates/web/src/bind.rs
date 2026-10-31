@@ -494,6 +494,15 @@ impl PageEngine {
 			.collect();
 	}
 
+	/// Which of the stage's cards are live now (`["path", …]`): the rest is as `setCards` last said.
+	#[wasm_bindgen(js_name = setLive)]
+	pub fn set_live(&mut self, live: &str) {
+		let live: std::collections::HashSet<String> = serde_json::from_str::<Vec<String>>(live).unwrap_or_default().into_iter().collect();
+		for card in &mut self.page.cards {
+			card.live = live.contains(&card.path);
+		}
+	}
+
 	/// Boards a drag carries (`["path", …]`), and how far.
 	pub fn carry(&mut self, paths: &str, dx: f64, dy: f64) {
 		self.page.carry = (ids(paths).into_iter().collect(), dx, dy);

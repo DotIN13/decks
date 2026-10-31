@@ -243,11 +243,21 @@ export class Apps {
 		}
 	}
 
+	/** Hears each change of an app's status (`app.ts`: told to the canvas frames showing it, `app.state`). */
+	onChange?: (name: string, state: AppState) => void;
+
 	private set(name: string, patch: Partial<Omit<AppState, "name" | "title" | "kind" | "url">>): void {
 		const was = this.states.get(name) ?? { status: this.firstStatus(name) };
 		const next = { ...was, ...patch };
 		for (const key of Object.keys(patch) as Array<keyof typeof patch>) if (patch[key] === undefined) delete next[key];
 		this.states.set(name, next);
+		if (was.status !== next.status && this.onChange) {
+			try {
+				this.onChange(name, this.state(name));
+			} catch {
+				/* an app gone while it changed: nothing to say */
+			}
+		}
 	}
 
 	log(name: string, tail = 200): string[] {

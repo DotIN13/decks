@@ -1,7 +1,7 @@
 import { VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
-import { appActor, callerTool, conversationFor } from "../stage/caller-run.ts";
+import { appActor, callerTool, canvasHolds, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
 import { bearerOf } from "../auth/guard.ts";
 import type { Principal } from "../auth/principal.ts";
@@ -363,6 +363,8 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
 	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
+	// An app's state, for a canvas holding an item of that app.
+	if (message.type === "app.state") return typeof message.name === "string" && canvasHolds(app.stage.pens, canvas, appActor(message.name));
 	if (message.type === "card.changed") {
 		const board = message.card as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;

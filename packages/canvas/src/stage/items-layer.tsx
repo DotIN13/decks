@@ -10,7 +10,7 @@ import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
-import { AWAKE, DEVICE } from "../render/device.ts";
+import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import { drawing } from "../edit/ink.ts";
 import { scheme } from "../lib/theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
@@ -54,15 +54,19 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * A pinch on pictures: while the scale moves, the awake cards are hidden and the sheet draws each as
 	 * its picture, so the page stretches one sheet and lays out, paints and layers no card.
 	 *
-	 * Off unless `?card-pictures=1` is in the page's address. Meant for an iPad or a phone, and measured
-	 * there in a simulated iPad (`scripts/card-zoom.mjs`, Playwright's iPad Pro 11, CPU 4×, 3 cards awake):
-	 * it changed nothing a pinch costs. Late frames in WebKit 2.0 and 2.0 per pinch off against 2.0 and
-	 * 0.2 on, noise either way; Chromium's paint, raster and layer work 4, 15 and 7 ms per pinch off, 5,
-	 * 14 and 7 on; the main thread's 71–98 ms off, 84–117 on, since each pinch tells the engine twice
-	 * that its cards changed. With at most three cards awake and each on a layer the compositor stretches,
-	 * there is little left for it to save. Kept for a measure on the real device.
+	 * By the engine's table (`render/device.ts`, `MOVING`): off everywhere today. Measured in a simulated
+	 * iPad (`scripts/card-zoom.mjs`, Playwright's iPad Pro 11, CPU 4×, 3 cards awake): it changed nothing
+	 * a pinch costs. Late frames in WebKit 2.0 and 2.0 per pinch off against 2.0 and 0.2 on, noise
+	 * either way; Chromium's paint, raster and layer work 4, 15 and 7 ms per pinch off, 5, 14 and 7 on;
+	 * the main thread's 71–98 ms off, 84–117 on, since each pinch tells the engine twice that its cards
+	 * changed. `?card-pictures=1` or `=0` in the page's address tries the other way, for a measure on a real device.
 	 */
-	const PINCH_ON_PICTURES = typeof location !== "undefined" && new URLSearchParams(location.search).get("card-pictures") === "1";
+	const PINCH_ON_PICTURES = (() => {
+		const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("card-pictures");
+		return asked === "1" ? true : asked === "0" ? false : MOVING[ENGINE].card === "cover";
+	})();
+	/** Whether an app's window or a document's editor is covered by its picture while the camera moves (`MOVING`). */
+	const COVER = { app: MOVING[ENGINE].app === "cover", document: MOVING[ENGINE].document === "cover" };
 	/** The awake cards are hidden: from the first step of a scale until it rests (`canvas.css`, `data-card-pictures`). */
 	const cardsHidden = createMemo(() => PINCH_ON_PICTURES && scaling());
 	/**
@@ -177,10 +181,13 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const sendCards = (cards: SceneCard[]) => {
 			/*
 			 * The engine draws the cards' pictures, and hears of every card: an arrow follows the card it
-			 * ends on, and a drawn item over a card gets the click shape that lets it be pressed there.
+			 * ends on, and a drawn item over a card gets the click shape that lets it be pressed there. It
+			 * is handed the stage's own index over them (`pageIndex`, the same order), so it builds none;
+			 * not while one is being sized, when the boxes it holds are not the index's.
 			 */
-			penLayer.setCards(cards);
+			penLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
 		};
+		const inMotion = moving() || panning() || scaling() || gliding();
 		sendCards(
 			props.boards
 				.map((board) => {
@@ -193,7 +200,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						h: sized?.h ?? board.h,
 						// A card while its surface shows; an app or a document only while its surface shows and the camera is still, and its picture otherwise
 						// (`item-surfaces.tsx`): an app that animates repainted its window at every step of a pan, and a document's editor laid out at every step of a zoom.
-						live: board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : board.item === "document" ? live.has(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path),
+						live: board.item === "app" ? appShowing(board.path) && !(COVER.app && inMotion) : board.item === "document" ? live.has(board.path) && !(COVER.document && inMotion) : live.has(board.path),
 						// An awake item's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// An item not live is its picture: a card's own, an app's as the frame runs it, a document's of its file.

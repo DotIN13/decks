@@ -154,6 +154,11 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
 		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
+		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
+		if (message.type === "app.state") {
+			for (const listener of ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status });
+			return;
+		}
 		// A card's file changed: its record taken, its place kept, as the drawing says it.
 		if (message.type === "card.changed") {
 			if (message.removed || !message.card) return;

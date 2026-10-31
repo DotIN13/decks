@@ -302,6 +302,8 @@ export type ServerMessage =
 	| { type: "runtimes"; list: RuntimeInfo[] }
 	/** A card (or an old board a canvas still holds) was written or removed. */
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; /** Only the size in its own tag changed: a page showing it keeps its document. */ sized?: true }
+	/** An app's state changed (`apps/service.ts`): for the canvas frames showing it, instead of each asking again every few seconds. */
+	| { type: "app.state"; name: string; title?: string; status: string }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

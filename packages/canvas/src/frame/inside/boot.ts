@@ -166,8 +166,11 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		handle().edit([{ op: "delete", id: child.id }]);
 		return true;
 	}
+	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
+	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
 		appStored,
+		appWatchers,
 		root,
 		start,
 		end,

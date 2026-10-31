@@ -266,6 +266,8 @@ export class App {
 		this.apps = new Apps(deck.path);
 		this.apps.decksPort = config.port;
 		this.apps.passes = this.passes;
+		// A canvas frame showing the app hears its state change (`verbs/router.ts`, `onCanvas`), instead of asking every ten seconds.
+		this.apps.onChange = (name, state) => this.tellStreams({ type: "app.state", name, ...(state.title ? { title: state.title } : {}), status: state.status });
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.

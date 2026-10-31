@@ -88,6 +88,26 @@ export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean 
 };
 
 /**
+ * What an awake item is while the camera moves, by its kind and the engine: `live`, its surface kept
+ * shown (and on a layer where `LAYERS` gives it one, so a zoom stretches it rather than painting it at
+ * every step); or `cover`, the sheet drawing its picture over it from the first camera step to two
+ * frames after rest, its surface not painted meanwhile (`items-layer.tsx`).
+ *
+ * A card stays live: in Chromium on its own layer (measured: 0 to 6 late frames of 495 on layers,
+ * 97 of 300 off); in WebKit, which gets no layers, covering it with its picture was measured on a
+ * simulated iPad and changed nothing a pinch costs, so it stays live there too, and `?card-pictures=1`
+ * tries the other way. An app's window (a whole page in a sandboxed frame, repainted at every camera
+ * step when it animates: 1,280 paints in a two-second pan) and a document's editor (laid out at every
+ * step of a zoom) are covered everywhere.
+ */
+export type Moving = "live" | "cover";
+export const MOVING: Record<BrowserEngine, { card: Moving; app: Moving; document: Moving }> = {
+	webkit: { card: "live", app: "cover", document: "cover" },
+	chromium: { card: "live", app: "cover", document: "cover" },
+	other: { card: "live", app: "cover", document: "cover" },
+};
+
+/**
  * How much a device's GPU can hold, as far as a page can tell: no browser says how much memory its
  * GPU has, so it is read from what they do say. A phone or tablet is small, and so is a computer whose
  * WebGPU allows buffers under 1 GB or that says it has 4 GB of memory or less; any other is big.

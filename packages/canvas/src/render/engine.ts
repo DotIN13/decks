@@ -194,6 +194,8 @@ export class StageEngine {
 	private drawnAt: { x: number; y: number; zoom: number } | undefined;
 	private placedCards: readonly SceneCard[] = [];
 	private cardKey = "";
+	/** The live paths last sent (`setLive`). */
+	private liveKey = "";
 	private viewState: { hidden: string[]; mute: string[]; holes: string[]; scrolls: Record<string, number>; writer?: { name?: string; color: string } } = { hidden: [], mute: [], holes: [], scrolls: {} };
 	private viewKey = "";
 	private fontsAsked = new Set<string>();
@@ -418,6 +420,7 @@ export class StageEngine {
 		this.viewKey = "";
 		this.sendView();
 		this.cardKey = "";
+		this.liveKey = "";
 		this.setCards(this.placedCards);
 		this.laidOut();
 		this.draw();
@@ -1292,16 +1295,31 @@ export class StageEngine {
 
 	// --- cards ---------------------------------------------------------------------------------
 
-	setCards(cards: readonly SceneCard[]): void {
+	/**
+	 * The cards as the stage places them. Sent whole only when something but liveness changed (a place, a
+	 * picture, a title, the news): a change of which are live alone, which every start and end of a camera
+	 * move is for the apps and documents it covers, sends the live paths and nothing else (`setLive`). The
+	 * stage's own index over the cards (`index`, in the same order) is taken when given, so none is built here.
+	 */
+	setCards(cards: readonly SceneCard[], index?: BoxIndex): void {
 		const was = this.placedCards;
 		this.placedCards = cards;
-		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture, b.title, b.kind]));
-		if (key === this.cardKey || !this.page) {
+		if (!this.page) return;
+		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.news, b.glow, b.picture, b.title, b.kind]));
+		const live = JSON.stringify(cards.filter((b) => b.live).map((b) => b.path));
+		if (key === this.cardKey) {
 			// The same boxes as the ones the index was made for: it answers for these too.
-			if (key === this.cardKey && this.indexed === was) this.indexed = cards;
+			if (this.indexed === was) this.indexed = cards;
+			if (live !== this.liveKey) {
+				this.liveKey = live;
+				this.cardsSent.calls++;
+				this.cardsSent.bytes += live.length;
+				this.page.setLive(live);
+			}
 			return;
 		}
 		this.cardKey = key;
+		this.liveKey = live;
 		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind })));
 		this.cardsSent.calls++;
 		this.cardsSent.bytes += sent.length;
@@ -1309,7 +1327,7 @@ export class StageEngine {
 		const boxes = cards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
 		if (boxes !== this.cardBoxes) {
 			this.cardBoxes = boxes;
-			this.cardIndex = new BoxIndex(cards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
+			this.cardIndex = index ?? new BoxIndex(cards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
 			this.writeHits();
 		}
 		this.indexed = cards;

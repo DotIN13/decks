@@ -31,6 +31,8 @@ export type Heard =
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
+	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
+	| { type: "app.state"; name: string; title?: string; status: string }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
 	| { type: "stage.call"; call: StageCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
@@ -38,7 +40,7 @@ export type Heard =
 	/** The stream is back after a drop: what was missed is read again. */
 	| { type: "reconnected" };
 
-const TYPES = ["stage.pen", "stage.pen.delta", "card.changed", "stage.call", "doc.state", "doc.patched", "doc.changed", "doc.versions", "doc.version", "doc.compiled", "doc.repo", "doc.gdoc", "doc.gcomments", "doc.remote"];
+const TYPES = ["stage.pen", "stage.pen.delta", "card.changed", "app.state", "stage.call", "doc.state", "doc.patched", "doc.changed", "doc.versions", "doc.version", "doc.compiled", "doc.repo", "doc.gdoc", "doc.gcomments", "doc.remote"];
 
 /** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {

@@ -108,15 +108,16 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
 		canvasHost().apps?.store?.(props.app, data.key, typeof data.value === "string" ? data.value : null);
 	};
-	// Whether it runs, asked again while the window is up: a server app starts when it is first opened here.
+	// Whether it runs: read once, then heard from the harness as it changes (`apps.watch`), never polled.
 	const readStatus = () =>
 		void canvasHost()
 			.apps?.status(props.app)
 			.then((got) => setAbout(got ?? {}))
 			.catch(() => setAbout((was) => was ?? {}));
-	let statusTimer: ReturnType<typeof setInterval> | undefined;
+	let unwatch: (() => void) | undefined;
 	onMount(() => {
 		props.ref?.();
+		unwatch = canvasHost().apps?.watch?.(props.app, (state) => setAbout((was) => ({ ...was, ...state })));
 		/*
 		 * The same rule on the window's bar and body (`input.ts`); the app's own page inside the iframe is the
 		 * exception, by choice: it takes the pointer only once the item is selected (`pointer-events` below),
@@ -125,7 +126,6 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		ownInput(host, host, { selected: () => props.selected, onSelect: props.onSelect });
 		addEventListener("message", onMessage);
 		readStatus();
-		statusTimer = setInterval(readStatus, 10_000);
 	});
 	// The window shows the app once its frame has loaded; until then, and when it runs elsewhere, the sheet shows its picture.
 	let saidShown = false;
@@ -138,7 +138,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		if (on) readStatus();
 	});
 	onCleanup(() => {
-		clearInterval(statusTimer);
+		unwatch?.();
 		if (saidShown) markShown(props.path, false);
 		removeEventListener("message", onMessage);
 	});
