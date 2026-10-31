@@ -3,7 +3,7 @@
  * (9 for the two per-frame times, see `WIDE`).
  *
  * Not a pass/fail check: it measures, and says only that each number could be measured. The canvas
- * is `perf` (`e2e/perf-canvas.mjs`: 2,000 items and 100 boards), written into this check's deck.
+ * is `perf` (`e2e/perf-canvas.mjs`: 2,000 items and 100 cards), written into this check's deck.
  * Run it with `node scripts/render-perf.mjs`, which prints the numbers as one JSON object.
  *
  * - tilesAtLoad, firstSharpMs: the page opened afresh on the canvas, each run; tiles painted until
@@ -104,7 +104,7 @@ link.send({ type: "agent.stage", id: agentId, stage: PERF_CANVAS });
 // Asked for as well: an agent already on the canvas is sent nothing new.
 setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
 const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= Math.min(1000, ITEMS / 2)), 20000);
-say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.boards} boards`);
+say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.cards} cards`);
 
 const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
 // The stage and its engine are in the canvas frame, made again when the page loads again.
@@ -577,7 +577,7 @@ if (want("images")) {
 
 // --- a long pen stroke --------------------------------------------------------------------------------
 if (want("stroke")) {
-	await page.locator('.v3-tool[data-tool="pen"]:visible').click();
+	await canvas.locator('.v3-tool[data-tool="pen"]:visible').click();
 	await page.waitForTimeout(300);
 	const per = [];
 	const inkBefore = await canvas.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
@@ -611,7 +611,7 @@ if (want("stroke")) {
 say("no errors on the page", errors.length === 0, errors.slice(0, 3).join(" | "));
 const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs", "fillAfterPanMs", "imageLoadMs"].map((k) => [k, result[k]]));
 const extra = Object.fromEntries(Object.entries(result).filter(([k]) => k !== "runs" && !(k in metrics)));
-const report = { ...metrics, ...extra, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS, ...(AB ? { ab: AB } : {}) } };
+const report = { ...metrics, ...extra, runs: result.runs, setup: { items: made.items, cards: made.cards, width: W, height: H, dpr: DPR, runs: RUNS, ...(AB ? { ab: AB } : {}) } };
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, `${JSON.stringify(report, null, "\t")}\n`);
 console.log(`METRICS ${JSON.stringify(report)}`);

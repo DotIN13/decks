@@ -120,6 +120,8 @@ const CHECKS = [
 	{ file: "stage-scroll.mjs", needsAgent: false },
 	/* A card typed into as it reads: suggestions, the style bar, pieces that drag, untouched blocks kept. */
 	{ file: "card-editor.mjs", needsAgent: false },
+	/* `decks canvas fit` on a card with a script and a container rule: the server's own measurement agrees with the frame's. */
+	{ file: "card-fit.mjs", needsAgent: false },
 	/* The same card on a phone, by touch: a double tap opens it, taps accept, the sheet stands aside. */
 	{ file: "card-phone.mjs", needsAgent: false },
 	/* An agent's screenshot of a card is the person's: what they typed, and what its script drew. */

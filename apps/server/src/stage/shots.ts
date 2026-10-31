@@ -197,8 +197,8 @@ export class StageShots {
 	}
 
 	/**
-	 * Measure one board where no canvas has: `measure.html` lays it out at its own size in this
-	 * Chromium and runs the canvas's own measurement on it. Undefined when the board never got ready.
+	 * Measure one card where no canvas has: `measure.html` mounts it at its own size in this
+	 * Chromium as the canvas frame does and reads it the same way. Undefined when it never laid out.
 	 */
 	async measure(board: { path: string; w: number; h: number }): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined> {
 		const query = new URLSearchParams({ path: board.path, w: String(Math.round(board.w)), h: String(Math.round(board.h)) });

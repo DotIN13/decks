@@ -1,12 +1,13 @@
 /**
- * What a pan costs on canvases heavy with boards and drawing.
+ * What a pan costs on canvases heavy with cards and drawing.
  *
  * Not a pass/fail check: it measures. Two canvases are written into the check's deck:
  *
  * - `real`: a copy of a real canvas (`PAN_HEAVY_SOURCE`, the Decks Studio canvas of this machine's
- *   deck by default): 26 boards and about a thousand drawn items, designs and notes.
+ *   deck by default): its cards and about a thousand drawn items, designs and notes. A canvas not yet
+ *   moved to cards (still `boards/`) is copied as it is, and its boards are drawn as pictures.
  * - `perf`: the 10 × 10 render-perf grid (`e2e/perf-canvas.mjs`), 2,000 drawn items, with every one
- *   of its 100 boards a real board's page instead of the generated one.
+ *   of its 100 cards a copy of a real card (the `real` canvas's) instead of the generated one, when it has cards.
  *
  * For each canvas and zoom, the camera rests on the busiest place, then real wheel input (CDP
  * `mouseWheel`, at 120 Hz from a timer, not paced by frames) pans for `SECONDS` there and back. The
@@ -15,7 +16,7 @@
  * - gapP50 / gapP95 / gapMax: ms between frames (8.3 ms is every frame at 120 Hz);
  * - missed: the share of frame gaps over 12 ms;
  * - mainMs: main-thread time per frame (`TaskDuration`), and its script, style and layout parts;
- * - pictured / pagesShown: the share of frames drawn with boards as pictures, and the pages showing a frame;
+ * - pictured / pagesShown: the share of frames drawn with cards as pictures, and the cards showing live;
  * - movingFrames / travelPx: the share of frames the stage called moving, and how far the camera went.
  *
  * `PAN_HEAVY_ONLY=real@0.25,perf@0.5` picks scenarios; `PAN_HEAVY_AB=<localStorage key>` runs each
@@ -23,7 +24,7 @@
  * compares pictures while moving with live pages); `PAN_HEAVY_TRACE=<file prefix>` writes a
  * Chrome trace of the first measured run of each scenario.
  */
-import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
@@ -68,27 +69,33 @@ const deck = await deckState();
 const real = join(deck.path, "canvases", "real");
 say("the real canvas to copy exists", existsSync(join(SOURCE, "canvas.pen")), SOURCE);
 cpSync(SOURCE, real, { recursive: true });
-writeFileSync(join(real, "canvas.json"), JSON.stringify({ title: "Real heavy", boards: [] }, null, "\t"));
-const realBoards = readdirSync(join(real, "boards")).filter((f) => f.endsWith(".html"));
+writeFileSync(join(real, "canvas.json"), JSON.stringify({ title: "Real heavy" }, null, "\t"));
+const inFolder = (folder) => (existsSync(folder) ? readdirSync(folder) : []);
+// Its cards (`cards/<name>/index.html`), or, on a canvas not yet moved to cards, its boards.
+const realCards = inFolder(join(real, "cards")).filter((name) => existsSync(join(real, "cards", name, "index.html")));
+const realPages = realCards.length || inFolder(join(real, "boards")).filter((f) => f.endsWith(".html")).length;
 
-writePerfCanvas(deck.path, { items: 2000, boards: 100 });
-const perfBoards = readdirSync(join(deck.path, "canvases", "perf", "boards")).filter((f) => f.endsWith(".html"));
-perfBoards.forEach((name, i) => {
-	const html = readFileSync(join(real, "boards", realBoards[i % realBoards.length]), "utf8");
-	writeFileSync(join(deck.path, "canvases", "perf", "boards", name), html);
-});
+writePerfCanvas(deck.path, { items: 2000, cards: 100 });
+// Each generated card replaced by a real one, folder and all, so what it imports beside it comes too.
+const perfCards = join(deck.path, "canvases", "perf", "cards");
+if (realCards.length)
+	inFolder(perfCards).forEach((name, i) => {
+		rmSync(join(perfCards, name), { recursive: true, force: true });
+		cpSync(join(real, "cards", realCards[i % realCards.length]), join(perfCards, name), { recursive: true });
+	});
+say("the perf canvas's cards", true, realCards.length ? `${realCards.length} to copy` : `${SOURCE} has no cards/ yet; the generated cards stay`);
 
-/** The world point where a window at `zoom` sees the most boards, from the canvas file. */
+/** The world point where a window at `zoom` sees the most cards, from the canvas file. */
 const busiest = (canvas, zoom) => {
 	const pen = JSON.parse(readFileSync(join(deck.path, "canvases", canvas, "canvas.pen"), "utf8"));
-	const boards = pen.children.filter((n) => n.type === "browser").map((n) => ({ x: n.x ?? 0, y: n.y ?? 0, w: n.width ?? 1000, h: n.height ?? 700 }));
+	const cards = pen.children.filter((n) => n.type === "browser").map((n) => ({ x: n.x ?? 0, y: n.y ?? 0, w: n.width ?? 1000, h: n.height ?? 700 }));
 	const vw = W / zoom;
 	const vh = H / zoom;
 	let best = { n: -1, x: 0, y: 0 };
-	for (const b of boards) {
+	for (const b of cards) {
 		const cx = b.x + b.w / 2;
 		const cy = b.y + b.h / 2;
-		const n = boards.filter((o) => o.x < cx + vw / 2 && o.x + o.w > cx - vw / 2 && o.y < cy + vh / 2 && o.y + o.h > cy - vh / 2).length;
+		const n = cards.filter((o) => o.x < cx + vw / 2 && o.x + o.w > cx - vw / 2 && o.y < cy + vh / 2 && o.y + o.h > cy - vh / 2).length;
 		if (n > best.n) best = { n, x: cx, y: cy };
 	}
 	return best;
@@ -106,21 +113,21 @@ if (THROTTLE > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROT
 let canvas;
 const metrics = async () => Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
 
-const goCanvas = async (canvas) => {
-	link.send({ type: "agent.stage", id: agentId, stage: canvas });
+const goCanvas = async (name) => {
+	link.send({ type: "agent.stage", id: agentId, stage: name });
 	setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1200);
-	await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === canvas), 20000);
+	await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === name), 20000);
 	// The page opens on the agent's canvas; a page already open is reloaded onto it.
 	await page.reload({ waitUntil: "domcontentloaded" });
 	// The stage is in the canvas frame, made again with the page.
 	canvas = await canvasFrame(page);
 	await canvas.evaluate(helpers);
-	const ok = await page
-		.waitForFunction((n) => (globalThis.__decksCards?.().length ?? 0) >= n, canvas === "perf" ? 90 : Math.min(20, realBoards.length), { timeout: 30000 })
+	const ok = await canvas
+		.waitForFunction((n) => (globalThis.__decksCards?.().length ?? 0) >= n, name === "perf" ? 90 : Math.min(20, realPages), { timeout: 30000 })
 		.then(() => true)
 		.catch(() => false);
 	if (!ok && process.env.PAN_HEAVY_DEBUG) say("DEBUG", false, JSON.stringify([...new Set(link.received.map((m) => m.type))]), JSON.stringify(link.received.filter((m) => /board|stage$/.test(m.type)).slice(-3)).slice(0, 3000));
-	say(`the stage shows the ${canvas} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+	say(`the stage shows the ${name} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
 };
 
 const helpers = () => {
@@ -164,7 +171,7 @@ const helpers = () => {
 			const tick = (t) => {
 				if (!this.recording) return;
 				this.frames.push(t);
-				// Frames drawn with the boards as pictures, and the pages showing then, to say which way a pan ran.
+				// Frames drawn with the cards as pictures, and the cards showing live then, to say which way a pan ran.
 				if (stage()?.dataset.pictures === "true") this.pictured++;
 				if (stage()?.dataset.moving === "true") this.movingFrames = (this.movingFrames ?? 0) + 1;
 				const c = globalThis.__decksRust?.camera;
@@ -191,7 +198,7 @@ const helpers = () => {
 	};
 };
 
-/** Until the camera is still, no tile has come for `ms`, and live boards have their pages. */
+/** Until the camera is still, no tile has come for `ms`, and live cards are drawn. */
 const quiet = (ms = 1500, cap = 20000) =>
 	canvas.evaluate(
 		async ({ ms, cap }) => {
@@ -305,7 +312,7 @@ for (const scenario of SCENARIOS) {
 	await canvas.evaluate(({ x, y }) => globalThis.__pan.panTo(x, y), spot);
 	await quiet(2000);
 	const state = await canvas.evaluate(() => globalThis.__pan.state());
-	// The pointer where a person's would be: the middle of the window, over a board when one is there.
+	// The pointer where a person's would be: the middle of the window, over a card when one is there.
 	const point = { x: W / 2, y: H / 2 };
 	const variants = AB ? ["off", "on"] : ["base"];
 	const runs = Object.fromEntries(variants.map((v) => [v, []]));

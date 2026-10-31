@@ -1,10 +1,4 @@
 {
   "version": 1,
-  "name": "Example",
-  "roots": [
-    {
-      "path": "../shared",
-      "writable": false
-    }
-  ]
+  "name": "Example"
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { documentHeight, measureFrame } from "./extent.ts";
+import { documentHeight, measureFrame } from "./page.ts";
 
 test("a board is measured as its page: no named blocks needed", () => {
 	// One flowing page, no `[data-id]` anywhere: the reading is the body's own height, with the

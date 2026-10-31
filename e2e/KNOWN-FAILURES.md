@@ -113,5 +113,7 @@ small pan drawing), both passing alone. Named: nudge, arrows-steady and text-sho
   the band. drop-lands moves the view onto bare canvas before it draws, so its drawings lie over no card.
 - tile-pixels allows its Chromium seams on 0.25% of the pixels (was 0.05%): with the cards in one narrow column, two
   seams' whole height is bare canvas.
-- Not updated, since they run only by name against a deck of their own: `perf-canvas.mjs` (render-perf, pan-heavy)
-  still builds a canvas of boards; stage-api (needs a model) reads `.board-row`, which the panel never renders.
+- Brought up afterwards: `perf-canvas.mjs` (render-perf, pan-heavy) builds a canvas of cards (pan-heavy's `real` canvas
+  is copied as it is, and the perf cards are copies of its cards when it has any); render-perf presses the pen in the
+  canvas frame, and pan-heavy waits for the cards there. stage-api (needs a model, not run) reads the Canvas tab's
+  card rows by title. card-fit checks that `decks canvas fit` measures a card alike with and without a canvas open.

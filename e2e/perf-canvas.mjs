@@ -1,15 +1,14 @@
 /**
  * The `perf` canvas: a big, busy canvas for `checks/render-perf.mjs`, made the same every time.
  *
- * 100 cells on a 10 × 10 grid centred on the origin, each 1,600 × 1,200: a small board (its own file under the canvas's
- * `boards/`), and twenty items round it — notes, text, rectangles and ellipses, a frame with three
- * children, arrows joining them, and ink strokes. That is 2,000 items and 100 boards.
+ * 100 cells on a 10 × 10 grid centred on the origin, each 1,600 × 1,200: a small card (its own folder under the
+ * canvas's `cards/`), and twenty items round it — notes, text, rectangles and ellipses, a frame with
+ * three children, arrows joining them, and ink strokes. That is 2,000 items and 100 cards.
  *
  * It is written into a deck when the check runs, not kept in `e2e/fixture/`: the deck lists every
- * canvas's boards as its own, and the runner's `resetStage` puts every board the deck lists on the
- * stage, so 100 boards in the fixture would be on every other check's canvas too.
+ * canvas's cards as its own, so 100 cards in the fixture would be in every other check's deck too.
  *
- *   node e2e/perf-canvas.mjs <deck folder> [items] [boards]    # write it into a deck
+ *   node e2e/perf-canvas.mjs <deck folder> [items] [cards]    # write it into a deck
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -35,27 +34,21 @@ const WORDS = "the agent keeps a value for each square and moves toward the larg
 const COLOURS = ["#fde68a", "#bfdbfe", "#bbf7d0", "#fecaca", "#ddd6fe", "#fed7aa"];
 const INKS = ["#e5484d", "#3b82f6", "#16a34a", "#111827"];
 
-const board = (n) => `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>Perf board ${n}</title>
-<meta name="board" content='{"w":600,"h":400,"bg":"plain"}' />
-<link rel="stylesheet" href="../../../lib/board.css" />
-</head>
-<body class="board">
-<div class="card" data-id="b" style="left:32px;top:32px;width:536px;height:336px">
-<h2>Board ${n}</h2>
-<p>A generated board for the render-perf canvas: a heading, a line of words and a list.</p>
+/** A card's `index.html`, as `decks card create` writes one: a piece of HTML, drawn in the canvas's page. */
+const card = (n) => `<title>Perf card ${n}</title>
+<meta name="card" content='{"w":600,"h":400}' />
+<style>
+	.doc { padding: 32px; font-size: 17px; line-height: 1.5 }
+</style>
+<div class="doc" data-id="doc">
+<h2>Card ${n}</h2>
+<p>A generated card for the render-perf canvas: a heading, a line of words and a list.</p>
 <ul><li>one</li><li>two</li><li>three</li></ul>
 </div>
-<script src="../../../lib/board.js"></script>
-</body>
-</html>
 `;
 
-/** The canvas's drawing and its boards' files: `{ pen, boards: [{ name, html }] }`. */
-export function perfCanvas({ items = 2000, boards = 100 } = {}) {
+/** The canvas's drawing and its cards' files: `{ pen, cards: [{ name, html }] }`, each `name` a folder in `cards/`. */
+export function perfCanvas({ items = 2000, cards = 100 } = {}) {
 	const rand = random(20261021);
 	const pick = (list) => list[Math.floor(rand() * list.length)];
 	const words = (n) => Array.from({ length: n }, () => pick(WORDS)).join(" ");
@@ -76,12 +69,12 @@ export function perfCanvas({ items = 2000, boards = 100 } = {}) {
 		// Centred on the origin, where a canvas opens: the page's first view is a busy one.
 		const ox = ((c % GRID) - GRID / 2) * CELL.w;
 		const oy = (Math.floor(c / GRID) - GRID / 2) * CELL.h;
-		if (c < boards) {
-			const name = `perf-${String(c).padStart(3, "0")}.html`;
-			// Relative to the canvas's own folder, as a standalone canvas names its boards.
-			const path = `boards/${name}`;
-			files.push({ name, html: board(c) });
-			children.push({ type: "browser", id: `pb${c}`, name: `Perf board ${c}`, url: path, width: 600, height: 400, metadata: { type: "decks.board", path }, x: ox + 40, y: oy + 40 });
+		if (c < cards) {
+			const name = `perf-${String(c).padStart(3, "0")}`;
+			// Relative to the canvas's own folder, as a canvas names its cards.
+			const path = `cards/${name}/index.html`;
+			files.push({ name, html: card(c) });
+			children.push({ type: "browser", id: `pc${c}`, name: `Perf card ${c}`, url: path, width: 600, height: 400, metadata: { type: "decks.card", path }, x: ox + 40, y: oy + 40 });
 		}
 		const ids = [];
 		const add = (node) => {
@@ -141,25 +134,27 @@ export function perfCanvas({ items = 2000, boards = 100 } = {}) {
 			});
 		}
 	}
-	return { pen: { version: "2.14", children }, boards: files, items: made };
+	return { pen: { version: "2.14", children }, cards: files, items: made };
 }
 
-/** Write the canvas into `deck`: `canvases/perf/canvas.pen`, its `canvas.json` and its boards. */
+/** Write the canvas into `deck`: `canvases/perf/canvas.pen`, its `canvas.json` and its cards. */
 export function writePerfCanvas(deck, options) {
-	const { pen, boards, items } = perfCanvas(options);
+	const { pen, cards, items } = perfCanvas(options);
 	const folder = join(deck, "canvases", PERF_CANVAS);
-	mkdirSync(join(folder, "boards"), { recursive: true });
-	for (const { name, html } of boards) writeFileSync(join(folder, "boards", name), html);
+	for (const { name, html } of cards) {
+		mkdirSync(join(folder, "cards", name), { recursive: true });
+		writeFileSync(join(folder, "cards", name, "index.html"), html);
+	}
 	writeFileSync(join(folder, "canvas.json"), `${JSON.stringify({ title: "perf" })}\n`);
 	writeFileSync(join(folder, "canvas.pen"), JSON.stringify(pen));
-	return { folder, items, boards: boards.length };
+	return { folder, items, cards: cards.length };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-	const [deck, items, boards] = process.argv.slice(2);
+	const [deck, items, cards] = process.argv.slice(2);
 	if (!deck) {
-		console.error("usage: node e2e/perf-canvas.mjs <deck folder> [items] [boards]");
+		console.error("usage: node e2e/perf-canvas.mjs <deck folder> [items] [cards]");
 		process.exit(2);
 	}
-	console.log(JSON.stringify(writePerfCanvas(resolve(deck), { items: Number(items ?? 2000), boards: Number(boards ?? 100) })));
+	console.log(JSON.stringify(writePerfCanvas(resolve(deck), { items: Number(items ?? 2000), cards: Number(cards ?? 100) })));
 }

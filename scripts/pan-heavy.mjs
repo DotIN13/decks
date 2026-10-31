@@ -1,5 +1,5 @@
 /**
- * Measure panning on canvases heavy with boards and drawing, and print the numbers as one JSON object.
+ * Measure panning on canvases heavy with cards and drawing, and print the numbers as one JSON object.
  *
  *   node scripts/pan-heavy.mjs            # ports 4671/4670, five runs of each measure
  *   PAN_HEAVY_RUNS=9 node scripts/pan-heavy.mjs

@@ -134,7 +134,7 @@ export default defineConfig({
 	},
 	/*
 	 * Three pages: the app, `shot.html`, the page the server's own Chromium loads to take a picture
-	 * of a stage, and `measure.html`, where it measures a board no canvas has (`server/stage/shots.ts`).
+	 * of a stage, and `measure.html`, where it measures a card no canvas has (`server/stage/shots.ts`).
 	 * The editor's dev page is not built.
 	 */
 	// The stage's render worker (`stage/render.worker.ts`) imports the engine's module: an ES module worker.

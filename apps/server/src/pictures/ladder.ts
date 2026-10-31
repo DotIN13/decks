@@ -131,7 +131,7 @@ export function pageClip(card: Pick<Board, "w" | "h">): { width: number; height:
 }
 
 /**
- * In the page: how tall the board's page is, the way `canvas/extent.ts` measures it (`documentHeight`).
+ * In the page: how tall the board's page is, the way `apps/web/src/measure/page.ts` measures it (`documentHeight`).
  *
  * The body's own height, with the height and floor `board.js` gave it released for the read, so the
  * reading is the content's. The two measurements have to agree or the picture and the board are
