@@ -86,7 +86,7 @@ const CHECKS = [
 	{ file: "placement.mjs", needsAgent: false },
 	/* The same rule when every camera is wrong: another window on another agent, this one panned away, a note in the slot. */
 	{ file: "placement-views.mjs", needsAgent: false },
-	/* An agent says where: newBoard and show with at, driven through a board's own code. */
+	/* An agent says where: canvas.insert and canvas.move with at, and beside, through the API as the person. */
 	{ file: "placement-at.mjs", needsAgent: false },
 	/* What a drop, the file picker and apps create put on the canvas: a file card, a document item, an app item, never a board. */
 	{ file: "items-made.mjs", needsAgent: false },

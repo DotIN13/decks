@@ -36,6 +36,6 @@ const sb = new HarnessSync({ deck: b, studio: url, key: "key-b", log: () => {} }
 await sa.sync(); await sb.sync();
 const got = parse(readFileSync(join(b, "canvases", "plan", "canvas.pen"), "utf8"));
 const board = readFileSync(join(b, "canvases", "plan", "boards", "plan.html"), "utf8");
-const css = await fetch(url + "/lib/board.css");
+const css = await fetch(url + "/lib/card.css");
 console.log(JSON.stringify({ node: process.version, laptopHas: got.children[0].content, board, boardCss: [css.status, css.headers.get("content-type")], canvases: store.canvases("ada").length }));
 server.closeAllConnections(); server.close(); process.exit(0);

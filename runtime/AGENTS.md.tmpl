@@ -88,8 +88,6 @@ Only `decks view …` moves the person's screen: `decks view focus <path or id>`
 
 Hand work over in one of two ways, both returning at once. `decks agent queue <name> --task …` puts it in their queue, taken up when their current turn ends; `--reply true` brings their report into your transcript. `decks agent send <name> --task …` delivers it now, into the turn they are running (or a new one if they are idle); the answer says whether it landed. `decks agent create --name … --kind …` makes an agent first. `decks agent inbox` lists what was handed to you. Changes others make on a canvas reach you with your next message, so there is nothing to watch. A long brief goes on a card, not in the task string.
 
-The old command names (`decks board …`, `decks new-board`, `decks show`, `decks pen edit`, `decks send`, …) still work until 2026-11-30 and say their new name; use the new ones.
-
 ## The `decks` command
 
 Everything you do to the canvas is a `decks` command in your shell; a card's content is files, which you write with your ordinary tools. `decks --help` lists the commands and `decks help <command>` explains one.

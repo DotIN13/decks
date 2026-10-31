@@ -121,8 +121,7 @@ changes it, its parameters and its result as schemas. From it:
   MCP server, and `runtime/decks-commands.md`, the reference every agent is given.
 
 Calls are stateless: every canvas call takes `{ canvas }`, and left out it means `decks.here()`,
-the caller's home canvas. The old names (the board verbs, `newBoard`, `pen.edit`, …) still answer
-until 2026-11-30, each with a note naming its new call, and the harness logs the first use of each.
+the caller's home canvas.
 
 `GET /api/v1/events` streams every change the harness broadcasts as Server-Sent Events, the same
 messages the page hears on its socket (`card.changed`, `stage.pen.delta`, `agent.state`, …).
