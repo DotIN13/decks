@@ -20,7 +20,7 @@ export interface DeviceFacts {
 
 export function deviceKind(facts: DeviceFacts): DeviceKind {
 	if (facts.forced === "computer" || facts.forced === "mobile") return facts.forced;
-	const apple = /iPhone|iPad|iPod/.test(facts.platform) || (facts.platform === "MacIntel" && facts.maxTouchPoints > 1);
+	const apple = /iPhone|iPad|iPod/.test(facts.platform) || /iPhone|iPad|iPod/.test(facts.userAgent) || (facts.platform === "MacIntel" && facts.maxTouchPoints > 1);
 	const android = /Android/i.test(facts.userAgent);
 	return apple || android ? "mobile" : "computer";
 }
@@ -94,7 +94,12 @@ export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean 
  * Each card's picture is fetched at the rung of the class's ladder (`PICTURES`) its drawn width needs
  * (`picture-ladder.ts`); the GPU makes its smaller sizes and draws it at any zoom from the nearest.
  */
-export type GpuClass = "big" | "small";
+export type GpuClass = "big" | "small" | "phone";
+
+/** A phone, not a tablet: an iPhone or iPod, or an Android device that calls itself Mobile (Android tablets do not). */
+export function isPhone(facts: { platform: string; userAgent: string }): boolean {
+	return /iPhone|iPod/.test(facts.platform) || /iPhone|iPod/.test(facts.userAgent) || /Android.*Mobile/i.test(facts.userAgent);
+}
 
 export interface GpuFacts {
 	kind: DeviceKind;
@@ -102,12 +107,16 @@ export interface GpuFacts {
 	deviceMemory?: number | undefined;
 	/** WebGPU's `maxBufferSize`, in bytes. */
 	maxBufferSize?: number | undefined;
-	/** `?pictures=small` or `?pictures=big` in the page's address, for testing one class on the other. */
+	/** A phone (`isPhone`): its pictures are only ever the smallest rung. */
+	phone?: boolean | undefined;
+	/** `?pictures=phone`, `small` or `big` in the page's address, for testing one class on the other. */
 	forced?: string | null | undefined;
 }
 
 export function gpuClass(facts: GpuFacts): GpuClass {
-	if (facts.forced === "small" || facts.forced === "big") return facts.forced;
+	if (facts.forced === "small" || facts.forced === "big" || facts.forced === "phone") return facts.forced;
+	// A phone whatever else it says of itself (an emulated iPhone reports a Mac's platform).
+	if (facts.phone) return "phone";
 	if (facts.kind === "mobile") return "small";
 	if (facts.deviceMemory !== undefined && facts.deviceMemory <= 4) return "small";
 	if (facts.maxBufferSize !== undefined && facts.maxBufferSize < 2 ** 30) return "small";
@@ -124,7 +133,23 @@ export function gpuClass(facts: GpuFacts): GpuClass {
 export const PICTURES: Record<GpuClass, { ladder: readonly number[]; budgetMB: number }> = {
 	big: { ladder: [192, 480, 800], budgetMB: 256 },
 	small: { ladder: [192, 480], budgetMB: 64 },
+	// A phone's screen is narrow and its memory the least: every card at 192, whatever its zoom (about 1,000 cards compressed).
+	phone: { ladder: [192], budgetMB: 32 },
 };
+
+/**
+ * This device's class as far as is known at once, before its WebGPU adapter answers (`readGpuClass`):
+ * a phone's or a tablet's is certain from what it is, so no picture is ever fetched at a computer's rungs
+ * on one while the adapter is asked; an iPhone fetched every card at 800 until it answered.
+ */
+export function knownGpuClass(): GpuClass {
+	const nav = typeof navigator === "undefined" ? undefined : navigator;
+	return gpuClass({
+		kind: DEVICE,
+		phone: isPhone({ platform: nav?.platform ?? "", userAgent: nav?.userAgent ?? "" }),
+		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),
+	});
+}
 
 /** This device's class, asked of its WebGPU adapter once; without WebGPU, from the rest. */
 export async function readGpuClass(): Promise<GpuClass> {
@@ -132,6 +157,7 @@ export async function readGpuClass(): Promise<GpuClass> {
 	const adapter = await nav?.gpu?.requestAdapter().catch(() => null);
 	return gpuClass({
 		kind: DEVICE,
+		phone: isPhone({ platform: nav?.platform ?? "", userAgent: nav?.userAgent ?? "" }),
 		deviceMemory: nav?.deviceMemory,
 		maxBufferSize: adapter?.limits.maxBufferSize,
 		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),

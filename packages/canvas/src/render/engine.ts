@@ -27,7 +27,7 @@ import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../camera/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
-import { ENGINE, PICTURES, readGpuClass } from "./device.ts";
+import { ENGINE, knownGpuClass, PICTURES, readGpuClass } from "./device.ts";
 import { upgrades } from "./picture-ladder.ts";
 import { noticeFor } from "./backends/notice.ts";
 
@@ -306,7 +306,7 @@ export class StageEngine {
 	 * fetched from, at the rung its drawn width needs (`picture-ladder.ts`), and drawn at any zoom from
 	 * the smaller sizes the GPU makes of it. Big until the adapter has been asked.
 	 */
-	private pictures = PICTURES.big;
+	private pictures = PICTURES[knownGpuClass()];
 	/** What this browser draws with (`backends/detect.ts`), found once. */
 	private detected: Detected | undefined;
 	/** Stops watching for the device to be lost. */

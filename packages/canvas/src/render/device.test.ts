@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { browserEngine, deviceKind, gpuClass, LAYERS, PICTURES } from "./device.ts";
+import { browserEngine, deviceKind, gpuClass, isPhone, LAYERS, PICTURES } from "./device.ts";
 
 const safariMac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15";
 
@@ -33,7 +33,7 @@ test("a phone or tablet has a small GPU, and so has a computer with little memor
 	assert.equal(gpuClass({ kind: "mobile", forced: "big" }), "big");
 	assert.equal(gpuClass({ kind: "computer", forced: "small" }), "small");
 	assert.equal(gpuClass({ kind: "computer", forced: "512" }), "big", "the old widths say nothing");
-	assert.deepEqual(PICTURES, { big: { ladder: [192, 480, 800], budgetMB: 256 }, small: { ladder: [192, 480], budgetMB: 64 } });
+	assert.deepEqual(PICTURES, { big: { ladder: [192, 480, 800], budgetMB: 256 }, small: { ladder: [192, 480], budgetMB: 64 }, phone: { ladder: [192], budgetMB: 32 } });
 });
 
 test("Safari, an iPad that says it is a Mac, and Chrome on iOS are WebKit", () => {
@@ -58,4 +58,19 @@ test("WebKit puts nothing on layers while the camera moves; Chromium and the res
 	assert.deepEqual(LAYERS.webkit, { scaling: false, sliding: false });
 	assert.deepEqual(LAYERS.chromium, { scaling: true, sliding: true });
 	assert.deepEqual(LAYERS.other, { scaling: true, sliding: true });
+});
+
+test("a phone gets only the smallest pictures; an iPad or an Android tablet does not", () => {
+	const iphone = { platform: "iPhone", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148" };
+	const pixel = { platform: "Linux armv8l", userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36" };
+	const tablet = { platform: "Linux armv8l", userAgent: "Mozilla/5.0 (Linux; Android 15; SM-X910) AppleWebKit/537.36 Chrome/131.0 Safari/537.36" };
+	const ipad = { platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15" };
+	assert.equal(isPhone(iphone), true);
+	assert.equal(isPhone(pixel), true);
+	assert.equal(isPhone(tablet), false);
+	assert.equal(isPhone(ipad), false);
+	assert.equal(gpuClass({ kind: "mobile", phone: true }), "phone");
+	assert.equal(gpuClass({ kind: "mobile", phone: false }), "small");
+	assert.equal(gpuClass({ kind: "computer", forced: "phone" }), "phone");
+	assert.deepEqual(PICTURES[gpuClass({ kind: "mobile", phone: true })].ladder, [192]);
 });
