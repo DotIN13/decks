@@ -407,9 +407,9 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	const result = await runCode(tool, `return await stage.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [640], "measured at the width the board has on that canvas");
-	// Placed on narrow, the board is narrow's own copy (`deck/layout.ts`): that copy is what is fitted.
+	// Placed on narrow, the board is narrow's own copy, a card (`stage/copy-in.ts`): that copy is what is fitted.
 	const copy = pens.copyOf("narrow", PLAN);
-	assert.equal(copy, "canvases/narrow/boards/plan.html");
+	assert.equal(copy, "canvases/narrow/cards/plan/index.html");
 	assert.deepEqual([deck.board(copy)?.w, deck.board(copy)?.h], [640, 812], "both numbers go to the copy's file");
 	const narrow = pens.boards("narrow").find((one) => one.path === copy)!;
 	assert.deepEqual([narrow.w, narrow.h], [640, 812], "and to the canvas it was fitted on");

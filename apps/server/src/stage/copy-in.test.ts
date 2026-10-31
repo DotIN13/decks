@@ -20,3 +20,25 @@ test("a card placed from another canvas comes with its whole folder, into cards/
 		rmSync(deck, { recursive: true, force: true });
 	}
 });
+
+test("a library board placed on an own canvas lands as a card, its links one folder deeper; on a friend's canvas, and a page no converter reads, it stays a board", () => {
+	const deck = mkdtempSync(join(tmpdir(), "copy-in-"));
+	try {
+		mkdirSync(join(deck, "boards"), { recursive: true });
+		mkdirSync(join(deck, "assets"), { recursive: true });
+		writeFileSync(join(deck, "assets/a.png"), "png");
+		writeFileSync(join(deck, "boards/sales.html"), `<html><head><title>Sales</title><link rel="stylesheet" href="../lib/board.css"></head><body class="board"><div class="doc"><img src="../assets/a.png"></div><script src="../lib/board.js"></script></body></html>`);
+		writeFileSync(join(deck, "boards/site.html"), `<body><iframe src="https://example.com"></iframe></body>`);
+		const copy = copyBoardInto(deck, "boards/sales.html", "b");
+		assert.equal(copy, "canvases/b/cards/sales/index.html");
+		const card = readFileSync(join(deck, copy), "utf8");
+		assert.match(card, /src="\.\.\/\.\.\/assets\/a\.png"/);
+		assert.doesNotMatch(card, /board\.js|<body/);
+		assert.ok(!existsSync(join(deck, "canvases/b/boards/sales.html")), "no board copy");
+		assert.equal(copyBoardInto(deck, "boards/sales.html", "b"), "canvases/b/cards/sales-2/index.html");
+		assert.equal(copyBoardInto(deck, "boards/site.html", "b"), "canvases/b/boards/site.html", "a page that is not a board's");
+		assert.equal(copyBoardInto(deck, "boards/sales.html", "shared/ada/old"), "shared/canvases/ada/old/boards/sales.html", "a friend's canvas keeps boards");
+	} finally {
+		rmSync(deck, { recursive: true, force: true });
+	}
+});

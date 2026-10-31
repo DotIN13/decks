@@ -21,7 +21,7 @@ function open() {
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
-/** A library board; each canvas it is put on places its own copy (`deck/layout.ts`). */
+/** A library board; each canvas it is put on places its own copy, as a card (`stage/copy-in.ts`). */
 const PATH = "boards/plan.html";
 const settle = () => new Promise((done) => setTimeout(done, 250));
 
@@ -31,7 +31,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		one.setInPlay([PATH], { place: true });
 		const mine = app.pens.copyOf(one.stageName()!, PATH);
-		assert.equal(mine, `canvases/${one.stageName()}/boards/plan.html`, "the canvas places its own copy");
+		assert.equal(mine, `canvases/${one.stageName()}/cards/plan/index.html`, "the canvas places its own copy, as a card");
 		const shown = () => app.stage.boards(one.id).find((board) => board.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 

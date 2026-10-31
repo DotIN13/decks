@@ -75,17 +75,17 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		const here = (await must("here")).value;
 		assert.ok(here.name, "an agent always has a canvas here");
 		const put = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value;
-		assert.equal(put.type, "board");
-		// A board from the library is copied into the canvas, and is the canvas's copy from then on (`deck/layout.ts`).
-		const a = `canvases/${here.name}/boards/a.html`;
-		const b = `canvases/${here.name}/boards/b.html`;
-		assert.equal(put.board, a);
+		assert.equal(put.type, "card");
+		// A board from the library is copied into the canvas as a card, and is the canvas's copy from then on (`stage/copy-in.ts`).
+		const a = `canvases/${here.name}/cards/a/index.html`;
+		const b = `canvases/${here.name}/cards/b/index.html`;
+		assert.equal(put.card, a);
 		assert.ok(app.deck.board("boards/a.html"), "the library keeps its own");
 		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
 		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
 		const node = file.children.find((one: { id: string }) => one.id === put.id);
 		assert.equal(node.type, "browser");
-		assert.deepEqual(node.metadata, { type: "decks.board", path: "boards/a.html" });
+		assert.deepEqual(node.metadata, { type: "decks.card", path: "cards/a/index.html" });
 
 		const next = (await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: "boards/a.html" }])).value;
 		assert.deepEqual(next.box, { x1: 1060, y1: 0, x2: 1660, y2: 300 }, "beside a board named by its path");
@@ -106,7 +106,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 
 		const read = (await must("canvas.read")).value;
 		assert.equal(read.canvas, here.name);
-		assert.deepEqual(read.items.filter((one: { type: string }) => one.type === "board").map((one: { board: string }) => one.board).sort(), [a, b]);
+		assert.deepEqual(read.items.filter((one: { type: string }) => one.type === "card").map((one: { card: string }) => one.card).sort(), [a, b]);
 
 		const gone = (await must("canvas.delete", [b])).value;
 		assert.equal(gone.deleted, b);
@@ -148,7 +148,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		assert.notEqual(other.name, home);
 		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
 		assert.equal((await must("here")).value.name, home, "making and writing a canvas does not move you to it");
-		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { board?: string }) => one.board), [`canvases/${other.name}/boards/a.html`]);
+		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { card?: string }) => one.card), [`canvases/${other.name}/cards/a/index.html`]);
 		assert.deepEqual((await must("canvas.read")).value.items, [], "your own canvas is untouched");
 		const unknown = await call("canvas.read", [{ canvas: "no such canvas" }]);
 		assert.match(unknown.error!, /No canvas is called "no such canvas"/);

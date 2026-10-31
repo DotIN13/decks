@@ -104,7 +104,7 @@ test("canvas.read of one item, by id or a board's path, and to a depth", async (
 		assert.equal(panel.items[0].children[0].children[0].id, "cell");
 		const board = (await must("canvas.read", [{ of: "boards/a.html" }])).value.items;
 		assert.equal(board.length, 1);
-		assert.equal(board[0].type, "board");
+		assert.equal(board[0].type, "card", "a library board lands as a card");
 		const top = (await must("canvas.read", [{ depth: 0 }])).value.items;
 		assert.deepEqual(top.map((n: { id: string; childCount?: number; children?: unknown }) => [n.id, n.childCount, n.children]), [[board[0].id, undefined, undefined], ["panel", 1, undefined]]);
 		const one = (await must("canvas.read", [{ of: "panel", depth: 1 }])).value.items[0];

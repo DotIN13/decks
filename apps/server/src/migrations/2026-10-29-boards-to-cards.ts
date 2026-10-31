@@ -24,8 +24,9 @@ import { BOARD_W } from "../cards/size.ts";
  *   became a card points at the card;
  * - an embedded file (`data-embed`) is dropped: cards show none.
  *
- * A board whose page is not a board's (an app's, a document's, the shared Chrome tab's, or a page with
- * no `.board` body) is left as it is and listed. A friend's canvas is theirs and is left alone; so is
+ * A board whose page is not a board's (an app's, a document's, the shared Chrome tab's, one file's edge
+ * to edge, or a page with no `.board` body) is left as it is and listed, for the board leftovers to take
+ * (`2026-10-30-board-leftovers.ts`). A friend's canvas is theirs and is left alone; so is
  * the old library in `boards/`, on no canvas. The canvases it changes are zipped first into
  * `.decks/backups/`, board files included, and the board files it converted are then removed. It runs
  * once, at start (`migrations/index.ts`), and says so in `.decks/migrations.json` with what it gave up on.
@@ -69,9 +70,24 @@ const walk = (nodes: unknown, visit: (node: Node) => void) => {
 	}
 };
 
+/**
+ * The live box a board's page is, read off an element's own attribute, so a page that only writes
+ * `data-live="doc"` in its words (in a `<code>`) is not taken for one.
+ */
+export function liveKind(html: string): "doc" | "app" | "web" | "agents" | undefined {
+	return /<[a-z][\w-]*\b[^>]*\bdata-live\s*=\s*["'](doc|app|web|agents)["']/i.exec(html)?.[1]?.toLowerCase() as "doc" | "app" | "web" | "agents" | undefined;
+}
+
+/** The file a file board shows edge to edge (`data-embed` with `data-bare`, the old `newFileBoard`), as its page names it. */
+export function fileBoardSource(html: string): string | undefined {
+	const box = /<[a-z][\w-]*\b[^>]*\bdata-embed\s*=\s*["']([^"']+)["'][^>]*>/i.exec(html);
+	return box && /\bdata-bare\b/i.test(box[0]) ? box[1] : undefined;
+}
+
 /** Why a board's page is not a card's, or undefined when it is. */
 export function notACard(html: string): string | undefined {
-	const live = /\bdata-live\s*=\s*["'](doc|app|web|agents)["']/i.exec(html)?.[1];
+	const live = liveKind(html);
+	if (fileBoardSource(html)) return "its page is one file";
 	if (live) return `its page is ${live === "doc" ? "a document" : live === "app" ? "an app" : live === "web" ? "the shared Chrome tab" : "the agents list"}`;
 	if (!/<body\b[^>]*class\s*=\s*["'][^"']*\bboard\b/i.test(html)) return "its page is not a board's";
 	return undefined;
@@ -155,7 +171,7 @@ export default function (card) {
  * A board's page as a card. `links` names, for each board file beside it (`a.html`), the card it
  * became, so a link to it follows; `placed` is the board's size on its canvas.
  */
-export function boardToCard(html: string, links: Map<string, string>, placed?: { w?: number; h?: number }): string {
+export function boardToCard(html: string, links: Map<string, string>, placed?: { w?: number; h?: number }, deeper = 1): string {
 	const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(html)?.[1] ?? "";
 	const body = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1] ?? html;
 	const title = /<title>([\s\S]*?)<\/title>/i.exec(head)?.[1]?.trim();
@@ -196,10 +212,10 @@ export function boardToCard(html: string, links: Map<string, string>, placed?: {
 		.replace(/<([a-z][\w-]*)\b[^>]*\bdata-embed\s*=[^>]*>[\s\S]*?<\/\1\s*>|<[a-z][\w-]*\b[^>]*\bdata-embed\s*=[^>]*\/>/gi, "");
 	parts.push(content.trim(), ...modules);
 	if (blocks.size) parts.push(`<script type="module">\n${evalModule(blocks)}</script>`);
-	// A folder of its own, one deeper than the board was: every `../` gains one more.
+	// A folder of its own, one deeper than the board was: every `../` gains one more (`deeper`, for a board in a folder of boards/).
 	return `${parts
 		.join("\n")
-		.replace(/(["'(`])((?:\.\.\/)+)/g, "$1../$2")
+		.replace(/(["'(`])((?:\.\.\/)+)/g, (_all, quote: string, ups: string) => `${quote}${"../".repeat(Math.max(0, ups.length / 3 + deeper))}`)
 		.replace(/\bhref\s*=\s*"([^"/:#?]+\.html?)(#[^"]*)?"/gi, (all, sibling: string, hash = "") => {
 			const card = links.get(sibling);
 			return card ? `href="../${card}/index.html${hash}"` : `href="../../boards/${sibling}${hash}"`;

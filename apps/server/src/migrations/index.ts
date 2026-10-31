@@ -4,6 +4,7 @@ import { migrated as isolationMigrated, migrateIsolation } from "./2026-10-21-is
 import { migrated as markdownCardsMigrated, migrateMarkdownCards } from "./2026-10-28-markdown-cards.ts";
 import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from "./2026-10-29-documents-and-apps.ts";
 import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-10-29-boards-to-cards.ts";
+import { countsOf, migrated as boardLeftoversMigrated, migrateBoardLeftovers } from "./2026-10-30-board-leftovers.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecord, writeVersion, type Semver } from "./version.ts";
@@ -30,6 +31,7 @@ import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSem
  * | 2026-10-28-markdown-cards.ts               | at open | `runAtOpen`, below; the same way |
  * | 2026-10-29-documents-and-apps.ts           | at open | `runAtOpen`, below; the same way |
  * | 2026-10-29-boards-to-cards.ts              | at open | `runAtOpen`, below; the same way, after documents and apps |
+ * | 2026-10-30-board-leftovers.ts              | at open | `runAtOpen`, below; the same way, with a report beside its backup |
  *
  * Each at-open migration carries a semantic version, the deck's once it has run, and the deck keeps
  * the last one run on it in `.decks/migrations.json` (`version.ts`, which says which part a change moves). A deck at `LATEST` opens without any migration looking at it; one behind runs only
@@ -136,6 +138,18 @@ export const MIGRATIONS: readonly Migration[] = [
 			if (ran && cards) [`boards are cards now: ${cards} in ${plan.canvases.filter((one) => one.cards.length).length} canvas(es)`, ...(backup ? [`the boards and drawings as they were are in ${backup}`] : [])].forEach(say);
 		},
 		dryRun: (deck, log) => void migrateBoardsToCards(deck, { dryRun: true, log }),
+	},
+	{
+		// Not breaking: what it writes (file cards, cards, document and app items) a 0.5 build reads already; the rest is boards removed.
+		version: "0.5.1",
+		id: "2026-10-30-board-leftovers",
+		migrated: boardLeftoversMigrated,
+		run: (deck, _options, say) => {
+			const { plan, ran, backup, report } = migrateBoardLeftovers(deck, { log: say });
+			const c = countsOf(plan);
+			if (ran && plan.canvases.length) [`the last boards on the canvases are gone: ${c.fileCards} file card(s), ${c.cards + c.pictureCards} card(s) (${c.pictureCards} of a picture), ${c.documents + c.apps} document or app item(s), ${c.removed} removed; ${c.deleted} board file(s) deleted`, ...(backup ? [`what changed is backed up in ${backup}`] : []), ...(report ? [`the report is ${report}`] : [])].forEach(say);
+		},
+		dryRun: (deck, log) => void migrateBoardLeftovers(deck, { dryRun: true, log }),
 	},
 ];
 

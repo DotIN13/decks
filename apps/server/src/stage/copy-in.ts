@@ -2,6 +2,7 @@ import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, s
 import { dirname, join, posix } from "node:path";
 import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas, servedAs } from "../deck/layout.ts";
 import { rewriteLinks } from "../migrations/2026-10-20-standalone-canvases.ts";
+import { boardToCard, notACard } from "../migrations/2026-10-29-boards-to-cards.ts";
 
 /**
  * A board placed on a canvas from somewhere else (another canvas, the library, a friend's canvas) is
@@ -15,6 +16,11 @@ import { rewriteLinks } from "../migrations/2026-10-20-standalone-canvases.ts";
  * - the runtime (`lib/`), and this deck's own `assets/`, `docs/` and `apps/`: nothing, they are served
  *   beside every canvas's boards;
  * - another board: the link is pointed at where that board is, from the copy's place.
+ *
+ * Boards are retired: a board's page placed on one of the deck's own canvases from the library or a
+ * friend's canvas lands as a card (`cards/<name>/`), converted as the boards-to-cards migration
+ * converts one (`boardToCard`). A page no converter reads, and a copy onto a friend's canvas, stay a
+ * board, as before.
  */
 
 /** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension. */
@@ -94,8 +100,24 @@ export function copyBoardInto(deck: string, from: string, canvas: string): strin
 		if (link.startsWith("./") && !next.startsWith(".")) next = `./${next}`;
 		if (next !== link) links.push({ from: link, to: next });
 	}
+	const copied = links.length ? rewriteLinks(text, links) : text;
+	// A board's page directly in boards/, onto the deck's own canvas: a card, its links one folder deeper.
+	if (!isSharedCanvas(canvas) && /\.html?$/i.test(to) && toDir === `${folder}/boards` && !notACard(copied)) return asCard(deck, copied, posix.basename(to).replace(/\.html?$/i, ""), folder);
 	mkdirSync(dirname(join(deck, to)), { recursive: true });
-	writeFileSync(join(deck, to), links.length ? rewriteLinks(text, links) : text);
+	writeFileSync(join(deck, to), copied);
+	return to;
+}
+
+/** A board's page, its links already the canvas's, written as a card in the canvas's `cards/`: its deck path. */
+function asCard(deck: string, html: string, base: string, folder: string): string {
+	let name = base;
+	for (let n = 2; existsSync(join(deck, folder, "cards", name)); n++) {
+		name = `${base}-${n}`;
+		if (n > 500) throw new Error(`Too many copies of the card ${base} in ${folder}.`);
+	}
+	const to = `${folder}/cards/${name}/index.html`;
+	mkdirSync(dirname(join(deck, to)), { recursive: true });
+	writeFileSync(join(deck, to), boardToCard(html, new Map()));
 	return to;
 }
 

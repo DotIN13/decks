@@ -1,6 +1,6 @@
 import { PenError, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { posix } from "node:path";
-import { canvasFolder, referenceFor, resolveReference, urlFor } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, referenceFor, resolveReference, urlFor } from "../deck/layout.ts";
 
 /**
  * A canvas's drawing as it is on disk, and as the harness holds it.
@@ -87,7 +87,8 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 			reference = referenceFor(name, copied);
 			if ("refused" in reference) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
 		}
-		node.metadata = { ...meta, type: meta.type as string, path: reference.path };
+		// A board copied in may have landed as a card (`copy-in.ts`): its tag follows its path.
+		node.metadata = { ...meta, type: isCardPath(reference.path) ? CARD_ITEM : (meta.type as string), path: reference.path };
 		node.url = urlFor(name, reference.path);
 	}
 	if (adopt?.frame) for (const ref of frameRefsOf(out)) adopt.frame(name, ref);
