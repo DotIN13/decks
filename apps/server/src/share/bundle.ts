@@ -4,7 +4,7 @@ import { join, posix, relative, sep } from "node:path";
 import type { Board } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import { renderShell } from "../boards/shell.ts";
-import type { ThumbScheme } from "../pictures/thumbs.ts";
+import type { ThumbScheme } from "../pictures/ladder.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 
 /**

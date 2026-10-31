@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { type ThumbService, wholeScale, wholeShot } from "./thumbs.ts";
+import { wholeScale, wholeShot } from "./ladder.ts";
+import type { ThumbService } from "./thumbs.ts";
 
 /**
  * A picture of a board as a reader left it, drawn by the server's Chrome from a snapshot of the

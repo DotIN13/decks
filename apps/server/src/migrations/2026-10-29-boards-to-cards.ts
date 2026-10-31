@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { revisionOf } from "../deck/loader.ts";
-import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../pictures/thumbs.ts";
+import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../pictures/ladder.ts";
 import { BOARD_W } from "../cards/size.ts";
 
 /**
