@@ -65,8 +65,9 @@ export function createEditor(
 
 	const opening = firstView?.camera ?? options.camera ?? fitAll(first, size(), options.dark ? "dark" : "light");
 	const [camera, setCameraSignal] = createSignal<Camera>(opening);
-	/** How many times each board's page has been told to load again (`reloadBoard`). */
+	/** How many times each card has been told to load again (`reloadCard`). */
 	const [reloads, setReloads] = createSignal<Record<string, number>>({});
+	const reload = (path: string) => setReloads((all) => ({ ...all, [path]: (all[path] ?? 0) + 1 }));
 	const [mode, setModeSignal] = options.state?.mode ?? createSignal<"edit" | "browse">(options.mode ?? "edit");
 	const [selected, setSelected] = createSignal<string | undefined>();
 	const [dark, setDarkSignal] = createSignal(options.dark === true);
@@ -315,7 +316,8 @@ export function createEditor(
 		camera: () => untrack(camera),
 		setCamera: putCamera,
 		restored: firstView !== undefined,
-		reloadBoard: (path) => setReloads((all) => ({ ...all, [path]: (all[path] ?? 0) + 1 })),
+		reloadCard: reload,
+		reloadBoard: reload,
 		dispose() {
 			disposeViews?.();
 			tools();

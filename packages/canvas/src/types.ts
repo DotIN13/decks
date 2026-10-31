@@ -32,7 +32,7 @@ export interface StageComment {
 }
 
 /** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */
-export type InkRequest = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
+export type InkRequest = { action: "drawing" | "card" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
 /** What the canvas frame gives `createEditor`. Only `text` is needed. */
 export interface CanvasOptions {
@@ -113,7 +113,7 @@ export interface CanvasOptions {
 	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
 	onViewport?: (viewport: { width: number; height: number }) => void;
 	/** Boards or items dragged onto the host's composer, to talk about them. */
-	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>) => void;
+	onRefer?: (pills: Array<{ kind: "card" | "item"; id: string; label: string; name?: string }>) => void;
 	/**
 	 * A drawing the host owns (its server): edits go to `send` as pen operations, each with a name
 	 * (`edit`) the host's server sends back with the drawing that has it (`setDocument`'s `made`); undo and redo are `step`'s. Each edit is shown at once and kept on top of
@@ -138,7 +138,7 @@ export interface CanvasOptions {
 	 */
 	onDeleteCard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/**
-	 * Ink selected, and the pill's Make a drawing, Make a board or Send pressed (`Stage`'s `onInk`): the host
+	 * Ink selected, and the pill's Make a drawing, Make a card or Send pressed (`Stage`'s `onInk`): the host
 	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;
@@ -198,6 +198,8 @@ export interface CanvasHandle {
 	camera(): Camera;
 	setCamera(camera: Camera): void;
 	/** A card's file changed where it comes from (a drop, an agent's edit): it loads again. */
+	reloadCard(path: string): void;
+	/** @deprecated `reloadCard`, its old name, kept until 2026-11-30. */
 	reloadBoard(path: string): void;
 	/** The canvas opened on the view kept for its scope (`views`), rather than on a fit. */
 	readonly restored: boolean;

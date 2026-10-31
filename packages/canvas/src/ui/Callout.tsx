@@ -47,7 +47,7 @@ export function PageCallout(props: {
 	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or send it as it
 	 * is, for the agent to read and act on (a command written by hand is carried out). First, in words.
 	 */
-	ink?: { agent: string; onDrawing: () => void; onBoard: () => void; onSend: () => void };
+	ink?: { agent: string; onDrawing: () => void; onCard: () => void; onSend: () => void };
 	/** Out of sight while something moves. */
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
@@ -161,7 +161,7 @@ export function PageCallout(props: {
 							<Icon of={Shapes} size={15} />
 							Make a drawing
 						</button>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onBoard()}>
+						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onCard()}>
 							<Icon of={LayoutTemplate} size={15} />
 							Make a card
 						</button>

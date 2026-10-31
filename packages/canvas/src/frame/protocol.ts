@@ -107,10 +107,10 @@ export type PageCalls = {
  */
 export interface ComposerPart {
 	selection?: { ids: readonly string[]; page?: string };
-	pills?: Array<{ kind: "board" | "item"; id: string; label: string }>;
+	pills?: Array<{ kind: "card" | "item"; id: string; label: string }>;
 	/** `send`: you pressed Send in the popover, so the page puts it in the composer as its own message, still for you to send. */
 	comment?: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
-	ink?: { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: Rect };
+	ink?: { action: "drawing" | "card" | "send"; ids: string[]; canvas: string; box: Rect };
 }
 
 /** What the frame sends the page. */

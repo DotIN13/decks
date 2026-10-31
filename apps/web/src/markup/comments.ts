@@ -10,8 +10,8 @@
  * Everything here is pure, so what the agent will read is a function that can be tested.
  */
 
-export { commentBlock, commentItem, QUOTE_LIMIT, quoteOf, withComments, type BoardComment } from "@decks/canvas/comments";
-import type { BoardComment } from "@decks/canvas/comments";
+export { commentBlock, commentItem, QUOTE_LIMIT, quoteOf, withComments, type CardComment } from "@decks/canvas/comments";
+import type { CardComment } from "@decks/canvas/comments";
 
 // --- kept between reloads ------------------------------------------------------------
 
@@ -27,7 +27,7 @@ export function commentsKey(agentId: string, canvas: string | undefined): string
  * Comments kept under the agent alone, before canvases were part of the key, moved to the canvas it
  * is on now and dropped from the old key; the same record when there is nothing to move.
  */
-export function adoptComments(all: Record<string, BoardComment[]>, agentId: string, canvas: string | undefined): Record<string, BoardComment[]> {
+export function adoptComments(all: Record<string, CardComment[]>, agentId: string, canvas: string | undefined): Record<string, CardComment[]> {
 	const former = all[agentId];
 	if (!canvas || !former?.length) return all;
 	const { [agentId]: _, ...rest } = all;
@@ -39,7 +39,7 @@ export const COMMENTS_KEY = "decks.comments";
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-function isComment(value: unknown): value is BoardComment {
+function isComment(value: unknown): value is CardComment {
 	if (!value || typeof value !== "object") return false;
 	const { id, board, quote, text, at, component } = value as Record<string, unknown>;
 	return (
@@ -53,11 +53,11 @@ function isComment(value: unknown): value is BoardComment {
 }
 
 /** Every agent's waiting comments. Anything unreadable is nothing, never an error. */
-export function loadComments(store: Store | undefined): Record<string, BoardComment[]> {
+export function loadComments(store: Store | undefined): Record<string, CardComment[]> {
 	try {
 		const raw: unknown = JSON.parse(store?.getItem(COMMENTS_KEY) ?? "{}");
 		if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-		const out: Record<string, BoardComment[]> = {};
+		const out: Record<string, CardComment[]> = {};
 		for (const [agent, list] of Object.entries(raw)) {
 			const kept = Array.isArray(list) ? list.filter(isComment) : [];
 			if (kept.length > 0) out[agent] = kept;
@@ -68,7 +68,7 @@ export function loadComments(store: Store | undefined): Record<string, BoardComm
 	}
 }
 
-export function saveComments(store: Store | undefined, comments: Record<string, BoardComment[]>): void {
+export function saveComments(store: Store | undefined, comments: Record<string, CardComment[]>): void {
 	try {
 		const kept = Object.fromEntries(Object.entries(comments).filter(([, list]) => list.length > 0));
 		if (Object.keys(kept).length === 0) store?.removeItem(COMMENTS_KEY);

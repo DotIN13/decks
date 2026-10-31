@@ -10,7 +10,7 @@
  * Everything here is pure, so what the agent will read is a function that can be tested.
  */
 
-export interface BoardComment {
+export interface CardComment {
 	id: string;
 	/** Deck-relative, as the agent knows it: `boards/plan.html`. */
 	board: string;
@@ -31,6 +31,9 @@ export interface BoardComment {
 	title?: string;
 }
 
+/** @deprecated `CardComment`, its old name, kept until 2026-11-30. */
+export type BoardComment = CardComment;
+
 export const QUOTE_LIMIT = 400;
 
 /** A selection as it is quoted: one line, and not the whole page. */
@@ -46,7 +49,7 @@ export function quoteOf(selected: string): string {
  * opening line says what the list is, because a message that begins with a file path and a
  * quotation is otherwise a puzzle.
  */
-export function commentBlock(comments: BoardComment[]): string {
+export function commentBlock(comments: CardComment[]): string {
 	if (comments.length === 0) return "";
 	const drawn = comments.every((comment) => comment.items?.length);
 	const head = drawn
@@ -60,7 +63,7 @@ export function commentBlock(comments: BoardComment[]): string {
  * One comment as the agent reads it in that list, numbered `n`: what a pill's Exact text shows, and
  * what `commentBlock` joins.
  */
-export function commentItem(comment: BoardComment, n: number): string {
+export function commentItem(comment: CardComment, n: number): string {
 	// A comment with no words points at the place and says nothing more.
 	const said = comment.text.trim() ? `\n${comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n")}` : "";
 	if (comment.items?.length) {
@@ -74,7 +77,7 @@ export function commentItem(comment: BoardComment, n: number): string {
 }
 
 /** A message with the waiting comments in front of it; either half may be empty. */
-export function withComments(text: string, comments: BoardComment[]): string {
+export function withComments(text: string, comments: CardComment[]): string {
 	const block = commentBlock(comments);
 	const said = text.trim();
 	if (!block) return said;

@@ -88,8 +88,8 @@ export function OverlayLayer(
 				{(box) => (
 					<div
 						class="pen-selection"
-						data-board={box().role === "board" ? "true" : undefined}
-						data-sizing={box().role === "board" && props.sizing(box().id.slice(6)) ? "true" : undefined}
+						data-page={box().role === "page" ? "true" : undefined}
+						data-sizing={box().role === "page" && props.sizing(box().id.slice("page:".length)) ? "true" : undefined}
 						data-round={box().round ? "true" : undefined}
 						style={{
 							left: `${box().x}px`,
@@ -149,7 +149,7 @@ export function OverlayLayer(
 				{(box) => (
 					<div
 						class="pen-hover"
-						data-board={box().board ? "true" : undefined}
+						data-page={box().board ? "true" : undefined}
 						data-round={box().round ? "true" : undefined}
 						style={{
 							left: `${box().x}px`,
@@ -392,7 +392,7 @@ export function OverlayLayer(
 								<div
 									class="pen-handle"
 									data-handle={handle}
-									data-board={box().path}
+									data-page={box().path}
 									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
 									onPointerDown={(event) => props.onPageHandle(event, handle)}
 								/>

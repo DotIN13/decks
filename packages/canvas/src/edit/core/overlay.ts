@@ -25,12 +25,12 @@ export type Offset = { dx: number; dy: number };
 export type Corners = { x1: number; y1: number; x2: number; y2: number };
 
 /**
- * One outline round something selected. `id` is the item's, `board:<path>` for a board, and empty
+ * One outline round something selected. `id` is the item's, `page:<path>` for a card, board, document or app, and empty
  * for the marquee: the page keys on these, so they are kept as they were.
  */
 export type Outline = Rect & {
 	id: string;
-	role: "item" | "board" | "marquee";
+	role: "item" | "page" | "marquee";
 	/** Notes and cards have a board's corners, and so does the outline round one. */
 	round?: true;
 };
@@ -174,7 +174,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 		const board = input.boards.find((candidate) => candidate.path === path);
 		if (!board) continue;
 		const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
-		out.push(outline(`board:${path}`, "board", { x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h }));
+		out.push(outline(`page:${path}`, "page", { x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h }));
 	}
 	// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
 	const chosen = input.selected;
@@ -184,7 +184,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 		const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
 		// Carried by a finger on its edge: outlined where the finger has it.
 		const at = carried?.path === board.path ? carried : { x: board.x + shift.dx, y: board.y + shift.dy };
-		out.push(outline(`board:${board.path}`, "board", sized?.path === board.path ? sized : { x: at.x, y: at.y, w: board.w, h: board.h }));
+		out.push(outline(`page:${board.path}`, "page", sized?.path === board.path ? sized : { x: at.x, y: at.y, w: board.w, h: board.h }));
 	}
 	if (input.marquee) out.push(outline("", "marquee", marqueeRect(input.marquee)));
 	return out;
@@ -232,9 +232,9 @@ export function radiusHandle(handles: Outline | undefined, input: Omit<HandleInp
 
 /** The selected board's box, when it alone is selected, can be resized, is not being carried, and is big enough on the screen to wear handles. */
 export function pageHandles(outlines: readonly Outline[], input: { resizable: boolean; carrying: boolean; boards: readonly PageBox[]; zoom?: number }): PageHandles | undefined {
-	if (!input.resizable || input.carrying || outlines.length !== 1 || outlines[0]!.role !== "board") return undefined;
+	if (!input.resizable || input.carrying || outlines.length !== 1 || outlines[0]!.role !== "page") return undefined;
 	if (tooSmallForHandles(outlines[0]!, input.zoom ?? 1)) return undefined;
-	const path = outlines[0]!.id.slice("board:".length);
+	const path = outlines[0]!.id.slice("page:".length);
 	const board = input.boards.find((candidate) => candidate.path === path);
 	if (!board) return undefined;
 	return { ...outlines[0]!, path };

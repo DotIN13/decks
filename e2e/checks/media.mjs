@@ -141,7 +141,7 @@ if (spot) {
 		}));
 		say("one click on a film mounts one player over it", !!player && player.players === 1, JSON.stringify(player));
 		say("…and it plays the file the item names", (player?.src ?? "").includes("a-film.mp4"), player?.src);
-		const picked = await until(() => canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
+		const picked = await until(() => canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-page])").length === 1));
 		say("…and the click selects it, as any drawn item", !!picked);
 
 		// Letting go of the item does not stop it: a film keeps playing while you work elsewhere.

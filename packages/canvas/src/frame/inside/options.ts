@@ -147,7 +147,7 @@ export function installHost(ctx: FrameContext): void {
 			move: (next, glide) => (glide ? ctx.handle().glide(next, glide) : ctx.handle().setCamera(next)),
 			focus: (targets) => focusOn(ctx, targets),
 			viewport: () => ({ width: innerWidth, height: innerHeight }),
-			reload: (path) => ctx.handle().reloadBoard(path),
+			reload: (path) => ctx.handle().reloadCard(path),
 			harness: (verb, args) => (studio ? Promise.resolve({ ok: false, error: `${verb}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.call(verb, args)),
 			page: (verb, args, card) => end.call("agent", { verb, args, card }),
 		}),
@@ -226,7 +226,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 				if (!item?.metadata) return;
 				const { scripts: _scripts, from: _from, ...rest } = item.metadata;
 				ctx.handle().edit([{ op: "update", id: item.id, set: { metadata: rest } }]);
-				setTimeout(() => ctx.handle().reloadBoard(path), 300);
+				setTimeout(() => ctx.handle().reloadCard(path), 300);
 			},
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
 			onExtent: (path, extent) => void (studio ? undefined : backend.post("card-extent", { path, ...extent })),

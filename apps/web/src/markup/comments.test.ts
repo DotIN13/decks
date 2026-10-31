@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type BoardComment } from "./comments.ts";
+import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type CardComment } from "./comments.ts";
 
-const comment = (extra: Partial<BoardComment> = {}): BoardComment => ({ id: "c1", board: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
+const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", board: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
 
 test("a quotation is one line, and not the whole page", () => {
 	assert.equal(quoteOf("  Keep\n\tit   short. "), "Keep it short.");
@@ -60,7 +60,7 @@ test("a comment on the whole board has no quote, and says so", () => {
 });
 
 test("a comment on drawn items names the canvas file, the items by id, and their words", () => {
-	const note: BoardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
+	const note: CardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
 	const block = commentBlock([note]);
 	assert.match(block, /^A comment on items drawn on a canvas:/);
 	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);

@@ -308,7 +308,7 @@ async function run(engine, { all }) {
 				await page.mouse.click(grip.x, grip.y);
 			},
 			prepare: async () => {
-				const h = await handle(`.pen-handle[data-handle="se"][data-board="${board.path}"]`);
+				const h = await handle(`.pen-handle[data-handle="se"][data-page="${board.path}"]`);
 				await drag(h, { x: h.x - 60, y: h.y - 40 }, 10);
 			},
 			commit: async (arm) => {
@@ -391,7 +391,7 @@ async function run(engine, { all }) {
 			await clickOn("ew-size");
 		},
 		prepare: async () => {
-			const h = await handle('.pen-handle[data-handle="se"]:not([data-board])');
+			const h = await handle('.pen-handle[data-handle="se"]:not([data-page])');
 			await drag(h, { x: h.x + 90, y: h.y + 60 });
 		},
 		commit: async (arm) => {
@@ -769,7 +769,7 @@ async function run(engine, { all }) {
 		prepare: async () => {
 			const b = await box("ew-frame");
 			await page.mouse.click(b.x + b.width - 12, b.y + b.height - 12);
-			const h = await handle('.pen-handle[data-handle="se"]:not([data-board])');
+			const h = await handle('.pen-handle[data-handle="se"]:not([data-page])');
 			await drag(h, { x: h.x + 100, y: h.y + 70 });
 		},
 		commit: async (arm) => {

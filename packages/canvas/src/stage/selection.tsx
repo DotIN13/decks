@@ -210,7 +210,7 @@ export function createSelection(deps: SelectionDeps) {
 	const calloutItems = createMemo(() => {
 		if ((props.selected && !groupPicked()) || props.drawing || !props.onPenEdit || editor.text()) return undefined;
 		const all = penOutlines().filter((one) => one.id);
-		const outlines = all.filter((one) => !one.id.startsWith("board:"));
+		const outlines = all.filter((one) => !one.id.startsWith("page:"));
 		const boards = all.length - outlines.length;
 		if (outlines.length !== editor.items().length || boards !== editor.pagePicks().length || !all.length) return undefined;
 		const x = Math.min(...all.map((one) => one.x));
@@ -363,7 +363,7 @@ export function createSelection(deps: SelectionDeps) {
 										? {
 												onComment: () =>
 													props.onComment?.({
-														// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
+														// A drawn item is found by its canvas's file and its id (`CardComment.items`).
 														path: stagePenPath() ?? "the canvas",
 														items: items().ids,
 														quote: items().words,
@@ -378,7 +378,7 @@ export function createSelection(deps: SelectionDeps) {
 												ink: {
 													agent: props.inkAgent,
 													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
-													onBoard: () => props.onInk?.({ action: "board", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
+													onCard: () => props.onInk?.({ action: "card", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
 													onSend: () => props.onInk?.({ action: "send", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
 												},
 											}
@@ -403,7 +403,7 @@ export function createSelection(deps: SelectionDeps) {
 						ink={{
 							agent: props.inkAgent ?? "the agent",
 							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
-							onBoard: () => props.onInk?.({ action: "board", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
+							onCard: () => props.onInk?.({ action: "card", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 						}}
 						// The rest of a selection's pill, acting on the lasso's strokes instead of the editor's pick.

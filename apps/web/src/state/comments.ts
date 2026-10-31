@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { adoptComments, commentsKey, loadComments, saveComments, type BoardComment } from "../markup/comments.ts";
+import { adoptComments, commentsKey, loadComments, saveComments, type CardComment } from "../markup/comments.ts";
 
 /**
  * Comments on boards: whether the one being written has words in it, and the ones waiting for the next message.
@@ -24,7 +24,7 @@ export interface CommentTarget {
 	title?: string;
 	/** Open straight to the box: the press that made it already said "comment". */
 	open?: boolean;
-	/** Drawn items commented on, by id; `path` is then the canvas's file (`BoardComment.items`). */
+	/** Drawn items commented on, by id; `path` is then the canvas's file (`CardComment.items`). */
 	items?: string[];
 }
 
@@ -33,9 +33,9 @@ const [commentDirty, setCommentDirty] = createSignal(false);
 export { commentDirty, setCommentDirty };
 
 const storage = () => (typeof localStorage === "undefined" ? undefined : localStorage);
-const [waiting, setWaiting] = createSignal<Record<string, BoardComment[]>>(loadComments(storage()));
+const [waiting, setWaiting] = createSignal<Record<string, CardComment[]>>(loadComments(storage()));
 
-const write = (next: Record<string, BoardComment[]>) => {
+const write = (next: Record<string, CardComment[]>) => {
 	setWaiting(next);
 	saveComments(storage(), next);
 };
@@ -55,7 +55,7 @@ export function removeComment(agentId: string, canvas: string | undefined, id: s
 }
 
 /** The waiting comments, handed over: they are about to be sent, so they stop waiting. */
-export function takeComments(agentId: string, canvas: string | undefined): BoardComment[] {
+export function takeComments(agentId: string, canvas: string | undefined): CardComment[] {
 	const key = commentsKey(agentId, canvas);
 	const taken = waiting()[key] ?? [];
 	if (taken.length > 0) write({ ...waiting(), [key]: [] });
@@ -75,7 +75,7 @@ export function adoptFormerComments(agentId: string, canvas: string | undefined)
  * frame can hand one over, a card's script too, so its pill has a dashed amber edge and its card says a
  * card handed it over; the card's Exact text is all of what goes with your next message.
  */
-export type WaitingComment = BoardComment & { from?: "canvas" };
+export type WaitingComment = CardComment & { from?: "canvas" };
 
 /** The most of any one text a frame draft may carry: longer is cut, with an ellipsis, and the cut is what is sent. */
 export const FRAME_TEXT_LIMIT = 2000;
@@ -103,8 +103,11 @@ export function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
 }
 
 type FrameComment = { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
-type FramePill = { kind: "board" | "item"; id: string; label: string; name?: string };
-type FrameInk = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
+/** A pill as the frame hands it: a card (`board`, its old name, from a frame of before 2026-11-30) or a drawn item. */
+type FramePill = { kind: "card" | "board" | "item"; id: string; label: string; name?: string };
+/** A pill for the composer: its mention kind is still `board` for a card, what a sent message's parts say. */
+type ComposerPill = { kind: "board" | "item"; id: string; label: string; name?: string };
+type FrameInk = { action: "drawing" | "card" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
 /** A comment from the frame, every text in it cleaned and cut. */
 export function cleanFrameComment(comment: FrameComment): FrameComment {
@@ -122,17 +125,17 @@ export function cleanFrameComment(comment: FrameComment): FrameComment {
 }
 
 /** Pills from the frame, their ids and labels cleaned and cut. */
-export function cleanFramePills(pills: readonly FramePill[]): FramePill[] {
+export function cleanFramePills(pills: readonly FramePill[]): ComposerPill[] {
 	return pills
 		.slice(0, FRAME_IDS_LIMIT)
-		.filter((pill) => pill && (pill.kind === "board" || pill.kind === "item"))
-		.map((pill) => ({ kind: pill.kind, id: frameText(pill.id), label: frameText(pill.label), ...(pill.name ? { name: frameText(pill.name) } : {}) }))
+		.filter((pill) => pill && (pill.kind === "card" || pill.kind === "board" || pill.kind === "item"))
+		.map((pill): ComposerPill => ({ kind: pill.kind === "item" ? "item" : "board", id: frameText(pill.id), label: frameText(pill.label), ...(pill.name ? { name: frameText(pill.name) } : {}) }))
 		.filter((pill) => pill.id !== "");
 }
 
 /** A sketch from the frame, its ids and canvas cleaned and cut, its box plain numbers. */
-export function cleanFrameInk<T extends FrameInk>(ink: T): T {
+export function cleanFrameInk<T extends FrameInk>(ink: T): Omit<T, "action"> & { action: "drawing" | "card" | "send" } {
 	const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
-	const action = ink.action === "drawing" || ink.action === "board" ? ink.action : "send";
+	const action = ink.action === "drawing" ? "drawing" : ink.action === "card" || ink.action === "board" ? "card" : "send";
 	return { ...ink, action, ids: frameTexts(ink.ids), canvas: frameText(ink.canvas), box: { x: num(ink.box?.x), y: num(ink.box?.y), w: num(ink.box?.w), h: num(ink.box?.h) } };
 }

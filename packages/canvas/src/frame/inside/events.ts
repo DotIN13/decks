@@ -105,7 +105,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 				// Kept by the page with the views it parks (`camera/landing.ts`): it arrives when that chat opens.
 				rememberView: (id, to, selected) => end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
 				select: selectCard,
-				reload: (path) => handle.reloadBoard(path),
+				reload: (path) => handle.reloadCard(path),
 				cursor: (at) => ctx.setCursor(at),
 			});
 		} catch (error) {
@@ -163,7 +163,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		}
 		follower.hear(message);
 	});
-	end.on("reload", (data) => handle.reloadBoard(data.path));
+	end.on("reload", (data) => handle.reloadCard(data.path));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
 		if (data.insets) useInsets(data.insets);

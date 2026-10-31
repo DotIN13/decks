@@ -86,7 +86,7 @@ const select = async (path) => {
 const cornerOnScreen = async (path) => {
 	for (let i = 0; i < 6; i++) {
 		const below = await canvas.evaluate((wanted) => {
-			const corner = document.querySelector(`.pen-handle[data-board="${wanted}"][data-handle="se"]`)?.getBoundingClientRect();
+			const corner = document.querySelector(`.pen-handle[data-page="${wanted}"][data-handle="se"]`)?.getBoundingClientRect();
 			return !!corner && corner.bottom > window.innerHeight - 140;
 		}, path);
 		if (!below) break;
@@ -97,7 +97,7 @@ const cornerOnScreen = async (path) => {
 
 /** Drag the handle by screen pixels, and report what the node was drawn at half way through. */
 const dragHandle = async (path, dx, dy) => {
-	const handle = canvas.locator(`.pen-handle[data-board="${path}"][data-handle="se"]`);
+	const handle = canvas.locator(`.pen-handle[data-page="${path}"][data-handle="se"]`);
 	await handle.waitFor({ state: "visible", timeout: 6000 });
 	const box = await handle.boundingBox();
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -137,7 +137,7 @@ await select(componentPath);
 const handleAt = (wanted) =>
 	canvas.evaluate((path) => {
 		const node = document.querySelector(`.board-node[data-path="${path}"]`);
-		const sizer = document.querySelector(`.pen-handle[data-board="${path}"][data-handle="se"]`);
+		const sizer = document.querySelector(`.pen-handle[data-page="${path}"][data-handle="se"]`);
 		if (!node || !sizer) return null;
 		const n = node.getBoundingClientRect();
 		const s = sizer.getBoundingClientRect();
@@ -218,7 +218,7 @@ say("…and a board you resized does not glow as news", !glows.glow, JSON.string
 await select(componentPath);
 await settle(page, 400);
 const before = await drawnAt(componentPath);
-const handle = canvas.locator(`.pen-handle[data-board="${componentPath}"][data-handle="se"]`);
+const handle = canvas.locator(`.pen-handle[data-page="${componentPath}"][data-handle="se"]`);
 await handle.waitFor({ state: "visible", timeout: 6000 });
 const grip = await handle.boundingBox();
 await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);

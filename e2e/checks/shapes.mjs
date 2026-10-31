@@ -279,7 +279,7 @@ if (room) {
 		await page.mouse.click(drawn.top.x + drawn.top.width / 2, drawn.top.y + drawn.top.height * 0.85);
 		await settle(page, 400);
 		const picked = await until(() => canvas.evaluate(() => {
-			const one = document.querySelector(".pen-selection:not([data-board])");
+			const one = document.querySelector(".pen-selection:not([data-page])");
 			if (!one) return undefined;
 			const box = one.getBoundingClientRect();
 			return { y: Math.round(box.y), h: Math.round(box.height) };

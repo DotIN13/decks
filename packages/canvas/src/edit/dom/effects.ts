@@ -15,7 +15,7 @@ type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;
 
 /** A mention of something dropped on the composer. */
 /** `label` is what the pill shows; `name` what it is called in full, for its card and the sent message. */
-export type ReferPill = { kind: "board" | "item"; id: string; label: string; name?: string };
+export type ReferPill = { kind: "card" | "item"; id: string; label: string; name?: string };
 
 export type EffectHost = {
 	/** The stage's element: what the ghost's attribute goes on. */
@@ -78,7 +78,7 @@ export function createEffects(host: EffectHost) {
 		return [
 			...boards.map((path) => {
 				const name = host.boards().find((board) => board.path === path)?.title || (path.split("/").pop() ?? path);
-				return { kind: "board" as const, id: path, label: shortLabel(name), name };
+				return { kind: "card" as const, id: path, label: shortLabel(name), name };
 			}),
 			...ids.map((id) => {
 				const node = named.get(id);
