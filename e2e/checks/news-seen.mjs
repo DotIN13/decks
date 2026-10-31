@@ -7,7 +7,7 @@
  * (`Stage`'s `onRead`, the frame's `card-seen`); the harness stamps it read and the frame's dot for it
  * goes. Said once: a second selection of the same unchanged card sends nothing more.
  */
-import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectCard, settle, write } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectCard, settle, socket, write } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await resetStage(page);
@@ -46,8 +46,12 @@ const waitFor = async (test, ms = 10000) => {
 
 if (card) {
 	// Not news to start with, then named the person's by their resize, then changed after that.
-	const resized = await call("resize", [card.path, { w: (card.w ?? 800) + 24 }], agent);
-	say("the person's resize names them the card's writer", resized.ok !== false, JSON.stringify(resized).slice(0, 200));
+	// The person's resize as the socket carries it (`card.resize`, `verbs/gestures.ts`).
+	const link = await socket();
+	link.send({ type: "card.resize", path: card.path, w: (card.w ?? 800) + 24 });
+	const named = await waitFor(async () => (await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy === "you");
+	say("the person's resize names them the card's writer", named, JSON.stringify((await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy));
+	link.close?.();
 	await page.waitForTimeout(1500);
 	const file = `${deck.path}/${card.path}`;
 	write(file, `${read(file)}\n<!-- changed elsewhere -->\n`);

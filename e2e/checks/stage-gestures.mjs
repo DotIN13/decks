@@ -784,7 +784,7 @@ await page.keyboard.press("Escape");
 		await page.mouse.up();
 		await settle(page, 600);
 		const pill = await page.evaluate(() => {
-			const one = document.querySelector('.composer-box [data-component="mention-pill"][data-kind="board"]');
+			const one = document.querySelector('.composer-box [data-component="mention-pill"][data-kind="card"]');
 			return one ? { id: one.dataset.mentionId, label: one.dataset.mentionLabel, icon: Boolean(one.querySelector('[data-slot="pill-icon"]')), wash: getComputedStyle(one).backgroundColor } : null;
 		});
 		/* Its own colour and its own icon: a board, a drawn item and a comment are three kinds of
