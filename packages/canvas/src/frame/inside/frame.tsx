@@ -1,3 +1,4 @@
+import { Show } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../editor.tsx";
 import type { Editor } from "../../types.ts";
@@ -63,12 +64,18 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		const card = at ? pages().find((page) => page.path === at.path) : undefined;
 		return at && card ? { x: card.x + at.x, y: card.y + at.y, label: at.label, color: at.color } : null;
 	};
+	/*
+	 * Only while an agent's cursor is out: its layer follows the camera, and drawn always it was written
+	 * at every step of every pan, a repaint and a new layer tree each time with nothing on it to see.
+	 */
 	const cursors = () => (
-		<div class="frame-cursors" style={{ position: "absolute", inset: "0", overflow: "hidden", "pointer-events": "none", "z-index": "5" }}>
-			<div style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: `translate(${innerWidth / 2}px, ${innerHeight / 2}px) scale(${camera().zoom}) translate(${-camera().x}px, ${-camera().y}px)` }}>
-				<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
+		<Show when={cursorAt()}>
+			<div class="frame-cursors" style={{ position: "absolute", inset: "0", overflow: "hidden", "pointer-events": "none", "z-index": "5" }}>
+				<div style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", "will-change": "transform", transform: `translate(${innerWidth / 2}px, ${innerHeight / 2}px) scale(${camera().zoom}) translate(${-camera().x}px, ${-camera().y}px)` }}>
+					<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
+				</div>
 			</div>
-		</div>
+		</Show>
 	);
 
 	if (chrome) {

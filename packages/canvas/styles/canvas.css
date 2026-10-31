@@ -1822,6 +1822,13 @@
 		background: var(--app-bg);
 		color-scheme: light;
 	}
+	/*
+	 * A running app scrolled far off: kept, so it never reloads, but not drawn. An app that animates
+	 * (a playhead, a clock) had the canvas repaint it at every step of every pan wherever the camera was.
+	 */
+	:where(.decks-canvas, .decks-layer) .app-surface[data-away] .app-surface-frame {
+		visibility: hidden;
+	}
 	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-frame {
 		color-scheme: dark;
 	}

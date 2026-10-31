@@ -102,7 +102,7 @@ let surfaces = 0;
  * they are yours. Elsewhere, or past the device's budget of running apps, it is the bar and Open, which
  * the host's page does in a tab of its own. The green light opens a tab either way.
  */
-export function AppSurface(props: { app: string; path: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
+export function AppSurface(props: { app: string; path: string; visible: boolean; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
 	let frame: HTMLIFrameElement | undefined;
 	const me = ++surfaces;
@@ -115,7 +115,8 @@ export function AppSurface(props: { app: string; path: string; selected: boolean
 	createEffect(() => {
 		if (!inCanvas() || live()) return;
 		const now = liveApps();
-		if (props.selected || now.size < APPS[DEVICE].live) setLiveApps(new Set([...now, me]));
+		// Only one near the screen starts (or the chosen one): an app far off was running, and painting, for nobody.
+		if (props.selected || (props.visible && now.size < APPS[DEVICE].live)) setLiveApps(new Set([...now, me]));
 	});
 	createEffect(() => {
 		const ask = inCanvas();
@@ -165,7 +166,7 @@ export function AppSurface(props: { app: string; path: string; selected: boolean
 		return got && "url" in got ? got.url : undefined;
 	};
 	return (
-		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} on:dblclick={() => !url() && open()}>
+		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} data-away={url() && !props.visible && !props.selected ? "true" : undefined} on:dblclick={() => !url() && open()}>
 			{/* A window's title bar, as macOS draws one: the lights, the name in the middle, whether it runs. */}
 			<div class="app-surface-bar">
 				<span class="app-surface-lights">

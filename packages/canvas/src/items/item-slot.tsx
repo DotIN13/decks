@@ -218,7 +218,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 					<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 				<Show when={awake() && props.board.item === "app"}>
-					<AppSurface app={props.board.app ?? ""} path={props.board.path} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 			</div>
 		</div>
