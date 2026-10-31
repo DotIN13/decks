@@ -42,7 +42,7 @@
 	/*
 	 * Framed by a page of another origin (Decks Studio showing a harness's board): that page cannot
 	 * listen in here as the Decks app does (`frame-gestures.ts`), so the gestures the canvas needs are
-	 * posted up to it by the same bridge an embed uses (`embed-guest.js`): a scroll nothing here can
+	 * posted up to it: a scroll nothing here can
 	 * take, a pinch, fingers, Space and a middle-drag.
 	 */
 	const foreignParent = (() => {
@@ -67,7 +67,6 @@
 		loaded.set(file, promise);
 		return promise;
 	}
-	if (foreignParent) void needScript("embed-guest.js").catch(() => {});
 	/*
 	 * Words selected here, said to the page framing this one when it is another origin: it cannot read
 	 * this document's selection, and offers a comment on them (Decks Studio). Where they are is in this
@@ -162,7 +161,7 @@
 	/*
 	 * Held still: on a touch screen the canvas asks a board nobody has picked to stop its CSS
 	 * animations (`plain-board.tsx`, `decks:still`): a looping one repaints every frame and takes the
-	 * canvas's own frames away. Picked again, it plays on. `embed-guest.js` hears the same, for pages
+	 * canvas's own frames away. Picked again, it plays on. The same for pages
 	 * without this script.
 	 */
 	window.addEventListener("message", (event) => {
@@ -1029,18 +1028,8 @@
 	 *   and a scroll must not be swallowed by something you are merely passing over.
 	 *   Leaving is the release gesture because Escape cannot be — once focus is inside
 	 *   the frame its keys belong to its document too, which is where this started.
-	 * - **The bridge**, for a page that opts in with `lib/embed-guest.js`. It applies the
-	 *   same rule one level down — a scroll its own boxes can take is theirs, the rest is
-	 *   posted up — and this side replays it as a wheel over the frame, which
-	 *   `frame-gestures.ts` then forwards without ever knowing it was synthetic. A guest
-	 *   needs no veil and no click, so announcing itself takes the veil away.
-	 *
-	 * Touch goes the same way and cannot go the same route: a fabricated `pointerdown`
-	 * would reach the board's editor as well as the canvas, so fingers arrive as a
-	 * `decks:embed-finger` event that only `frame-gestures.ts` reads, while a fabricated
-	 * wheel is indistinguishable from a real one to the only listener that wants it.
-	 *
-	 * Only messages from this frame's own window are read, and only the three shapes below.
+	 * The bridge a page could opt into (`embed-guest.js`), which handed its scrolls, fingers
+	 * and drops up, is gone with the boards: an embedded page is behind its veil until clicked.
 	 * An embed is quarantined content; a postMessage channel into the app's document is
 	 * exactly the sort of thing that must not quietly become a remote control.
 	 */
@@ -1099,108 +1088,6 @@
 
 		body.append(veil, hint);
 		set(false);
-
-		window.addEventListener("message", (event) => {
-			// A remount replaces the frame; the listener on `window` outlives it.
-			if (!frame.isConnected) return;
-			if (event.source !== frame.contentWindow) return;
-			const message = event.data;
-			if (!message || typeof message !== "object") return;
-
-			if (message.t === "decks:embed-ready") {
-				host.classList.add("embed-guest");
-				host.classList.remove("embed-live");
-				veil.remove();
-				hint.remove();
-				// A board that is the page holds it whole, as it holds a PDF's pages: the page is told, and says its size.
-				if (host.hasAttribute("data-bare")) frame.contentWindow?.postMessage({ t: "decks:hosted" }, "*");
-				return;
-			}
-			if (message.t === "decks:size") {
-				if (!host.hasAttribute("data-bare")) return;
-				fitPage(frame, Number(message.w), Number(message.h));
-				return;
-			}
-			if (message.t === "decks:touch") {
-				const phase = message.phase;
-				if (phase !== "down" && phase !== "move" && phase !== "up") return;
-				const raw = Number(message.id);
-				const x = Number(message.x);
-				const y = Number(message.y);
-				if (!Number.isFinite(raw) || !Number.isFinite(x) || !Number.isFinite(y)) return;
-
-				let id = fingers.get(raw);
-				if (id === undefined) {
-					// A move or an up for a gesture this side never saw begin is noise.
-					if (phase !== "down") return;
-					id = nextEmbedFinger++;
-					fingers.set(raw, id);
-				}
-
-				/*
-				 * Named rather than replayed. A synthetic `WheelEvent` is read by nobody
-				 * but `frame-gestures.ts`, so replaying one is honest; a synthetic
-				 * `pointerdown` would also reach the editor, which would select this
-				 * embed and then drag it while the finger was busy inside the page.
-				 * `frame-gestures.ts` listens for this event and nothing else does.
-				 */
-				const rect = frame.getBoundingClientRect();
-				// From the frame, so the board knows the finger is over the page and can scroll what holds it.
-				frame.dispatchEvent(
-					new CustomEvent("decks:embed-finger", {
-						bubbles: true,
-						detail: { phase, id, x: rect.left + x, y: rect.top + y },
-					}),
-				);
-				if (phase === "up") fingers.delete(raw);
-				return;
-			}
-			if (message.t === "decks:scroll-ask") {
-				// The distance in the page's pixels at the canvas's zoom, which `frame-gestures.ts` says (`decksScale`).
-				const scale = typeof window.decksScale === "function" ? Number(window.decksScale()) || 1 : 1;
-				frame.contentWindow?.postMessage({ t: "decks:scroll", id: message.id, dx: (Number(message.dx) || 0) / scale, dy: (Number(message.dy) || 0) / scale }, "*");
-				return;
-			}
-			if (message.t === "decks:space") {
-				document.dispatchEvent(new KeyboardEvent(message.held === true ? "keydown" : "keyup", { code: "Space", key: " ", bubbles: true, cancelable: true }));
-				return;
-			}
-			if (message.t === "decks:pointer") {
-				const phase = message.phase;
-				if (phase !== "down" && phase !== "move" && phase !== "up") return;
-				const sx = Number(message.sx);
-				const sy = Number(message.sy);
-				if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
-				// A pan, in screen pixels, which only `frame-gestures.ts` reads (`decks:embed-pan`).
-				frame.dispatchEvent(new CustomEvent("decks:embed-pan", { bubbles: true, detail: { phase, sx, sy, button: Number(message.button) || 0 } }));
-				return;
-			}
-			if (message.t !== "decks:wheel") return;
-
-			const dx = Number(message.dx);
-			const dy = Number(message.dy);
-			if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
-
-			/*
-			 * The guest's `clientX/clientY` are its own pixels, and its own pixels are
-			 * this document's: the frame fills the embed's body at 1:1, and the canvas's
-			 * zoom is a transform on an ancestor of both. So the point is the frame's
-			 * offset plus the guest's and the deltas pass through unchanged — the same
-			 * trade `frame-gestures.ts` makes one level up, for the same reason.
-			 */
-			const rect = frame.getBoundingClientRect();
-			frame.dispatchEvent(
-				new WheelEvent("wheel", {
-					deltaX: clampDelta(dx),
-					deltaY: clampDelta(dy),
-					clientX: rect.left + (Number(message.x) || 0),
-					clientY: rect.top + (Number(message.y) || 0),
-					ctrlKey: message.zooming === true,
-					bubbles: true,
-					cancelable: true,
-				}),
-			);
-		});
 	}
 
 	/**
@@ -1416,8 +1303,7 @@
 				 * nothing else — no same-origin, no forms, no top-level navigation.
 				 */
 				const frame = document.createElement("iframe");
-				// A board that is the page asks for it with the guest bridge in it, so it needs no click (`guardEmbed`).
-				frame.src = host.hasAttribute("data-bare") ? `${url}${url.includes("?") ? "&" : "?"}guest=1` : url;
+				frame.src = url;
 				frame.setAttribute("sandbox", "allow-scripts");
 				frame.setAttribute("referrerpolicy", "no-referrer");
 				frame.title = label;

@@ -1,6 +1,5 @@
 import { existsSync, statSync } from "node:fs";
 import { sttReady, transcribe } from "../stt.ts";
-import { readFile } from "node:fs/promises";
 import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
@@ -11,7 +10,7 @@ import { filePreview, previewKind } from "../files/preview.ts";
 import { boardHeaders, quarantine } from "../files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "../files/upload.ts";
 import { actsAsPerson } from "../auth/principal.ts";
-import { asyncRoute, wildcard, sendFile, withGuest, type RouteDeps } from "./shared.ts";
+import { asyncRoute, wildcard, sendFile, type RouteDeps } from "./shared.ts";
 import express, { type Router } from "express";
 
 /**
@@ -54,8 +53,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		const target = resolveFileRequest(app.deck.roots, { path, from });
 		if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(path);
 		// 302 rather than 301: which file a relative path resolves to depends on the
-		// deck that is open, and that changes. A board that is the page asks for the bridge, and still does there.
-		res.redirect(302, `${fileUrl(target)}${req.query.guest === undefined ? "" : "?guest=1"}`);
+		// deck that is open, and that changes.
+		res.redirect(302, fileUrl(target));
 	});
 
 	/** The resolved file itself, at its absolute path — read-only and quarantined (§4). */
@@ -66,11 +65,6 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const target = resolveFileRequest(app.deck.roots, { path: requested });
 			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(requested);
 			quarantine(res, target);
-			// A web page outside the deck that is its board, with the bridge in it, as one inside the deck gets (`/card/*path`).
-			if (req.query.guest !== undefined && /\.html?$/i.test(target)) {
-				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}card/lib/embed-guest.js`));
-				return;
-			}
 			await sendFile(res, target);
 		}),
 	);

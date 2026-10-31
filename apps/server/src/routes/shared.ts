@@ -53,23 +53,6 @@ export function sendFile(res: Response, target: string): Promise<void> {
 }
 
 
-/**
- * A web page with `lib/embed-guest.js` put first in its head, so it takes the scrolls it can use and
- * hands the rest to the canvas. A page that brings its own bridge (it says `decks:embed-ready`) is
- * left as it is: two bridges would hand every scroll up twice.
- */
-export function withGuest(page: string, src: string): string {
-	if (page.includes("decks:embed-ready")) return page;
-	return withScript(page, src);
-}
-
-/** A page with a script put first in its head, before any of its own. */
-export function withScript(page: string, src: string): string {
-	const tag = `<script src="${src}"></script>`;
-	const head = /<head[^>]*>/i.exec(page);
-	return head ? `${page.slice(0, head.index + head[0].length)}${tag}${page.slice(head.index + head[0].length)}` : `${tag}${page}`;
-}
-
 /** The commit this harness runs, short, read once; "" when it is not a git checkout. */
 let version: string | undefined;
 export function harnessVersion(): string {

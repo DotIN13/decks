@@ -53,7 +53,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const raw = req.query.raw !== undefined;
 			const card = raw ? undefined : app.deck.board(normalizeBoardPath(requested));
 			if (await cardPageAnswer(app, asked, requested, target, card, raw, res)) return;
-			await assetAnswer(asked, requested, target, req.query.guest !== undefined, res);
+			await assetAnswer(target, res);
 		}),
 	);
 }
