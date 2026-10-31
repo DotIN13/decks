@@ -82,8 +82,10 @@ export const PICTURE_LOOK = 3;
  * web app's `measure.html` as the canvas frame draws it (`mountCard`, card.css before the card's own
  * styles), where it was a page of its own; every card's picture is taken again once. Old boards and
  * friends' pages keep `PICTURE_LOOK`, so the pictures an old deck's migration reads keep their names.
+ * 5: the smaller rungs end on a whole row (`SHRINK`), where their last row was half transparent and drawn
+ * on down to a taller box's foot as a grey bar.
  */
-export const CARD_LOOK = 4;
+export const CARD_LOOK = 5;
 /** A card, as the canvas frame and `measure.html` tell one: the `index.html` of a folder in a `cards/`. */
 export const CARD_PATH = /(?:^|\/)cards\/[^/]+\/index\.html$/i;
 /** The look a picture of this page is named with: `CARD_LOOK` for a card, `PICTURE_LOOK` for any other page. */
@@ -201,7 +203,17 @@ export const SHRINK = `async ([b64, width]) => {
 	const text = atob(b64);
 	const bytes = new Uint8Array(text.length);
 	for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
-	const bitmap = await createImageBitmap(new Blob([bytes]), { resizeWidth: width, resizeQuality: "high" });
+	/*
+	 * A whole number of rows, taken from a part of the picture of exactly that shape: left to the
+	 * browser, a height that does not come out whole (531 at 800 is 318.6 at 480) is rounded up and
+	 * its last row resampled half from beyond the picture's foot, transparent, and the canvas draws
+	 * that last row on down to a taller box's foot as a grey bar.
+	 */
+	const source = await createImageBitmap(new Blob([bytes]));
+	const height = Math.max(1, Math.floor((source.height * width) / source.width));
+	const rows = Math.min(source.height, Math.round((height * source.width) / width));
+	const bitmap = await createImageBitmap(source, 0, 0, source.width, rows, { resizeWidth: width, resizeHeight: height, resizeQuality: "high" });
+	source.close();
 	const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
 	canvas.getContext("2d").drawImage(bitmap, 0, 0);
 	bitmap.close();

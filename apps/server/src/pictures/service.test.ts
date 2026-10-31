@@ -315,7 +315,7 @@ test("a card is pictured on the web app's measure.html as the frame draws it, in
 	// Its pictures in the look before (a page of its own), of this revision and an earlier one.
 	const before = [thumbName(path, 3, "light", "whole"), thumbName(path, 3, "light", "small", 480), thumbName(path, 2, "light", "small", 192)].map((name) => name.replace(/-l\d+\.webp$/, "-l3.webp"));
 	for (const name of before) writeFileSync(join(dir, name), "old");
-	assert.match(thumbName(path, 3, "light"), /-l4\.webp$/, "a card's pictures are named in the card look");
+	assert.match(thumbName(path, 3, "light"), /-l5\.webp$/, "a card's pictures are named in the card look");
 	assert.match(thumbName("canvases/plan/boards/old.html", 3, "light"), /-l3\.webp$/, "an old page's keep the page look, which the migrations read");
 	const card = board(path, 3, 800, 300);
 	assert.deepEqual(thumbs.nearest(card, "light", "whole"), { file: join(dir, before[0]!), exact: false }, "the older look stands in until the new picture comes");

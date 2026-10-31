@@ -15,7 +15,7 @@ import type { Rect } from "../protocol.ts";
  * How the server draws card pictures, in each picture's address: raised with `CARD_LOOK` in the server's
  * `pictures/ladder.ts`, since the browser keeps a picture a year under the same address.
  */
-const PICTURE_LOOK = 4;
+const PICTURE_LOOK = 5;
 
 /** Text as base64url, UTF-8 first, for an address. */
 const base64url = (text: string) => {
