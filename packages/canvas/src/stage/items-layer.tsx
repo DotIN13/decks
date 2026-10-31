@@ -161,6 +161,31 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	};
 
 	/**
+	 * Each app's status, by name, for the dot on the window the engine paints: read once per app on the
+	 * canvas and then heard from the harness as it changes (`CanvasHost.apps.watch`).
+	 */
+	const [appStates, setAppStates] = createSignal<ReadonlyMap<string, string>>(new Map());
+	const appWatched = new Map<string, () => void>();
+	createEffect(() => {
+		const apps = canvasHost().apps;
+		const names = new Set(props.boards.filter((board) => board.item === "app" && board.app).map((board) => board.app!));
+		for (const [name, stop] of appWatched) {
+			if (names.has(name)) continue;
+			stop();
+			appWatched.delete(name);
+		}
+		for (const name of names) {
+			if (appWatched.has(name) || !apps) continue;
+			const put = (status: string | undefined) => status && setAppStates((was) => (was.get(name) === status ? was : new Map(was).set(name, status)));
+			void apps.status(name).then((got) => put(got?.status)).catch(() => {});
+			appWatched.set(name, apps.watch?.(name, (state) => put(state.status)) ?? (() => {}));
+		}
+	});
+	onCleanup(() => {
+		for (const stop of appWatched.values()) stop();
+	});
+
+	/**
 	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
 	 *
 	 * A dragged board is where it was picked up, here: the sheet draws its picture once on the carried
@@ -170,6 +195,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const live = liveCards();
 		const look = scheme();
 		const pictures = cardPictures();
+		const states = appStates();
 		/*
 		 * An awake card being sized is its surface, drawn over the sheet at the new box, so the sheet
 		 * keeps it where it was until the file has the size: each step otherwise painted the whole
@@ -205,9 +231,10 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						...(live.has(board.path) ? { ready: true } : {}),
 						// An item not live is its picture: a card's own, an app's as the frame runs it, a document's of its file.
 						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item === "document" && board.file ? props.shots().picture({ path: board.file, rev: board.rev }, look) : board.item ? "" : props.shots().picture(board, look),
-						// Painted on its paper until its picture comes.
+						// Painted on its paper until its picture comes; an app's window carries its name and status in every state.
 						title: board.title,
 						kind: board.card ? "card" : (board.item ?? "board"),
+						...(board.item === "app" && board.app ? { status: states.get(board.app) ?? "" } : {}),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
 				}),

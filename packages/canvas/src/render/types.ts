@@ -52,7 +52,12 @@ export interface SceneCard {
 	/** Its title and kind, painted on its paper while it has no picture (`engine.rs`, `frame`). */
 	title?: string;
 	kind?: "card" | "app" | "document" | "board";
+	/** An app's status, for the dot on its window's bar. */
+	status?: string;
 }
+
+/** An app's window bar, in stage units: painted by the engine in every state; the page's iframe sits below it. */
+export const APP_BAR = 44;
 
 /** A stroke of ink the drawing does not hold yet, as the page shaped it (`strokeShape`), in stage pixels. */
 export interface LiveInk {

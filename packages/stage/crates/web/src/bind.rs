@@ -489,6 +489,7 @@ impl PageEngine {
 					glow: b.get("glow").and_then(serde_json::Value::as_bool).unwrap_or(false),
 					title: b.get("title").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
 					kind: b.get("kind").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+					status: b.get("status").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
 				})
 			})
 			.collect();

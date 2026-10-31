@@ -178,7 +178,7 @@ export function PageCallout(props: {
 			</button>
 			<Show when={props.board && !props.board.live ? props.board : undefined}>
 				{(board) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={canvasHost().fileUrl(board().path)} target="_blank" rel="noopener">
+				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { if (board().item === "app" && board().app) { event.preventDefault(); canvasHost().apps?.open(board().app!); } }}>
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}

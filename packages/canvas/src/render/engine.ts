@@ -1305,7 +1305,7 @@ export class StageEngine {
 		const was = this.placedCards;
 		this.placedCards = cards;
 		if (!this.page) return;
-		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.news, b.glow, b.picture, b.title, b.kind]));
+		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.news, b.glow, b.picture, b.title, b.kind, b.status]));
 		const live = JSON.stringify(cards.filter((b) => b.live).map((b) => b.path));
 		if (key === this.cardKey) {
 			// The same boxes as the ones the index was made for: it answers for these too.
@@ -1320,7 +1320,7 @@ export class StageEngine {
 		}
 		this.cardKey = key;
 		this.liveKey = live;
-		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind })));
+		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind, status: b.status })));
 		this.cardsSent.calls++;
 		this.cardsSent.bytes += sent.length;
 		this.page.setCards(sent);

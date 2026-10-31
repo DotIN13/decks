@@ -503,6 +503,7 @@ impl Page {
 		let paper = if self.scene.dark { [0.118, 0.118, 0.125, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
 		let mut placeholders: Vec<Placeholder> = Vec::new();
 		let mut titled: Vec<Placeholder> = Vec::new();
+		let mut windows: Vec<Window> = Vec::new();
 		let mut pictured = Vec::new();
 		let mut carrying = Vec::new();
 		// A drag's ghost is the lifted items alone: no boards.
@@ -510,18 +511,26 @@ impl Page {
 		for board in cards {
 			let carried = self.carry.0.contains(&board.path);
 			let picture = self.pictures.get(&board.picture);
-			// A live item is drawn here only while a drag carries it: as its picture, or as its paper and title until it has one.
-			if board.live && !carried {
-				continue;
-			}
+			let app = board.kind == "app";
 			let (dx, dy) = if carried { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
 			let place = Rect { x: board.x + dx, y: board.y + dy, w: board.w, h: board.h };
 			if !place.meets(&view) {
 				continue;
 			}
 			let (x, y, w, h) = snap(&place);
+			// An app's window is painted in every state, live too: the page holds only its body below the bar.
+			if app {
+				windows.push(Window { x, y, w, h, title: board.title.clone(), status: board.status.clone() });
+			}
+			// A live item is drawn here only while a drag carries it: as its picture, or as its paper and title until it has one.
+			if board.live && !carried {
+				continue;
+			}
 			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii: [12.0 * s as f32; 4], ellipse: false };
 			over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
+			// An app's body is below its bar: its picture and its placeholder go there.
+			let bar = if app { (APP_BAR * s).round() as f32 } else { 0.0 };
+			let (y, h) = (y + bar, (h - bar).max(0.0));
 			if let Some((texture, pw, ph)) = picture {
 				/*
 				 * At the box's width, from its top. A picture taller than the box is cut at its foot, as the
@@ -549,8 +558,8 @@ impl Page {
 			} else {
 				pictured.push(board.path.clone());
 			}
-			// Its title above it, as a sleeping item's bar reads: only where a 12 px line is more than a smudge.
-			if picture.is_some() && !board.title.is_empty() && s * 12.0 >= 5.0 {
+			// Its title above it, as a sleeping item's bar reads: only where a 12 px line is more than a smudge; an app's name is on its window.
+			if !app && picture.is_some() && !board.title.is_empty() && s * 12.0 >= 5.0 {
 				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
 			}
 			if let Some(colour) = board.news.filter(|_| board.glow) {
@@ -567,7 +576,7 @@ impl Page {
 		 * scheme's ink, so it is never a bare rectangle; the same for every kind. Set at the screen's
 		 * scale, as the lifted items' words are, so the glyph texture holds what they need.
 		 */
-		if !placeholders.is_empty() || !titled.is_empty() {
+		if !placeholders.is_empty() || !titled.is_empty() || !windows.is_empty() {
 			let skip = HashSet::new();
 			let pictures = &self.pictures;
 			let image = |url: &str| pictures.get(url);
@@ -582,6 +591,9 @@ impl Page {
 				}
 				for p in &titled {
 					paint_title(&ctx, &self.titles, p, s, dark, &mut labels);
+				}
+				for win in &windows {
+					paint_window(&ctx, &self.titles, win, s, dark, &mut labels);
 				}
 				if !self.atlas.borrow_mut().take_overflow() {
 					break;
@@ -1557,7 +1569,7 @@ mod tests {
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
 		page.pictures.held.insert("card:boards/x.html".into(), (900, 400, 300));
-		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new() };
+		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new(), status: String::new() };
 		page.cards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
@@ -1786,6 +1798,22 @@ pub struct CardPlace {
 	/// Its title and kind ("card", "app", "document", "board"), painted on its paper while it has no picture.
 	pub title: String,
 	pub kind: String,
+	/// An app's status ("running", "asleep", "stopped", …), for the dot on its window's bar.
+	pub status: String,
+}
+
+/// An app's window bar, in stage units: the page's iframe sits below it (`items/item-surfaces.tsx`, `APP_BAR`).
+pub const APP_BAR: f64 = 44.0;
+
+/// An app's window as `frame` found it, on the screen: its bar, lights, name and status are painted
+/// over whatever its body is (the page's iframe, its picture, its placeholder).
+struct Window {
+	x: f32,
+	y: f32,
+	w: f32,
+	h: f32,
+	title: String,
+	status: String,
 }
 
 /// A card with no picture yet, as `frame` found it: its paper on the screen, to paint its title and kind on.
@@ -1848,6 +1876,63 @@ fn paint_title(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Place
 	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, top]);
 	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: (height * scale) as f32 + 1.0, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, top as f32) }));
 	stage_paint::painter::draw_laid(ctx, laid, (2.0, 0.0), &[Color::straight(muted, 1.0)], &m, ops);
+	ops.push(Op::PopClip);
+}
+
+/// An app's window: a bar `APP_BAR` tall at the top of its box with three lights, its name in the
+/// middle and a status dot at the right, and a hairline round the whole box; the same in every state,
+/// as today's macOS draws a window. The name is laid once per name (`titles`).
+fn paint_window(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, win: &Window, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	use stage_paint::list::{Affine, Paint, Shape};
+	let r = 12.0 * scale as f32;
+	let bar_h = (APP_BAR * scale).round() as f32;
+	if bar_h < 2.0 || win.w < 8.0 {
+		return;
+	}
+	let bar_fill = if dark { [0.16, 0.16, 0.17, 1.0] } else { [0.965, 0.965, 0.97, 1.0] };
+	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.10] };
+	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
+	// The bar: the top of the box, its top corners round, cut to the box.
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y) }));
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(bar_fill, 1.0)), stroke: None });
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: 1.0_f32.max(scale as f32 * 0.5), radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y + bar_h - 1.0), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: None });
+	// The three lights.
+	let d = (12.0 * scale) as f32;
+	let cy = win.y + (bar_h - d) / 2.0;
+	for (i, colour) in [[1.0, 0.373, 0.341, 1.0], [0.996, 0.737, 0.18, 1.0], [0.157, 0.784, 0.251, 1.0]].iter().enumerate() {
+		let cx = win.x + (14.0 * scale) as f32 + i as f32 * (20.0 * scale) as f32;
+		ops.push(Op::Shape { shape: Shape { w: d, h: d, radii: [d / 2.0; 4], ellipse: true }, transform: Affine::translate(cx, cy), paint: Paint::Solid(Color::straight(*colour, 1.0)), stroke: None });
+	}
+	// The status dot at the right: green while it runs, grey asleep or on its way, nothing stopped.
+	let dot = match win.status.as_str() {
+		"running" => Some([0.157, 0.784, 0.251, 1.0]),
+		"asleep" | "starting" | "building" | "installing" => Some([0.6, 0.6, 0.64, 1.0]),
+		_ => None,
+	};
+	if let Some(colour) = dot {
+		let dd = (8.0 * scale) as f32;
+		ops.push(Op::Shape { shape: Shape { w: dd, h: dd, radii: [dd / 2.0; 4], ellipse: true }, transform: Affine::translate(win.x + win.w - (16.0 * scale) as f32 - dd, win.y + (bar_h - dd) / 2.0), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
+	}
+	ops.push(Op::PopClip);
+	// The hairline round the window.
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
+	// The name in the middle, where a 13 px line is more than a smudge.
+	if scale * 13.0 < 5.0 || win.title.is_empty() {
+		return;
+	}
+	let Some(text) = ctx.text else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let mut titles = titles.borrow_mut();
+	let laid = titles.entry(format!("app:{}", win.title)).or_insert_with(|| text.lay_words(&win.title, &style, None, stage_text::Align::Left, false, false));
+	let room = (win.w as f64 / scale) - 160.0;
+	if room < 20.0 {
+		return;
+	}
+	let left = ((win.w as f64 / scale) - (laid.width as f64).min(room)) / 2.0;
+	let top = (APP_BAR - laid.height as f64) / 2.0;
+	let m = Mat([scale, 0.0, 0.0, scale, win.x as f64, win.y as f64]);
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: (room * scale) as f32, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x + (80.0 * scale) as f32, win.y) }));
+	stage_paint::painter::draw_laid(ctx, laid, (left, top), &[Color::straight(ink, 1.0)], &m, ops);
 	ops.push(Op::PopClip);
 }
 

@@ -4,6 +4,7 @@ import type { PageView } from "../edit/index.ts";
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
+import { APP_BAR } from "../render/types.ts";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
@@ -185,10 +186,14 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			}}
 		>
 			<div class="shade" aria-hidden="true" />
-			<Show when={props.visible}>
+			{/* An app's name is on the window bar the engine paints, which is also what it is dragged by (`app-grip`). */}
+			<Show when={props.visible && props.board.item !== "app"}>
 				<div class="plain-card-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
 					{props.board.title}
 				</div>
+			</Show>
+			<Show when={props.board.item === "app"}>
+				<div class="app-grip" title={props.board.title} style={{ height: `${APP_BAR}px` }} onPointerDown={grip} onDblClick={() => props.onOpen()} />
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>

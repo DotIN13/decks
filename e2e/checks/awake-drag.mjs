@@ -81,7 +81,8 @@ const rects = (path) =>
 	canvas.evaluate((path) => {
 		const c = globalThis.__decksCards().find((one) => one.path === path);
 		const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
-		const bar = node?.querySelector(".plain-card-bar")?.getBoundingClientRect();
+		// A card's bar above its box, or an app's grip over the window bar the engine paints.
+		const bar = node?.querySelector(".plain-card-bar, .app-grip")?.getBoundingClientRect();
 		return { item: c && [c.rect.x, c.rect.y, c.rect.width, c.rect.height].map(Math.round), state: node?.dataset.state, bar: bar && [bar.x, bar.y, bar.width, bar.height].map(Math.round) };
 	}, path);
 /** Hover the item so its node and bar appear, press the bar, move 320 px right and 120 down, picture it, let go. */

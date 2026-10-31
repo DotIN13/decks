@@ -1,6 +1,7 @@
 import { mountDocPage } from "@decks/docs/page";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { ownInput } from "./input.ts";
+import { APP_BAR } from "../render/types.ts";
 import { canvasHost } from "../host.ts";
 import { scheme } from "../lib/theme.ts";
 
@@ -78,14 +79,15 @@ const markShown = (path: string, on: boolean) =>
 	});
 
 /**
- * An app item (`decks.app`): the app's bar on the canvas, and below it the app itself, running in a
- * sandboxed iframe, where the host can open it here (`CanvasHost.apps.inCanvas`: on a canvas that is yours
+ * An app item (`decks.app`): the app itself, running in a sandboxed iframe below the window bar the
+ * engine paints (`engine.rs`, `paint_window`: the bar, lights, name and status, the same in every
+ * state), where the host can open it here (`CanvasHost.apps.inCanvas`: on a canvas that is yours
  * alone, its pass in its address). Mounted only while the item is awake (`items/awake.ts`: near the
  * screen, within the device's budget of apps, or selected), and its picture on the sheet otherwise.
  * It takes the pointer once the item is selected, as a card does once entered; before that a press
  * selects it and a wheel pans the canvas. Its cards' scripts may reach it: they are yours. Where the
- * host cannot open it here it is the bar and Open, which the host's page does in a tab of its own.
- * The green light opens a tab either way.
+ * host cannot open it here, its body says so and offers Open, which the host's page does in a tab of
+ * its own; the pill's New tab does the same.
  */
 export function AppSurface(props: { app: string; path: string; visible: boolean; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
@@ -147,20 +149,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		return got && "url" in got ? got.url : undefined;
 	};
 	return (
-		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} on:dblclick={() => !url() && open()}>
-			{/* A window's title bar, as macOS draws one: the lights, the name in the middle, whether it runs. */}
-			<div class="app-surface-bar">
-				<span class="app-surface-lights">
-					<span class="app-light" data-light="close" aria-hidden="true" />
-					<span class="app-light" data-light="min" aria-hidden="true" />
-					{/* The green one opens it in a tab, as a window's grows: a listener of its own, since the item keeps its presses from the canvas. */}
-					<button type="button" class="app-light" data-light="zoom" title="Open in a tab" aria-label={`Open ${about()?.title ?? props.app} in a tab`} on:click={open} />
-				</span>
-				<span class="app-surface-title">{about()?.title ?? props.app}</span>
-				<span class="app-surface-status" data-status={about()?.status ?? "unknown"}>
-					{about()?.status ?? ""}
-				</span>
-			</div>
+		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} style={{ top: `${APP_BAR}px` }} on:dblclick={() => !url() && open()}>
 			<Show
 				when={url()}
 				fallback={
