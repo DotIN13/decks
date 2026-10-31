@@ -21,6 +21,14 @@
 		user-select: none;
 		-webkit-touch-callout: none;
 	}
+	/* A pencil has been used: fingers go through to the stage and its cards; the pencil is caught on the stage (`StageInk.tsx`). The lasso's selection stays pressable. */
+	.stage-ink[data-pencil] {
+		pointer-events: none;
+	}
+	.stage-ink[data-pencil] .ink-selection,
+	.stage-ink[data-pencil] .ink-corner {
+		pointer-events: auto;
+	}
 	.stage-ink[data-tool="eraser"] {
 		cursor: cell;
 	}

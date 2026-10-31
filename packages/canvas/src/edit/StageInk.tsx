@@ -592,9 +592,51 @@ export function StageInk(props: {
 			}
 		};
 		const options = { passive: false } as const;
-		for (const type of ["touchstart", "touchmove", "touchend"] as const) sheet.addEventListener(type, own, options);
+		/*
+		 * Once a pencil has been used the glass lets fingers through (`data-pencil`, ink.css), so a finger
+		 * pans by the stage's own scrolling and presses a card as it would without the draw tool: the
+		 * glass's `touch-action: none` had stopped every finger pan, and it lay over every card. The
+		 * pencil (and a mouse) is caught on its way down instead, on the stage it now lands on, and
+		 * the stylus's touches are still kept from scrolling it there.
+		 */
+		const stage = (sheet.closest(".stage") ?? sheet.parentElement ?? sheet) as HTMLElement;
+		const onGlass = (event: Event) => event.target instanceof Node && !!sheet?.contains(event.target);
+		const caught = (event: PointerEvent) => {
+			if (!penSeen() || onGlass(event)) return;
+			if (event.pointerType === "touch") {
+				if (palm(event)) {
+					palms.add(event.pointerId);
+					event.preventDefault();
+					event.stopPropagation();
+				} else fingerDown(event);
+				return;
+			}
+			onDown(event);
+		};
+		const followed = (event: PointerEvent) => {
+			if (!penSeen() || onGlass(event)) return;
+			if (event.type === "pointermove") onMove(event);
+			else onUp(event);
+		};
+		// A palm while the pencil is on the glass, or a moment after, does not scroll the stage either.
+		const palmScroll = (event: TouchEvent) => {
+			if (penSeen() && palm(event as unknown as PointerEvent) && event.cancelable) event.preventDefault();
+		};
+		for (const type of ["touchstart", "touchmove", "touchend"] as const) {
+			sheet.addEventListener(type, own, options);
+			stage.addEventListener(type, own, options);
+		}
+		stage.addEventListener("touchmove", palmScroll, options);
+		stage.addEventListener("pointerdown", caught, true);
+		for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) stage.addEventListener(type, followed, true);
 		onCleanup(() => {
-			for (const type of ["touchstart", "touchmove", "touchend"] as const) sheet?.removeEventListener(type, own);
+			for (const type of ["touchstart", "touchmove", "touchend"] as const) {
+				sheet?.removeEventListener(type, own);
+				stage.removeEventListener(type, own);
+			}
+			stage.removeEventListener("touchmove", palmScroll);
+			stage.removeEventListener("pointerdown", caught, true);
+			for (const type of ["pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) stage.removeEventListener(type, followed, true);
 		});
 	});
 
@@ -612,6 +654,7 @@ export function StageInk(props: {
 			ref={sheet}
 			class="stage-ink"
 			data-tool={inkTool()}
+			data-pencil={penSeen() ? "true" : undefined}
 			width={props.view.width}
 			height={props.view.height}
 			onPointerDown={onDown}

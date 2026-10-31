@@ -1,8 +1,8 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "a4dbcc700129ee362850155d913772621d84ef8149b5114bea1f371559d0d05c",
-	"rules": 1861,
+	"hash": "6eb8e0f75b47aea6e36bf02f0861181c617f97f9cb27ad4fe825affb84ea2c58",
+	"rules": 1863,
 	"sheets": 21,
 	"ties": 23,
 	"outsideLayer": 3,
@@ -24,7 +24,7 @@
 		"packages/agent-ui/styles/stream.css": 101,
 		"packages/canvas/styles/canvas.css": 322,
 		"packages/canvas/styles/chrome.css": 159,
-		"packages/canvas/styles/ink.css": 56,
+		"packages/canvas/styles/ink.css": 58,
 		"packages/canvas/styles/markdown.css": 28,
 		"packages/canvas/styles/properties.css": 87,
 		"packages/canvas/styles/tokens.css": 5
@@ -957,6 +957,8 @@
 		["styles/shell.css","@layer components ▸ :root[data-pen] body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}"],
 		["styles/shell.css","@layer components ▸ :root[data-pen] body :is(input,textarea,select,[contenteditable]:not([contenteditable=\"false\"])){-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ .stage-ink{position:absolute;left:0;top:0;z-index:1;overflow:visible;pointer-events:auto;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}"],
+		["packages/canvas/styles/ink.css","@layer components ▸ .stage-ink[data-pencil]{pointer-events:none}"],
+		["packages/canvas/styles/ink.css","@layer components ▸ .stage-ink[data-pencil] .ink-selection,.stage-ink[data-pencil] .ink-corner{pointer-events:auto}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ .stage-ink[data-tool=\"eraser\"]{cursor:cell}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ .stage-ink[data-tool=\"lasso\"]{cursor:default}"],
 		["packages/canvas/styles/ink.css","@layer components ▸ .ink-loop,.ink-selection{fill:none;stroke:var(--color-accent);stroke-width:1.5;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}"],

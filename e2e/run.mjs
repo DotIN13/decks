@@ -180,6 +180,7 @@ const CHECKS = [
 	{ file: "same-drawing.mjs", needsAgent: false },
 	/* A long stroke drawn as it grows is the stroke shaped whole, and its last frames cost less than shaping it whole each frame. */
 	{ file: "ink-long-stroke.mjs", needsAgent: false },
+	{ file: "pencil-then-finger.mjs", needsAgent: false },
 	/*
 	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
 	 * as a still with a badge on it, and nothing decoding until it is pressed.
