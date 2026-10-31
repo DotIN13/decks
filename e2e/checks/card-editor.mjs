@@ -91,7 +91,7 @@ for (let i = 0; i < 30; i++) {
 const clear = () => canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	for (let y = 150; y <= 700; y += 50) for (let x = 420; x <= 820; x += 50) if (document.elementFromPoint(x, y) !== stage) return false;
-	return (window.__decksBoards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
+	return (window.__decksCards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
 });
 for (let i = 0; i < 12 && !(await clear()); i++) {
 	await page.mouse.move(700, 400);
@@ -217,7 +217,7 @@ const bare = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const points = [];
 	for (let y = 820; y >= 100; y -= 10) for (let x = 1260; x >= 300; x -= 10) points.push({ x, y, at: document.elementFromPoint(x, y) });
-	return [points.find((p) => p.at === stage), points.find((p) => p.at?.classList?.contains("board-edge"))].filter(Boolean).map(({ x, y }) => ({ x, y }))[0];
+	return [points.find((p) => p.at === stage), points.find((p) => p.at?.classList?.contains("card-edge"))].filter(Boolean).map(({ x, y }) => ({ x, y }))[0];
 });
 await page.mouse.move(bare?.x ?? 1100, bare?.y ?? 700);
 await page.mouse.wheel(0, 60);

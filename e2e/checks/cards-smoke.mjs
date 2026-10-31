@@ -26,7 +26,7 @@ say(`view.goto ${canvas}`, !went.error, JSON.stringify(went).slice(0, 200));
 await page.waitForTimeout(6000);
 const seen = await (await canvasFrame(page)).evaluate(() => {
 	const surfaces = [...document.querySelectorAll(".card-surface")];
-	const frames = document.querySelectorAll("iframe.plain-board-page").length;
+	const frames = document.querySelectorAll("iframe.plain-card-page").length;
 	return { cards: surfaces.length, hosts: document.querySelectorAll(".card-host").length, frames };
 });
 say("cards are on the stage as card hosts, not frames", seen.cards > 0 && seen.hosts === seen.cards, JSON.stringify(seen));

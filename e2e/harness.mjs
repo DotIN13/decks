@@ -127,7 +127,7 @@ export async function deckState(api) {
  */
 export async function stagePath(page, path) {
 	return (await canvasFrame(page)).evaluate((wanted) => {
-		const all = window.__decksBoards?.() ?? [];
+		const all = window.__decksCards?.() ?? [];
 		if (!/^boards\//.test(wanted) || all.some((one) => one.path === wanted)) return wanted;
 		const file = wanted.slice("boards/".length);
 		return all.find((one) => /^canvases\/[^/]+\/boards\//.test(one.path) && one.path.split("/").slice(3).join("/") === file)?.path ?? wanted;
@@ -351,8 +351,8 @@ export async function highlightMode(page) {
 export async function liveZoom(page, { tries = 12 } = {}) {
 	const canvas = await canvasFrame(page);
 	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
-	const boards = () => canvas.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
-	await canvas.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+	const boards = () => canvas.evaluate(() => window.__decksCards?.().length ?? document.querySelectorAll(".card-node").length);
+	await canvas.waitForFunction(() => (window.__decksCards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
 		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
 		await canvas
@@ -372,7 +372,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 			 * board off screen.
 			 */
 			const seen = (r) => Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) * Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
-			const rects = (window.__decksBoards?.() ?? []).map((one) => one.rect);
+			const rects = (window.__decksCards?.() ?? []).map((one) => one.rect);
 			const cx = rect.left + rect.width / 2;
 			const cy = rect.top + rect.height / 2;
 			// The centre when it is on a board already, so a desktop lands where it always has.
@@ -399,7 +399,7 @@ export async function ready(page, { timeout = 30000 } = {}) {
 		null,
 		{ timeout, polling: 100 },
 	);
-	await canvas.waitForFunction(() => [...document.querySelectorAll(".board-node")].every((node) => node.dataset.inert !== "true"), null, { timeout: 5000, polling: 100 }).catch(() => {});
+	await canvas.waitForFunction(() => [...document.querySelectorAll(".card-node")].every((node) => node.dataset.inert !== "true"), null, { timeout: 5000, polling: 100 }).catch(() => {});
 }
 
 /**
@@ -446,7 +446,7 @@ export async function emptyCanvas(page, { timeout = 15000 } = {}) {
 	// A conversation with no canvas yet has no frame at all, which is as empty as a canvas gets.
 	const canvas = await canvasFrame(page, { timeout: Math.min(timeout, 5000) }).catch(() => undefined);
 	if (!canvas) return;
-	await canvas.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksBoards?.().length ?? 0) === 0, null, { timeout });
+	await canvas.waitForFunction(() => document.querySelectorAll(".card-node").length === 0 && (window.__decksCards?.().length ?? 0) === 0, null, { timeout });
 }
 
 /**
@@ -917,8 +917,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	const canvas = await canvasFrame(page);
 	// A board is its picture on the stage's sheet; a card, a document or an app awake has a node. The stage says where each is.
 	const candidates = () => canvas.evaluate((wanted) => {
-		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-		const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
+		const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
 		if (!r) return [];
 		const stage = document.querySelector(".stage");
 		const out = [];
@@ -928,7 +928,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 				const y = r.y + r.height * fy;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
 				const hit = document.elementFromPoint(x, y);
-				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : (hit === stage || stage?.contains(hit)) && window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
+				if (node ? hit && hit.closest(".card-node") === node && !hit.closest("a, button, input, textarea, select") : (hit === stage || stage?.contains(hit)) && window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
 			}
 		}
 		return out;
@@ -951,8 +951,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	// Still under the composer or a panel: pan it to the middle of the window.
 	if (!at) {
 		const off = await canvas.evaluate((wanted) => {
-			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
+			const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return null;
 			return { dx: r.x + r.width / 2 - innerWidth / 2, dy: r.y + r.height / 2 - innerHeight / 2 };
 		}, path);
@@ -965,8 +965,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	}
 	if (!at) {
 		const why = await canvas.evaluate((wanted) => {
-			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
+			const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return "not on the canvas";
 			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
 			return `at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}, its middle under ${hit?.tagName.toLowerCase()}.${String(hit?.className ?? "").split(" ")[0]}`;
@@ -975,7 +975,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	}
 	await page.mouse.click(at.x, at.y);
 	// The selected item's pill (`canvas/BoardCallout.tsx`).
-	await canvas.waitForSelector(".board-callout:not([data-hidden])", { timeout });
+	await canvas.waitForSelector(".card-callout:not([data-hidden])", { timeout });
 	await page.waitForTimeout(150);
 }
 
@@ -1000,7 +1000,7 @@ export async function pressBoardAction(page, label) {
 	 */
 	const pillAt = () =>
 		canvas.evaluate(() => {
-			const pill = document.querySelector(".stage-fixed > .board-callout");
+			const pill = document.querySelector(".stage-fixed > .card-callout");
 			if (!pill || pill.hasAttribute("data-hidden")) return null;
 			const r = pill.getBoundingClientRect();
 			const x = r.x + r.width / 2;
@@ -1010,7 +1010,7 @@ export async function pressBoardAction(page, label) {
 			return hit && pill.contains(hit) ? { x, y } : null;
 		});
 	// The pill hides while the camera moves and comes back a moment after it rests.
-	const shownPill = () => canvas.waitForFunction(() => { const pill = document.querySelector(".stage-fixed > .board-callout"); return !!pill && !pill.hasAttribute("data-hidden"); }, null, { timeout: 3000 }).catch(() => {});
+	const shownPill = () => canvas.waitForFunction(() => { const pill = document.querySelector(".stage-fixed > .card-callout"); return !!pill && !pill.hasAttribute("data-hidden"); }, null, { timeout: 3000 }).catch(() => {});
 	const at = await pillAt();
 	if (!at || !(await onCanvasAt(page, at.x, at.y))) {
 		await focusCanvas(page);
@@ -1019,7 +1019,7 @@ export async function pressBoardAction(page, label) {
 		await rest(page);
 		await shownPill();
 	}
-	const pill = canvas.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
+	const pill = canvas.locator(`.card-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
 	if ((await pill.count()) === 0) return false;
 	// The button itself under the page's chrome (the side panel, say) though the pill's middle is not: framed once more, then pressed where it is.
 	const button = await pill.boundingBox();
@@ -1042,17 +1042,17 @@ export async function boardEdge(page, path) {
 	path = await stagePath(page, path);
 	const canvas = await canvasFrame(page);
 	// The bands are drawn on the item under the pointer (or the selected one), so point at it first.
-	const box = await canvas.locator(`.board-node[data-path="${path}"]`).boundingBox().catch(() => null);
+	const box = await canvas.locator(`.card-node[data-path="${path}"]`).boundingBox().catch(() => null);
 	if (box) {
 		const x = Math.min(Math.max(box.x + box.width / 2, 2), page.viewportSize().width - 2);
 		const y = Math.min(Math.max(box.y + Math.min(box.height / 2, 40), 2), page.viewportSize().height - 2);
 		await page.mouse.move(x, y);
-		await canvas.waitForFunction((wanted) => [...document.querySelectorAll(".board-edge")].some((band) => band.closest(".board-node")?.dataset.path === wanted), path, { timeout: 2000 }).catch(() => {});
+		await canvas.waitForFunction((wanted) => [...document.querySelectorAll(".card-edge")].some((band) => band.closest(".card-node")?.dataset.path === wanted), path, { timeout: 2000 }).catch(() => {});
 	}
 	const points = await canvas.evaluate((wanted) => {
 		const out = [];
-		for (const band of document.querySelectorAll(".board-edge")) {
-			if (band.closest(".board-node")?.dataset.path !== wanted) continue;
+		for (const band of document.querySelectorAll(".card-edge")) {
+			if (band.closest(".card-node")?.dataset.path !== wanted) continue;
 			const r = band.getBoundingClientRect();
 			const along = band.dataset.side === "n" || band.dataset.side === "s";
 			for (const f of [0.5, 0.3, 0.7, 0.15, 0.85]) {

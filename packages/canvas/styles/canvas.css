@@ -83,7 +83,7 @@
  * document's editor and an app's window (`item-surfaces.tsx`). Each is as much a page to redraw at every
  * step of a zoom, and was redrawn at each one before it was named here.
  */
-.stage[data-scaling="true"] .board-node :is(.card-host, .document-surface, .app-surface) {
+.stage[data-scaling="true"] .card-node :is(.card-host, .document-surface, .app-surface) {
 	will-change: transform;
 }
 /*
@@ -91,17 +91,17 @@
  * moves, and the sheet draws their pictures over where they are, so no card is laid out, painted or
  * given a layer at any step. They stay mounted, and show again at rest under their pictures.
  */
-.stage[data-card-pictures="true"] .board-node .card-surface {
+.stage[data-card-pictures="true"] .card-node .card-surface {
 	visibility: hidden;
 }
-.stage[data-card-pictures="true"] .board-node .card-host {
+.stage[data-card-pictures="true"] .card-node .card-host {
 	will-change: auto;
 }
 /*
  * A card let go lately and kept asleep with its root (`items/live-cards.ts`, `kept`): not laid out, painted
  * or pressed, while the sheet draws its picture over it; shown again at once when it wakes.
  */
-.board-node[data-asleep] .card-surface {
+.card-node[data-asleep] .card-surface {
 	content-visibility: hidden;
 }
 	/*
@@ -207,12 +207,12 @@
 	pointer-events: none;
 }
 	/* A slot's surface has no ground of its own: a board's, or a sleeping card's, covered the picture the sheet draws under it. */
-	.stage[data-engine] .board-node > .surface {
+	.stage[data-engine] .card-node > .surface {
 	background: transparent;
 }
 	/* --- a board on the stage ---------------------------------------------------- */
 
-.board-node {
+.card-node {
 	position: absolute;
 }
 	/*
@@ -220,8 +220,8 @@
 	 * bar and its selection outline ease to the new size together, on the app's curve. Its page
 	 * lays out at each step, which one board can afford for a quarter of a second.
 	 */
-	.board-node[data-sizing="true"],
-	.board-node[data-sizing="true"] > .surface,
+	.card-node[data-sizing="true"],
+	.card-node[data-sizing="true"] > .surface,
 	.bar-layer .chrome[data-sizing="true"],
 	.world > .pen-selection[data-sizing="true"] {
 	transition:
@@ -265,7 +265,7 @@
  * the app measured the same shape, 42ms → 20ms.) Radius and clipping on the surface itself
  * are fine — only the decorations that paint *outside* the box trigger it.
  */
-.board-node > .shade {
+.card-node > .shade {
 	position: absolute;
 	border-radius: var(--radius-board, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
 	/* No shadow: a board lies flat on the canvas, its edge the 1px outline alone. */
@@ -289,7 +289,7 @@
  * from wherever it got to — a keyframe fade here jumped to its first frame mid-breath, which
  * read as a stutter. The two opacities multiply, so the glow keeps breathing as it goes.
  */
-.board-node > .news-glow {
+.card-node > .news-glow {
 	position: absolute;
 	inset: 0;
 	border-radius: var(--radius-board, 12px);
@@ -297,7 +297,7 @@
 	opacity: 1;
 	transition: opacity var(--read-ms, 1500ms) ease-out;
 }
-	.board-node > .news-glow::after {
+	.card-node > .news-glow::after {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -315,7 +315,7 @@
 	 * frame and breathes on from there once the camera rests. Paused, not removed: removing it jumped
 	 * the glow to full strength, from a breath that rests at 65%, so every pan darkened it.
 	 */
-	.stage[data-moving="true"] .board-node > .news-glow::after {
+	.stage[data-moving="true"] .card-node > .news-glow::after {
 	animation-play-state: paused;
 }
 	/*
@@ -323,17 +323,17 @@
 	 * lands, as the title bars do (`.bar-layer[data-moving]`). A filter, not the opacity, which
 	 * already carries the slow fade of being read; and none at rest, so it costs nothing then.
 	 */
-	.stage[data-carrying="true"] .board-node > .news-glow {
+	.stage[data-carrying="true"] .card-node > .news-glow {
 	visibility: hidden;
 	filter: opacity(0);
 	transition: none;
 }
-	.stage:not([data-carrying="true"]) .board-node > .news-glow {
+	.stage:not([data-carrying="true"]) .card-node > .news-glow {
 	transition: opacity var(--read-ms, 1500ms) ease-out, filter 90ms ease-out;
 }
 	/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own
    moment and is at nothing when the read is stamped and the box goes. */
-.board-node > .news-glow[data-reading] {
+.card-node > .news-glow[data-reading] {
 	opacity: 0;
 }
 	@keyframes news-breathe {
@@ -345,23 +345,23 @@
 		opacity: 1;
 	}
 }
-	.board-node > .surface {
+	.card-node > .surface {
 	position: relative;
 	overflow: hidden;
 	border-radius: var(--radius-board, 12px);
 	background: var(--bg);
 }
 	/* A board's place among the others, which never moves (`Stage`): no box of its own. */
-	.world > .board-slot {
+	.world > .card-slot {
 	display: contents;
 }
 /* Carried by a drag: the sheet's carried layer shows the board's picture under the pointer, and the
    page waits here, unseen, for the move to land (`PenLayer.carry`). Kept, not unloaded. */
-.board-node[data-carried] > :is(.shade, .surface) {
+.card-node[data-carried] > :is(.shade, .surface) {
 	visibility: hidden;
 }
 	/* The board's outline, taken by the canvas so a scroll landing on it pans (`BoardFrame.tsx`). */
-	.board-node > .surface > .edge {
+	.card-node > .surface > .edge {
 	position: absolute;
 	inset: 0;
 	z-index: 1;
@@ -370,14 +370,14 @@
 	overflow: visible;
 	pointer-events: none;
 }
-	.board-node > .surface > .edge > rect {
+	.card-node > .surface > .edge > rect {
 	fill: none;
 	stroke: transparent;
 	stroke-width: 8px;
 	vector-effect: non-scaling-stroke;
 	pointer-events: stroke;
 }
-	.board-node > .surface > .placeholder {
+	.card-node > .surface > .placeholder {
 	position: absolute;
 	inset: 0;
 }
@@ -419,7 +419,7 @@
 }
 	/*
 	 * A board being moved or sized, by its bar, its edge or its handles: every bar is gone at once,
-	 * and fades back in where the board lands, as the touch screens' pill does (`.board-callout`).
+	 * and fades back in where the board lands, as the touch screens' pill does (`.card-callout`).
 	 * Hidden, not removed, so a drag that began on a bar keeps the element holding its pointer.
 	 */
 	.stage-fixed > .bar-layer[data-moving="true"] .chrome {
@@ -527,7 +527,7 @@
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
 	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
 	 */
-	.stage-fixed > .board-callout {
+	.stage-fixed > .card-callout {
 	position: absolute;
 	z-index: 6;
 	display: flex;
@@ -542,33 +542,33 @@
 	color: var(--fg);
 	transform: translate(-50%, -100%);
 	pointer-events: auto;
-	animation: board-callout-in 90ms ease-out;
+	animation: card-callout-in 90ms ease-out;
 }
-	.stage-fixed > .board-callout[data-below="true"] {
+	.stage-fixed > .card-callout[data-below="true"] {
 	transform: translate(-50%, 0);
-	animation-name: board-callout-in-below;
+	animation-name: card-callout-in-below;
 }
 	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
-	.stage-fixed > .board-callout:not([data-hidden]) {
+	.stage-fixed > .card-callout:not([data-hidden]) {
 	transition: opacity 90ms ease-out;
 }
-	.stage-fixed > .board-callout[data-hidden] {
+	.stage-fixed > .card-callout[data-hidden] {
 	visibility: hidden;
 	opacity: 0;
 }
-	.stage-fixed > .board-callout > a.icon-button {
+	.stage-fixed > .card-callout > a.icon-button {
 	color: var(--muted);
 	text-decoration: none;
 }
 	/* A hairline before Hide: the one action that takes the board away. */
-	.stage-fixed > .board-callout > .callout-rule {
+	.stage-fixed > .card-callout > .callout-rule {
 	width: 1px;
 	height: 16px;
 	margin: 0 2px;
 	background: var(--line-strong);
 }
 	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
-	.stage-fixed > .board-callout > .callout-word {
+	.stage-fixed > .card-callout > .callout-word {
 	display: flex;
 	flex: none;
 	align-items: center;
@@ -585,33 +585,33 @@
 	font-weight: 500;
 	white-space: nowrap;
 }
-	.stage-fixed > .board-callout > .callout-word > svg {
+	.stage-fixed > .card-callout > .callout-word > svg {
 	color: var(--muted);
 }
-	.stage-fixed > .board-callout > .callout-word:hover {
+	.stage-fixed > .card-callout > .callout-word:hover {
 	background: var(--fill);
 }
-	.stage-fixed > .board-callout > .callout-ask > svg {
+	.stage-fixed > .card-callout > .callout-ask > svg {
 	color: var(--color-accent);
 }
 	/* Delete, on drawn items: the one action that cannot be put back with Show. */
-	.stage-fixed > .board-callout > .icon-button.callout-danger {
+	.stage-fixed > .card-callout > .icon-button.callout-danger {
 	color: var(--color-danger);
 }
-	@keyframes board-callout-in {
+	@keyframes card-callout-in {
 	from {
 		opacity: 0;
 		transform: translate(-50%, calc(-100% + 4px));
 	}
 }
-	@keyframes board-callout-in-below {
+	@keyframes card-callout-in-below {
 	from {
 		opacity: 0;
 		transform: translate(-50%, -4px);
 	}
 }
 	/* The band along an awake item's edge that moves it (`item-slot.tsx`): invisible, a move cursor. */
-	.stage .board-edge {
+	.stage .card-edge {
 	position: absolute;
 	/* Over the surface's own edge ring (`.surface > .edge`, 1), which would otherwise take its inner part. */
 	z-index: 2;
@@ -660,7 +660,7 @@
 	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
 	 * at work, so they cost that only then.
 	 */
-	.world > .board-slot > .board-node > :is(.agent-cursor, .act-hold, .act-land) {
+	.world > .card-slot > .card-node > :is(.agent-cursor, .act-hold, .act-land) {
 	z-index: 2;
 }
 	.world > .pen-hits {
@@ -1144,7 +1144,7 @@
 	.stage[data-pen-tool] {
 	cursor: crosshair;
 }
-	.stage[data-pen-tool] .world > .board-slot > .board-node {
+	.stage[data-pen-tool] .world > .card-slot > .card-node {
 	pointer-events: none;
 }
 	/*
@@ -1602,7 +1602,7 @@
 	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="green"] { color: #15803d; }
 	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="blue"] { color: #2563eb; }
 	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="purple"] { color: #7c3aed; }
-	.board-node .placeholder {
+	.card-node .placeholder {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -1628,7 +1628,7 @@
  * change actually is. It is also the only signal: Escape leaves, and the message that
  * started it holds the other way back.
  */
-.stage[data-previewing="true"] .board-node > .shade {
+.stage[data-previewing="true"] .card-node > .shade {
 	outline-color: var(--color-warn);
 }
 	/* The same rules, under the same query. */
@@ -1646,7 +1646,7 @@
 	/* An item's title above it, to move it by, outside its box so the item and the sheet's picture of
 	   it both start at the box's top. Sized in stage pixels, so it
 	   scales with the board and a zoom writes nothing to it. */
-	.plain-board-bar {
+	.plain-card-bar {
 		position: absolute;
 		left: 0;
 		bottom: 100%;

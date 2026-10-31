@@ -219,8 +219,11 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	type LiveFile = { id: string; file: string; name: string };
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
 	const LIVE_FILES = 12;
-	/** For the browser checks: every board on the canvas and where it is on screen, node or picture (`rendered`). */
-	(globalThis as { __decksBoards?: () => Array<{ path: string; node: boolean; rect: DOMRect }> }).__decksBoards = () => {
+	/**
+	 * For the browser checks: every card (and old board) on the canvas and where it is on screen, node or
+	 * picture (`rendered`). `__decksBoards` is its old name, kept until 2026-11-30.
+	 */
+	const cardsOnScreen = () => {
 		const element = deps.element();
 		if (!element) return [];
 		const r = element.getBoundingClientRect();
@@ -232,6 +235,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				return { path: board.path, node: nodes.has(board.path), rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
+	(globalThis as { __decksCards?: typeof cardsOnScreen; __decksBoards?: typeof cardsOnScreen }).__decksCards = cardsOnScreen;
+	(globalThis as { __decksBoards?: typeof cardsOnScreen }).__decksBoards = cardsOnScreen;
 
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
@@ -555,7 +560,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				 */}
 				<For each={props.boards} fallback={null}>
 					{(board) => (
-						<div class="board-slot">
+						<div class="card-slot">
 							<Show when={isRendered(board.path)}>{pageNode(board)}</Show>
 						</div>
 					)}

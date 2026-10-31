@@ -41,14 +41,14 @@ await settle(page, 300);
  */
 const line = await until(() =>
 	canvas.evaluate((path) => {
-		const node = document.querySelector(`.board-node[data-path="${path}"]`);
+		const node = document.querySelector(`.card-node[data-path="${path}"]`);
 		if (!node?.querySelector(".card-host") || node.dataset.inert === "true") return null;
 		const r = node.getBoundingClientRect();
 		const left = Math.max(r.x, 420);
 		return { x: left + (r.right - left) * 0.3, y: r.y + r.height * 0.17, w: (r.right - left) * 0.4 };
 	}, made.value?.card),
 );
-say("the card shows its words", !!line, line ? "" : JSON.stringify(await canvas.evaluate((path) => { const node = document.querySelector(`.board-node[data-path="${path}"]`); return { node: !!node, inert: node?.dataset.inert, host: !!node?.querySelector(".card-host"), paths: [...document.querySelectorAll(".board-node")].map((one) => one.dataset.path) }; }, made.value?.card)));
+say("the card shows its words", !!line, line ? "" : JSON.stringify(await canvas.evaluate((path) => { const node = document.querySelector(`.card-node[data-path="${path}"]`); return { node: !!node, inert: node?.dataset.inert, host: !!node?.querySelector(".card-host"), paths: [...document.querySelectorAll(".card-node")].map((one) => one.dataset.path) }; }, made.value?.card)));
 if (line) {
 	await page.mouse.move(line.x, line.y);
 	await page.mouse.down();

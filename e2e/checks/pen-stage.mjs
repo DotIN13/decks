@@ -185,7 +185,7 @@ if (inView) {
 const spots = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
-	const boards = (window.__decksBoards?.() ?? []).map((b) => b.rect);
+	const boards = (window.__decksCards?.() ?? []).map((b) => b.rect);
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
 	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150), left of
 	// where the properties panel opens on the right once something is selected,
@@ -306,7 +306,7 @@ if (spot) {
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
 	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
-	const quiet = await canvas.addStyleTag({ content: ".stage-fixed > .board-callout { display: none !important }" });
+	const quiet = await canvas.addStyleTag({ content: ".stage-fixed > .card-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
@@ -416,7 +416,7 @@ if (boardItem) {
 	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
 	const under = () => canvas.evaluate(({ x, y }) => {
 		const e = document.elementFromPoint(x, y);
-		return e?.closest(".board-node") ? "board" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
+		return e?.closest(".card-node") ? "board" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
 	}, at);
 	const shown = await until(() => under().then((u) => u.startsWith("drawing") && u));
 	say("a drawing over a board is on top of it and catches the click there", shown === "drawing:e2e-over", await under());

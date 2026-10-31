@@ -53,7 +53,7 @@ const select = async (path) => {
 	 * one's. Hiding the rest is what a person does with the ×, and it makes the click mean what it
 	 * says.
 	 */
-	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
+	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
 	for (const other of others) link.send({ type: "card.hide", path: other });
 	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
@@ -105,7 +105,7 @@ const dragHandle = async (path, dx, dy) => {
 	await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 10 });
 	await settle(page, 200);
 	const during = await canvas.evaluate((wanted) => {
-		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+		const node = document.querySelector(`.card-node[data-path="${wanted}"]`);
 		return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
 	}, path);
 	await page.mouse.up();
@@ -136,7 +136,7 @@ await select(componentPath);
  */
 const handleAt = (wanted) =>
 	canvas.evaluate((path) => {
-		const node = document.querySelector(`.board-node[data-path="${path}"]`);
+		const node = document.querySelector(`.card-node[data-path="${path}"]`);
 		const sizer = document.querySelector(`.pen-handle[data-page="${path}"][data-handle="se"]`);
 		if (!node || !sizer) return null;
 		const n = node.getBoundingClientRect();
@@ -157,7 +157,7 @@ const handleAt = (wanted) =>
  * This is the one place a mistake of this kind can be caught, and it took a person looking at the canvas
  * to find it: a `/* … *\/` written in the **children** position of JSX is not a comment, it is text — and
  * it is *valid* JSX, so `tsc` is happy and esbuild strips it. This app compiles JSX with Solid's preset,
- * which does not, so ninety words of a source file rendered as a text node inside every `.board-node` and
+ * which does not, so ninety words of a source file rendered as a text node inside every `.card-node` and
  * sat under eight boards. Nothing in the toolchain objects. The DOM does.
  */
 const stray = await canvas.evaluate(() => {
@@ -193,7 +193,7 @@ await page.waitForTimeout(1500);
 const nowComponent = read(component);
 const drawnAt = (wanted) =>
 	canvas.evaluate((wanted) => {
-		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+		const node = document.querySelector(`.card-node[data-path="${wanted}"]`);
 		return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
 	}, wanted);
 const drawn = await drawnAt(componentPath);
@@ -207,7 +207,7 @@ say("…and writes that size to the board's own file", Math.abs(writtenMeta?.w -
 // The person's own resize is theirs: the board's new file time must not read as an agent's change.
 await page.waitForTimeout(600);
 const glows = await canvas.evaluate((wanted) => {
-	const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+	const node = document.querySelector(`.card-node[data-path="${wanted}"]`);
 	return { glow: Boolean(node?.querySelector(".news-glow")) };
 }, componentPath);
 say("…and a board you resized does not glow as news", !glows.glow, JSON.stringify(glows));
@@ -229,7 +229,7 @@ const letGo = await drawnAt(componentPath);
 await canvas.evaluate((wanted) => {
 	const seen = (window.__heights = []);
 	const sample = () => {
-		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+		const node = document.querySelector(`.card-node[data-path="${wanted}"]`);
 		seen.push(Math.round(Number.parseFloat(node.style.height)));
 		if (seen.length < 120) requestAnimationFrame(sample);
 	};
@@ -283,10 +283,10 @@ say(
  * gesture that already meant "go to this board". Done here, before the canvas is emptied, because
  * it needs a board to click.
  */
-const countNow = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
+const countNow = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 await flyToBoard(page, flowPath);
 await settle(page, 900);
-const countAfterBar = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
+const countAfterBar = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 /*
  * The claim is that the count did **not** grow, not that it is one: the hides above are best-effort (they
  * go out on a socket and this block does not read the canvas back), and requiring `countNow === 1` made this
@@ -305,14 +305,14 @@ say("a double-click on a board's own bar makes nothing", countAfterBar === count
  * canvas is both simpler and closer to what the gesture is for: a double-click on empty canvas.
  */
 const link = await socket();
-for (const path of await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {
+for (const path of await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].map((node) => node.dataset.path))) {
 	link.send({ type: "card.hide", path });
 }
 await new Promise((resolve) => setTimeout(resolve, 800));
 link.close();
 await settle(page, 800);
 
-const empty = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
+const empty = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 say("the canvas can be emptied for the press", empty === 0, `${empty} board(s) left`);
 
 const spots = await canvas.evaluate(() => {
@@ -320,7 +320,7 @@ const spots = await canvas.evaluate(() => {
 	for (let y = 160; y < window.innerHeight - 220; y += 40)
 		for (let x = 320; x < window.innerWidth - 200; x += 40) {
 			const el = document.elementFromPoint(x, y);
-			if (el && !el.closest(".board-node") && !el.closest(".float") && !el.closest("aside") && !el.closest(".notice") && !el.closest(".inspector")) out.push({ x, y });
+			if (el && !el.closest(".card-node") && !el.closest(".float") && !el.closest("aside") && !el.closest(".notice") && !el.closest(".inspector")) out.push({ x, y });
 		}
 	return out;
 });
@@ -345,7 +345,7 @@ await page.mouse.click(spot.x + 300, spot.y + 120);
 await settle(page, 1500);
 const notes = (pens.last("stage.pen")?.doc?.children ?? []).filter((node) => node.type === "note");
 say("…and the note is saved with what was typed", JSON.stringify(notes).includes("hello"), `${notes.length} note(s)`);
-const boardsAfter = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
+const boardsAfter = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 say("…and no board was made", boardsAfter === 0, `${boardsAfter} board(s)`);
 pens.close();
 

@@ -113,7 +113,7 @@ if (target) {
 	const describe = (node: EventTarget | null) => {
 		const el = node instanceof Element ? node : null;
 		if (!el) return String(node?.constructor?.name ?? "?");
-		const board = el.closest(".board-node");
+		const board = el.closest(".card-node");
 		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${board ? " in board" : ""}${el.isConnected ? "" : " DETACHED"}`;
 	};
 	const seen = new WeakMap<Event, number>();

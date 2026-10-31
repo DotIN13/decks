@@ -344,7 +344,7 @@ async function run(engine, lags) {
 	await edit("a box resized by a corner", {
 		setup: () => clickOn("as-box-a"),
 		prepare: async () => {
-			const h = await handle('.pen-handle[data-handle="se"]:not([data-board])');
+			const h = await handle('.pen-handle[data-handle="se"]:not([data-page])');
 			await drag(h, { x: h.x + 40, y: h.y + 30 });
 		},
 		commit: async (arm) => {

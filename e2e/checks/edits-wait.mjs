@@ -245,7 +245,7 @@ async function run(engine, { all }) {
 	const properties = async () => (await cv()).locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {
-		const button = (await cv()).locator(`.stage-fixed > .board-callout:not([data-hidden]) [aria-label="${label}"]`).first();
+		const button = (await cv()).locator(`.stage-fixed > .card-callout:not([data-hidden]) [aria-label="${label}"]`).first();
 		await button.waitFor({ timeout: 3000 });
 		const r = await button.boundingBox();
 		await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -259,7 +259,7 @@ async function run(engine, { all }) {
 	/** A point on a board's picture that is the canvas's, not the page's chrome over it. */
 	const pictureSpot = async (path) => {
 		const points = await (await cv()).evaluate((wanted) => {
-			const r = window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const r = window.__decksCards?.().find((one) => one.path === wanted)?.rect;
 			const out = [];
 			if (!r) return out;
 			for (const fy of [0.5, 0.3, 0.7]) for (const fx of [0.5, 0.3, 0.7]) {
@@ -276,7 +276,7 @@ async function run(engine, { all }) {
 	};
 	const pick = async () => {
 		const paths = await (await cv()).evaluate(() =>
-			window.__decksBoards()
+			window.__decksCards()
 				.filter((one) => one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 				.map((one) => one.path),
 		);
@@ -322,10 +322,10 @@ async function run(engine, { all }) {
 				setup: async () => {
 					const grip = await pictureSpot(board.path);
 					await page.mouse.click(grip.x, grip.y);
-					await (await cv()).locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
+					await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
 				},
 				commit: async (arm) => {
-					const r = await (await cv()).locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					const r = await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 					await arm();
 					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);

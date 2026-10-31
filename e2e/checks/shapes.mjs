@@ -216,7 +216,7 @@ if (first && target) {
  * cover the view the checks above leave, and a live board's page is not bare canvas.
  */
 for (let i = 0; i < 12; i++) {
-	const right = await canvas.evaluate(() => Math.max(-Infinity, ...(window.__decksBoards?.() ?? []).map(({ rect }) => rect.right)));
+	const right = await canvas.evaluate(() => Math.max(-Infinity, ...(window.__decksCards?.() ?? []).map(({ rect }) => rect.right)));
 	if (right < 360) break;
 	// Scrolled where the stage itself is under the pointer: a live board's page keeps a wheel over it.
 	const at = await canvas.evaluate(() => {
@@ -333,7 +333,7 @@ if (diagonal) {
 			for (let dy = 10; dy < box.height - 10; dy += 8) {
 				for (let dx = 10; dx < box.width - 10; dx += 8) {
 					const el = document.elementFromPoint(box.x + dx, box.y + dy);
-					if (!el?.closest?.(".pen-hits") && !el?.closest?.(".board-node")) inside.push({ x: box.x + dx, y: box.y + dy, tag: el?.tagName, cls: el?.getAttribute?.("class") });
+					if (!el?.closest?.(".pen-hits") && !el?.closest?.(".card-node")) inside.push({ x: box.x + dx, y: box.y + dy, tag: el?.tagName, cls: el?.getAttribute?.("class") });
 				}
 			}
 			// The one furthest from the line, which is the diagonal of the box.
@@ -448,7 +448,7 @@ if (diagonal) {
 	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
-		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".stage-fixed > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
+		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
 		say("a selected shape gets the pill: zoom, comment, duplicate and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Delete"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
 		// Pressed by its coordinates: a locator's click scrolls its target into view, and the stage is a scroll container.
@@ -456,13 +456,13 @@ if (diagonal) {
 			const r = await canvas.locator(selector).first().boundingBox();
 			await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
 		};
-		await pressOn('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Duplicate"]');
+		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Duplicate"]');
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
 		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
 		// The copy is selected once the drawing has it: the outline moves onto it.
 		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
-		await pressOn('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Delete"]');
+		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
 		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);
 	}

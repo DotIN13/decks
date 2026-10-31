@@ -37,11 +37,11 @@ const box = await until(() => canvas.evaluate(() => window.__decksPenBox?.("pill
 say("the box is on screen", !!box, JSON.stringify(box));
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-await until(() => canvas.locator(".stage-fixed > .board-callout:not([data-hidden])").count());
+await until(() => canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").count());
 // The pill fades in from 4 px lower: measure it at rest.
 await settle(page, 300);
 const anchor = await until(() => canvas.locator('.pen-anchor[data-side="top"]').boundingBox());
-const pill = await until(() => canvas.locator(".stage-fixed > .board-callout:not([data-hidden])").boundingBox());
+const pill = await until(() => canvas.locator(".stage-fixed > .card-callout:not([data-hidden])").boundingBox());
 say("a selected box shows its top arrow handle and the pill", !!anchor && !!pill, JSON.stringify({ anchor, pill }));
 const clear = anchor && pill ? anchor.y - (pill.y + pill.height) : NaN;
 say("the pill sits above the handle, 6 px clear of it", Math.abs(clear - 6) < 1.5, `${clear.toFixed?.(1)} px`);
@@ -66,7 +66,7 @@ await page.keyboard.down("Shift");
 await page.mouse.click(two.x + two.width / 2, two.y + two.height / 2);
 await page.keyboard.up("Shift");
 await settle(page, 400);
-const both = await canvas.evaluate(() => ({ anchors: document.querySelectorAll(".pen-anchor").length, pill: document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect().bottom }));
+const both = await canvas.evaluate(() => ({ anchors: document.querySelectorAll(".pen-anchor").length, pill: document.querySelector(".stage-fixed > .card-callout:not([data-hidden])")?.getBoundingClientRect().bottom }));
 const top = Math.min(box.y, two.y);
 say("two selected have no handles, and the pill sits 10 px above them", both.anchors === 0 && Math.abs(top - both.pill - 10) < 1.5, JSON.stringify({ ...both, top }));
 
@@ -83,7 +83,7 @@ let press;
  * A board whose top is on screen first: the pill goes 10 px above the group only when that slot is in
  * the window, and under it otherwise (a board whose top was above the window put it under the group).
  */
-const boards = await canvas.evaluate(() => window.__decksBoards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
+const boards = await canvas.evaluate(() => window.__decksCards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
 boards.sort((a, b) => Number(a.rect.y < 140) - Number(b.rect.y < 140));
 for (const one of boards) {
 	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
@@ -108,7 +108,7 @@ if (press) {
 	await page.keyboard.up("Shift");
 	await settle(page, 400);
 	const group = await canvas.evaluate(() => {
-		const pills = [...document.querySelectorAll(".stage-fixed > .board-callout:not([data-hidden])")];
+		const pills = [...document.querySelectorAll(".stage-fixed > .card-callout:not([data-hidden])")];
 		const r = pills[0]?.getBoundingClientRect();
 		return { pills: pills.length, label: pills[0]?.getAttribute("aria-label") ?? pills[0]?.querySelector("[aria-label]")?.getAttribute("aria-label"), top: r?.top, bottom: r?.bottom, middle: r && (r.left + r.right) / 2 };
 	});
@@ -143,7 +143,7 @@ await settle(page, 300);
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await settle(page, 400);
 const under = await canvas.evaluate(() => {
-	const r = document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+	const r = document.querySelector(".stage-fixed > .card-callout:not([data-hidden])")?.getBoundingClientRect();
 	return r && { x: r.x, y: r.y, right: r.right, bottom: r.bottom };
 });
 const hits = (a, b) => a && b && a.x < b.x + b.width && a.right > b.x && a.y < b.y + b.height && a.bottom > b.y;
@@ -166,7 +166,7 @@ if (under) {
 	await settle(page, 700);
 	const moved = await canvas.evaluate(() => window.__decksPenBox?.("pill-box"));
 	const after = await canvas.evaluate(() => {
-		const r = document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+		const r = document.querySelector(".stage-fixed > .card-callout:not([data-hidden])")?.getBoundingClientRect();
 		return r && { x: r.x, y: r.y, width: r.width };
 	});
 	const centred = moved && after && Math.abs(after.x + after.width / 2 - (moved.x + moved.width / 2)) < 2;

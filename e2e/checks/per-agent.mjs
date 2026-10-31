@@ -104,8 +104,8 @@ const look = async () => {
 				// The camera, not the world's style: the world's transform holds only the scroll origin and zoom now.
 				world: globalThis.__decksCameraTransform?.() ?? "?",
 				zoom: document.querySelector(".v3-zoom-value")?.textContent?.trim(),
-				shown: (window.__decksBoards?.() ?? []).map((board) => board.path),
-				selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,
+				shown: (window.__decksCards?.() ?? []).map((board) => board.path),
+				selected: document.querySelector('.card-node[data-selected="true"]')?.dataset.path ?? null,
 			}))
 		: { world: "?", zoom: undefined, shown: [], selected: null };
 	// The page's half: the draft and the question.
@@ -160,8 +160,8 @@ await (await canvasFrame(page)).locator('[aria-label="Fit everything on the canv
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await selectBoard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksBoards?.() ?? [])[0]?.path));
-await (await canvasFrame(page)).waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
+await selectBoard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? [])[0]?.path));
+await (await canvasFrame(page)).waitForSelector('.card-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
 await settle(page, 500);

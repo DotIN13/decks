@@ -161,7 +161,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	onCleanup(() => say(false));
 	return (
 		<div
-			class="board-node plain-board"
+			class="card-node plain-card"
 			data-path={props.board.path}
 			data-selected={props.selected}
 			data-inert={!shown() || props.asleep}
@@ -179,13 +179,13 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 		>
 			<div class="shade" aria-hidden="true" />
 			<Show when={props.visible}>
-				<div class="plain-board-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
+				<div class="plain-card-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
 					{props.board.title}
 				</div>
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>
-				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
+				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="card-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
 			</Show>
 			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
 			<Show when={props.onScriptsOn && props.board.card}>

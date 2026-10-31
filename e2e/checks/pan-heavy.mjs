@@ -116,11 +116,11 @@ const goCanvas = async (canvas) => {
 	canvas = await canvasFrame(page);
 	await canvas.evaluate(helpers);
 	const ok = await page
-		.waitForFunction((n) => (globalThis.__decksBoards?.().length ?? 0) >= n, canvas === "perf" ? 90 : Math.min(20, realBoards.length), { timeout: 30000 })
+		.waitForFunction((n) => (globalThis.__decksCards?.().length ?? 0) >= n, canvas === "perf" ? 90 : Math.min(20, realBoards.length), { timeout: 30000 })
 		.then(() => true)
 		.catch(() => false);
 	if (!ok && process.env.PAN_HEAVY_DEBUG) say("DEBUG", false, JSON.stringify([...new Set(link.received.map((m) => m.type))]), JSON.stringify(link.received.filter((m) => /board|stage$/.test(m.type)).slice(-3)).slice(0, 3000));
-	say(`the stage shows the ${canvas} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksBoards?.().length)));
+	say(`the stage shows the ${canvas} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
 };
 
 const helpers = () => {

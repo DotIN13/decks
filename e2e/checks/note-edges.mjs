@@ -68,7 +68,7 @@ for (const run of RUNS) {
 	say(`${run.label}: the stage draws with ${run.want}`, opened && stats?.backend === run.want && stats?.workerBackend === run.want, JSON.stringify(stats));
 	// The camera opens at the origin and, a couple of seconds later, goes to what the agent has up:
 	// wait for it to get there and stay, or the note is placed (and later sought) in a view that is gone.
-	await canvas.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksCards?.().length ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await new Promise((r) => setTimeout(r, 150))) {
 		const now = await canvas.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
 		if (now !== last) [last, since] = [now, Date.now()];
@@ -84,7 +84,7 @@ for (const run of RUNS) {
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();
 			const zoom = Number(m[3]);
-			const boards = (window.__decksBoards?.() ?? []).map((b) => b.rect);
+			const boards = (window.__decksCards?.() ?? []).map((b) => b.rect);
 			const free = (x, y) => boards.every((r) => x < r.left - 4 || x > r.right + 4 || y < r.top - 4 || y > r.bottom + 4);
 			// The free spot nearest the middle (clear of the panels at the sides): room for the note and paper to its left.
 			const spots = [];

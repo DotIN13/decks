@@ -31,11 +31,11 @@ const link = await socket();
 // The linked board off the canvas first, so the link is what brings it back.
 link.send({ type: "card.hide", path: LINKED });
 const canvas = await canvasFrame(page);
-const onCanvas = () => canvas.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path));
-await canvas.waitForFunction((path) => !(window.__decksBoards?.() ?? []).some((one) => one.path === path), LINKED, { timeout: 8000 }).catch(() => {});
+const onCanvas = () => canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path));
+await canvas.waitForFunction((path) => !(window.__decksCards?.() ?? []).some((one) => one.path === path), LINKED, { timeout: 8000 }).catch(() => {});
 say("the linked board is off the canvas to begin with", !(await onCanvas()).includes(LINKED), (await onCanvas()).join(" "));
 
-const rectOf = (path) => canvas.evaluate((wanted) => (window.__decksBoards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
+const rectOf = (path) => canvas.evaluate((wanted) => (window.__decksCards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
 /** The card framed, then its `n`th link pressed where it is on screen. */
 const press = async (n) => {
 	await flyToBoard(page, CARD);
@@ -46,7 +46,7 @@ const press = async (n) => {
 
 // --- a link to another board ---
 await press(0);
-await canvas.waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), LINKED, { timeout: 8000 }).catch(() => {});
+await canvas.waitForFunction((path) => (window.__decksCards?.() ?? []).some((one) => one.path === path), LINKED, { timeout: 8000 }).catch(() => {});
 say("a link to a board puts that board on the canvas", (await onCanvas()).includes(LINKED), (await onCanvas()).join(" "));
 await rest(page).catch(() => {});
 await settle(page, 1200);

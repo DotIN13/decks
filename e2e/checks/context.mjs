@@ -256,7 +256,7 @@ const agent = {
 		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
 		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
 		// The stage's boards, pictures among them: a phone has one live page at most (`device.ts`), and a tap on a picture selects it as on a page.
-		const found = (globalThis.__decksBoards?.() ?? [])
+		const found = (globalThis.__decksCards?.() ?? [])
 			.map(({ path, rect: r }) => {
 				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
 				return { path, x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
@@ -270,7 +270,7 @@ const agent = {
 	// The board tapped: a picture has no node to say it is selected, so it is the one under the tap.
 	const tapped = target?.path ?? null;
 	const menu = await canvas.evaluate((path) => {
-		const callout = document.querySelector(".board-callout");
+		const callout = document.querySelector(".card-callout");
 		if (!callout) return null;
 		const items = [...callout.querySelectorAll("[role=menuitem]")];
 		const box = (el) => el.getBoundingClientRect();
@@ -283,7 +283,7 @@ const agent = {
 			// The pill is centred on the board's middle wherever that is, off the screen included (`BoardCallout.tsx`, `place`).
 			centre: Math.round((box(callout).left + box(callout).right) / 2),
 			boardMid: (() => {
-				const r = (window.__decksBoards?.() ?? []).find((one) => one.path === path)?.rect;
+				const r = (window.__decksCards?.() ?? []).find((one) => one.path === path)?.rect;
 				return r ? Math.round(r.left + r.width / 2) : null;
 			})(),
 		};

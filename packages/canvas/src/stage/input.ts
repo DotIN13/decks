@@ -59,7 +59,7 @@ export function createStageInput(deps: StageInputDeps) {
 	onMount(() => {
 		const element = el();
 		const press = (event: PointerEvent) => {
-			if (!(event.target as Element | null)?.closest?.(".board-callout")) setPressHeld(true);
+			if (!(event.target as Element | null)?.closest?.(".card-callout")) setPressHeld(true);
 		};
 		const release = () => setPressHeld(false);
 		element.addEventListener("pointerdown", press, { capture: true, passive: true });

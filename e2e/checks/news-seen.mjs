@@ -29,7 +29,7 @@ page.on("request", (request) => {
 });
 
 // A card on the canvas on screen (the fixture's are its boards, which the frame lists and marks as it does cards).
-const onStage = await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path));
+const onStage = await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path));
 const deck = await deckState();
 const card = deck.boards.find((board) => board.path === "canvases/untitled-canvas/boards/plan.html" && onStage.includes(board.path)) ?? deck.boards.find((board) => onStage.includes(board.path));
 say("a card is on the canvas on screen", Boolean(card), JSON.stringify(onStage));

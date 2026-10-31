@@ -186,7 +186,7 @@ export function highlight(path: string, id: string): void {
 	clearLast?.run();
 	clearLast = undefined;
 
-	const frame = document.querySelector<HTMLIFrameElement>(`.board-node[data-path="${cssEscape(path)}"] iframe`);
+	const frame = document.querySelector<HTMLIFrameElement>(`.card-node[data-path="${cssEscape(path)}"] iframe`);
 	const target = frame?.contentDocument?.querySelector<HTMLElement>(`[data-id="${cssEscape(id)}"]`);
 	if (!target) return;
 

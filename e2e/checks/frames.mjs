@@ -125,7 +125,7 @@ if (spot) {
 		await page.mouse.down();
 		await page.mouse.move((from.x + into.x) / 2, (from.y + into.y) / 2, { steps: 6 });
 		await settle(page, 200);
-		const holding = await canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length);
+		const holding = await canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-page])").length);
 		say("the press picked the item up rather than starting a marquee", holding === 1, `outlines ${holding}`);
 		// The frame says it would take it, before anything is let go: the gesture has to be legible.
 		const lit = await canvas.evaluate(() => document.querySelectorAll('.pen-join[data-drop="frame"]').length);
@@ -135,7 +135,7 @@ if (spot) {
 			joins: document.querySelectorAll(".pen-join").length,
 			drops: document.querySelectorAll('.pen-join[data-drop="frame"]').length,
 			carried: globalThis.__decksPenBox?.("f-note")?.x,
-			selection: document.querySelectorAll(".pen-selection:not([data-board])").length,
+			selection: document.querySelectorAll(".pen-selection:not([data-page])").length,
 		}));
 		await page.mouse.up();
 		const refused = link.received.filter((m) => m.type === "notice").map((m) => m.text);

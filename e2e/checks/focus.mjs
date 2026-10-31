@@ -17,11 +17,11 @@ await page.locator('.panel-shell [title^="What the survey round found"]').first(
 await settle(page, 900);
 const NOTES = await stagePath(page, "boards/notes.html");
 const canvas = await canvasFrame(page);
-const onCanvas = await canvas.evaluate((path) => (window.__decksBoards?.() ?? []).filter((one) => one.path === path).length, NOTES);
+const onCanvas = await canvas.evaluate((path) => (window.__decksCards?.() ?? []).filter((one) => one.path === path).length, NOTES);
 say("the flow board is on the canvas", onCanvas === 1, `${onCanvas} at ${NOTES}`);
 
 await selectBoard(page, NOTES);
-const bar = await canvas.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
+const bar = await canvas.evaluate(() => [...document.querySelectorAll(".card-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
 // Delete is there because the canvas frame can delete a card's or board's file (`frame/frame.tsx`, `onDeleteBoard`).
 say("the pill over the board offers fit, a tab, a comment, delete and going away, in that order", bar.join(",") === "Fit,New tab,Comment,Delete,Hide", JSON.stringify(bar));
 

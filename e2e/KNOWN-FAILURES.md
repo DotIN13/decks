@@ -83,5 +83,5 @@ before the steps.
   picture and fetched none: nothing was drawn. `lose()` (`render/engine.ts`) clears them now. App bug, fixed.
 - tiers' "the hide button takes a board off the stage" fails under load (the full run, four checks at once) and passes
   alone (three runs out of three). The board leaves the frame, is drawn again for a moment, and is gone by the time the
-  message is written: the first read of `__decksBoards` still had it, the second did not. Likely the same lag as
+  message is written: the first read of `__decksCards` still had it, the second did not. Likely the same lag as
   edits-wait's hidden board (an echo of the stage from before the hide), not fixed.

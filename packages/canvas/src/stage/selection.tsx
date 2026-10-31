@@ -337,7 +337,7 @@ export function createSelection(deps: SelectionDeps) {
 											quote: "",
 											title: board.title,
 											// Under the pill, which follows the board as the camera moves.
-											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),
 								}
@@ -368,7 +368,7 @@ export function createSelection(deps: SelectionDeps) {
 														items: items().ids,
 														quote: items().words,
 														title: items().name,
-														anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+														anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 														open: true,
 													}),
 											}
@@ -415,7 +415,7 @@ export function createSelection(deps: SelectionDeps) {
 											items: held().ids,
 											quote: "",
 											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
-											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
 										}),
 								}

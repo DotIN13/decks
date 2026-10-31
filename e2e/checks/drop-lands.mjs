@@ -54,7 +54,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
 	const candidates = await canvas.evaluate((picture) => {
 		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
-		return window.__decksBoards()
+		return window.__decksCards()
 			.filter((one) => {
 				const r = one.rect;
 				return pictured.has(one.path) === picture && r.width >= 40 && r.x >= 300 && r.y >= 60 && r.right <= innerWidth - 200 && r.bottom <= innerHeight - 160;
@@ -65,11 +65,11 @@ async function boardStaysDropped(page, label, { picture }) {
 	let grip;
 	for (const path of candidates) {
 		// A board shown as a picture has no node, so no edge band to hold: it is picked up by its picture.
-		const hasNode = (await canvas.locator(`.board-node[data-path="${path}"]`).count()) > 0;
+		const hasNode = (await canvas.locator(`.card-node[data-path="${path}"]`).count()) > 0;
 		grip = hasNode ? await boardEdge(page, path) : null;
 		grip ??= await canvas.evaluate((path) => {
-			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
-			const r = window.__decksBoards().find((one) => one.path === path).rect;
+			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".card-node")?.dataset.path === path;
+			const r = window.__decksCards().find((one) => one.path === path).rect;
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
@@ -84,7 +84,7 @@ async function boardStaysDropped(page, label, { picture }) {
 			break;
 		}
 	}
-	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksCards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
 	const from = await canvas.evaluate((path) => {
 		const board = globalThis.__decksRust.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
@@ -94,7 +94,7 @@ async function boardStaysDropped(page, label, { picture }) {
 		globalThis.__boardFrames = [];
 		globalThis.__boardSampling = true;
 		const sample = () => {
-			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			const node = document.querySelector(`.card-node[data-path="${CSS.escape(path)}"]`);
 			const box = engine.placedCards.find((one) => one.path === path);
 			const carried = engine.carriedCount > 0;
 			globalThis.__boardFrames.push({
@@ -106,7 +106,7 @@ async function boardStaysDropped(page, label, { picture }) {
 		};
 		requestAnimationFrame(sample);
 	}, pick.path);
-	const startNode = await canvas.evaluate((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect().toJSON(), pick.path);
+	const startNode = await canvas.evaluate((path) => document.querySelector(`.card-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect().toJSON(), pick.path);
 	await page.mouse.move(grip.x, grip.y);
 	await page.mouse.down();
 	for (let i = 1; i <= 12; i++) {
@@ -145,7 +145,7 @@ async function boardStaysDropped(page, label, { picture }) {
 async function zoomToPictures(page) {
 	const canvas = await canvasFrame(page);
 	for (let i = 0; i < 16; i++) {
-		if (await canvas.evaluate(() => window.__decksBoards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		if (await canvas.evaluate(() => window.__decksCards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -174,7 +174,7 @@ async function liveAndSmall(page) {
 	for (let i = 0; i < 40 && (await zoom()) > 0.45; i++) await pinch(40);
 	await rest(page).catch(() => {});
 	const off = await canvas.evaluate((middle) => {
-		const narrowest = window.__decksBoards().sort((a, b) => a.rect.width - b.rect.width)[0];
+		const narrowest = window.__decksCards().sort((a, b) => a.rect.width - b.rect.width)[0];
 		if (!narrowest) return null;
 		const r = narrowest.rect;
 		return { dx: r.x + r.width / 2 - middle.x, dy: r.y + r.height / 2 - middle.y };

@@ -145,7 +145,7 @@ export function PageCallout(props: {
 	return (
 		<div
 			ref={element}
-			class="board-callout"
+			class="card-callout"
 			role="menu"
 			aria-label={props.label}
 			data-below={place().below ? "true" : undefined}

@@ -17,7 +17,7 @@ const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 // What is on the stage, in the canvas frame (none while the conversation has no canvas); a board placed on a canvas is its copy there, so compared by file.
 const onCanvas = async () => {
 	const canvas = await canvasFrame(page, { timeout: 5000 }).catch(() => undefined);
-	const paths = canvas ? await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path)) : [];
+	const paths = canvas ? await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path)) : [];
 	return paths.map(base).sort();
 };
 // `.row-name` — the row says a board's *basename*, and that is the class it says it in. It was

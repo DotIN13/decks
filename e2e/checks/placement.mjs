@@ -24,12 +24,12 @@ await settle(page, 900);
 
 /**
  * Every board on the canvas, as boxes on screen: the stage's own list, because below the live zoom
- * a board is a picture with no `.board-node` (only the selected one keeps its page).
+ * a board is a picture with no `.card-node` (only the selected one keeps its page).
  */
 const onScreen = async () =>
 	(await canvasFrame(page)).evaluate(() => {
 		const view = { w: window.innerWidth, h: window.innerHeight };
-		return (window.__decksBoards?.() ?? []).map(({ path, rect: box }) => {
+		return (window.__decksCards?.() ?? []).map(({ path, rect: box }) => {
 			return {
 				path,
 				x: Math.round(box.x),
@@ -58,14 +58,14 @@ link.send({ type: "card.move", path: stray, x: 0, y: 520_000 });
  * run this check failed on its second assertion about once in twenty, which reads as the
  * hide being broken rather than as the wait being short.
  */
-await (await canvasFrame(page)).waitForFunction((path) => !(window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 });
+await (await canvasFrame(page)).waitForFunction((path) => !(window.__decksCards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 });
 await settle(page, 300);
 
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);
 
 link.send({ type: "card.play", path: stray });
-await (await canvasFrame(page)).waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
+await (await canvasFrame(page)).waitForFunction((path) => (window.__decksCards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
 await settle(page, 1200);
 
 const after = await onScreen();
@@ -106,7 +106,7 @@ const answered = await (async () => {
 	}
 })();
 say("document.create is answered with the item's path on the stage", /^item:/.test(answered?.path ?? ""), JSON.stringify(answered));
-await (await canvasFrame(page)).waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), answered?.path, { timeout: 8000 }).catch(() => {});
+await (await canvasFrame(page)).waitForFunction((path) => (window.__decksCards?.() ?? []).some((one) => one.path === path), answered?.path, { timeout: 8000 }).catch(() => {});
 await settle(page, 600);
 
 const made = (await onScreen()).find((board) => !before.has(board.path));

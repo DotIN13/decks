@@ -231,7 +231,7 @@ async function run(engine, lags) {
 		async () =>
 			(await cv()).evaluate(() =>
 				window
-					.__decksBoards()
+					.__decksCards()
 					.filter((one) => one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 					.map((one) => one.path),
 			),
@@ -240,7 +240,7 @@ async function run(engine, lags) {
 	/** A point on a board's picture that is the canvas's, not the page's chrome over it. */
 	const pictureSpot = async (path) => {
 		const points = await (await cv()).evaluate((wanted) => {
-			const r = window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const r = window.__decksCards?.().find((one) => one.path === wanted)?.rect;
 			const out = [];
 			if (!r) return out;
 			for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) for (const fx of [0.5, 0.3, 0.7]) {

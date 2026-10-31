@@ -18,7 +18,7 @@ const bareSpot = async () => {
 		for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16)
 			for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) {
 				const hit = document.elementFromPoint(x, y);
-				if (!hit?.closest(".board-node, .v3-tools, .pen-tools, .board-callout, .v3-zoom, [class*='zoom']")) out.push({ x, y });
+				if (!hit?.closest(".card-node, .v3-tools, .pen-tools, .card-callout, .v3-zoom, [class*='zoom']")) out.push({ x, y });
 				if (out.length > 40) return out;
 			}
 		return out;
@@ -85,7 +85,7 @@ const bare = await bareSpot();
 if (bare) await page.mouse.click(bare.x, bare.y);
 say(
 	"the canvas has the focus, not a board",
-	await canvas.evaluate(() => document.activeElement === document.querySelector(".stage") || !document.activeElement?.closest(".board-node")),
+	await canvas.evaluate(() => document.activeElement === document.querySelector(".stage") || !document.activeElement?.closest(".card-node")),
 	`clicked ${JSON.stringify(bare)}`,
 );
 await page.keyboard.press("0");
@@ -95,7 +95,7 @@ await settle(page, 400);
 const fitted = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();
 	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
-	const nodes = window.__decksBoards().map((one) => one.rect);
+	const nodes = window.__decksCards().map((one) => one.rect);
 	return {
 		inside: nodes.every(
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,

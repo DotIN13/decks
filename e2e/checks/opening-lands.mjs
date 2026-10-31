@@ -16,7 +16,7 @@ await page.reload({ waitUntil: "load" });
 // The canvas is drawn in its frame, made again by the reload.
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => typeof globalThis.__decksCameraTransform === "function", null, { timeout: 30000 });
-await canvas.waitForFunction(() => (globalThis.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 });
+await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) > 0, null, { timeout: 30000 });
 const boardsAt = Date.now() - started;
 // Landed: the camera has left the origin it opens at (0, 0, 100%).
 const landedAt = await canvas
@@ -25,7 +25,7 @@ const landedAt = await canvas
 	.catch(() => undefined);
 say("the page lands on its boards", landedAt !== undefined, `${landedAt} ms`);
 say("…within 1.5 s of its boards arriving, not after the 3 s cap", landedAt !== undefined && landedAt - boardsAt < 1500, `boards at ${boardsAt} ms, landed at ${landedAt} ms`);
-const inView = await canvas.evaluate(() => globalThis.__decksBoards().filter((b) => b.rect.right > 0 && b.rect.left < innerWidth && b.rect.bottom > 0 && b.rect.top < innerHeight).length);
+const inView = await canvas.evaluate(() => globalThis.__decksCards().filter((b) => b.rect.right > 0 && b.rect.left < innerWidth && b.rect.bottom > 0 && b.rect.top < innerHeight).length);
 say("…with its boards in view", inView > 0, `${inView} in view`);
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();

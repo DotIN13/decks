@@ -85,7 +85,7 @@ const back = await placed("bend-ab");
 say("letting go puts the saved arrow back", back && Math.abs(back.h - routed.h) < 0.5, JSON.stringify(back));
 
 // --- a board dragged alone: an arrow ending on it bends with it -------------------------------------
-const board = await canvas.evaluate(() => window.__decksBoards()[0]);
+const board = await canvas.evaluate(() => window.__decksCards()[0]);
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "bend-board", geometry: "M0 0 L1 1", metadata: { type: "decks.arrow", from: "bend-b", to: board.path, route: "elbow" } } }] });
 const saved = await until(() => placed("bend-board"));
 say("an arrow from a box to a board is routed by the server", !!saved, JSON.stringify(saved));

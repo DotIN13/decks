@@ -15,7 +15,7 @@ const { browser, page, errors } = await open({ width: 1600, height: 1000, panelT
  * What is on the stage: a board is only its picture, so the stage's own list is what is read, in
  * the canvas frame (asked for again each time: the frame is made again on another canvas).
  */
-const onCanvas = async () => (await canvasFrame(page)).evaluate(() => (window.__decksBoards?.() ?? []).map((board) => board.path).sort());
+const onCanvas = async () => (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? []).map((board) => board.path).sort());
 
 const base = (path) => path.split("/").pop();
 const names = paths.map(base).sort();
@@ -84,7 +84,7 @@ const two = twoNames.map((name) => `boards/${name}`);
 const link = await socket();
 if (made) link.send({ type: "agent.focus", id: made.id });
 for (const path of two) link.send({ type: "card.play", path });
-await (await canvasFrame(page)).waitForFunction((wanted) => (window.__decksBoards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
+await (await canvasFrame(page)).waitForFunction((wanted) => (window.__decksCards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page);
 await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
@@ -98,7 +98,7 @@ say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.l
 const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? two[0];
 await selectBoard(page, first);
 await pressBoardAction(page, "Hide");
-await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksBoards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
+await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksCards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not

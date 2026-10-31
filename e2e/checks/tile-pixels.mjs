@@ -54,7 +54,7 @@ async function shots(target, on, label) {
 	await canvas.addStyleTag(hidden);
 	const snap = async () => {
 		out.pictures.push((await page.screenshot()).toString("base64"));
-		out.boards.push(await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
+		out.boards.push(await canvas.evaluate(() => (window.__decksCards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
 	};
 	// Out by fixed steps (not until the boards are pictures, which depends on timing), so every page is at the same zoom.
 	// Where it opens is not compared: live boards' pages differ a little from page to page.
