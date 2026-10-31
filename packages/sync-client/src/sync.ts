@@ -486,6 +486,8 @@ export class HarnessSync {
 				continue;
 			}
 			if (this.shared(name)) this.writeMeta(name, { title: c.title, shared: { owner: c.owner, ownerName: c.ownerName ?? "", role: c.role } });
+			// One of yours that someone else may edit too: the harness runs no app inside it (`stage/pens.ts`, `yoursAlone`).
+			else this.writeMeta(name, { othersEdit: c.othersEdit === true });
 			this.latest.set(c.id, Math.max(this.latest.get(c.id) ?? 0, c.rev));
 			await this.syncCanvas(name, c);
 			await this.syncCanvasFiles(name, c, fresh);
@@ -680,7 +682,7 @@ export class HarnessSync {
 	 * What `canvas.json` says about a synced canvas: the Studio canvas it is, and for a friend's, who
 	 * shared it and as what (`StagePens.sharing`). `fresh` writes a title too, for one that came down.
 	 */
-	private writeMeta(name: string, set: { title?: string; studio?: string; shared?: { owner: string; ownerName: string; role: string } }, fresh = false) {
+	private writeMeta(name: string, set: { title?: string; studio?: string; shared?: { owner: string; ownerName: string; role: string }; othersEdit?: boolean }, fresh = false) {
 		const file = join(this.folder(name), "canvas.json");
 		let meta: Record<string, unknown> = {};
 		try {
@@ -690,6 +692,8 @@ export class HarnessSync {
 		}
 		const studio = set.studio ?? (typeof meta.studio === "string" ? meta.studio : undefined);
 		const next: Record<string, unknown> = { ...meta, ...((fresh || !meta.title) && set.title ? { title: set.title } : {}), ...(studio ? { studio } : {}), ...(set.shared ? { shared: { ...set.shared, ...(studio ? { studio } : {}) } } : {}) };
+		if (set.othersEdit === true) next.othersEdit = true;
+		else if (set.othersEdit === false) delete next.othersEdit;
 		next.boards ??= [];
 		if (JSON.stringify(next) === JSON.stringify(meta)) return;
 		mkdirSync(dirname(file), { recursive: true });

@@ -11,6 +11,13 @@ import { cardCalls } from "./card-calls.ts";
 import type { FrameContext } from "./boot.ts";
 import type { Rect } from "../protocol.ts";
 
+/** Text as base64url, UTF-8 first, for an address. */
+const base64url = (text: string) => {
+	let binary = "";
+	for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
 /** A rectangle on this frame's screen, as the page places it (it adds where the frame sits). */
 const rectOf = (box: DOMRect | undefined): Rect | undefined => (box ? { x: box.x, y: box.y, w: box.width, h: box.height } : undefined);
 
@@ -93,6 +100,35 @@ export function installHost(ctx: FrameContext): void {
 				}
 			},
 			open: (name: string) => end.emit("open-app", { name }),
+			/*
+			 * Inside the canvas, on a canvas that is yours alone: asked of the harness with this frame's canvas
+			 * pass, which answers the app's address with an app pass in its path (`server/src/routes/apps.ts`).
+			 * What the app saved in this browser goes after `#`, which never reaches the server.
+			 */
+			...(studio
+				? {}
+				: {
+						inCanvas: async (name: string): Promise<{ url: string } | { tab: string }> => {
+							try {
+								const api = start.backend.api.replace(/\/+$/, "");
+								const response = await fetch(`${api}/apps/${encodeURIComponent(name)}/open`, { method: "POST", headers: { authorization: `Bearer ${ctx.backendToken()}` } });
+								const answer = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+								if (!response.ok || !answer.url) return { tab: answer.error ?? `The app did not open here (${response.status}).` };
+								const saved = ctx.appStored.get(name) ?? {};
+								const hash = Object.keys(saved).length ? `#decks-storage=${base64url(JSON.stringify(saved))}` : "";
+								return { url: `${new URL(answer.url, api).href}${hash}` };
+							} catch (error) {
+								return { tab: (error as Error).message };
+							}
+						},
+						store: (name: string, key: string, value: string | null) => {
+							const saved = ctx.appStored.get(name) ?? {};
+							if (value === null) delete saved[key];
+							else saved[key] = value;
+							ctx.appStored.set(name, saved);
+							end.emit("app-store", { app: name, key, value });
+						},
+					}),
 		},
 		// So is any other tab a link opens: this sandbox may not open one.
 		openLink: (href) => end.emit("open-link", { href }),

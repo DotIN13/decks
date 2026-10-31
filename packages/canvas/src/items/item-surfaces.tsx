@@ -2,6 +2,7 @@ import { mountDocPage } from "@decks/docs/page";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { INTERACTIVE, scrollsInside } from "./card.ts";
 import { canvasHost } from "../host.ts";
+import { APPS, DEVICE } from "../render/device.ts";
 import { scheme } from "../lib/theme.ts";
 
 /**
@@ -78,31 +79,71 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 	return <div class="document-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%", overflow: "auto", background: "var(--b-bg, #fff)" }} />;
 }
 
+/** The apps running inside the canvas now, by surface: at most `APPS[DEVICE].live`, the selected one always. */
+const [liveApps, setLiveApps] = createSignal<ReadonlySet<number>>(new Set());
+let surfaces = 0;
+
 /**
- * An app item (`decks.app`): the app's bar on the canvas, and Open, which the host's page does in a tab
- * of its own (`CanvasHost.apps`). An app with a server can do what its server does, so nothing on the
- * canvas reaches it: not the frame, and not a card's script beside it.
+ * An app item (`decks.app`): the app's bar on the canvas, and below it the app itself, running in a
+ * sandboxed iframe, where the host can open it here (`CanvasHost.apps.inCanvas`: on a canvas that is yours
+ * alone, its pass in its address). It takes the pointer once the item is selected, as a card does once
+ * entered; before that a press selects it and a wheel pans the canvas. Its cards' scripts may reach it:
+ * they are yours. Elsewhere, or past the device's budget of running apps, it is the bar and Open, which
+ * the host's page does in a tab of its own. The green light opens a tab either way.
  */
 export function AppSurface(props: { app: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
+	let frame: HTMLIFrameElement | undefined;
+	const me = ++surfaces;
 	const [about, setAbout] = createSignal<{ title?: string; status?: string }>();
+	const [address, setAddress] = createSignal<{ url: string } | { tab: string }>();
 	const open = () => canvasHost().apps?.open(props.app);
+	const inCanvas = () => canvasHost().apps?.inCanvas;
+	// Running here: once it has a place in the budget, kept until the item goes, so it never reloads under you.
+	const live = () => liveApps().has(me);
+	createEffect(() => {
+		if (!inCanvas() || live()) return;
+		const now = liveApps();
+		if (props.selected || now.size < APPS[DEVICE].live) setLiveApps(new Set([...now, me]));
+	});
+	createEffect(() => {
+		const ask = inCanvas();
+		if (!live() || !ask || address()) return;
+		void ask(props.app).then(setAddress);
+	});
+	// What the app saves in its browser storage (`decks-storage.js`), from its own iframe only.
+	const onMessage = (event: MessageEvent) => {
+		if (!frame || event.source !== frame.contentWindow) return;
+		const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
+		if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
+		canvasHost().apps?.store?.(props.app, data.key, typeof data.value === "string" ? data.value : null);
+	};
 	onMount(() => {
 		props.ref?.();
 		ownEvents(host, () => props.selected, props.onSelect);
+		addEventListener("message", onMessage);
 		void canvasHost()
 			.apps?.status(props.app)
 			.then((got) => setAbout(got ?? {}))
 			.catch(() => setAbout({}));
 	});
+	onCleanup(() => {
+		removeEventListener("message", onMessage);
+		const now = new Set(liveApps());
+		if (now.delete(me)) setLiveApps(now);
+	});
+	const url = () => {
+		const got = address();
+		return got && "url" in got ? got.url : undefined;
+	};
 	return (
-		<div class="app-surface" ref={(element) => (host = element)} on:dblclick={open}>
+		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} on:dblclick={() => !url() && open()}>
 			{/* A window's title bar, as macOS draws one: the lights, the name in the middle, whether it runs. */}
 			<div class="app-surface-bar">
 				<span class="app-surface-lights">
 					<span class="app-light" data-light="close" aria-hidden="true" />
 					<span class="app-light" data-light="min" aria-hidden="true" />
-					{/* The green one opens it, as a window's grows: a listener of its own, since the item keeps its presses from the canvas. */}
+					{/* The green one opens it in a tab, as a window's grows: a listener of its own, since the item keeps its presses from the canvas. */}
 					<button type="button" class="app-light" data-light="zoom" title="Open in a tab" aria-label={`Open ${about()?.title ?? props.app} in a tab`} on:click={open} />
 				</span>
 				<span class="app-surface-title">{about()?.title ?? props.app}</span>
@@ -110,14 +151,34 @@ export function AppSurface(props: { app: string; selected: boolean; onSelect: ()
 					{about()?.status ?? ""}
 				</span>
 			</div>
-			<div class="app-surface-body">
-				<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
-					<p>{about()?.title ?? props.app} runs in a tab of its own.</p>
-					<button type="button" class="app-surface-open" on:click={open}>
-						Open
-					</button>
-				</Show>
-			</div>
+			<Show
+				when={url()}
+				fallback={
+					<div class="app-surface-body">
+						<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
+							<p>{(() => {
+								const got = address();
+								if (got && "tab" in got) return got.tab;
+								if (live()) return `Opening ${about()?.title ?? props.app}…`;
+								return `${about()?.title ?? props.app} runs in a tab of its own.`;
+							})()}</p>
+							<button type="button" class="app-surface-open" on:click={open}>
+								Open
+							</button>
+						</Show>
+					</div>
+				}
+			>
+				<iframe
+					ref={(element) => (frame = element)}
+					class="app-surface-frame"
+					title={about()?.title ?? props.app}
+					src={url()}
+					sandbox="allow-scripts allow-forms allow-modals allow-downloads"
+					allow="clipboard-read; clipboard-write; fullscreen"
+					style={{ "pointer-events": props.selected ? "auto" : "none" }}
+				/>
+			</Show>
 		</div>
 	);
 }

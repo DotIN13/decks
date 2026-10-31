@@ -46,3 +46,28 @@ test("a pass in the path reaches its canvas's folder and pictures, every part pl
 	assert.ok(passCovers("shared/ana/trip", "/api/board/shared/canvases/ana/trip/a.html"));
 	assert.ok(passCovers("main", "/api/board/boards/a.html", (path) => path === "boards/a.html"), "a board placed on it from elsewhere");
 });
+
+test("an app pass held by a canvas works while its token works and the app is on that canvas, with no day to run out", () => {
+	let live = true;
+	let placed = true;
+	const passes = new Passes({ live: () => live, role: () => "edit", appOnCanvas: (name, canvas) => placed && name === "review" && canvas === "main" });
+	const pass = passes.appCanvas("review", "main", "k1");
+	assert.deepEqual(passes.openApp(pass), { app: "review", holder: "canvas", canvas: "main" });
+	assert.deepEqual(passes.openApp(pass, Date.now() + 3 * 24 * 3_600_000)?.holder, "canvas", "no day, unlike a tab's");
+	placed = false;
+	assert.equal(passes.openApp(pass), undefined, "taken off the canvas, or the canvas no longer yours alone: it stops at once");
+	placed = true;
+	live = false;
+	assert.equal(passes.openApp(pass), undefined, "signed out: it stops");
+	live = true;
+	assert.equal(passes.openApp(passes.appCanvas("review", "other", "k1")), undefined, "made for a canvas the app is not on");
+	assert.equal(new Passes({ live: () => true, role: () => "edit" }).openApp(pass), undefined, "a harness that cannot say where apps are placed takes none");
+});
+
+test("a canvas pass may open an app on its canvas, and nothing else of the apps' but reading one", async () => {
+	const { canvasMay } = await import("./guard.ts");
+	assert.equal(canvasMay("POST", "/api/apps/review/open", "main"), true);
+	assert.equal(canvasMay("GET", "/api/apps/review", "main"), true);
+	assert.equal(canvasMay("POST", "/api/apps/review/restart", "main"), false);
+	assert.equal(canvasMay("POST", "/api/passes", "main"), false);
+});

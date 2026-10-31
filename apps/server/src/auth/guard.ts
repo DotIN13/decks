@@ -137,6 +137,8 @@ export function canvasMay(method: string, path: string, canvas: string, placed: 
 	// A card on its canvas written out for the harness's Chrome to draw (`/api/snapshot`, which checks the card is on it).
 	if (method === "POST" && path === "/api/snapshot") return true;
 	if (read && /^\/api\/apps\/[^/]+$/.test(path)) return true;
+	// An app placed on the canvas, opened in its frame: the route checks it is placed there (`routes/apps.ts`).
+	if (method === "POST" && /^\/api\/apps\/[^/]+\/open$/.test(path)) return true;
 	if (path.startsWith("/c/")) return false;
 	if (read) {
 		const decoded = decodedSegment(path);
@@ -223,6 +225,8 @@ export function guard(gate: Gate) {
 				return;
 			}
 			req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
+			// The token the pass was made with: what an app pass made from it is bound to (`routes/apps.ts`).
+			req.tokenId = pass.by;
 			next();
 			return;
 		}

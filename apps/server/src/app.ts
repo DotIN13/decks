@@ -45,6 +45,7 @@ import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
+import { appActor, canvasHolds } from "./stage/caller-run.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -163,6 +164,11 @@ export class App {
 					return pens.sharing(canvas)?.role === "view" ? "view" : "edit";
 				},
 				appRun: (name) => this.apps?.runOf(name),
+				// An app on a canvas runs in its frame only while it is placed there and the canvas is yours alone.
+				appOnCanvas: (name, canvas) => {
+					const pens = this.stage?.pens;
+					return !!pens?.has(canvas) && pens.yoursAlone(canvas) && canvasHolds(pens, canvas, appActor(name));
+				},
 			},
 			passSecret(config.dataDir),
 		);

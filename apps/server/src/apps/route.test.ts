@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createServer, get, type Server } from "node:http";
+import { createServer, get, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 import { appRequest, withoutToken } from "./route.ts";
@@ -140,4 +140,48 @@ test("another site opens an app with an app pass for it, which the app never see
 test("a pass leaves the query as the token does", () => {
 	assert.equal(withoutToken("?decks_pass=t"), "");
 	assert.equal(withoutToken("?a=1&decks_pass=t&decks_token=x"), "?a=1");
+});
+
+test("an app inside a canvas frame is reached on the pass in its path: any method, read from no origin, the pass never reaching the app", async () => {
+	let seen: { url?: string; method?: string; headers: Record<string, unknown> } = { headers: {} };
+	const app = createServer((req, res) => {
+		seen = { url: req.url, method: req.method, headers: req.headers };
+		res.writeHead(302, { location: "/done", "access-control-allow-origin": "https://elsewhere.example" });
+		res.end();
+	});
+	const appPort = await listen(app);
+	const apps = { exists: () => true, manifest: () => ({ kind: "server" }), seen: () => {}, portFor: async () => appPort } as unknown as Apps;
+	const good = "dk_ap_abc.def";
+	const decks = createServer((req, res) => void appRequest(req, res as Parameters<typeof appRequest>[1], apps, undefined, undefined, (pass, name) => pass === good && name === "review"));
+	const decksPort = await listen(decks);
+	const ask = (path: string, method = "GET", headers: Record<string, string> = {}) =>
+		new Promise<{ status: number; headers: Record<string, unknown>; body: string }>((resolve) => {
+			const req = request({ host: "127.0.0.1", port: decksPort, path, method, headers: { origin: "null", "sec-fetch-site": "cross-site", ...headers } }, (res) => {
+				let body = "";
+				res.on("data", (chunk) => (body += chunk));
+				res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+			});
+			req.end();
+		});
+	try {
+		const posted = await ask(`/app/t/${good}/review/api/items?x=1`, "POST");
+		assert.equal(seen.url, "/api/items?x=1", "the app sees its own path, not the pass");
+		assert.equal(seen.method, "POST");
+		assert.equal(seen.headers["x-forwarded-prefix"], `/app/t/${good}/review`);
+		assert.equal(posted.headers["access-control-allow-origin"], "*", "readable by an origin-less page, the app's own CORS answer replaced");
+		assert.equal(posted.headers.location, `/app/t/${good}/review/done`, "a redirect stays inside the address, pass and all");
+		const preflight = await ask(`/app/t/${good}/review/api/items`, "OPTIONS", { "access-control-request-method": "PUT", "access-control-request-headers": "content-type" });
+		assert.equal(preflight.status, 204);
+		assert.equal(preflight.headers["access-control-allow-headers"], "content-type");
+		const refused = await ask(`/app/t/dk_ap_wrong.pass/review/`);
+		assert.equal(refused.status, 401);
+		const script = await ask(`/app/t/${good}/review/decks-storage.js`);
+		assert.equal(script.status, 200);
+		assert.match(script.body, /decks\.app:review:/, "the storage script keeps the app's values under its name");
+	} finally {
+		decks.closeAllConnections();
+		decks.close();
+		app.closeAllConnections();
+		app.close();
+	}
 });

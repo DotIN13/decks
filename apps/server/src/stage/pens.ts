@@ -330,6 +330,21 @@ export class StagePens {
 	 * Who shared a friend's canvas, and as what (`canvas.json`, written by the sync when it came down,
 	 * `studio/sync.ts`); undefined for one of this deck's own.
 	 */
+	/**
+	 * Whether a canvas is yours alone, so what is on it may act as you: not a friend's (`shared/…`), and
+	 * not one of yours that Studio says someone else may edit (`othersEdit` in its `canvas.json`, written by
+	 * the sync). An app placed on it runs inside the canvas frame only then (`auth/passes.ts`).
+	 */
+	yoursAlone(name: string): boolean {
+		if (sharedParts(name)) return false;
+		try {
+			const meta = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { othersEdit?: unknown };
+			return meta.othersEdit !== true;
+		} catch {
+			return true;
+		}
+	}
+
 	sharing(name: string): { owner: string; ownerName?: string; role: "edit" | "view"; studio?: string } | undefined {
 		const parts = sharedParts(name);
 		if (!parts) return undefined;

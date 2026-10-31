@@ -144,6 +144,15 @@ export async function readGpuClass(): Promise<GpuClass> {
  * to one is instant. A live card is a root of elements this one page lays out, paints and runs the
  * scripts of; an iPad or a phone has one thread and a hard memory ceiling for all of it.
  */
+/**
+ * A device's apps inside the canvas (`items/item-surfaces.tsx`): how many run at once, the one selected
+ * always among them. Each is a whole page with its own scripts, in Safari on the canvas's one thread.
+ */
+export const APPS: Record<DeviceKind, { live: number }> = {
+	computer: { live: 2 },
+	mobile: { live: 1 },
+};
+
 export const CARDS: Record<DeviceKind, { live: number; kept: number }> = {
 	computer: { live: 12, kept: 4 },
 	mobile: { live: 3, kept: 2 },

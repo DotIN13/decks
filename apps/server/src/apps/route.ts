@@ -4,6 +4,7 @@ import type { Duplex } from "node:stream";
 import type { Response } from "express";
 import { bearerOf, fromAnotherSite, originOf, queryTokenOf } from "../auth/guard.ts";
 import { APP_NAME, type Apps } from "./service.ts";
+import { STORAGE_SCRIPT, storageScript } from "./storage-script.ts";
 
 /**
  * `/app/<name>/…`: an app on Decks' own address (`service.ts`).
@@ -33,6 +34,24 @@ export type PairedCheck = (token: string | undefined, origin?: string) => boolea
 /** Whether what a GET carries in its address opens this app: an app pass for a tab, for this app (`decks_pass`, `auth/passes.ts`). */
 export type TicketCheck = (pass: string | undefined, name: string) => boolean;
 
+/** Whether the pass in an address's path opens this app: an app pass held by a canvas the app is placed on (`/app/t/<pass>/<name>/…`). */
+export type CarriedCheck = (pass: string, name: string) => boolean;
+
+/**
+ * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`routes/apps.ts`, `open`). The frame is
+ * sandboxed and so is the app's iframe in it, with no origin of its own and no cookies, so the pass rides in
+ * the path, and every relative address the app loads, fetches or opens a socket to carries it too.
+ */
+const CARRIED = /^\/app\/t\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\/([^/?]+)(\/[^?]*)?(\?.*)?$/;
+
+function carriedTarget(url: string): { pass: string; name: string; inner: string; query: string; slash: boolean } | undefined {
+	const match = CARRIED.exec(url);
+	if (!match) return undefined;
+	const [, pass = "", name = "", inner, query = ""] = match;
+	if (!APP_NAME.test(name)) return undefined;
+	return { pass, name, inner: inner ?? "/", query, slash: inner !== undefined };
+}
+
 const ROUTE = /^\/app\/([^/?]+)(\/[^?]*)?(\?.*)?$/;
 
 function target(url: string): { name: string; inner: string; query: string; slash: boolean } | undefined {
@@ -44,11 +63,36 @@ function target(url: string): { name: string; inner: string; query: string; slas
 }
 
 /** Answer one request. Answers whether it was an `/app/` request at all. */
-export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps, paired?: PairedCheck, ticketed?: TicketCheck): boolean {
+export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps, paired?: PairedCheck, ticketed?: TicketCheck, carried?: CarriedCheck): boolean {
 	const url = req.url ?? "/";
-	const at = target(url);
+	const inFrame = carriedTarget(url);
+	const at = inFrame ?? target(url);
 	if (!at) return false;
-	if (byTicket(req, at.name, ticketed)) {
+	// Where the app's own addresses start: what its redirects and its base-path header are put under.
+	const base = inFrame ? `/app/t/${inFrame.pass}/${at.name}` : `/app/${at.name}`;
+	if (inFrame) {
+		if (!carried?.(inFrame.pass, at.name)) {
+			plain(res, 401, "This app's address has stopped working: the app is no longer on that canvas, the canvas is no longer yours alone, or you signed out. Reload the canvas.");
+			return true;
+		}
+		// The page's address holds the pass: not sent on as the Referer of what it loads from elsewhere.
+		res.setHeader("Referrer-Policy", "no-referrer");
+		/*
+		 * Readable by the app's own page, which has no origin (`Origin: null`): every fetch it makes counts as
+		 * another site's. The pass in the path is the credential, and no cookie is used, so `*` is enough.
+		 */
+		res.setHeader("Access-Control-Allow-Origin", "*");
+		res.setHeader("Access-Control-Expose-Headers", "*");
+		if (req.method === "OPTIONS" && req.headers["access-control-request-method"]) {
+			res.writeHead(204, {
+				"access-control-allow-methods": "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
+				"access-control-allow-headers": String(req.headers["access-control-request-headers"] ?? "*"),
+				"access-control-max-age": "600",
+			});
+			res.end();
+			return true;
+		}
+	} else if (byTicket(req, at.name, ticketed)) {
 		// The page's address holds its ticket, which is not sent on as the Referer of what it loads.
 		res.setHeader("Referrer-Policy", "no-referrer");
 	} else if (refusedSite(req, paired)) {
@@ -71,12 +115,22 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 	 * told its base path, which answers the bare name itself: Next.js sends `/app/x/` to `/app/x`,
 	 * and the two redirects went round until the browser gave up.
 	 */
+	if (inFrame && manifest.prefix) {
+		plain(res, 409, `apps/${at.name} is told its base path, so it loads by absolute addresses, which do not carry the pass. Open it in a tab.`);
+		return true;
+	}
 	if (!at.slash && !manifest.prefix) {
-		res.writeHead(301, { location: `/app/${at.name}/${at.query}` });
+		res.writeHead(301, { location: `${base}/${at.query}` });
 		res.end();
 		return true;
 	}
 	apps.seen(at.name);
+	// The browser storage an app asks for with one script tag (`storage-script.ts`): Decks', not the app's.
+	if (at.inner === `/${STORAGE_SCRIPT}`) {
+		res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
+		res.end(storageScript(at.name));
+		return true;
+	}
 	if (manifest.kind !== "server") {
 		const file = apps.file(at.name, at.inner);
 		if (!file) {
@@ -99,11 +153,13 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			return;
 		}
 		const path = manifest.prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`;
-		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: forwarded(req, at.name, paired) }, (answer) => {
+		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: forwarded(req, base, paired) }, (answer) => {
 			const headers = { ...answer.headers };
 			// A redirect the app made to its own root goes back inside its address.
 			const location = headers.location;
-			if (!manifest.prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//")) headers.location = `/app/${at.name}${location}`;
+			if (!manifest.prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//")) headers.location = `${base}${location}`;
+			// Its own CORS answer would fight the one above, which is what lets its origin-less page read it.
+			if (inFrame) for (const key of Object.keys(headers)) if (key.startsWith("access-control-")) delete headers[key];
 			res.writeHead(answer.statusCode ?? 502, headers);
 			answer.pipe(res);
 		});
@@ -122,11 +178,13 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 }
 
 /** A websocket to a server app (a dev server's reloads, a chat). Answers whether it was an `/app/` upgrade at all. */
-export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, apps: Apps, paired?: PairedCheck): boolean {
+export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, apps: Apps, paired?: PairedCheck, carried?: CarriedCheck): boolean {
 	const url = req.url ?? "/";
-	const at = target(url);
+	const inFrame = carriedTarget(url);
+	const at = inFrame ?? target(url);
 	if (!at) return false;
-	if (refusedSite(req, paired)) {
+	const base = inFrame ? `/app/t/${inFrame.pass}/${at.name}` : `/app/${at.name}`;
+	if (inFrame ? !carried?.(inFrame.pass, at.name) : refusedSite(req, paired)) {
 		socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
 		return true;
 	}
@@ -135,11 +193,15 @@ export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, a
 		return true;
 	}
 	const prefix = apps.manifest(at.name).prefix;
+	if (inFrame && prefix) {
+		socket.end("HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n");
+		return true;
+	}
 	void apps.portFor(at.name).then((port) => {
 		if (port === undefined) return void socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
 		const upstream = connect(port, "127.0.0.1", () => {
 			const lines = [`${req.method ?? "GET"} ${prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`} HTTP/1.1`];
-			for (const [name, value] of Object.entries(forwarded(req, at.name, paired))) {
+			for (const [name, value] of Object.entries(forwarded(req, base, paired))) {
 				for (const one of Array.isArray(value) ? value : [value]) if (one !== undefined) lines.push(`${name}: ${one}`);
 			}
 			upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
@@ -191,7 +253,7 @@ export function withoutToken(query: string): string {
 	return rest ? `?${rest}` : "";
 }
 
-function forwarded(req: IncomingMessage, name: string, paired?: PairedCheck): Record<string, string | string[] | undefined> {
+function forwarded(req: IncomingMessage, base: string, paired?: PairedCheck): Record<string, string | string[] | undefined> {
 	const headers: Record<string, string | string[] | undefined> = {};
 	for (const [key, value] of Object.entries(req.headers)) if (!key.startsWith("x-decks-")) headers[key] = value;
 	// A pairing token is Decks' to check, never the app's to see; an app's own bearer token goes on.
@@ -201,7 +263,7 @@ function forwarded(req: IncomingMessage, name: string, paired?: PairedCheck): Re
 	if (host) headers["x-forwarded-host"] = host;
 	headers["x-forwarded-proto"] = req.headers["x-forwarded-proto"] ?? "http";
 	headers["x-forwarded-for"] = req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "";
-	headers["x-forwarded-prefix"] = `/app/${name}`;
+	headers["x-forwarded-prefix"] = base;
 	return headers;
 }
 

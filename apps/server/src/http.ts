@@ -75,9 +75,14 @@ export function createHttpApp(app: App): Express {
 		const seen = app.tokens.verify(token, { origin });
 		return seen.ok && actsAsPerson(seen.principal);
 	};
+	// An app inside a canvas frame: an app pass held by a canvas the app is placed on, in the path (`auth/passes.ts`).
+	const carried = (pass: string, name: string) => {
+		const opened = app.passes.openApp(pass);
+		return opened?.holder === "canvas" && opened.app === name;
+	};
 	// The deck's apps (`apps/route.ts`), for the same reason: a server app's request is the app's.
 	server.use((req, res, next) => {
-		if (!appRequest(req, res, app.apps, paired, ticketed)) next();
+		if (!appRequest(req, res, app.apps, paired, ticketed, carried)) next();
 	});
 
 	/*

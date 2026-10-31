@@ -16,10 +16,23 @@ change a file, finish a build or restart the server.
 | Rung | Pick it when | Starter |
 | --- | --- | --- |
 | **A card** | One screen with a few controls. Not an app. | `decks card create` |
-| **static** | Pages and scripts, no build. Libraries from a CDN. Data in `localStorage`. Most apps. | `static` |
+| **static** | Pages and scripts, no build. Libraries from a CDN. Only state about this browser. Most apps. | `static` |
 | **server** | Data shared or kept on disk, an API key, code that cannot run in a page. | `node` (no packages) |
 | **build** | You need JSX or a framework's compiler. | `react`, `solid` |
 | **server, built** | Server rendering, with Next.js. Install is 370 MB and about 40 s. | `next` |
+
+## Pick storage by what the app needs
+
+- **Data that must follow the person to every device** (the app's real data: notes, reviews,
+  settings that matter): the app's own server keeps it, as JSON or SQLite in the app's folder. That
+  makes it a **server** app.
+- **State that is only about this browser** (the last tab open, a panel's width, a draft in
+  progress): `localStorage`, with this line at the top of the page, before your own scripts:
+  `<script src="decks-storage.js"></script>`. Decks answers that address itself. On the canvas the
+  app runs in a sandboxed frame where the browser's `localStorage` throws; the script stands one in,
+  kept by the page in this browser. In a tab it uses the browser's own. Calls and properties both work
+  (`localStorage.getItem("t")`, `localStorage.t = "dark"`); IndexedDB and cookies do not, on the canvas.
+- When unsure, the server: losing data hurts more than syncing it.
 
 ## The loop
 
@@ -56,9 +69,10 @@ before you run it. Keep secrets in `.env`, which the repo ignores.
 
 ## Rules that are easy to break
 
-- **Use relative addresses.** The app lives under `/app/<name>/`, so write `fetch("api/items")`
-  and `href="style.css"`, never `/api/items`, which points at Decks itself. Vite needs
-  `base: "./"`, which the starters set.
+- **Use relative addresses.** The app lives under `/app/<name>/`, and on a canvas under
+  `/app/t/<pass>/<name>/`, its pass in the path; so write `fetch("api/items")` and `href="style.css"`,
+  never `/api/items` or `/app/<name>/api/items`, which miss it. Vite needs `base: "./"`, which the
+  starters set. An app told its base path (Next.js, `"prefix": true`) opens in a tab, not on the canvas.
 - **A server listens on `process.env.PORT`**, on `127.0.0.1`. It sees the path inside the app
   (`/api/items`). Next.js is the exception: it is told its base path, so its `app.json` says
   `"prefix": true`, and `basePath: process.env.BASE_PATH` goes in its config.

@@ -93,10 +93,21 @@ httpServer.on("upgrade", (request, socket, head) => {
 	}
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
 	else if (
-		appUpgrade(request, socket, head, app.apps, (token, origin) => {
-			const seen = app.tokens.verify(token, { origin });
-			return seen.ok && actsAsPerson(seen.principal);
-		})
+		appUpgrade(
+			request,
+			socket,
+			head,
+			app.apps,
+			(token, origin) => {
+				const seen = app.tokens.verify(token, { origin });
+				return seen.ok && actsAsPerson(seen.principal);
+			},
+			// An app inside a canvas frame, on the app pass in its path (`auth/passes.ts`).
+			(pass, name) => {
+				const opened = app.passes.openApp(pass);
+				return opened?.holder === "canvas" && opened.app === name;
+			},
+		)
 	)
 		return;
 	else if (!forwardUpgrade(request, socket, head, app.forwards)) socket.destroy();

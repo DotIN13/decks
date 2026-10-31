@@ -1810,6 +1810,15 @@
 	:where(.decks-canvas, .decks-layer) .app-surface-open:hover {
 		background: #0077ed;
 	}
+	/* The app itself, running inside the canvas (`AppSurface`): the window's body, edge to edge. */
+	:where(.decks-canvas, .decks-layer) .app-surface-frame {
+		display: block;
+		flex: 1;
+		width: 100%;
+		min-height: 0;
+		border: 0;
+		background: #fff;
+	}
 	:where(.decks-canvas, .decks-layer) .document-surface .dp {
 		height: 100%;
 	}

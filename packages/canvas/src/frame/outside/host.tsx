@@ -162,8 +162,29 @@ export function createFramedEditor(options: Options): FramedEditor {
 	let modeNow: "edit" | "browse" = options.mode ?? "edit";
 	const storage = options.frame.storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
 	const storeKey = (canvas: string) => `decks.frame:${canvas}:`;
+	/**
+	 * Where an app inside a canvas keeps its browser storage on this page: by the app, not the canvas, so
+	 * the same app on another canvas reads the same values; the same keys its own tab uses on this origin
+	 * (`decks-storage.js`, `server/src/apps/storage-script.ts`).
+	 */
+	const APP_STORE = "decks.app:";
 	/** What the frame's own views were kept under in that store (`createAgentViews`'s key "frame"). */
 	const FRAME_VIEWS = "decks.views:frame";
+
+	/** Every app's saved browser values on this page, by app name and key. */
+	const appStoredNow = (): Record<string, Record<string, string>> => {
+		const out: Record<string, Record<string, string>> = {};
+		if (!storage) return out;
+		for (let i = 0; i < (storage as Storage).length; i++) {
+			const key = (storage as Storage).key(i);
+			if (!key?.startsWith(APP_STORE)) continue;
+			const rest = key.slice(APP_STORE.length);
+			const at = rest.indexOf(":");
+			if (at <= 0) continue;
+			(out[rest.slice(0, at)] ??= {})[rest.slice(at + 1)] = storage.getItem(key) ?? "";
+		}
+		return out;
+	};
 
 	/** A rectangle on the frame's screen, on this page's. */
 	const onPage = (at: Rect | undefined): DOMRect | undefined => {
@@ -239,6 +260,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
 			stored,
+			appStored: appStoredNow(),
 		};
 		const onHello = (event: MessageEvent) => {
 			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
@@ -359,6 +381,12 @@ export function createFramedEditor(options: Options): FramedEditor {
 		page.on("viewport", (data) => options.onViewport?.(data));
 		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), anchor: () => onPage(data.at) }));
 		page.on("export", (data) => options.onExport?.(data.ids));
+		page.on("app-store", (data) => {
+			if (!storage || !data.app || data.app.includes(":")) return;
+			const key = `${APP_STORE}${data.app}:${data.key}`;
+			if (data.value === null) storage.removeItem(key);
+			else storage.setItem(key, data.value);
+		});
 		page.on("store", (data) => {
 			if (!storage) return;
 			if (data.value === null) storage.removeItem(storeKey(canvas) + data.key);
@@ -515,7 +543,8 @@ export function createFramedEditor(options: Options): FramedEditor {
 							}}
 							class="canvas-frame"
 							title="Canvas"
-							sandbox="allow-scripts allow-downloads"
+							/* allow-forms and allow-modals for the apps inside it (`AppSurface`), which can have no more than this frame has. */
+							sandbox="allow-scripts allow-downloads allow-forms allow-modals"
 							allow="clipboard-read; clipboard-write; fullscreen"
 							src={frameAddress()}
 							style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }}

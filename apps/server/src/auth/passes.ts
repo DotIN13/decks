@@ -18,7 +18,11 @@ import { join } from "node:path";
  * the bearer), made when that run starts and good while that run is the app's (`Apps.runOf`), so it
  * ends when the app stops or exits. A tab another site opens the app in carries one in its address
  * (`/app/<name>/?decks_pass=…`, the GET that opens it, `apps/route.ts`), asked for with a harness
- * token, bound to it, for a day.
+ * token, bound to it, for a day. An app on a canvas holds one too, made for that canvas: the canvas
+ * frame opens the app with its canvas pass (`POST /api/apps/<name>/open`) and loads it at
+ * `/app/t/<pass>/<name>/`, so every request the app makes carries it. It is checked on every use: the
+ * token still works, the app is still placed on the canvas, and the canvas is still trusted (yours,
+ * and nobody else may edit it); there is no day, so the app never reloads to renew it.
  *
  * A pass is `<prefix><payload>.<mac>`, the payload base64url JSON and the mac its HMAC-SHA256, over
  * the prefix and the payload, under the harness's secret (`<dataDir>/ticket-secret`, `passSecret`), so
@@ -63,6 +67,8 @@ export interface PassChecks {
 	role(canvas: string): "edit" | "view" | undefined;
 	/** The id of the run of an app's server going now, or undefined when it is not running. */
 	appRun?(name: string): string | undefined;
+	/** Whether an app is placed on a canvas now, and the canvas is one whose cards may use it: yours alone. */
+	appOnCanvas?(name: string, canvas: string): boolean;
 }
 
 interface AppPayload {
@@ -72,13 +78,17 @@ interface AppPayload {
 	/** Or the harness token it was asked for with, for a tab, and when it runs out. */
 	k?: string;
 	e?: number;
+	/** Or, with `k`, the canvas it was made for: no `e`, since it lasts while it is checked. */
+	c?: string;
 }
 
 /** An app pass as it is read: which app, and whether it is its server's or a tab's. */
 export interface AppPassOf {
 	app: string;
-	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it. */
-	holder: "server" | "tab";
+	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it; `canvas`: the app placed on a canvas. */
+	holder: "server" | "tab" | "canvas";
+	/** For `canvas`, which one. */
+	canvas?: string;
 }
 
 /** Whether a string looks like a canvas pass, before it is checked. */
@@ -131,13 +141,20 @@ export class Passes {
 		return { pass: this.sign(APP_PASS, { a: name, k: by, e: expires } satisfies AppPayload), expires };
 	}
 
-	/** An app pass read and checked: a server's while its run goes on, a tab's while its token works and its day lasts. */
+	/** A pass for an app placed on a canvas, bound to the harness token whose id is `by`: good while that token works and the app is on the canvas. */
+	appCanvas(name: string, canvas: string, by: string): string {
+		return this.sign(APP_PASS, { a: name, k: by, c: canvas } satisfies AppPayload);
+	}
+
+	/** An app pass read and checked: a server's while its run goes on, a tab's while its token works and its day lasts, a canvas's while its token works and the app is on that canvas. */
 	openApp(pass: string | undefined, now = Date.now()): AppPassOf | undefined {
 		if (!isAppPass(pass)) return undefined;
 		const payload = this.open(APP_PASS, pass) as Partial<AppPayload> | undefined;
 		if (!payload || typeof payload.a !== "string") return undefined;
 		if (typeof payload.r === "string") return this.checks.appRun?.(payload.a) === payload.r ? { app: payload.a, holder: "server" } : undefined;
-		if (typeof payload.k !== "string" || typeof payload.e !== "number" || payload.e <= now || !this.checks.live(payload.k)) return undefined;
+		if (typeof payload.k !== "string" || !this.checks.live(payload.k)) return undefined;
+		if (typeof payload.c === "string") return this.checks.appOnCanvas?.(payload.a, payload.c) ? { app: payload.a, holder: "canvas", canvas: payload.c } : undefined;
+		if (typeof payload.e !== "number" || payload.e <= now) return undefined;
 		return { app: payload.a, holder: "tab" };
 	}
 

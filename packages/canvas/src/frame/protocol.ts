@@ -60,6 +60,8 @@ export interface Start {
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
 	stored: Record<string, string>;
+	/** What each app on the canvas saved in its browser storage, kept by the page (`app-store`), by app name and key. */
+	appStored?: Record<string, Record<string, string>>;
 	/** The card or board the page has selected on this canvas, selected again as the frame starts. */
 	selected?: string;
 }
@@ -128,6 +130,8 @@ export interface FrameToPage {
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
 	export: { ids: string[] };
 	store: { key: string; value: string | null };
+	/** A value an app inside the canvas saved in its browser storage (`decks-storage.js`), for the page to keep under the app's name. */
+	"app-store": { app: string; key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
 	/** A press or Escape in the frame, which the page does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
 	away: Record<string, never>;

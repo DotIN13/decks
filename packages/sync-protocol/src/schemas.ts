@@ -25,6 +25,11 @@ export const SyncCanvas = z.object({
 	owner: z.string(),
 	/** The owner's name, as a harness names the folder a friend's canvas lands in: `shared/canvases/<owner>/<name>/`. */
 	ownerName: z.string().optional(),
+	/**
+	 * On the owner's own listing: someone else may edit this canvas too. What lands in it is then not only
+	 * the owner's, so the owner's harness runs no app inside it (`othersEdit` in its `canvas.json`).
+	 */
+	othersEdit: z.boolean().optional(),
 });
 export type SyncCanvas = z.infer<typeof SyncCanvas>;
 

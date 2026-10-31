@@ -46,9 +46,10 @@ function files(starter: Starter, title: string): Record<string, string> {
 		case "static":
 			return {
 				"app.json": json({ title, kind: "static" }),
-				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n`),
+				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n	<!-- localStorage on the canvas too, where the app runs in a sandboxed frame (Decks answers this address). -->\n	<script src="decks-storage.js"></script>\n`),
 				"style.css": STYLE,
 				"app.js": `// Served as it is: no build. Addresses are relative ("style.css", not "/style.css"), since the app lives under /app/<name>/.
+// The count is only about this browser, so localStorage (decks-storage.js stands it in on the canvas); data that must follow you to every device goes in a server app's folder.
 let count = Number(localStorage.getItem("count") ?? 0);
 const show = () => (document.getElementById("count").textContent = \`Pressed \${count} times.\`);
 document.getElementById("press").onclick = () => {

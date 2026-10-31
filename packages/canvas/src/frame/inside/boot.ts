@@ -125,6 +125,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const [busy, setBusy] = createSignal<{ writer?: { name?: string; color: string } }>(start.writer ? { writer: start.writer } : {});
 	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
 	const kept = new Map(Object.entries(start.stored));
+	/** What each app inside the canvas saved in this browser, by app name: the page keeps it (`app-store`), and an app's address carries it (`options.ts`). */
+	const appStored = new Map(Object.entries(start.appStored ?? {}));
 	/** The page keeps what this frame cannot: it has no storage of its own. */
 	const storage = {
 		getItem: (key: string) => kept.get(key) ?? null,
@@ -165,6 +167,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		return true;
 	}
 	return {
+		appStored,
 		root,
 		start,
 		end,
