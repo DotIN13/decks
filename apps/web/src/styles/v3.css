@@ -780,16 +780,12 @@ body {
 		color: var(--v3-fg);
 	}
 
-	/* The boards list, in v3's type. */
+	/* The panel's list headings, in v3's type. */
 	.v3-panel .panel-meta {
 		height: 28px;
 		color: var(--v3-fg);
 		font-size: 12.5px;
 		font-weight: 500;
-	}
-	.v3-panel .board-row {
-		border-radius: 8px;
-		font-size: 13px;
 	}
 
 	/* The apps list. */

@@ -188,11 +188,6 @@
 		justify-items: end;
 	}
 
-	/* The boards list's right-hand mark is the dot, whose circle ends seven pixels inside the box. */
-	.panel-list[data-tab="boards"] .panel-meta > .count {
-		--count-inset: 7px;
-	}
-
 	/*
 	 * What the group is doing: `1 wants you`, `2 working` — a workspace heading only.
 	 *
