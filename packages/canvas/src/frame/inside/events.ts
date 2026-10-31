@@ -172,7 +172,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			return;
 		}
 		follower.hear(message);
-	});
+	}, () => follower.rev());
 	end.on("reload", (data) => handle.reloadCard(data.path));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);

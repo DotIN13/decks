@@ -203,7 +203,7 @@ export function write(file, text) {
  * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
  * any more.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", cards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "canvas" } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", cards = true, device, edit = false, dpr, engine = "chromium", init, before, panelTab = "canvas" } = {}) {
 	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
 	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
 	/*
@@ -223,6 +223,8 @@ export async function open({ width = 1500, height = 950, scheme = "dark", cards 
 	const page = await context.newPage();
 	/* `init` runs in the page before the app does, in every frame: to take an API away, say (`backends.mjs`). */
 	if (init) await page.addInitScript(init);
+	/* `before` runs here, with the page made and nothing loaded: to route the frame's line, say (`lagCanvasLine`). */
+	if (before) await before(page);
 	const errors = [];
 	page.on("pageerror", (error) => {
 		// The init script touches localStorage before the app has a chance to; that throw
@@ -1122,67 +1124,36 @@ export async function freshAgent(page, workspace) {
  */
 export async function lagCanvasLine(page) {
 	const state = { ms: 0, queued: 0 };
-	await page.addInitScript(() => {
-		if (!location.pathname.endsWith("canvas-frame.html")) return;
-		const real = globalThis.fetch.bind(globalThis);
-		globalThis.__decksLag = { ms: 0, queued: 0 };
-		globalThis.fetch = async (input, init) => {
-			const response = await real(input, init);
-			const url = typeof input === "string" ? input : (input?.url ?? String(input));
-			if (!/\/v1\/events\b/.test(url) || !response.body) return response;
-			const reader = response.body.getReader();
-			const lag = globalThis.__decksLag;
-			let last = 0;
-			const body = new ReadableStream({
-				start(controller) {
-					void (async () => {
-						for (;;) {
-							const { done, value } = await reader.read();
-							const at = Math.max(Date.now() + lag.ms, last);
-							last = at;
-							lag.queued++;
-							setTimeout(() => {
-								lag.queued--;
-								try {
-									if (done) controller.close();
-									else controller.enqueue(value);
-								} catch {
-									/* the frame stopped reading */
-								}
-							}, at - Date.now());
-							if (done) return;
-						}
-					})().catch((error) => controller.error(error));
-				},
-				cancel: (reason) => reader.cancel(reason),
-			});
-			return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
-		};
+	/*
+	 * The frame's line is one WebSocket (`/api/v1/socket`): every message from the harness (the answer to an
+	 * edit, the canvas's changes) is held back `ms`, in order; what the frame sends goes through at once.
+	 */
+	await page.routeWebSocket(/\/api\/v1\/socket/, (ws) => {
+		const server = ws.connectToServer();
+		let last = 0;
+		server.onMessage((message) => {
+			const at = Math.max(Date.now() + state.ms, last);
+			last = at;
+			state.queued++;
+			setTimeout(() => {
+				state.queued--;
+				try {
+					ws.send(message);
+				} catch {
+					/* the frame went away */
+				}
+			}, at - Date.now());
+		});
+		server.onClose(() => ws.close().catch(() => {}));
+		ws.onMessage((message) => server.send(message));
+		ws.onClose(() => server.close().catch(() => {}));
 	});
-	await page.route(/\/api\/v1\/canvas\.batch/, async (route) => {
-		const ms = state.ms;
-		state.queued++;
-		try {
-			const response = await route.fetch();
-			if (ms) await new Promise((resolve) => setTimeout(resolve, ms));
-			await route.fulfill({ response });
-		} catch {
-			await route.abort().catch(() => {});
-		} finally {
-			state.queued--;
-		}
-	});
-	const inFrame = async (run, arg) => {
-		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
-		return frame ? frame.evaluate(run, arg).catch(() => undefined) : undefined;
-	};
 	return {
 		async set(ms) {
 			state.ms = ms;
-			await inFrame((ms) => globalThis.__decksLag && (globalThis.__decksLag.ms = ms), ms);
 		},
 		async queued() {
-			return state.queued + ((await inFrame(() => globalThis.__decksLag?.queued ?? 0)) ?? 0);
+			return state.queued;
 		},
 	};
 }

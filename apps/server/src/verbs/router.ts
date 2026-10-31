@@ -35,8 +35,7 @@ export interface VerbAnswer extends StageCallResult {}
 
 export function verbRoutes(app: App): express.Router {
 	const router = express.Router();
-	/** Apps the person let call verbs with "Allow once": remembered until the server restarts. */
-	const allowedOnce = new Set<string>();
+	const allowedOnce = app.appsAllowedOnce;
 
 	router.get("/", (_req, res) => {
 		res.set("cache-control", "no-store").json({
@@ -121,14 +120,9 @@ export function verbRoutes(app: App): express.Router {
 	 */
 	const onItsCanvas = (req: Request, res: Response): string | undefined => {
 		const path = String((req.body as { path?: unknown } | undefined)?.path ?? "");
-		const principal = req.principal;
-		if (!path || !app.deck.board(path)) {
-			res.status(404).json({ ok: false, error: `There is no card or board at ${path || "that path"}.` });
-			return undefined;
-		}
-		if (principal?.kind === "person" || principal?.kind === "site") return path;
-		if (principal?.kind === "canvas" && boardOnCanvas(app, path, principal.canvas)) return path;
-		res.status(403).json({ ok: false, error: `${path} is not on this canvas.` });
+		const refused = cardRefusedFor(app, req.principal, path);
+		if (!refused) return path;
+		res.status(refused.status).json({ ok: false, error: refused.error });
 		return undefined;
 	};
 	/**
@@ -183,50 +177,55 @@ export function verbRoutes(app: App): express.Router {
 		res.json({ ok: true });
 	});
 	router.post("/:verb", async (req: Request, res: Response) => {
-		const name = String(req.params.verb ?? "");
-		const verb = VERB_BY_NAME.get(name);
-		if (!verb) {
-			res.status(404).json({ ok: false, error: renamedVerb(name) ?? `There is no verb called ${name}. GET /api/v1 lists them.`, notes: [] });
-			return;
-		}
-		const body = (req.body ?? {}) as { args?: unknown };
-		const args = body.args === undefined ? [] : body.args;
-		if (!Array.isArray(args)) {
-			res.status(400).json({ ok: false, error: `Send the arguments as a list: { "args": [...] }. ${signature(verb)}`, notes: [] });
-			return;
-		}
-		if (req.principal?.kind === "canvas") {
-			const refused = refusedForCanvas(app, name, Array.isArray(args) ? args : [], req.principal.canvas, req.principal.role);
-			if (refused) {
-				res.status(403).json({ ok: false, error: refused, notes: [] });
-				return;
-			}
-		}
-		const problem = checkArgs(verb, args);
-		if (problem) {
-			res.status(400).json({ ok: false, error: problem, notes: [] });
-			return;
-		}
-
-		// A pairing code lets another Decks in, so only someone at the harness's own machine may make one.
-		if (name === "pair.code" && !fromThisMachine(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ ok: false, error: "A pairing code is made only on the harness's own machine: run decks pair code in a shell there.", notes: [] });
-			return;
-		}
-		const caller = await callerOf(app, req, allowedOnce);
-		if ("error" in caller) {
-			res.status(caller.status).json({ ok: false, error: caller.error, notes: [] });
-			return;
-		}
-		const call = () => caller.tool.call(name, args, caller.on ?? {});
-		// The person's name for an edit to the drawing, sent back with the revision that has it (`StagePens`, `penEditBy`).
-		const answer = caller.edit ? await penEditBy.run(caller.edit, call) : await call();
-		if (caller.announce) caller.announce(name, answer);
-		res.status(answer.ok ? 200 : 422).json(answer satisfies VerbAnswer);
+		const { status, answer } = await runVerb(app, req.principal, req.headers, String(req.params.verb ?? ""), (req.body as { args?: unknown } | undefined)?.args, req.socket.remoteAddress);
+		res.status(status).json(answer);
 	});
 
 	return router;
 }
+
+/**
+ * One verb called for a principal, as `POST /api/v1/<verb>` and the line's `call` both run it: the verb
+ * looked up, its arguments checked against the table, a canvas frame held to its canvas, the caller's
+ * tool found for the token, and the answer as the SDK reads it, with the status a request would get.
+ * `headers` carry what the caller says it acts on (`X-Decks-Stage`, `X-Decks-Agent`, `X-Decks-Edit`).
+ */
+export async function runVerb(app: App, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string): Promise<{ status: number; answer: VerbAnswer }> {
+	const refuse = (status: number, error: string) => ({ status, answer: { ok: false, error, notes: [] } satisfies VerbAnswer });
+	const verb = VERB_BY_NAME.get(name);
+	if (!verb) return refuse(404, renamedVerb(name) ?? `There is no verb called ${name}. GET /api/v1 lists them.`);
+	const args = rawArgs === undefined ? [] : rawArgs;
+	if (!Array.isArray(args)) return refuse(400, `Send the arguments as a list: { "args": [...] }. ${signature(verb)}`);
+	if (principal?.kind === "canvas") {
+		const refused = refusedForCanvas(app, name, args, principal.canvas, principal.role);
+		if (refused) return refuse(403, refused);
+	}
+	const problem = checkArgs(verb, args);
+	if (problem) return refuse(400, problem);
+	// A pairing code lets another Decks in, so only someone at the harness's own machine may make one.
+	if (name === "pair.code" && !fromThisMachine(remoteAddress, headers)) return refuse(403, "A pairing code is made only on the harness's own machine: run decks pair code in a shell there.");
+	const caller = await callerOf(app, { headers, principal }, app.appsAllowedOnce);
+	if ("error" in caller) return refuse(caller.status, caller.error);
+	const call = () => caller.tool.call(name, args, caller.on ?? {});
+	// The person's name for an edit to the drawing, sent back with the revision that has it (`StagePens`, `penEditBy`).
+	const answer = caller.edit ? await penEditBy.run(caller.edit, call) : await call();
+	if (caller.announce) caller.announce(name, answer);
+	return { status: answer.ok ? 200 : 422, answer };
+}
+
+/**
+ * Why a caller may not say something of a card (that it was read, how it measured): the card must exist,
+ * and a canvas frame speaks only of cards on its own canvas; the person and a paired site of any.
+ */
+export function cardRefusedFor(app: Pick<App, "deck" | "stage">, principal: Principal | undefined, path: string): { status: number; error: string } | undefined {
+	if (!path || !app.deck.board(path)) return { status: 404, error: `There is no card or board at ${path || "that path"}.` };
+	if (principal?.kind === "person" || principal?.kind === "site") return undefined;
+	if (principal?.kind === "canvas" && boardOnCanvas(app, path, principal.canvas)) return undefined;
+	return { status: 403, error: `${path} is not on this canvas.` };
+}
+
+/** What a document item's editor may send (`@decks/docs`'s `DocClientMessage`). */
+export const DOC_CALLS: ReadonlySet<string> = new Set(["doc.open", "doc.close", "doc.patch", "doc.review", "doc.versions", "doc.version", "doc.compile", "doc.restore", "doc.git", "doc.gstyle", "doc.gcomment"]);
 
 type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
 
@@ -269,9 +268,6 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
  * shared to view reads only.
  */
 export const CANVAS_FRAME_VERBS: ReadonlySet<string> = new Set([...cardCalls("canvas"), "here", "now"]);
-
-/** What a document item's editor may send (`@decks/docs`'s `DocClientMessage`). */
-const DOC_CALLS = new Set(["doc.open", "doc.close", "doc.patch", "doc.review", "doc.versions", "doc.version", "doc.compile", "doc.restore", "doc.git", "doc.gstyle", "doc.gcomment"]);
 
 /** The items only the person and agents place: a document names a file to open, an app a server to reach. */
 const TRUSTED_ITEMS = ["decks.document", "decks.app"];

@@ -193,10 +193,10 @@ async function op(page, engine, name, { probe, setup, prepare, commit, cleanup, 
 }
 
 async function run(engine, { all }) {
-	const { browser, page, errors } = await open({ width: 1400, height: 900, ...(engine === "webkit" ? { engine: "webkit" } : {}) });
+	// The frame's line is routed before anything loads, so the first socket it opens is the lagged one.
+	const { browser, page, errors } = await open({ width: 1400, height: 900, ...(engine === "webkit" ? { engine: "webkit" } : {}), before: async (p) => (line = await lagCanvasLine(p)) });
 	cv = () => canvasFrame(page);
 	await page.addInitScript(SAMPLER);
-	line = await lagCanvasLine(page);
 	await rest(page, { start: 0 });
 	await laggedSocket(page);
 	await liveZoom(page);

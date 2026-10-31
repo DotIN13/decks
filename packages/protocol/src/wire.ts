@@ -286,6 +286,33 @@ export type ClientMessage =
 	/** Unpair Decks Studio: its key is deleted, so the deck stops syncing, and every token given through it is taken back. Answered with `pairing`. */
 	| { type: "studio.unpair" };
 
+/** Who made one write of a canvas: the person (an edit from a page), an agent (its own call, by id), the file itself (a hand edit), or Studio (a change from another harness or browser, by Studio's user id). */
+export type ChangeAuthor = { kind: "person" | "agent" | "file" | "studio"; id?: string; name?: string };
+
+/**
+ * What a client says on the line, `/api/v1/socket`: one duplex connection that carries the verbs, the
+ * canvas's events and the frame's own messages, in one envelope. The first message is `hello` with
+ * the token (a canvas pass, the person's, a paired site's, an agent's); nothing else is heard before
+ * it, and the line closes if it does not come within five seconds. A `call` is a verb of the table
+ * with its arguments, answered once with `answer` under the same `id`. `canvas.watch` asks to hear a
+ * canvas's changes (`canvas.changed`, and its cards', apps' and documents' messages); with `since`,
+ * the changes from that revision are sent at once, as edits or the whole drawing.
+ */
+export type LineClientMessage =
+	| { type: "hello"; token: string; watch?: Array<{ canvas: string; since?: number }>; /** Hear every broadcast, as the event stream does (the person's and a paired site's token only). */ all?: boolean }
+	/** A renewed token, for every message from now on. */
+	| { type: "token"; token: string }
+	| { type: "canvas.watch"; canvas: string; since?: number }
+	| { type: "canvas.unwatch"; canvas: string }
+	| { type: "call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Stage` and `X-Decks-Agent`. */ stage?: string; agent?: string }
+	/** The answer to an agent's `stage.call` on a watched canvas. */
+	| { type: "stage.result"; id: string; value?: unknown; error?: string }
+	/** A document item's editor's message, for a file on a watched canvas; its answers come back on this line. */
+	| { type: "doc"; message: DocClientMessage }
+	/** The person read this card (`card.seen`), or the frame measured it (`card.extent`). */
+	| { type: "card.seen"; path: string }
+	| { type: "card.extent"; path: string; rev: number; w: number; h: number; [key: string]: unknown };
+
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
 	/**
@@ -400,6 +427,19 @@ export type ServerMessage =
 	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; /** The browsers' edits this revision is the first to have, by the names they gave them. */ made?: string[]; /** The agent that last wrote this drawing, by id, as its placeholder frames are marked (`placeholder: true`: a dashed outline in its colour, with its name); absent when no agent has written it since the server started. */ by?: string; }
 	/** A browser's named edit or step was not made (a refusal, nothing to undo): the browser stops showing it. */
 	| { type: "stage.pen.refused"; agentId: string; edit: string }
+	/**
+	 * A canvas changed: the one message every client hears of it, on the line (`/api/v1/socket`) and the
+	 * event stream, once per change, whoever made it. From revision `from` as the edits that made it
+	 * (`edits`, the canvas log's), or whole as `doc` when the client's revision is unknown or too old
+	 * (`from` absent). `base` is the canvas folder's address, `made` the browsers' names for the edits of
+	 * theirs this revision is the first to have, `by` the agent that last wrote the canvas (as `stage.pen`),
+	 * and `author` who made this write. `stage.pen` and `stage.pen.delta` say the same per agent, for one release.
+	 */
+	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; error?: string; base: string; made?: string[]; by?: string; author?: ChangeAuthor }
+	/** The line's answer to a `call`, under the call's `id` (`LineClientMessage`). */
+	| { type: "answer"; id: string; ok: boolean; value?: unknown; error?: string; notes?: string[] }
+	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
+	| { type: "hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *

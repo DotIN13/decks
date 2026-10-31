@@ -10,6 +10,7 @@ import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
 import { installDir } from "@decks/runtime";
 import { Hub } from "./ws.ts";
+import { Line } from "./line.ts";
 import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
 
@@ -41,6 +42,8 @@ const hub = new Hub(
 	(reply, view) => app.greet(reply, view),
 );
 app.attach(hub);
+// The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`line.ts`).
+const line = new Line(app);
 
 // Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
 // Its app list goes to Studio too, so Studio can list the apps beside the canvases.
@@ -79,6 +82,11 @@ httpServer.on("upgrade", (request, socket, head) => {
 		return;
 	}
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
+	if (path === "/api/v1/socket") {
+		// The token comes in the first message (`hello`), and the line closes without one.
+		line.handleUpgrade(request, socket, head);
+		return;
+	}
 	if (path === "/ws") {
 		/*
 		 * The socket runs the person's commands, so it is opened only with the person's token or a
@@ -138,6 +146,7 @@ const shutdown = () => {
 	void studio.stop();
 	app.dispose();
 	hub.close();
+	line.close();
 	httpServer.close(() => process.exit(0));
 	// A socket that will not close must not hold the process open forever.
 	setTimeout(() => process.exit(0), 2000).unref();

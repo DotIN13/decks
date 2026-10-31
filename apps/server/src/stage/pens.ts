@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Author, ChangeRecord } from "../agents/canvas-news.ts";
+import type { ChangeAuthor } from "@decks/protocol";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { rustRouter } from "./arrows.ts";
 import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
@@ -1113,28 +1114,59 @@ export class StagePens {
 	/** The version of each stage last sent to browsers, whole or as edits: what the next edits are from. */
 	private readonly sent = new Map<string, { rev: number; doc: PenDocument }>();
 
+	/** Who made the write that gave a canvas its current revision, from the log; nothing when the log does not say. */
+	private authorOf(name: string, rev: number): ChangeAuthor | undefined {
+		const record = this.changeLogs.get(name)?.findLast((one) => one.rev === rev);
+		return record ? { kind: record.by.kind, ...("id" in record.by ? { id: record.by.id } : {}) } : undefined;
+	}
+
+	/** A canvas as `canvas.changed` says it whole: the drawing with its imports, for a client with no revision or one the log no longer reaches. */
+	private changedWhole(name: string, entry: PenEntry, made: string[]): ServerMessage {
+		const doc = this.withImported(name, entry.doc);
+		const by = this.writers.get(name);
+		const author = this.authorOf(name, entry.rev);
+		return { type: "canvas.changed", canvas: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}), ...(author ? { author } : {}) };
+	}
+
 	/**
-	 * What changed since the version last sent, as `stage.pen.delta` frames for these agents, or the
-	 * whole drawing when nothing was sent before or the file does not read. Whatever made the change
-	 * (an edit, arrows rerouting, undo, the file written by hand), the edits are worked out from the
-	 * two versions, so they are always right.
+	 * What changed since the version last sent: one `canvas.changed` for every client on the canvas's
+	 * line or stream, then the same as `stage.pen.delta` frames for these agents (what a tab's socket
+	 * still reads, for one release); or the whole drawing when nothing was sent before or the file does
+	 * not read. The edits are the log's whenever it holds every revision since the one sent (`editsSince`);
+	 * else (a frame of the canvas changed with no revision, a revision from before this server) the two
+	 * drawings, imports and all, are compared, so the edits are always right.
 	 */
 	changes(agentIds: readonly string[], name: string): ServerMessage[] {
 		const entry = this.get(name);
 		const before = this.sent.get(name);
 		const made = this.takeMade(name);
-		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name, this.madeLately.get(name) ?? made));
+		if (!before || entry.error) {
+			const whole = this.changedWhole(name, entry, made.length ? made : (this.madeLately.get(name) ?? []));
+			return [whole, ...agentIds.map((id) => this.frame(id, name, this.madeLately.get(name) ?? made))];
+		}
 		const doc = this.withImported(name, entry.doc);
-		/*
-		 * From the log when it holds every revision since the one sent: the edits as each write worked them
-		 * out, which Studio and the agents' notes get too. Else (a frame of the canvas changed, no revision;
-		 * a revision from before this server) the two drawings, imports and all, are compared.
-		 */
 		const edits = (entry.rev > before.rev ? this.editsSince(name, before.rev, entry.rev)?.edits : undefined) ?? diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });
 		const base = `${fileUrl(this.folderOf(name))}/`;
 		const by = this.writers.get(name);
-		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}) }));
+		const author = this.authorOf(name, entry.rev);
+		const changed: ServerMessage = { type: "canvas.changed", canvas: name, rev: entry.rev, from: before.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}), ...(author ? { author } : {}) };
+		return [changed, ...agentIds.map((agentId): ServerMessage => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}) }))];
+	}
+
+	/**
+	 * What a client holding revision `since` of a canvas is sent to catch up (`canvas.watch` on the line):
+	 * nothing when it holds the current one; the edits since, with the browsers' names for theirs, when
+	 * the log reaches back to it; else the drawing whole.
+	 */
+	caughtUp(name: string, since: number): ServerMessage | undefined {
+		const entry = this.get(name);
+		if (!entry.error && entry.rev === since) return undefined;
+		const span = entry.error ? undefined : this.editsSince(name, since, entry.rev);
+		if (!span) return this.changedWhole(name, entry, []);
+		const by = this.writers.get(name);
+		const author = this.authorOf(name, entry.rev);
+		return { type: "canvas.changed", canvas: name, rev: entry.rev, from: since, edits: span.edits, base: `${fileUrl(this.folderOf(name))}/`, ...(span.made.length ? { made: span.made } : {}), ...(by ? { by } : {}), ...(author ? { author } : {}) };
 	}
 
 	/** Replace the document whole, from text that must parse. */
