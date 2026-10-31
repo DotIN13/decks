@@ -115,6 +115,17 @@ export type ClientMessage =
 	| { type: "board.seen"; path: string }
 	| { type: "board.hide"; path: string; /** The stage on screen. */ stage?: string }
 	/**
+	 * The same six under the card's name: what `board.move`, `board.resize`, `board.extent`,
+	 * `board.play`, `board.seen` and `board.hide` do, for a card. The board names are answered too
+	 * until 2026-11-30.
+	 */
+	| { type: "card.move"; path: string; x: number; y: number; stage?: string }
+	| { type: "card.resize"; path: string; w?: number; h?: number; stage?: string }
+	| { type: "card.extent"; path: string; rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
+	| { type: "card.play"; path: string; stage?: string }
+	| { type: "card.seen"; path: string }
+	| { type: "card.hide"; path: string; stage?: string }
+	/**
 	 * A document put on the canvas from the file picker: an item that opens the file as a page you type
 	 * into (`{ type: "browser", metadata: { type: "decks.document", path } }`), at `at` (its top-left
 	 * corner) or beside the newest thing on the canvas. `document` names a file the deck can open;
@@ -301,6 +312,11 @@ export type ServerMessage =
 	 */
 	| { type: "runtimes"; list: RuntimeInfo[] }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; /** Only the size in the board's own tag changed: a page showing it keeps its document. */ sized?: true }
+	/**
+	 * `board.changed` under the card's name, `card` in place of `board`: sent beside it for every
+	 * change (`App.send`). `board.changed`, its old name, is sent until 2026-11-30.
+	 */
+	| { type: "card.changed"; path: string; rev: number; card?: Board; removed?: boolean; sized?: true }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

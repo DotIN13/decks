@@ -209,12 +209,12 @@ export function CardSurface(props: {
 	};
 
 	/**
-	 * The deck path a link names: under the app's `/api/board/` on this page's origin, or, in the canvas
-	 * frame, under its ticketed address (`/api/t/<ticket>/board/`), which only its host knows.
+	 * The deck path a link names: under the app's `/api/card/` (or `/api/board/`, its old prefix) on this
+	 * page's origin, or, in the canvas frame, under its pass's address, which only its host knows.
 	 */
 	const boardOf = (url: URL): string | undefined => {
-		const at = url.pathname.indexOf("/api/board/");
-		const named = url.origin === location.origin && at >= 0 ? decodeURIComponent(url.pathname.slice(at + "/api/board/".length)) : canvasHost().boardLink(url.href, location.href);
+		const prefix = /\/api\/(?:card|board)\//.exec(url.pathname);
+		const named = url.origin === location.origin && prefix ? decodeURIComponent(url.pathname.slice(prefix.index + prefix[0].length)) : canvasHost().boardLink(url.href, location.href);
 		const path = named?.replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
 		return path && !path.split("/").some((part) => part === "" || part === "." || part === "..") ? path : undefined;
 	};

@@ -161,9 +161,11 @@ test("files read on a pass are sent with no referrer, readable by the sandboxed 
 		const mine = String(((await post("/api/v1/card.create", person, { args: [{ title: "Mine", canvas: one }] })).body.value as { path: string }).path);
 		const theirs = String(((await post("/api/v1/card.create", person, { args: [{ title: "Theirs", canvas: two }] })).body.value as { path: string }).path);
 		const pass = passFor(one);
-		const at = (path: string) => fetch(`${origin}/api/t/${pass}/board/${path.split("/").map(encodeURIComponent).join("/")}?raw=1`);
+		const at = (path: string, prefix = "card") => fetch(`${origin}/api/t/${pass}/${prefix}/${path.split("/").map(encodeURIComponent).join("/")}?raw=1`);
 		const read = await at(mine);
 		assert.equal(read.status, 200);
+		assert.equal((await at(mine, "board")).status, 200, "the old prefix, until 2026-11-30");
+		assert.equal((await at(theirs, "board")).status, 401);
 		assert.equal(read.headers.get("referrer-policy"), "no-referrer");
 		assert.equal(read.headers.get("access-control-allow-origin"), "*");
 		assert.equal((await at(theirs)).status, 401, "another canvas's card");
@@ -310,7 +312,10 @@ test("the frame says a card on its canvas was read and how it measured, for its 
 		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
 		assert.equal((await post("/api/v1/board-seen", frame, { path: mine })).status, 200);
 		assert.equal((await post("/api/v1/board-extent", frame, { path: mine, rev: 1, w: 400, h: 300, words: 12 })).status, 200);
-		for (const route of ["board-seen", "board-extent"]) assert.equal((await post(`/api/v1/${route}`, frame, { path: theirs, rev: 1, w: 1, h: 1 })).status, 403, route);
+		// The card names, and the board names they had until 2026-11-30.
+		assert.equal((await post("/api/v1/card-seen", frame, { path: mine })).status, 200);
+		assert.equal((await post("/api/v1/card-extent", frame, { path: mine, rev: 1, w: 400, h: 300, words: 12 })).status, 200);
+		for (const route of ["board-seen", "board-extent", "card-seen", "card-extent"]) assert.equal((await post(`/api/v1/${route}`, frame, { path: theirs, rev: 1, w: 1, h: 1 })).status, 403, route);
 		// A card written out for the harness's Chrome to draw (an agent's screenshot of it): past the gate, and refused by the route for another canvas's card.
 		const snapshot = await fetch(`${origin}/api/snapshot?path=${encodeURIComponent(theirs)}`, { method: "POST", headers: { ...frame, "content-type": "text/html" }, body: "<p>x</p>" });
 		assert.equal(snapshot.status, 403);

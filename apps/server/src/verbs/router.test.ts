@@ -164,16 +164,18 @@ test("the event stream carries what a verb changed, and only the types asked for
 	const { base, token, call, cleanup } = await open();
 	try {
 		const url = base.replace(/\/api\/v1$/, "");
-		const heard: Array<{ type: string; path?: string }> = [];
-		const stream = connect({ url, token, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["board.changed"] });
+		const heard: Array<{ type: string; path?: string; card?: { path?: string } }> = [];
+		const stream = connect({ url, token, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["card.changed", "board.changed"] });
 		// The stream is open once its first comment arrives; a short wait is enough on loopback.
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		const moved = await call("move", ["boards/tall.html", { x: 320, y: 160 }]);
 		assert.ok(moved.body.ok, moved.body.error);
-		for (let i = 0; i < 40 && !heard.some((event) => event.path === "boards/tall.html"); i++) await new Promise((resolve) => setTimeout(resolve, 25));
+		for (let i = 0; i < 40 && !heard.some((event) => event.type === "card.changed" && event.path === "boards/tall.html"); i++) await new Promise((resolve) => setTimeout(resolve, 25));
 		stream.close();
-		assert.ok(heard.some((event) => event.type === "board.changed" && event.path === "boards/tall.html"), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
-		assert.ok(heard.every((event) => event.type === "board.changed"), "nothing else came through the filter");
+		assert.ok(heard.some((event) => event.type === "card.changed" && event.path === "boards/tall.html" && event.card?.path === "boards/tall.html"), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
+		// The old name is said beside it until 2026-11-30.
+		assert.ok(heard.some((event) => event.type === "board.changed" && event.path === "boards/tall.html"));
+		assert.ok(heard.every((event) => event.type === "card.changed" || event.type === "board.changed"), "nothing else came through the filter");
 	} finally {
 		cleanup();
 	}

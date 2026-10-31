@@ -234,12 +234,12 @@ export class StageService {
 		return fileUrl(resolveFileRequest(this.deck.roots, { path: file }));
 	}
 
-	/** Where Playwright should point to look at a board. */
+	/** Where Playwright should point to look at a card (or an old board), under `/api/card/`. */
 	url(path: string, port: number): string {
 		const board = this.deck.board(path);
 		const rev = board ? `?rev=${board.rev}` : "";
 		const encoded = path.split("/").map(encodeURIComponent).join("/");
-		return `http://127.0.0.1:${port}/api/board/${encoded}${rev}`;
+		return `http://127.0.0.1:${port}/api/card/${encoded}${rev}`;
 	}
 
 	// --- writes the server owns ----------------------------------------------------

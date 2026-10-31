@@ -193,3 +193,16 @@ export const boards = {
 		});
 	},
 } satisfies WirePart;
+
+/**
+ * The same messages under the card's name (`card.move`, …), each answered as its board name is; the
+ * board names are answered too until 2026-11-30.
+ */
+export const cards = {
+	"card.move": (message, reply, wire) => boards["board.move"]({ ...message, type: "board.move" }, reply, wire),
+	"card.resize": (message, reply, wire) => boards["board.resize"]({ ...message, type: "board.resize" }, reply, wire),
+	"card.extent": (message, reply, wire) => boards["board.extent"]({ ...message, type: "board.extent" }, reply, wire),
+	"card.play": (message, reply, wire) => boards["board.play"]({ ...message, type: "board.play" }, reply, wire),
+	"card.seen": (message, reply, wire) => boards["board.seen"]({ ...message, type: "board.seen" }, reply, wire),
+	"card.hide": (message, reply, wire) => boards["board.hide"]({ ...message, type: "board.hide" }, reply, wire),
+} satisfies WirePart;

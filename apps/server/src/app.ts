@@ -981,6 +981,13 @@ export class App {
 		}
 		this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
+		// The card's name for the same change, said beside it; `board.changed` goes on 2026-11-30.
+		if (message.type === "board.changed") {
+			const { type: _type, board, ...rest } = message;
+			const twin: ServerMessage = { type: "card.changed", ...rest, ...(board ? { card: board } : {}) };
+			this.hub?.each((view) => this.forView(twin, view));
+			for (const listener of this.listeners) listener(twin);
+		}
 	}
 
 	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `verbs/router.ts`). */
@@ -1053,6 +1060,11 @@ export class App {
 				if (!message.board) return message;
 				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
 				return placed ? { ...message, board: { ...message.board, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
+			}
+			case "card.changed": {
+				if (!message.card) return message;
+				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
+				return placed ? { ...message, card: { ...message.card, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
 			}
 			default:
 				return message;

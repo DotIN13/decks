@@ -45,8 +45,9 @@ export function verbRoutes(app: App): express.Router {
 
 	/**
 	 * Every change as it happens, for a client that is not a browser on the socket: the frames Decks
-	 * broadcasts (`board.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each.
-	 * `?types=board.changed,stage.pen.delta` keeps only those. A comment every 25 seconds keeps
+	 * broadcasts (`card.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each;
+	 * `board.changed`, `card.changed`'s old name, is sent beside it until 2026-11-30.
+	 * `?types=card.changed,stage.pen.delta` keeps only those. A comment every 25 seconds keeps
 	 * proxies from closing a quiet stream.
 	 */
 	router.get("/events", (req: Request, res: Response) => {
@@ -115,7 +116,7 @@ export function verbRoutes(app: App): express.Router {
 
 	/**
 	 * What the canvas frame says about a card on its canvas, which a tab says on the socket: that you
-	 * read it (`board-seen`) and how it measured (`board-extent`, kept for `decks canvas fit` to report).
+	 * read it (`card-seen`) and how it measured (`card-extent`, kept for `decks canvas fit` to report).
 	 * Each for a card or board on the caller's own canvas; the person and a paired site may say them for any.
 	 */
 	const onItsCanvas = (req: Request, res: Response): string | undefined => {
@@ -155,13 +156,14 @@ export function verbRoutes(app: App): express.Router {
 		res.json({ ok: true });
 	});
 
-	router.post("/board-seen", (req: Request, res: Response) => {
+	// `/board-seen` and `/board-extent` are the old names of `/card-seen` and `/card-extent`, kept until 2026-11-30.
+	router.post(["/card-seen", "/board-seen"], (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
 		app.boards.seen(path);
 		res.json({ ok: true });
 	});
-	router.post("/board-extent", (req: Request, res: Response) => {
+	router.post(["/card-extent", "/board-extent"], (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
 		const body = req.body as Record<string, unknown>;
@@ -339,7 +341,7 @@ function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }
 
 /**
  * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
- * cards and boards (`board.changed` for one on it), and what is said to it alone.
+ * cards and boards (`card.changed` and `board.changed` for one on it), and what is said to it alone.
  */
 export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
 	/*
@@ -362,8 +364,8 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
 	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
-	if (message.type === "board.changed") {
-		const board = message.board as { path?: unknown } | undefined;
+	if (message.type === "board.changed" || message.type === "card.changed") {
+		const board = (message.board ?? message.card) as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;
 		if (!path) return false;
 		return boardOnCanvas(app, path, canvas);

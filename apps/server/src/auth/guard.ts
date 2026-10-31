@@ -13,7 +13,7 @@ import { decodedPath, HARNESS_ID, isAppPass, isCanvasPass, passCovers, splitPath
  * app pass, one app's server, or a tab another site opens the app in (`apps/route.ts`). Where it is:
  * `Authorization: Bearer <credential>`; for a socket, which cannot set headers, `decks_token` in its
  * address; for what an image, a module or a frame loads, a canvas pass in the path,
- * `/api/t/<pass>/board/…`. Nothing else says who is calling: not an `X-Decks-*` header, not reaching the
+ * `/api/t/<pass>/card/…` (or `/board/`). Nothing else says who is calling: not an `X-Decks-*` header, not reaching the
  * harness from this machine, not being a page on its own address.
  *
  * In front of the gate, in `http.ts`: the names the harness answers to (`hosts.ts`), which goes
@@ -101,7 +101,7 @@ export function isPublic(method: string, path: string): boolean {
  * picture (`pictures/thumbs.ts`, `stage/shots.ts`): what its own pass reaches (`passes.ts`, made for no
  * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
-const OWN_READS = /^\/api\/(?:(?:board|f|thumb|stage-thumb|stage-pen|avatar|revision|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
+const OWN_READS = /^\/api\/(?:(?:card|board|f|thumb|stage-thumb|stage-pen|avatar|revision|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
 
 export function harnessReads(method: string, path: string): boolean {
 	return (method === "GET" || method === "HEAD") && OWN_READS.test(path);

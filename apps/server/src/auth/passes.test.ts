@@ -39,6 +39,8 @@ test("one pass kind for one use: a canvas pass is no app pass, and an app pass n
 test("a pass in the path reaches its canvas's folder and pictures, every part plain", () => {
 	assert.deepEqual(splitPathPass("/api/t/dk_cp_a.b/board/canvases/main/x.png?v=1"), { pass: "dk_cp_a.b", rest: "/api/board/canvases/main/x.png?v=1" });
 	assert.ok(passCovers("main", "/api/board/canvases/main/cards/a/index.html"));
+	assert.ok(passCovers("main", "/api/card/canvases/main/cards/a/index.html"));
+	assert.ok(!passCovers("main", "/api/card/canvases/other/cards/a/index.html"));
 	assert.ok(passCovers("main", "/api/thumb/canvases/main/cards/a/index.html"));
 	assert.ok(!passCovers("main", "/api/board/canvases/other/a.html"));
 	assert.ok(!passCovers("main", "/api/board/canvases/main/.decks/x"));

@@ -194,12 +194,12 @@ export function canvasFolder(canvas: string): string {
 
 /**
  * Whether a canvas pass reaches a GET of this path (decoded, as the route sees it): a file in the
- * canvas's folder (`/api/board/<folder>…`), its picture (`/api/thumb/<folder>…`), or a card or board
+ * canvas's folder (`/api/card/<folder>…`, or `/api/board/…`, the old prefix), its picture (`/api/thumb/<folder>…`), or a card or board
  * placed on the canvas from elsewhere (`placed`), by its own path. Every part plain: never `..`, `.`, or a
  * hidden folder.
  */
 export function passCovers(canvas: string, path: string, placed: (deckPath: string) => boolean = () => false): boolean {
-	const route = /^\/api\/(board|thumb)\/(.+)$/.exec(path);
+	const route = /^\/api\/(card|board|thumb)\/(.+)$/.exec(path);
 	if (!route) return false;
 	const rest = route[2]!;
 	if (!rest.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
@@ -236,7 +236,8 @@ export function passSecret(dataDir: string): Buffer {
 }
 
 /**
- * A pass carried in the path rather than a header, `/api/t/<pass>/board/<path>`: what a canvas frame's
+ * A pass carried in the path rather than a header, `/api/t/<pass>/card/<path>` (or `/board/`, the old
+ * prefix, until 2026-11-30): what a canvas frame's
  * files, pictures, modules and sheets are read at, so every relative address they load carries it too.
  * Answers the pass and the path as the route sees it.
  */
