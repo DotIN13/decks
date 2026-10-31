@@ -520,7 +520,7 @@ function rekey(deck: string, plan: Plan, dataDir: string | undefined, log: (line
 			plan.steps.push({ kind: "records", what: `.decks/${toPosix(name)}`, count });
 		}
 	}
-	// Pictures: named by the hash of the board's path (`boards/thumbs.ts`).
+	// Pictures: named by the hash of the board's path (`pictures/thumbs.ts`).
 	const thumbs = join(records, "thumbs");
 	if (existsSync(thumbs)) {
 		const names = readdirSync(thumbs);

@@ -15,7 +15,7 @@ import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
 import { canvasFolder, isCardPath, pageName, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
-import { copyBoardInto, copyFileInto, copyFrameInto } from "../boards/copy-in.ts";
+import { copyBoardInto, copyFileInto, copyFrameInto } from "./copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
 /**
@@ -263,7 +263,7 @@ export class StagePens {
 
 	/**
 	 * How a canvas takes in a board or a frame from elsewhere: copied into its own folder
-	 * (`boards/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
+	 * (`stage/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
 	 */
 	adopt: Adopt = {
 		board: (canvas, path) => this.copyIn(canvas, path),
@@ -312,7 +312,7 @@ export class StagePens {
 
 	/**
 	 * The board a canvas places for a deck path, copied in now when the canvas has no copy of it yet
-	 * (`boards/copy-in.ts`): what an agent's list of boards on its canvas is turned into, so the same
+	 * (`stage/copy-in.ts`): what an agent's list of boards on its canvas is turned into, so the same
 	 * library board asked for twice is one copy, not two. A path with no file is left as it is.
 	 */
 	ownPath(name: string, path: string): string {

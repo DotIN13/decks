@@ -98,7 +98,7 @@ export function isPublic(method: string, path: string): boolean {
 
 /**
  * The pages and pictures the harness's own Chromium reads, drawing a board, a card or a canvas for a
- * picture (`boards/thumbs.ts`, `stage/shots.ts`): what its own pass reaches (`passes.ts`, made for no
+ * picture (`pictures/thumbs.ts`, `stage/shots.ts`): what its own pass reaches (`passes.ts`, made for no
  * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
 const OWN_READS = /^\/api\/(?:(?:board|f|thumb|stage-thumb|stage-pen|avatar|revision|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;

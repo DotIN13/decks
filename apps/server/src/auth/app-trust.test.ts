@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { EvalTrust } from "./eval-trust.ts";
+import { EvalTrust } from "./app-trust.ts";
 
 /**
  * The trust list: what a board can be allowed to do, and what a broken file means.

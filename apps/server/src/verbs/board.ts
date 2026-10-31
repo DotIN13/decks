@@ -1,9 +1,9 @@
 import { canvasFolder, canvasOfPath, isCardPath } from "../deck/layout.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { cardShell } from "../boards/cards.ts";
+import { cardShell } from "../cards/cards.ts";
 import { slug } from "../agents/slug.ts";
-import { boardWidth } from "../boards/templates.ts";
+import { boardWidth } from "../cards/size.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 

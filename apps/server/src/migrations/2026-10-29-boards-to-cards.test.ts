@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { boardToCard, measuredHeight, migrated, migrateBoardsToCards, notACard, restyle } from "./2026-10-29-boards-to-cards.ts";
 import { revisionOf } from "../deck/loader.ts";
-import { thumbName } from "../boards/thumbs.ts";
+import { thumbName } from "../pictures/thumbs.ts";
 
 const BOARD = `<!doctype html>
 <html lang="en">

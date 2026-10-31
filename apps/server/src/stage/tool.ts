@@ -164,7 +164,7 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
-	/** Set when the caller is a board's own code (`stage/board-actor.ts`), not an agent. */
+	/** Set when the caller is a board's own code (`stage/caller-actor.ts`), not an agent. */
 	board?: string;
 	/**
 	 * Set when the caller is the person, in the browser, acting on this agent's stage (`verbs/person.ts`):
@@ -214,7 +214,7 @@ export interface StageTool {
 	readonly guidelines: string[];
 	/**
 	 * The `stage` object the verbs act through, bound to this caller: an agent, or a board or app
-	 * acting for a conversation (`stage/board-actor.ts`).
+	 * acting for a conversation (`stage/caller-actor.ts`).
 	 */
 	readonly stage: Stage;
 	/**

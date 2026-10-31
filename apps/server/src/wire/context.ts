@@ -4,7 +4,7 @@ import type { Cameras } from "../deck/cameras.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
 import type { BoardService } from "../boards/service.ts";
-import type { EvalTrust } from "../boards/eval-trust.ts";
+import type { EvalTrust } from "../auth/app-trust.ts";
 import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
@@ -95,7 +95,7 @@ export interface WireContext {
 	readonly stage: StageService;
 	/** The `stage.pen` frame for one agent, when its stage has a drawing (`stage/pens.ts`). */
 	penMessage(agentId: string): ServerMessage | undefined;
-	/** Which boards may run their own code, and the list the question writes (`boards/eval-trust.ts`). */
+	/** Which boards may run their own code, and the list the question writes (`auth/app-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
 	readonly port: number;

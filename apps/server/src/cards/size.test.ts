@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { boardWidth, IMPORT_MAP, WIDE_BOARD_W } from "./templates.ts";
+import { boardWidth, IMPORT_MAP, WIDE_BOARD_W } from "./size.ts";
 
 /*
  * What a new card is made from: the width it starts at, and the libraries its head can import.

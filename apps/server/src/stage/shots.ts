@@ -253,7 +253,7 @@ export class StageShots {
 	 * A small picture of a whole stage, for the manager's cards, taken once per revision.
 	 *
 	 * Kept on disk by name, revision and scheme, exactly as a board's picture is
-	 * (`boards/thumbs.ts`) and for the same reason: the picture is the expensive part, a browser
+	 * (`pictures/thumbs.ts`) and for the same reason: the picture is the expensive part, a browser
 	 * asks for it by a URL carrying the revision, and an unchanged stage never misses. Older
 	 * revisions of the same stage are removed as they are replaced, so the folder is one file per
 	 * stage per scheme rather than a history nobody reads.

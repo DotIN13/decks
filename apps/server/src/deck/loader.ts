@@ -6,7 +6,7 @@ import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
 import { fillsOf, isBoardFile, liveKindOf, shellFor } from "./kinds.ts";
-import { BOARD_W } from "../boards/templates.ts";
+import { BOARD_W } from "../cards/size.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";

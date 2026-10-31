@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Deck } from "../deck/loader.ts";
+import type { Deck } from "./loader.ts";
 
 /**
  * Every version of every board, content-addressed (DESIGN §6.7).

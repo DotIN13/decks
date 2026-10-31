@@ -13,7 +13,7 @@ const run = promisify(execFile);
  * again only when the file is newer than its picture.
  *
  * A PDF is drawn by poppler's `pdftoppm`, which reads its page count too (`pdfinfo`); an SVG or a
- * web page by the server's Chromium, which is already there for board pictures (`boards/thumbs.ts`).
+ * web page by the server's Chromium, which is already there for board pictures (`pictures/thumbs.ts`).
  * A server without either answers with no picture, and the card shows the file's name alone.
  */
 

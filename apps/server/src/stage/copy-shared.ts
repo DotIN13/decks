@@ -26,7 +26,7 @@ import type { StagePens } from "./pens.ts";
  * goes back to the owner.
  */
 
-/** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension (as `boards/copy-in.ts`). */
+/** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension (as `stage/copy-in.ts`). */
 const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
 /** Files whose links are read and re-pointed. */
 const TEXT = /\.(?:x?html?|mdx?|css|svg|js|mjs|json|txt)$/i;

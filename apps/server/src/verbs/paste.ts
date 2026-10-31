@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { clipItems, clone, isArrow, pastedItems, walk, type PenDocument, type PenNode } from "@decks/pen";
-import { copyBoardInto } from "../boards/copy-in.ts";
+import { copyBoardInto } from "../stage/copy-in.ts";
 import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas } from "../deck/layout.ts";
 
 /**

@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { cardShell } from "../boards/cards.ts";
+import { cardShell } from "../cards/cards.ts";
 import { STARTERS, writeStarter } from "./starters.ts";
 
 test("every app starter fits a phone and a desktop: a viewport, a fluid column and a narrow-width rule", () => {

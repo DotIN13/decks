@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { revisionOf } from "../deck/loader.ts";
-import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../boards/thumbs.ts";
-import { BOARD_W } from "../boards/templates.ts";
+import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../pictures/thumbs.ts";
+import { BOARD_W } from "../cards/size.ts";
 
 /**
  * 2026-10-29: every board on a canvas becomes a card.
@@ -209,7 +209,7 @@ export function boardToCard(html: string, links: Map<string, string>, placed?: {
 /**
  * How tall a board's page last measured, laid out at width `w`, when the deck knows: a browser's
  * reading of this revision (`.decks/heights.json`, from when browsers sized boards), or the height of
- * its picture of this revision, which was taken at the height its page measured (`boards/thumbs.ts`).
+ * its picture of this revision, which was taken at the height its page measured (`pictures/thumbs.ts`).
  * A board's item kept the height somebody once gave it, often the 240 px a new board starts at, while
  * its page grew past it; the card it becomes is given the page's height, so it opens whole.
  */

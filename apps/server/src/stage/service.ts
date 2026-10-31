@@ -147,7 +147,7 @@ export class StageService {
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
 	shots: StageShots | undefined;
-	/** The server's own picture of a whole board, fresh from its file (`boards/thumbs.ts`): what a screenshot falls back to. */
+	/** The server's own picture of a whole board, fresh from its file (`pictures/thumbs.ts`): what a screenshot falls back to. */
 	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;
 
 	constructor(

@@ -16,15 +16,15 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, NotFound, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isCardPath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
-import { cardModules, cardPage, readDeckImports } from "./boards/cards.ts";
+import { cardModules, cardPage, readDeckImports } from "./cards/cards.ts";
 import { unstampCard } from "@decks/board-host";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { boardOnCanvas, verbRoutes } from "./verbs/router.ts";
-import { renderSnapshot } from "./boards/snapshot.ts";
-import { keptWidth, pictureType, squeezed, wireEncoding } from "./boards/thumbs.ts";
+import { renderSnapshot } from "./pictures/snapshot.ts";
+import { keptWidth, pictureType, squeezed, wireEncoding } from "./pictures/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
@@ -560,7 +560,7 @@ export function createHttpApp(app: App): Express {
 			let requested = served.path;
 			/*
 			 * A card's scripts, each at its own address beside the card (`sales.html.m0.js`), so its relative
-			 * imports resolve from its folder (`boards/cards.ts`). A friend's card runs none: the stage cleans
+			 * imports resolve from its folder (`cards/cards.ts`). A friend's card runs none: the stage cleans
 			 * them out, and none is served either.
 			 */
 			const cardModule = /^(.+\.html?)\.m(\d+)\.js$/i.exec(requested);
@@ -619,7 +619,7 @@ export function createHttpApp(app: App): Express {
 			 * the shell stays *relative* and a nested board resolves its own sibling.
 			 */
 			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
-			// A card opened by itself, or pictured: the piece in a page of its own (`boards/cards.ts`).
+			// A card opened by itself, or pictured: the piece in a page of its own (`cards/cards.ts`).
 			if (req.query.raw === undefined && isCardPath(requested)) {
 				const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
 				const mapFile = resolveServed(app.deck.path, "assets/importmap.json");
@@ -680,7 +680,7 @@ export function createHttpApp(app: App): Express {
 	});
 
 	/**
-	 * A picture of a card (`boards/thumbs.ts`): `whole=1`, and `w=` one of the ladder's rungs
+	 * A picture of a card (`pictures/thumbs.ts`): `whole=1`, and `w=` one of the ladder's rungs
 	 * (`SMALL_WIDTHS`) or none for the whole picture; `astc=1` for it compressed for the GPU.
 	 *
 	 * `v` is the revision the canvas knows, and it is only there to make the URL a new one when the
@@ -1046,7 +1046,7 @@ export function createHttpApp(app: App): Express {
 	 * not a truncated file.
 	 */
 	/**
-	 * A board or card drawn from a snapshot of the reader's page (`boards/snapshot.ts`): the page's markup
+	 * A board or card drawn from a snapshot of the reader's page (`pictures/snapshot.ts`): the page's markup
 	 * as it stood, drawn by the server's Chrome at its own address. The answer is the picture. A card's
 	 * comes from the canvas frame showing it (`packages/canvas/src/items/card-snapshot.ts`).
 	 */

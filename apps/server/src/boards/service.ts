@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { dirname, join } from "node:path";
 import type { Board, DeckState, ServerMessage } from "@decks/protocol";
-import { Revisions } from "./snapshots.ts";
-import { Authors, Seen } from "./authors.ts";
+import { Revisions } from "../deck/snapshots.ts";
+import { Authors, Seen } from "../deck/authors.ts";
 import type { Deck } from "../deck/loader.ts";
 import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
 

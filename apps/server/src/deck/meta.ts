@@ -1,4 +1,4 @@
-import { BOARD_W } from "../boards/templates.ts";
+import { BOARD_W } from "../cards/size.ts";
 /**
  * What a board says about itself, read from the top of the file.
  *

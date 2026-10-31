@@ -2,7 +2,7 @@ import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { Cameras } from "../deck/cameras.ts";
-import { boardActor } from "./board-actor.ts";
+import { boardActor } from "./caller-actor.ts";
 import type { StageService } from "./service.ts";
 import { createStageTool, type StageTool } from "./tool.ts";
 
@@ -10,7 +10,7 @@ import { createStageTool, type StageTool } from "./tool.ts";
  * Verbs called by something that is not an agent: a board's button, or an app.
  *
  * Both get the stage object an agent gets, acting for **the conversation on their canvas** under
- * a name of their own (`stage/board-actor.ts`). Each verb they call is announced in that
+ * a name of their own (`stage/caller-actor.ts`). Each verb they call is announced in that
  * conversation (`verbs/router.ts`): a thing that starts on its own and says nothing reads as a
  * fault, and an agent reading the chat later needs to know a press or an app did something. Their
  * code runs in their own page or process; the server only answers the verbs.
@@ -30,7 +30,7 @@ export interface CallerSpec {
 	name: string;
 	/**
 	 * Whether `send({ name, kind }, …)` may make an agent. An app may: it has the whole stage API,
-	 * as the person decided when they let it. A board's button may not (`board-actor.ts`).
+	 * as the person decided when they let it. A board's button may not (`caller-actor.ts`).
 	 */
 	mayCreate?: boolean;
 	/** The canvas the press came from, when the browser names it. */

@@ -9,14 +9,14 @@ import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, Stage
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { BoardService } from "./boards/service.ts";
-import { EvalTrust } from "./boards/eval-trust.ts";
+import { EvalTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
-import { SMALL_WIDTHS, ThumbService } from "./boards/thumbs.ts";
+import { SMALL_WIDTHS, ThumbService } from "./pictures/thumbs.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./verbs/router.ts";
@@ -113,7 +113,7 @@ export class App {
 	readonly codes: PairCodes;
 	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
 	readonly passes: Passes;
-	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
+	/** Which boards may run their own code, and the list the first question writes (`auth/app-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
 	placedOn(path: string, canvas: string): boolean {
@@ -208,7 +208,7 @@ export class App {
 			 * had before, with the move itself correct on disk.
 			 *
 			 * No id is a board running its own code, which acts for the conversation in front of
-			 * the person (`stage/board-actor.ts`), so that case keeps the old answer.
+			 * the person (`stage/caller-actor.ts`), so that case keeps the old answer.
 			 */
 			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
@@ -967,7 +967,7 @@ export class App {
 	send(message: ServerMessage): void {
 		/*
 		 * Every change to a board is announced through here, whoever made it, which makes it
-		 * the one place to keep the board's picture up with it (`boards/thumbs.ts`).
+		 * the one place to keep the board's picture up with it (`pictures/thumbs.ts`).
 		 */
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { boardActor, type BoardConversation } from "./board-actor.ts";
+import { boardActor, type BoardConversation } from "./caller-actor.ts";
 
 /**
  * The actor a board is when it runs its own code.

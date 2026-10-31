@@ -1,5 +1,5 @@
 import { cardModules, runsInCard } from "@decks/board-host";
-import { IMPORT_MAP } from "./templates.ts";
+import { IMPORT_MAP } from "./size.ts";
 
 const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 
