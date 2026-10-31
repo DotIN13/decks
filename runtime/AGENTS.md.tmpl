@@ -4,9 +4,9 @@ This deck is `{{DECK_NAME}}` at `{{DECK_PATH}}`, and it is your working director
 
 {{TIME}}
 
-Cards and boards right now:
+Cards right now:
 
-{{BOARDS}}
+{{CARDS}}
 
 ## Draw, card or app
 
@@ -68,7 +68,7 @@ A card is a piece of HTML that you design, drawn straight into the canvas's own 
 - Then `decks canvas fit <path>` (the card must be on the canvas: `decks canvas insert`, below). **`fit` sets the card's height and answers with what the browser measured: the height, the word count, the smallest type, anything wider than the card, any box that cuts off its own content, and what happens when each control is pressed. It says which of them is wrong.** A view behind a tab is part of the card, and `fit` is the only one who looks at it unless you do. Act on that instead of taking a screenshot, and when it answers "One screen" the card is done: stop polishing.
 - Edit a card's files in place (Write, Edit). Never `sed -i` or another rename-save: the canvas stops watching a replaced file. Never edit `lib/`.
 - A link to another card is a relative path to its `index.html`, `<a href="../other/index.html">`, and opens beside this one; every other link opens a new tab. A picture or a video is an `<img>` or `<video>` of a file in the card's folder or the canvas's `files/`. {{ROOTS}}
-- A button is wired in the card's own module and acts through `card.decks`, the same calls as `decks`: `await card.decks.agent.send("<your name>", { task: "Option A", boards: [card.path] })` for a decision the person makes by pressing. The canvas's own calls change this canvas; a message to an agent waits for the person's OK; calls that reach past the canvas are refused.
+- A button is wired in the card's own module and acts through `card.decks`, the same calls as `decks`: `await card.decks.agent.send("<your name>", { task: "Option A", cards: [card.path] })` for a decision the person makes by pressing. The canvas's own calls change this canvas; a message to an agent waits for the person's OK; calls that reach past the canvas are refused.
 - A document the person writes in (a `.md`, `.tex` or `.docx`) is a document item, still made as a small page that holds only `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md"></div>`, its path relative to that page; it fills its box. The file is edited where it is: the person's typing goes to it, and its history and review are kept apart in `docs/<name>/`, which is not yours to write. Edit the file itself with your own tools: your edit lands at once, highlighted on the words you changed, and the person accepts or rejects it (one at a time or all at once); History shows and restores any earlier version. A Google Doc opens the same way, from its link (Add menu, Document…): edit it with `gdocs_read` and `gdocs_edit`, never by writing its mirror in `docs/`, and your edit is highlighted on its page like any other.
 - When the person asks for an app (something to use, with its own pages, data or server, more than one screen of reading), build it in `apps/<name>/` with `decks apps …` and show it with `decks canvas insert '{"type":"app","app":"<name>"}'`: read the app-building skill first. A card with a few controls is still a card.
 
@@ -88,7 +88,7 @@ Only `decks view …` moves the person's screen: `decks view focus <path or id>`
 
 Hand work over in one of two ways, both returning at once. `decks agent queue <name> --task …` puts it in their queue, taken up when their current turn ends; `--reply true` brings their report into your transcript. `decks agent send <name> --task …` delivers it now, into the turn they are running (or a new one if they are idle); the answer says whether it landed. `decks agent create --name … --kind …` makes an agent first. `decks agent inbox` lists what was handed to you. Changes others make on a canvas reach you with your next message, so there is nothing to watch. A long brief goes on a card, not in the task string.
 
-The old command names (`decks board …`, `decks new-board`, `decks show`, `decks pen edit`, `decks send`, …) still work for one release and say their new name; use the new ones. `decks board create` now makes a card.
+The old command names (`decks board …`, `decks new-board`, `decks show`, `decks pen edit`, `decks send`, …) still work until 2026-11-30 and say their new name; use the new ones.
 
 ## The `decks` command
 
@@ -96,7 +96,7 @@ Everything you do to the canvas is a `decks` command in your shell; a card's con
 
 - A plain argument (a path, a name, a title) is a word; an object argument's keys are flags, `--title "…"`, with a dot for a key inside a key, `--at.x1 0`; anything else is JSON, and `-` reads it from stdin. `--args '<JSON list>'` gives every argument at once.
 - The value goes to stdout: a string as it is, so `u=$(decks card url <path>)` is the address, and anything else as JSON for `jq`. Notes (where a card went, what `decks canvas fit` measured, reminders) go to stderr, and a refusal exits with 1 and says why.
-- `decks events board.changed` prints each change to a card as it happens, one JSON line each, until you stop it.
+- `decks events card.changed` prints each change to a card as it happens, one JSON line each, until you stop it.
 - Chain them in bash, or write a node script when you need loops: `const { decks } = await import(process.env.DECKS_SDK)` gives every command below as `await decks.card.create({ … })`, `await decks.canvas.insert(item, { beside })`. A card's module has the same calls as `card.decks`.
 
 {{DECKS_COMMANDS}}

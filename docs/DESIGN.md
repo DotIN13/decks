@@ -1,1139 +1,193 @@
-# Decks — architecture & design
+# Decks: how it is built
 
-Pi owns reasoning, conversation, context, compaction, tool use and the session tree.
-Decks is the environment around it, and the environment is a **canvas**: an infinite
-stage of boards, with the transcript floating at its edge. This document is what the
-code's comments point at when they say "§4".
+Decks is a canvas you share with AI agents. An agent answers on the canvas with a drawing, a
+**card** (a piece of HTML it designs), a **document** you can type into, or an **app**; you pan,
+zoom, drag and retype what it made. This page describes the system as it is now. The reasoning
+of the board era, much of which still holds, is in
+[`archive/DESIGN-boards-era.md`](archive/DESIGN-boards-era.md).
 
-Status: **all six milestones built and verified** — deck and stage, one agent,
-`stage_eval`, the user's editor, many chats with delegation, and the time machine.
+## 1. The parts
 
----
+| Part | Where | What it does |
+| --- | --- | --- |
+| The harness | `apps/server` | One Node process per deck: the files, the agents, the verbs, the pictures, the sockets. |
+| The app's page | `apps/web` | The chrome around the canvas: the agent panel, the composer, settings, the canvas manager. |
+| The canvas frame | `packages/canvas` (`frame/`) | The canvas itself, its engine and every card on it, in a sandboxed page of its own. |
+| The stage engine | `packages/stage` | Rust built to WebAssembly: draws the drawing and the cards' pictures with WebGPU or WebGL 2, in a render worker. |
+| The verb table | `packages/api` | Every call Decks answers, declared once; the routes and the SDK are made from it. |
+| The SDK | `packages/sdk` | The verbs three ways: a TypeScript client, the `decks` command, an MCP server. |
+| The wire | `packages/protocol` | What the page and the harness say on the socket and the event stream. |
+| Documents | `packages/docs` | `.md`, `.tex` and `.docx` files opened as pages you type into. |
+| Sharing | `packages/hub`, `packages/sync-client`, `packages/sync-protocol` | The canvas folder layout, and keeping a deck in step with Decks Studio. |
+| The runtime | `runtime/` | What agents read: the deck context template, the command reference, guidelines, skills. |
 
-## 1. Product definition
+Decks Studio, a separate product, is a front end on many harnesses: it syncs their canvases and
+draws them with the same `@decks/canvas`.
 
-A **board** is a local HTML file: one page whose content flows top to bottom, laid out with
-ordinary CSS, as wide as its `<meta>` says and as tall as its content. What used to be two
-formats, `component` and `flow`, is one: a board is a file, and how it lays itself out is CSS
-rather than a kind. It is where a
-plan gets drafted, and where the agent reports that work is done. Both sides draw on
-it: the agent by editing the file with its ordinary tools, the user by direct
-manipulation. Because a board is a file it is also an artifact — it passes between
-agents as context, and it can embed the user's real documents instead of summaries of
-them.
+## 2. The deck is a folder
 
-What Decks is not: a diagramming tool, a document editor, or a place the agent's
-output is *rendered*. The board is the shared workspace, not a view of a transcript.
-
-## 2. The deck, and the data directory
-
-One directory holds everything Decks stores, named by one variable, and the deck is
-`decks/` inside it:
+Everything a person makes is a file in the deck folder (`data/decks` in a checkout, or
+`DECKS_DATA_DIR`), so a deck is backed up, diffed and moved like any folder:
 
 ```
-$DECKS_DATA_DIR/     default ~/.decks · npm run dev uses <repo>/data · tests a scratch dir
-  decks/
-    deck.json        the deck's name, the roots embeds may reach, and a size a board cannot state
-    boards/*.html    the boards
-    lib/             the primitives, copied in and refreshed on open (§2.1)
-    assets/          images the boards use, and the files the user drops on them
-    .decks/          revisions and avatars — never watched, never served except by hash
-  shared/            optional; the demo uses one as an out-of-deck root
+deck/
+  canvases/<name>/                  a canvas, standing alone
+    canvas.pen  canvas.json         its drawing (a pen.dev file) and its title
+    cards/<card>/index.html         its cards, each a folder with what it keeps beside it
+    frames/  files/                 its saved frames, and the pictures and files it uses
+  shared/canvases/<owner>/<name>/   a canvas a friend shared, the same shape
+  assets/  docs/  apps/             the deck's own, pointed at by their deck path
+  lib/                              the page runtime a card page loads, copied in and refreshed
+  .decks/                           revisions, tokens, the Studio key, trash
 ```
 
-**Three tiers, and only one of them is a directory.** The deck is every board file; what
-an agent is *holding* is the rail; what it has put *in play* is the canvas.
-
-| | is | owned by | changed by |
-|---|---|---|---|
-| **deck** | every board under `boards/` | the filesystem | writing or deleting a file |
-| **context** | what an agent holds — the rail | the agent | `attach` / `detach` |
-| **in play** | what the canvas renders | the agent, narrowed by the user | `decks.canvas.insert` / `decks.canvas.delete`, or a click in the rail |
-
-Attaching a board puts it in play, so holding something still surfaces it; `decks.canvas.insert` is how an
-agent narrows to what matters now, and `decks.canvas.delete` takes a board off the canvas *without*
-dropping it from context. That asymmetry is deliberate: the canvas is the user's view and
-they may clear it, but an agent's context is its own, and a user quietly removing a board
-the agent is reasoning from would be a bug they could not see.
-
-**An agent holding nothing lists the whole deck and shows none of it.** The two tiers
-answer the empty case differently, and the difference is the point: the rail is how you
-find a board, so it lists everything there is to find; the canvas is what an agent put in
-play, so it holds nothing until something does.
-
-Both used to fall back to the whole deck, on the argument that a fresh agent opening onto a
-blank canvas reads as data loss. That was wrong about which state misleads. A canvas showing
-every board claims the agent is working from all of them, and it made the first useful thing
-an agent does — narrowing to the one board it is answering on — look like the rest of the
-deck being deleted. An empty canvas beside a full rail states the truth up front instead of
-contradicting itself one turn later. The cost is honest and worth naming: the first screen
-of a new deck is a grid with nothing on it, and finding the boards means the rail.
-
-**A deleted board has to leave the context with it**, or the fallback is one path away from
-never firing. A board that is gone still resolves to nothing in the rail and matches nothing
-on the canvas, so an agent holding only that one path showed an empty rail *and* an empty
-canvas — and because its context was not empty, the whole-deck fallback stayed out of it.
-The deck looked deleted. The watcher now prunes the path from every agent
-(`registry.boardRemoved`), and the client resolves held paths against the deck as well,
-because a rewind can restore a context naming a board that has since been deleted; holding
-only ghosts counts as holding nothing.
-
-**One deck per data directory.** That is a constraint, not a preference: the deck
-directory is the agent's cwd, a Pi session's cwd cannot move, and Pi keys a session's
-transcripts to the path it ran in — so "which deck", "which history", "which revisions"
-and "which settings" are all one choice. Switching decks means pointing at another data
-directory, which is also how the tests stay out of the way of real work.
-
-It grew the other way round first: a `DECKS_DECK` variable naming any directory, whose
-default was a fixture *inside the repository*. That produced `decks/decks/example` in the
-logs, put the user's own board in a committed folder, and let the verification suite
-write into the deck somebody was working in. `DECKS_DATA_DIR` had been sitting in the
-config the whole time, read by nothing.
-
-`$DATA` is the application's directory and the deck is one thing inside it, which leaves
-the room `settings.json` and a recents list will want.
-
-**A first run creates an empty deck** — `boards/`, `assets/`, a copy of `runtime/lib`, a
-`deck.json` (`Deck.create`) — and nothing else. Not a copy of the demo: a blank canvas is
-the honest first screen, and `e2e/fixture/` is a data directory the browser checks run on
-(`npm run dev:example`).
-
-**The transcripts are not in the deck.** They are Pi's, at
-`~/.pi/agent/sessions/<slug of the deck path>/`. Moving a deck leaves its conversations
-behind unless that directory is copied to the new path's slug; boards, revisions and each
-conversation's arrangement travel with the folder — a stage's positions live in its own agent
-record under `.decks/agents/`, inside the deck.
-
-What copying them buys is narrower than it sounds, and worth stating so nobody expects
-more: **nothing in the app resumes a session.** Every start is a new conversation, so the
-spine shows only the live one. Copied files stay keyed to the deck's path, which means
-`pi -r` in the deck directory still lists them and a session picker would find them — and
-they keep their `board-rev` entries, which is how a past board is dated. A copied file also
-still records the old cwd in its header: harmless for listing, but a fork resumed from one
-would carry the stale path.
-
-The deck directory is the agent's cwd. That is the whole integration: the agent's
-`read`, `write`, `edit` and `grep` already work on boards, so there are no board CRUD
-tools to keep in sync with a schema.
-
-**Where a board *sits*, and how big it *is*, belong to the board and its conversation.** What a
-board contains lives in the board file, and so does its size: one `<meta name="board">` tag for HTML,
-front-matter for markdown. The width is the writer's; the height is the content's, measured by the
-browser that is showing it, and a height stated in the file is a **floor** the measurement raises
-rather than a ceiling it has to respect. That is what makes a board that clips impossible. Where it sits
-lives in the record of the agent whose canvas it is — `AgentRecord.positions`, under
-`.decks/agents/<id>/`, beside what that conversation is holding and showing (`§6.2`). So two
-conversations can look at one deck from two arrangements, the way they already keep two cameras, and
-a drag in one moves nothing for the other. A board no stage has placed takes the place the deck
-itself was laid out with, and a board with neither goes through `Deck.arrange` — the rows-of-three
-rule `autoPlace` has always applied. Either place is written down on that stage the first time it is
-sent, so a board lands once instead of chasing whatever was dragged last.
-
-**`deck.json` is then the deck's own facts and nothing else**: its name, and the roots its embeds may
-reach. The app never writes it — a place belongs to a stage and a size to the board, so there is no
-board state left in it to rewrite — and it is read forgivingly: an unparseable field is a default plus
-a warning, never a refusal to open. An older file's `boards` map is read for its places, which become
-the **seed** a stage starts from: handed to the first conversation that asks, written into that
-conversation's own record, so a deck somebody laid out by hand does not open in rows of three. Its
-`w`/`h`, and a newer `sizes` map, are ignored — a size is the board's own file's business, and
-preferring a copy here is what made a resize that wrote the file look like it had done nothing.
-
-### 2.1 `lib/` is a copy, and the copy is refreshed
-
-A board is a standalone document, so its stylesheet and its runtime have to be files
-sitting beside it — not a route this server serves. That is why `lib/` is copied into
-every deck, and it is not negotiable: a board has to render from the filesystem with
-Decks not running.
-
-But a copy taken once and never touched again is a deck frozen at the version of Decks
-that happened to create it, and the cost was not hypothetical. It set the ceiling on the
-component vocabulary the editor could offer (§6.5): a class this build added to
-`board.css` was an unstyled box in every deck made before it, so the editor could only
-ever speak the *oldest* `board.css` in the wild. It also meant a fixed bug in
-`board.js` never reached the decks that had it.
-
-So **opening a deck brings its `lib/` up to this build** (`deck/lib-sync.ts`,
-`App.refreshLib`). `lib/` is this application's directory, not the user's; a file of
-your own belongs in `assets/`. Three properties make that safe to do on every start:
-
-- **Content-compared, so an unchanged restart writes nothing.** Not an mtime
-  comparison, which is the usual shortcut and wrong here — a fresh clone or an
-  `npm ci` rewrites mtimes without changing a byte. Rewriting 82 files would wake the
-  watcher and reload every board on the canvas for nothing (§4, the `asset` case).
-- **It runs before the watcher attaches**, so even the restart that *does* rewrite
-  files cannot reload the boards twice.
-- **A missing `runtime/lib` is refused rather than treated as an empty one.** A broken
-  or partial install must not be able to prune a working deck's primitives to nothing.
-
-Stale files are removed, which is the part worth arguing about since it can delete
-something a person put there. It earns its keep: the vendored libraries rename files
-between versions, and a `pdf.worker.min.mjs` from an older pdf.js sitting beside a
-newer `pdf.min.mjs` is not untidiness — it is a board that fails to open a paper with a
-version-mismatch error nobody can place. Every removal is logged by name for that
-reason.
-
-## 3. The board file
-
-```html
-<meta name="board" content='{"w":1000}'>
-<link rel="stylesheet" href="../lib/board.css">
-<body class="board">
-  <div class="doc">
-    <h1>Goal</h1>
-    <section class="card" data-id="goal">…</section>
-    <div data-embed="../papers/oauth.pdf" data-pages="3-5" data-id="spec" …></div>
-  </div>
-  <script src="../lib/board.js"></script>
-</body>
-```
-
-- The width lives in the board's own `<meta>`, because how wide a page is, is a property
-  of the page; the height is its content's, and a stated `h` is a floor. Position on the
-  canvas does not; that is the arrangement's business.
-- **`data-id` is an optional name on a block.** It lets a person comment on one block and
-  an agent point at one (the stage highlights by id, and change marks outline it).
-- **A run of words the user can retype is a leaf**: an element holding text and no other
-  elements. Nothing declares it — the shape is the rule, and a retype is addressed by the
-  component's id plus the element-child indices walked in from it (§6.5). What the
-  authoring skill asks for in exchange is one string per leaf: three labelled numbers are
-  three spans, because a row holding three strings is not a leaf and cannot be typed into.
-- `<meta name="poster">` is optional and is the escape hatch for a board too
-  expensive to mount at thumbnail size (§7).
-- **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
-  "a box with prose in it" (`text`, `sticky`, `card`, `callout`), three that
-  bring their own inner markup (`kpi`, `table`, `chip`), and the `embed`; the only
-  variant attribute is `data-tone`. That list is also the ceiling on what the
-  user's editor can offer (§6.5). It is a copy in every deck rather than a route, and it
-  is brought forward on every open (§2.1), so growing the vocabulary means editing
-  `board.css` and the editor's list together.
-- **There is no connector, and `board.js` draws nothing of its own.** It used to route an
-  `svg.link` between two components named by id, and that was removed: a line positioned
-  at mount time is a drawing the file does not state, so the file stopped being the whole
-  truth about the board — the agent could not say where a line went without running the
-  page, and the user had nothing to drag. A diagram is now a component that owns its own
-  geometry, an `<svg>` inside a box with coordinates its author chose, which is a thing
-  both of them can read and edit. `runtime/skills/board-authoring` teaches it and the
-  example deck's two boards are built that way. The cost is accepted and was paid
-  knowingly: `lib/` is re-synced on every open (§2.1), so existing user boards lost their
-  arrows on their next restart, with no compatibility path.
-- The head asks for a stylesheet, a runtime, and an inert import map. `board.js` loads whatever a
-  component actually uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of
-  three stickies does not pay for pdf.js and the agent does not have to remember which script tag
-  goes with which component. The map is the same bargain for the libraries an agent picks for
-  itself (`d3`, `three`, `gsap`, `chart.js` on a new board): a table of names, and nothing fetched
-  until a board imports one — which is why a static `import` at the top of a module is not the same
-  thing, and why the skill asks for `await import("d3")` where the chart is drawn.
-- `board.js` sets `window.__boardReady` when fonts and every mount are done. The app
-  waits for it before measuring; the agent's Playwright waits for it before shooting.
-  Without it a screenshot is a race, and the race is usually lost.
-
-**An embed is sorted into a family by extension, and the last family is "anything".**
-Markdown, PDF (with page ranges), image, HTML, and plain-text-or-source — the last
-rendered as escaped preformatted text through `textContent`, never as markup, and asked
-for with a `Range` header so a 50MB log truncates on the wire rather than in a DOM node
-every other mount waits behind. What is left over is not an error case: a file with no
-family becomes a chip naming it, its size and its kind, with an open and a download,
-because "put anything on a board" is the promise and a blank box with a console warning
-behind it is indistinguishable from a broken embed. `familyOf` in `board.js` is the one
-place that decides, and the file picker's icons and the drop's default box shape both
-name the same list from their own side — `board.js` is standalone by design (§3) and
-cannot import from the app.
-
-The revision of a board is a **hash of its contents**, not its modification time.
-Mtime was the obvious choice and the wrong one: it has millisecond resolution, so two
-writes inside the same millisecond leave it unchanged and the frame never reloads.
-
-## 4. Two trust tiers
-
-Agent-authored HTML needs no protecting from — the agent has `bash`. Foreign HTML
-does. So the sandbox is applied where the danger is, and nowhere else.
-
-**A board frame is same-origin.** `/api/board/*path` sends the file with `nosniff` and
-no sandbox, path-shaped so a board's own relative references resolve to siblings and
-land back on the same guard. Because the frame shares the app's origin, the app reads
-`frame.contentDocument` directly — measuring, hit-testing, theming and (from M4)
-editing are ordinary app code. There is no bridge, no `postMessage` protocol and no
-capability token anywhere in the system. The first thing this buys is small and
-telling: a dark shell hands its `data-theme` to its boards in three lines
-(`lib/theme.ts`), and a board that named its own theme keeps it.
-
-**Inside the deck, only a board gets the origin.** `/api/board/*path` serves the whole
-deck, because that is what makes a board's own `../assets/photo.png` and
-`../lib/board.css` resolve — so "same origin, no sandbox" cannot be a property of the
-route. It is a property of *being a board*: a path under `boards/` ending in `.html`
-gets `boardHeaders`, and everything else gets `assetHeaders`, which adds
-`Content-Security-Policy: sandbox allow-scripts` to anything a browser would run. That
-distinction was cosmetic until the user could drop a file onto a board (§6.9): an
-uploaded `evil.html` served with the app's origin is a stored cross-site script, and
-`data-embed="../assets/evil.html"` writes the URL into a board file where somebody
-will eventually open it in a tab. The rule is decided from the shape of the path rather
-than by asking the open deck, because a board written a second ago is on disk before the
-watcher has mentioned it, and a board served as an asset loses the origin the editor
-needs.
-
-**A foreign file is quarantined.** `/api/file` is read-only, resolves only inside a
-root declared in `deck.json`, never follows a symlink out, never lists a directory,
-and sends `Content-Security-Policy: sandbox allow-scripts` for anything a browser
-*runs* — HTML, SVG, XML. `board.js` mounts an HTML embed as a nested
-`<iframe sandbox="allow-scripts">`: one level in from a board, two from the app.
-Everything else on that route (markdown, PDF bytes, images) is data that `board.js`
-draws itself, so it never executes at all. The example deck's `report.html` prints
-what it can reach, and what it prints is `localStorage: blocked`.
-
-The trade, stated: a script the agent writes into a board has the app's authority. It
-could call `/api/*` or read app storage. That is not a new capability — the agent has
-bash — and it buys the entire editor as testable app code. Foreign content, which
-*would* be a new capability, is the thing behind glass. If a board ever needs to run
-something genuinely untrusted, it embeds it rather than inlining it.
-
-**Why `/api/file` takes a query and answers a redirect.** A browser deletes `..`
-segments from a URL path before the request is sent — including their `%2e%2e`
-spellings — so a relative path cannot survive inside the path. It arrives in a query
-parameter, where nothing rewrites it, and leaves as `302 → /api/f/<absolute path>`.
-From then on the URL is path-shaped, which is what makes a foreign page's own relative
-references land back on the guard. `from` names the board that asked, so a relative
-path means what it would mean in an `<img src>` on that board.
-
-Every path decision is in `deck/roots.ts` and nothing else makes one. Symlinks are
-resolved *before* the containment test, because a link inside a directory the agent
-can write is not hypothetical.
-
-## 5. The protocol
-
-One WebSocket per browser (`/ws`), JSON frames, typed in `@decks/protocol` so both
-sides are forced to agree. Reads that return bytes are HTTP; everything that changes
-state is a frame. The server's greeting on connect is the whole deck state, which is
-what makes a reconnect a refresh — and the dev server restarts on every save, so that
-path is exercised constantly rather than theoretically.
-
-## 6. The server
-
-### 6.1 The open deck
-
-`Deck` (`deck/loader.ts`) holds `deck.json`, the boards found under `boards/`, and the
-resolved roots. It owns no agent and no camera: the camera belongs to the browser
-looking, the selection belongs to the frame, and **the arrangement belongs to the agent's
-record** — `Deck.state(positions)` puts a conversation's boards where that conversation put
-them. Boards it has not been given a place for are auto-placed in rows, under the ones it has,
-so a board the agent just wrote appears beside its siblings rather than on top of one; dragging
-it makes that position the stage's.
-
-The watcher (`deck/watcher.ts`) coalesces per path — a single save fires several
-filesystem events, and without the quiet period a board reloads three times per edit.
-`.decks/` is ignored, and that is load-bearing rather than tidy: the revision store
-lives there and is written *in response to* a change, so watching it would loop.
-
-### 6.2 One agent, and many
-
-**Four runtimes, one contract, and the shell knows none of them by name.**
-`agents/backend.ts` says what the shell needs from an agent; each runtime under `runtimes/`
-says what *it* is. `runtimes/contract.ts` is `AgentRuntime` — the kind, the name a person
-calls it, its capabilities, the `/` commands a dormant chat offers, whether it can start on
-this machine, and the factory — and `runtimes/registry.ts` is the one list. Pi runs in this
-process (`runtimes/pi/backend.ts`, over `createAgentSession`); Claude through
-`@anthropic-ai/claude-agent-sdk` (`runtimes/claude/backend.ts`), holding one `query()` open
-per agent in streaming-input mode; opencode and antigravity are somebody else's program,
-reached through their own SDKs.
-
-Streaming input is not a preference: it is what makes `interrupt`, `setModel`,
-`setPermissionMode` and `getContextUsage` exist at all, and a query per turn would re-pay
-process start every time. The Claude SDK is a thin client for the `claude` binary, which it
-does *not* look for on `PATH`, so `runtimes/claude/available.ts` does the looking
-(`DECKS_CLAUDE_PATH` overrides) — that way an install can use the Claude Code already on the
-machine instead of a per-platform 283 MB dependency.
-
-**That availability answer is on the wire**, which is the part that was missing for a
-while: every runtime could say whether it could run here, and no client could ask, so the `+`
-menu offered all four on every machine and the first prompt was where you found out. The
-greeting now carries `{ kind, label, available, reason }` per runtime, and the menu draws the
-runtime's own name and greys out what this machine cannot start. `availability()` returns a
-union — available, or unavailable *with* a reason — so a disabled row cannot be a dead end.
-
-Adding a runtime is a directory and a row in that registry. It used to be an import and three
-tables in `agents/session.ts` (which meant the neutral shell imported every runtime), the
-union and its array in `packages/protocol`, three entries in the browser's mark file, and a
-new directory. The shell asks the registry and never learns a name.
-
-Which runtime an agent uses is chosen when it is created and fixed for its life: a live
-session cannot swap the process behind it, and pretending otherwise would silently start a
-new conversation. `DECKS_BACKEND` is only what the `+` button hands you. Where the runtimes
-differ, the difference is in `capabilities` rather than in a method that throws, so a client
-that can see what an agent cannot do never offers it.
-
-`agents/session.ts` owns what is neither runtime's: the transcript in memory, the identity, the
-context set. `agents/translator.ts` decides what a transcript *is* — when a reply is
-flushed, what a tool call is called — and is shared by every backend;
-`runtimes/pi/events.ts` is the only file that reads Pi's event shapes.
-
-An agent exists before it can be prompted: a Pi session has to load extensions,
-resolve models and check credentials, so `start()` is a promise a prompt waits on. A
-failure to start (no credentials, usually) is a notice in that agent's own transcript
-rather than something that takes the deck down.
-
-**The chat list is a record, not a scratch buffer.** `agents/store.ts` keeps one directory
-per agent under `.decks/agents/<id>/`: `meta.json` is how to continue (the runtime, the ref
-to resume, and what the row says before anything starts) and `chat.json` is what to show.
-Before this, agents lived only in `Registry`'s array, so every restart emptied the list and
-`focused()` minted a replacement with a new id — and in development, where `node --watch`
-restarts the server on any source edit, that happened every few minutes. Nothing was ever
-corrupted; the runtimes keep their own transcripts, and Decks simply had no way back to them.
-
-Two properties make it cheap. **Restored chats start nothing** — `prompt()` already opens
-with `await this.start()` and `start()` is memoised, so a dormant row costs a directory read
-and the first thing said to it starts its runtime. Fifteen rows would otherwise mean fifteen
-model runtimes at boot. And **resuming is in place, not a fork**: pi reopens the session file
-with `SessionManager.open` and Claude passes `resume` without `forkSession`, so continuing a
-chat continues it. Fork stays what it is in §6.7 — a deliberate branch.
-
-Three details that are decisions rather than mechanics:
-
-- **The transcript is stored whole on each change, not appended to.** `ChatItem`s mutate
-  after they are pushed — deltas accumulate, tool calls gain results, an assistant turn that
-  only called tools is spliced out again — so an append log would persist half-built rows and
-  need a truncation pass for rewinds. Writing `history()` whole makes both vanish, and the
-  translator's 500-item cap bounds the file.
-- **An agent nobody spoke to is not written down.** `focused()` creates one on demand so a
-  deck is never agentless, so without this rule every boot would leave an empty row behind.
-- **Closing a chat deletes its record**, or it would return on the next restart. What it does
-  not touch is the runtime's own session file: pi's and Claude's transcript directories are
-  theirs, and closing a chat is not deleting a conversation.
-
-Because the id is part of the record, an avatar at `.decks/avatars/<id>.svg` resolves again
-after a restart; it used to be orphaned by the new id every time.
-
-What this does *not* recover is a turn that was in flight. A restart kills the reply being
-written, and the resumed session simply lacks its tail — persistence cannot help there.
-
-**Delegation** (`registry.spawn`) creates a child in-process — not a subprocess, as
-Pi's own subagent example does — because the child should share this deck's stage, so
-its boards land on the same canvas and its transcript is a row in the same chat list.
-What it does not share is context: it is a fresh session with its own file. The child
-is handed the *source* of the boards it needs, because that is the point of boards
-being files — alignment is a paste, not a briefing. Four children at a time, which is
-a legibility limit rather than a resource one.
-
-**The canvas calls are defined once.** The verb table in `packages/api` declares them and
-`stage/tool.ts` answers them (§6.3); no runtime registers a canvas tool of its own. Every agent
-reaches them with the `decks` command in its own shell (`decks canvas insert`, `decks view focus`),
-which each runtime puts on the PATH with the agent's identity, and reads what they are in
-`runtime/decks-commands.md`, generated from the same table.
-
-**Two things Pi did through its session tree now live in the shell**, because they had no
-Claude counterpart and one mechanism is better than two. The stage snapshot — what an agent
-held, showed and called itself — was carried in a tool result's `details` and rebuilt from
-the branch on `session_start`; MCP tool results have no `details`, and the SDK's
-`structuredContent` looks like the equivalent but *replaces* the text the model reads. It is
-now `agents/agent-state.ts`, a series resolved by time, the same way `BoardService.boardsAt` picks which
-revision of a board to show. It stays in memory, but no longer for the reason first given —
-"nothing recreates agents when the server restarts, so a snapshot has nothing to survive to"
-stopped being true the moment agents were persisted. What it survives *to* is now the record
-below, which stores the resolved context and in-play sets; the series itself is in memory
-because what it exists for — answering "what was on the canvas at that point?" during a
-rewind, and seeding a fork — only ever happens while the process is up. And the "the user
-edited a board" nudge was `pi.sendMessage({ deliverAs: "nextTurn" })`; it is now a queue on
-the agent, prepended to the next prompt, which keeps the property it was chosen for — a
-board edit is not an interruption — without needing the runtime's cooperation.
-
-**Its words are one file, because five runtimes show them.** What a model reads about the
-calls is `runtime/decks-commands.md`, beside `runtime/AGENTS.md.tmpl`, handed to every runtime by
-the server. Two runtimes once carried their own shortened copy of the tool's description under a
-comment claiming they were "in the same words", and the model on those runtimes was told
-something different about what a board is for.
-
-**A board has to be cheaper than a paragraph.** If answering on a board costs fifteen
-lines of boilerplate and answering in chat costs nothing, the chat wins every time — so
-`decks.board.create({ title })` writes the shell, mints a unique slug from the title, and
-returns the deck-relative path; `decks.canvas.insert({ type: "board", board })` puts it on a
-canvas. Neither moves the camera (that is `decks.view.focus`), and create refuses to overwrite
-an existing board.
-
-**The shell is blank, and there are no templates.** A board is a heading and the import
-map, and nothing else: a served shape decided too much of the board before the writer had
-a sentence, and a board that starts shaped is a board the writer keeps the shape of. The
-blank document is a string in `boards/templates.ts` because it is four lines and there is
-one of it.
-
-The write itself lives in `boards/service.ts`, which is where board writes and their
-revisions live; the extension reaches it through `StageService`. The old `kind` and
-`template` arguments are still accepted and ignored, because an agent may have read them in an
-older reference and breaking it mid-turn would cost somebody a turn to save a deprecation.
-
-### 6.3 The verb table, `/api/v1` and the `decks` command
-
-Every verb Decks answers is declared once, in `packages/api`: its arguments and result as a small
-JSON Schema, and what it touches (`change`, `view`, `read`, `outside`). That table is the API, and
-three things are made from it:
-
-- **The routes.** `POST /api/v1/<verb>` with `{ "args": [...] }` checks the arguments against the
-  table before any handler runs, calls the verb on the caller's stage tool (`StageTool.call`), and
-  answers `{ ok, value, notes }`. `GET /api/v1` lists the verbs, and `GET /api/v1/events` streams
-  every frame Decks broadcasts as Server-Sent Events, for a client that is not on the socket.
-- **The SDK, in three forms** (`packages/sdk`, generated by `scripts/gen-sdk.mjs`): a TypeScript
-  client for apps, board buttons and node scripts; the `decks` command for a shell, which prints
-  the value to stdout and the notes to stderr; and an MCP server, one tool per verb.
-- **The agent's reference** (`runtime/decks-commands.md`), injected into every agent's context.
-
-**The server runs nobody's code.** Agents chain verbs in their own shell, where each runtime puts
-`decks` on the PATH with `DECKS_URL` and the agent's own token, `DECKS_TOKEN` (`runtimes/decks-env.ts`).
-Apps call the SDK from their own process with theirs. A board's button runs its `text/decks-eval`
-block in the board's own page with the SDK as `stage` (`runtime/lib/board.js`), and the page around
-it makes the call. Who is calling is the token a request carries and nothing else (`auth/`): an app
-or a board is asked once whether it may use the stage at all, and each of its calls is noted in the
-conversation it acts for.
-
-`stage/tool.ts` builds its object as the SDK's generated `Verbs` type, so a verb the table
-declares and the server lacks, or a signature that disagrees, is a compile error; a test checks
-the same at run time.
-
-Reads the server can answer (`decks.canvas.read`, `decks.file.url`, `decks.board.url`) are answered directly. Anything only the
-browser can do becomes a `stage.call` frame and is awaited; with no browser connected it resolves
-as a no-op that says so, because an agent working while nobody watches should finish and report,
-not block.
-
-### 6.4 State that survives rewinding
-
-Every effect of an eval is recorded in the tool result's `details`, never in a server
-variable alone, and rebuilt by walking `sessionManager.getBranch()`. Rewinding the
-conversation then rewinds what is in context and what is on screen, because the
-transcript is the record.
-
-What is restored is a *set*, and a place for each: the snapshot carries `inPlay: string[]` and the
-stage's `positions`, not one shown board, so a rewind puts back the arrangement the user was
-looking at rather than a single frame of it.
-
-### 6.5 Direct manipulation
-
-A board's own page is **not edited from the canvas**. There was an editor over
-`frame.contentDocument` — drag, retype, an inspector, a palette, files dropped into the page — whose
-gestures went to the server as patches spliced into the file. It is gone, and with it the patch
-messages, the `/api/boards/insert` route and the server's splicer: a board is written by whoever
-writes its file (an agent, a person in their editor), and a new revision simply reloads the page.
-
-What a person changes by hand is the **drawing** around the boards (§7): notes, shapes, cards and
-where each board sits. The canvas's mode says only whether that drawing shows its editing
-affordances: browse reads the boards and still moves and retypes what is drawn; edit adds the
-outlines, grips and distances.
-
-### 6.6 Seeing a board is the agent's job
-
-There is no screenshot service and no thumbnail service, by design. Pi's `read` takes
-images, so the loop is entirely the agent's: drive Playwright over bash, wait for
-`window.__boardReady`, shoot, `read` the PNG. `runtime/skills/board-debug` teaches it.
-That gives the agent a debugger rather than a camera — console output, `page.evaluate`
-measurements, click-and-re-shoot — and it costs the app no dependency. Playwright is
-the agent's to install, when it first wants it.
-
-### 6.7 Revisions, and the time machine
-
-Every new version of a board, from either author, is stored content-addressed under
-`.decks/revisions/`, and the sequence is stored beside it in `index.json`. The files
-were always durable; the *order* was not, and without it a restart made "the oldest
-version I know of" mean "the file as it is now" — so both undo and the timeline quietly
-lost everything from before the restart.
-
-Which version belonged to which moment is answered two ways. Under Pi the agent's writes
-append a `board-rev` custom entry to the session, so the mapping travels in the session tree
-and costs no LLM context. For boards the conversation has not written to — and for every
-board under Claude, which has no custom-entry API — the store answers by time: the newest
-version that already existed when that message was sent. That fallback is why the Claude
-backend can return an empty map from `revisionsAt` and still have a working time machine;
-the two answers differ only where two writes share a second. That scan does not assume the
-sequence is sorted — a migrated index has entries dated zero, and a restore is old content
-written now.
-
-**A rewind means different things to the two runtimes, and the same thing to the user.** Pi
-walks its session tree in place with `navigateTree`. Claude cannot, but it can copy a session
-up to a point, so a rewind is *a fork you stay in*: the history becomes a new session id and
-the agent's query is reopened against it. Either way the abandoned path stays on disk.
-
-Pairing a message with its session entry has a timing trap worth knowing. Pi's `prompt()`
-awaits the turn, so the shell can pair immediately afterwards. Claude's returns as soon as
-the message is queued — the turn runs on its message stream — so pairing there happens when
-the *turn ends*, on the `result` frame. Doing it where Pi does left every message after the
-first with no id, and a message with no id has no rewind, no fork and no board restore.
-
-**The controls live on the user's messages**, one set per turn: `rewind · fork · restore
-boards`, revealed on hover — on the floating bubbles now that those are the only transcript
-there is (§7), which is what stopped the time machine going with the chat column. A user message is the point `navigateTree` accepts and the
-thing a person recognises, so it is also the natural place to act from — and the server
-pairs each message with the session entry it became (`PiBackend.syncEntryIds`, the field
-`ChatItem.entryId`) precisely so it can be.
-
-Hovering **rewind** is a **preview**, immediately: the frames load revisions from the
-store, the stage marks itself and refuses pointer events, and nothing is written. There is
-no dwell delay because you only arrive by reaching for the action itself. Clicking rewinds
-the conversation — which also rewinds the context set and the identity, since all three are
-reconstructed from the same branch (§6.4). Restoring the *boards* is a separate, deliberate
-button, and is itself recorded as a new revision: going back is a thing that happened, and
-undoing it has to be possible too.
-
-There was a second control for a while — a bar of notches at the bottom right — and it was
-the same list of user messages drawn twice, thirty pixels from the spine. Removed. The
-spine keeps one job (open the conversation at a turn) and the messages carry the actions.
-
-### 6.8 Permissions belong to the runtime, and the app supplies the surface
-
-Decks ships no policy of its own. What it ships is the surface a runtime needs to ask a
-human: `bindExtensions({mode: "rpc", uiContext})` for Pi, `canUseTool` for Claude, and one
-bridge (`agents/extension-ui.ts`) that turns either into frames the browser draws. Under Pi
-a permission extension then covers `bash`, `write` and `edit` alike (a `decks` call is a `bash` call), and
-nothing about it is Decks-specific. Under Claude the CLI decides what is worth asking about
-and Decks answers. The path guards on the HTTP routes stay regardless: that is web-server
-hygiene, not agent policy.
-
-**Claude's four modes are exposed rather than chosen for you** — `manual`, `acceptEdits`,
-`plan`, `auto`, mapping onto the CLI's own permission modes, with `acceptEdits` the default
-because writing boards is what the agent is *for* and a confirm per board write would make
-the app unusable. `capabilities.modes` is empty for Pi, so the control is absent rather than
-present and inert.
-
-Two things this got wrong first, both about visibility rather than policy. The question was
-drawn inside the transcript, which is away by default, so the first thing a Claude agent
-asked stopped the turn for a reason nobody could see; it is in the dock above the input bar
-now (§7). And a pending question is replayed in the agent's greeting — it was sent once, to
-a browser that then reloaded, and the agent waited forever on an answer that could no longer
-arrive.
-
-**Signing in is the same surface, used for the app's own question.** `/login` on a Claude
-agent has three steps and an earlier version of it had none of them, which made it a command
-that could not finish what it started:
-
-1. **Which account.** `claude auth login` signs in to a subscription by default and takes
-   `--console` for an Anthropic API account (usage billing) instead — a different account
-   with different billing. Decks asks out loud, in a `select` above the input bar, because a
-   headless login that guessed would sign a Console user into the wrong place and only say
-   so a turn later, when the first request came back unauthorised.
-2. **The URL**, which the CLI writes as an OSC-8 hyperlink: the address appears in the
-   escape sequence *and* again as the visible text, separated by a BEL that `\S+` does not
-   stop at. Matching the raw line therefore returns both copies glued together — not a link
-   anybody can open. `claude/cli-output.ts` strips the escapes first, and its test asserts
-   the naive match really is twice as long.
-3. **Somewhere to paste the code.** What `auth login` actually runs is a paste-the-code
-   flow: it prints the URL, then sits on **stdin**. The child is spawned with a stdin pipe
-   and the login dialog carries a field; the exit code is what says whether the exchange
-   worked (0, credentials written; 1, with the CLI's own "Login failed: …" on stderr).
-
-The auth poll that closes the dialog on its own survives as a fallback, but only when the
-agent was *not* already signed in. Unconditional, it could not tell "signed in" from "was
-already signed in" — so running `/login` to move from a subscription to a Console account
-fired on the first tick, closed the dialog, and reported a sign-in that had not happened,
-leaving the person on the account they were trying to leave.
-
-Nothing is stored by Decks: the credentials are Claude's own, in the user's home, the way an
-interactive `claude` would keep them.
-
-### 6.9 Files the user drops in
-
-Everything that changes state goes over the socket (§5) — but bytes are not state, so a
-file dragged in from the desktop is the one thing that arrives as a request body:
-`POST /api/upload?name=…`, one file per request, the bytes raw. Not
-`multipart/form-data`, which would be a parser and therefore a dependency for no gain;
-one request per file is also what lets the browser report progress per file and land each
-one as its own component.
-
-**A dropped file is copied into the deck.** `assets/` already meant "the images the
-boards use", and a deck is meant to be self-contained: an embed pointing at
-`~/Desktop/photo.png` is a board that breaks the first time the user tidies up, and it
-would not survive being handed to another machine either.
-
-This is the first thing in Decks that writes bytes the user did not name, so the guards
-are worth listing, and so is what they do not cover.
-
-- **One directory.** `resolveAssetWrite` in `deck/roots.ts` — every path decision is
-  still in that one file — takes a plain file name and answers with a path inside
-  `<deck>/assets`, resolving symlinks before both containment tests, since an `assets`
-  that is a link out of the deck is as much a way out as a name that is.
-- **The name is derived, not trusted.** `assetName` reduces whatever the browser sent to
-  a basename over a conservative ASCII alphabet: no separators of either kind, no `..`,
-  no control characters, no leading dot (so an upload can never be a dotfile, and never
-  addresses `.decks/`). It *repairs*; `resolveAssetWrite` then *refuses* anything that
-  still does not look like a plain name, so a bug in the repair is a 403 rather than a
-  traversal. A test asserts every name the first produces is one the second accepts,
-  because the interesting failure is those two drifting apart.
-- **A cap checked before the body is buffered.** `MAX_UPLOAD_BYTES` (32MB) lives in the
-  protocol package so both sides know it; `express.raw` refuses on `Content-Length`
-  before reading a byte and again on a chunked body that lied, and the answer is a 413
-  with a sentence.
-- **Nothing is overwritten, and identical files are stored once.** The name stays
-  readable and a clash becomes `photo-2.png`; the content hash is used for *comparison*
-  rather than as the file name. Naming files after their hash was the alternative and it
-  is worse where it matters: `assets/` is a directory a person opens and an agent greps,
-  and `data-embed="../assets/9f3c…d1.png"` tells neither of them anything. The write is
-  `O_EXCL`, so "never overwrite" survives the gap between the check and the write.
-- **An uploaded HTML file cannot script the app.** See §4: an asset that a browser would
-  run is served sandboxed even though it lives inside the deck.
-- **One CSRF-shaped check**, because it is free: `Sec-Fetch-Site` is set by the browser
-  and cannot be forged by page script, so an upload that says `cross-site` is refused. An
-  absent header is allowed — `curl` and older Safari do not send one.
-
-**What is deliberately not defended against.** There is no authentication anywhere
-(DEPLOYMENT §1), and this route does not invent any: `/ws` next door accepts every frame
-from every origin and runs `bash`, and WebSockets are not subject to CORS, so a hostile
-page in a browser pointed at the port already has strictly more than this offers. Nor is
-there a quota — the cap is per file, not per deck — no rate limit, no scanning of what is
-uploaded, and no re-encoding of images: an uploaded PNG is stored as it arrived and drawn
-by the browser's own decoder. Windows-reserved names (`nul.txt`) are not special-cased.
-
-**Nothing is dropped into a board.** A file dropped anywhere on the canvas — over a board's page
-too — lands on the canvas where it was let go: a picture, text, a film or a sound as an item of its
-own, anything else as a file card. A board's page refuses the drop and hands it back
-(`embed-guest.js`, `decks:drop`), and the canvas replays it on the board's frame at the same point
-on the screen, so it reaches the same handler a drop on empty canvas does.
-
-## 7. The canvas
-
-One CSS transform over an absolutely-positioned layer of frames. The boards live in
-world coordinates and never learn about the camera except to counter-scale their title
-bars, so a pan composites one layer instead of re-laying-out a dozen documents.
-
-- `camera.x/y` is the world point under the **centre** of the viewport. Centre-based is
-  what makes "zoom about the cursor" and "fit these boards" two lines each, and it
-  means a resized window keeps looking at the same thing.
-- Gestures follow the trackpad, because that is what this is used on: two-finger scroll
-  pans, pinch zooms, ⌘-wheel zooms, space or middle-drag pans from anywhere. The
-  per-event zoom factor is clamped, or one wheel notch jumps 2.7×.
-- **A gesture that starts over a board is forwarded out of it** (`frame-gestures.ts`).
-  A board frame is a separate document, so a wheel event over it never reaches the
-  stage — no amount of listening in the parent will see one. With the frame live that
-  meant panning and pinching stopped working exactly where the user is most likely to
-  be looking. Same origin makes the fix small: listen inside the frame, hand the
-  gesture to the stage. Positions are converted (in-frame pixels are board pixels,
-  since the zoom is a transform on an ancestor) and deltas are passed through
-  unchanged; a test pans by the same delta over bare stage and over a board and
-  insists the camera moves equally.
-- **An HTML embed is the same problem one document deeper, and the same answer does not
-  reach it** (`guardEmbed` in `board.js`). A `[data-embed]` page is mounted in a sandboxed
-  iframe in an opaque origin (§4), so nobody can listen inside it: the scroll arrived
-  there and stopped, and a board covered by one could not be dragged by that patch of
-  itself either. Two answers, and an embed gets whichever it earns. A **veil** — a
-  transparent sheet in the board's own document — covers a page that has never heard of
-  Decks, so wheel and pointer land where the canvas can already see them; a click lifts
-  it and the pointer leaving the box brings it back. Leaving is the release gesture
-  because Escape cannot be one: focus inside the frame means its keys belong to its
-  document too, which is where this started. A page that opts in with
-  `lib/embed-guest.js` gets the **bridge** instead: it applies the canvas's own rule one
-  level down — a scroll its boxes can take is theirs, the rest is posted up as
-  `decks:wheel` — and `board.js` replays that as a wheel over the frame, which
-  `frame-gestures.ts` forwards without knowing it was synthetic. A guest needs no veil
-  and no click, so `decks:embed-ready` takes the veil away. Only messages from that
-  frame's own window are read, and only those three shapes: a postMessage channel into the
-  app's document must not quietly become a remote control.
-- **Fingers take a named channel, and the wheel does not need one.** A fabricated
-  `WheelEvent` over the frame is read by nobody but `onWheel`, so replaying one is honest.
-  A fabricated `pointerdown` would also reach the editor, which listens in the same
-  document — it would select the embed component and then drag it while the finger was
-  busy inside the page. So a guest's fingers arrive as `decks:embed-finger`, which only
-  `frame-gestures.ts` reads, and they arrive already decided: the guest applies the
-  scroll rule one level down, which means it also takes `touch-action: none` and scrolls
-  its own boxes by hand, exactly as the board does and for the same reason. Ids are
-  allocated from 900001 up, because the stage pools fingers by id from every document it
-  can see and a guest's `pointerId` starts at 1 like everyone else's — a pinch made of a
-  thumb on the board and a finger in an embed that shared an id would be one finger
-  teleporting. `embed-touch.mjs` asserted the pan, the pinch, the tap, and the half that
-  must *not* travel, and that the zoom was above `INTERACT_ZOOM` first — below it no frame
-  takes a pointer at all and every one of those would pass for the wrong reason. That check
-  has been cut, so none of this is asserted any more.
-- **A file dropped on a board is the canvas's.** A drag from the desktop over a board produces
-  `dragover`/`drop` inside the frame's document and nothing in the app's, so the page itself
-  refuses it (`embed-guest.js`) and posts the files up with the point; the canvas replays the drop
-  on the frame and it bubbles to the app's document like any other.
-- **The app's document swallows file drags globally**, because the browser's default for a
-  dropped file is to navigate to it — which would unload the SPA, socket and camera and
-  all, to show a PNG.
-- **Space is held in one place.** Each document only sees the keys pressed while it has
-  focus, so a space pressed over the canvas and a drag begun over a board were two
-  documents with two opinions. The stage owns the answer and the frames ask it.
-- **A scroll a box inside a board can take is given to it.** An embedded paper or a long
-  markdown file has its own scrollbar, and turning that into a canvas pan would make
-  the embed unreadable; the canvas takes over at the end of the box. The scroll is
-  applied by hand rather than by leaving the default action alone, because inside a
-  scaled iframe the browser does not reliably scroll anything — the same board scrolls
-  when opened on its own and not at 64%. Doing it by hand is also what makes the
-  content follow the fingers at the current zoom.
-- Above `INTERACT_ZOOM` (0.5) a frame stops taking pointer events: at a distance the
-  boards are a map and dragging across one should pan; up close they are documents and
-  a click belongs to the page.
-- A board's title counter-scales against the camera (`scale(1/zoom)`) so it stays legible
-  however far out you are, and there is one identity to keep in mind when touching it: a box
-  inside a world scaled by `zoom` that carries `scale(1/zoom)` renders at **its layout size
-  in screen pixels** — the two cancel. So its height and width are written in screen pixels,
-  and only the visual gap above the board needs dividing by the zoom. Asking for `24 / zoom`
-  height made the bar 88px tall at 27% zoom, which read as the title drifting off the boards
-  as they shrank.
-- A board's title bar sits *outside* its surface and is the drag handle. A board is a
-  document, not a window — its own top-left corner belongs to the page — and moving one
-  should never depend on finding a part of the page that happens to be empty. Below
-  `INTERACT_ZOOM` the whole board is the handle: the title bar is a 24px target that can
-  end up behind a floating panel, and at that distance there is nothing inside the board
-  worth clicking anyway.
-- A board off screen is a document not loaded. The margin is one viewport, so panning
-  arrives at boards that are already rendered.
-- **A board row owns a live document, so its identity must not change.** Solid re-creates
-  a row whose item is a new object, and re-creating a row reloads the iframe in it — so
-  replacing the boards array reloaded every board on screen. That was what "moving a
-  board refreshes the page" turned out to be: a drag wrote `deck.json`, the watcher
-  reported it, and the whole deck arrived as new objects. A drag writes the conversation's
-  own record now — a file under `.decks/`, which the watcher ignores — but a board change
-  still arrives as a new object, so the merge is what keeps a row's document alive. Board
-  updates are merged in place (`reconcile` keyed on the path), and the server no longer
-  reports its own `deck.json` write back — a hand edit still gets through, because the
-  bytes differ.
-- **A user's own edit must not reload the board they are editing.** The editor applies the
-  change to the live document, so a reload can only replace what is already correct — with
-  a white flash, losing scroll position and selection. The frame is therefore *pinned* to
-  the revision it loaded, and only an edit from somewhere else clears the pin.
-
-  Two things made that pin leak, and both are the same mistake in different clothes:
-  assuming a write produces one notification, and assuming the pin can be re-set. One patch
-  produces **two** `board.changed` messages — the immediate one from the write and the
-  watcher's — so a boolean "I just wrote this" flag is consumed by the first, and the second
-  is indistinguishable from the agent's write. The guard is keyed by revision instead
-  (`selfRevs`), and since a rev is a content hash it absorbs however many echoes arrive.
-  Separately, re-pinning on each edit moved the pin to the newest rev while the document on
-  screen was still the one it first loaded, so the URL changed and the frame reloaded from
-  the second drag onward: the pin is set once and left alone.
-
-  A third trap sits next to them: assigning `src` reloads an iframe **even when the value is
-  identical**, so the attribute cannot be a plain reactive binding — `BoardFrame` assigns it
-  only when the string actually differs. The pin is safe against a stale document because
-  `rev` is a cache-buster, not a content selector: the server serves the current file for a
-  path whatever rev the URL names, so a board culled while panned away and remounted comes
-  back current.
-- A rail item is the board itself, scaled down, mounted when it scrolls into view.
-  A thumbnail is therefore never stale and never a job that has to finish before you
-  can see your deck. `<meta name="poster">` is the way out for a board that is
-  expensive to mount.
-- **The dock: the last reply, a question if one is waiting, and the input bar.** One
-  bottom-centred stack rather than three separately-positioned things, so a question
-  appearing pushes the reply up instead of landing on it, and none of them has to know how
-  tall the others are. That is also what removed the hardcoded `bottom: 92px` a taller stack
-  used to collide with; the dock now publishes its measured height as `--dock` instead.
-
-  A first-run hint listing the canvas gestures used to sit at the top of the stack. It is
-  gone: it was a line of chrome under every board on every visit, teaching two things
-  (two-finger scroll, pinch) that the trackpad already teaches on the first try, and naming
-  four more that nobody reads at the moment they would need them.
-
-  The reply floating there is the concession the app owes its own thesis. Boards are the
-  medium and the conversation is away by default — but *not needing* the transcript is not
-  the same as never seeing a word of it, and a reply that names the board it just wrote is
-  worth a glance. So the last one flows above the input bar as it arrives, following the
-  text while it streams and returning to the top once it stops, because a finished message
-  left scrolled to its end opens mid-sentence and reads as if the start had been lost.
-  Clicking it opens the whole history; the × waves it away, keyed by message id so
-  dismissing one reply does not silence the next.
-
-  A question goes here too, and only here (§6.8). It used to be a card in the transcript on
-  the argument that a question belongs to the conversation that raised it. That argument was
-  right and the placement was still wrong: the transcript is away, so the first thing a
-  Claude agent asked stopped the turn for a reason nobody could see. Above the input bar it
-  is where the user's hands already are, and it is not a modal — the canvas the question is
-  about stays visible. Which is also why a field in one of these cards focuses itself: every
-  dialog that has one is asking for something to be typed or pasted *now* — a sign-in code,
-  a name — and a question over the input bar that needs a click before it will take a paste
-  is a question that looks broken.
-
-- **One transcript, and it is bubbles over the boards.** There were two: a 380px sheet that
-  slid in from the right edge with the full history in it, and a translucent condensation of
-  the newest turn floating over the canvas. Two surfaces for one conversation, and the one
-  that could actually be read was the one nobody could find — the sheet was away by default,
-  summoned by a cursor approaching an edge, and everything it could do the float had a
-  dimmer, click-through version of. So the sheet is gone and the bubbles took its job: the
-  whole history, scrollable, with `rewind · fork · restore boards` on each message and a
-  turn's tool calls collapsed to a pill that opens into the same chips the column used.
-
-  Two things had to change with it. It is **deliberate** now — opened from the dock's peek,
-  the title-bar button or a click on the spine, and closed on the × — rather than appearing
-  on its own for every turn, because a surface you can scroll is a surface that swallows the
-  canvas's wheel and one that arrives uninvited would swallow it uninvited. And the column
-  **takes the pointer** while it is up, where it used to be `pointer-events: none` with only
-  its rows as targets: that is a lovely property for something that appears by itself and a
-  broken one for something you have to scroll, since the wheel over a gap between bubbles
-  went to the canvas and the history under the cursor did not move.
-
-  The newest turn sits at the bottom, against the input bar, by an auto margin on the first
-  row rather than `justify-content: flex-end` on the scroller — an auto margin resolves to
-  zero once the content overflows, so the top of a long history stays reachable, where
-  `flex-end` puts the overflow somewhere nothing can scroll to.
-
-- **The agent's replies are markdown, and no HTML is built to render them.** Model output
-  used to be drawn as plain text, on the argument that markdown means HTML means sanitising
-  it — a dependency and an attack surface — to gain bold and bullets in a narrow column. The
-  argument was right about HTML and wrong about the conclusion: an agent writes lists,
-  headings and `code` constantly, and a reply showing its own asterisks makes the reader do
-  the parsing.
-
-  So the text becomes a **token tree** (`chat/markdown.ts`) and the app builds real elements
-  from it (`chat/Markdown.tsx`). There is no `innerHTML` on the path and no sanitiser,
-  because a string of markup is never constructed — every leaf is a string the browser
-  inserts as text. The one remaining way a document can be attacked through structured
-  output is a link target, so that is an allowlist of three schemes: `http:`, `https:`,
-  `mailto:`, and anything else stays the literal text it was. Relative targets are refused
-  along with `javascript:`, for a different reason — following one in a single-page app
-  unloads the socket, the camera and the transcript to show a file.
-
-  Three decisions in the parser are worth knowing:
-
-  - **`_` does not emphasise.** A deliberate break with markdown. Underscores in an agent's
-    replies are names — `file_path`, `MAX_DEPTH`, and above all Python's dunders, where
-    every rule that reads `__` as bold renders `__init__` as **init** and eats the two
-    characters carrying the meaning. No model reaches for `_` to emphasise; they all write
-    `*`. One marker family does emphasis and underscores are literal.
-  - **An unterminated fence is code to the end.** Replies stream, so the half-typed states
-    are the ones a reader watches: parsing an open fence as a paragraph shows three
-    backticks and a run of prose, then snaps into a code block when the closing fence lands.
-  - **A heading is weight, not an outline entry.** `<h1>`–`<h6>` would interleave each
-    reply's structure into the page's heading outline with every other reply in the history,
-    which is a worse document than no headings at all.
-
-  Your own messages stay verbatim. A reply is written *as* markdown; a message you typed is
-  the literal text that was sent, and transforming it would leave you unable to see what the
-  agent actually received. The dock's peek is the third case: too small to draw a list, so it
-  shows the same words with the syntax stripped (`plainText`) rather than raw `**` under a
-  bubble that renders it bold.
-- **A list that scrolls has to be allowed to shrink.** `.side` is the box with a height
-  (`top`/`bottom`), and the rail inside it is `flex: 1` — but a flex child defaults to
-  `min-height: auto`, which refuses to go below its content. So a rail of fourteen boards
-  took its full 2022px, ran a thousand pixels off the bottom of the screen, and never
-  scrolled: `overflow-y: auto` does nothing to a box that is never smaller than what is in
-  it. `min-height: 0` on the rail and on its `.items` is the fix, and the agent list needed
-  the same.
-- **What mounts follows the scroll, not the array.** A rail item is a live document, so the
-  number of them has to be bounded — but bounding it by *index* (the first eight) meant a
-  thumbnail past the eighth board stayed blank however far you scrolled. The bound comes
-  from geometry instead: an item mounts while it is within a screen of the visible part of
-  the list, and unmounts when it is not, so the cost holds for any size of deck. The margin
-  is what stops that thrashing as you scroll.
-- A thumbnail is a second copy of the document with no live DOM to protect, so it does have
-  to reload to show an edit — but it reloads the whole board, libraries included, and a drag
-  produces a revision per drop. Rail reloads are coalesced on a trailing delay, which is all
-  a thumbnail needs.
-- **The rail is the context; the canvas is what is in play.** The rail lists what the
-  focused agent is holding — the full set, whether or not it is on screen — and the stage
-  renders the subset the agent put in play, falling back to the whole deck when it holds
-  nothing (§2). Clicking a rail item plays it and flies to it; the `×` on a board's title
-  bar hides it, which takes it off the canvas and leaves the agent's context alone. So the
-  rail is the agent's shelf and the canvas is its slide, and the user can clear the slide
-  without reaching into the shelf.
-- The rail deliberately does not line up with the canvas. It is a list of what is held, in
-  a stable order; the canvas is a spatial arrangement the agent chose. Making the two agree
-  would mean either sorting the rail by position, which moves items around as boards are
-  dragged, or letting the rail dictate layout.
-
-### 7.1 A hand instead of a cursor
-
-A phone is not the primary way to use a coding agent's canvas and never will be. But an
-infinite canvas you cannot zoom with two fingers is not usable *at all*, and that is what
-this was: a touchscreen sends no wheel events, so two-finger scroll, pinch, ⌘-wheel and
-space-drag were all simply absent, and a one-finger drag over a live board moved nothing
-whatsoever — the canvas was frozen wherever a board sat under your finger, which up close
-is the whole screen. The aim here is "genuinely usable for looking at a deck, reading a
-board, talking to the agent and light editing", and everything below serves that.
-
-- **Two fingers are always the canvas, and there is one pool of fingers for the whole
-  stage.** `canvas/touch.ts` reduces a set of fingers to a pan or to one step of a pinch,
-  and `pinchCamera` (`camera/camera.ts`) turns that step into a camera: the world point under
-  the old midpoint goes under the new one at the new zoom, which is `zoomAbout` generalised
-  to an anchor that moves. Steps are measured against the previous event rather than
-  against the start of the gesture, so a spread past `MAX_ZOOM` is clamped once instead of
-  being accumulated into a gesture the camera has to unwind before it answers again.
-
-  The pool is what makes it correct, and it is not an optimisation. A pinch does not
-  respect document boundaries: one finger can be inside a board's iframe and the other on
-  bare canvas, or on a *different* board's title bar. Each of those is two event streams
-  and one gesture, and a tracker per stream turns a pinch into two independent one-finger
-  pans — which was the original bug in miniature. So the stage owns the fingers and the
-  other documents report into it (`frame-gestures.ts`, `BoardFrame`), which is the same
-  division of labour §7 already describes for the wheel: the frame knows where the pointer
-  is, the stage owns the camera.
-
-- **One finger moves the canvas unless it landed on something that says otherwise.** That
-  is the whole rule, and the exceptions are: a board's title bar moves the board, a
-  scrollable box inside a board scrolls, and a component *already selected* drags. A
-  desktop distinguishes dragging from panning by which button is down and whether space is
-  held; a finger has neither, and the two gestures it must not confuse are "read this
-  board" and "rearrange it". So **selecting is a tap and only a tap**, and dragging is
-  available on the second gesture, when the thing under the finger is the thing the outline
-  is already around. Nothing is ever picked up by accident, a pan across a board never
-  changes the selection, and the price is one extra tap before a move.
-
-  A finger that belongs to something else is *claimed* rather than withheld
-  (`claimTouch`): it still counts towards the pool, so a second finger forms a pinch with
-  the right positions, and two fingers clear every claim — pinching out of a board you had
-  begun to drag is a change of mind, not an ambiguity, and the board goes back where it
-  was.
-
-- **Coordinates, three traps deep.** In-frame pixels are board pixels (§6.5), and for
-  touch that is not enough. (1) A pan measured in them cancels half of itself, because the
-  pan drags the board along under the finger: 60 screen pixels of finger moved the camera
-  30. So the frame converts to stage pixels before reporting, and the stage does *not*
-  convert again — subtracting the stage's offset twice is a horizontal pinch that walks the
-  canvas 90px vertically. (2) The conversion has to use the frame's geometry as of the
-  coordinates the browser is reporting, which during a gesture is *before* the camera
-  change that gesture just caused; sampling it after each step and using it for the next is
-  the pairing that holds a pinch's midpoint still. (3) A tap cannot be told from a pan by
-  distance travelled at all, for the same reason as (1) — a 60px pan measures 8px in the
-  board's frame — so `frame-gestures.ts` says so out loud and `Editor.ts` listens
-  (`pan-signal.ts`). Screen coordinates would have answered it, and `screenX` is 0 for a
-  synthesised touch, so the browser checks could not have seen the bug either.
-
-- **`touch-action: none` on everything inside a board frame.** On the root alone it was not
-  enough: the browser still claimed a finger that landed inside an embed's own scroller,
-  scrolled it natively and sent a `pointercancel` three events in, so the gesture was half
-  native and half ours and the canvas took the rest. The universal selector is blunt and it
-  is exactly the intent — a board on the stage does not scroll itself, and the scrolling
-  that looks native is done by hand for the reason the wheel path documents. The style is
-  marked `data-decks-ui` like every other affordance, so a board opened on its own scrolls
-  the way any page does.
-
-- **Tap to select, tap again to retype.** A double-tap is the browser's zoom gesture and a
-  poor thing to ask of a finger over a 14px line of text, so the second tap on a component
-  that is already selected starts the edit — the idiom every phone teaches, and it falls
-  out of the selection rule rather than being a second mechanism. Focusing that
-  `contenteditable` raises the keyboard over the bottom half of the screen, which is
-  usually where the words are: `keepVisible` pans the camera the smallest distance that
-  puts the component in the room left over, and `app/viewport.ts` publishes how much of the
-  window the keyboard is covering as `--keyboard`, which the bottom chrome adds to its own
-  offset. There is no CSS unit for that inset, and `dvh` describes the wrong thing.
-
-- **Where a cursor cannot hover, the chrome is toggled.** The board rail arrives when the
-  cursor approaches the left edge, and a finger cannot approach anything: on a phone it was
-  unreachable, and worse, a pan that began at that edge summoned the rail over the canvas
-  mid-gesture. So under `(hover: none)` proximity is off entirely and a button in the title
-  bar opens it, which honours §7's thesis better than an edge that opens by accident. The
-  conversation's button is beside it and is *not* touch-only: it has no edge to be summoned
-  from since the transcript sheet went, so it is the only handle it has and it is drawn for
-  every pointer. Below 760px both are full-width sheets and **mutually exclusive** — 200px
-  of rail and 340px of bubbles on a 390px phone is two surfaces and no canvas — and both
-  stop above the dock, so the composer is never what they cover. Everything else that was
-  revealed by hovering (a board's `×`, a message's `rewind · fork · restore boards`) is
-  simply there.
-
-- **Three media queries, asked about three different things.** `(hover: none)` is about
-  *discoverability*, `(pointer: coarse)` is about *size* — nothing moves, the targets grow
-  to 40–44px — and a width breakpoint is used only for what is genuinely about width: the
-  dock's clearance, and the rail and the conversation becoming sheets. Nothing is a separate
-  mobile layout; every rule is an override, and above the thresholds the stylesheet is the
-  app it was.
-
-- **The inspector becomes a bottom sheet, and it is the one place the desktop's reasoning
-  does not survive the smaller screen.** Top right is right on a laptop (§6.5). Across the
-  top of a phone it is in the way of the tap that opened it: you tap a component, a panel
-  appears where your finger just was, and the next tap lands on a class switch nobody meant
-  to touch — which happened, and wrote a revision each time. At the bottom the hand is
-  already there and the component stays visible above it. It takes the zoom controls' place
-  while it is up, because zooming has fingers to do it with.
-
-- **The dock was zero pixels wide.** `width: min(720px, calc(100% - 650px))` was the room
-  left beside two panels, and on a 390px screen that is a negative number: the composer was
-  18px across with the placeholder broken one letter per line, and the send button was
-  unreachable. This is the whole class of bug that only a real device viewport finds, which
-  is why `e2e/checks/mobile.mjs` ran in a device context with `hasTouch` and dispatched real
-  touches through CDP — a mouse would have hidden every one of these. That check has been
-  cut; nothing exercises a device viewport now.
-
-- **Getting a file in without a desktop to drag from.** The upload route and the insert
-  path already existed (§6.9); what was missing was somewhere to tap. The file picker grew
-  a "from this device" button over a hidden `<input type="file">`, which on a phone offers
-  the camera and the photo library as well as the file browser — three routes for one
-  control, none of them ours to build — and a pasted file lands on the selected board, at
-  the last point that board was touched. The picker is dismissed by a press that *begins*
-  on its backdrop rather than by a click on it: the tap that opened the picker produces a
-  `click` afterwards at the same coordinates, and the backdrop is by then underneath it, so
-  a click closed the picker the instant it opened.
-
-- **Every keyboard-only action has a touch route.** The palette's `V S C T E` are its
-  buttons, ⌘D / `[` / `]` / ⌫ are the inspector's row, `0` is the zoombar's `fit`, `1` is a
-  rail item or a double-tap on a title bar, and Escape is the inspector's `×`. ⌘Z had
-  nothing, so undo sits in the palette on a touch device — not a tool, and there anyway,
-  because the palette is the only editing chrome a finger has and it appears under exactly
-  the condition that makes an edit possible.
-
-**What mobile deliberately does not cover.** Editing on a phone happens zoomed in, because
-`INTERACT_ZOOM` is unchanged: a whole 1600px board fitted to a 390px screen is 24%, where a
-frame takes no pointer events and text is unreadable anyway. There is no drag-and-drop of
-files (the platform has none), no marquee, no multi-select, no keyboard shortcuts, and no
-hover preview on the timeline — the spine is hidden below 760px and rewinding is reached
-through the transcript, so the tap is the whole gesture rather than a preview and then a
-commitment. A pinch whose fingers land inside a *nested* sandboxed embed (an HTML embed is
-an iframe two levels in) is not forwarded, exactly as a wheel over one is not. And the
-agent-facing side is untouched: the `decks` calls, the time machine and the permission dialogs
-are the same code on any device.
-
-## 8. What is built
-
-All six milestones, each verified against the real app rather than only unit-tested.
-
-| | |
-|---|---|
-| M1 | Deck, stage, embeds: pan/zoom, drag-to-arrange, md/pdf/html/image/text embeds, files dropped in from the desktop, live reload. |
-| M2 | One agent: Pi adapter, transcript, composer, extension-UI bridge, both skills. |
-| M3 | `stage_eval`: stage service, eval, identity, state rebuilt from the branch. |
-| M4 | The user draws: revisions, undo (the in-board editor, palette and inspector have since been removed). |
-| M5 | Many chats: registry, chat list, `stage.send` with board handoff (`stage.delegate` until the verb cut). |
-| M6 | Time machine: rewind / fork / restore on each message, preview from revisions. |
-
-Since then the canvas also works under a finger — pinch and two-finger pan pooled across
-the board frames, tap to select and tap again to retype, the panels toggled and the chrome
-sized for a fingertip (§7.1) — with the scope of that stated at the end of the same
-section.
-
-### Known edges
-
-- The rail and the chat list share the left panel, and it has no collapsed-but-visible
-  state beyond the sliver — a board parked at the far left sits behind it when it is out
-  (draggable by its body once zoomed out).
-- No deck picker: switching decks means switching data directories, by argument or by
-  `DECKS_DATA_DIR`. The socket already carries `deck.open` for the day there is one.
-- No session resume, so a restart is a fresh conversation and older sessions are reachable
-  only through the Pi CLI. Drawing one would mean rebuilding a transcript from a session
-  file — `agents/translator.ts` builds it from live events only.
-- The rail's reveal is hover-driven, and where there is no hover it is toggled from the
-  title bar instead and everything hover-revealed is simply shown (§7.1). What
-  touch loses with it is the *preview*: `rewind` previews the boards on hover, so on a
-  phone the tap is the whole gesture.
-- A diagram drawn as a bare top-level `<svg>` can be selected, renamed, copied and
-  deleted but not dragged, resized or retyped — the editor's geometry is `HTMLElement`'s
-  and an `SVGElement` has none of it (§6.5). Putting the drawing inside a box component
-  is the answer the authoring skill gives, and it costs one wrapper.
-- Text sitting directly in an element beside markup — the `See` in `<p>See <a>x</a></p>` —
-  has no address of its own, and editing that paragraph replaces the whole run. That is the
-  point of the run being one field, but it means the words either side of a mark cannot be
-  retyped in isolation, and a select-all in a row of two `<span>`s replaces both. The
-  authoring skill's "one string per leaf" advice is what keeps the units the size an author
-  meant.
-- A run is offered as editable from the DOM's shape and accepted from the file's, so a file
-  whose element holds something a parser built no element for — a comment — is offered and
-  then has that comment replaced by the commit. It replaced a worse edge: a board nobody had
-  annotated with `data-edit` had no retypeable text at all.
-- A markdown or Mermaid source containing raw HTML cannot be edited from the app. What
-  `board.js` mounted was the element's `textContent`, with the tags already dropped, so
-  the browser never had the file's bytes to send back; it is refused rather than
-  flattened.
-- The inspector edits one component at a time. There is no multi-select, so "make these
-  four cards callouts" is four clicks or a sentence to the agent.
-- `kpi`, `table` and `chip` get a name, an order, a copy and a delete, and no appearance
-  rows: their CSS styles children the four prose classes do not have.
-- An embed's caption, an image's alt text and how a picture fits its box are not
-  editable, and this is the lib-is-a-copy constraint rather than an oversight —
-  `board.js` labels an embed from its filename and `board.css` has one rule for the
-  image inside one, so every one of those needs a runtime that older decks do not have.
-  The board's own `<meta>` (size, background, theme) is not editable either: it is not a
-  component, and it is one line for the agent.
-- A component inserted or duplicated lands before `</body>`, which is *after* the
-  `<script src="../lib/board.js">` line. Valid, and it renders, but a reader of the file
-  sees a component below the script tag.
-- A dropped file only lands on a board, and only while the board is live: on empty canvas
-  it is refused with a notice, and there is no drop onto a rail thumbnail (they are
-  `pointer-events: none`, so such a drop is the stage's and gets the same notice). Pasting
-  is built now and needs a rule where a drop has a point: a pasted file lands on the
-  *selected* board, at the last place that board was touched, and on no board at all if
-  none is selected. A file added through the picker's "from this device" is one file, not a
-  batch — a batch is the drop path's shape, which lays several out in a row.
-- A rewind truncates our transcript by matching the rewound message's text, which is
-  what `navigateTree` hands back. Two identical messages in one conversation would cut
-  at the first.
-- `stage.delegate` is gone. It waited for the child, and a stage run is abandoned after 20
-  seconds (`stage/eval.ts`) while a turn is minutes, so the report never came back: in 434
-  runs on the live deck it was never called once. `stage.send` is the only handover, and
-  `reply: true` is how an answer arrives — in the sender's transcript, on its next turn.
+A canvas may point at its own folder and at the deck's `assets/`, `docs/` and `apps/`, never at
+another canvas, a hidden folder or outside the deck (`packages/hub/src/layout.ts`); placing
+something from elsewhere copies it in. That is what lets a canvas be copied, shared or synced
+whole. The rules for a path that becomes a file are in `deck/roots.ts`, which resolves symlinks
+before it compares.
+
+When the shape on disk changes, a migration converts it (`apps/server/src/migrations`, one file
+per change, named by the day it shipped). The last two turned the deck's boards into cards and
+its document and app boards into items. A friend's shared canvas is never rewritten: a board left
+on one is drawn as its picture.
+
+Every write the harness makes is recorded as a revision (`deck/snapshots.ts`), content
+addressed under `.decks/revisions`, so the timeline can show the canvas as it was at any point
+of a conversation and restore it when asked.
+
+## 3. What is on a canvas
+
+A canvas's drawing is a pen.dev document: notes, text, shapes, arrows, icons, frames and refs to
+saved frames, edited by hand and by agents in the same operations (`@decks/pen`). Three kinds of
+item carry more than a drawing:
+
+- **A card** is pen's `browser` item tagged `{ type: "decks.card", path }`, read and written
+  through the verbs as `{ type: "card", card: <path> }`. Its file is a piece of HTML (no
+  `<html>` or `<body>`) that the canvas puts in a closed shadow root of the frame's own page
+  (`packages/canvas/src/items/card.ts`): its styles stay inside, its events bubble out to the
+  stage, a library two cards import loads once. Its inline scripts are modules, each served at
+  its own address beside the card (`index.html.m0.js`, `apps/server/src/cards/cards.ts`), so a
+  relative import resolves from the card's folder; the default export is called with the card
+  (`card.root`, `card.decks`, …) each time it wakes. A card opened by itself, or pictured, is the
+  same piece in a page of its own (`cardPage`), at `/api/card/<path>`.
+- **A document** is `{ type: "browser", metadata: { type: "decks.document", path } }`: a file in
+  the deck opened as a page you type into. Keystrokes reach the file as splices, another writer's
+  edits come back as changes to accept or reject, and every pause is a version (`packages/docs`).
+- **An app** is `{ type: "browser", metadata: { type: "decks.app", name } }`: a folder in
+  `apps/<name>/` that the harness serves (`static`), builds (`build`) or runs and puts to sleep
+  (`server`), shown on the canvas as the app itself at `/app/<name>/` (`apps/server/src/apps`).
+
+Only the person and agents make document and app items; a card's script may move, size or delete
+one, never make one or change what it names (`verbs/router.ts`, `touchesTrustedItems`).
+
+## 4. Trust
+
+Who is calling is a token or a pass, and nothing else: no header, address or machine says it
+(`auth/guard.ts`, `auth/tokens.ts`, `auth/passes.ts`).
+
+- **A harness token** (`dk_h_`) is the person (a Decks tab, a terminal after `decks login`), a
+  site the person paired (Studio, a second Decks), or one agent. Only its hash is kept; it slides,
+  lasting a day unused (an agent's lasts as long as the agent runs).
+- **A canvas pass** (`dk_cp_`) is the canvas frame's one credential: one canvas, your role there,
+  an hour, renewed by the page unseen. It is signed with the pass secret (kept in
+  `<data dir>/ticket-secret`) and stored nowhere; every use checks the token that asked for it and
+  your role now. It goes in the `Authorization` header for calls, and in the address for files and
+  pictures (`/api/t/<pass>/card/…`), since an image or a module cannot send a header.
+- **An app pass** (`dk_ap_`) is one app's: its server gets one as `DECKS_TOKEN` for that run, and
+  a tab another site opens it in carries one in its address.
+
+**The canvas frame is the sandbox.** It is a page of its own origin with `allow-scripts`, holding
+nothing but its canvas pass, so a card's script can reach neither the app's page nor the person's
+token. Each verb says where a card's call to it goes (the table's `card` column,
+`frame/inside/card-calls.ts`): the person's view and the time are answered in the frame; the
+canvas's own calls go to the harness on the canvas pass, which refuses anything else
+(`CANVAS_FRAME_VERBS`); an agent call goes to the app's page, which asks the person first; and
+anything that reaches past the canvas is refused. A canvas shared with you to view reads only.
+
+A card from a friend's canvas runs no scripts: they are cleaned out before it is placed and never
+served. An app calling the verbs is asked about once ("Allow until Decks restarts", "Always
+allow"), remembered in `AppTrust` (`auth/app-trust.ts`).
+
+## 5. The verbs
+
+`packages/api/src/verbs.ts` is the API. Each entry names a call (noun then verb: `canvas.insert`,
+`card.create`, `agent.send`), what it touches (`deck`, `screen`, `agents`, `outside`), whether it
+changes it, its parameters and its result as schemas. From it:
+
+- the harness makes a route of each (`POST /api/v1/<name>`), checks the arguments against the
+  schema before the handler runs, and answers `{ ok, value, notes }` (`verbs/router.ts`);
+- `scripts/gen-sdk.mjs` writes the SDK's types and verb list, `verbs.json` for the command and the
+  MCP server, and `runtime/decks-commands.md`, the reference every agent is given.
+
+Calls are stateless: every canvas call takes `{ canvas }`, and left out it means `decks.here()`,
+the caller's home canvas. The old names (the board verbs, `newBoard`, `pen.edit`, …) still answer
+until 2026-11-30, each with a note naming its new call, and the harness logs the first use of each.
+
+`GET /api/v1/events` streams every change the harness broadcasts as Server-Sent Events, the same
+messages the page hears on its socket (`card.changed`, `stage.pen.delta`, `agent.state`, …).
+
+## 6. The canvas in the browser
+
+The app's page makes the frame (`createFramedEditor`), gives it `start` and a `MessagePort`, and
+after that trades only what is the page's: its chrome, the composer, your storage
+(`frame/protocol.ts`). The frame reads its drawing from the harness on its pass, follows its
+canvas's event stream, and sends your edits itself; the page never relays the drawing.
+
+Inside the frame, the editor (`packages/canvas`) keeps the drawing as a model, sends each edit as
+pen operations, and hands the engine what to draw. The engine draws the drawing and, for each card
+that is not live, its **picture**; only the cards near the screen and at a readable zoom are live
+DOM, within a budget per device. Panning is native scrolling over the engine's canvas.
+
+**Pictures** are taken on the server by its own Chromium (`pictures/service.ts`): a card is a page
+of its own, and the server is the one place that can reach every card without anybody opening it.
+One browser, two pages at a time, newest request first, kept on disk by path, revision and scheme,
+at a ladder of widths (`pictures/ladder.ts`), compressed for the GPU and the wire. A picture of a
+whole canvas (`canvas.screenshot`, export) is drawn natively by `stage-shot` over the cards'
+pictures where it can, and in Chromium where it must.
+
+## 7. Agents
+
+An agent is a conversation with a runtime: Pi, Claude Code, opencode, OpenCode 2 or Antigravity
+(`apps/server/src/runtimes`). Each has a name, a face, tags, a workspace and a home canvas
+(`agents/registry.ts`), and its own `DECKS_TOKEN` and the `decks` command in its shell, so
+everything it does on the canvas is a verb call as itself.
+
+Its context is the deck: `runtime/AGENTS.md.tmpl` filled in with the deck, its cards and the
+command reference (`agents/context.ts`), the guidelines in `runtime/guidelines.txt`, and the
+skills in `runtime/skills` (card authoring and debugging, canvas authoring and design, building
+apps). Changes to its canvas made by others reach it with its next message.
+
+Agents hand work to one another: `agent.send` delivers now (steering a running turn where the
+runtime can), `agent.queue` waits for the turn to end, and a hand-off names the cards it is about,
+whose source the receiver is given. Permissions are the runtime's own; the app supplies the
+surface for its questions.
+
+## 8. Sync with Studio
+
+A harness with a Studio key (`DECKS_STUDIO_KEY`, or `.decks/studio.json`) keeps its deck in step
+with Studio in the background (`apps/server/src/studio`, `@decks/sync-client`): it watches the
+folder, pushes and pulls each canvas's drawing as changes and its files by hash, over the
+`/sync/v1` routes `@decks/sync-protocol` describes and `@decks/hub` serves. Edits made on both
+sides at once are merged. The harness reads and writes its folder as before; nothing else needs
+to know.
+
+The key is also the pairing. Studio's browsers are never paired themselves: when one needs the
+harness, Studio asks on its socket for a harness token for the person signed in, bound to Studio's
+origin and lapsing after an hour unused. Studio draws a harness's canvas with the same canvas
+frame, on a canvas pass it asks for, with the cards' pictures the harness uploads. Unpairing deletes
+the key and takes back every token given through it.
+
+Canvases friends share arrive in `shared/canvases/<owner>/<canvas>/` with your role there: edit,
+where your changes sync back to them, or view, where the only change is your own copy
+(`canvas.copyShared`).
+
+## 9. Working on it
+
+- `npm run dev` runs the harness and Vite; `npm run typecheck`, `npm test` and `node e2e/run.mjs`
+  are the checks (`e2e/README.md`).
+- A new call is an entry in the verb table and a handler in `apps/server/src/verbs`, then
+  `node --import tsx scripts/gen-sdk.mjs`; a test fails while the generated files are stale.
+- A new message on the socket is a variant in `packages/protocol/src/wire.ts`; the harness's table
+  of handlers (`wire/index.ts`) fails to compile until something answers it.
+- A change to how the deck is kept on disk is a migration, never a reader that guesses.

@@ -1,5 +1,5 @@
 {
 	"name": "decks",
 	"version": "0.1.0",
-	"description": "Writing and debugging the HTML boards a Decks deck is made of."
+	"description": "Drawing on a Decks canvas, and writing and debugging its cards and apps."
 }

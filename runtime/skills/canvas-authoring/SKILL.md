@@ -47,7 +47,7 @@ Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. 
 `decks.here()`, your home canvas, the one the person sees beside you. None of these moves you:
 
 ```ts
-await decks.canvas.list();                    // every canvas: { name, title, open: [agents], boards (cards counted) }
+await decks.canvas.list();                    // every canvas: { name, title, open: [agents], cards }
 await decks.canvas.create("Launch plan");     // a new, empty canvas; nobody is moved to it
 await decks.canvas.read({ canvas: "deploy" }); // another canvas, read where it is
 await decks.agent.update({ canvas: "deploy" }); // make it your home: the person sees it beside you

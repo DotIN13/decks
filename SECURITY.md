@@ -14,10 +14,10 @@ is the long version, and it is worth reading before this file.
 
 So the interesting security work here is not "add a password". It is:
 
-- **Keeping a board from reaching anything the agent was not asked to reach.** Boards render
-  in the deck's origin, and an embed is a document from somewhere else. §4 of
-  [docs/DESIGN.md](docs/DESIGN.md) is the trust model: the two tiers, what the sandbox does,
-  and what it does not.
+- **Keeping a card from reaching anything the agent was not asked to reach.** Cards run in the
+  canvas frame, a sandboxed page of its own origin that holds only a pass for its one canvas. §4
+  of [docs/DESIGN.md](docs/DESIGN.md) is the trust model: the tokens and passes, what the frame
+  lets a card's script call, and what it does not.
 - **Keeping a path from escaping the deck.** Every route that turns a URL into a file goes
   through `deck/roots.ts`, which resolves symlinks before it compares. An escape there is a
   bug worth reporting.

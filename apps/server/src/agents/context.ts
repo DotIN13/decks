@@ -2,6 +2,7 @@ import { processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { agentsTemplate, decksCommands } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
+import { isCardPath } from "../deck/layout.ts";
 
 /**
  * What the agent is told about the deck, once, as a context file.
@@ -61,16 +62,17 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
 		// agent still has the skills and the deck.
-		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/. The decks command in your shell reaches the canvas: decks --help.`;
+		return `You are working in a deck at ${deck.path}. Each canvas keeps its cards in canvases/<name>/cards/<card>/index.html. The decks command in your shell reaches the canvas: decks --help.`;
 	}
 
-	const boards = deck.boards;
-	const boardList =
-		boards.length === 0
-			? "_None yet. Write the first one._"
-			: boards
-					.map((board) => `- \`${board.path}\` — ${board.title} (${board.w}×${board.h})`)
-					.join("\n");
+	// The cards, then any old boards a canvas still holds, which show and can be read but get no new work.
+	const line = (one: { path: string; title: string; w: number; h: number }) => `- \`${one.path}\` — ${one.title} (${one.w}×${one.h})`;
+	const cards = deck.boards.filter((one) => isCardPath(one.path));
+	const boards = deck.boards.filter((one) => !isCardPath(one.path));
+	const cardList = [
+		cards.length === 0 ? "_None yet. Write the first one._" : cards.map(line).join("\n"),
+		...(boards.length ? ["", "Old boards, which show and can be read (new work is a card):", "", boards.map(line).join("\n")] : []),
+	].join("\n");
 
 	const roots = deck.roots.roots;
 	const rootList =
@@ -89,7 +91,7 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 		.replaceAll("{{DECKS_COMMANDS}}", api ? apiFor(api, { web: options.web === true }).trim() : "_The command reference is not in this install: `decks --help` lists the commands._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", deck.path)
-		.replaceAll("{{BOARDS}}", boardList)
+		.replaceAll("{{CARDS}}", cardList)
 		.replaceAll("{{ROOTS}}", rootList)
 		.replaceAll("{{TIME}}", timeLine());
 }

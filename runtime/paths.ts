@@ -6,13 +6,14 @@ import { fileURLToPath } from "node:url";
 /**
  * Where the runtime's assets are, resolved once.
  *
- * `runtime/` is what the agents' runtimes read: the board primitives every deck copies, the
- * skills an agent is taught with, the shells a new board starts from, the canvas API, the
- * tool's own words, and the two shims that let a runtime outside this process call back.
+ * `runtime/` is what the agents' runtimes read: the page primitives every deck copies (the old
+ * boards' stylesheet and runtime, which their pages still load), the skills an agent is taught
+ * with, the canvas API, the tool's own words, and the shims that let a runtime outside this
+ * process call back.
  *
  * **It is a package so the paths are one module rather than four sums.** Before this, four
  * files worked out the directory for themselves — `agents/context.ts` counted four levels up
- * from `src/agents`, `boards/templates.ts` four from `src/boards`, `app.ts` three, and the
+ * from `src/agents`, `boards/templates.ts` (now `cards/size.ts`) four from `src/boards`, `app.ts` three, and the
  * opencode shim two from `runtime/opencode/tools` — and each was right about a different
  * depth. Nothing tied any of them to the directory they meant, so moving a file was a silent
  * change to a path that happened to still resolve, or to one that did not.
@@ -46,9 +47,10 @@ export function skillsDir(): string {
 }
 
 /**
- * The board primitives a deck copies into itself.
+ * The page primitives a deck copies into itself (`lib/`): the stylesheet and runtime the old boards
+ * load, and that a card may use.
  *
- * A *copy*, and the copy is refreshed whenever a deck is opened (`deck/lib-sync.ts`) — a
+ * A *copy*, and the copy is refreshed whenever a deck is opened (`deck/lib-sync.ts`) — an old
  * board is a standalone document, so its stylesheet and runtime have to be files beside it
  * rather than a route this server serves.
  */
@@ -99,11 +101,11 @@ export function antigravityServer(): string {
  *
  * Read by the test beside this file and by nothing else at run time, which is the point:
  * the list is documentation that can fail. Adding an asset means adding it here, and a
- * clone missing one says so rather than starting an agent that cannot read a board.
+ * clone missing one says so rather than starting an agent that cannot read a card.
  */
 export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean }> = [
 	{ path: "skills", what: "what an agent is taught with", dir: true },
-	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },
+	{ path: "AGENTS.md.tmpl", what: "the deck context, with the card list filled in" },
 	{ path: "decks-commands.md", what: "the decks command reference, generated from the verb table" },
 	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },
 	{ path: "opencode", what: "opencode's config directory: its Google Docs tools, the plugin that names a session for decks, and Decks' skills", dir: true },

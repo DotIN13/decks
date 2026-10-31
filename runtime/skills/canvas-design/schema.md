@@ -322,7 +322,9 @@ A JavaScript file that makes the item's children in pen.dev.
 
 ### `browser`
 
-A live web page. On a Decks canvas this is a board.
+A live web page. On a Decks canvas this is a card (`metadata: { type: "decks.card", path }`), an app
+(`decks.app`) or a document (`decks.document`); an old board (`decks.board`) on a friend's canvas is
+drawn as its picture.
 
 | field | values | meaning |
 |---|---|---|

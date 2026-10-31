@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "What the agents' runtimes read: board primitives, skills, templates, the canvas API, and the tool shims.",
+	"description": "What the agents' runtimes read: skills, the deck context template, the canvas API, the page primitives a deck copies, and the tool shims.",
 	"exports": {
 		".": "./paths.ts"
 	},

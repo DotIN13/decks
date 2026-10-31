@@ -32,7 +32,8 @@ is read with one. There are three kinds:
   - **An agent** gets one as `DECKS_TOKEN` in its shell: it calls as that agent, has no idle limit while
     the agent is there, and is taken back when the agent stops.
 - **A canvas pass** (`dk_cp_`), for the canvas frame on one canvas, with your role there: signed with
-  `<data dir>/ticket-secret` and kept nowhere, it lasts an hour and the page asks for the next one
+  the pass secret in `<data dir>/ticket-secret` (the file keeps the name it had when it signed
+  tickets, so passes made before an upgrade still work) and kept nowhere, it lasts an hour and the page asks for the next one
   unseen. It is sent as the `Authorization` header for calls, and in the address for files and
   pictures (`/api/t/<pass>/…`, served with no referrer). Every use checks the token that asked for it
   still works and your role on the canvas now, so signing out or unsharing ends it at once.
@@ -65,8 +66,8 @@ Everything else here is ordinary deployment work. This part is the part that mat
 One process, one port. `http.ts` mounts `apps/web/dist` as static files when that directory
 exists and falls through to `index.html` for anything unmatched, so the built UI and the API
 share an origin and Vite is never needed at runtime — only at build time. That origin
-sharing is not incidental: boards load into same-origin frames (§4), and "same origin" has
-to be true of the origin the browser actually loaded.
+sharing is not incidental: the canvas frame, the cards drawn in it and an app's pages are
+served from it (docs/DESIGN.md, "Trust"), and "same origin" has to be true of the origin the browser actually loaded.
 
 ```
 browser ──https──▶ private-network proxy ──http──▶ 127.0.0.1:4329
@@ -149,7 +150,7 @@ sudo -u decks -H mkdir -p /srv/decks/data
 
 A picture of a stage (`decks.canvas.screenshot`, and Export) is drawn natively by
 `stage-shot`, a small Rust program in `packages/stage/crates/shot`: the stage engine paints the
-drawing over each board's stored picture, in 3–11 ms a shot warm, against about 1 s in Chromium.
+drawing over each card's stored picture, in 3–11 ms a shot warm, against about 1 s in Chromium.
 It is not part of `npm run build` and has to be built once on each machine:
 
 ```bash
@@ -161,14 +162,14 @@ sudo -u decks -H bash -c "cd /srv/decks/app/packages/stage && cargo build --rele
 - **It draws with Metal only, so today it works on a Mac.** On Linux, or with no binary, or
   no graphics card, every picture falls back to Chromium (below), which is correct, only slower.
 - A picture also goes to Chromium when it holds math, a picture or icon that cannot be loaded,
-  a board with no picture of its current revision (that picture is then taken in the
+  a card with no picture of its current revision (that picture is then taken in the
   background), or when the caller asks for `live: true`.
 - The answer says which it was: `how` is `"native"`, or `"chromium: <why>"`. §11 shows how to
   check.
 
 ### The browser
 
-The `card-debug` skill drives Chromium to screenshot a board, read its console and
+The `card-debug` skill drives Chromium to screenshot a card, read its console and
 measure its elements. That is a capability of the agent rather than a test tool, so a
 deployment that skips it ships an agent that cannot see its own work. Two halves, and they
 need different privileges:
@@ -223,7 +224,7 @@ shred -u <stage>/*        # a staging copy of a key is still a copy of a key
 
 The transcripts do not live in the deck: Pi keys them to a slug of the deck's path under
 `~/.pi/agent/sessions/`. A deployed deck therefore starts with no history even if you copy
-the boards, and its conversations stay on the server.
+the canvases, and its conversations stay on the server.
 
 ## 7. The service
 
@@ -354,7 +355,7 @@ change you made.
 When `packages/stage/` changed, build `stage-shot` again as in §5 before the restart; an old
 binary still runs, but draws with the old engine.
 
-Rolling back is `git checkout <sha>` plus the same two lines. Boards and revisions live in
+Rolling back is `git checkout <sha>` plus the same two lines. Canvases, cards and revisions live in
 `DECKS_DATA_DIR`, not in the repo, so they are untouched by either direction.
 
 ## 11. Verifying
@@ -420,8 +421,8 @@ curl -s -X POST http://127.0.0.1:4329/api/v1/canvas.screenshot \
   the agent runs as. That is convenient and worth knowing: an agent asked to fix a bug in
   Decks can edit the copy it is running from. Move the checkout outside the writable path if
   you would rather it could not.
-- **No backups are configured.** `DECKS_DATA_DIR` holds the boards, their revisions and the
-  arrangement; nothing here replicates it.
+- **No backups are configured.** `DECKS_DATA_DIR` holds the canvases, their cards, their revisions and
+  the arrangement; nothing here replicates it.
 - **Native stage pictures are Mac-only.** `stage-shot` opens Metal; elsewhere every picture is
   taken in Chromium (§5).
 - **Restarting is not resuming.** Each start is a new conversation; older ones are reachable

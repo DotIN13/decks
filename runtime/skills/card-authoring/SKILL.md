@@ -153,7 +153,7 @@ Boards are retired: everything that used to be a board is now a card. Old boards
   app, so a claim can cite its source with `href="https://…"`.
 - **A button acts through `card.decks`, wired in the card's module.** The calls are the `decks`
   command's, by group and name, answering a promise: a decision is a button whose listener calls
-  `await card.decks.agent.send("<your name>", { task: "Option A", boards: [card.path] })`. The view,
+  `await card.decks.agent.send("<your name>", { task: "Option A", cards: [card.path] })`. The view,
   `here` and `now` are answered at once; the canvas's own calls (`canvas.*`, `card.*`, `frame.create`,
   `file.url`) change this canvas as the person; `agent.*` and `view.goto` go through the app, which
   asks the person before a card's message reaches an agent; anything else (apps, the shared tab,

@@ -1,19 +1,20 @@
 # Decks
 
 **A canvas where you and your AI agents work side by side.** Ask an agent a question and it
-answers on a board: a page it designs and places on an infinite canvas you pan and zoom.
-Boards stay where they were put, so a plan, a chart or a working app is still there an hour
+answers on the canvas: a card it designs, a drawing or a working app, placed on an infinite
+canvas you pan and zoom. Everything stays where it was put, so a plan, a chart or a working app is still there an hour
 later, ready for you to edit by hand or to hand to the next agent.
 
 [![test](https://github.com/DotIN13/decks/actions/workflows/test.yml/badge.svg)](https://github.com/DotIN13/decks/actions/workflows/test.yml)
 
-![A Decks canvas planning a mission to Mars: boards with a photo, a chart and two working apps, drawn notes, a flowchart, a checklist card and arrows between them](docs/assets/canvas.png)
+![A Decks canvas planning a mission to Mars: cards with a photo, a chart and two working apps, drawn notes, a flowchart, a checklist card and arrows between them](docs/assets/canvas.png)
 
 ## What it can do
 
-- **Boards are plain HTML files.** Read them, diff them, open them in a browser without Decks.
-  Agents write them with their usual tools; you drag, resize and retype them.
-- **Draw around them.** Notes, shapes, arrows, icons and frames sit between boards, saved
+- **Cards are plain HTML files.** Each is a folder in its canvas (`cards/<name>/index.html`):
+  read it, diff it, open it in a browser without Decks. Agents write cards with their usual
+  tools; you drag, resize and retype them.
+- **Draw around them.** Notes, shapes, arrows, icons and frames sit between cards, saved
   as a [pen.dev](https://pen.dev) file that agents edit too.
 - **Apps on the canvas.** Ask for a tool, a game or a dashboard and an agent builds it in
   `apps/<name>/`: a single page, a React or Solid build, or a Next.js or Node server that
@@ -23,7 +24,7 @@ later, ready for you to edit by hand or to hand to the next agent.
 - **Many agents, five runtimes.** Run agents on [Pi](https://github.com/earendil-works/pi),
   Claude Code, opencode, OpenCode 2 or Antigravity. Each has a name, a face and its own canvas, and
   they can hand work to one another.
-- **Your files, in place.** Show PDFs, images, films and source code on a board, or drop
+- **Your files, in place.** Show PDFs, images, films and source code on a card, or drop
   files from your desktop onto the canvas.
 - **Your own browser, shared.** With the Decks extension, an agent can read and fill in a
   Chrome tab you choose to share.
@@ -44,7 +45,7 @@ npm ci
 npm run dev                       # then open http://127.0.0.1:4328
 ```
 
-Your first canvas is empty. Type a request in the box at the bottom and the first board
+Your first canvas is empty. Type a request in the box at the bottom and the first card
 appears. `npm run dev:example` opens a demo deck instead. Everything you make lives in one
 folder (`data/` here, or wherever `DECKS_DATA_DIR` points), so a deck is easy to back up or
 move.

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A canvas-centric coding agent: boards are local HTML files on an infinite canvas, written by an agent and edited by hand",
+  "description": "A canvas-centric coding agent: cards, drawings, documents and apps on an infinite canvas, written by agents as local files and edited by hand",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +17,7 @@
     "agent",
     "coding-agent",
     "canvas",
-    "boards",
+    "cards",
     "html",
     "pi",
     "claude-code"

@@ -6,12 +6,12 @@
 		<title>Decks — a canvas-centric coding agent</title>
 		<meta
 			name="description"
-			content="Boards are local HTML files on an infinite canvas. The agent writes them, you and it edit them, and nothing scrolls away. Runs on Pi or Claude Code."
+			content="Cards, drawings, documents and apps on an infinite canvas, kept as local files. The agent writes them, you and it edit them, and nothing scrolls away. Runs on Pi, Claude Code and more."
 		/>
 		<meta property="og:title" content="Decks — a canvas-centric coding agent" />
 		<meta
 			property="og:description"
-			content="Boards are local HTML files on an infinite canvas. The agent writes them, you and it edit them, and nothing scrolls away."
+			content="Cards, drawings, documents and apps on an infinite canvas, kept as local files. The agent writes them, you and it edit them, and nothing scrolls away."
 		/>
 		<meta property="og:type" content="website" />
 		<link
@@ -19,7 +19,7 @@
 			href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b5cf6'/%3E%3Crect x='14' y='16' width='22' height='14' rx='3' fill='%23fff'/%3E%3Crect x='14' y='34' width='36' height='14' rx='3' fill='%23fff' opacity='.65'/%3E%3C/svg%3E"
 		/>
 		<style>
-			/* The palette is the board primitives' own (runtime/lib/board.css), so the page and
+			/* The palette is the page primitives' own (lib/board.css), so the page and
 			   the thing it describes read as one piece of software. */
 			:root {
 				--grey-50: #ffffff;
@@ -362,7 +362,7 @@
 				<p class="eyebrow">A canvas-centric coding agent</p>
 				<h1>Decks</h1>
 				<p class="lede">
-					Boards are local HTML files of absolutely-positioned components, laid out on an infinite canvas
+					Cards are local HTML files, laid out with drawings, documents and apps on an infinite canvas
 					you pan and zoom. The agent writes them with its ordinary tools, and you drag, resize and retype
 					them. <b>Nothing scrolls away.</b>
 				</p>
@@ -381,11 +381,11 @@
 							src="assets/stage.png"
 							width="1600"
 							height="1000"
-							alt="The Decks canvas: four boards laid out on a grid, one of them a chart, with the conversation column down the right-hand side."
+							alt="The Decks canvas: four cards laid out on a grid, one of them a chart, with the conversation column down the right-hand side."
 						/>
 					</picture>
 					<figcaption>
-						The canvas holds boards; the conversation floats at the edge. The screenshot is the committed demo
+						The canvas holds cards; the conversation floats at the edge. The screenshot is the committed demo
 						deck.
 					</figcaption>
 				</figure>
@@ -393,26 +393,26 @@
 
 			<section id="idea">
 				<h2>The idea</h2>
-				<p class="claim">A chat scrolls away. A board stays where it was put.</p>
+				<p class="claim">A chat scrolls away. A card stays where it was put.</p>
 				<div class="three">
 					<div>
-						<h3>Boards are files</h3>
+						<h3>Cards are files</h3>
 						<p>
-							Plain HTML in <code>boards/*.html</code>, absolutely positioned, rendered on an infinite
-							stage. Read one, diff one, open one in a browser with Decks not running.
+							Plain HTML in <code>canvases/&lt;name&gt;/cards/&lt;card&gt;/index.html</code>, drawn on an
+							infinite canvas. Read one, diff one, open one in a browser with Decks not running.
 						</p>
 					</div>
 					<div>
 						<h3>The agent works where you look</h3>
 						<p>
-							It answers on a board, lays designs out on boards, and reports finished work on boards. The
-							chat says which board and why.
+							It answers on the canvas, lays designs out as drawings and cards, and reports finished work
+							there. The chat says which card and why.
 						</p>
 					</div>
 					<div>
-						<h3>Boards pass between agents</h3>
+						<h3>Cards pass between agents</h3>
 						<p>
-							A subagent is handed the <b>source</b> of the boards it was given, not a summary of them, and
+							A subagent is handed the <b>source</b> of the cards it was given, not a summary of them, and
 							it reports back by changing them.
 						</p>
 					</div>
@@ -427,7 +427,7 @@
 						<h3>One SDK for the canvas</h3>
 						<p>
 							The <code>decks</code> command in the agent's shell, the same calls as TypeScript and MCP:
-							start a board, place it on a canvas, hand work to another agent.
+							write a card, place it on a canvas, hand work to another agent.
 						</p>
 					</div>
 					<div class="card">
@@ -440,7 +440,7 @@
 					<div class="card">
 						<h3>Embeds</h3>
 						<p>
-							Markdown, PDF with page ranges, HTML, images, source. Anything a board cannot draw becomes a
+							Markdown, PDF with page ranges, HTML, images, source. Anything a card cannot draw becomes a
 							chip naming the file, its size and its kind.
 						</p>
 					</div>
@@ -454,21 +454,21 @@
 					<div class="card">
 						<h3>Files, by drag or finger</h3>
 						<p>
-							Drop files onto a board and they land where you dropped them, copied into the deck so a board
+							Drop files onto the canvas and they land where you dropped them, copied into the deck so a card
 							never breaks. Two fingers pan and pinch; panels become sheets.
 						</p>
 					</div>
 					<div class="card">
 						<h3>A time machine</h3>
 						<p>
-							Hover the timeline to see the boards as they were at that point in the conversation. Click to
-							rewind; restore the boards only if you ask.
+							Hover the timeline to see the cards as they were at that point in the conversation. Click to
+							rewind; restore them only if you ask.
 						</p>
 					</div>
 					<div class="card">
 						<h3>One deck, one directory</h3>
 						<p>
-							Boards, revisions, dropped files and the arrangement all live in the data directory. A deck
+							Canvases, cards, revisions and dropped files all live in the data directory. A deck
 							moves by moving the folder.
 						</p>
 					</div>
@@ -495,7 +495,7 @@ npm run dev:example  <span class="c"># the demo deck instead of yours</span></pr
 							canvas and the editor still work; only the agent does not.
 						</li>
 						<li>
-							<b>Chromium</b> for the browser checks and the agent's own board-debugging skill:
+							<b>Chromium</b> for the browser checks and the agent's own card-debugging skill:
 							<code>npx playwright install chromium</code>.
 						</li>
 						<li>
