@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "cbed61096bc7c3eb841828866067198a880de84d2c44039dabef34466c56e50e",
+	"hash": "4dd6d3ded5363ba43ea6b593de3359f655009239aa3fc62bb520785dad9eab11",
 	"rules": 1865,
 	"sheets": 21,
 	"ties": 23,
@@ -842,7 +842,7 @@
 		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .app-surface-open{padding:7px 22px;border:0;border-radius:999px;background:#0a84ff;color:#fff;cursor:pointer;font:inherit;font-size:14px;font-weight:500}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .app-surface-open:hover{background:#0077ed}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .app-surface-frame{display:block;flex:1;width:100%;min-height:0;border:0;background:var(--app-bg);color-scheme:light}"],
-		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .app-surface[data-away] .app-surface-frame{visibility:hidden}"],
+		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .app-surface[data-away] .app-surface-frame,:where(.decks-canvas,.decks-layer) .card-node[data-covered] .app-surface-frame{display:none}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ [data-color-scheme=\"dark\"] :where(.decks-canvas,.decks-layer) .app-surface-frame{color-scheme:dark}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ :where(.decks-canvas,.decks-layer) .document-surface .dp{height:100%}"],
 		["styles/stages.css","@layer components ▸ .stage-manager{position:fixed;inset:0;z-index:var(--z-popup);display:grid;place-items:center;box-sizing:border-box;padding:32px;background:rgb(10 10 12 / 34%);-webkit-backdrop-filter:blur(6px) saturate(115%);backdrop-filter:blur(6px) saturate(115%);opacity:0;pointer-events:none;transition:opacity 140ms ease}"],

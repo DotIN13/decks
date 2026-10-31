@@ -1826,8 +1826,11 @@
 	 * A running app scrolled far off: kept, so it never reloads, but not drawn. An app that animates
 	 * (a playhead, a clock) had the canvas repaint it at every step of every pan wherever the camera was.
 	 */
-	:where(.decks-canvas, .decks-layer) .app-surface[data-away] .app-surface-frame {
-		visibility: hidden;
+	:where(.decks-canvas, .decks-layer) .app-surface[data-away] .app-surface-frame,
+	/* While the camera moves the sheet draws the app's picture over it (`items-layer.tsx`): once it does, the window is not drawn under it. */
+	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .app-surface-frame {
+		/* Not drawn at all: hidden by visibility, its page went on painting each frame; a frame not displayed is not rendered, and is not reloaded either. */
+		display: none;
 	}
 	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-frame {
 		color-scheme: dark;

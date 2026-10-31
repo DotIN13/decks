@@ -168,6 +168,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			data-selected={props.selected}
 			data-inert={!shown() || props.asleep}
 			data-asleep={props.asleep && props.covered ? "" : undefined}
+			data-covered={props.covered ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}

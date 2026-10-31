@@ -191,8 +191,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// A document draws itself at any zoom; an app only while its window shows the app, and is its picture otherwise (`item-surfaces.tsx`).
-						live: board.item === "document" || (board.item === "app" ? appShowing(board.path) : live.has(board.path)),
+						// A document draws itself at any zoom; an app only while its window shows the app and the camera is still, and is its picture otherwise (`item-surfaces.tsx`):
+						// an app that animates repainted its window at every step of a pan.
+						live: board.item === "document" || (board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path)),
 						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// A card not live is its picture.
