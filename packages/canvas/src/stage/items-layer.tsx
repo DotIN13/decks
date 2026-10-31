@@ -1,6 +1,6 @@
 import type { Page, Camera } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
-import { boxOf, INTERACT_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
+import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { canvasHost, openInTab } from "../host.ts";
 import { appShowing } from "../items/item-surfaces.tsx";
@@ -302,8 +302,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** On screen, or within a window of it: the R-tree's answer, not each board's own arithmetic. */
 	const isVisible = (board: Page) => isNear(board.path);
 
-	/** At or above this device's live zoom (`INTERACT_ZOOM`): items near the window have their slots, title and all. */
-	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
+	/** At or above the live zoom (`LIVE_ZOOM`): items may be awake, and files near the window show live. */
+	const liveNow = createMemo(() => ctl.zoom() >= LIVE_ZOOM);
 	const pageIndex = createMemo(() => new BoxIndex(props.boards));
 	const pageSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
@@ -374,14 +374,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** Whether a card is awake: each slot is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
 	/**
-	 * The items that have a slot on the page at all: those near the window at the live zoom, found
-	 * through a spatial index (`spatial.ts`) rather than by asking every one, and any that must stay
-	 * whatever the camera does: an awake card, the selected item, one being dragged or resized, and
-	 * every document and app item.
-	 *
-	 * Below the live zoom a board or a sleeping card is its picture on the sheet and nothing else, so it
-	 * has no node: 400 of them cost a pan step 10 ms of the page's time, and each camera step reached
-	 * every one. The stage finds the one under a press itself (`editor/dom/pointer.ts`, `pictureUnder`).
+	 * The items that have a slot on the page at all: the awake ones (`items/awake.ts`: live, kept and
+	 * leaving), the selected item, one being dragged or resized, and the sleeping item under the pointer,
+	 * which gets its bar and edge band to move it by. A sleeping item is its picture on the sheet and
+	 * nothing else, at any zoom, its title painted over it by the engine: 400 nodes cost a pan step 10 ms
+	 * of the page's time, and each camera step reached every one. The stage finds the one under a press
+	 * itself (`editor/dom/pointer.ts`, `pictureUnder`).
 	 */
 	const rendered = createMemo<readonly Page[]>((was) => {
 		const boards = props.boards;
@@ -398,14 +396,14 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						const at = pageSlot().get(board.path);
 						return at === undefined ? [] : [at];
 					})
-				: liveNow()
-					? pageIndex().search(reach())
-					: [],
+				: [],
 		);
 		const keep = (path: string | undefined) => {
 			const at = path === undefined ? undefined : pageSlot().get(path);
 			if (at !== undefined) found.add(at);
 		};
+		// The sleeping item under the pointer: its bar and edge band, never mid-gesture.
+		if (!moved) keep(editor.hoverPicture());
 		for (const path of liveCards().keys()) keep(path);
 		keep(props.selected);
 		for (const path of livePaths()) keep(path);
@@ -448,7 +446,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		() => {
 			penDrawn();
 			const cam = restCamera();
-			if (cam.zoom < INTERACT_ZOOM || !props.pen) return [] as LiveFile[];
+			if (cam.zoom < LIVE_ZOOM || !props.pen) return [] as LiveFile[];
 			const v = view();
 			const mx = v.width * 0.25;
 			const my = v.height * 0.25;

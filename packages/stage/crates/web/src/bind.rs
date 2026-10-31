@@ -470,6 +470,8 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = setCards)]
 	pub fn set_cards(&mut self, cards: &str) {
 		let list: Vec<serde_json::Value> = serde_json::from_str(cards).unwrap_or_default();
+		// Titles laid for the cards before: a changed title is laid again, and gone ones are let go.
+		self.page.titles.borrow_mut().clear();
 		self.page.cards = list
 			.iter()
 			.filter_map(|b| {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, interactZoom, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -135,7 +135,7 @@ test("a box too big for the room left is aligned to its top left, where reading 
  * `fitInto` — fitting into the canvas column rather than into the window.
  *
  * The regression these guard is the one `EDGE_FLOOR` is named for: padding counted on top
- * of the panels, so a flown-to board landed under `INTERACT_ZOOM` and could not be clicked.
+ * of the panels, so a flown-to board landed under the live zoom and could not be clicked.
  */
 test("fitInto with no chrome is fit", () => {
 	const view = { width: 1400, height: 900 };
@@ -168,7 +168,7 @@ test("fitInto puts the content in the middle of the region, not of the window", 
 	assert.ok(Math.abs(at.x - screenCentreOfRegion) < 0.001, `content centred at ${at.x}, region at ${screenCentreOfRegion}`);
 });
 
-test("a board flown to inside the chrome stays above INTERACT_ZOOM", () => {
+test("a board flown to inside the chrome stays above the live zoom", () => {
 	// The actual failure: 1400x900 window, 264px panel and a 320px inspector, one 1600px
 	// board. With `breathingRoom` added on top of the panels this came out at 0.42.
 	const view = { width: 1400, height: 900 };
@@ -258,8 +258,3 @@ test("an empty stage leaves the camera where it is, at the same arriving zoom", 
 	assert.equal(kept.zoom, STAGE_ZOOM);
 });
 
-test("boards come alive at 50% on every device", () => {
-	assert.equal(interactZoom({ coarse: false, short: 900 }), 0.5);
-	assert.equal(interactZoom({ coarse: true, short: 390 }), 0.5);
-	assert.equal(interactZoom({ coarse: true, short: 820 }), 0.5);
-});

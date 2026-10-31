@@ -95,7 +95,7 @@ export function createFraming(stagePages: () => Page[]) {
  * **The camera goes to the board that was asked for, and only to it.** It used to frame the
  * pair, on the argument that a board arriving beside another is only useful if you can see
  * that it did. What that costs is the thing the link was followed for: two boards side by
- * side fit at half the zoom of one, which on a laptop is under `INTERACT_ZOOM` — the board
+ * side fit at half the zoom of one, which on a laptop is under `LIVE_ZOOM` — the board
  * lands too small to read and too small to click into. Where it sits is answerable by
  * zooming out; text too small to read is not answerable at all.
  */

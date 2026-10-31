@@ -231,7 +231,7 @@ export function CanvasOps(props: { onClose: () => void }) {
 				</div>
 
 				{/* Said once, at the bottom, because it is the rule behind half the rows above:
-				    below `INTERACT_ZOOM` a card is its picture, except the selected one, whose page works. */}
+				    below `LIVE_ZOOM` a card is its picture, except the selected one, whose page works. */}
 				<Show when={canHover()}>
 					<footer class="border-t border-line px-3 py-[9px] text-note leading-normal text-faint">
 						Zoomed out far enough, a card is a picture on a map: drag it to move it. The card you select keeps its page, and works at any zoom.

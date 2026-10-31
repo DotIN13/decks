@@ -11,24 +11,6 @@ import type { Page, Camera } from "@decks/protocol";
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 4;
 
-/** The slot zoom, on every device. */
-const SLOT_ZOOM = 0.5;
-
-/**
- * The zoom from which the items near the window have slots of their own: a title bar to drag them by
- * and an edge to size them by, and a press on one is the item's. Below it a sleeping card or a board is
- * its picture on the sheet and nothing else, and the stage finds the one under a press itself.
- *
- * 50% on every device. `device` is for a test, and kept so a device can differ again without changing
- * the callers.
- */
-export function interactZoom(_device?: { coarse: boolean; short: number }): number {
-	return SLOT_ZOOM;
-}
-
-/** This device's slot zoom (`interactZoom`). */
-export const INTERACT_ZOOM = interactZoom();
-
 /**
  * The zoom below which no item is awake, except the selected one: the engine draws every card, app and
  * document as its picture (`items/awake.ts`). Under 40% an item's words are too small to read or press,
@@ -212,7 +194,7 @@ export function fit(
  * This constant is a bug fix with a name. `fit` pads by `breathingRoom`, up to 96px a
  * side, which is right when the whole window is the canvas — and wrong once the chrome
  * insets it, because then the padding is counted *on top of* a 264px panel and a 240px
- * inspector. A board flown to on a laptop landed at 42%, below `INTERACT_ZOOM`, where a
+ * inspector. A board flown to on a laptop landed at 42%, below `LIVE_ZOOM`, where a
  * board takes no pointer events: clicking the thing you had just asked to look at did
  * nothing at all.
  *
@@ -275,7 +257,7 @@ export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: 
 /**
  * What an arrival looks at: a few boards at once, not one board's words.
  *
- * Below `INTERACT_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
+ * Below `LIVE_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
  * scale and not a working one — you land seeing what the stage holds and zoom into the board you
  * came for. A landing that could be typed into straight away would have to be a landing on one
  * board, and the manager's whole job is the other question.

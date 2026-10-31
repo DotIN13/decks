@@ -8,7 +8,7 @@ use stage_paint::painter::{Context, IconShape, LiveInk, Writer, paint_area, pain
 use stage_scene::geometry::Mat;
 use stage_paint::tiles::{Grid, Key, TILE, overview_scale, scale_for};
 use stage_scene::{Rect, Scene, Updated, arrows};
-use stage_text::Text;
+use stage_text::{Laid, Text};
 use stage_text::atlas::Atlas;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -54,6 +54,8 @@ pub struct Page {
 	pub icons: HashMap<String, IconShape>,
 	pub text: Text,
 	pub atlas: RefCell<Atlas>,
+	/// Sleeping items' titles as laid, by title: one line each, laid once and painted every frame (`frame`).
+	pub titles: RefCell<HashMap<String, Laid>>,
 	pub pictures: Pictures,
 	/// Pictures put whose sizes the layout has not yet taken in (`lay_out_pictures`).
 	pictures_unlaid: bool,
@@ -116,7 +118,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
+		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), titles: RefCell::new(HashMap::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -500,6 +502,7 @@ impl Page {
 		let mut over = DrawList::new(Color::TRANSPARENT);
 		let paper = if self.scene.dark { [0.118, 0.118, 0.125, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
 		let mut placeholders: Vec<Placeholder> = Vec::new();
+		let mut titled: Vec<Placeholder> = Vec::new();
 		let mut pictured = Vec::new();
 		let mut carrying = Vec::new();
 		// A drag's ghost is the lifted items alone: no boards.
@@ -544,6 +547,10 @@ impl Page {
 			} else if !board.title.is_empty() {
 				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
 			}
+			// Its title above it, as a sleeping item's bar reads: only where a 12 px line is more than a smudge.
+			if picture.is_some() && !board.title.is_empty() && s * 12.0 >= 5.0 {
+				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
+			}
 			if let Some(colour) = board.news.filter(|_| board.glow) {
 				over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
 			}
@@ -558,7 +565,7 @@ impl Page {
 		 * scheme's ink, so it is never a bare rectangle; the same for every kind. Set at the screen's
 		 * scale, as the lifted items' words are, so the glyph texture holds what they need.
 		 */
-		if !placeholders.is_empty() {
+		if !placeholders.is_empty() || !titled.is_empty() {
 			let skip = HashSet::new();
 			let pictures = &self.pictures;
 			let image = |url: &str| pictures.get(url);
@@ -570,6 +577,9 @@ impl Page {
 				labels.clear();
 				for p in &placeholders {
 					paint_placeholder(&ctx, p, s, dark, &mut labels);
+				}
+				for p in &titled {
+					paint_title(&ctx, &self.titles, p, s, dark, &mut labels);
 				}
 				if !self.atlas.borrow_mut().take_overflow() {
 					break;
@@ -1819,6 +1829,23 @@ fn paint_placeholder(ctx: &Context, p: &Placeholder, scale: f64, dark: bool, ops
 	// Cut at the paper's foot: a long title on a short paper shows its first lines.
 	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
 	stage_paint::painter::draw_laid(ctx, &title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
+	ops.push(Op::PopClip);
+}
+
+/// A sleeping item's title, 12 px in the stage's units above its picture, as the bar over an awake
+/// item reads it: one line, cut at the item's width. Laid once per title and kept (`titles`).
+fn paint_title(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let muted = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let mut titles = titles.borrow_mut();
+	let laid = titles.entry(p.title.clone()).or_insert_with(|| text.lay_words(&p.title, &style, None, stage_text::Align::Left, false, false));
+	let height = laid.height as f64;
+	// Above the item, its foot 4 units over the item's top, as the bar sits; cut at the item's width.
+	let top = p.y as f64 - (height + 4.0) * scale;
+	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, top]);
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: (height * scale) as f32 + 1.0, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, top as f32) }));
+	stage_paint::painter::draw_laid(ctx, laid, (2.0, 0.0), &[Color::straight(muted, 1.0)], &m, ops);
 	ops.push(Op::PopClip);
 }
 
