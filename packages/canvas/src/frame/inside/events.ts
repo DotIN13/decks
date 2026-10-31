@@ -155,9 +155,9 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		if (message.type === "stage.call") return stageCall(message.call);
 		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
 		// A card's file changed: its record taken, its place kept, as the drawing says it.
-		if (message.type === "board.changed") {
-			if (message.removed || !message.board) return;
-			const record = message.board;
+		if (message.type === "card.changed") {
+			if (message.removed || !message.card) return;
+			const record = message.card;
 			setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust } : page)));
 			return;
 		}

@@ -104,7 +104,7 @@ say("an arrow to a board is drawn when it is made", typeof arrow?.geometry === "
 
 // --- moving a board moves its item, and the arrow follows ------------------------------------------
 const before = arrow?.geometry;
-link.send({ type: "board.move", path: firstBoard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
+link.send({ type: "card.move", path: firstBoard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
 const movedItem = await until(() => {
 	const now = onDisk().children.find((n) => n.metadata?.path === inFolder(firstBoard));
 	return now && now.x === (item?.x ?? 0) + 400 ? now : undefined;

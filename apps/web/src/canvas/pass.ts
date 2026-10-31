@@ -20,7 +20,7 @@ export async function canvasPass(canvas: string): Promise<CanvasPass> {
 	return {
 		api: new URL(api("/"), location.href).href.replace(/\/$/, ""),
 		token: answer.pass,
-		files: at("board/"),
+		files: at("card/"),
 		pictures: at("thumb/"),
 		expires: answer.expires ?? Date.now() + 3_600_000,
 	};

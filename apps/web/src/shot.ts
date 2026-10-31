@@ -46,7 +46,7 @@ async function main(): Promise<void> {
 		(board) =>
 			new Promise<void>((resolve) => {
 				const frame = document.createElement("iframe");
-				frame.src = `/api/board/${board.path.split("/").map(encodeURIComponent).join("/")}`;
+				frame.src = `/api/card/${board.path.split("/").map(encodeURIComponent).join("/")}`;
 				frame.setAttribute("scrolling", "no");
 				Object.assign(frame.style, { left: `${board.x}px`, top: `${board.y}px`, width: `${board.w}px`, height: `${board.h}px` });
 				world.append(frame);

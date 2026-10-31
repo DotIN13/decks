@@ -55,9 +55,9 @@ const select = async (path) => {
 	 */
 	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
-	for (const other of others) link.send({ type: "board.hide", path: other });
+	for (const other of others) link.send({ type: "card.hide", path: other });
 	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
-	link.send({ type: "board.play", path });
+	link.send({ type: "card.play", path });
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	link.close();
 	await settle(page, 500);
@@ -306,7 +306,7 @@ say("a double-click on a board's own bar makes nothing", countAfterBar === count
  */
 const link = await socket();
 for (const path of await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {
-	link.send({ type: "board.hide", path });
+	link.send({ type: "card.hide", path });
 }
 await new Promise((resolve) => setTimeout(resolve, 800));
 link.close();

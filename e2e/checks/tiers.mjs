@@ -83,7 +83,7 @@ const twoNames = names.slice(0, 2);
 const two = twoNames.map((name) => `boards/${name}`);
 const link = await socket();
 if (made) link.send({ type: "agent.focus", id: made.id });
-for (const path of two) link.send({ type: "board.play", path });
+for (const path of two) link.send({ type: "card.play", path });
 await (await canvasFrame(page)).waitForFunction((wanted) => (window.__decksBoards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page);

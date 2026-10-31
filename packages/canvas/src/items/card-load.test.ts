@@ -9,7 +9,7 @@ function harness(answers: Array<{ ok: boolean; text?: string } | Error>) {
 	const timers: Array<() => void> = [];
 	let reads = 0;
 	const loader = cardLoader({
-		url: () => "/api/t/T/board/canvases/c/cards/a@1/index.html?raw=1",
+		url: () => "/api/t/T/card/canvases/c/cards/a@1/index.html?raw=1",
 		read: async () => {
 			const answer = answers[Math.min(reads++, answers.length - 1)]!;
 			if (answer instanceof Error) throw answer;

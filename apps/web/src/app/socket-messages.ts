@@ -142,20 +142,20 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					if (index !== -1 && state.boards[index]!.h !== message.h) setState("boards", index, "h", message.h);
 					return;
 				}
-				case "board.changed": {
+				case "card.changed": {
 					if (message.removed) {
 						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
-					if (!message.board) return;
-					const board = message.board;
+					if (!message.card) return;
+					const board = message.card;
 					/*
 					 * An agent named this board while its own stage was the one on screen: it was watched
 					 * being written, so it is not news. Reading it is how the browser says so, and the read
 					 * stamp is the server's, so the mark clears on every device signed in.
 					 */
 					if (watchedBeingNamed(board, { focused: state.focused })) {
-						send({ type: "board.seen", path: board.path });
+						send({ type: "card.seen", path: board.path });
 					}
 					// Merged into the existing row so its frame survives; only a board that
 					// is genuinely new grows the array.

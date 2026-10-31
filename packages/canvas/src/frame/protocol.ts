@@ -51,7 +51,7 @@ export interface Start {
 	 * unless the page sends the next (`token`).
 	 */
 	backend: { api: string; token: string; expires: number; kind?: "harness" | "studio" };
-	/** The address the canvas's files are read at, with the pass in it: `…/api/t/<pass>/board/canvases/<name>/`. */
+	/** The address the canvas's files are read at, with the pass in it: `…/api/t/<pass>/card/canvases/<name>/`. */
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same pass: `…/api/t/<pass>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;

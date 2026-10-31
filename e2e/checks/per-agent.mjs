@@ -79,12 +79,12 @@ const make = async (name, path, y) => {
 	let shown;
 	if (path) {
 		const file = path.split("/").pop();
-		link.send({ type: "board.play", path });
+		link.send({ type: "card.play", path });
 		shown = await until(
 			() => link.received.filter((m) => m.type === "context.changed" && m.agentId === id).at(-1)?.inPlay?.find((one) => one.split("/").pop() === file),
 			`${name}'s board to be in play`,
 		);
-		link.send({ type: "board.move", path: shown, x: 0, y });
+		link.send({ type: "card.move", path: shown, x: 0, y });
 	}
 	/* A rename is answered with the agent's identity, not a new list. */
 	await until(() => link.received.some((m) => m.type === "agent.identity" && m.id === id && m.identity?.name === name), `${name} to be called that`);

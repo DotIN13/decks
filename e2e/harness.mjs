@@ -637,8 +637,8 @@ export async function resetStage(at) {
 	while (Date.now() < deadline) {
 		agent = link.last("agents")?.focused ?? agent;
 		if (agent) {
-			for (const board of places) link.send({ type: "board.move", path: board.path, x: board.x, y: board.y });
-			for (const path of wanted) link.send({ type: "board.play", path });
+			for (const board of places) link.send({ type: "card.move", path: board.path, x: board.x, y: board.y });
+			for (const path of wanted) link.send({ type: "card.play", path });
 		}
 		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.
 		const resend = Date.now() + (agent ? 1500 : 100);

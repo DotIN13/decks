@@ -229,13 +229,13 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 				setTimeout(() => ctx.handle().reloadBoard(path), 300);
 			},
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
-			onExtent: (path, extent) => void (studio ? undefined : backend.post("board-extent", { path, ...extent })),
+			onExtent: (path, extent) => void (studio ? undefined : backend.post("card-extent", { path, ...extent })),
 			onOpenLink: (path, from) => {
 				void end.call("open", { path, from });
 				return true;
 			},
 			news: () => ctx.news(),
-			onRead: (path) => void (studio ? undefined : backend.post("board-seen", { path })),
+			onRead: (path) => void (studio ? undefined : backend.post("card-seen", { path })),
 			// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
 			onHide: (path) => {
 				if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path]);

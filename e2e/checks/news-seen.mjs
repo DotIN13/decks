@@ -4,7 +4,7 @@
  * A card is news when something changed it that the person has not read since (`items/news.ts`):
  * here, the person's own resize names them its writer, and the file changing after that, as an agent
  * or a script writing it would, makes it news. Selecting it in the canvas frame says it was read
- * (`Stage`'s `onRead`, the frame's `board-seen`); the harness stamps it read and the frame's dot for it
+ * (`Stage`'s `onRead`, the frame's `card-seen`); the harness stamps it read and the frame's dot for it
  * goes. Said once: a second selection of the same unchanged card sends nothing more.
  */
 import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectBoard, settle, write } from "../harness.mjs";
@@ -22,10 +22,10 @@ const person = await asPerson();
 const me = (await call("agent.me", [], person)).value;
 const agent = { ...person, "x-decks-agent": me.id };
 
-// The frame's posts of `board-seen`, counted.
+// The frame's posts of `card-seen`, counted.
 const seenPosts = [];
 page.on("request", (request) => {
-	if (request.method() === "POST" && /\/api\/v1\/board-seen$/.test(request.url())) seenPosts.push(request.postData() ?? "");
+	if (request.method() === "POST" && /\/api\/v1\/card-seen$/.test(request.url())) seenPosts.push(request.postData() ?? "");
 });
 
 // A card on the canvas on screen (the fixture's are its boards, which the frame lists and marks as it does cards).
@@ -58,7 +58,7 @@ if (card) {
 	await selectBoard(page, card.path);
 	const cleared = await waitFor(async () => !(card.path in (await newsNow())));
 	say("selecting it clears its dot", cleared, JSON.stringify(await newsNow()));
-	say("…by one board-seen from the frame", seenPosts.length - before === 1, `${seenPosts.length - before} posts: ${seenPosts.slice(before).join(" | ")}`);
+	say("…by one card-seen from the frame", seenPosts.length - before === 1, `${seenPosts.length - before} posts: ${seenPosts.slice(before).join(" | ")}`);
 	const stamped = (await deckState()).boards.find((board) => board.path === card.path);
 	say("…which the harness keeps as read", (stamped?.seenAt ?? 0) >= Math.max(stamped?.modifiedAt ?? 0, stamped?.namedAt ?? 0), JSON.stringify({ seenAt: stamped?.seenAt, modifiedAt: stamped?.modifiedAt, namedAt: stamped?.namedAt }));
 

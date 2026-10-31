@@ -20,7 +20,7 @@ const h = Number(query.get("h")) || 240;
 const READY_MS = 10_000;
 
 const frame = document.createElement("iframe");
-frame.src = `/api/board/${path.split("/").map(encodeURIComponent).join("/")}`;
+frame.src = `/api/card/${path.split("/").map(encodeURIComponent).join("/")}`;
 frame.setAttribute("scrolling", "no");
 Object.assign(frame.style, { width: `${w}px`, height: `${h}px` });
 document.body.append(frame);

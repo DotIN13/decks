@@ -50,8 +50,8 @@ const stray = paths.at(-1);
 const link = await socket();
 /* Off the canvas and half a million pixels down: the place the deck-wide layout used to give a
    board that nobody had put anywhere. */
-link.send({ type: "board.hide", path: stray });
-link.send({ type: "board.move", path: stray, x: 0, y: 520_000 });
+link.send({ type: "card.hide", path: stray });
+link.send({ type: "card.move", path: stray, x: 0, y: 520_000 });
 /*
  * Waited for rather than slept through. A hide travels socket → canvas → every browser, and
  * a fixed 700ms was enough until the canvas list started travelling with it: under a full
@@ -64,7 +64,7 @@ await settle(page, 300);
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);
 
-link.send({ type: "board.play", path: stray });
+link.send({ type: "card.play", path: stray });
 await (await canvasFrame(page)).waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
 await settle(page, 1200);
 

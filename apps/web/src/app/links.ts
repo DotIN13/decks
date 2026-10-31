@@ -59,7 +59,7 @@ export function createFraming(stageBoards: () => Board[]) {
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
-		send({ type: "board.play", path });
+		send({ type: "card.play", path });
 		frameWhenPlaced(path);
 	};
 	createEffect(() => {
@@ -126,7 +126,7 @@ export const openLinkedBoard = (path: string, from: string): boolean => {
 		land(there);
 		return true;
 	}
-	send({ type: "board.play", path });
+	send({ type: "card.play", path });
 	// The server copies the board into the canvas; it is landed when the copy arrives.
 	const started = performance.now();
 	const wait = () => {

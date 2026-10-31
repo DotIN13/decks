@@ -255,7 +255,7 @@ if (bar) {
 	await page.mouse.wheel(0, -160);
 	await settle(page, 400);
 	// Put it back where the fixture had it.
-	link.send({ type: "board.move", path: bar.path, x: boardBefore.x, y: boardBefore.y });
+	link.send({ type: "card.move", path: bar.path, x: boardBefore.x, y: boardBefore.y });
 }
 await page.keyboard.press("Escape");
 say("Escape lets the whole selection go", (await count(".pen-selection")) === 0);
@@ -755,7 +755,7 @@ await page.keyboard.press("Escape");
 		});
 		say("a drag on a board moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
 		if (moved) {
-			link.send({ type: "board.move", path: chrome.path, x: start.x, y: start.y });
+			link.send({ type: "card.move", path: chrome.path, x: start.x, y: start.y });
 			await until(() => itemOf(onDisk(), chrome.path)?.x === start.x);
 			await settle(page, 500);
 			const again = await grip(chrome.path);

@@ -61,7 +61,7 @@ async function shoot(markup: string, act: string): Promise<{ html: string; w: nu
 			// eslint-disable-next-line no-new-func
 			await new Function("root", "body", `return (async () => { ${act} })()`)(root, body);
 			const { snapshotOfCard } = (globalThis as unknown as { cardSnapshot: typeof import("./card-snapshot.ts") }).cardSnapshot;
-			const shot = snapshotOfCard(root, { w: 400, h: 300, scheme: "dark", url: `${location.origin}/api/t/abc/board/canvases/c/cards/x@1/index.html`, skip: (sheet) => sheet === shared })!;
+			const shot = snapshotOfCard(root, { w: 400, h: 300, scheme: "dark", url: `${location.origin}/api/t/abc/card/canvases/c/cards/x@1/index.html`, skip: (sheet) => sheet === shared })!;
 			return { html: shot.html, w: shot.w, h: shot.h };
 		},
 		{ markup, act },
@@ -115,10 +115,10 @@ describe("snapshotOfCard", () => {
 	it("notes scroll positions and makes the card's own origin relative to the site", async (t) => {
 		if (!page) return t.skip(why);
 		const { html } = await shoot(
-			`<div id=box style="height: 50px; overflow: auto"><div style="height: 500px"></div></div><img src="ORIGIN/api/t/abc/board/canvases/c/cards/x@1/a.png">`,
+			`<div id=box style="height: 50px; overflow: auto"><div style="height: 500px"></div></div><img src="ORIGIN/api/t/abc/card/canvases/c/cards/x@1/a.png">`,
 			`root.getElementById("box").scrollTop = 120; const img = root.querySelector("img"); img.setAttribute("src", img.getAttribute("src").replace("ORIGIN", location.origin));`,
 		);
 		assert.match(html, /data-decks-scroll="0,120"/);
-		assert.match(html, /<img src="\/api\/t\/abc\/board\/canvases\/c\/cards\/x@1\/a.png">/);
+		assert.match(html, /<img src="\/api\/t\/abc\/card\/canvases\/c\/cards\/x@1\/a.png">/);
 	});
 });
