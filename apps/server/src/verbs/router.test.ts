@@ -57,9 +57,9 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 	const { base, token, bearer, cleanup } = await open();
 	try {
 		assert.equal((await fetch(base)).status, 401, "even the list needs a token");
-		const listed = (await (await fetch(base, { headers: bearer(token) })).json()) as { verbs: Array<{ name: string; signature: string; effect: string; alias?: string }> };
-		const { ALL_VERBS } = await import("@decks/api");
-		assert.equal(listed.verbs.length, ALL_VERBS.length);
+		const listed = (await (await fetch(base, { headers: bearer(token) })).json()) as { verbs: Array<{ name: string; signature: string; effect: string }> };
+		const { VERBS } = await import("@decks/api");
+		assert.equal(listed.verbs.length, VERBS.length);
 		assert.deepEqual(listed.verbs.find((verb) => verb.name === "canvas.move"), {
 			name: "canvas.move",
 			group: "canvas",
@@ -68,7 +68,12 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 			summary: "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
 			signature: "canvas.move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
 		});
-		assert.equal(listed.verbs.find((verb) => verb.name === "move")?.alias, "decks.canvas.move(card, { at })", "an old name is listed with its new call");
+		assert.equal(listed.verbs.find((verb) => verb.name === "move"), undefined, "an old name is not listed");
+		const old = await fetch(`${base}/move`, { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ args: ["x", { x: 0, y: 0 }] }) });
+		assert.equal(old.status, 404);
+		assert.match(((await old.json()) as { error: string }).error, /move was an old name and has been removed: use decks\.canvas\.move/, "an old name is refused with its new call");
+		const unknown = await fetch(`${base}/nothing.here`, { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: "{}" });
+		assert.match(((await unknown.json()) as { error: string }).error, /There is no verb called nothing\.here/);
 	} finally {
 		cleanup();
 	}
@@ -77,21 +82,21 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 test("a verb is called for the agent whose token the request carries, whatever a header says", async () => {
 	const { app, call, agent, token, bearer, cleanup } = await open();
 	try {
-		const byId = await call("boards");
+		const byId = await call("card.get", ["boards/tall.html"]);
 		assert.equal(byId.status, 200);
 		assert.ok(byId.body.ok);
-		assert.ok((byId.body.value as Array<{ path: string }>).some((board) => board.path === "boards/tall.html"));
+		assert.equal((byId.body.value as { path: string }).path, "boards/tall.html");
 
-		const renamed = await call("me", [{ name: "Wren", tags: ["testing"], workspace: "decks", avatar: { emoji: "🐦" } }]);
+		const renamed = await call("agent.update", [{ name: "Wren", tags: ["testing"], workspace: "decks", avatar: { emoji: "🐦" } }]);
 		assert.ok(renamed.body.ok, renamed.body.error);
 		assert.equal((renamed.body.value as { name: string }).name, "Wren");
 		assert.equal(agent.name, "Wren");
 
 		// Another agent named in a header changes nothing: the token is who is calling.
 		const other = app.agents.create({ name: "Ada" });
-		const claimed = await call("me", [], { ...bearer(token), "x-decks-agent": other.id });
+		const claimed = await call("agent.me", [], { ...bearer(token), "x-decks-agent": other.id });
 		assert.equal((claimed.body.value as { name: string }).name, "Wren");
-		const theirs = await call("me", [], bearer(app.bridge.issue(other.id)));
+		const theirs = await call("agent.me", [], bearer(app.bridge.issue(other.id)));
 		assert.equal((theirs.body.value as { name: string }).name, "Ada");
 	} finally {
 		cleanup();
@@ -101,12 +106,12 @@ test("a verb is called for the agent whose token the request carries, whatever a
 test("a change goes to the deck, and its notes come back beside the value", async () => {
 	const { call, deck, cleanup } = await open();
 	try {
-		const made = await call("newBoard", [{ title: "The finding", at: { x1: 0, y1: 0 } }]);
+		const made = await call("card.create", [{ title: "The finding" }]);
 		assert.ok(made.body.ok, made.body.error);
-		const path = made.body.value as string;
+		const path = (made.body.value as { path: string }).path;
 		assert.match(path, /^canvases\/[^/]+\/cards\/the-finding\//, "made in the caller's canvas");
 		assert.ok(existsSync(join(deck, path)), "the board's file was written");
-		assert.ok(made.body.notes.length > 0, "newBoard tells the caller about the viewport, as a run does");
+		assert.ok(made.body.notes.length > 0, "card.create tells the caller the card's width, as a run does");
 	} finally {
 		cleanup();
 	}
@@ -115,23 +120,23 @@ test("a change goes to the deck, and its notes come back beside the value", asyn
 test("wrong calls are answered with a sentence and the verb's signature", async () => {
 	const { call, agent, bearer, cleanup } = await open();
 	try {
-		const missing = await call("move", ["boards/tall.html"]);
+		const missing = await call("card.get");
 		assert.equal(missing.status, 400);
-		assert.match(missing.body.error!, /move needs at\. move\(path: string, at: Point\)/);
+		assert.match(missing.body.error!, /card\.get needs card\. card\.get\(card: string\)/);
 
 		const unknown = await call("teleport");
 		assert.equal(unknown.status, 404);
 
-		const nobody = await call("boards", [], {});
+		const nobody = await call("card.list", [], {});
 		assert.equal(nobody.status, 401, "no token, though it comes from this machine");
 
-		const named = await call("boards", [], { "x-decks-agent": agent.id });
+		const named = await call("card.list", [], { "x-decks-agent": agent.id });
 		assert.equal(named.status, 401, "a header naming an agent is not a token");
 
-		const stranger = await call("boards", [], bearer("dk_a_nobody-here"));
+		const stranger = await call("card.list", [], bearer("dk_a_nobody-here"));
 		assert.equal(stranger.status, 401);
 
-		const refused = await call("fit", ["boards/no-such.html"]);
+		const refused = await call("canvas.fit", ["boards/no-such.html"]);
 		assert.equal(refused.status, 422, "a verb that throws is an answer, not a crash");
 		assert.equal(refused.body.ok, false);
 		assert.ok(refused.body.error);
@@ -148,12 +153,12 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 	const { base, agent, token, cleanup } = await open();
 	try {
 		const env = { ...process.env, DECKS_TOKEN: "", ...decksEnv(Number(new URL(base).port), agent.id, token) };
-		const listed = await run("sh", ["-c", "decks boards | head -c 2000"], { env });
-		assert.ok(JSON.parse(listed.stdout).some((board: { path: string }) => board.path === "boards/tall.html"));
-		const made = await run("sh", ["-c", 'p=$(decks new-board --title "From the shell" --at.x1 0 --at.y1 900) && echo "$p"'], { env });
-		assert.match(made.stdout.trim(), /^canvases\/[^/]+\/cards\/from-the-shell\//);
+		const listed = await run("sh", ["-c", "decks card get boards/tall.html | head -c 2000"], { env });
+		assert.equal(JSON.parse(listed.stdout).path, "boards/tall.html");
+		const made = await run("sh", ["-c", 'decks card create --title "From the shell"'], { env });
+		assert.match(made.stdout, /canvases\/[^/]+\/cards\/from-the-shell\//);
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
-		await assert.rejects(run("sh", ["-c", "decks move boards/tall.html"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /move needs at/.test(error.stderr));
+		await assert.rejects(run("sh", ["-c", "decks card get"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /card\.get needs card/.test(error.stderr));
 	} finally {
 		cleanup();
 	}
@@ -165,17 +170,16 @@ test("the event stream carries what a verb changed, and only the types asked for
 	try {
 		const url = base.replace(/\/api\/v1$/, "");
 		const heard: Array<{ type: string; path?: string; card?: { path?: string } }> = [];
-		const stream = connect({ url, token, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["card.changed", "board.changed"] });
+		const stream = connect({ url, token, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["card.changed"] });
 		// The stream is open once its first comment arrives; a short wait is enough on loopback.
 		await new Promise((resolve) => setTimeout(resolve, 150));
-		const moved = await call("move", ["boards/tall.html", { x: 320, y: 160 }]);
-		assert.ok(moved.body.ok, moved.body.error);
-		for (let i = 0; i < 40 && !heard.some((event) => event.type === "card.changed" && event.path === "boards/tall.html"); i++) await new Promise((resolve) => setTimeout(resolve, 25));
+		const made = await call("card.create", [{ title: "Heard" }]);
+		assert.ok(made.body.ok, made.body.error);
+		const path = (made.body.value as { path: string }).path;
+		for (let i = 0; i < 40 && !heard.some((event) => event.type === "card.changed" && event.path === path); i++) await new Promise((resolve) => setTimeout(resolve, 25));
 		stream.close();
-		assert.ok(heard.some((event) => event.type === "card.changed" && event.path === "boards/tall.html" && event.card?.path === "boards/tall.html"), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
-		// The old name is said beside it until 2026-11-30.
-		assert.ok(heard.some((event) => event.type === "board.changed" && event.path === "boards/tall.html"));
-		assert.ok(heard.every((event) => event.type === "card.changed" || event.type === "board.changed"), "nothing else came through the filter");
+		assert.ok(heard.some((event) => event.type === "card.changed" && event.path === path && event.card?.path === path), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
+		assert.ok(heard.every((event) => event.type === "card.changed"), "nothing else came through the filter, and no old board.changed beside it");
 	} finally {
 		cleanup();
 	}
@@ -204,13 +208,13 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	}
 });
 
-test("an app is shown by an item: apps.board names it, canvas.insert places it, apps.delete takes it off", async () => {
+test("an app is shown by an item: apps.item names it, canvas.insert places it, apps.delete takes it off", async () => {
 	const { app, call, cleanup } = await open();
 	try {
 		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
 		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static", title: "Notes" }));
 		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
-		const item = await call("apps.board", ["notes"]);
+		const item = await call("apps.item", ["notes"]);
 		assert.deepEqual(item.body.value, { type: "app", app: "notes" }, "the item to insert, and no file written");
 		assert.equal(existsSync(join(app.deck.path, "boards", "apps", "notes.html")), false);
 		const placed = await call("canvas.insert", [item.body.value, { at: { x1: 0, y1: 0 } }]);
@@ -242,17 +246,17 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 		// An app's server holds a pass for its run; a run that is not the app's (it stopped) is nobody.
 		const runs: Record<string, string> = { notes: "run1", nothing: "run2" };
 		app.apps.runOf = (name: string) => runs[name];
-		const asApp = await call("boards", [], bearer(app.passes.appServer("notes", "run1")));
+		const asApp = await call("card.list", [], bearer(app.passes.appServer("notes", "run1")));
 		assert.equal(asApp.status, 200, asApp.body.error);
-		const gone = await call("boards", [], bearer(app.passes.appServer("nothing", "run2")));
+		const gone = await call("card.list", [], bearer(app.passes.appServer("nothing", "run2")));
 		assert.equal(gone.status, 404);
-		const stopped = await call("boards", [], bearer(app.passes.appServer("notes", "run0")));
+		const stopped = await call("card.list", [], bearer(app.passes.appServer("notes", "run0")));
 		assert.equal(stopped.status, 401, "an earlier run's pass");
-		const tab = await call("boards", [], bearer(app.passes.appTab("notes", app.tokens.issue({ kind: "person" }).id).pass));
+		const tab = await call("card.list", [], bearer(app.passes.appTab("notes", app.tokens.issue({ kind: "person" }).id).pass));
 		assert.equal(tab.status, 401, "a tab's pass opens the app's page, and calls nothing");
 
 		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
-		assert.equal((await call("boards", [], site)).status, 200);
+		assert.equal((await call("card.list", [], site)).status, 200);
 		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("boards/tall.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
 		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
 
@@ -270,10 +274,10 @@ test("an agent's harness token calls as that agent while it runs, with no idle l
 		const token = app.bridge.issue(ada.id);
 		assert.match(token, /^dk_h_/);
 		assert.equal(app.tokens.verify(token, { now: Date.now() + 400 * 86_400_000 }).ok, true, "no idle limit while its agent is there");
-		const me = await call("me", [], bearer(token));
+		const me = await call("agent.me", [], bearer(token));
 		assert.equal((me.body.value as { name: string }).name, "Ada");
 		assert.equal(app.agents.remove(ada.id).removed, true);
-		const after = await call("me", [], bearer(token));
+		const after = await call("agent.me", [], bearer(token));
 		assert.equal(after.status, 401, "its agent stopped: its token with it");
 	} finally {
 		cleanup();

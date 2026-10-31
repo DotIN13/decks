@@ -2,7 +2,7 @@
  * Where a board goes when nobody said where.
  *
  * One rule, in one place, because the app has five ways for a board to arrive on a stage —
- * an agent's `decks.board.create`, `decks.canvas.insert`, the ＋ in the corner, a board picked out of the
+ * an agent's `decks.canvas.insert`, the ＋ in the corner, a board picked out of the
  * panel, the shared-Chrome card — and each of them used to fall through to the deck's own auto-layout, which
  * put a new board below every board the stage had ever had a place for: a column a million
  * pixels tall.

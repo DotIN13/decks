@@ -35,7 +35,7 @@ export function canvasNameReminder(pens: StagePens | undefined, stage: string | 
 	if (then.size === 0) return undefined;
 	const fresh = boards.filter((path) => !then.has(path)).length;
 	if (fresh >= NEW_AT_LEAST && fresh > boards.length / 2) {
-		return `[Decks] Your canvas "${naming.title}" now holds mostly cards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks canvas rename "…"; to keep it, say decks title "${naming.title}".`;
+		return `[Decks] Your canvas "${naming.title}" now holds mostly cards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks canvas rename "…"; to keep it, give it the same name again: decks canvas rename "${naming.title}".`;
 	}
 	return undefined;
 }

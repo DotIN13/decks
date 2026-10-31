@@ -15,11 +15,6 @@ import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/star
 import type { StageService, WebTarget } from "./service.ts";
 import { imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
 import { verbContext } from "../verbs/context.ts";
-import { boardsVerbs } from "../verbs/boards.ts";
-import { stageVerbs } from "../verbs/stage.ts";
-import { agentsVerbs } from "../verbs/agents.ts";
-import { stagesVerbs } from "../verbs/stages.ts";
-import { penVerbs } from "../verbs/pen.ts";
 import { appsVerbs } from "../verbs/apps.ts";
 import { webVerbs } from "../verbs/web.ts";
 import { miscVerbs } from "../verbs/misc.ts";
@@ -27,7 +22,8 @@ import { canvasVerbs } from "../verbs/canvas.ts";
 import { boardVerbs } from "../verbs/board.ts";
 import { agentVerbs } from "../verbs/agent.ts";
 import { viewVerbs } from "../verbs/view.ts";
-import { aliasNote, OLD_NAMES_UNTIL, VERB_BY_NAME } from "@decks/api";
+import { renamedVerb } from "../verbs/renamed.ts";
+import { gestures, type Gestures } from "../verbs/gestures.ts";
 
 /**
  * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person, a board or an app.
@@ -147,7 +143,7 @@ export interface StageAgentHooks {
 	recordRevision(path: string): string | undefined;
 	/**
 	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
-	 * reports. Called by `decks.board.create`, `decks.canvas.fit`, `decks.agent.claim` and the old names behind them. Optional so a host
+	 * reports. Called by `decks.card.create`, `decks.canvas.fit` and `decks.agent.claim`. Optional so a host
 	 * with no deck record (a board actor) can leave it out.
 	 */
 	worked?(path: string): void;
@@ -225,13 +221,15 @@ export interface StageTool {
 	 */
 	webShared(): boolean;
 	/**
-	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`, or an old name), with its arguments as a list.
+	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`); an old name is refused with its new call, with its arguments as a list.
 	 *
 	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes the verb added
 	 * (where an item went, what `decks.canvas.fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
 	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<StageCallResult>;
+	/** What the person's hands did on the canvas, sent over the socket (`verbs/gestures.ts`): not a verb. */
+	gesture<G extends keyof Gestures>(name: G, args: Parameters<Gestures[G]>): Promise<StageCallResult>;
 	snapshot(): StageSnapshot;
 }
 
@@ -261,16 +259,6 @@ function guidelines(): string[] {
 }
 const GUIDELINES = guidelines();
 
-/** The old names used since the server started: each is logged the first time, so whoever still calls one can be found before 2026-11-30. */
-const oldNamesSeen = new Set<string>();
-
-/** Log an old name's first use in this process (`ALIASES` in @decks/api). */
-export function logOldName(name: string, use: string): void {
-	if (oldNamesSeen.has(name)) return;
-	oldNamesSeen.add(name);
-	console.warn(`[decks] the old name ${name} was called; it is removed on ${OLD_NAMES_UNTIL}: use ${use}.`);
-}
-
 export function createStageTool(deps: {
 	stage: StageService;
 	agent: StageAgentHooks;
@@ -288,14 +276,7 @@ export function createStageTool(deps: {
 	 * routes and these handlers cannot disagree about a verb's name or its arguments.
 	 */
 	const stage: Stage = {
-		// The old names, kept until 2026-11-30 (`ALIASES` in @decks/api); each answer says its new call.
-		...boardsVerbs(ctx),
-		...stageVerbs(ctx),
-		...stagesVerbs(ctx),
-		...agentsVerbs(ctx),
 		...miscVerbs(ctx),
-		...penVerbs(ctx),
-		// The calls of the redesign.
 		...canvasVerbs(ctx),
 		...boardVerbs(ctx),
 		...agentVerbs(ctx),
@@ -304,32 +285,7 @@ export function createStageTool(deps: {
 		...webVerbs(ctx),
 	};
 
-	/*
-	 * The old names whose new call answers the same question take that call's answer, so there is
-	 * one implementation of each; the rest keep their own code, for the answer shape and placement
-	 * their callers were written against (`ALIASES` in @decks/api says which new call each maps to).
-	 */
-	stage.url = (path) => stage.card.url(path);
-	stage.resolve = (file) => stage.file.url(file);
-	stage.viewport = () => stage.view.viewport();
-	stage.cursor = (path, at) => stage.view.cursor(path, at);
-	stage.reload = async (path) => {
-		await stage.view.reload({ card: path });
-	};
-	stage.report = async (path) => ({ reported: await stage.agent.claim(path) });
-	stage.pen = {
-		...stage.pen,
-		file: () => stage.canvas.file(),
-		create: (path, item) => stage.frame.create(path, item),
-		save: async (id, path, options) => ({ overwrote: false, ...(await stage.canvas.save(id, path, options?.replace === undefined ? {} : { replace: options.replace })) }),
-	};
-	const openStage = stage.open;
-	// `open` is agent.update({ canvas }) and then view.goto: the home moves, and the screen follows.
-	stage.open = async (name) => {
-		const opened = await openStage(name);
-		if (!agent.person && !agent.board) await service.goto(agent.id, opened.stage).catch(() => undefined);
-		return opened;
-	};
+	const hands = gestures(ctx);
 
 	const snapshot = (): StageSnapshot => ({
 		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards
@@ -347,6 +303,20 @@ export function createStageTool(deps: {
 		snapshot,
 		webShared: () => service.web?.status().paired === true,
 
+		async gesture(name, args) {
+			notes.length = 0;
+			images.length = 0;
+			let answer: StageCallResult;
+			try {
+				const value = await (hands[name] as (...given: unknown[]) => Promise<unknown>)(...args);
+				answer = { ok: true, value, notes: [...notes] };
+			} catch (error) {
+				answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };
+			}
+			deps.persist?.(snapshot());
+			return answer;
+		},
+
 		async call(name: string, args: readonly unknown[], on: { stage?: string } = {}): Promise<StageCallResult> {
 			notes.length = 0;
 			images.length = 0;
@@ -356,7 +326,7 @@ export function createStageTool(deps: {
 			let owner: unknown = stage;
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown> | undefined)?.[key];
 			const verb = (owner as Record<string, unknown> | undefined)?.[path[path.length - 1]!];
-			if (typeof verb !== "function") return { ok: false, error: `${name} is not a verb.`, notes: [] };
+			if (typeof verb !== "function") return { ok: false, error: renamedVerb(name) ?? `${name} is not a verb.`, notes: [] };
 			let answer: StageCallResult;
 			try {
 				const run = () => (verb as (...given: unknown[]) => Promise<unknown>).apply(owner, [...args]);
@@ -369,13 +339,6 @@ export function createStageTool(deps: {
 			// After the verb's own notes, the agent's reminders: who it is, and what its canvas is called.
 			// Not for the person, whose clicks are theirs and not the agent's.
 			const said = [...notes];
-			// An old name says its new call, every time, so a caller learns it from using the old.
-			const known = VERB_BY_NAME.get(name);
-			const renamed = known ? aliasNote(known) : undefined;
-			if (renamed) {
-				said.push(renamed);
-				logOldName(name, known!.alias!);
-			}
 			ctx.callOn.stage = undefined;
 			if (!agent.person) {
 				const unsaid = identityReminder(agent.identity(), { afterCall: true });

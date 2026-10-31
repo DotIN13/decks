@@ -8,8 +8,8 @@ import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
-import { fitOn } from "./boards.ts";
-import { shootOn } from "./stage.ts";
+import { fitOn } from "./fit.ts";
+import { shootOn } from "./shoot.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 import { freeSpot, type Side } from "./space.ts";
@@ -210,7 +210,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		const { type: _type, board, title: _title, ...own } = rest as Record<string, unknown>;
 		if (typeof board !== "string" || !board) throw new Error('A board item names its file: { type: "board", board: "boards/plan.html" }.');
 		const file = service.fileBoard(board);
-		if (!file) throw new Error(`There is no board ${board} in the deck. decks board create makes one; decks board list lists them.`);
+		if (!file) throw new Error(`There is no board ${board} in the deck. decks card create makes a card; decks card list lists them.`);
 		let id = typeof own.id === "string" && own.id ? own.id : undefined;
 		if (!id) {
 			const base = slug(pageName(board), 40) || "board";
@@ -594,8 +594,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);
-				// `board` is `card`'s old name, answered beside it until 2026-11-30.
-				return { card: sized.path, board: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
+				return { card: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
 			},
 			save: async (id: string, frame: string, options?: { canvas?: string; replace?: boolean }) => {
 				const name = canvasOf(options?.canvas);

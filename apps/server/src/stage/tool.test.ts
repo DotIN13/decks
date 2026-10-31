@@ -15,7 +15,7 @@ import { runCode } from "./run-code.test-helper.ts";
  * What the tool *says*, as opposed to what it does (DESIGN §6.3).
  *
  * The two things under test here are both result text rather than return values: the
- * viewport line after `newBoard`, and the refusals `send` gives an address it cannot use.
+ * viewport line after `card.create`, and the refusals a hand-off gives an address it cannot use.
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
@@ -24,9 +24,8 @@ const PLAN = "canvases/ada/boards/plan.html";
 
 function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: StageHost["measureAway"] } = {}) {
 	/*
-	 * A stage that remembers, for the checks on what `newBoard` and `show` say about where a board
-	 * went. Placement here is a stand-in (a named place is kept, anything else goes to x 5000):
-	 * the rule itself is `deck/place.ts` and is tested there.
+	 * A stage that remembers what is up, for the checks on the person's gestures. Placement here is a
+	 * stand-in (a named place is kept, anything else goes to x 5000): the rule is `deck/place.ts`.
 	 */
 	const stageful = options.stageful === true;
 	let playing: string[] = [];
@@ -53,7 +52,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const worked: string[] = [];
 	/** The stage ops sent to the browser, in order. */
 	const calls: unknown[] = [];
-	/** Every `stage.move`, with the stage it was written on. */
+	/** Every move written, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
 		writeBoard: (path, html) => {
@@ -137,16 +136,19 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			stageName: () => "ada",
 		},
 	});
-	/** Put a board on the agent's canvas ("ada") at its file's size: `stage.fit` measures at the width it has there. */
+	/** The deck's canvases, which `card.create` and every canvas call need. */
+	const withPens = () => (service.pens ??= new StagePens(root, () => {}));
+	/** Put a board on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */
 	const hold = (path: string) => {
-		service.pens ??= new StagePens(root, () => {});
+		const pens = withPens();
 		const board = deck.refresh(path) ?? deck.board(path);
 		if (!board) throw new Error(`no board at ${path}`);
-		service.pens.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
+		pens.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
 	};
 	return {
 		tool,
 		hold,
+		withPens,
 		worked,
 		calls,
 		moved,
@@ -157,7 +159,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		service,
 		/** What was actually written to disk, which is the only place a board's size lives. */
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
-		/** For a test that needs a board the stub's `newBoard` does not write. */
+		/** For a test that needs a board `card.create` does not write. */
 		write: (path: string, html: string) => {
 			writeFileSync(join(root, path), html);
 			deck.refresh(path);
@@ -169,26 +171,28 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	};
 }
 
-test("newBoard says how much room the canvas has, after the path it returns", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const result = await runCode(tool, `return await stage.newBoard({ title: "Sizing" })`);
+test("card.create says how much room the canvas has, after the card it returns", async () => {
+	const { tool, withPens, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	withPens();
+	const result = await runCode(tool, `return (await stage.card.create({ title: "Sizing" })).path`);
 
-	assert.equal(result.isError, false);
+	assert.equal(result.isError, false, result.text);
 	const lines = result.text.split("\n");
-	assert.match(lines[0] ?? "", /cards\/sizing\/index\.html/, "the path is still the value, so `const path = await …` keeps working");
+	assert.match(lines[0] ?? "", /cards\/sizing\/index\.html/, "the card is the value");
 	assert.equal(lines[1], "viewport 1440×900 px");
 	cleanup();
 });
 
 test("with no reading from a browser, it says nothing rather than making a number up", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const result = await runCode(tool, `return await stage.newBoard({ title: "Sizing" })`);
+	const { tool, withPens, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	withPens();
+	const result = await runCode(tool, `return await stage.card.create({ title: "Sizing" })`);
 
 	assert.equal(/viewport \d+/.test(result.text), false, "no measurement, because nobody took one");
-	// The *advice* is still said, because it still applies: a board nobody is looking at is
-	// still a board somebody will read.
+	// The *advice* is still said, because it still applies: a card nobody is looking at is
+	// still a card somebody will read.
 	assert.match(result.text, /One screen/);
-	assert.equal((await runCode(tool, `return (await stage.viewport()) ?? "none"`)).text, `"none"`);
+	assert.equal((await runCode(tool, `return (await stage.view.viewport()) ?? "none"`)).text, `"none"`);
 	cleanup();
 });
 
@@ -206,20 +210,23 @@ test("a default width is the board's own, or the screen when the screen is small
 	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
-	const onWide = await runCode(wide.tool, `return await stage.newBoard({ title: "Wide" })`);
+	wide.withPens();
+	const onWide = await runCode(wide.tool, `return await stage.card.create({ title: "Wide" })`);
 	assert.equal(widthOf(wide.read("canvases/ada/cards/wide/index.html")), 1000, "the board's own width, on a screen with room to spare");
 	assert.match(onWide.text, /card width 1000/);
 	wide.cleanup();
 
 	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
-	const onPhone = await runCode(phone.tool, `return await stage.newBoard({ title: "Phone" })`);
+	phone.withPens();
+	const onPhone = await runCode(phone.tool, `return await stage.card.create({ title: "Phone" })`);
 	assert.equal(widthOf(phone.read("canvases/ada/cards/phone/index.html")), 390, "the screen, when the screen is smaller");
 	assert.match(onPhone.text, /card width 390\. One screen/);
 	phone.cleanup();
 
 	// A huge screen is not an invitation: the board's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
-	await runCode(huge.tool, `return await stage.newBoard({ title: "Huge" })`);
+	huge.withPens();
+	await runCode(huge.tool, `return await stage.card.create({ title: "Huge" })`);
 	assert.equal(widthOf(huge.read("canvases/ada/cards/huge/index.html")), 1000);
 	huge.cleanup();
 
@@ -229,36 +236,39 @@ test("a default width is the board's own, or the screen when the screen is small
 	 * narrow one; a caller who means 1800 has a reason that cannot be seen from in there.
 	 */
 	const asked = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
-	await runCode(asked.tool, `return await stage.newBoard({ title: "Asked", w: 1800 })`);
+	asked.withPens();
+	await runCode(asked.tool, `return await stage.card.create({ title: "Asked", w: 1800 })`);
 	assert.equal(widthOf(asked.read("canvases/ada/cards/asked/index.html")), 1800);
 	asked.cleanup();
 });
 
 test("the viewport is the canvas in pixels, not divided by the zoom", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 0.25, width: 1440, height: 900 });
-	assert.equal((await runCode(tool, `return await stage.viewport()`)).text, `{\n  "width": 1440,\n  "height": 900\n}`);
+	assert.equal((await runCode(tool, `return await stage.view.viewport()`)).text, `{\n  "width": 1440,\n  "height": 900\n}`);
 	cleanup();
 });
 
-test("the note is per run: a call that did not start a board carries no viewport line", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	await runCode(tool, `return await stage.newBoard({ title: "One" })`);
-	const second = await runCode(tool, `return (await stage.boards()).length`);
+test("the note is per run: a call that did not make a card carries no viewport line", async () => {
+	const { tool, withPens, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	withPens();
+	await runCode(tool, `return await stage.card.create({ title: "One" })`);
+	const second = await runCode(tool, `return (await stage.card.list()).length`);
 
 	assert.equal(second.text.includes("viewport"), false);
 	cleanup();
 });
 
-test("send needs an address and a task, and passes both on", async () => {
+test("a hand-off needs an agent and a task, and passes both on", async () => {
 	const { tool, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 
-	assert.match((await runCode(tool, `return await stage.send("", { task: "x" })`)).text, /Say who/);
-	assert.match((await runCode(tool, `return await stage.send("Kit", { task: "  " })`)).text, /needs a description/);
-	assert.equal(sends.length, 0, "and neither reached the registry");
+	assert.match((await runCode(tool, `return await stage.agent.queue("", { task: "x" })`)).text, /Name an agent/);
+	assert.match((await runCode(tool, `return await stage.agent.queue("Nobody", { task: "x" })`)).text, /No agent Nobody/);
+	assert.match((await runCode(tool, `return await stage.agent.queue("Rune", { task: "  " })`)).text, /needs a task/);
+	assert.equal(sends.length, 0, "and none reached the registry");
 
-	const ok = await runCode(tool, `return await stage.send(" Kit ", { task: "Remeasure", boards: ["${PLAN}"] })`);
-	assert.equal(ok.isError, false);
-	assert.deepEqual(sends, [{ target: "Kit", spec: { task: "Remeasure", boards: [PLAN] } }]);
+	const ok = await runCode(tool, `return await stage.agent.queue(" Rune ", { task: "Remeasure", cards: ["${PLAN}", "${PLAN}"] })`);
+	assert.equal(ok.isError, false, ok.text);
+	assert.deepEqual(sends, [{ target: "a2", spec: { task: "Remeasure", boards: [PLAN] } }], "by its id, each card once");
 	cleanup();
 });
 
@@ -272,71 +282,62 @@ test("now is the time where the person is, in the process clock's zone", async (
 	cleanup();
 });
 
-test("a board is the agent's once it is named: newBoard, fit, a one-board show and report, and nothing else", async () => {
-	const { tool, hold, worked, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+test("a card is the agent's once it is named: card.create, canvas.fit and agent.claim, and nothing else", async () => {
+	const { tool, hold, withPens, worked, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	withPens();
 
-	await runCode(tool, `await stage.newBoard({ title: "One" }); await stage.newBoard({ title: "Two" });`);
+	await runCode(tool, `await stage.card.create({ title: "One" }); await stage.card.create({ title: "Two" });`);
 	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]);
 	worked.length = 0;
 	// The stub writes the file and no more; the watcher is what would tell the deck.
 	deck.refresh("canvases/ada/cards/one/index.html");
 	deck.refresh("canvases/ada/cards/two/index.html");
 
-	// Arranging the canvas and reading are not authorship.
-	const arranged = await runCode(tool, `await stage.show(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]); await stage.boards(); await stage.hide("canvases/ada/cards/two/index.html");`);
-	assert.equal(arranged.isError, false, arranged.text);
+	// Reading is not authorship.
+	const read = await runCode(tool, `await stage.card.list(); await stage.card.get("canvases/ada/cards/two/index.html"); await stage.canvas.read();`);
+	assert.equal(read.isError, false, read.text);
 	assert.deepEqual(worked, []);
-
-	const shown = await runCode(tool, `await stage.show("canvases/ada/cards/one/index.html", { highlight: "x" });`);
-	assert.equal(shown.isError, false, shown.text);
-	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html"]);
 
 	const rev = deck.board("canvases/ada/cards/two/index.html")!.rev;
 	extents.set("canvases/ada/cards/two/index.html", { rev, w: 900, h: 1200 });
 	hold("canvases/ada/cards/two/index.html");
-	const fitted = await runCode(tool, `return await stage.fit("canvases/ada/cards/two/index.html")`);
+	const fitted = await runCode(tool, `return await stage.canvas.fit("canvases/ada/cards/two/index.html")`);
 	assert.equal(fitted.isError, false, fitted.text);
-	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]);
+	assert.deepEqual(worked, ["canvases/ada/cards/two/index.html"]);
 
-	const reported = await runCode(tool, `return await stage.report(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"])`);
-	assert.match(reported.text, /"reported"/);
-	assert.equal(worked.length, 4);
-	assert.match((await runCode(tool, `return await stage.report("boards/none.html")`)).text, /No such card/);
-	assert.equal(worked.length, 4);
+	const claimed = await runCode(tool, `return await stage.agent.claim(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"])`);
+	assert.equal(claimed.isError, false, claimed.text);
+	assert.equal(worked.length, 3);
+	assert.match((await runCode(tool, `return await stage.agent.claim("boards/none.html")`)).text, /No such card/);
+	assert.equal(worked.length, 3);
 	cleanup();
 });
 
-test("send with a shape makes the agent and queues the work for it", async () => {
-	const { tool, created, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+test("agent.create makes the agent on a canvas of its own, and refuses a blank or a taken name", async () => {
+	const { tool, created, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 
-	assert.match((await runCode(tool, `return await stage.send({ name: "  " }, { task: "x" })`)).text, /needs a name/);
+	assert.match((await runCode(tool, `return await stage.agent.create({ name: "  " })`)).text, /needs a name/);
+	assert.match((await runCode(tool, `return await stage.agent.create({ name: "rune" })`)).text, /already called rune/);
 	assert.equal(created.length, 0, "and nothing was made");
 
-	const made = await runCode(tool, `return await stage.send({ name: " Survey ", tags: ["survey-design"] }, { task: "Draft the questions" })`);
+	const made = await runCode(tool, `return await stage.agent.create({ name: " Survey ", tags: ["survey-design"] })`);
 	assert.equal(made.isError, false, made.text);
-	assert.match(made.text, /"agent": "new-1"/);
-	assert.deepEqual(created, [{ name: "Survey", tags: ["survey-design"] }]);
-	assert.deepEqual(sends, [{ target: "new-1", spec: { task: "Draft the questions" } }], "the work went to the agent it just made");
+	assert.match(made.text, /"id": "new-1"/);
+	assert.deepEqual(created, [{ name: "Survey", tags: ["survey-design"], newCanvas: true }]);
 	cleanup();
 });
 
-test("stage.agents() carries what each one is working on, and what is waiting for them", async () => {
+test("agent.list carries what each one is working on, and what is waiting for them", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const seen = JSON.parse((await runCode(tool, `return await stage.agents()`)).text) as Array<Record<string, unknown>>;
+	const seen = JSON.parse((await runCode(tool, `return await stage.agent.list()`)).text) as Array<Record<string, unknown>>;
 
-	// `tags` was documented in stage.d.ts and dropped on the way out, so an agent asking what
-	// the others were doing got an object the type said had it and the value did not. `kind`
-	// and `holding` joined the row for the same reason — the runtime is load-bearing now, and
-	// a capped list without its true total reads as "all of them".
 	assert.deepEqual(seen[0]?.tags, ["panel-css"]);
 	assert.equal(seen[0]?.queued, 3);
-	assert.equal(seen[0]?.me, true);
 	assert.equal(seen[0]?.kind, "claude");
-	assert.equal(seen[0]?.holding, 1);
-	// And the workspace, which is the same argument one level up: "who else is on this" should
-	// not need a second call for a fact the first one already had in hand.
+	// And the workspace: "who else is on this" should not need a second call.
 	assert.equal(seen[0]?.workspace, "political-llm");
 	assert.equal(seen[2]?.workspace, undefined, "an agent in none says so by saying nothing");
+	assert.equal(JSON.parse((await runCode(tool, `return await stage.agent.list({ workspace: "Political LLM" })`)).text).length, 2, "and a workspace asked for keeps the ones on it");
 	cleanup();
 });
 
@@ -346,25 +347,26 @@ test("stage.agents() carries what each one is working on, and what is waiting fo
  * is the honesty of `fit`: it refuses when nothing has measured the board, because the
  * alternative is a plausible number nobody took.
  */
-test("resize writes the meta and the deck agrees immediately", async () => {
+test("a person's resize writes the meta and the deck agrees immediately", async () => {
 	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const before = deck.board(PLAN);
 	assert.equal(before?.w, 1000, "the default width, since this board's file says nothing");
 
-	const result = await runCode(tool, `return await stage.resize("${PLAN}", { w: 1600, h: 1100 })`);
-	assert.match(result.text, /"w": 1600/);
+	const result = await tool.gesture("resize", [PLAN, { w: 1600, h: 1100 }]);
+	assert.equal(result.ok, true, result.error);
+	assert.equal((result.value as { w: number }).w, 1600);
 	assert.equal(deck.board(PLAN)?.h, 1100);
 
-	const onlyHeight = await runCode(tool, `return await stage.resize("${PLAN}", { h: 900 })`);
-	assert.match(onlyHeight.text, /"w": 1600/, "the dimension that was not named is kept");
-	assert.match(onlyHeight.text, /"h": 900/);
+	const onlyHeight = await tool.gesture("resize", [PLAN, { h: 900 }]);
+	assert.deepEqual([(onlyHeight.value as { w: number }).w, (onlyHeight.value as { h: number }).h], [1600, 900], "the dimension that was not named is kept");
+	assert.match((await tool.gesture("resize", [PLAN, {}])).error ?? "", /needs a width, a height, or both/);
 	cleanup();
 });
 
 test("fit says to put the board on the canvas rather than guessing a height", async () => {
 	const { tool, hold, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	hold(PLAN);
-	const result = await runCode(tool, `return await stage.fit("${PLAN}")`);
+	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.equal(result.isError, true);
 	assert.match(result.text, /put it on the canvas/);
 	cleanup();
@@ -383,7 +385,7 @@ test("fit measures a board no canvas is showing in the server's own browser", as
 		},
 	});
 	hold(PLAN);
-	const result = await runCode(tool, `return await stage.fit("${PLAN}")`);
+	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [PLAN]);
 	assert.equal(deck.board(PLAN)?.h, 612, "the document's own height, with no margin added");
@@ -404,7 +406,7 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	pens.placeBoards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
 	const ada = pens.boards("ada").find((one) => one.path === PLAN)!;
 
-	const result = await runCode(tool, `return await stage.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
+	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [640], "measured at the width the board has on that canvas");
 	// Placed on narrow, the board is narrow's own copy, a card (`stage/copy-in.ts`): that copy is what is fitted.
@@ -421,13 +423,13 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 test("fit says what to do when the board is not on the canvas, rather than picking a width", async () => {
 	const { tool, hold, write, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	hold(PLAN);
-	const missing = await runCode(tool, `return await stage.fit("${PLAN}", { canvas: "nowhere" })`);
+	const missing = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "nowhere" })`);
 	assert.equal(missing.isError, true);
 	assert.match(missing.text, /No canvas is called "nowhere"/);
 	write("boards/loose.html", `<!doctype html><title>loose</title><body class="board"></body>`);
-	const loose = await runCode(tool, `return await stage.fit("boards/loose.html")`);
+	const loose = await runCode(tool, `return await stage.canvas.fit("boards/loose.html")`);
 	assert.equal(loose.isError, true);
-	assert.match(loose.text, /not on your canvas/);
+	assert.match(loose.text, /boards\/loose\.html is not on the canvas "ada"/);
 	cleanup();
 });
 
@@ -438,7 +440,7 @@ test("fit takes the height from the content and leaves the width alone", async (
 	extents.set(PLAN, { rev: board!.rev, w: 700, h: 1400 });
 
 	hold(PLAN);
-	await runCode(tool, `return await stage.fit("${PLAN}")`);
+	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	const fitted = deck.board(PLAN);
 	assert.equal(fitted?.h, 1448, "the content, plus the margin its components start at");
 	/*
@@ -466,7 +468,7 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	extents.set("canvases/ada/boards/page.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
 	hold("canvases/ada/boards/page.html");
-	await runCode(tool, `return await stage.fit("canvases/ada/boards/page.html")`);
+	await runCode(tool, `return await stage.canvas.fit("canvases/ada/boards/page.html")`);
 	// The file, not the record: the tag is what `board.js` makes the body's height, and those
 	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
 	assert.match(read("canvases/ada/boards/page.html"), /"h":604/, "the measurement, and nothing added to it");
@@ -474,7 +476,7 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	const plan = deck.board(PLAN);
 	extents.set(PLAN, { rev: plan!.rev, w: 700, h: 1400, page: 900 });
 	hold(PLAN);
-	await runCode(tool, `return await stage.fit("${PLAN}")`);
+	await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.equal(deck.board(PLAN)?.h, 1448);
 	cleanup();
 });
@@ -497,7 +499,7 @@ test("fit says when a view is taller than the board, not only when it is long", 
 	extents.set(PLAN, { rev: board!.rev, w: 956, h: 542, words: 120 });
 
 	hold(PLAN);
-	const result = await runCode(tool, `return await stage.fit("${PLAN}")`);
+	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.match(result.text, /after pressing "Where it lives" it is 667 px tall, where it opens at 542 px/);
 	assert.match(result.text, /min-height/, "and it says what to do about it");
 	cleanup();
@@ -509,7 +511,7 @@ test("fit still grows the height past a board its content has outgrown", async (
 	extents.set(PLAN, { rev: board!.rev, w: 1300, h: 600 });
 
 	hold(PLAN);
-	await runCode(tool, `return await stage.fit("${PLAN}", { margin: 0 })`);
+	await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
 	assert.equal(deck.board(PLAN)?.w, 1000, "the width is not what grew");
 	assert.equal(deck.board(PLAN)?.h, 600);
 	cleanup();
@@ -518,7 +520,7 @@ test("fit still grows the height past a board its content has outgrown", async (
 /*
  * And a wide board stays wide: the width is the author's, and a fit is not the place to disagree
  * with it silently. Nothing is said about it either — a note on every fit of a wide board is a
- * note nobody reads, and narrowing is `stage.resize`'s job.
+ * note nobody reads, and narrowing is the person's or `canvas.update`'s job.
  */
 test("a fit of a wide board leaves it wide and says nothing about width", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
@@ -526,35 +528,14 @@ test("a fit of a wide board leaves it wide and says nothing about width", async 
 	extents.set(PLAN, { rev: board!.rev, w: 1900, h: 600 });
 
 	hold(PLAN);
-	const result = await runCode(tool, `return await stage.fit("${PLAN}", { margin: 0 })`);
+	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { margin: 0 })`);
 	assert.equal(deck.board(PLAN)?.w, 1000, "the width the board has, not the content's");
 	assert.equal(deck.board(PLAN)?.h, 600);
 	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
 });
 
-// Every new board is a card now, one HTML page: there is no format to ask for, and a slide deck is not one.
-test("a new board is an .html page, whatever format an old caller asks for", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const board = await runCode(tool, `return await stage.newBoard({ title: "Ordinary" })`);
-	assert.match(board.text.split("\n")[0] ?? "", /cards\/ordinary\/index\.html/);
-	assert.match(board.text, /card width 1000/);
-	// An old caller still saying `format: "slides"` gets an ordinary board.
-	const deck = await runCode(tool, `return await stage.newBoard({ title: "Talk", format: "slides" })`);
-	assert.match(deck.text.split("\n")[0] ?? "", /cards\/talk\/index\.html/);
-	cleanup();
-});
 
-test("a shape asked for is answered with a blank board, and the note says so", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const result = await runCode(tool, `return await stage.newBoard({ title: "Talk", kind: "report" })`);
-
-	assert.equal(result.isError, false);
-	// Templates are gone: every board starts blank, whatever shape was asked for, and the
-	// agent is told rather than left wondering what happened to the shape.
-	assert.match(result.text, /there are no templates any more/);
-	cleanup();
-});
 
 /*
  * `stage.web`: the user's shared Chrome, through the one object the server holds for it.
@@ -643,7 +624,7 @@ function name(target: string | { ref: string } | { name: string; nth?: number })
  * from the verb table (`@decks/api`); this pins the third party, the `stage` object the handlers
  * live on, to the same list, so a verb cannot be documented and missing or answered and secret.
  */
-test("the stage object has exactly the verbs in the table", async () => {
+test("the stage object has exactly the verbs in the table, and no old name", async () => {
 	const { VERBS } = await import("@decks/api");
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	try {
@@ -653,22 +634,36 @@ test("the stage object has exactly the verbs in the table", async () => {
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown>)[key];
 			assert.equal(typeof (owner as Record<string, unknown>)[path.at(-1)!], "function", `${verb.name} is in the table but not on the stage`);
 		}
+		// And the other way round: every function on the stage is a verb in the table.
+		const names = new Set(VERBS.map((verb) => verb.name));
+		const walk = (owner: Record<string, unknown>, prefix: string): void => {
+			for (const [key, value] of Object.entries(owner)) {
+				if (typeof value === "function") assert.ok(names.has(prefix + key), `${prefix + key} is on the stage but not in the table`);
+				else if (value && typeof value === "object") walk(value as Record<string, unknown>, `${prefix + key}.`);
+			}
+		};
+		walk(tool.stage as unknown as Record<string, unknown>, "");
+		// An old name is refused with what to call now.
+		const old = await tool.call("newBoard", [{ title: "x" }]);
+		assert.equal(old.ok, false);
+		assert.match(old.error ?? "", /newBoard was an old name and has been removed: use decks\.card\.create, then decks\.canvas\.insert/);
+		assert.match((await tool.call("teleport", [])).error ?? "", /teleport is not a verb/);
 	} finally {
 		cleanup?.();
 	}
 });
 
-test("stage.me reads with nothing and writes with a patch, and says what was stored", async () => {
+test("agent.update writes a patch and says what was stored; agent.me reads it", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	/*
 	 * The tool does not clean the tags: `session.setTags` is the one place that slugs them, and
 	 * the *return* is the point of the call — it is how a model finds out that the sentence it
 	 * sent became `panel-css`, rather than setting the same tags forever.
 	 */
-	const set = await runCode(tool, `return await stage.me({ name: "Ada", tags: ["panel-css"] })`);
+	const set = await runCode(tool, `return await stage.agent.update({ name: "Ada", tags: ["panel-css"] })`);
 	assert.equal(set.isError, false, set.text);
 	assert.match(set.text, /"name": "Ada"/);
-	assert.equal((await runCode(tool, `return (await stage.me()).name`)).text, `"Ada"`, "and reading it back says the same");
+	assert.equal((await runCode(tool, `return (await stage.agent.me()).name`)).text, `"Ada"`, "and reading it back says the same");
 	cleanup();
 });
 
@@ -679,17 +674,16 @@ test("stage.me reads with nothing and writes with a patch, and says what was sto
  */
 test("fit reports the height, the words, the smallest type and any spill, and names only what is over", async () => {
 	const { tool, hold, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	await runCode(tool, `await stage.newBoard({ title: "Plan", w: 1000 })`);
 	const board = deck.refresh(PLAN);
 
 	extents.set(PLAN, { rev: board!.rev, w: 1000, h: 600, words: 130, minFont: 15 });
 	hold(PLAN);
-	const fine = await runCode(tool, `return await stage.fit("${PLAN}")`);
+	const fine = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.match(fine.text, /One screen: 600 px tall, 130 words, smallest text 15px\. Nothing to fix\./);
 
 	const again = deck.refresh(PLAN);
 	extents.set(PLAN, { rev: again!.rev, w: 1000, h: 1900, words: 640, minFont: 11, overflowX: 96 });
-	const over = await runCode(tool, `return await stage.fit("${PLAN}")`);
+	const over = await runCode(tool, `return await stage.canvas.fit("${PLAN}")`);
 	assert.match(over.text, /1900 px tall, which is more than one screen/);
 	assert.match(over.text, /640 words/);
 	assert.match(over.text, /smallest text is 11px/);
@@ -697,18 +691,17 @@ test("fit reports the height, the words, the smallest type and any spill, and na
 	cleanup();
 });
 
-test("a move is written on the canvas of the agent that asked, not on whichever chat is open", async () => {
+test("a move is written on the canvas of the caller, not on whichever chat is open", async () => {
 	const { tool, moved, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const result = await runCode(tool, `await stage.move("${PLAN}", { x: 40, y: 80 }); return "done"`);
-	assert.equal(result.isError, false, result.text);
-	// `a1` is this tool's own agent. It used to be whoever the browser last acted on, so an agent
-	// tidying its own canvas moved the board on somebody else's and left its own where it was.
+	const result = await tool.gesture("move", [PLAN, { x: 40, y: 80 }]);
+	assert.equal(result.ok, true, result.error);
+	// `a1` is this tool's own. It used to be whoever the browser last acted on, so a move on one
+	// canvas moved the board on somebody else's and left its own where it was.
 	assert.deepEqual(moved, [{ agentId: "a1", path: PLAN, x: 40, y: 80 }]);
 	cleanup();
 });
 
-/* `show` adds to the stage and `hide` takes off only what it names. */
-test("show adds to the stage, and hide takes off only what it names", async () => {
+test("a person's hide takes off only what it names", async () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-additive-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of ["a.html", "b.html", "c.html"]) {
@@ -727,7 +720,7 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		agents: () => [],
 	});
-	let up: string[] = [];
+	let up: string[] = ["boards/a.html", "boards/b.html", "boards/c.html"];
 	let held: string[] = [];
 	const tool = createStageTool({
 		stage: service,
@@ -753,46 +746,36 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 		},
 	});
 
-	await runCode(tool, `await stage.show(["boards/a.html", "boards/b.html"])`);
-	await runCode(tool, `await stage.show("boards/c.html")`);
-	assert.deepEqual(up, ["boards/a.html", "boards/b.html", "boards/c.html"], "a second show adds beside the first");
-
-	await runCode(tool, `await stage.show("boards/a.html")`);
-	assert.deepEqual(up, ["boards/a.html", "boards/b.html", "boards/c.html"], "showing a board that is up changes nothing");
-
-	await runCode(tool, `await stage.hide("boards/b.html")`);
+	assert.equal((await tool.gesture("hide", ["boards/b.html"])).ok, true);
 	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "an out-of-date board comes off by name");
 
-	const emptied = await runCode(tool, `await stage.hide(["boards/a.html", "boards/c.html"])`);
-	assert.equal(emptied.isError, false, emptied.text);
-	assert.deepEqual(up, [], "an agent's own stage can be cleared");
+	const emptied = await tool.gesture("hide", [["boards/a.html", "boards/c.html"]]);
+	assert.equal(emptied.ok, true, emptied.error);
+	assert.deepEqual(up, [], "a stage can be cleared");
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("canvas.pen edits the drawing in pen's own words, answers with boxes, and reads it back", async () => {
+test("the person's drawing edit is pen's own words, answers with boxes, and canvas.read reads it back", async () => {
 	const { tool, service, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	assert.match((await runCode(tool, `return await stage.pen.read()`)).text, /keeps no stage drawing/);
+	assert.match((await runCode(tool, `return await stage.canvas.read()`)).text, /keeps no stage drawing/);
 	service.pens = new StagePens(deck.path, () => {});
 	try {
-		const edited = await runCode(tool, `return await stage.pen.edit([
+		const edited = await tool.gesture("edit", [[
 			{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } },
-			{ op: "insert", node: { type: "path", id: "to-plan", metadata: { type: "decks.arrow", from: "n", to: "${PLAN}" } } },
-		])`);
-		assert.equal(edited.isError, false, edited.text);
-		const answer = JSON.parse(edited.text) as { results: Array<{ id: string; box?: { x1: number; x2: number } }> };
+			{ op: "insert", node: { type: "path", id: "to-plan", metadata: { type: "decks.arrow", from: "n", to: PLAN } } },
+		]]);
+		assert.equal(edited.ok, true, edited.error);
+		const answer = edited.value as { results: Array<{ id: string; box?: { x1: number; x2: number } }> };
 		assert.deepEqual(answer.results[0]!.box, { x1: 1060, y1: 0, x2: 1300, y2: 120 });
 		// The arrow to the board was drawn: the board is where the deck's own list has it.
 		assert.ok(answer.results[1]!.box, "the arrow has a box once it is routed");
-		const read = JSON.parse((await runCode(tool, `return await stage.pen.read()`)).text) as { file: string; children: Array<{ id: string; type: string }> };
-		assert.equal(read.file, "canvases/ada/canvas.pen");
-		assert.deepEqual(read.children.map((c) => c.id), ["n", "to-plan"]);
-		assert.equal((await runCode(tool, `return await stage.pen.file()`)).text, `"canvases/ada/canvas.pen"`);
-		const bad = await runCode(tool, `return await stage.pen.edit([{ op: "wiggle", id: "n" }])`);
-		assert.equal(bad.isError, true);
-		assert.match(bad.text, /Edit 1 \(wiggle\) failed, and nothing was saved/);
-		// And every board read has its box, so an edge is never a sum.
-		const boards = JSON.parse((await runCode(tool, `return await stage.boards()`)).text) as Array<{ x: number; w: number; box: { x1: number; x2: number } }>;
-		assert.equal(boards[0]!.box.x2, boards[0]!.x + boards[0]!.w);
+		const read = JSON.parse((await runCode(tool, `return await stage.canvas.read()`)).text) as { canvas: string; items: Array<{ id: string }> };
+		assert.equal(read.canvas, "ada");
+		assert.deepEqual(read.items.map((c) => c.id), ["n", "to-plan"]);
+		assert.equal((await runCode(tool, `return await stage.canvas.file()`)).text, `"canvases/ada/canvas.pen"`);
+		const bad = await tool.gesture("edit", [[{ op: "wiggle", id: "n" }]]);
+		assert.equal(bad.ok, false);
+		assert.match(bad.error ?? "", /Edit 1 \(wiggle\) failed, and nothing was saved/);
 	} finally {
 		service.pens.close();
 		cleanup();
@@ -800,42 +783,43 @@ test("canvas.pen edits the drawing in pen's own words, answers with boxes, and r
 });
 
 /**
- * `stage.show` on a **drawn item**: the same verb, because the question it answers is the same
- * one — look at this. What travels is the box, measured off the stage's layout here, because
- * the browser paints the drawing on a canvas and has no node to look an id up in.
+ * `view.focus` on a **drawn item**: what travels is the box, measured off the stage's layout here,
+ * because the browser paints the drawing on a canvas and has no node to look an id up in.
  */
-test("stage.show takes a drawn item's id and sends the browser its box", async () => {
-	const { tool, service, deck, calls, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+test("view.focus takes a drawn item's id and sends the browser its box", async () => {
+	const { tool, service, deck, hold, calls, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	service.pens = new StagePens(deck.path, () => {});
 	try {
-		await runCode(tool, `await stage.pen.edit([{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } }])`);
+		await tool.gesture("edit", [[{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } }]]);
+		hold(PLAN);
 		calls.length = 0;
 
-		const shown = await runCode(tool, `return await stage.show("n")`);
+		const shown = await runCode(tool, `return await stage.view.focus("n")`);
 		assert.equal(shown.isError, false, shown.text);
 		const sent = calls.at(-1) as { op: string; args: { paths: string[]; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> } };
-		assert.deepEqual(sent.args.paths, [], "an item is not a board and is not held");
+		assert.deepEqual(sent.args.paths, [], "an item is not a board");
 		assert.deepEqual(sent.args.items, [{ id: "n", box: { x: 1060, y: 0, w: 240, h: 120 } }]);
 
-		const both = await runCode(tool, `return await stage.show(["${PLAN}", "n"])`);
+		const both = await runCode(tool, `return await stage.view.focus(["${PLAN}", "n"])`);
 		assert.equal(both.isError, false, both.text);
 		const pair = calls.at(-1) as { args: { paths: string[]; items?: unknown[] } };
 		assert.deepEqual(pair.args.paths, [PLAN]);
-		assert.equal(pair.args.items?.length, 1, "the board is held, the item is only framed");
+		assert.equal(pair.args.items?.length, 1);
 
-		const missing = await runCode(tool, `return await stage.show("nothing-by-that-name")`);
+		const missing = await runCode(tool, `return await stage.view.focus("nothing-by-that-name")`);
 		assert.equal(missing.isError, true);
-		assert.match(missing.text, /No such board or drawn item: nothing-by-that-name/);
+		assert.match(missing.text, /Nothing called nothing-by-that-name is on the canvas/);
 	} finally {
 		service.pens.close();
 		cleanup();
 	}
 });
 
-test("stage.screenshot hands the picture to the model with the run's result, and names the file", async () => {
-	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+test("canvas.screenshot hands the picture to the model with the run's result, and names the file", async () => {
+	const { tool, service, withPens, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	withPens();
 	try {
-		assert.match((await runCode(tool, `return await stage.screenshot()`)).text, /cannot take pictures/);
+		assert.match((await runCode(tool, `return await stage.canvas.screenshot()`)).text, /cannot take pictures/);
 		const asked: unknown[] = [];
 		service.shots = {
 			take: async (request: unknown) => {
@@ -843,7 +827,7 @@ test("stage.screenshot hands the picture to the model with the run's result, and
 				return { file: ".decks/shots/ada.png", bytes: Buffer.from("png!"), format: "png", width: 20, height: 10, box: { x1: 0, y1: 0, x2: 10, y2: 5 } };
 			},
 		} as unknown as NonNullable<typeof service.shots>;
-		const result = await runCode(tool, `return await stage.screenshot({ of: "n", scale: 2 })`);
+		const result = await runCode(tool, `return await stage.canvas.screenshot({ of: "n", scale: 2 })`);
 		assert.equal(result.isError, false, result.text);
 		assert.equal(JSON.parse(result.text).file, ".decks/shots/ada.png");
 		assert.deepEqual(result.images, [{ data: Buffer.from("png!").toString("base64"), mimeType: "image/png" }]);
@@ -853,7 +837,7 @@ test("stage.screenshot hands the picture to the model with the run's result, and
 	}
 });
 
-test("stage.screenshot of a .pen path pictures that file whole; an item's id path stays an item", async () => {
+test("canvas.screenshot of a .pen path pictures that file whole; an item's id path stays an item", async () => {
 	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	const deckPath = (service as unknown as { deck: Deck }).deck.path;
 	const asked: Array<Record<string, unknown>> = [];
@@ -868,7 +852,7 @@ test("stage.screenshot of a .pen path pictures that file whole; an item's id pat
 		mkdirSync(join(deckPath, "frames", "ui"), { recursive: true });
 		writeFileSync(join(deckPath, "frames", "ui", "button.pen"), JSON.stringify({ version: "2.14", children: [{ id: "button", type: "rectangle", width: 10, height: 10 }] }));
 		for (const of of ["frames/ui/button.pen", "frames/ui/button", "card-1/title", { x1: 0, y1: 0, x2: 10, y2: 10 }]) {
-			const result = await runCode(tool, `return await stage.screenshot({ of: ${JSON.stringify(of)} })`);
+			const result = await runCode(tool, `return await stage.canvas.screenshot({ of: ${JSON.stringify(of)} })`);
 			assert.equal(result.isError, false, result.text);
 		}
 		assert.deepEqual(asked.map((one) => one.file ?? one.of), ["frames/ui/button.pen", "frames/ui/button", "card-1/title", { x1: 0, y1: 0, x2: 10, y2: 10 }]);
@@ -880,37 +864,16 @@ test("stage.screenshot of a .pen path pictures that file whole; an item's id pat
 	}
 });
 
-test("at is two numbers, and places one board at a time", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const bad = await runCode(tool, `return await stage.newBoard({ title: "Where", at: { x1: "left" } })`);
-	assert.equal(bad.isError, true);
-	assert.match(bad.text, /at is the board's top-left corner on the stage, as in at: \{ x1: 1160, y1: 0 \}/);
-	const two = await runCode(tool, `return await stage.show(["${PLAN}", "boards/where.html"], { at: { x1: 0, y1: 0 } })`);
-	assert.equal(two.isError, true);
-	assert.match(two.text, /at places one board/);
-	cleanup();
-});
 
-test("newBoard says where a board went when it was not told, and what a named place sits on", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { stageful: true });
-	await runCode(tool, `return await stage.show("${PLAN}", { at: { x1: 0, y1: 0 } })`);
-	const unnamed = await runCode(tool, `return await stage.newBoard({ title: "Somewhere" })`);
-	assert.match(unnamed.text, /No at was given, so canvases\/ada\/cards\/somewhere\/index\.html went beside your newest board, at x1 5000, y1 0/);
-	const clear = await runCode(tool, `return await stage.newBoard({ title: "Clear", at: { x1: 20000, y1: 0 } })`);
-	assert.doesNotMatch(clear.text, /No at was given|sits on/, "a place given and clear says nothing");
-	const onTop = await runCode(tool, `return await stage.newBoard({ title: "On top", at: { x1: 100, y1: 100 } })`);
-	assert.match(onTop.text, /canvases\/ada\/cards\/on-top\/index\.html is at x1 100, y1 100, as asked, and sits on canvases\/ada\/boards\/plan\.html/);
-	cleanup();
-});
 
 test("every stage result asks an agent that has not said who it is, until it has", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { identity: { name: "Agent 3", tags: [] } });
-	const result = await runCode(tool, `return (await stage.boards()).length`);
-	assert.match(result.text, /^1\n\[Decks\] You have not said who you are: set it now with decks agent update --name: .*; --tags .*\./);
+	const result = await runCode(tool, `return (await stage.agent.list()).length`);
+	assert.match(result.text, /^3\n\[Decks\] You have not said who you are: set it now with decks agent update --name: .*; --tags .*\./);
 	assert.doesNotMatch(result.text, /--avatar|--workspace/, "only what is missing is asked for");
 	cleanup();
 	const whole = toolOn({ x: 0, y: 0, zoom: 1 });
-	assert.equal((await runCode(whole.tool, `return (await stage.boards()).length`)).text, "1", "and an agent that has said it all hears nothing");
+	assert.equal((await runCode(whole.tool, `return (await stage.agent.list()).length`)).text, "3", "and an agent that has said it all hears nothing");
 	whole.cleanup();
 });
 

@@ -63,9 +63,8 @@ export function viewVerbs(ctx: VerbContext): Pick<Stage, "view"> {
 			},
 			viewport: async () => service.viewport(agent.id) ?? null,
 			cursor: async (card: string, at: { x: number; y: number } | null) => service.cursor(agent.id, card, at, agent.identity().name, agent.identity().color),
-			reload: async (options: { card?: string; board?: string; canvas?: string }) => {
-				// `board` is `card`'s old name, taken until 2026-11-30.
-				const card = options?.card ?? options?.board;
+			reload: async (options: { card?: string; canvas?: string }) => {
+				const card = options?.card;
 				if (typeof card !== "string" || !card) throw new Error('reload names the card: decks view reload --card canvases/plan/cards/q3/index.html.');
 				const name = options.canvas === undefined || options.canvas === null ? undefined : canvasOf(options.canvas);
 				return { reloaded: await service.reloadEverywhere(agent.id, card, name) };

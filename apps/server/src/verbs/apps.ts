@@ -143,7 +143,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					};
 				},
 				/** The item that shows an app whose folder was written by hand; nothing is written. */
-				board: async (name: string) => appItem(known(name)),
+				item: async (name: string) => appItem(known(name)),
 				build: async (name: string) => {
 					agentOnly("build");
 					return service_().build(known(name));

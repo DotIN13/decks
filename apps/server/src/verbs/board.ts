@@ -12,7 +12,7 @@ import type { VerbContext } from "./context.ts";
  * and file addresses. A board file is the deck's, on any number of canvases or none: making one does
  * not place it, which is the canvas's job (`canvas.insert`).
  */
-export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "frame" | "file"> {
+export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame" | "file"> {
 	const { service, agent, notes, needPens } = ctx;
 
 	/** Who wrote a board, as a name: an agent's, or "person" for the person's own edit. */
@@ -22,9 +22,9 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 		return agent.agents().find((one) => one.id === who)?.name ?? who;
 	};
 	const needBoard = (path: unknown) => {
-		if (typeof path !== "string" || !path.trim()) throw new Error('A board is named by its path, as in "boards/plan.html": decks board list lists them.');
+		if (typeof path !== "string" || !path.trim()) throw new Error('A card is named by its path, as in "canvases/plan/cards/q3/index.html": decks card list lists them.');
 		const board = service.fileBoard(path);
-		if (!board) throw new Error(`There is no board ${path}. decks board list lists them.`);
+		if (!board) throw new Error(`There is no card ${path}. decks card list lists them.`);
 		return board;
 	};
 	const asBoard = (board: { path: string; title: string; lastWrittenBy?: string }) => {
@@ -45,13 +45,14 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 		return name;
 	};
 
-	const board = {
-			list: async () => service.allBoards().map(asBoard),
+	const card = {
+			/** Every card in the deck, placed or not. */
+			list: async () => service.allBoards().filter((one) => isCardPath(one.path)).map(asBoard),
 			get: async (path: string) => asBoard(needBoard(path)),
 			canvases: async (path: string) => {
 				needBoard(path);
 				const pens = needPens();
-				const out: Array<{ card: string; board: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
+				const out: Array<{ card: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
 				const file = service.fileBoard(path);
 				/*
 				 * A board in a canvas's folder is on that canvas and no other (`deck/layout.ts`), so this answers
@@ -71,8 +72,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 					if (!held) continue;
 					const content = (home ? file : service.fileBoard(own))?.content;
 					const clipped = content ? content.w > held.w || content.h > held.h : undefined;
-					// `board` is `card`'s old name, answered beside it until 2026-11-30.
-					out.push({ card: own, board: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
+					out.push({ card: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
 				}
 				return out;
 			},
@@ -80,11 +80,6 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 				needBoard(path);
 				return service.url(path, ctx.port);
 			},
-	};
-
-	const card = {
-			/** Every card in the deck, placed or not. */
-			list: async () => service.allBoards().filter((one) => isCardPath(one.path)).map(asBoard),
 			/**
 			 * A blank card, `cards/<title>/index.html` in a canvas's own folder: a piece of HTML the stage draws
 			 * in its own page (`card.ts`), with a folder for what it keeps beside it. Placing it is the canvas's job.
@@ -96,14 +91,9 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 				);
 				return asBoard(service.fileBoard(path) ?? { path, title });
 			},
-			get: board.get,
-			canvases: board.canvases,
-			url: board.url,
 	};
 
 	return {
-		// Boards are retired: an old name that makes one makes a card instead.
-		board: { ...board, create: card.create },
 		card,
 		frame: {
 			// A frame is made in the caller's canvas's own frames/, so the canvas stands alone (`deck/layout.ts`).
@@ -125,8 +115,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 }
 
 /**
- * Write a blank card, `cards/<title>/index.html` in a canvas's own folder (`card.create`, and the old
- * `newBoard`): the shell from its title, at a width held inside the screen when none is asked for.
+ * Write a blank card, `cards/<title>/index.html` in a canvas's own folder (`card.create`): the shell from its title, at a width held inside the screen when none is asked for.
  * Placing it is the caller's job. The viewport goes in the call's notes.
  */
 export function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: number }, stageName: string): { path: string; title: string; width: number; canvas: string } {

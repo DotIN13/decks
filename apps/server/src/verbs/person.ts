@@ -1,6 +1,7 @@
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { StagePens } from "../stage/pens.ts";
+import type { Gestures } from "./gestures.ts";
 
 /**
  * Whose stage the person's click acts on.
@@ -34,5 +35,21 @@ export async function asPerson(
 ): Promise<boolean> {
 	const answer = await personAgent(context, asked).personTool().call(verb, args);
 	if (!answer.ok) reply({ type: "notice", level: "warn", text: answer.error ?? `${verb} failed` });
+	return answer.ok;
+}
+
+/**
+ * A card moved, sized or taken off by the person's hands on the canvas (`wire/boards.ts`), on the stage
+ * on screen. A refusal comes back as the notice the person sees.
+ */
+export async function personGesture<G extends keyof Gestures>(
+	context: { agents: Registry; pens?: StagePens | undefined },
+	asked: { stage?: string; agent?: string },
+	name: G,
+	args: Parameters<Gestures[G]>,
+	reply: (message: { type: "notice"; level: "warn"; text: string }) => void,
+): Promise<boolean> {
+	const answer = await personAgent(context, asked).personTool().gesture(name, args);
+	if (!answer.ok) reply({ type: "notice", level: "warn", text: answer.error ?? `${name} failed` });
 	return answer.ok;
 }

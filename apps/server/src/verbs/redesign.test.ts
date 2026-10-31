@@ -111,9 +111,9 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		const gone = (await must("canvas.delete", [b])).value;
 		assert.equal(gone.deleted, b);
 		assert.ok(app.deck.board(b), "a board's file stays in the deck");
-		assert.deepEqual((await must("board.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's board is on that canvas, and only there");
-		assert.deepEqual((await must("board.canvases", ["boards/a.html"])).value.map((one: { board: string }) => one.board), [a], "the library's board says where it was copied");
-		assert.deepEqual((await must("board.canvases", [b])).value, []);
+		assert.deepEqual((await must("card.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's card is on that canvas, and only there");
+		assert.deepEqual((await must("card.canvases", ["boards/a.html"])).value.map((one: { card: string }) => one.card), [a], "the library's board says where it was copied");
+		assert.deepEqual((await must("card.canvases", [b])).value, []);
 	} finally {
 		cleanup();
 	}
@@ -166,38 +166,37 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 	}
 });
 
-test("board.create, an alias of card.create, writes a card and places nothing", async () => {
+test("card.create writes a card and places nothing", async () => {
 	const { must, cleanup } = await open();
 	try {
-		const made = (await must("board.create", [{ title: "Churn halved" }])).value;
+		const made = (await must("card.create", [{ title: "Churn halved" }])).value;
 		const home = (await must("here")).value.name;
 		assert.equal(made.path, `canvases/${home}/cards/churn-halved/index.html`, "a card is made in the caller's canvas's own folder");
 		const named = (await must("canvas.create", ["Elsewhere"])).value.name;
-		assert.match((await must("board.create", [{ title: "Over there", canvas: named }])).value.path, new RegExp(`^canvases/${named}/cards/over-there/index\\.html$`), "or in the canvas it names");
+		assert.match((await must("card.create", [{ title: "Over there", canvas: named }])).value.path, new RegExp(`^canvases/${named}/cards/over-there/index\\.html$`), "or in the canvas it names");
 		assert.equal(made.title, "Churn halved");
-		assert.deepEqual((await must("board.canvases", [made.path])).value, []);
-		assert.ok((await must("board.list")).value.some((one: { path: string }) => one.path === made.path));
-		assert.equal((await must("board.get", [made.path])).value.title, "Churn halved");
+		assert.deepEqual((await must("card.canvases", [made.path])).value, []);
+		assert.ok((await must("card.list")).value.some((one: { path: string }) => one.path === made.path));
+		assert.equal((await must("card.get", [made.path])).value.title, "Churn halved");
+		const here = (await must("here")).value;
+		assert.equal(typeof here.cards, "number");
+		assert.equal(here.boards, undefined, "a canvas says its cards, and no boards beside them");
 	} finally {
 		cleanup();
 	}
 });
 
-test("an old name still answers as it did, and says its new call", async () => {
-	const { must, cleanup } = await open();
+test("an old name is no call: it is refused with the call that does its work now", async () => {
+	const { call, cleanup } = await open();
 	try {
-		const listed = await must("boards");
-		assert.ok(Array.isArray(listed.value));
-		assert.ok(listed.notes.some((note) => /boards is an old name, removed on 2026-11-30: use decks\.canvas\.read/.test(note)), listed.notes.join("\n"));
-		const read = await must("pen.read");
-		assert.ok(Array.isArray(read.value.children), "pen.read keeps its old shape");
-		assert.ok(read.notes.some((note) => /decks\.canvas\.read/.test(note)));
-		const fresh = await must("canvas.read");
-		assert.ok(!fresh.notes.some((note) => /old name/.test(note)), "a new call carries no such note");
-		// A canvas says its cards, and its boards (the old name) beside them, until 2026-11-30.
-		const here = (await must("here")).value;
-		assert.equal(typeof here.cards, "number");
-		assert.equal(here.boards, here.cards);
+		for (const [old, now] of [["boards", /decks\.canvas\.read, or decks\.card\.list/], ["board.create", /decks\.card\.create/], ["open", /decks\.agent\.update\(\{ canvas \}\), then decks\.view\.goto/], ["pen.edit", /decks\.canvas\.batch/], ["apps.board", /decks\.apps\.item/]] as const) {
+			const answer = await call(old, []);
+			assert.equal(answer.ok, false, old);
+			assert.match(answer.error ?? "", new RegExp(`^${old.replace(".", "\\.")} was an old name and has been removed: use `), old);
+			assert.match(answer.error ?? "", now, old);
+		}
+		const fresh = await call("canvas.read", []);
+		assert.ok(fresh.ok && !fresh.notes.some((note) => /old name/.test(note)), "a call carries no such note");
 	} finally {
 		cleanup();
 	}
@@ -207,15 +206,14 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 	const { app, agent, as, must, cleanup } = await open();
 	try {
 		const other = app.agents.create({ name: "Rune" });
-		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", boards: ["boards/a.html"] }])).value;
+		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", cards: ["boards/a.html"] }])).value;
 		assert.deepEqual(queued, { queued: true, position: 1 });
 		const theirs = (await must("agent.inbox", [], as(other.id))).value;
 		assert.equal(theirs.length, 1);
 		assert.equal(theirs[0].task, "Read the plan");
 		assert.equal(theirs[0].from, agent.name);
 		assert.deepEqual(theirs[0].cards, ["boards/a.html"]);
-		assert.deepEqual(theirs[0].boards, ["boards/a.html"], "the old field, until 2026-11-30");
-		// `cards` is the hand-off's name for what it names; `boards` is still taken.
+		assert.equal(theirs[0].boards, undefined, "no old field beside it");
 		await must("agent.queue", ["Rune", { task: "And this one", cards: ["boards/b.html"] }]);
 		assert.deepEqual((await must("agent.inbox", [], as(other.id))).value[1].cards, ["boards/b.html"]);
 
@@ -284,27 +282,6 @@ test("an arrow joined at both ends goes between them, with no note to say where"
 		assert.ok(arrow.value.box.x1 >= 880 && arrow.value.box.x2 <= 1080, `between the boards: ${JSON.stringify(arrow.value.box)}`);
 		const note = await must("canvas.insert", [{ type: "note", content: "Loose" }]);
 		assert.ok(note.notes.some((one) => /say where/.test(one)), "an item with no place still hears it");
-	} finally {
-		cleanup();
-	}
-});
-
-test("the old names map onto the new calls: open moves the home canvas, report claims, url and resolve are the new addresses", async () => {
-	const { agent, must, cleanup } = await open();
-	try {
-		const other = (await must("canvas.create", ["Elsewhere"])).value.name;
-		const opened = await must("open", [other]);
-		assert.equal(opened.value.stage, other);
-		assert.equal((await must("here")).value.name, other, "open is agent.update({ canvas })");
-		assert.ok(opened.notes.some((note) => /agent\.update\(\{ canvas \}\), then decks\.view\.goto/.test(note)));
-		const reported = await must("report", ["boards/a.html"]);
-		assert.deepEqual(reported.value, { reported: ["boards/a.html"] });
-		assert.ok(reported.notes.some((note) => /decks\.agent\.claim/.test(note)));
-		assert.equal((await must("url", ["boards/a.html"])).value, (await must("board.url", ["boards/a.html"])).value);
-		const made = await must("newStage", ["Third"]);
-		assert.equal((await must("here")).value.name, made.value.stage, "newStage still moves you, as it always did");
-		assert.ok(made.notes.some((note) => /decks\.canvas\.create/.test(note)));
-		void agent;
 	} finally {
 		cleanup();
 	}

@@ -1,7 +1,7 @@
 import type { Op } from "@decks/pen";
 import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
-import { asPerson } from "../verbs/person.ts";
+import { personGesture } from "../verbs/person.ts";
 import { penEditBy } from "../stage/pens.ts";
 
 /**
@@ -16,7 +16,7 @@ export const pen = {
 	"stage.pen.edit": (message, reply, wire) => {
 		const asked = { agent: message.agentId, ...(message.stage ? { stage: message.stage } : {}) };
 		const edit = typeof message.edit === "string" && message.edit ? message.edit.slice(0, 80) : undefined;
-		const run = () => asPerson({ agents: wire.agents, pens: wire.stage.pens }, asked, "pen.edit", [message.ops as Op[]], reply);
+		const run = () => personGesture({ agents: wire.agents, pens: wire.stage.pens }, asked, "edit", [message.ops as Op[]], reply);
 		void (edit ? penEditBy.run(edit, run) : run()).then((ok) => {
 			if (ok) return;
 			if (edit) reply({ type: "stage.pen.refused", agentId: message.agentId, edit });
@@ -44,7 +44,7 @@ export const pen = {
 	 */
 	"agent.stage": (message, reply, wire) => {
 		if (!wire.agents.get(message.id)) return;
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "open", [message.stage], reply);
+		void personGesture({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "open", [message.stage], reply);
 	},
 
 	/** A stage made from a name you typed, opened for that agent at once. */
@@ -52,7 +52,7 @@ export const pen = {
 		if (!wire.agents.get(message.id)) return;
 		const title = typeof message.title === "string" ? message.title.trim() : "";
 		if (!title) return;
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "newStage", [title], reply).then((ok) => {
+		void personGesture({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "newStage", [title], reply).then((ok) => {
 			if (ok) reply({ type: "deck.state", deck: wire.stageState() });
 		});
 	},

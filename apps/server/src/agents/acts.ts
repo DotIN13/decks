@@ -16,7 +16,7 @@ import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
  * - **The file lands.** The watcher says the board changed; the file as it was when the tool
  *   call started is diffed against the new one by `data-id`, at any depth, and the blocks whose
  *   own markup differs are what changed. A board with no names is marked whole.
- * - **A canvas call.** `decks.board.create`, `decks.canvas.fit`, and `decks.canvas.insert`,
+ * - **A canvas call.** `decks.card.create`, `decks.canvas.fit`, and `decks.canvas.insert`,
  *   `update`, `move` or `delete` on a board name a board and need no diff.
  *
  * Two phases go out: `start` when the tool call begins, so the held outline can be drawn

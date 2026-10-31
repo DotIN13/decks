@@ -103,7 +103,7 @@ test("a friend's canvas shared with you to view refuses a drop, an edit, a board
 		const insert = await verb("canvas.insert", [{ type: "note", content: "mine" }, { canvas: "shared/ada/fetcher" }]);
 		assert.equal(insert.ok, false);
 		assert.match(insert.error ?? "", /shared with you to view.*copy-shared/);
-		const board = await verb("board.create", [{ title: "Mine", canvas: "shared/ada/fetcher" }]);
+		const board = await verb("card.create", [{ title: "Mine", canvas: "shared/ada/fetcher" }]);
 		assert.equal(board.ok, false);
 		assert.match(board.error ?? "", /shared with you to view/);
 		const rename = await verb("canvas.rename", ["Mine now", { canvas: "shared/ada/fetcher" }]);

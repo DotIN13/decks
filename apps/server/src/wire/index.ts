@@ -1,7 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { accounts } from "./accounts.ts";
 import { agents } from "./agents.ts";
-import { boards, cards } from "./boards.ts";
+import { boards } from "./boards.ts";
 import { deck } from "./deck.ts";
 import { docs } from "./docs.ts";
 import type { Reply, WireContext, WireTable } from "./context.ts";
@@ -26,7 +26,6 @@ import { share } from "./share.ts";
 const WIRE: WireTable = {
 	...deck,
 	...boards,
-	...cards,
 	...agents,
 	...accounts,
 	...web,

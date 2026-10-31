@@ -5,12 +5,10 @@ import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
-/** Addresses and time: a board's URL, a file's, forwarded ports, the clock, and the link to Decks Studio. */
-export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now" | "studio" | "pair"> {
-	const { service, agent, port } = ctx;
+/** Forwarded ports, the clock, and the link to Decks Studio. */
+export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "studio" | "pair"> {
+	const { service, agent } = ctx;
 	return {
-		resolve: async (file: string) => service.resolve(file),
-		url: async (path: string) => service.url(path, port),
 		/**
 		 * The ports forwarded through Decks, so a board can frame a server this machine runs
 		 * (`ports.ts`): read with nothing, `{ open: port, label }` to forward one, `{ close: port }`

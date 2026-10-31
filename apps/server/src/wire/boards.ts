@@ -1,7 +1,7 @@
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import type { WireContext, WirePart } from "./context.ts";
 import { isAbsolute, relative } from "node:path";
-import { asPerson, personAgent } from "../verbs/person.ts";
+import { personAgent, personGesture } from "../verbs/person.ts";
 import { putOn } from "../stage/canvas-ops.ts";
 import { joinSpot } from "../deck/place.ts";
 
@@ -9,9 +9,9 @@ import { joinSpot } from "../deck/place.ts";
 const DOCUMENT_SIZE = { w: 1000, h: 1100 };
 
 /**
- * The board frames: the user's half of the canvas, and the two ways the past comes back.
+ * The card frames: the user's half of the canvas, and the two ways the past comes back.
  *
- * This is where the *user* touches a board — move, play, hide, delete — and puts a document on
+ * This is where the *user* touches a card — move, play, hide, delete — and puts a document on
  * the canvas. A board's own page is never edited from the canvas. The agent's writes do not come through
  * here at all: it edits the file with its own tools, and the watcher tells everyone.
  */
@@ -30,9 +30,9 @@ function stageFor(message: { stage?: string }, wire: WireContext): { name?: stri
 }
 
 export const boards = {
-	/** A board dragged on the canvas: the person's `move`, on the stage on screen (`verbs/person.ts`). */
-	"board.move": (message, reply, wire) => {
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "move", [message.path, { x: message.x, y: message.y }], reply);
+	/** A card dragged on the canvas: the person's move, on the stage on screen (`verbs/gestures.ts`). */
+	"card.move": (message, reply, wire) => {
+		void personGesture({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "move", [message.path, { x: message.x, y: message.y }], reply);
 	},
 
 	/*
@@ -47,12 +47,12 @@ export const boards = {
 	 * app's own templates use, and the ceiling is well past the tallest board in the deck — a
 	 * resize is not the place to discover that a number was a typo.
 	 */
-	"board.resize": (message, reply, wire) => {
+	"card.resize": (message, reply, wire) => {
 		const size = { ...(typeof message.w === "number" ? { w: message.w } : {}), ...(typeof message.h === "number" ? { h: message.h } : {}) };
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "resize", [message.path, size], reply);
+		void personGesture({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "resize", [message.path, size], reply);
 	},
 
-	"board.extent": (message, _reply, wire) => {
+	"card.extent": (message, _reply, wire) => {
 		wire.boards.noteExtent(message.path, {
 			rev: message.rev,
 			w: message.w,
@@ -79,7 +79,7 @@ export const boards = {
 	 * the agent's, and nobody should be able to strip what it is working from by tidying
 	 * the view.
 	 */
-	"board.play": (message, _reply, wire) => {
+	"card.play": (message, _reply, wire) => {
 		const { name, agent } = stageFor(message, wire);
 		// A board picked out of the rail is a board joining the canvas, so it is placed beside what
 		// is on it unless the place it already has is already beside it (`deck/place.ts`).
@@ -88,12 +88,12 @@ export const boards = {
 	},
 
 	/** The person read it, so it is no longer news on the canvas until it is written again. */
-	"board.seen": (message, _reply, wire) => {
+	"card.seen": (message, _reply, wire) => {
 		wire.boards.seen(message.path);
 	},
 
-	"board.hide": (message, reply, wire) => {
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "hide", [message.path], reply);
+	"card.hide": (message, reply, wire) => {
+		void personGesture({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "hide", [message.path], reply);
 	},
 
 	/*
@@ -192,17 +192,4 @@ export const boards = {
 			text: restored === 0 ? "Those boards are already as they were." : `Restored ${restored} board${restored === 1 ? "" : "s"}.`,
 		});
 	},
-} satisfies WirePart;
-
-/**
- * The same messages under the card's name (`card.move`, …), each answered as its board name is; the
- * board names are answered too until 2026-11-30.
- */
-export const cards = {
-	"card.move": (message, reply, wire) => boards["board.move"]({ ...message, type: "board.move" }, reply, wire),
-	"card.resize": (message, reply, wire) => boards["board.resize"]({ ...message, type: "board.resize" }, reply, wire),
-	"card.extent": (message, reply, wire) => boards["board.extent"]({ ...message, type: "board.extent" }, reply, wire),
-	"card.play": (message, reply, wire) => boards["board.play"]({ ...message, type: "board.play" }, reply, wire),
-	"card.seen": (message, reply, wire) => boards["board.seen"]({ ...message, type: "board.seen" }, reply, wire),
-	"card.hide": (message, reply, wire) => boards["board.hide"]({ ...message, type: "board.hide" }, reply, wire),
 } satisfies WirePart;

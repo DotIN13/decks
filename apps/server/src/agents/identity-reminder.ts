@@ -3,8 +3,8 @@ import type { Identity } from "@decks/protocol";
 /**
  * What an agent has not yet said about itself, and the sentence that asks for it.
  *
- * An agent is addressed by its name (`@name`, `decks send <name>`), found by its workspace
- * (`decks agents --filter.workspace …`) and read at a glance by its tags, and the
+ * An agent is addressed by its name (`@name`, `decks agent send <name>`), found by its workspace
+ * (`decks agent list --workspace …`) and read at a glance by its tags, and the
  * instructions ask for all three once. Agents skip it: the deck filled with `Agent 3`s working
  * on nothing in particular. An instruction read at the start of a session is easy to pass over,
  * so the same request now travels at the two moments it is cheap to act on: at the head of each

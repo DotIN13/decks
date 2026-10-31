@@ -1,4 +1,4 @@
-import { ALL_VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
+import { VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import { appActor, callerTool, conversationFor } from "../stage/caller-run.ts";
@@ -6,6 +6,7 @@ import { fromThisMachine } from "../auth/issue.ts";
 import { bearerOf } from "../auth/guard.ts";
 import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
+import { renamedVerb } from "./renamed.ts";
 import { penEditBy } from "../stage/pens.ts";
 import { settleStage } from "../wire/deck.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
@@ -39,14 +40,13 @@ export function verbRoutes(app: App): express.Router {
 
 	router.get("/", (_req, res) => {
 		res.set("cache-control", "no-store").json({
-			verbs: ALL_VERBS.map((verb) => ({ name: verb.name, group: verb.group, touches: verb.touches, effect: verb.effect, summary: verb.summary, signature: signature(verb), ...(verb.alias ? { alias: verb.alias } : {}) })),
+			verbs: VERBS.map((verb) => ({ name: verb.name, group: verb.group, touches: verb.touches, effect: verb.effect, summary: verb.summary, signature: signature(verb) })),
 		});
 	});
 
 	/**
 	 * Every change as it happens, for a client that is not a browser on the socket: the frames Decks
-	 * broadcasts (`card.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each;
-	 * `board.changed`, `card.changed`'s old name, is sent beside it until 2026-11-30.
+	 * broadcasts (`card.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each.
 	 * `?types=card.changed,stage.pen.delta` keeps only those. A comment every 25 seconds keeps
 	 * proxies from closing a quiet stream.
 	 */
@@ -156,14 +156,13 @@ export function verbRoutes(app: App): express.Router {
 		res.json({ ok: true });
 	});
 
-	// `/board-seen` and `/board-extent` are the old names of `/card-seen` and `/card-extent`, kept until 2026-11-30.
-	router.post(["/card-seen", "/board-seen"], (req: Request, res: Response) => {
+	router.post("/card-seen", (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
 		app.boards.seen(path);
 		res.json({ ok: true });
 	});
-	router.post(["/card-extent", "/board-extent"], (req: Request, res: Response) => {
+	router.post("/card-extent", (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
 		const body = req.body as Record<string, unknown>;
@@ -187,7 +186,7 @@ export function verbRoutes(app: App): express.Router {
 		const name = String(req.params.verb ?? "");
 		const verb = VERB_BY_NAME.get(name);
 		if (!verb) {
-			res.status(404).json({ ok: false, error: `There is no verb called ${name}. GET /api/v1 lists them.`, notes: [] });
+			res.status(404).json({ ok: false, error: renamedVerb(name) ?? `There is no verb called ${name}. GET /api/v1 lists them.`, notes: [] });
 			return;
 		}
 		const body = (req.body ?? {}) as { args?: unknown };
@@ -341,7 +340,7 @@ function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }
 
 /**
  * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
- * cards and boards (`card.changed` and `board.changed` for one on it), and what is said to it alone.
+ * cards (`card.changed` for one on it), and what is said to it alone.
  */
 export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
 	/*
@@ -364,8 +363,8 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
 	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
-	if (message.type === "board.changed" || message.type === "card.changed") {
-		const board = (message.board ?? message.card) as { path?: unknown } | undefined;
+	if (message.type === "card.changed") {
+		const board = message.card as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;
 		if (!path) return false;
 		return boardOnCanvas(app, path, canvas);
