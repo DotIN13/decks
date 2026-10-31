@@ -266,6 +266,15 @@ if (docBox) {
 	}, docPaths[0]);
 	say("one press inside the document selects it and reaches its editor, as a press in a card does", !!picked && focusIn, `selected ${!!picked}, focus inside ${focusIn}`);
 }
+// --- zoomed back out, the apps that ran are their pictures, as cards are ------------------------------------
+at("back to 30%");
+await view(0.3);
+await rest();
+const appsPictured = await until(async () => {
+	const pictured = await canvas.evaluate(() => globalThis.__decksPictured?.() ?? []);
+	return appPaths.every((path) => pictured.includes(path)) ? pictured : undefined;
+}, 10000);
+say("zoomed out to 30%, every app, the ones that ran included, is drawn as its picture, as a card is", !!appsPictured, JSON.stringify(await canvas.evaluate(() => (globalThis.__decksPictured?.() ?? []).filter((p) => p.startsWith("item:")))));
 say("no page errors", errors.length === 0, errors.join(" | "));
 await page.close().catch(() => {});
 // The harness's socket would keep the process alive.

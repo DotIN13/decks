@@ -224,9 +224,10 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// A card while its surface shows; an app or a document only while its surface shows and the camera is still, and its picture otherwise
-						// (`item-surfaces.tsx`): an app that animates repainted its window at every step of a pan, and a document's editor laid out at every step of a zoom.
-						live: board.item === "app" ? appShowing(board.path) && !(COVER.app && inMotion) : board.item === "document" ? live.has(board.path) && !(COVER.document && inMotion) : live.has(board.path),
+						// Every kind by one rule: live while its slot says its surface shows (`onLive`: awake and not asleep); an app besides only once its window
+						// has loaded the app, and an app or a document only while the camera is still (`MOVING`), its picture otherwise: an app that
+						// animates repainted its window at every step of a pan, and a document's editor laid out at every step of a zoom.
+						live: board.item === "app" ? live.has(board.path) && appShowing(board.path) && !(COVER.app && inMotion) : board.item === "document" ? live.has(board.path) && !(COVER.document && inMotion) : live.has(board.path),
 						// An awake item's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// An item not live is its picture: a card's own, an app's as the frame runs it, a document's of its file.
