@@ -1,5 +1,4 @@
 import { createSignal } from "solid-js";
-import type { CanvasMode } from "../board/tools.ts";
 
 /**
  * What is selected, and which mode the canvas is in.
@@ -17,12 +16,19 @@ import type { CanvasMode } from "../board/tools.ts";
  * `onCleanup` and `createEffect` require a component to hang from. Those stay in `App.tsx`,
  * where they belong.
  */
+/**
+ * What a click on the canvas means: **browse** reads the boards (text selects, a game plays, a
+ * link opens) and still moves and retypes what is drawn; **edit** is for changing the drawing,
+ * with its outlines, grips and distances. A board's own page is never edited from the canvas.
+ */
+export type CanvasMode = "browse" | "edit";
+
 function createSelection() {
 	/** The selected board, by path. */
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 
 	/**
-	 * Browse or edit (`board/tools.ts`), and **browse is where every session starts**: a deck is
+	 * Browse or edit (`CanvasMode`, above), and **browse is where every session starts**: a deck is
 	 * read far more often than it is drawn, and browsing still moves and retypes what is drawn.
 	 * Not persisted. A board's own page is never edited from the canvas, in either.
 	 */

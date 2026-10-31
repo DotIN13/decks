@@ -5,12 +5,12 @@ import type { Board, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import {createComputed, createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { createFileDrops } from "./app/files.ts";
+import { createFileDrops } from "./app/files/drops.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import { createAlerts } from "./app/alerts.ts";
 import { camera } from "./state/camera.ts";
-import { handleFrame, type FrameHooks } from "./app/frames.ts";
+import { handleFrame, type FrameHooks } from "./app/socket-messages.ts";
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory } from "./state/history.ts";
@@ -23,7 +23,7 @@ import { pens } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
 import { boardsOpen, boardsStarted, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
 import { destination, destinationLabel } from "./app/send-from-bar.ts";
-import { FilePicker } from "./board/FilePicker.tsx";
+import { FilePicker } from "./app/files/FilePicker.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
 import { adoptFormerComments, removeComment, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
@@ -33,10 +33,10 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { StageManager } from "./canvas/StageManager.tsx";
 import { stageOf, stages, viewOnly } from "./state/stages.ts";
-import { TopBar } from "./v3/TopBar.tsx";
-import { TopRight } from "./v3/TopRight.tsx";
-import { ChatSection, StatusPill } from "./v3/ChatSection.tsx";
-import { installTooltips } from "./v3/tooltip.ts";
+import { TopBar } from "./chrome/TopBar.tsx";
+import { TopRight } from "./chrome/TopRight.tsx";
+import { ChatSection, StatusPill } from "./chrome/ChatSection.tsx";
+import { installTooltips } from "./chrome/tooltip.ts";
 import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
@@ -279,8 +279,8 @@ export function App() {
 	const stageBoards = (): Board[] => shownBoards;
 
 	/*
-	 * What `handleFrame` may touch (`app/frames.ts`). **Three fields**, and each has a reason
-	 * to be here: a request registry `app/files.ts` owns and mints, a signal whose one reader
+	 * What `handleFrame` may touch (`app/socket-messages.ts`). **Three fields**, and each has a reason
+	 * to be here: a request registry `app/files/drops.ts` owns and mints, a signal whose one reader
 	 * is the conversation column, and behaviour that needs the component's own `focusAgent`.
 	 * Everything else the handler uses it imports — the camera, the store.
 	 */
@@ -308,7 +308,7 @@ export function App() {
 	const { addFile, intoComposer } = files;
 
 
-	// A paste, and a drop on the canvas, over a board or not (`app/files.ts`).
+	// A paste, and a drop on the canvas, over a board or not (`app/files/drops.ts`).
 	files.install({
 		preview,
 		// A paste with the focus on this page: items copied on a canvas, or words, go to the canvas on screen.

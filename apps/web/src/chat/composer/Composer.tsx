@@ -12,7 +12,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, 
 import { ScribbleCatch } from "@decks/ui";
 import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../../state/notices.ts";
-import { carriesFiles } from "../../board/file-drop.ts";
+import { carriesFiles } from "../../app/files/file-drop.ts";
 import type { WaitingComment } from "../../state/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
 import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
@@ -161,7 +161,7 @@ export function Composer(props: {
 	 */
 	page: string;
 	/**
-	 * Button one of three: the file picker the app already has (`canvas/FilePicker`).
+	 * Button one of three: the file picker the app already has (`app/files/FilePicker.tsx`).
 	 *
 	 * Optional, and the button is absent rather than inert when it is not supplied. A
 	 * paperclip that opens nothing is worse than no paperclip: it is the one control in

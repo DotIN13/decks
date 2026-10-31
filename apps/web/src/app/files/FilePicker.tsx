@@ -1,5 +1,5 @@
-import { api } from "../connections/connection.ts";
-import { authHeaders } from "../lib/session.ts";
+import { api } from "../../connections/connection.ts";
+import { authHeaders } from "../../lib/session.ts";
 import type { LucideIcon } from "lucide-solid";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import ChevronRight from "lucide-solid/icons/chevron-right";
@@ -19,7 +19,7 @@ import Search from "lucide-solid/icons/search";
 import Upload from "lucide-solid/icons/upload";
 import X from "lucide-solid/icons/x";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "../../ui/icons.tsx";
 
 interface BrowseEntry {
 	name: string;

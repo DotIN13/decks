@@ -5,9 +5,9 @@ import { drawing, setDrawing } from "@decks/canvas/tools";
 import { makeFloat } from "@decks/ui/float";
 import { createEffect, onCleanup, Show } from "solid-js";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
-import { PenTray } from "../v3/PenTray.tsx";
-import { ToolColumn } from "../v3/ToolColumn.tsx";
-import { ZoomBar } from "../v3/ZoomBar.tsx";
+import { PenTray } from "./PenTray.tsx";
+import { ToolColumn } from "./ToolColumn.tsx";
+import { ZoomBar } from "./ZoomBar.tsx";
 
 /**
  * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `frame/chrome.ts`):

@@ -10,7 +10,7 @@ import { batch, createSignal } from "solid-js";
  * view you are leaving and takes the one you are arriving at (`camera/agent-view.ts`).
  *
  * It lived in `App.tsx` until four modules were reaching back into the component for it —
- * `app/files.ts` to turn a drop's stage pixels into world pixels, `app/camera-report.ts` to
+ * `app/files/drops.ts` to turn a drop's stage pixels into world pixels, `app/camera-report.ts` to
  * read it and write it, and two fields of `FrameHooks`. That is what puts a value here
  * rather than in the component: not that it is state, but that modules have to reach it.
  *

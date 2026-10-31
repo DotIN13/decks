@@ -10,7 +10,7 @@ import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
-import type { CanvasMode } from "../board/tools.ts";
+import type { CanvasMode } from "../state/selection.ts";
 import { DecksMark, Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
@@ -579,7 +579,7 @@ export function AgentMenu(props: {
 
 export function AgentPill(props: {
 	/**
-	 * The canvas's mode (`board/tools.ts`). This pill only ever asks for browse: a board is a
+	 * The canvas's mode (`state/selection.ts`). This pill only ever asks for browse: a board is a
 	 * *document* — text selects and copies, a game plays, a click is an ordinary click — and
 	 * what is drawn still moves and retypes. Its pages are never edited from the canvas.
 	 */

@@ -108,7 +108,7 @@ export function watchDock(dock: Element | null): void {
  * Everything this file knows, wired up — three facts about the window, one call.
  *
  * The three were three statements in an `onMount` in `App.tsx` that also installed the paste
- * listener and the drop guard, and when those two moved to `app/files.ts` the cut took these
+ * listener and the drop guard, and when those two moved to `app/files/drops.ts` the cut took these
  * with them. Nothing caught it: they were dead *imports* afterwards, which a typechecker does
  * not report, and every browser check runs in a desktop Chromium with a mouse — no on-screen
  * keyboard, no pinch gesture, and a dock whose height never changes. Two of the three were

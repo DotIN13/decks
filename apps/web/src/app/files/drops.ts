@@ -1,21 +1,21 @@
 import { onCleanup, onMount } from "solid-js";
 import { toWorld } from "@decks/canvas/camera";
-import { camera } from "../state/camera.ts";
-import { guardDocumentDrops, naturalSize } from "../board/file-drop.ts";
+import { camera } from "../../state/camera.ts";
+import { guardDocumentDrops, naturalSize } from "./file-drop.ts";
 import { cardPicture, centredOp, fileCardOps, fileItem, liveFileOps, markdownText, mediaItem, pictureItem, rowOps, wordsCard, type DroppedItem, type FilePreview, type SizedItem } from "@decks/canvas/tools";
-import { state } from "../state/deck.ts";
-import { notice, working } from "../state/notices.ts";
-import { send } from "../state/socket.ts";
-import { setDraft, setPicking } from "../state/ui.ts";
+import { state } from "../../state/deck.ts";
+import { notice, working } from "../../state/notices.ts";
+import { send } from "../../state/socket.ts";
+import { setDraft, setPicking } from "../../state/ui.ts";
 import { mayUpload, uploadAsset } from "./upload.ts";
-import { api } from "../connections/connection.ts";
-import { openBundle } from "../connections/bundle.ts";
-import { can } from "../connections/backend.ts";
-import { switchTo } from "../connections/connection.ts";
-import { ensureWorker } from "../connections/worker.ts";
-import { editDrawing, stageOnScreen } from "../state/decks.ts";
-import { viewOnly } from "../state/stages.ts";
-import { authedSrc } from "../lib/authed.tsx";
+import { api } from "../../connections/connection.ts";
+import { openBundle } from "../../connections/bundle.ts";
+import { can } from "../../connections/backend.ts";
+import { switchTo } from "../../connections/connection.ts";
+import { ensureWorker } from "../../connections/worker.ts";
+import { editDrawing, stageOnScreen } from "../../state/decks.ts";
+import { viewOnly } from "../../state/stages.ts";
+import { authedSrc } from "../../lib/authed.tsx";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -130,7 +130,7 @@ export function createFileDrops() {
 	/**
 	 * One file from the device, copied into the deck, answered as an embed path.
 	 *
-	 * The other end of the file picker (`board/FilePicker.tsx`): the bytes go into the deck's
+	 * The other end of the file picker (`FilePicker.tsx`): the bytes go into the deck's
 	 * `assets/` first, and the path comes back for whoever asked.
 	 */
 	const addFile = async (file: File): Promise<string | undefined> => {

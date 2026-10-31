@@ -2,7 +2,7 @@ import type { Camera } from "@decks/protocol";
 import { onCleanup, untrack, type JSX } from "solid-js";
 import { createFramedEditor, type FramedEditorOptions, type FramedHandle } from "@decks/canvas";
 import { drawing } from "@decks/canvas/tools";
-import { canvasPass, cardAgentCall } from "../board/canvas-frame.ts";
+import { canvasPass, cardAgentCall } from "../canvas/pass.ts";
 import { scheme } from "../lib/theme.ts";
 import { camera, glide } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
@@ -11,8 +11,8 @@ import { pens } from "../state/pens.ts";
 import { mode, selected, setMode, setSelected } from "../state/selection.ts";
 import { reportCameraSoon } from "./camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer } from "./frame-handoffs.ts";
-import type { createFileDrops } from "./files.ts";
-import { rememberView } from "./frames.ts";
+import type { createFileDrops } from "./files/drops.ts";
+import { rememberView } from "./socket-messages.ts";
 import { openLinkedBoard } from "./links.ts";
 
 /** What the canvas host needs of the page around it. */

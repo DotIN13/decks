@@ -130,7 +130,7 @@ export type AgentScratchStore = ReturnType<typeof createAgentScratch>;
  *
  * Created here rather than inside a component, because two things that are not components
  * need it: the history window (`state/history.ts`, for the two flags a reconnect clears) and
- * the frame switch (`app/frames.ts`, for the last state an agent was in and the view parked
+ * the frame switch (`app/socket-messages.ts`, for the last state an agent was in and the view parked
  * for it). Handing it out through `FrameHooks` was the symptom; this is the value.
  *
  * Nothing renders from it — that is the whole point of it being scratch — so it needs no

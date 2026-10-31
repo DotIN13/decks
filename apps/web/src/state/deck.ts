@@ -160,7 +160,7 @@ export const runtimeFor = (kind: AgentKind | undefined): RuntimeInfo | undefined
  * times, something the compiler cannot check.
  *
  * Here rather than in the component because eleven of those writes are in the frame switch
- * (`app/frames.ts`), which is not a component and has no business being handed a store write.
+ * (`app/socket-messages.ts`), which is not a component and has no business being handed a store write.
  */
 export const ensureAgent = (id: string): void => {
 	if (!state.agents[id]) setState("agents", id, emptyAgent());

@@ -9,7 +9,7 @@
  * Read once, before anything else on the page runs, and the tag taken out of the document straight
  * away, so a script that looks later finds nothing there. From then on this page sends it on every
  * request of its own to the harness, `Authorization: Bearer`, and on its socket (`decks_token`). A
- * card is not given this one: the canvas frame has a canvas pass for its one canvas (`board/canvas-frame.ts`).
+ * card is not given this one: the canvas frame has a canvas pass for its one canvas (`canvas/pass.ts`).
  */
 const tag = typeof document === "undefined" ? null : document.querySelector<HTMLMetaElement>('meta[name="decks-session"]');
 const token = tag?.content || undefined;

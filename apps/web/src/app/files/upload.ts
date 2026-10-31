@@ -1,7 +1,7 @@
-import { api } from "../connections/connection.ts";
-import { authHeaders } from "../lib/session.ts";
+import { api } from "../../connections/connection.ts";
+import { authHeaders } from "../../lib/session.ts";
 import { CONFIRM_UPLOAD_BYTES, MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
-import { ask } from "../state/confirm.ts";
+import { ask } from "../../state/confirm.ts";
 
 /**
  * Sending a dropped file to the server, with something honest to show while it goes.

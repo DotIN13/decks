@@ -1168,7 +1168,7 @@ svg.lucide {
  * fill free to mean the one thing it should: this is the answer that acts.
  */
 /*
- * The file picker (`board/FilePicker.tsx`): a window with a name, two tabs when it opens a
+ * The file picker (`app/files/FilePicker.tsx`): a window with a name, two tabs when it opens a
  * document (the deck's files, or Google Docs), a bar for where you are and a filter, rows that
  * say what each file is, and a footer for the upload. A fixed height, so changing tab or folder
  * never moves the window under the pointer.
