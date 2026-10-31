@@ -11,6 +11,12 @@ import { cardCalls } from "./card-calls.ts";
 import type { FrameContext } from "./boot.ts";
 import type { Rect } from "../protocol.ts";
 
+/**
+ * How the server draws card pictures, in each picture's address: raised with `CARD_LOOK` in the server's
+ * `pictures/ladder.ts`, since the browser keeps a picture a year under the same address.
+ */
+const PICTURE_LOOK = 4;
+
 /** Text as base64url, UTF-8 first, for an address. */
 const base64url = (text: string) => {
 	let binary = "";
@@ -217,7 +223,8 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 				const picturesAt = ctx.picturesAt();
 				if (picturesAt.includes("{path}")) return picturesAt.replace("{path}", at).replace("{scheme}", scheme);
 				// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
-				return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&whole=1`;
+				// `look`, so a picture kept a year under its revision is asked for again when the server draws cards another way.
+				return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&look=${PICTURE_LOOK}&whole=1`;
 			},
 			// A friend's card, on their canvas or pasted from it with its scripts off until you turn them on (`canvas.paste`).
 			cardScripts: (path) => trust(path) !== "friend" && cardItem(path)?.metadata?.scripts !== false,

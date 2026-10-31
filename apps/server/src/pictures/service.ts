@@ -5,7 +5,9 @@ import { compress, encoder, type Level } from "./astc.ts";
 import { compressedName, LEVELS, squeezed, wireEncoding, wireName, type WireEncoding } from "./compress.ts";
 import {
 	AHEAD_WIDTHS,
+	CARD_PATH,
 	keptWidth,
+	lookOf,
 	MEASURE,
 	PICTURE_LOOK,
 	pageClip,
@@ -89,6 +91,8 @@ const WINDOW_ASPECT = 3 / 4;
 const CONCURRENCY = 2;
 const IDLE_MS = 60_000;
 const READY_MS = 8_000;
+/** How long a card on `measure.html` may take to hold its height and say so: its own wait is 10 s (`measure.ts`). */
+const CARD_READY_MS = 12_000;
 /** How long a background picture waits for a board to say it is ready (`take`). */
 const AHEAD_READY_MS = 3_000;
 /** How long a board has to stop changing before its picture is retaken. */
@@ -112,6 +116,8 @@ export interface ThumbHost {
 	 */
 	reader?: () => string;
 	extraOrigins?: () => string[];
+	/** Where the web app's pages are (`measure.html`): Vite's in development; `origin` when not said. */
+	webOrigin?: () => string;
 }
 
 /** How far the indexer has got (`PictureService.progress`), for the app's ⋯ menu. */
@@ -499,8 +505,10 @@ export class PictureService {
 		}
 		if (found.length === 0) return undefined;
 		const current = whole.slice(0, whole.indexOf("-whole")).replace(/-\d+$/, "");
-		// This revision in this look, or else the revision whose picture was written last.
-		let pool = found.filter((one) => one.name.startsWith(current) && one.name.includes(`-l${PICTURE_LOOK}.`));
+		// This revision in this look, or in an older look, or else the revision whose picture was written last.
+		let pool = found.filter((one) => one.name.startsWith(current) && one.name.includes(`-l${lookOf(board.path)}.`));
+		// This revision drawn the way it was before (a card's look raised): the same card, until its new picture comes.
+		if (pool.length === 0) pool = found.filter((one) => one.name.startsWith(current));
 		if (pool.length === 0) {
 			const at = (one: { name: string }) => {
 				try {
@@ -668,19 +676,34 @@ export class PictureService {
 		try {
 			const page = lease?.page ?? (await context.newPage());
 			if (lease) await page.setViewportSize({ width: clip.width, height: tall });
-			const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
-			await page.goto(url, { waitUntil: "load", timeout: 20_000 });
-			/*
-			 * `board.js` sets this after fonts, markdown, maths and diagrams. A board that never says
-			 * so is drawn as it stands: a late picture beats none. The background waits less for one:
-			 * two such boards were an eighth of a sweep's time.
-			 */
-			await page.waitForFunction("window.__cardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
 			let shotClip = clip;
-			const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
-			// Never below what the card says it is: a picture cropped under its box would be a different card from the one on the canvas.
-			const h = Math.max(measured, job.board.h);
-			if (measured > 0 && h !== job.board.h) shotClip = pageClip({ w: job.board.w, h });
+			if (CARD_PATH.test(job.board.path)) {
+				/*
+				 * A card is drawn by the web app's `measure.html` (`apps/web/src/measure.ts`, `picture=1`), as
+				 * the canvas frame draws it: `mountCard` in a closed shadow root at its width, card.css before its
+				 * own styles, its modules handed the card, in the scheme asked for. It says it is ready once its
+				 * height has held and its fonts have come, and how tall it came to: never below its box.
+				 */
+				const query = new URLSearchParams({ path: job.board.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1" });
+				await page.goto(`${(this.host.webOrigin ?? this.host.origin)()}/measure.html?${query}`, { waitUntil: "load", timeout: 20_000 });
+				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
+				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
+				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
+			} else {
+				// Anything else pictured (a friend's old board, the page a picture card links to) is a page of its own.
+				const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
+				await page.goto(url, { waitUntil: "load", timeout: 20_000 });
+				/*
+				 * `card.js` sets this after fonts, markdown, maths and diagrams. A page that never says
+				 * so is drawn as it stands: a late picture beats none. The background waits less for one:
+				 * two such pages were an eighth of a sweep's time.
+				 */
+				await page.waitForFunction("window.__cardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
+				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
+				// Never below what the page says it is: a picture cropped under its box would be a different page from the one on the canvas.
+				const h = Math.max(measured, job.board.h);
+				if (measured > 0 && h !== job.board.h) shotClip = pageClip({ w: job.board.w, h });
+			}
 			const shot = await wholeShot(page, shotClip, job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : Math.min(2, job.width! / shotClip.width));
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(job.file, shot);
@@ -727,8 +750,11 @@ export class PictureService {
 		// And their compressed sizes (`compressedName`), which no stand-in ever is.
 		const packed = new RegExp(small.source.replace("\\.webp$", "\\.astc(\\.br|\\.gz)?$"));
 		try {
+			// And every picture of it in an older look (`lookOf`), of any revision: it is drawn another way now.
+			const look = `-l${lookOf(job.board.path)}.`;
 			for (const name of readdirSync(this.host.dir)) {
-				if (job.kind === "whole" && name !== mine && wholes.test(name)) rmSync(join(this.host.dir, name), { force: true });
+				if ((wholes.test(name) || small.test(name) || packed.test(name)) && !name.includes(look)) rmSync(join(this.host.dir, name), { force: true });
+				else if (job.kind === "whole" && name !== mine && wholes.test(name)) rmSync(join(this.host.dir, name), { force: true });
 				else if ((small.test(name) || packed.test(name)) && !name.startsWith(thisRev)) rmSync(join(this.host.dir, name), { force: true });
 			}
 		} catch {

@@ -64,7 +64,7 @@ export function pictureType(bytes: Uint8Array): "webp" | "jpeg" {
  */
 export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: ThumbKind = "whole", width = SMALL_TAKEN): string {
 	const hash = createHash("sha1").update(path).digest("hex").slice(0, 16);
-	const whole = `${hash}-${rev}-${scheme}-${THUMB_WIDTH}-whole-l${PICTURE_LOOK}.webp`;
+	const whole = `${hash}-${rev}-${scheme}-${THUMB_WIDTH}-whole-l${lookOf(path)}.webp`;
 	return kind === "small" ? smallName(whole, width) : whole;
 }
 
@@ -77,6 +77,19 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
  * puts the same number in each picture's address (`thumbUrl`), which the browser keeps a year.
  */
 export const PICTURE_LOOK = 3;
+/**
+ * How cards are drawn for their pictures, as `PICTURE_LOOK` is for pages. 4: a card is pictured by the
+ * web app's `measure.html` as the canvas frame draws it (`mountCard`, card.css before the card's own
+ * styles), where it was a page of its own; every card's picture is taken again once. Old boards and
+ * friends' pages keep `PICTURE_LOOK`, so the pictures an old deck's migration reads keep their names.
+ */
+export const CARD_LOOK = 4;
+/** A card, as the canvas frame and `measure.html` tell one: the `index.html` of a folder in a `cards/`. */
+export const CARD_PATH = /(?:^|\/)cards\/[^/]+\/index\.html$/i;
+/** The look a picture of this page is named with: `CARD_LOOK` for a card, `PICTURE_LOOK` for any other page. */
+export function lookOf(path: string): number {
+	return CARD_PATH.test(path) ? CARD_LOOK : PICTURE_LOOK;
+}
 
 /**
  * The canvas's picture ladder: the widths a card's picture is kept at, the rungs the canvas chooses

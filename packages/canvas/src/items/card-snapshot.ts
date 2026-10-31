@@ -43,7 +43,8 @@ export function snapshotOfCard(root: ShadowRoot, options: CardShotOptions): Card
 	const head: string[] = [];
 	// What the card's root holds beside its body: a stylesheet a part put in (KaTeX's), a `<style>`.
 	for (const child of Array.from(root.children)) {
-		if (child === body) continue;
+		// card.css itself, which the page loads as card.css.
+		if (child === body || child.hasAttribute("data-card-sheet")) continue; // `CARD_SHEET` in card.ts
 		if (child.localName === "link" || child.localName === "style") head.push(withRules(child).outerHTML);
 	}
 	for (const sheet of Array.from(root.adoptedStyleSheets ?? [])) {

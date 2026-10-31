@@ -310,6 +310,8 @@ export class App {
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
 			reader: () => this.passes.canvas("", "view", HARNESS_ID).pass,
 			extraOrigins: () => (process.env.DECKS_WEB_PORT ? [`http://127.0.0.1:${process.env.DECKS_WEB_PORT}`] : []),
+			// The web app's `measure.html`, which draws a card for its picture as the canvas frame draws it: Vite's in development.
+			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`),
 		});
 		this.thumbs.indexLater();
 		/*

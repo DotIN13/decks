@@ -64,10 +64,23 @@ say("…which counts the script's late height and the container rule", (awayH ??
 
 // Now the frame shows it: its own measurement is the one fit reads.
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
+// The heights the frame reports for the card (`card-extent`): its script's late 333 px is the last of them.
+const reported = [];
+page.context().on("request", (request) => {
+	if (!request.url().includes("/card-extent")) return;
+	try {
+		const body = JSON.parse(request.postData() ?? "{}");
+		if (String(body.path).includes("fit-check")) reported.push(body.h);
+	} catch {
+		/* not one of ours */
+	}
+});
 await settle(page, 1500);
 const mounted = await until(async () => (await canvasFrame(page)).evaluate(() => [...document.querySelectorAll(".card-node[data-path]")].some((one) => one.dataset.path.includes("fit-check") && one.querySelector(".card-host"))));
 say("the card is mounted in the frame", !!mounted, await (await canvasFrame(page)).evaluate(() => [...document.querySelectorAll(".card-node[data-path]")].map((one) => one.dataset.path + ":" + !!one.querySelector(".card-host")).join(" ")));
 await settle(page, 1500);
+// The card's script runs after its sheet, its parts and its module have come, later on a busy machine (a full run, pictures being taken): wait for the frame to report what it did.
+await until(async () => reported.some((h) => h > 600), 10000);
 // Answered before the server's own Chromium would start (1.2 s): the frame's measurement, not the away one.
 const started = Date.now();
 const seen = await call("canvas.fit", [path, { margin: 0 }], agent);

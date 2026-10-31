@@ -111,6 +111,8 @@ export interface MountedCard {
 	reading(): ReturnType<typeof readingOfCard>;
 	/** Stop its scripts and empty it. */
 	dispose(): void;
+	/** Settles once card.css is in and its markdown, maths, diagrams and code are drawn (its scripts start after). */
+	drawn: Promise<void>;
 }
 
 /** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
@@ -215,18 +217,32 @@ function cssInDeck(css: string, base: string): boolean {
 
 /*
  * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
- * `body.board` turned into the card's own host and element. One sheet for every card on the page,
- * adopted by each root, and the fonts declared once in the page itself, since a shadow root's
- * `@font-face` is not used.
+ * `body.board` turned into the card's own host and element, and the fonts declared once in the page
+ * itself, since a shadow root's `@font-face` is not used.
+ *
+ * It goes in each root as a `<style>` before the card's own (`data-card-sheet`), not as an adopted
+ * sheet: adopted sheets cascade after every sheet in the tree, so card.css's `h1 { font-size: 30px }`
+ * beat a card's own `h1 { font-size: 23px }`, and `.board .doc`'s padding a card's `.board .doc`,
+ * where on a page of its own (and in every picture and screenshot of it) the card's own rule, written
+ * later, wins. The browser parses the same text once for every root that holds it.
  */
-const sheets = new Map<string, Promise<CSSStyleSheet | undefined>>();
-const cardSheets = new WeakSet<CSSStyleSheet>();
-/** Whether a sheet is the one every card adopts (card.css as the card's): a card's snapshot loads card.css instead (`card-snapshot.ts`). */
-export const isCardSheet = (sheet: CSSStyleSheet): boolean => cardSheets.has(sheet);
+const sheets = new Map<string, Promise<string | undefined>>();
+/** Kept for callers that skipped card.css among a root's adopted sheets: card.css is never one now (`CARD_SHEET`). */
+export const isCardSheet = (_sheet: CSSStyleSheet): boolean => false;
+/** The attribute on the `<style>` that holds card.css in a card's root: a card's snapshot loads card.css instead (`card-snapshot.ts`). */
+export const CARD_SHEET = "data-card-sheet";
+/**
+ * The inherited properties a card's host starts from: a page's initial values, so nothing of the page
+ * the host sits in (its font, its letter-spacing, a phone's text inflation) reaches the card's text.
+ */
+const HOST_RESET =
+	"font: 16px/normal serif; font-kerning: auto; font-feature-settings: normal; font-variation-settings: normal; font-synthesis: weight style; letter-spacing: normal; word-spacing: normal; " +
+	"text-align: start; text-indent: 0; text-transform: none; text-shadow: none; text-rendering: auto; white-space: normal; hyphens: manual; " +
+	"-webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-font-smoothing: auto;";
 const fontsSaid = new Set<string>();
 /** A response's text, or a failure for one refused or missing. */
 const textOf = (response: Response): Promise<string> => (response.ok ? response.text() : Promise.reject(new Error(`${response.url}: ${response.status}`)));
-function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
+function cardSheet(lib: string): Promise<string | undefined> {
 	// One sheet whatever pass `lib` was read on (`host.ts`).
 	const key = passless(lib);
 	let made = sheets.get(key);
@@ -255,12 +271,13 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				 * As tall as what is in it, so the card can be measured (`onHeight`, what `decks canvas fit` reads);
 				 * the paper is the host's, so a card shorter than its box still fills it, and what does not fit in the
 				 * box is hidden at its foot.
+				 *
+				 * And what a page's root would hand a card, rather than whatever the page around the host
+				 * inherits into it (the app's type, a frame's text-size-adjust): a card is laid out the same in
+				 * the canvas frame, on the server's page that measures and pictures it, and on a phone.
 				 */
-				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }";
-			const sheet = new CSSStyleSheet();
-			sheet.replaceSync(css);
-			cardSheets.add(sheet);
-			return sheet;
+				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg); " + HOST_RESET + " }";
+			return css;
 		} catch {
 			// Asked for again by the next card: a pass run out or a restart is not the end of the card's look.
 			sheets.delete(key);
@@ -521,8 +538,12 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	host.dataset.theme = source.theme;
 	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
 	const lib = new URL("../../lib/", source.url).href;
-	const sheetReady = cardSheet(lib).then((sheet) => {
-		if (sheet) root.adoptedStyleSheets = [sheet, ...root.adoptedStyleSheets];
+	const sheetReady = cardSheet(lib).then((css) => {
+		if (css === undefined) return;
+		const style = document.createElement("style");
+		style.setAttribute(CARD_SHEET, "");
+		style.textContent = css;
+		root.prepend(style);
 	});
 
 	// Parsed where nothing runs: a template's content is inert, scripts and all.
@@ -626,6 +647,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	sizes.observe(body);
 	return {
 		root,
+		drawn: partsDrawn.then(() => undefined, () => undefined),
 		reading: () => readingOfCard(body),
 		onHeight(listener) {
 			heightListeners.add(listener);

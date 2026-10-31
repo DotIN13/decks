@@ -306,3 +306,29 @@ test("the indexer takes every board's small pictures, not its whole one, and say
 	await thumbs.index();
 	assert.equal(chrome.opened.length, before);
 });
+
+test("a card is pictured on the web app's measure.html as the frame draws it, in a look of its own that retires its older pictures", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	const chrome = fake();
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", webOrigin: () => "http://127.0.0.1:2", dir }, async () => chrome.browser);
+	const path = "canvases/plan/cards/sales/index.html";
+	// Its pictures in the look before (a page of its own), of this revision and an earlier one.
+	const before = [thumbName(path, 3, "light", "whole"), thumbName(path, 3, "light", "small", 480), thumbName(path, 2, "light", "small", 192)].map((name) => name.replace(/-l\d+\.webp$/, "-l3.webp"));
+	for (const name of before) writeFileSync(join(dir, name), "old");
+	assert.match(thumbName(path, 3, "light"), /-l4\.webp$/, "a card's pictures are named in the card look");
+	assert.match(thumbName("canvases/plan/boards/old.html", 3, "light"), /-l3\.webp$/, "an old page's keep the page look, which the migrations read");
+	const card = board(path, 3, 800, 300);
+	assert.deepEqual(thumbs.nearest(card, "light", "whole"), { file: join(dir, before[0]!), exact: false }, "the older look stands in until the new picture comes");
+	const asked = thumbs.get(card, "light");
+	await tick();
+	await chrome.release();
+	await asked;
+	const url = new URL(chrome.opened[0]!.url);
+	assert.equal(url.origin + url.pathname, "http://127.0.0.1:2/measure.html");
+	assert.deepEqual(Object.fromEntries(url.searchParams), { path, w: "800", h: "300", scheme: "light", picture: "1" });
+	// The fake page answers 1234 for the height the card came to (`__cardHeight`).
+	assert.deepEqual(chrome.clips, [1234], "pictured as tall as the card came to");
+	assert.ok(existsSync(join(dir, thumbName(path, 3, "light"))));
+	for (const name of before) assert.equal(existsSync(join(dir, name)), false, `${name} is gone`);
+	thumbs.dispose();
+});
