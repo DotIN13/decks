@@ -1647,6 +1647,14 @@
 	/* An item's title above it, to move it by, outside its box so the item and the sheet's picture of
 	   it both start at the box's top. Sized in stage pixels, so it
 	   scales with the board and a zoom writes nothing to it. */
+	/*
+	 * A node that is not live (hovered or selected while asleep, kept, leaving, waking under its picture)
+	 * has its title painted by the engine above its picture (`engine.rs`, `paint_title`): its bar stays as
+	 * the grip to drag it by, but says nothing, or the title read twice.
+	 */
+	.card-node:not([data-state="live"]) > .plain-card-bar {
+		color: transparent;
+	}
 	.plain-card-bar {
 		position: absolute;
 		left: 0;
