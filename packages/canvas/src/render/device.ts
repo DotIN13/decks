@@ -98,14 +98,14 @@ export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean 
  * simulated iPad and changed nothing a pinch costs, so it stays live there too, and `?card-pictures=1`
  * tries the other way. An app stays live as a card does, the person's choice (2026-10-31): its window
  * is a whole page in a sandboxed frame, repainted at every camera step when it animates (1,280 paints
- * in a two-second pan), which is the cost of seeing it move. A document's editor, laid out at every
- * step of a zoom, is covered everywhere.
+ * in a two-second pan), which is the cost of seeing it move; so does a document's editor, laid out at
+ * every step of a zoom. Covering is kept in the table for a measure on a slow device.
  */
 export type Moving = "live" | "cover";
 export const MOVING: Record<BrowserEngine, { card: Moving; app: Moving; document: Moving }> = {
-	webkit: { card: "live", app: "live", document: "cover" },
-	chromium: { card: "live", app: "live", document: "cover" },
-	other: { card: "live", app: "live", document: "cover" },
+	webkit: { card: "live", app: "live", document: "live" },
+	chromium: { card: "live", app: "live", document: "live" },
+	other: { card: "live", app: "live", document: "live" },
 };
 
 /**

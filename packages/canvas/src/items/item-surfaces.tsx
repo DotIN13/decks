@@ -103,7 +103,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		if (!ask || address()) return;
 		void ask(props.app).then(setAddress);
 	});
-	// What the app's own iframe says (`decks-storage.js`): what it saved in its browser storage, and a wheel it had no use for.
+	// What the app's own iframe says: what it saved in its browser storage (`decks-storage.js`), and a wheel it had no use for (`decks-canvas.js`).
 	const onMessage = (event: MessageEvent) => {
 		if (!frame || event.source !== frame.contentWindow) return;
 		const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
@@ -184,7 +184,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 	);
 }
 
-/** A wheel the app's page could not scroll with, as `decks-storage.js` hands it up: the app page's viewport pixels. */
+/** A wheel the app's page could not scroll with, as `decks-canvas.js` hands it up: the app page's viewport pixels. */
 type ForwardedWheel = { dx: number; dy: number; mode?: number; x: number; y: number; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean };
 
 /**

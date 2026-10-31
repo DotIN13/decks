@@ -5,6 +5,7 @@ import type { Response } from "express";
 import { bearerOf, fromAnotherSite, originOf, queryTokenOf } from "../auth/guard.ts";
 import { APP_NAME, type Apps } from "./service.ts";
 import { STORAGE_SCRIPT, storageScript, withStorage } from "./storage-script.ts";
+import { GUEST_SCRIPT, guestScript, withGuest } from "./canvas-guest.ts";
 import { readFile } from "node:fs/promises";
 
 /**
@@ -132,6 +133,12 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 		res.end(storageScript(at.name));
 		return true;
 	}
+	// What a page needs on the canvas (`canvas-guest.ts`): its wheels, apart from its storage.
+	if (at.inner === `/${GUEST_SCRIPT}`) {
+		res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
+		res.end(guestScript(at.name));
+		return true;
+	}
 	if (manifest.kind !== "server") {
 		const file = apps.file(at.name, at.inner);
 		if (!file) {
@@ -144,7 +151,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			void readFile(file, "utf8").then(
 				(html) => {
 					res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
-					res.end(withStorage(html, `${base}/${STORAGE_SCRIPT}`));
+					res.end(withGuest(withStorage(html, `${base}/${STORAGE_SCRIPT}`), `${base}/${GUEST_SCRIPT}`));
 				},
 				(error: Error) => plain(res, 500, error.message),
 			);
@@ -179,7 +186,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 				const parts: Buffer[] = [];
 				answer.on("data", (part: Buffer) => parts.push(part));
 				answer.on("end", () => {
-					const html = withStorage(Buffer.concat(parts).toString("utf8"), `${base}/${STORAGE_SCRIPT}`);
+					const html = withGuest(withStorage(Buffer.concat(parts).toString("utf8"), `${base}/${STORAGE_SCRIPT}`), `${base}/${GUEST_SCRIPT}`);
 					delete headers["content-length"];
 					res.writeHead(answer.statusCode ?? 502, headers);
 					res.end(html);
