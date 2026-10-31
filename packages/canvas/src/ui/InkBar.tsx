@@ -1,4 +1,4 @@
-import { INK_COLORS } from "@decks/board-kit";
+import { INK_COLORS } from "@decks/ink";
 import type { LucideIcon } from "lucide-solid";
 import Eraser from "lucide-solid/icons/eraser";
 import Highlighter from "lucide-solid/icons/highlighter";

@@ -13,7 +13,7 @@
 	},
 	"dependencies": {
 		"@decks/docs": "*",
-		"@decks/board-host": "*"
+		"@decks/card-host": "*"
 	},
 	"devDependencies": {
 		"tsx": "^4.20.7",

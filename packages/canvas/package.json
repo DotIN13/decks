@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@decks/api": "*",
-		"@decks/board-kit": "*",
+		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
 		"@decks/stage": "*",

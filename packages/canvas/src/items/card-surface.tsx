@@ -49,7 +49,7 @@ export function CardSurface(props: {
 	let host!: HTMLDivElement;
 	/*
 	 * The card's address with its folder stamped with its revision (`cards/sales@<rev>/index.html`,
-	 * `@decks/board-host`): what it imports beside it is then a new address at each version. A page keeps
+	 * `@decks/card-host`): what it imports beside it is then a new address at each version. A page keeps
 	 * every module it has imported, so the same address would hand a changed `chart.js` back as it was.
 	 */
 	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);

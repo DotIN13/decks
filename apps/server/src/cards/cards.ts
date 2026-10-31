@@ -1,4 +1,4 @@
-import { cardModules, runsInCard } from "@decks/board-host";
+import { cardModules, runsInCard } from "@decks/card-host";
 import { IMPORT_MAP } from "./size.ts";
 
 const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;

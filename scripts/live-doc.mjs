@@ -1,5 +1,5 @@
 /**
- * Bundle the document page into `packages/board-host/lib/live-doc.js`, the one module a `[data-live="doc"]`
+ * Bundle the document page into `packages/card-host/lib/live-doc.js`, the one module a `[data-live="doc"]`
  * board loads (`runtime/live-doc.ts`). Committed output, like the other bundles in `lib/`.
  *
  *     npm run build:live-doc
@@ -15,9 +15,9 @@ await build({
 	format: "esm",
 	platform: "browser",
 	target: ["es2022"],
-	outfile: join(root, "packages", "board-host", "lib", "live-doc.js"),
+	outfile: join(root, "packages", "card-host", "lib", "live-doc.js"),
 	minify: true,
 	legalComments: "none",
 	logLevel: "error",
 });
-console.log("[live-doc] packages/board-host/lib/live-doc.js");
+console.log("[live-doc] packages/card-host/lib/live-doc.js");

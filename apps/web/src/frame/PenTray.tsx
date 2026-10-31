@@ -1,4 +1,4 @@
-import { INK_COLORS, type InkColor } from "@decks/board-kit";
+import { INK_COLORS, type InkColor } from "@decks/ink";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronLeft from "lucide-solid/icons/chevron-left";

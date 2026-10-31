@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SERVER_SIDE = ["pen", "board-kit", "docs", "protocol", "sync-protocol", "hub", "sync-client", "board-host"];
+const SERVER_SIDE = ["pen", "ink", "docs", "protocol", "sync-protocol", "card-host", "hub", "sync-client"];
 execFileSync(process.execPath, [join(root, "scripts", "build-packages.mjs"), ...SERVER_SIDE], { stdio: "inherit" });
 
 const dir = mkdtempSync(join(tmpdir(), "decks-packed-"));

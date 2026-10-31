@@ -1,14 +1,11 @@
 {
   "name": "@decks/board-host",
   "version": "0.1.0",
-  "description": "What a Decks board needs to run anywhere: board.css, board.js and their libraries (lib/), and the rules for serving boards live in a sandbox with signed read passes",
+  "private": true,
+  "description": "Deprecated: the old name of @decks/card-host, answering until 2026-11-30 so Decks Studio's imports keep working; import @decks/card-host instead",
   "license": "MIT",
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./lib/*": "./lib/*"
-  },
-  "files": ["src", "lib"],
-  "scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test \"test/**/*.test.ts\"" },
-  "devDependencies": { "tsx": "^4.20.7", "typescript": "^5.9.3" }
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "devDependencies": { "typescript": "^5.9.3" }
 }

@@ -1,0 +1,15 @@
+{
+  "name": "@decks/card-host",
+  "version": "0.1.0",
+  "description": "What a Decks card needs to run anywhere: the card runtime (board.css, theme.css, board.js, the live pages and their libraries, in lib/), how a card's scripts are named and served, and the rules for serving cards in a sandbox with signed read passes",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sandbox": "./src/sandbox.ts",
+    "./lib/*": "./lib/*"
+  },
+  "files": ["src", "lib"],
+  "scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test \"test/**/*.test.ts\"" },
+  "devDependencies": { "tsx": "^4.20.7", "typescript": "^5.9.3" }
+}

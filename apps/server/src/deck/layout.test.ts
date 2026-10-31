@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { canvasFolder, canvasOfPath, isBoardPagePath, isHidden, referenceFor, resolveReference, servedAs, sharedName, urlFor } from "./layout.ts";
+import { canvasFolder, canvasOfPath, isPagePath, isHidden, referenceFor, resolveReference, servedAs, sharedName, urlFor } from "./layout.ts";
 import { PathRefused, realPathOf, resolveFileRequest, resolveRoots, resolveServed } from "./roots.ts";
 
 const path = (r: ReturnType<typeof resolveReference>) => ("path" in r ? r.path : `refused: ${r.refused}`);
@@ -52,9 +52,9 @@ test("lib/ is served beside every canvas's boards, and the deck's parts beside i
 	assert.equal(path(servedAs("shared/canvases/ada/plan/assets/a.png")), "shared/canvases/ada/plan/assets/a.png");
 	assert.ok("refused" in servedAs("shared/canvases/ada/plan/apps/review/index.html"));
 	assert.equal(path(servedAs("canvases/plan/boards/a.html")), "canvases/plan/boards/a.html");
-	assert.ok(isBoardPagePath("canvases/plan/boards/a.html"));
-	assert.ok(isBoardPagePath("shared/canvases/ada/plan/boards/a.html"));
-	assert.ok(!isBoardPagePath("canvases/plan/files/a.html"));
+	assert.ok(isPagePath("canvases/plan/boards/a.html"));
+	assert.ok(isPagePath("shared/canvases/ada/plan/boards/a.html"));
+	assert.ok(!isPagePath("canvases/plan/files/a.html"));
 });
 
 test("hidden folders are refused by every file route, by the path asked and the file it is", () => {

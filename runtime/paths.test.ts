@@ -23,7 +23,7 @@ test("every path resolves to something real", () => {
 
 test("the named spots are the ones the app asks for", () => {
 	assert.ok(isAbsolute(runtimeDir()));
-	assert.ok(runtimeLib().endsWith(join("board-host", "lib")), "the board primitives are @decks/board-host's");
+	assert.ok(runtimeLib().endsWith(join("card-host", "lib")), "the board primitives are @decks/card-host's");
 	assert.equal(skillsDir(), join(runtimeDir(), "skills"));
 	assert.equal(decksCommands(), join(runtimeDir(), "decks-commands.md"));
 	assert.equal(opencodeConfigDir(), join(runtimeDir(), "opencode"));

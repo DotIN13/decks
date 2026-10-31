@@ -11,6 +11,7 @@
     "./follower": "./src/follower.ts"
   },
   "dependencies": {
+    "@decks/card-host": "*",
     "@decks/pen": "*",
     "@decks/sync-protocol": "*",
     "zod": "^4.4.3"

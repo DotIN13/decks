@@ -31,7 +31,7 @@ function ownEvents(host: HTMLElement, selected: () => boolean, onSelect: () => v
  * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.
  */
 /**
- * The board tokens a dark board has (`board-host/lib/theme.css`, `[data-theme="dark"]`), as values: the
+ * The board tokens a dark board has (`card-host/lib/theme.css`, `[data-theme="dark"]`), as values: the
  * document editor draws in `--b-*`, with light values as its fallbacks, and the frame's page defines none.
  */
 const DARK_TOKENS: Record<string, string> = {

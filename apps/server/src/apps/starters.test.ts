@@ -30,6 +30,6 @@ test("a new card starts fluid, with padding that shrinks and the card container 
 });
 
 test("the card's element is a size container named card, in board.css", () => {
-	const css = readFileSync(new URL("../../../../packages/board-host/lib/board.css", import.meta.url), "utf8");
+	const css = readFileSync(new URL("../../../../packages/card-host/lib/board.css", import.meta.url), "utf8");
 	assert.match(css, /body\.board \{[^}]*container: card \/ inline-size;/);
 });

@@ -1,4 +1,4 @@
-import type { InkColor } from "@decks/board-kit";
+import type { InkColor } from "@decks/ink";
 import { createSignal } from "solid-js";
 import { scheme } from "../lib/theme.ts";
 import { inkHex } from "../model/ink.ts";

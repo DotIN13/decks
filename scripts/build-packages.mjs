@@ -5,7 +5,7 @@
  * Each TypeScript package is compiled by tsc to JavaScript with its types beside it; its
  * package.json is rewritten so every export points at the JavaScript, `private` and the dev parts
  * go, and its `@decks/*` dependencies name this version. Folders a package serves as they are
- * (board-host's `lib/`, stage's wasm builds, canvas's stylesheet) are copied. `npm pack` or
+ * (card-host's `lib/`, stage's wasm builds, canvas's stylesheet) are copied. `npm pack` or
  * `npm publish` runs in each folder.
  *
  *   node scripts/build-packages.mjs            build every public package
@@ -22,13 +22,13 @@ const out = join(root, "dist-packages");
 /** What is published, in the order they depend on each other. `copy` is shipped as it is. */
 const PUBLIC = [
 	{ dir: "pen" },
-	{ dir: "board-kit" },
+	{ dir: "ink" },
 	{ dir: "docs" },
 	{ dir: "protocol" },
 	{ dir: "sync-protocol" },
+	{ dir: "card-host", copy: ["lib"] },
 	{ dir: "hub" },
 	{ dir: "sync-client" },
-	{ dir: "board-host", copy: ["lib"] },
 	// The canvas: its own build (JSX for Solid, one file per module, and the scoped stylesheet).
 	{ dir: "ui", js: false, solid: true, copy: ["dist"], exports: solidExports },
 	{ dir: "agent-ui", js: false, solid: true, copy: ["dist", "sounds", "styles", "vite-plugin.mjs", "vite-plugin.d.mts"], exports: solidExports },

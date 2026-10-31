@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import type { Router } from "express";
-import { unstampCard } from "@decks/board-host";
+import { unstampCard } from "@decks/card-host";
 import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts";
 import { normalizeBoardPath } from "../deck/schema.ts";
 import { NotFound, PathRefused, resolveServed } from "../deck/roots.ts";
@@ -29,7 +29,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	api.get(
 		["/card/*path", "/board/*path"],
 		asyncRoute(async (req, res) => {
-			// A card's folder at a version (`cards/sales@<rev>/`, `@decks/board-host`) is the folder.
+			// A card's folder at a version (`cards/sales@<rev>/`, `@decks/card-host`) is the folder.
 			const asked = unstampCard(wildcard(req));
 			// A canvas's `lib/`, and the deck's `assets/`, `docs/` and `apps/` beside its boards (`deck/layout.ts`).
 			const served = servedAs(asked);

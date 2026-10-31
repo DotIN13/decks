@@ -30,8 +30,8 @@ trying — `npx playwright install-deps chromium`, as root, is the fix.
 ## The loop
 
 `decks card url <path>` is the address: the card in a page of its own. Wait for
-`window.__boardReady`, the only ready signal the card page's runtime (`lib/board.js`) gives (the
-name is from before cards): it goes true after fonts, markdown, maths and diagrams have finished,
+`window.__cardReady`, the card page's ready signal (`lib/board.js` sets it, and
+`window.__boardReady`, its name from before cards, beside it): it goes true after fonts, markdown, maths and diagrams have finished,
 and a screenshot taken before it is a picture of a card still loading.
 
 Two things in the preamble are worth keeping when you adapt this. `createRequire`
@@ -54,8 +54,8 @@ page.on("console", (m) => notes.push(`${m.type()}: ${m.text()}`));
 page.on("pageerror", (e) => notes.push(`pageerror: ${e.message}`));
 page.on("response", (r) => { if (r.status() >= 400) notes.push(`http ${r.status()}: ${r.url()}`); });
 await page.goto(url, { waitUntil: "load" });
-await page.waitForFunction("window.__boardReady === true", { timeout: 15000 })
-  .catch(() => notes.push("!! __boardReady never became true — something did not finish mounting"));
+await page.waitForFunction("window.__cardReady === true", { timeout: 15000 })
+  .catch(() => notes.push("!! __cardReady never became true — something did not finish mounting"));
 await page.screenshot({ path: out, fullPage: true });
 console.log(notes.join("\n") || "(clean)");
 await browser.close();
@@ -101,7 +101,7 @@ await page.emulateMedia({ colorScheme: "dark" });
   360 wide with `decks canvas update <id> --size.w 360` and take `decks canvas screenshot --of <path>`.
 - Fix from the source. A screenshot tells you *that* something is wrong and roughly
   where; the HTML tells you why.
-- If `__boardReady` never arrives, the console output in the same run usually says
+- If `__cardReady` never arrives, the console output in the same run usually says
   which mount threw. A module that throws is named with its card's file (`index.html.m0.js`).
 - A card that works on its own page and not on the canvas is reaching for `document` or `window`:
   on the canvas those are the app's page. Use `card.root`.

@@ -5,7 +5,7 @@ machine syncs the same canvas into its deck folder, where its agents work on it.
 
 | File | What it is | From |
 |---|---|---|
-| `src/server.ts` | Who is who (a key each), the canvases, `/sync/v1`, the live socket, the board runtime | `@decks/hub`, `@decks/board-host` |
+| `src/server.ts` | Who is who (a key each), the canvases, `/sync/v1`, the live socket, the board runtime | `@decks/hub`, `@decks/card-host` |
 | `src/page.ts` | The editor in a page: load, edit, hear others' edits | `@decks/canvas`, `@decks/pen` |
 | `index.html` | The page's frame | |
 

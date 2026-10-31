@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Live, MemoryStore, syncHandler, type HubStore, type Who } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
-import { LIVE_BOARD_HEADERS, libFile } from "@decks/board-host";
+import { LIVE_CARD_HEADERS, libFile } from "@decks/card-host";
 import { WebSocketServer } from "ws";
 
 /**
@@ -56,7 +56,7 @@ export async function startSite(o: SiteOptions, port = 0): Promise<{ server: Ser
 			// The board runtime, for boards on the canvas (`../lib/board.css`).
 			if (req.url?.startsWith("/lib/")) {
 				const f = libFile(decodeURIComponent(req.url.slice(5).split("?")[0]!));
-				if (f) return res.writeHead(200, { ...LIVE_BOARD_HEADERS, "Content-Type": f.type }).end(f.bytes);
+				if (f) return res.writeHead(200, { ...LIVE_CARD_HEADERS, "Content-Type": f.type }).end(f.bytes);
 			}
 			res.writeHead(404, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "Not found." }));
 		} catch (e) {

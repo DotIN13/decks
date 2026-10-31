@@ -9,7 +9,7 @@ import { serialize, parse } from "@decks/pen";
 import { Live, MemoryStore, syncHandler } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
 import { HarnessSync } from "@decks/sync-client";
-import { libFile, LIVE_BOARD_HEADERS } from "@decks/board-host";
+import { libFile, LIVE_CARD_HEADERS } from "@decks/card-host";
 
 const store = new MemoryStore();
 const live = new Live(store);
@@ -18,7 +18,7 @@ const who = (req) => keys.get(req.headers.get("authorization")?.replace(/^Bearer
 const sync = nodeHandler(syncHandler({ store, live, who }));
 const server = createServer(async (req, res) => {
 	if (await sync(req, res)) return;
-	if (req.url.startsWith("/lib/")) { const f = libFile(req.url.slice(5)); if (f) { res.writeHead(200, { ...LIVE_BOARD_HEADERS, "Content-Type": f.type }); return res.end(f.bytes); } }
+	if (req.url.startsWith("/lib/")) { const f = libFile(req.url.slice(5)); if (f) { res.writeHead(200, { ...LIVE_CARD_HEADERS, "Content-Type": f.type }); return res.end(f.bytes); } }
 	res.writeHead(404).end();
 });
 const wss = new WebSocketServer({ noServer: true });

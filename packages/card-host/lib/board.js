@@ -25,7 +25,8 @@
  * stay on the revision it loaded instead of reloading a whole board for one panel.
  *
  * It also owns the readiness flag. Every async mount is awaited, then
- * `window.__boardReady` goes true — which is what the app waits for before it
+ * `window.__cardReady` goes true (and `window.__boardReady` with it, its name from
+ * before cards, which the app and older scripts wait on) — which is what the app waits for before it
  * measures a board, and what the agent's Playwright waits for before it takes a
  * picture. Without it a screenshot is a race, and the race is usually lost. A
  * re-render takes the flag down and puts it back for the same reason.
@@ -773,12 +774,12 @@
 	 * board's own `<script>` listening for it would run a second time.
 	 */
 	async function redraw(element, source) {
-		window.__boardReady = false;
+		window.__boardReady = window.__cardReady = false;
 		document.body.dataset.ready = "false";
 		try {
 			await drawSource(element, source);
 		} finally {
-			window.__boardReady = true;
+			window.__boardReady = window.__cardReady = true;
 			document.body.dataset.ready = "true";
 		}
 	}
@@ -1628,7 +1629,7 @@
 		 * and an element and no component to go with them.
 		 */
 		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
-		window.__boardReady = true;
+		window.__boardReady = window.__cardReady = true;
 		document.body.dataset.ready = "true";
 		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));
 	}

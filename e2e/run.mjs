@@ -286,7 +286,7 @@ function freshDeck() {
 	cpSync(join(root, "e2e", "fixture"), data, { recursive: true });
 	// `e2e/fixture/decks/lib` is generated and gitignored, so a fresh clone has to be given one or every
 	// board in the fixture loads without its stylesheet.
-	cpSync(join(root, "packages", "board-host", "lib"), join(data, "decks", "lib"), { recursive: true });
+	cpSync(join(root, "packages", "card-host", "lib"), join(data, "decks", "lib"), { recursive: true });
 	// Revisions and agent transcripts from whoever ran the example deck last are not fixture.
 	rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });
 	rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });

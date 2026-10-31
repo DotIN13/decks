@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { libDir as boardLib } from "@decks/board-host";
+import { libDir as boardLib } from "@decks/card-host";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -55,7 +55,7 @@ export function skillsDir(): string {
  * rather than a route this server serves.
  */
 export function runtimeLib(): string {
-	// A variant runtime (`DECKS_RUNTIME_DIR`) may carry its own primitives; otherwise they are @decks/board-host's.
+	// A variant runtime (`DECKS_RUNTIME_DIR`) may carry its own primitives; otherwise they are @decks/card-host's.
 	if (HERE !== SELF && existsSync(resolve(HERE, "lib"))) return resolve(HERE, "lib");
 	return boardLib();
 }

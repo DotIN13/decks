@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import type { NextFunction, Request, Response } from "express";
-import { isBoardPagePath, SHARED_SANDBOX } from "../deck/layout.ts";
+import { isPagePath, SHARED_SANDBOX } from "../deck/layout.ts";
 import type { App } from "../app.ts";
 import type { Relay } from "../share/relay.ts";
 
@@ -27,7 +27,7 @@ export function asyncRoute(handler: (req: Request, res: Response) => Promise<voi
  */
 export function isBoardPath(requested: string): boolean {
 	// The library's `boards/`, or a canvas's own (`deck/layout.ts`): both are boards.
-	return isBoardPagePath(requested);
+	return isPagePath(requested);
 }
 
 /**

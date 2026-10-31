@@ -1,4 +1,4 @@
-import { strokeShape, type InkColor, type InkStroke } from "@decks/board-kit";
+import { strokeShape, type InkColor, type InkStroke } from "@decks/ink";
 import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
 
 /**

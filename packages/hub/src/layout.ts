@@ -28,17 +28,23 @@
 
 /** Where a deck keeps its canvases, where a friend's land, and what a canvas's own folder holds besides its drawing. */
 import { CANVASES, OWN_PARTS, SHARED_CANVASES } from "@decks/sync-protocol";
+import { CARD_SANDBOX } from "@decks/card-host/sandbox";
 export { CANVASES, OWN_PARTS, SHARED_CANVASES };
 /** The deck's folders a canvas may point at by their deck path. */
 export const DECK_PARTS = ["assets", "docs", "apps"] as const;
-/** The board runtime, served beside every canvas's boards/ so `../lib/board.css` works from any of them. */
+/**
+ * The card runtime (`@decks/card-host`'s `lib/`: board.css, theme.css, board.js and the live pages),
+ * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/board.css`
+ * and an old board's `../lib/board.css` both find it.
+ */
 export const LIB = "lib";
 
 /**
- * The sandbox a friend's board runs in: scripts, forms, pop-ups, dialogs and downloads, and never
- * `allow-same-origin`, so its page has a blank origin and reaches nothing of the harness's.
+ * The sandbox a friend's page runs in: scripts, forms, pop-ups, dialogs and downloads, and never
+ * `allow-same-origin`, so its page has a blank origin and reaches nothing of the harness's. The
+ * card host's `CARD_SANDBOX`, the one list every live card is served with too.
  */
-export const SHARED_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
+export const SHARED_SANDBOX = CARD_SANDBOX;
 
 /** What a canvas may point at, said once for every refusal. */
 const MAY = "a canvas points at its own boards/, frames/ and files/, and the deck's assets/, docs/ and apps/";
@@ -200,14 +206,17 @@ export function servedAs(path: string): Resolution {
 	return { path };
 }
 
-/** Whether a deck path is a board's page: in the library, or in a canvas's own `boards/` or `cards/`. */
-export function isBoardPagePath(path: string): boolean {
+/** Whether a deck path is a page: a card in a canvas's own `cards/`, or an old board in its `boards/` or the library. */
+export function isPagePath(path: string): boolean {
 	const clean = path.split("\\").join("/").replace(/^\/+/, "");
 	if (!/\.x?html?$/i.test(clean) || clean.includes("\0")) return false;
 	if (/^boards\//.test(clean)) return true;
 	const at = canvasOfPath(clean);
 	return !!at && (at.rest.startsWith("boards/") || isCardPath(clean));
 }
+
+/** @deprecated `isPagePath`; the old name answers until 2026-11-30. */
+export const isBoardPagePath = isPagePath;
 
 /**
  * Whether a deck path is a card: the `index.html` of a folder in a canvas's own `cards/`

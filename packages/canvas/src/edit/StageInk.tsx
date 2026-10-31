@@ -1,4 +1,4 @@
-import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
+import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/ink";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "./ink.ts";

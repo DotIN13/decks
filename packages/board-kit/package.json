@@ -2,8 +2,9 @@
 	"name": "@decks/board-kit",
 	"version": "0.1.0",
 	"private": true,
+	"description": "Deprecated: the old name of @decks/ink, answering until 2026-11-30; import @decks/ink instead",
 	"type": "module",
 	"exports": { ".": "./src/index.ts" },
-	"scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test \"src/**/*.test.ts\"" },
-	"devDependencies": { "tsx": "^4.20.7", "typescript": "^5.9.3" }
+	"scripts": { "typecheck": "tsc -p tsconfig.json --noEmit" },
+	"devDependencies": { "typescript": "^5.9.3" }
 }

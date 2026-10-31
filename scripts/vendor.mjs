@@ -1,5 +1,5 @@
 /**
- * Put the board primitives into `board-host/lib`, from the packages in node_modules.
+ * Put the board primitives into `card-host/lib`, from the packages in node_modules.
  *
  * Boards are standalone documents: `lib/` is copied into every deck so a board
  * renders a paper, a diagram and a formula with no network and no server. That
@@ -27,9 +27,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const modules = join(root, "node_modules");
-const out = join(root, "packages", "board-host", "lib");
+const out = join(root, "packages", "card-host", "lib");
 
-/** [from, to] — `to` is relative to board-host/lib. */
+/** [from, to] — `to` is relative to card-host/lib. */
 const FILES = [
 	["d3/dist/d3.min.js", "d3.min.js"],
 	["marked/lib/marked.umd.js", "marked.umd.js"],

@@ -33,7 +33,7 @@ jobs:
 
       # `engines.node` says >=22.19, and 22.18 is where Node strips TypeScript types by
       # itself — which is how the `.mjs` browser checks import `@decks/protocol` and
-      # `@decks/board-kit` with no build step at all.
+      # `@decks/ink` with no build step at all.
       - uses: actions/setup-node@v4
         with:
           node-version: "22.x"

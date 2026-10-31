@@ -2,7 +2,7 @@
  * A long stroke on the stage: drawn as it grows, it is the stroke shaped whole, and its frames cost
  * no more at its end than at its start.
  *
- * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/board-kit`; `StageInk.tsx`),
+ * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `StageInk.tsx`),
  * only its new points and its end each frame; `globalThis.__inkWhole` shapes it whole every frame,
  * as before. This draws the same strokes both ways in one page, alternating — a mouse's (a line of
  * one width) and a pencil's (an outline, its pressure moving), 600 and 2,000 points, four samples a
