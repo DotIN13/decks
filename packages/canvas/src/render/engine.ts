@@ -318,6 +318,8 @@ export class StageEngine {
 	private restarts = 0;
 	/** The pictures put on the page engine, of boards and of fills: for checks. */
 	private picturesPut = 0;
+	/** How often, and how much, the cards have been sent to the page engine (`setCards`): for `awake-bench.mjs`. */
+	private cardsSent = { calls: 0, bytes: 0 };
 
 	/** Restarts after an engine error, capped (`recovery.ts`). */
 	private recovery = new Recovery();
@@ -387,7 +389,7 @@ export class StageEngine {
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
 		const self = this;
 		(globalThis as { __decksEngine?: unknown }).__decksEngine = {
-			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture, restarts: this.restarts, pictures: this.picturesPut, paused: this.paused }),
+			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture, restarts: this.restarts, pictures: this.picturesPut, paused: this.paused, cardsSent: { ...this.cardsSent } }),
 			/** The boards a drag carries as their picture, and by how far. */
 			get carried() {
 				// Live pages carried as their picture, and boards already drawn as pictures that the drag moves.
@@ -1300,7 +1302,10 @@ export class StageEngine {
 			return;
 		}
 		this.cardKey = key;
-		this.page.setCards(JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow }))));
+		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow })));
+		this.cardsSent.calls++;
+		this.cardsSent.bytes += sent.length;
+		this.page.setCards(sent);
 		const boxes = cards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
 		if (boxes !== this.cardBoxes) {
 			this.cardBoxes = boxes;

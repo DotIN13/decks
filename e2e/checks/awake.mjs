@@ -1,0 +1,189 @@
+/**
+ * The one surface lifecycle: a card, an app and a document wake, sleep and take a press by one rule
+ * (`items/awake.ts`). A small canvas of 3 cards, 3 apps and 1 document (`e2e/awake-canvas.mjs`), and:
+ *
+ * - below the live zoom (40%) no item of any kind has a node: each is its picture on the sheet;
+ * - at 60% every item near the screen is awake within its kind's budget, and has a node;
+ * - with three apps near and a budget of two, the two nearest the middle run; panned so the third is
+ *   nearest, it takes a place and the farthest sleeps to its picture;
+ * - a pinch mounts nothing mid-gesture: nodes come and go only at rest;
+ * - a press in an app selects it first, and only then does its window take the pointer (the person's choice).
+ */
+import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
+import { writeAwakeCanvas } from "../awake-canvas.mjs";
+
+const CANVAS = "awake-small";
+const until = async (test, ms = 15000) => {
+	const deadline = Date.now() + ms;
+	for (;;) {
+		const value = await Promise.resolve().then(test).catch(() => undefined);
+		if (value || Date.now() > deadline) return value;
+		await new Promise((resolve) => setTimeout(resolve, 120));
+	}
+};
+
+/** A check that hangs says where: its phase, then it exits. */
+let phase = "start";
+const at = (name) => (phase = name);
+setTimeout(() => {
+	say(`the check finished within 90 s (hung in: ${phase})`, false);
+	process.exit(1);
+}, 90_000).unref();
+const deck = await deckState();
+const written = writeAwakeCanvas(deck.path, { cards: 3, apps: 3, documents: 1, name: CANVAS, prefix: "small" });
+say("the small awake canvas is written", written.cards === 3 && written.apps === 3 && written.documents === 1, JSON.stringify(written));
+
+const link = await socket();
+const agentId = await until(() => link.last("agents")?.focused);
+const { page, errors } = await open({ width: 1400, height: 900, cards: false });
+link.send({ type: "agent.stage", id: agentId, stage: CANVAS });
+setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1000);
+await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
+await page.reload({ waitUntil: "domcontentloaded" });
+const canvas = await canvasFrame(page);
+const seven = await canvas
+	.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 7, undefined, { timeout: 30000 })
+	.then(() => true)
+	.catch(() => false);
+say("the stage shows the seven items", seven, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+
+await canvas.evaluate(() => {
+	const stage = () => document.querySelector(".stage");
+	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
+	const wheel = (deltaX, deltaY, ctrlKey) => {
+		const r = stage().getBoundingClientRect();
+		stage().dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, ctrlKey, deltaMode: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
+	};
+	globalThis.__t = {
+		async zoomTo(zoom) {
+			for (let i = 0; i < 200; i++) {
+				const now = globalThis.__decksRust.camera.zoom;
+				const ln = Math.log(zoom / now);
+				if (Math.abs(ln) < 1e-6) return;
+				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
+				await raf();
+			}
+		},
+		async panTo(x, y) {
+			for (let i = 0; i < 40; i++) {
+				const c = globalThis.__decksRust.camera;
+				const dx = (x - c.x) * c.zoom;
+				const dy = (y - c.y) * c.zoom;
+				if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+				wheel(Math.max(-3000, Math.min(3000, dx)), Math.max(-3000, Math.min(3000, dy)), false);
+				await raf();
+				await raf();
+			}
+		},
+		/** The stage at rest: which items have nodes, which windows show an app, how many documents are editors. */
+		state() {
+			const cards = globalThis.__decksCards?.() ?? [];
+			return {
+				nodes: cards.filter((c) => c.node).map((c) => c.path).sort(),
+				apps: [...document.querySelectorAll(".world .card-node")].filter((n) => n.querySelector(".app-surface[data-live]")).map((n) => n.dataset.path).sort(),
+				documents: document.querySelectorAll(".world .document-surface").length,
+				cardHosts: document.querySelectorAll(".world .card-host").length,
+			};
+		},
+	};
+});
+/** Until the camera is still and nothing on the stage has changed for `ms`. */
+const rest = (ms = 900, cap = 12000) =>
+	canvas.evaluate(
+		async ({ ms, cap }) => {
+			const t0 = performance.now();
+			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".stage")?.dataset.moving]);
+			let last = snap();
+			let at = performance.now();
+			while (performance.now() - t0 < cap) {
+				await new Promise((done) => setTimeout(done, 100));
+				const now = snap();
+				if (now !== last || document.querySelector(".stage")?.dataset.moving === "true") {
+					last = now;
+					at = performance.now();
+				} else if (performance.now() - at >= ms) return true;
+			}
+			return false;
+		},
+		{ ms, cap },
+	);
+await canvas.waitForFunction(() => !!globalThis.__decksRust?.camera, undefined, { timeout: 20000 }).catch(() => {});
+const items = await canvas.evaluate(() => globalThis.__decksCards().map((c) => c.path));
+const appPaths = items.filter((p) => /^item:aa/.test(p));
+const docPaths = items.filter((p) => /^item:ad/.test(p));
+const cardPaths = items.filter((p) => /cards\//.test(p));
+say("three apps, one document and three cards are placed", appPaths.length === 3 && docPaths.length === 1 && cardPaths.length === 3, items.join(" "));
+
+// --- below the live zoom: pictures only -----------------------------------------------------------------
+const view = (zoom) => canvas.evaluate(async ({ z, x, y }) => {
+	await globalThis.__t.zoomTo(z);
+	await globalThis.__t.panTo(x, y);
+}, { z: zoom, x: -1400 / 2 / zoom + 700, y: -900 / 2 / zoom + 500 });
+at("30%");
+await view(0.3);
+await rest();
+let state = await canvas.evaluate(() => globalThis.__t.state());
+say("at 30% no item of any kind has a node: every card, app and document is its picture", state.nodes.length === 0 && state.apps.length === 0 && state.documents === 0 && state.cardHosts === 0, JSON.stringify(state));
+
+// --- at 60%: everything near is awake, within its kind's budget ---------------------------------------
+at("60%");
+await view(0.6);
+await rest();
+state = await canvas.evaluate(() => globalThis.__t.state());
+const nearApps = await canvas.evaluate(() => {
+	const r = document.querySelector(".stage").getBoundingClientRect();
+	const mx = r.width / 2;
+	const my = r.height / 2;
+	const far = (c) => Math.hypot(Math.max(c.rect.left - r.left - mx, 0, mx - (c.rect.right - r.left)), Math.max(c.rect.top - r.top - my, 0, my - (c.rect.bottom - r.top)));
+	return globalThis.__decksCards().filter((c) => /^item:aa/.test(c.path)).sort((a, b) => far(a) - far(b)).map((c) => c.path);
+});
+say("at 60% the cards near the screen and the document are awake, with nodes", cardPaths.every((p) => state.nodes.includes(p)) && state.documents === 1 && state.cardHosts === 3, JSON.stringify(state));
+say("…and of three apps near, the two nearest the middle run (the computer's budget of two)", state.apps.length === 2 && state.apps.includes(nearApps[0]) && state.apps.includes(nearApps[1]), `${JSON.stringify(state.apps)} nearest ${JSON.stringify(nearApps)}`);
+say("…and a sleeping app has no node: it is its picture, not a bar and a button", !state.nodes.includes(nearApps[2]), JSON.stringify(state.nodes));
+
+// --- an app that becomes nearest takes a place ----------------------------------------------------------
+at("third app");
+const third = await canvas.evaluate((path) => {
+	const c = globalThis.__decksCards().find((one) => one.path === path);
+	const cam = globalThis.__decksRust.camera;
+	const r = document.querySelector(".stage").getBoundingClientRect();
+	// World point of the third app's middle, from its screen rect.
+	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
+}, nearApps[2]);
+await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), third);
+await rest();
+state = await canvas.evaluate(() => globalThis.__t.state());
+say("panned so the third app is under the middle, it runs, and the farthest app sleeps", state.apps.includes(nearApps[2]) && state.apps.length === 2, JSON.stringify(state.apps));
+
+// --- nothing mounts mid-pinch -----------------------------------------------------------------------------
+at("pinch");
+const added = await canvas.evaluate(async () => {
+	let added = 0;
+	const observer = new MutationObserver((list) => {
+		for (const m of list) for (const n of m.addedNodes) if (n instanceof Element && (n.matches(".card-node") || n.querySelector?.(".card-node"))) added++;
+	});
+	observer.observe(document.querySelector(".world"), { childList: true, subtree: true });
+	await globalThis.__t.zoomTo(1.0);
+	const mid = added;
+	observer.disconnect();
+	return mid;
+});
+say("a pinch from 60% to 100% mounts nothing while it moves", added === 0, `${added} nodes added mid-pinch`);
+await rest();
+
+// --- select first on an app ------------------------------------------------------------------------------
+await view(0.6);
+await rest();
+at("select first");
+const takes = () => canvas.evaluate(() => [...document.querySelectorAll(".app-surface-frame")].map((f) => getComputedStyle(f).pointerEvents));
+const before = await takes();
+say("before it is selected a running app takes no pointer", before.length > 0 && before.every((p) => p === "none"), JSON.stringify(before));
+const frameBox = await page.locator("iframe.canvas-frame").boundingBox();
+const box = await canvas.locator(".app-surface[data-live]").first().boundingBox();
+await page.mouse.click(frameBox.x + box.x + box.width / 2, frameBox.y + box.y + box.height * 0.6);
+const after = await until(async () => ((await takes()).includes("auto") ? await takes() : undefined), 4000);
+say("…selected, its window takes the pointer", !!after && after.includes("auto"), JSON.stringify(after ?? (await takes())));
+say("no page errors", errors.length === 0, errors.join(" | "));
+await page.close().catch(() => {});
+// The harness's socket would keep the process alive.
+process.exit(0);

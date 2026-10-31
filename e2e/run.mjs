@@ -202,6 +202,10 @@ const CHECKS = [
 	{ file: "render-perf.mjs", needsAgent: false, named: true },
 	/* Measures: panning a canvas heavy with live boards and drawing (`node scripts/pan-heavy.mjs`). Run only when named. */
 	{ file: "pan-heavy.mjs", needsAgent: false, named: true },
+	/* Measures: a pan and a zoom on a canvas of 100 cards, 8 apps and 4 documents (`node scripts/awake-bench.mjs`). Run only when named. */
+	{ file: "awake-bench.mjs", needsAgent: false, named: true },
+	/* The one surface lifecycle: cards, apps and documents wake, sleep, picture and take a press by one rule. */
+	{ file: "awake.mjs", needsAgent: false },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },
