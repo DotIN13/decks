@@ -25,3 +25,8 @@ test("a query narrows the items and leaves the arrows out", () => {
 	assert.deepEqual(items.map((one) => one.id), ["t1"]);
 	assert.deepEqual(arrows, []);
 });
+
+test("a card with no name of its own is listed by its folder, not as index", () => {
+	const named = { version: "2.6", children: [{ type: "browser", id: "c1", x: 0, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: "cards/sales/index.html" } }] } as unknown as PenDocument;
+	assert.deepEqual(canvasItems(named).items.map((one) => [one.kind, one.label, one.board]), [["board", "sales", "cards/sales/index.html"]]);
+});

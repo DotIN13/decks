@@ -1,6 +1,6 @@
-import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
-import { canvasFolder, canvasOfPath, isHidden, isSharedCanvas, servedAs } from "../deck/layout.ts";
+import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas, servedAs } from "../deck/layout.ts";
 import { rewriteLinks } from "../migrations/2026-10-20-standalone-canvases.ts";
 
 /**
@@ -49,6 +49,7 @@ function insideBoards(path: string): string {
 export function copyBoardInto(deck: string, from: string, canvas: string): string {
 	const source = join(deck, from);
 	if (!isFile(source)) throw new Error(`There is no board ${from} to copy onto the canvas.`);
+	if (isCardPath(from)) return copyCardInto(deck, from, canvas);
 	const folder = canvasFolder(canvas);
 	const inside = insideBoards(from);
 	let to = `${folder}/boards/${inside}`;
@@ -96,6 +97,26 @@ export function copyBoardInto(deck: string, from: string, canvas: string): strin
 	mkdirSync(dirname(join(deck, to)), { recursive: true });
 	writeFileSync(join(deck, to), links.length ? rewriteLinks(text, links) : text);
 	return to;
+}
+
+/**
+ * Copy the card at deck path `from` (`canvases/a/cards/sales/index.html`) into `canvas`'s `cards/`,
+ * its whole folder (its scripts, styles and data are its own), under the same name or the next free
+ * one (`sales-2`). Answers the copy's deck path, a card too. A card's runtime is `../../lib/`, served
+ * inside every canvas, so it needs no rewriting; a link out of its folder into its old canvas's
+ * `files/` is left as it is, and finds that name in this canvas's `files/` or nothing.
+ */
+function copyCardInto(deck: string, from: string, canvas: string): string {
+	const name = from.split("/").at(-2)!;
+	const folder = canvasFolder(canvas);
+	let to = `${folder}/cards/${name}`;
+	for (let n = 2; existsSync(join(deck, to)); n++) {
+		to = `${folder}/cards/${name}-${n}`;
+		if (n > 500) throw new Error(`Too many copies of the card ${name} on ${canvas}.`);
+	}
+	mkdirSync(dirname(join(deck, to)), { recursive: true });
+	cpSync(join(deck, posix.dirname(from)), join(deck, to), { recursive: true });
+	return `${to}/index.html`;
 }
 
 /** Copy a saved frame (`frames/<name>`, from the deck's library) into the canvas, when it is not there yet. */

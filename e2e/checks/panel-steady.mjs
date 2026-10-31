@@ -69,7 +69,7 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
 	lastAt: Date.now() - ago,
 	unread: 0,
 	identity: { name, color: "#3b5cf6" },
-	boards: ["boards/plan.html", "boards/risks.html"],
+	boards: ["canvases/auth-refresh/cards/plan/index.html", "canvases/auth-refresh/cards/risks/index.html"],
 	inPlay: [],
 	...extra,
 });

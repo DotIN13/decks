@@ -17,7 +17,7 @@
  * the harness: the stage is read there, and its writes are what is held back.
  */
 import { zoomStep } from "../backends-kit.mjs";
-import { boardEdge, canvasFrame, editMode, onCanvasAt, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { cardEdge, canvasFrame, editMode, onCanvasAt, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -66,14 +66,15 @@ async function boardStaysDropped(page, label, { picture }) {
 	for (const path of candidates) {
 		// A board shown as a picture has no node, so no edge band to hold: it is picked up by its picture.
 		const hasNode = (await canvas.locator(`.card-node[data-path="${path}"]`).count()) > 0;
-		grip = hasNode ? await boardEdge(page, path) : null;
+		grip = hasNode ? await cardEdge(page, path) : null;
 		grip ??= await canvas.evaluate((path) => {
 			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".card-node")?.dataset.path === path;
 			const r = window.__decksCards().find((one) => one.path === path).rect;
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
-				if (at(x, y) && !document.elementFromPoint(x, y)?.closest("iframe, a, button")) return { x, y };
+				// Not where something drawn lies over it (the check's own note, say): a press there is the drawing's.
+				if (at(x, y) && !document.elementFromPoint(x, y)?.closest("iframe, a, button, .pen-hit")) return { x, y };
 			}
 			return null;
 		}, path);
@@ -201,6 +202,18 @@ await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 const canvas = await canvasFrame(page);
+/*
+ * The check draws round the middle of the window, so the view is moved first onto bare canvas right
+ * of the fixture's cards (stacked, their right-hand edges at x 1600): what it draws then lies over no
+ * card, and the cards are left clear for the drops at the end.
+ */
+{
+	const opening = await canvas.evaluate(() => globalThis.__decksRust.camera);
+	await page.mouse.move(700, 450);
+	await page.mouse.wheel((2900 - opening.x) * opening.zoom, 0);
+	await rest(page).catch(() => {});
+	await settle(page, 300);
+}
 const cam = await canvas.evaluate(() => globalThis.__decksRust.camera);
 const r = await canvas.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.

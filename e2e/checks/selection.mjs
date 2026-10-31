@@ -6,7 +6,7 @@
  * the selection to it, and flying to a board selects it. The selected board is the one the pill
  * (`BoardCallout`) is over; its "New tab" link names the board's file.
  */
-import { boardPath, canvasFrame, flyToBoard, onCanvasAt, open, resetStage, say, settle, stagePath, zoom } from "../harness.mjs";
+import { canvasFrame, card, flyToCard, nameOf, onCanvasAt, open, resetStage, say, settle, zoom } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 await resetStage(page);
@@ -14,16 +14,16 @@ await settle(page, 800);
 const canvas = await canvasFrame(page);
 
 /** The board the pill is over, by its file name, or nothing. */
-const selected = () =>
-	canvas.evaluate(() => {
+const selected = async () =>
+	nameOf(await canvas.evaluate(() => {
 		const pill = document.querySelector(".stage-fixed > .card-callout");
 		const link = pill?.querySelector('a[aria-label="New tab"]')?.getAttribute("href") ?? "";
-		return pill && link ? decodeURIComponent(link.split("?")[0].split("/").pop()) : "";
-	});
-const file = (path) => path.split("/").pop();
+		return pill && link ? decodeURIComponent(link) : "";
+	}));
+const file = nameOf;
 
-const first = (await boardPath("plan.html")) && (await stagePath(page, "boards/plan.html"));
-await flyToBoard(page, first);
+const first = card("plan");
+await flyToCard(page, first);
 await settle(page, 900);
 say("flying to a board selects it", (await selected()) === file(first), (await selected()) || "nothing selected");
 

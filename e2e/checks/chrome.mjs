@@ -9,9 +9,9 @@
  * with the title bar, and the three labelled buttons under every message became one handle
  * that opens a menu. The properties are the same; only the surfaces they live on moved.
  */
-import { ask, boardPath, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
+import { ask, cardFile, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
 
-const plan = await boardPath("plan.html");
+const plan = await cardFile("plan");
 
 const { browser, page, errors } = await open();
 say("the bottom history bar is gone", (await page.locator(".timeline").count()) === 0);
@@ -22,7 +22,7 @@ await settle(page, 1200);
 await page.mouse.move(800, 500);
 
 // Enough tool calls to overflow the column — the case that squeezed the chips.
-await ask(page, "Read each of boards/plan.html, boards/risks.html and boards/sources.html with the read tool, one call each, then say 'done' and nothing else.");
+await ask(page, "Read each of canvases/auth-refresh/cards/plan/index.html, canvases/auth-refresh/cards/risks/index.html and canvases/auth-refresh/cards/sources/index.html with the read tool, one call each, then say 'done' and nothing else.");
 
 // The corner's button opens the conversation; `data-shown` is the panel's own answer.
 await openHistory(page);

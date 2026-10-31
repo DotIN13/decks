@@ -12,7 +12,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { canvasFrame, deckState, editMode, fitCanvas, focusCanvas, highlightMode, onCanvasAt, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, deckState, editMode, fitCanvas, focusCanvas, highlightMode, onCanvasAt, open, resetStage, say, selectCard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -708,7 +708,7 @@ await page.keyboard.press("Escape");
 	await page.mouse.move(900, 500);
 	await page.mouse.wheel(-700, 0);
 	await settle(page, 400);
-	// A board is its picture, dragged where it is pressed.
+	// A card on screen, carried by its edge.
 	const path = await canvas.evaluate(() => {
 		for (const one of window.__decksCards()) {
 			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
@@ -720,11 +720,25 @@ await page.keyboard.press("Escape");
 			if (x > 320 && x < 1560 && y > 150 && y < 800 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".card-node") === node)) return node.dataset.path;
 		}
 	});
-	/** A point on the board's picture the page leaves to the canvas. */
+	/**
+	 * A point the page leaves to the canvas that carries the card: the band along its top edge, which an
+	 * awake card shows once it is selected (a press inside a card is the card's own), or, for a card with
+	 * no node, a point on its picture.
+	 */
 	const grip = async (wanted) =>
 		firstOnCanvas(await canvas.evaluate((wanted) => {
-			const r = window.__decksCards().find((one) => one.path === wanted)?.rect;
 			const out = [];
+			const edge = document.querySelector(`.card-node[data-path="${CSS.escape(wanted)}"] .card-edge[data-side="n"]`);
+			if (edge) {
+				const e = edge.getBoundingClientRect();
+				for (const fx of [0.5, 0.3, 0.7]) {
+					const x = e.x + e.width * fx;
+					const y = e.y + e.height / 2;
+					if (document.elementFromPoint(x, y) === edge) out.push({ x, y });
+				}
+				return out;
+			}
+			const r = window.__decksCards().find((one) => one.path === wanted)?.rect;
 			if (!r) return out;
 			for (const [fx, fy] of [[0.5, 0.2], [0.3, 0.3], [0.7, 0.3], [0.5, 0.5]]) {
 				const x = r.x + r.width * fx;
@@ -736,13 +750,13 @@ await page.keyboard.press("Escape");
 		}, wanted));
 	let chrome;
 	if (path) {
-		await selectBoard(page, path);
+		await selectCard(page, path);
 		const at = await grip(path);
 		if (at) chrome = { ...at, path };
 	}
 	say("a board on screen to drag", !!chrome, JSON.stringify(chrome ?? null));
 	if (chrome) {
-		// Dragged by its picture, the board moves.
+		// Dragged by its edge, the card moves.
 		const start = itemOf(onDisk(), chrome.path);
 		await page.mouse.move(chrome.x, chrome.y);
 		await page.mouse.down();

@@ -57,7 +57,7 @@ setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
 const on = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
 say("the agent is on the text canvas", !!on);
 
-const { browser, page } = await open({ width: W, height: H, dpr: DPR, boards: false });
+const { browser, page } = await open({ width: W, height: H, dpr: DPR, cards: false });
 // The stage and its engine are in the canvas frame.
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 6, null, { timeout: 30000 });

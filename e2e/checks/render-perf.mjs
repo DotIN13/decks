@@ -106,7 +106,7 @@ setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
 const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= Math.min(1000, ITEMS / 2)), 20000);
 say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.boards} boards`);
 
-const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, boards: false });
+const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
 // The stage and its engine are in the canvas frame, made again when the page loads again.
 let canvas = await canvasFrame(page);
 const cdp = await context.newCDPSession(page);

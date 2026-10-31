@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`show`/`hide` from the `decks` command) is
  * checked in stage-api.mjs, which does need one.
  */
-import { canvasFrame, deckState, emptyCanvas, freshAgent, open, openPanel, pressBoardAction, say, selectBoard, settle, socket } from "../harness.mjs";
+import { canvasFrame, deckState, emptyCanvas, freshAgent, nameOf, open, openPanel, pressCardAction, say, selectCard, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -17,7 +17,7 @@ const { browser, page, errors } = await open({ width: 1600, height: 1000, panelT
  */
 const onCanvas = async () => (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? []).map((board) => board.path).sort());
 
-const base = (path) => path.split("/").pop();
+const base = nameOf;
 const names = paths.map(base).sort();
 
 /*
@@ -76,11 +76,11 @@ say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowe
  * the stage on screen.
  */
 /*
- * Played as the library boards (`boards/…`); the agent's canvas holds its own copies of them
- * (`canvases/<canvas>/boards/…`), so what is on the stage is compared by file name.
+ * Played as the fixture canvas's cards; the agent's canvas holds its own copies of them
+ * (`canvases/<canvas>/cards/<name>/`), so what is on the stage is compared by card name.
  */
 const twoNames = names.slice(0, 2);
-const two = twoNames.map((name) => `boards/${name}`);
+const two = twoNames.map((name) => paths.find((path) => base(path) === name));
 const link = await socket();
 if (made) link.send({ type: "agent.focus", id: made.id });
 for (const path of two) link.send({ type: "card.play", path });
@@ -96,8 +96,8 @@ say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.l
 // wherever the previous check put it the button can sit off-screen or exactly where the
 // neighbouring board begins — which is a fact about the camera, not about hiding.
 const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? two[0];
-await selectBoard(page, first);
-await pressBoardAction(page, "Hide");
+await selectCard(page, first);
+await pressCardAction(page, "Hide");
 await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksCards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*

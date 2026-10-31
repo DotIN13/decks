@@ -60,7 +60,7 @@ const onDisk = () => {
 };
 
 await resetStage();
-const { browser, page, errors } = await open({ width: 1300, height: 900, boards: false });
+const { browser, page, errors } = await open({ width: 1300, height: 900, cards: false });
 await settle(page, 1200);
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);

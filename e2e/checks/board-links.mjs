@@ -13,20 +13,20 @@
  *
  * The card is still there, where it was, after each.
  */
-import { API, asPerson, canvasFrame, flyToBoard, open, rest, resetStage, say, settle, socket, stagePath, zoom } from "../harness.mjs";
+import { API, asPerson, canvasFrame, flyToCard, open, rest, card as cardPath, resetStage, say, settle, socket, zoom } from "../harness.mjs";
 
 await resetStage();
 const person = await asPerson();
 const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person }, body: JSON.stringify({ args }) })).json();
 /* Four links, each a quarter of the card, so a press can find one by where it is: the card's root is closed. */
 const row = (href, text, i) => `<a href="${href}" style="position:absolute;left:0;right:0;top:${i * 25}%;height:25%;display:flex;align-items:center;font-size:28px">${text}</a>`;
-const html = `<div style="position:relative;height:400px">${row("../../boards/risks.html", "Risks", 0)}${row("https://example.com/elsewhere", "Elsewhere", 1)}${row("../../assets/sketch.svg", "Sketch", 2)}${row("../../boards/not-written-yet.html", "Nowhere", 3)}</div>`;
+const html = `<div style="position:relative;height:400px">${row("../risks/index.html", "Risks", 0)}${row("https://example.com/elsewhere", "Elsewhere", 1)}${row("../../assets/sketch.svg", "Sketch", 2)}${row("../not-written-yet/index.html", "Nowhere", 3)}</div>`;
 const made = await call("canvas.insert", [{ type: "card", title: "Links", html, width: 600, height: 400 }]);
 const CARD = made.value?.card;
 say("a card of links", made.ok === true && !!CARD, JSON.stringify(made).slice(0, 200));
 
 const { browser, context, page, errors } = await open({ width: 1500, height: 1000 });
-const LINKED = await stagePath(page, "boards/risks.html");
+const LINKED = cardPath("risks");
 const link = await socket();
 // The linked board off the canvas first, so the link is what brings it back.
 link.send({ type: "card.hide", path: LINKED });
@@ -38,7 +38,7 @@ say("the linked board is off the canvas to begin with", !(await onCanvas()).incl
 const rectOf = (path) => canvas.evaluate((wanted) => (window.__decksCards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
 /** The card framed, then its `n`th link pressed where it is on screen. */
 const press = async (n) => {
-	await flyToBoard(page, CARD);
+	await flyToCard(page, CARD);
 	await settle(page, 400);
 	const r = await rectOf(CARD);
 	await page.mouse.click(r.x + r.width * 0.15 + 40, r.y + r.height * (n * 0.25 + 0.125));
@@ -89,8 +89,8 @@ say("a file that is not a board opens in a tab too", file.includes("sketch.svg")
 await press(3);
 await settle(page, 900);
 const notice = await page.evaluate(() => [...document.querySelectorAll(".notice")].map((one) => one.textContent).join(" | "));
-const appeared = (await onCanvas()).some((path) => path.endsWith("/not-written-yet.html"));
-say("a board link the deck cannot open says so, and opens nothing", notice.includes("not-written-yet.html") && !appeared, notice || "(no notice)");
+const appeared = (await onCanvas()).some((path) => path.includes("/not-written-yet"));
+say("a board link the deck cannot open says so, and opens nothing", notice.includes("not-written-yet") && !appeared, notice || "(no notice)");
 say("…and the card is still on the canvas", (await onCanvas()).includes(CARD));
 
 link.close();

@@ -4,9 +4,9 @@
  *
  * Needs a model, because the thing being travelled through is a real conversation.
  */
-import { ask, boardPath, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
+import { ask, cardFile, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
 
-const plan = await boardPath("plan.html");
+const plan = await cardFile("plan");
 const original = read(plan);
 
 const { browser, page, errors } = await open();
@@ -18,7 +18,7 @@ try {
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 
-	await ask(page, "Add a sticky to boards/plan.html with data-id 'timecheck' at left 1264px top 780px saying 'first turn'. Just do it, briefly.");
+	await ask(page, "Add a sticky to canvases/auth-refresh/cards/plan/index.html with data-id 'timecheck' at left 1264px top 780px saying 'first turn'. Just do it, briefly.");
 	say("the first turn changed the board", /timecheck/.test(read(plan)));
 
 	await ask(page, "Now change that sticky's text to 'second turn'. Briefly.");

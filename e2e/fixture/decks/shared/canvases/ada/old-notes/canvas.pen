@@ -1,0 +1,19 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "browser",
+      "id": "notes",
+      "name": "What the survey round found",
+      "url": "boards/notes.html",
+      "width": 760,
+      "height": 240,
+      "metadata": {
+        "type": "decks.board",
+        "path": "boards/notes.html"
+      },
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

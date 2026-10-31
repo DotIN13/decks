@@ -126,14 +126,15 @@ for (const target of TARGETS) {
 		const boards = [...first.boards[i], ...again.boards[i], ...bytes.boards[i]];
 		const steady = await first.compare(first.pictures[i], again.pictures[i], boards);
 		/*
-		 * Chromium draws one faint seam (a line a pixel wide where two tiles meet) one of two ways, a
-		 * few levels apart, as it happens on each visit, tiles as pictures both times as well: in
-		 * Chromium, steady and the same are each within four levels on under 0.05% of the pixels (four
-		 * was seen eight steps out, on 284 of 1.26 million). WebKit, the engine the bytes are for, must
-		 * match exactly.
+		 * Chromium draws its seams (a line a pixel wide where two tiles meet) one of two ways, a few
+		 * levels apart, as it happens on each visit, tiles as pictures both times as well: in Chromium,
+		 * steady and the same are each within four levels on under 0.25% of the pixels. A seam runs the
+		 * height of the window between two columns of tiles, and the fixture's cards stand in one narrow
+		 * column, so two seams' whole length is bare canvas: 1 to 2.2 thousand pixels of 1.26 million,
+		 * at most two levels, were seen. WebKit, the engine the bytes are for, must match exactly.
 		 */
 		const webkit = target.open.engine === "webkit";
-		const near = (d) => d.differ === 0 || (!webkit && d.most <= 4 && d.differ < d.pixels * 0.0005);
+		const near = (d) => d.differ === 0 || (!webkit && d.most <= 4 && d.differ < d.pixels * 0.0025);
 		say(`${name}, ${views[i]}: two picture pages agree (the screenshot is steady)`, near(steady), JSON.stringify(steady));
 		const same = [await first.compare(first.pictures[i], bytes.pictures[i], boards), await again.compare(again.pictures[i], bytes.pictures[i], boards)];
 		say(`${name}, ${views[i]}: tiles as bytes draw the same pixels as tiles as pictures`, same.some((d) => d.differ === 0) || same.every(near), JSON.stringify(same));
@@ -146,7 +147,7 @@ for (const target of TARGETS) {
 
 // Unasked, WebKit hands tiles over as bytes and Chromium as pictures (`pixelsFirst`).
 for (const target of TARGETS) {
-	const { browser, page } = await open({ ...target.open, scheme: "light", boards: false });
+	const { browser, page } = await open({ ...target.open, scheme: "light", cards: false });
 	const canvas = await canvasFrame(page);
 	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
 	await sharp(page);

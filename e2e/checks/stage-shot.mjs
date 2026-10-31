@@ -35,7 +35,7 @@ const until = async (test, ms = 15000) => {
 };
 
 const keep = process.env.DECKS_E2E_SHOTS;
-const { browser, page, errors } = await open({ width: 1600, height: 1000, scheme: "light", boards: true });
+const { browser, page, errors } = await open({ width: 1600, height: 1000, scheme: "light", cards: true });
 // The stage and its engine are in the canvas frame; the screenshots and the pixel counting are the page's.
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});

@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { API, asPerson, canvasFrame, deckState, editMode, fitCanvas, focusCanvas, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, editMode, fitCanvas, focusCanvas, open, resetStage, say, selectCard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -38,10 +38,10 @@ const agentId = await until(() => link.last("agents")?.focused);
 say("the server says which agent is focused", !!agentId);
 
 // --- an edit from the wire: a note, and an arrow from it to a board --------------------------------
-const firstBoard = deck.boards[0].path;
+const firstCard = deck.boards[0].path;
 /*
- * On disk a board item's `url` and `metadata.path` are relative to the canvas folder: the canvas's
- * copy `canvases/<canvas>/boards/x.html` is `boards/x.html` in its own file.
+ * On disk a card item's `url` and `metadata.path` are relative to the canvas folder: the canvas's
+ * card `canvases/<canvas>/cards/x/index.html` is `cards/x/index.html` in its own file.
  */
 const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
@@ -66,7 +66,7 @@ link.send({
 	agentId,
 	ops: [
 		{ op: "insert", node: { type: "note", id: "e2e-note", content: "Drawn by the check" }, box: { x1: Math.round(middle.x), y1: Math.round(middle.y) } },
-		{ op: "insert", node: { type: "path", id: "e2e-arrow", metadata: { type: "decks.arrow", from: "e2e-note", to: firstBoard } } },
+		{ op: "insert", node: { type: "path", id: "e2e-arrow", metadata: { type: "decks.arrow", from: "e2e-note", to: firstCard } } },
 	],
 });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
@@ -91,12 +91,12 @@ say("the stage is a pen file on disk", existsSync(file), file);
 const doc = onDisk();
 say("its version is pen's", typeof doc.version === "string" && /^\d+\.\d+$/.test(doc.version), doc.version);
 
-// --- boards are browser items in it --------------------------------------------------------------
-const boardItems = () => onDisk().children.filter((n) => n.type === "browser" && n.metadata?.type === "decks.board");
-const shownPaths = (await until(() => boardItems().length >= deck.boards.length && boardItems())) || boardItems();
-say("every board on the stage is a browser item in the file", deck.boards.every((b) => shownPaths.some((n) => n.metadata.path === inFolder(b.path))), `${shownPaths.length} of ${deck.boards.length}`);
-const item = shownPaths.find((n) => n.metadata.path === inFolder(firstBoard));
-say("a board item points at the board's file, relative to the stage", item?.url === inFolder(firstBoard), item?.url);
+// --- cards are browser items in it ---------------------------------------------------------------
+const cardItems = () => onDisk().children.filter((n) => n.type === "browser" && n.metadata?.type === "decks.card");
+const shownPaths = (await until(() => cardItems().length >= deck.boards.length && cardItems())) || cardItems();
+say("every card on the stage is a browser item in the file", deck.boards.every((b) => shownPaths.some((n) => n.metadata.path === inFolder(b.path))), `${shownPaths.length} of ${deck.boards.length}`);
+const item = shownPaths.find((n) => n.metadata.path === inFolder(firstCard));
+say("a card item points at the card's file, relative to the stage", item?.url === inFolder(firstCard), item?.url);
 
 // --- the arrow was routed to the board ------------------------------------------------------------
 const arrow = onDisk().children.find((n) => n.id === "e2e-arrow");
@@ -104,9 +104,9 @@ say("an arrow to a board is drawn when it is made", typeof arrow?.geometry === "
 
 // --- moving a board moves its item, and the arrow follows ------------------------------------------
 const before = arrow?.geometry;
-link.send({ type: "card.move", path: firstBoard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
+link.send({ type: "card.move", path: firstCard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
 const movedItem = await until(() => {
-	const now = onDisk().children.find((n) => n.metadata?.path === inFolder(firstBoard));
+	const now = onDisk().children.find((n) => n.metadata?.path === inFolder(firstCard));
 	return now && now.x === (item?.x ?? 0) + 400 ? now : undefined;
 });
 say("a board moved on the canvas is moved in the file", !!movedItem, JSON.stringify(movedItem && { x: movedItem.x, y: movedItem.y }));
@@ -395,17 +395,17 @@ if (spot) {
 		say("…and pressing fit-content takes the pinned height off again", !!hugging, JSON.stringify(onDisk().children.find((n) => n.id === cardId)?.height));
 	}
 }
-// --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
-const boardItem = onDisk().children.find((n) => n.metadata?.path === inFolder(firstBoard));
-if (boardItem) {
-	const w = Math.round((boardItem.width ?? 400) * 0.4);
-	const h = Math.round((boardItem.height ?? 300) * 0.3);
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: boardItem.x + 20, y1: boardItem.y + 20, x2: boardItem.x + 20 + w, y2: boardItem.y + 20 + h } }] });
+// --- cards at the back: a drawing over a card catches its own clicks ------------------------------
+const cardItem = onDisk().children.find((n) => n.metadata?.path === inFolder(firstCard));
+if (cardItem) {
+	const w = Math.round((cardItem.width ?? 400) * 0.4);
+	const h = Math.round((cardItem.height ?? 300) * 0.3);
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: cardItem.x + 20, y1: cardItem.y + 20, x2: cardItem.x + 20 + w, y2: cardItem.y + 20 + h } }] });
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
 	await focusCanvas(page);
 	await page.keyboard.press("Escape");
-	// Framed on the board, close enough to press the drawing over it.
-	await selectBoard(page, firstBoard);
+	// Framed on the card, close enough to press the drawing over it.
+	await selectCard(page, firstCard);
 	await page.keyboard.press("1");
 	await settle(page, 1200);
 	await page.keyboard.press("Escape");
@@ -413,16 +413,16 @@ if (boardItem) {
 	const at = await canvas.evaluate(({ x, y }) => {
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
-	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
+	}, { x: cardItem.x + 20 + w / 2, y: cardItem.y + 20 + h / 2 });
 	const under = () => canvas.evaluate(({ x, y }) => {
 		const e = document.elementFromPoint(x, y);
-		return e?.closest(".card-node") ? "board" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
+		return e?.closest(".card-node") ? "card" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
 	}, at);
 	const shown = await until(() => under().then((u) => u.startsWith("drawing") && u));
-	say("a drawing over a board is on top of it and catches the click there", shown === "drawing:e2e-over", await under());
-	// A board is only its picture now (no page of its own to press through to): the selected board stays under the drawing.
-	await selectBoard(page, firstBoard);
-	say("…and the drawing stays on top of the selected board", (await under()) === "drawing:e2e-over", await under());
+	say("a drawing over a card is on top of it and catches the click there", shown === "drawing:e2e-over", await under());
+	// The selected card stays under the drawing.
+	await selectCard(page, firstCard);
+	say("…and the drawing stays on top of the selected card", (await under()) === "drawing:e2e-over", await under());
 }
 await editMode(page, false);
 

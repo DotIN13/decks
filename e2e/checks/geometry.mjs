@@ -9,7 +9,7 @@
  * A board is only its picture on the canvas now (no page of its own in it), so what this asked of a
  * board's page (kept through a resize, its content a floor for its height) is gone with it.
  */
-import { boardPath, canvasFrame, flyToBoard, onCanvasAt, open, read, resetStage, say, selectBoard, settle, socket, stagePath, write } from "../harness.mjs";
+import { card, cardFile, canvasFrame, flyToCard, onCanvasAt, open, read, resetStage, say, selectCard, settle, socket, write } from "../harness.mjs";
 
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000, edit: true });
@@ -62,8 +62,8 @@ const select = async (path) => {
 	link.close();
 	await settle(page, 500);
 	// The panel has no row per board file any more (its Canvas tab lists items by their names), so it is
-	// picked on the canvas and flown to with its Fit, which finds it wherever the camera is (`flyToBoard`).
-	await flyToBoard(page, path);
+	// picked on the canvas and flown to with its Fit, which finds it wherever the camera is (`flyToCard`).
+	await flyToCard(page, path);
 	await settle(page, 300);
 	for (let i = 0; i < 8; i++) {
 		const level = await canvas.evaluate(() =>
@@ -73,7 +73,7 @@ const select = async (path) => {
 		await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 		await settle(page, 250);
 	}
-	await selectBoard(page, path);
+	await selectCard(page, path);
 	await settle(page, 600);
 	await cornerOnScreen(path);
 };
@@ -117,10 +117,10 @@ const dragHandle = async (path, dx, dy) => {
 
 // The board's own file is the canvas's copy, and the stage shows it under that path; both read before
 // the first `select` hides the other boards.
-const component = await boardPath("risks.html");
-const componentPath = await stagePath(page, "boards/risks.html");
-const flow = await boardPath("notes.html");
-const flowPath = await stagePath(page, "boards/notes.html");
+const component = await cardFile("risks");
+const componentPath = card("risks");
+const flow = await cardFile("notes");
+const flowPath = card("notes");
 const wasComponent = read(component);
 const componentMeta = metaOf(wasComponent);
 say("the component board declares its own size", componentMeta !== null && componentMeta.w > 0, JSON.stringify(componentMeta));
@@ -284,7 +284,7 @@ say(
  * it needs a board to click.
  */
 const countNow = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
-await flyToBoard(page, flowPath);
+await flyToCard(page, flowPath);
 await settle(page, 900);
 const countAfterBar = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 /*

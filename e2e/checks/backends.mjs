@@ -17,7 +17,7 @@ for (const target of TARGETS) {
 
 	await resetStage();
 	{
-		const { browser, page, errors } = await open({ ...target.open, boards: false, init: noGpu });
+		const { browser, page, errors } = await open({ ...target.open, cards: false, init: noGpu });
 		// The stage and its engine are in the canvas frame.
 		const canvas = await canvasFrame(page);
 		const stats = () => canvas.evaluate(() => window.__decksEngine?.stats?.());
@@ -48,7 +48,7 @@ for (const target of TARGETS) {
 
 	await resetStage();
 	{
-		const { browser, page } = await open({ ...target.open, boards: false, init: noGpuNoWebgl });
+		const { browser, page } = await open({ ...target.open, cards: false, init: noGpuNoWebgl });
 		const canvas = await canvasFrame(page);
 		const shown = await canvas.waitForSelector(".stage-notice", { timeout: 30000 }).then(() => true, () => false);
 		const text = shown ? await canvas.locator(".stage-notice").textContent() : "";

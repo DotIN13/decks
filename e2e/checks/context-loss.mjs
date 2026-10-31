@@ -9,7 +9,7 @@ import { TARGETS, canvasDraws, noGpu, outOfLive } from "../backends-kit.mjs";
 for (const target of TARGETS) {
 	const name = target.label;
 	await resetStage();
-	const { browser, page, errors } = await open({ ...target.open, boards: false, init: noGpu });
+	const { browser, page, errors } = await open({ ...target.open, cards: false, init: noGpu });
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
 	const stats = () => canvas.evaluate(() => window.__decksEngine?.stats?.());

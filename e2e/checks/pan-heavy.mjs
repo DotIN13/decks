@@ -98,7 +98,7 @@ const busiest = (canvas, zoom) => {
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 say("the server says which agent is focused", !!agentId);
-const { page, context, errors } = await open({ width: W, height: H, dpr: DPR, boards: false });
+const { page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
 const cdp = await context.newCDPSession(page);
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 if (THROTTLE > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });

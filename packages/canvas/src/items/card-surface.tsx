@@ -38,6 +38,12 @@ export function CardSurface(props: {
 	size: () => { w: number; h: number };
 	selected: boolean;
 	onSelect: () => void;
+	/**
+	 * A mouse or pen press with Shift (or ⌘) inside the card, offered to the editor as a press on the
+	 * card's edge is (`PageView.press`): it adds the card to the selection, or takes it out, rather
+	 * than picking it alone. True when the editor took it.
+	 */
+	onAddPress?: ((event: PointerEvent, on: HTMLElement) => boolean) | undefined;
 	onShown: () => void;
 	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenPage`), by its deck path. */
 	onOpenPage?: ((path: string) => void) | undefined;
@@ -133,10 +139,16 @@ export function CardSurface(props: {
 		root.addEventListener("pointerdown", (event) => {
 			const press = event as PointerEvent;
 			if (press.pointerType === "touch") {
+				/*
+				 * A finger's press goes on to the stage, which pans or pinches with it, and picks the card
+				 * as a finger on a board's picture does; a press on the card's own controls keeps it.
+				 */
 				if (own(press)) press.stopPropagation();
+				else if (press.isPrimary && !props.selected) props.onSelect();
 				return;
 			}
 			if (press.button !== 0 && press.button !== 2) return;
+			if (press.button === 0 && (press.shiftKey || press.metaKey) && !own(press) && props.onAddPress?.(press, element)) return;
 			if (!props.selected) props.onSelect();
 			press.stopPropagation();
 		});

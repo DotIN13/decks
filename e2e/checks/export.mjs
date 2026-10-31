@@ -38,7 +38,7 @@ const until = async (test, ms = 15000) => {
 	}
 };
 
-const { browser, page, errors } = await open({ width: 1200, height: 800, scheme: "light", boards: true });
+const { browser, page, errors } = await open({ width: 1200, height: 800, scheme: "light", cards: true });
 const deck = await deckState();
 const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
 const X = Math.round(Math.max(0, ...placed.map((b) => b.x + (b.w ?? 0))) + 400);

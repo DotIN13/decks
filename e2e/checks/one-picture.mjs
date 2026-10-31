@@ -49,7 +49,7 @@ for (const target of TARGETS) {
 	const name = target.label;
 	const ladder = target.slug === "chromium" ? [192, 480, 800] : [192, 480];
 	await resetStage();
-	const { browser, page, errors } = await open({ ...target.open, boards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
+	const { browser, page, errors } = await open({ ...target.open, cards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
 	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});

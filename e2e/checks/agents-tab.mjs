@@ -67,7 +67,7 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
 	lastAt: Date.now() - ago,
 	unread: 0,
 	identity: identityOf(id, name),
-	boards: ["boards/plan.html", "boards/risks.html"],
+	boards: ["canvases/auth-refresh/cards/plan/index.html", "canvases/auth-refresh/cards/risks/index.html"],
 	inPlay: [],
 	...extra,
 });

@@ -24,7 +24,7 @@ const until = async (test, ms = 15000) => {
 };
 
 const person = await asPerson();
-const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", boards: false });
+const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", cards: false });
 const frame = await canvasFrame(page);
 
 const ID = "shot-card";

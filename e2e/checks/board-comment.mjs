@@ -6,7 +6,7 @@
  * that opens the box in the frame, and a kept comment goes over the input bar on the page for the
  * next message, a draft that is never sent on its own.
  */
-import { API, asPerson, canvasFrame, flyToBoard, focusCanvas, open, resetStage, rest, say, settle } from "../harness.mjs";
+import { API, asPerson, canvasFrame, flyToCard, focusCanvas, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -27,7 +27,7 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 let canvas = await canvasFrame(page);
 await canvas.waitForFunction((id) => (globalThis.__decksFrameDrawn?.().children ?? []).some((one) => one.id === id), made.value?.id, { timeout: 10000 });
 // Framed as a person does: selected, then the pill's Fit (an agent's view.focus waits while the person is using the canvas).
-await flyToBoard(page, made.value?.card);
+await flyToCard(page, made.value?.card);
 await settle(page, 600);
 canvas = await canvasFrame(page);
 

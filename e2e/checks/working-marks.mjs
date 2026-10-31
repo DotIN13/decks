@@ -49,7 +49,7 @@ const chat = (id, name, kind, state) => ({
 	lastLine: "Reading the file",
 	unread: 0,
 	identity: { name, color: "#3b5cf6" },
-	boards: ["boards/plan.html"],
+	boards: ["canvases/auth-refresh/cards/plan/index.html"],
 	inPlay: [],
 });
 

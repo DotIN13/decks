@@ -2,11 +2,11 @@
  * The redesign's view calls, in a real browser: they move or reload what the person sees, and
  * write no file.
  *
- * - `view.reload({ board })` is counted over every open page: this page shows the board, so one
+ * - `view.reload({ card })` is counted over every open page: this page shows the card, so one
  *   page reloads; named with a canvas this page is not showing, none does.
  * - `view.goto(canvas)` shows a canvas by opening a conversation on it; with nobody on that
  *   canvas it says it could not, and on the canvas already it says so.
- * - `view.focus(board, { canvas })` on the canvas on screen moves the view, and on another
+ * - `view.focus(card, { canvas })` on the canvas on screen moves the view, and on another
  *   canvas says the screen shows another one.
  * - None of them changed the canvas file.
  */
@@ -26,15 +26,15 @@ const me = (await call("agent.me", [], person)).value;
 const agent = { ...person, "x-decks-agent": me.id };
 const home = (await call("here", [], agent)).value;
 const read = await call("canvas.read", [], agent);
-const board = read.value.items.find((item) => item.type === "board")?.board;
-say("the agent on screen has a home canvas with boards on it", Boolean(home?.name && board), `${home?.name} ${board}`);
+const card = read.value.items.find((item) => item.type === "card")?.card;
+say("the agent on screen has a home canvas with cards on it", Boolean(home?.name && card), `${home?.name} ${card}`);
 const before = JSON.stringify((await call("canvas.read", [], agent)).value.items);
 
-const reloaded = await call("view.reload", [{ board }], agent);
-say("view.reload reloads the board on the page showing it, and counts it", reloaded.ok && reloaded.value.reloaded === 1, JSON.stringify(reloaded));
+const reloaded = await call("view.reload", [{ card }], agent);
+say("view.reload reloads the card on the page showing it, and counts it", reloaded.ok && reloaded.value.reloaded === 1, JSON.stringify(reloaded));
 
 const other = (await call("canvas.create", ["Elsewhere for views"], agent)).value;
-const none = await call("view.reload", [{ board, canvas: other.name }], agent);
+const none = await call("view.reload", [{ card, canvas: other.name }], agent);
 say("named with a canvas no page shows, no page reloads", none.ok && none.value.reloaded === 0, JSON.stringify(none));
 
 const already = await call("view.goto", [home.name], agent);
@@ -44,7 +44,7 @@ say("view.goto a canvas nobody is on says it could not show it", nobody.ok && no
 
 // The screen is the person's for a few seconds after they last touched it (the harness's own setup counts).
 await settle(page, 6500);
-const focused = await call("view.focus", [board], agent);
+const focused = await call("view.focus", [card], agent);
 say("view.focus on the canvas on screen moves the view", focused.ok && !focused.value.deferred, JSON.stringify(focused));
 await call("canvas.insert", [{ type: "note", id: "far-note", content: "over here" }, { canvas: other.name, at: { x1: 0, y1: 0 } }], agent);
 const elsewhere = await call("view.focus", ["far-note", { canvas: other.name }], agent);

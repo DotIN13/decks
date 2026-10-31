@@ -204,6 +204,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 						size={size}
 						selected={props.selected}
 						onSelect={() => props.view.select()}
+						onAddPress={(event, on) => props.view.press(event, on)}
 						onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}
 						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
 						onShown={() => setShown(true)}

@@ -44,6 +44,16 @@ await canvas.evaluate(() => {
 	};
 });
 
+/*
+ * Quiet first: the fixture's cards are awake at this zoom, and a card mounting, measuring or having its
+ * picture come draws the sheet again. Waited until no draw has come for 700 ms.
+ */
+for (let i = 0, last = -1; i < 20; i++) {
+	const now = await draws();
+	if (now === last) break;
+	last = now;
+	await settle(page, 700);
+}
 await page.mouse.move(700, 450);
 const before = await draws();
 let gaps = 0;

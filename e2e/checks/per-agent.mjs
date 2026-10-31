@@ -17,7 +17,7 @@
  * questions are fed: a question outstanding for the agent you are *not* looking at cannot be
  * produced on demand any other way.
  */
-import { canvasFrame, deckState, focusCanvas, open, ready, say, selectBoard, settle, socket, still } from "../harness.mjs";
+import { canvasFrame, deckState, focusCanvas, nameOf, open, ready, say, selectCard, settle, socket, still } from "../harness.mjs";
 
 const { browser, page, errors, stopAnswering } = await open({ width: 1500, height: 1000 });
 /* The harness presses Allow on any dialog it sees, and this check is about dialogs being left alone. */
@@ -78,10 +78,10 @@ const make = async (name, path, y) => {
 	 */
 	let shown;
 	if (path) {
-		const file = path.split("/").pop();
+		const file = nameOf(path);
 		link.send({ type: "card.play", path });
 		shown = await until(
-			() => link.received.filter((m) => m.type === "context.changed" && m.agentId === id).at(-1)?.inPlay?.find((one) => one.split("/").pop() === file),
+			() => link.received.filter((m) => m.type === "context.changed" && m.agentId === id).at(-1)?.inPlay?.find((one) => nameOf(one) === file),
 			`${name}'s board to be in play`,
 		);
 		link.send({ type: "card.move", path: shown, x: 0, y });
@@ -160,7 +160,7 @@ await (await canvasFrame(page)).locator('[aria-label="Fit everything on the canv
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await selectBoard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? [])[0]?.path));
+await selectCard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? [])[0]?.path));
 await (await canvasFrame(page)).waitForSelector('.card-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });

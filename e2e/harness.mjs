@@ -101,37 +101,60 @@ export async function asPerson(api) {
 	return { authorization: `Bearer ${await personToken(api)}` };
 }
 
-/*
- * A library board played onto a canvas lands as the canvas's own copy, `canvases/<name>/boards/<file>`
- * (`deck/stage-boards.ts`), and the deck lists both. The copy is the board on the canvas.
+/**
+ * The fixture's canvas (`e2e/fixture/decks/canvases/auth-refresh/`): five cards (plan, risks, sources,
+ * notes and how-deep-is-the-deep-sea), which `resetStage` puts the focused agent on.
  */
-const copyOf = (path) => (/^canvases\/[^/]+\/boards\//.test(path) ? `boards/${path.split("/").slice(3).join("/")}` : undefined);
+export const CANVAS = "auth-refresh";
+
+/** A fixture card's deck path, by its name: `card("plan")` is `canvases/auth-refresh/cards/plan/index.html`. */
+export const card = (name) => `canvases/${CANVAS}/cards/${name}/index.html`;
 
 /**
- * The deck the server actually has open, straight from the API. A library board that a canvas holds a
- * copy of is left out of `boards`, so `boards` is what is on the canvases: a check counting the boards
- * on screen counts each once. `library` is every board the deck lists.
+ * The fixture's one leftover board: a friend's shared canvas (`shared/canvases/ada/old-notes/`, view
+ * only), whose board is drawn as a picture and never runs. For the checks of an old board's drawing.
+ */
+export const SHARED_CANVAS = "shared/ada/old-notes";
+export const SHARED_BOARD = "shared/canvases/ada/old-notes/boards/notes.html";
+
+/** What a check calls a card or a board by: a card's folder (`plan` for `…/cards/plan/index.html`), else its file's name. */
+export const nameOf = (path) => /\/cards\/([^/]+)\/index\.html$/.exec(path.split("?")[0])?.[1] ?? path.split("?")[0].split("/").pop();
+
+/** Where the fixture puts each of its cards, from its canvas file: what `resetStage` moves them back to. */
+const FIXTURE_PLACES = (() => {
+	const doc = JSON.parse(readFileSync(new URL(`./fixture/decks/canvases/${CANVAS}/canvas.pen`, import.meta.url), "utf8"));
+	return (doc.children ?? []).filter((node) => node.metadata?.type === "decks.card").map((node) => ({ path: `canvases/${CANVAS}/${node.metadata.path}`, x: node.x, y: node.y }));
+})();
+
+/**
+ * The deck the server actually has open, straight from the API. `boards` is every card, board,
+ * document and app on the deck's own canvases, which a check counting what is on screen counts;
+ * a friend's shared canvas is left out of it. `library` is everything the deck lists.
+ *
+ * Each one's place and size are its item's in its canvas's file, read from disk: the deck's own
+ * `x`/`y` are only the seed a new stage would lay it out from, not where the canvas has it.
  */
 export async function deckState(api) {
 	api = typeof api === "string" ? api : API;
 	const response = await fetch(`${api}/api/deck`, { headers: await asPerson(api) });
 	if (!response.ok) throw new Error(`GET /api/deck -> ${response.status}`);
 	const deck = (await response.json()).deck;
-	const copied = new Set(deck.boards.map((board) => copyOf(board.path)).filter(Boolean));
-	return { ...deck, library: deck.boards, boards: deck.boards.filter((board) => !copied.has(board.path)) };
-}
-
-/**
- * The path the stage shows a board under: a library path (`boards/plan.html`) is its canvas copy's
- * when the stage has that and not the library board itself; any other path is itself.
- */
-export async function stagePath(page, path) {
-	return (await canvasFrame(page)).evaluate((wanted) => {
-		const all = window.__decksCards?.() ?? [];
-		if (!/^boards\//.test(wanted) || all.some((one) => one.path === wanted)) return wanted;
-		const file = wanted.slice("boards/".length);
-		return all.find((one) => /^canvases\/[^/]+\/boards\//.test(one.path) && one.path.split("/").slice(3).join("/") === file)?.path ?? wanted;
-	}, path);
+	const drawings = new Map();
+	const placed = (board) => {
+		const canvas = /^canvases\/([^/]+)\//.exec(board.path)?.[1];
+		if (!canvas) return board;
+		if (!drawings.has(canvas)) {
+			try {
+				drawings.set(canvas, JSON.parse(readFileSync(`${deck.path}/canvases/${canvas}/canvas.pen`, "utf8")).children ?? []);
+			} catch {
+				drawings.set(canvas, []);
+			}
+		}
+		const inFolder = board.path.slice(`canvases/${canvas}/`.length);
+		const node = drawings.get(canvas).find((one) => one.metadata?.path === inFolder);
+		return node && Number.isFinite(node.x) ? { ...board, x: node.x, y: node.y, w: node.width ?? board.w, h: node.height ?? board.h } : board;
+	};
+	return { ...deck, library: deck.boards, boards: deck.boards.filter((board) => !board.path.startsWith("shared/")).map(placed) };
 }
 
 /**
@@ -152,11 +175,10 @@ export async function preflight() {
 	return deck;
 }
 
-/** A board file inside the deck under test: the canvas's copy of it when a canvas holds one, so a change to it reaches the canvas. */
-export async function boardPath(name) {
+/** A fixture card's file inside the deck under test, by its name (`cardFile("plan")`). */
+export async function cardFile(name) {
 	const deck = await deckState();
-	const copy = deck.boards.find((board) => copyOf(board.path) === `boards/${name}`);
-	return `${deck.path}/${copy ? copy.path : `boards/${name}`}`;
+	return `${deck.path}/${card(name)}`;
 }
 
 export function read(file) {
@@ -181,7 +203,7 @@ export function write(file, text) {
  * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
  * any more.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "canvas" } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", cards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "canvas" } = {}) {
 	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
 	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
 	/*
@@ -251,7 +273,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	const watch = setInterval(() => void answer(), 700);
 	page.on("close", () => clearInterval(watch));
 
-	if (boards) {
+	if (cards) {
 		await liveZoom(page);
 		await ready(page);
 	}
@@ -586,50 +608,49 @@ export async function socket(api) {
 	return link;
 }
 
+/*
+ * What the server last said an agent has on its stage: its `context.changed`, or its row in the
+ * `agents` roster, whichever came later. The roster is the only word when nothing changed: a fresh
+ * server's first agent may already be on the fixture's canvas, and opening it again changes nothing.
+ */
+const holding = (link, agent) => {
+	let inPlay = [];
+	for (const m of link.received) {
+		if (m.type === "context.changed" && m.agentId === agent) inPlay = m.inPlay ?? [];
+		else if (m.type === "agents") inPlay = m.chats?.find((chat) => chat.id === agent)?.inPlay ?? inPlay;
+	}
+	return inPlay;
+};
+
 /**
- * Put the whole deck on the focused agent's stage.
+ * Put the fixture's canvas on the focused agent's stage, with each of its cards where the fixture has it.
  *
- * Most of these checks predate the context/in-play tiers and expect to see every board.
+ * Most of these checks expect to see every card.
  * Without this they inherit whatever the previous check narrowed the stage to, and fail
  * for reasons that have nothing to do with what they test.
  *
  * A URL is for the runner, which has one server per worker and so no single `API` to read;
  * checks call it with their page, or nothing, and get this process's `API`.
  */
-/*
- * A library board played onto a canvas lands as the canvas's own copy, `canvases/<name>/boards/<file>`
- * (`deck/stage-boards.ts`), so a board is on it when its path is, or that copy's is.
- */
-const onCanvas = (inPlay, path) => inPlay.includes(path) || (/^boards\//.test(path) && inPlay.some((one) => /^canvases\/[^/]+\/boards\//.test(one) && one.split("/").slice(3).join("/") === path.slice("boards/".length)));
-
 export async function resetStage(at) {
 	const api = typeof at === "string" ? at : API;
-	const deck = await deckState(api);
-	const wanted = deck.boards.map((board) => board.path);
+	const wanted = FIXTURE_PLACES.map((one) => one.path);
 	/*
 	 * And where the fixture puts them, not wherever the last check left them.
 	 *
-	 * A board's place belongs to the conversation now, so it survives from one check to the next: a
-	 * drag in `gestures.mjs` is still in force when `selection.mjs` flies to `plan.html` and expects
-	 * its neighbours. `/api/deck` answers with the deck's own arrangement — the seed a stage starts
-	 * from — so putting each board back is one `board.move` per board, the same message a drag sends.
+	 * A card's place belongs to the canvas, so it survives from one call to the next within a check: a
+	 * drag is still in force when the check flies to the plan and expects its neighbours. So each card is
+	 * put back where the fixture's canvas file has it, one `card.move` per card, the same message a drag sends.
 	 */
-	const places = deck.boards.filter((board) => Number.isFinite(board.x) && Number.isFinite(board.y));
 	const link = await socket(api);
 	/*
 	 * Confirmed, for the *focused* agent, and retried until it is.
 	 *
-	 * This used to send the plays and wait 400ms. Long enough once the server has settled
-	 * and not for the first check of a run: `board.play` is attributed to the focused agent,
-	 * and a fresh server is still starting one — so the plays landed on nobody, the stage
-	 * stayed empty, and the check failed thirty seconds later waiting for a board that was
-	 * never coming. Always the first two checks, which is what a race at startup looks like
-	 * and what it gets blamed on last.
-	 *
-	 * Waiting for any `context.changed` was not enough either. A restored session and a new
-	 * agent both send one, so the last message could describe an agent the browser is not
-	 * looking at — the plays were real and on the wrong stage. So the agent is named: the
-	 * greeting says who is focused, and this waits for that one's in-play set.
+	 * A fresh server is still starting its first agent when the first check begins, and that agent opens
+	 * on a canvas of its own (a new agent joins the latest canvas of its workspace's agents, and it has
+	 * none), so it is sent to the fixture's canvas (`agent.stage`) and this waits until the server says
+	 * that agent holds every card. The greeting says who is focused; any other agent's `context.changed`
+	 * describes a stage the browser is not looking at.
 	 */
 	const deadline = Date.now() + 25000;
 	let landed = [];
@@ -637,22 +658,22 @@ export async function resetStage(at) {
 	while (Date.now() < deadline) {
 		agent = link.last("agents")?.focused ?? agent;
 		if (agent) {
-			for (const board of places) link.send({ type: "card.move", path: board.path, x: board.x, y: board.y });
-			for (const path of wanted) link.send({ type: "card.play", path });
+			link.send({ type: "agent.stage", id: agent, stage: CANVAS });
+			for (const one of FIXTURE_PLACES) link.send({ type: "card.move", stage: CANVAS, path: one.path, x: one.x, y: one.y });
 		}
 		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.
 		const resend = Date.now() + (agent ? 1500 : 100);
 		while (Date.now() < resend) {
 			await new Promise((resolve) => setTimeout(resolve, 25));
-			landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
-			if (agent && wanted.every((path) => onCanvas(landed, path))) break;
+			landed = holding(link, agent);
+			if (agent && wanted.every((path) => landed.includes(path))) break;
 		}
-		if (agent && wanted.every((path) => onCanvas(landed, path))) break;
+		if (agent && wanted.every((path) => landed.includes(path))) break;
 	}
 	link.close();
 	if (!agent) throw new Error("resetStage: the server never said which agent is focused");
-	if (!wanted.every((path) => onCanvas(landed, path))) {
-		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s stage: wanted ${wanted.join(", ")}; on it ${landed.join(", ")}`);
+	if (!wanted.every((path) => landed.includes(path))) {
+		throw new Error(`resetStage: ${wanted.filter((path) => landed.includes(path)).length} of ${wanted.length} cards reached ${agent}'s stage: wanted ${wanted.join(", ")}; on it ${landed.join(", ")}`);
 	}
 	return wanted;
 }
@@ -810,7 +831,7 @@ export async function newAgent(page, kind = "pi") {
  * that call it are asking a question — "is every board reachable from here" — that is still
  * worth asking under that name.
  */
-export async function openAllBoards(page) {
+export async function openAllCards(page) {
 	// The side panel's Canvas tab lists what is on the canvas, boards among it (`.v3-item`).
 	await openPanel(page);
 	const tab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Canvas\s*$/i }).first();
@@ -912,8 +933,7 @@ export function rangeOfAttr(html, attr, value) {
  */
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
-export async function selectBoard(page, path, { timeout = 4000 } = {}) {
-	path = await stagePath(page, path);
+export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	const canvas = await canvasFrame(page);
 	// A board is its picture on the stage's sheet; a card, a document or an app awake has a node. The stage says where each is.
 	const candidates = () => canvas.evaluate((wanted) => {
@@ -980,9 +1000,9 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 }
 
 /** Select a board and fly the camera to it with the pill's Fit — what a double-click on its bar used to do. */
-export async function flyToBoard(page, path) {
-	await selectBoard(page, path);
-	await pressBoardAction(page, "Fit");
+export async function flyToCard(page, path) {
+	await selectCard(page, path);
+	await pressCardAction(page, "Fit");
 	await rest(page);
 }
 
@@ -990,7 +1010,7 @@ export async function flyToBoard(page, path) {
  * One of the selected item's actions on its pill, by its word: Fit, Focus, New tab, Hide. `label` may
  * be a list, of which the first the pill offers is pressed; false when it offers none.
  */
-export async function pressBoardAction(page, label) {
+export async function pressCardAction(page, label) {
 	const labels = [label].flat();
 	const canvas = await canvasFrame(page);
 	/*
@@ -1038,8 +1058,7 @@ export async function pressBoardAction(page, label) {
  * A point on the band along an awake item's edge, which moves it (`item-slot.tsx`): on the screen
  * and uncovered, or null. The band shows on the item under the pointer or the selected one.
  */
-export async function boardEdge(page, path) {
-	path = await stagePath(page, path);
+export async function cardEdge(page, path) {
 	const canvas = await canvasFrame(page);
 	// The bands are drawn on the item under the pointer (or the selected one), so point at it first.
 	const box = await canvas.locator(`.card-node[data-path="${path}"]`).boundingBox().catch(() => null);

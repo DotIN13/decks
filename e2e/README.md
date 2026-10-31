@@ -31,8 +31,9 @@ the fixture is a throwaway copy.
   (`npm run dev:web`) on its web port for the whole run.
 - For each check, the worker copies `e2e/fixture/` to a fresh `decks-e2e-*` directory under the
   system temp, starts the server on it (`node --import tsx src/index.ts` in `apps/server`, the
-  `start` script: no `--watch`, so saving a file mid-run cannot restart it), puts the whole deck
-  in play (`resetStage`), runs the check — which opens its own browser — then stops that
+  `start` script: no `--watch`, so saving a file mid-run cannot restart it), runs the check —
+  which puts the fixture's canvas on the focused agent's stage (`resetStage`) when it needs the
+  cards, and opens its own browser — then stops that
   server (TERM, then KILL, its own process group only) and deletes the copy.
 - So nothing a check does reaches another, and order does not matter. A check that fails in
   the full run fails alone too; run it alone before believing otherwise.
@@ -83,14 +84,33 @@ list's order. **Deleting it did not fix that; it removed the only thing reportin
 
 ## Two rules
 
+## The fixture
+
+`e2e/fixture/decks/` is a deck of the shape a migrated deck has:
+
+- `canvases/auth-refresh/`: the canvas most checks work on, five **cards** (`cards/<name>/index.html`:
+  `plan`, `risks`, `notes`, `sources`, `how-deep-is-the-deep-sea`), stacked with their right-hand
+  edges in line. They were the five library boards of the old fixture, put through the
+  boards-to-cards migration (`apps/server/src/migrations/2026-10-29-boards-to-cards.ts`).
+  `card("plan")` is a card's deck path, `cardFile("plan")` its file, `nameOf(path)` the name a
+  check compares by. `resetStage()` sends the focused agent to this canvas (`agent.stage`) and puts
+  each card back where `canvas.pen` has it; `deckState()` reads every place from the canvas files.
+- `shared/canvases/ada/old-notes/`: a friend's view-only canvas holding the one **board** left, which
+  is drawn as a picture and never runs (`SHARED_CANVAS`, `SHARED_BOARD`; `old-board.mjs`).
+- `assets/`, `docs/`, `papers/`: files the cards and checks point at.
+
+A fresh server's first agent may open on a new empty canvas of its own (a new agent joins the
+latest canvas of its workspace's other agents, and it has none), which is what a check that does
+not call `resetStage` gets.
+
 **Nothing is hardcoded to one machine.** The deck under test comes from `/api/deck`, not
 from a path in the script.
 
 **Wait for the app, never for the clock.** Every check used to pad its page load with
 `waitForTimeout(2500)`. That was two thirds of the suite's runtime, and wrong twice over: a
 board is ready in ~700ms, so most of it was slack, and it is still too short on a loaded
-machine — simultaneously slow and flaky. `harness.open()` waits for every board to report
-`window.__boardReady`. Where something has no observable signal — a CSS transition — use
+machine — simultaneously slow and flaky. `harness.open()` waits for the canvas's sheet to be
+drawn and every card on screen to be awake (the card page itself says `window.__cardReady`). Where something has no observable signal — a CSS transition — use
 `settle(page, ms)` and keep it short.
 
 Removing the sleeps once took the suite from 189s to 33s, and the stricter waits found a bug
@@ -102,34 +122,36 @@ and the pages it brought to mount — rather than a pause as long as the longest
 ## Writing one
 
 ```js
-import { open, say, boardPath, read, write, changed } from "../harness.mjs";
+import { open, say, cardFile, read, write, changed } from "../harness.mjs";
 
-const { browser, page, errors } = await open();          // clears localStorage, waits for boards
+const { browser, page, errors } = await open();          // clears localStorage, waits for the cards
 say("something true", await page.evaluate(() => true));  // sets the exit code on failure
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
 ```
 
 - `say(name, ok, detail)` — one line of output; a failure sets a non-zero exit code.
-- `open({ width, height, scheme })` — a page with storage cleared and the boards mounted.
+- `open({ width, height, scheme })` — a page with storage cleared and the cards mounted
+  (`cards: false` waits only for the canvas frame).
 - `open({ device: "iPhone 15" })` — the same, in a Playwright device context: `hasTouch`, the
   pixel ratio and the user agent. `context.mjs` uses it for the narrow viewport. Dispatching
   real touches needs a CDP session on the returned `context` (`context.newCDPSession(page)`);
   `mobile.mjs` did that and has been cut, so nothing does it today. A mouse hides exactly the
   bugs a touchscreen has, so a check that means to test touch must not use one.
-- `boardPath(name)` / `read` / `write` / `changed(file, was)` — the fixture's files.
-- `socket()` — drive the protocol the way the client does (`board.play`, `board.move`).
+- `cardFile(name)` / `read` / `write` / `changed(file, was)` — the fixture's files.
+- `selectCard(page, path)`, `flyToCard`, `pressCardAction(page, "Fit")`, `cardEdge`,
+  `openAllCards` — what a person does to a card (or anything else in a slot) on the canvas.
+- `socket()` — drive the protocol the way the client does (`card.play`, `card.move`, `agent.stage`).
 - `ask(page, text)` / `idle(page)` — one agent turn. Never swallow the timeout: a prompt
   typed into a still-running turn truncates it, and the truncated reply reads as a bug.
-- A check that creates boards must play them (`board.play`) and delete them in a `finally`.
-  A board nobody holds is not on the canvas, and a leftover fixture changes what the rest
-  of the same check sees.
+- A check that makes cards must take them off again (`card.hide`, or a delete) in a `finally`:
+  a leftover card changes what the rest of the same check sees.
 
 ## Things that have bitten
 
 - **State leaks between checks.** They used to share one server and one deck, and five
   checks failed only in full order. Each check now has its own; within a check, clicking a
-  rail item still plays that board *and only that board*.
+  row in the panel still brings that card *and only that card*.
 - **Assertions that cannot fail.** `say("...", x !== undefined)` and `ok || true` both
   shipped here. If a check has never failed, break the code and watch it fail.
 - **`src` changes before the document does.** Waiting for an iframe's URL and then reading

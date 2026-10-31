@@ -32,7 +32,7 @@ const cardNode = () => {
 };
 const block = (id, content) => ({ type: "text", id, content, textGrowth: "fixed-width", width: "fill_container", metadata: { type: "decks.markdown" } });
 
-const { browser, page, errors } = await open({ device: "iPhone 14 Pro", scheme: "light", boards: false });
+const { browser, page, errors } = await open({ device: "iPhone 14 Pro", scheme: "light", cards: false });
 await settle(page, 1500);
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);

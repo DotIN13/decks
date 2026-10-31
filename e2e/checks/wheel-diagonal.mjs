@@ -9,7 +9,7 @@
 import { canvasFrame, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 await resetStage();
-const { browser, page, errors } = await open({ width: 1400, height: 900, boards: false, dpr: 2 });
+const { browser, page, errors } = await open({ width: 1400, height: 900, cards: false, dpr: 2 });
 await rest(page, { start: 0 });
 await settle(page, 600);
 const canvas = await canvasFrame(page);

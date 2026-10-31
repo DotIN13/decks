@@ -1,11 +1,6 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>Auth refresh — the plan</title>
-		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
-		<link rel="stylesheet" href="../lib/board.css" />
-		<style>
+<title>Auth refresh — the plan</title>
+<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
+<style>
 			/*
 			 * The claim diagram's own vocabulary. Keyed on `.claim` and never on
 			 * `.card .claim`, because the user may have made this a panel by the time
@@ -45,9 +40,7 @@
 				font-size: 11px;
 			}
 		</style>
-	</head>
-	<body class="board">
-		<div class="flow" data-id="page" data-migrated="placed" style="position: static; width: 100%">
+<div class="flow" data-id="page" data-migrated="placed" style="position: static; width: 100%">
 		<div class="flow-row" style="display: flex; align-items: flex-start; margin-top: 80px">
 			<div class="chip" data-id="status" style="position: static; flex: none; width: 120px; margin: 0px 0 0 1320px; height: 40px">draft · not agreed</div>
 		</div>
@@ -77,11 +70,11 @@
 				<li>Client: one shared promise per tab group</li>
 				<li>
 					The <a href="https://example.com/auth-refresh">upstream write-up</a> and the
-					<a href="../assets/sketch.svg">sketch</a> live elsewhere, and open in tabs of
+					<a href="../../assets/sketch.svg">sketch</a> live elsewhere, and open in tabs of
 					their own.
 				</li>
 				<li>
-					A link to <a href="not-written-yet.html">a board nobody has written</a> says so
+					A link to <a href="../not-written-yet/index.html">a card nobody has written</a> says so
 					rather than opening an empty one.
 				</li>
 			</ul>
@@ -95,7 +88,7 @@
 			<div class="callout" data-id="decision" data-tone="warn" style="position: static; flex: none; width: 852px; margin: 0px 0 0 48px">
 			<strong>Open question.</strong> Rotate on every refresh, or only when the family is
 			suspected? Rotating always means more windows, not fewer — see
-			<a href="risks.html">the risks board</a>.
+			<a href="../risks/index.html">the risks card</a>.
 		</div>
 			<div class="kpi" data-id="kpi-failed" style="position: static; flex: none; width: 220px; margin: 0px 0 0 92px">
 			<span class="value">2,455</span>
@@ -174,6 +167,3 @@
 			the drawing's own coordinate space, so dragging the card's corner scales it
 			instead of breaking it.
 		-->
-		<script src="../lib/board.js"></script>
-	</body>
-</html>

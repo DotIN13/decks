@@ -30,7 +30,7 @@ const until = async (test, ms = 15000) => {
 	}
 };
 
-const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", boards: true });
+const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", cards: true });
 // The stage and its engine are in the canvas frame; the screenshots and the pixel reading are the page's.
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});

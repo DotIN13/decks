@@ -217,10 +217,12 @@ async function run(engine, lags) {
 	};
 	const person = await asPerson();
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
-	/** The boards as the server's drawing has them (its `decks.board` items), by path. */
+	/** The cards (and boards) as the server's drawing has them (its `decks.card` and `decks.board` items), by deck path. */
 	const serverBoards = async () => {
 		const out = {};
-		for (const node of link.last("stage.pen")?.doc?.children ?? []) if (node.type === "browser" && node.metadata?.type === "decks.board") out[String(node.metadata.path ?? node.id)] = { x: node.x, y: node.y };
+		// The drawing names its own cards from its folder (`cards/plan/index.html`); the stage names them from the deck.
+		const canvasPath = (path) => (/^(?:shared\/)?canvases\//.test(path) ? path : `canvases/${link.last("stage.pen")?.stage}/${path}`);
+		for (const node of link.last("stage.pen")?.doc?.children ?? []) if (node.type === "browser" && (node.metadata?.type === "decks.card" || node.metadata?.type === "decks.board")) out[canvasPath(String(node.metadata.path ?? node.id))] = { x: node.x, y: node.y };
 		return out;
 	};
 

@@ -7,7 +7,7 @@
  * (`Stage`'s `onRead`, the frame's `card-seen`); the harness stamps it read and the frame's dot for it
  * goes. Said once: a second selection of the same unchanged card sends nothing more.
  */
-import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectBoard, settle, write } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectCard, settle, write } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await resetStage(page);
@@ -28,10 +28,10 @@ page.on("request", (request) => {
 	if (request.method() === "POST" && /\/api\/v1\/card-seen$/.test(request.url())) seenPosts.push(request.postData() ?? "");
 });
 
-// A card on the canvas on screen (the fixture's are its boards, which the frame lists and marks as it does cards).
+// A card on the canvas on screen (the fixture's plan).
 const onStage = await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path));
 const deck = await deckState();
-const card = deck.boards.find((board) => board.path === "canvases/untitled-canvas/boards/plan.html" && onStage.includes(board.path)) ?? deck.boards.find((board) => onStage.includes(board.path));
+const card = deck.boards.find((board) => board.path === "canvases/auth-refresh/cards/plan/index.html" && onStage.includes(board.path)) ?? deck.boards.find((board) => onStage.includes(board.path));
 say("a card is on the canvas on screen", Boolean(card), JSON.stringify(onStage));
 
 const newsNow = () => canvas.evaluate(() => window.__decksFrameNews?.() ?? {});
@@ -55,7 +55,7 @@ if (card) {
 	say("the card changed after that is news in the frame", became, JSON.stringify(await newsNow()));
 
 	const before = seenPosts.length;
-	await selectBoard(page, card.path);
+	await selectCard(page, card.path);
 	const cleared = await waitFor(async () => !(card.path in (await newsNow())));
 	say("selecting it clears its dot", cleared, JSON.stringify(await newsNow()));
 	say("…by one card-seen from the frame", seenPosts.length - before === 1, `${seenPosts.length - before} posts: ${seenPosts.slice(before).join(" | ")}`);
@@ -66,7 +66,7 @@ if (card) {
 	await page.keyboard.press("Escape");
 	await page.waitForTimeout(300);
 	const again = seenPosts.length;
-	await selectBoard(page, card.path);
+	await selectCard(page, card.path);
 	await page.waitForTimeout(800);
 	say("selecting it again, unchanged, says nothing more", seenPosts.length === again, `${seenPosts.length - again} more posts`);
 }

@@ -10,7 +10,7 @@ import { canvasFrame, open, resetStage, say } from "../harness.mjs";
 await resetStage();
 // Opened without waiting for the canvas, then loaded again on the clock: the harness clears this browser's
 // storage at each load, so there is no view kept from before to land on at once.
-const { browser, page, errors } = await open({ width: 1400, height: 900, boards: false });
+const { browser, page, errors } = await open({ width: 1400, height: 900, cards: false });
 const started = Date.now();
 await page.reload({ waitUntil: "load" });
 // The canvas is drawn in its frame, made again by the reload.

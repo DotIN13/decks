@@ -69,6 +69,8 @@ const CHECKS = [
 	 * else opens in a tab, and neither of them navigates the canvas frame.
 	 */
 	{ file: "board-links.mjs", needsAgent: false },
+	/* The one board left: a friend's shared canvas keeps its board, drawn as a picture and never run. */
+	{ file: "old-board.mjs", needsAgent: false },
 	/* Words selected in a card, commented on: the popover in the frame, the draft over the composer. */
 	{ file: "board-comment.mjs", needsAgent: false },
 	{ file: "shell.mjs", needsAgent: false },

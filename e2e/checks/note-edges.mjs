@@ -60,7 +60,7 @@ async function edgeRow([png, box, dpr, out, inside]) {
 let noteId = "";
 const rows = {};
 for (const run of RUNS) {
-	const { browser, page, errors } = await open({ ...run.open, scheme: "light", boards: false, init: run.init });
+	const { browser, page, errors } = await open({ ...run.open, scheme: "light", cards: false, init: run.init });
 	/** The canvas frame: the stage and its engine are there (the screenshot and its reading stay the page's). */
 	const canvas = await canvasFrame(page);
 	const opened = await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);

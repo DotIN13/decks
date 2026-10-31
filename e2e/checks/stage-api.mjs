@@ -4,14 +4,14 @@
  * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
  */
-import { ask, canvasFrame, deckState, emptyCanvas, freshAgent, open, openPanel, say, settle, socket } from "../harness.mjs";
+import { ask, canvasFrame, deckState, emptyCanvas, freshAgent, nameOf, open, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const two = deck.boards.map((board) => board.path).slice(0, 2);
 /* The panel's rows say a basename, and the canvas's nodes carry the path. Comparing the two
    lists means coming down to the same thing — the directory is the same for every row and
    spending a third of a 264px panel restating it is what the old rail did. */
-const base = (path) => path.split("/").pop();
+const base = nameOf;
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 // What is on the stage, in the canvas frame (none while the conversation has no canvas); a board placed on a canvas is its copy there, so compared by file.

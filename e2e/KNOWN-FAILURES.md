@@ -85,3 +85,33 @@ before the steps.
   alone (three runs out of three). The board leaves the frame, is drawn again for a moment, and is gone by the time the
   message is written: the first read of `__decksCards` still had it, the second did not. Likely the same lag as
   edits-wait's hidden board (an echo of the stage from before the hide), not fixed.
+
+## The fixture is cards (board-leftovers step 5, part 3, 2026-10-30)
+
+The fixture deck's five library boards are now the five cards of `canvases/auth-refresh/` (put through the
+boards-to-cards migration, stacked with their right-hand edges in line), and the one board left is on a friend's
+shared canvas (`shared/canvases/ada/old-notes/`, checked by `old-board.mjs`). The full run (3 workers): 983 assertions
+passed; a second run after the fixes below, 981 passed and 2 failed (glide's last frames still moving, engine-slide's
+small pan drawing), both passing alone. Named: nudge, arrows-steady and text-shots pass; edits-wait fails as above
+(a hidden card lags a frame or two in `placedCards`).
+
+### App bugs found and fixed
+
+- A card placed on a canvas from another canvas was copied as an old board (`boards/cards/<name>/index.html`, its
+  folder left behind); it is copied with its whole folder into `cards/<name>/` and stays a card (`stage/copy-in.ts`).
+- A finger's tap on a live card selected nothing (the card passed touches on to the stage, which saw no picture under
+  them); a finger's press on a card's content now picks it, and still pans (`card-surface.tsx`). context's phone tap.
+- A Shift- (or ⌘-) press on a live card picked it alone, dropping the selection; it goes to the editor as a press on
+  the card's edge does and adds it (`PageView.press`, `card-surface.tsx`). nudge's "a board and two items".
+- The Canvas tab listed a card with no name as "index"; it is listed by its folder (`model/layers.ts`).
+
+### Check changes worth knowing
+
+- `deckState()` reads each card's place from its canvas file: the deck's own `x`/`y` are the seed a new stage lays
+  out from, and stage-gestures had been steering by them (they happened to match the old boards).
+- A card is carried by its edge band, not its content (a press inside a card is the card's): stage-gestures drags by
+  the band. drop-lands moves the view onto bare canvas before it draws, so its drawings lie over no card.
+- tile-pixels allows its Chromium seams on 0.25% of the pixels (was 0.05%): with the cards in one narrow column, two
+  seams' whole height is bare canvas.
+- Not updated, since they run only by name against a deck of their own: `perf-canvas.mjs` (render-perf, pan-heavy)
+  still builds a canvas of boards; stage-api (needs a model) reads `.board-row`, which the panel never renders.

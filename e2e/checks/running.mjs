@@ -20,7 +20,7 @@ await page.mouse.move(800, 500);
 // The model this run is allowed to spend, before anything is sent. `ask` does this for the
 // other checks; this one types into the box itself, because it has to watch the turn start.
 await useModel(page);
-await page.locator(".dockfield").fill("Read boards/plan.html and say its title, nothing else.");
+await page.locator(".dockfield").fill("Read canvases/auth-refresh/cards/plan/index.html and say its title, nothing else.");
 await page.locator(".dockfield").press("Enter");
 
 /*
