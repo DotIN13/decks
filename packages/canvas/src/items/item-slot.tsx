@@ -37,8 +37,6 @@ export interface ItemSlotProps {
 	/** The sheet is drawing this item's picture over it: only then does an asleep card hide, so it never leaves bare canvas for a frame. */
 	covered?: boolean | undefined;
 	selected: boolean;
-	/** Its place in the drawing's order, for stacking: a later item sits over an earlier one (`items-layer.tsx`, `slots`). */
-	order?: number | undefined;
 	/**
 	 * Its surface is showing, or has stopped showing. Until it says so the sheet keeps the item's
 	 * picture over it, so a card never flashes empty on its way from a picture to its surface.
@@ -185,7 +183,6 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 				transform: shift(),
 				width: `${size().w}px`,
 				height: `${size().h}px`,
-				...(props.order === undefined ? {} : { "z-index": props.order }),
 			}}
 		>
 			<div class="shade" aria-hidden="true" />

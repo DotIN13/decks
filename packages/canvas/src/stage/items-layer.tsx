@@ -554,7 +554,6 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
-			order={pageSlot().get(board.path)}
 			gestures={gestures}
 			{...(props.onOpenPage ? { onOpenPage: props.onOpenPage } : {})}
 			view={editor.pageView(board.path)}
@@ -622,13 +621,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		}
 	};
 
-	/**
-	 * The boards in an order that never changes while they stay: by path. The drawing's order is their
-	 * stacking (`order`, a z-index), so a board brought to the front (`Stage`, on selection) moves no
-	 * node: **moving an iframe reloads its page**.
-	 */
-	const stableBoards = createMemo(() => [...props.boards].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)));
-	/** Every board's slot, in the world: a node in a fixed order, stacked by the drawing's order. */
+	/** Every board's slot, in the world. */
 	const slots = () => (
 		<>
 
@@ -642,7 +635,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
 				 * is within reach: only a slot's inside changes, and boards still stack in file order.
 				 */}
-				<For each={stableBoards()} fallback={null}>
+				<For each={props.boards} fallback={null}>
 					{(board) => (
 						<div class="card-slot">
 							<Show when={isRendered(board.path)}>{pageNode(board)}</Show>
