@@ -6,7 +6,7 @@
 // Run: node --import tsx scripts/gen-sdk.mjs        Check only: node --import tsx scripts/gen-sdk.mjs --check
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { ALL_VERBS, commandOf, jsonSchemaOf, namesIn, OLD_NAMES_UNTIL, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
+import { commandOf, jsonSchemaOf, namesIn, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const sdk = `${root}packages/sdk/src/`;
@@ -30,21 +30,20 @@ function doc(text, indent) {
 const method = (verb, indent) => {
 	const short = verb.name.split(".").pop();
 	const params = verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}: ${tsOf(param.schema)}`).join(", ");
-	const said = verb.alias ? `${verb.summary} @deprecated Use ${verb.alias}.` : verb.summary;
-	return `${doc(said, indent)}${indent}${short}(${params}): Promise<${verb.result ? tsOf(verb.result) : "void"}>;\n`;
+	return `${doc(verb.summary, indent)}${indent}${short}(${params}): Promise<${verb.result ? tsOf(verb.result) : "void"}>;\n`;
 };
 
 export function declarations() {
 	const named = new Map();
-	for (const verb of ALL_VERBS) {
+	for (const verb of VERBS) {
 		for (const param of verb.params) namesIn(param.schema, named);
 		if (verb.result) namesIn(verb.result, named);
 	}
 	let out = HEADER;
 	for (const [name, schema] of named) out += `${schema.description ? doc(schema.description, "") : ""}export type ${name} = ${tsOf(schema, true)};\n`;
-	out += `\n/** Every call Decks answers: the new names, and the old ones kept until ${OLD_NAMES_UNTIL} (marked deprecated). */\nexport interface Verbs {\n`;
+	out += `\n/** Every call Decks answers. */\nexport interface Verbs {\n`;
 	const groups = new Map();
-	for (const verb of ALL_VERBS) {
+	for (const verb of VERBS) {
 		if (verb.name.includes(".")) {
 			const group = verb.name.split(".")[0];
 			groups.set(group, [...(groups.get(group) ?? []), verb]);
@@ -84,16 +83,14 @@ export interface ConnectOptions {
 	headers?: Record<string, string>;
 }
 
-export type AgentSpec = Exclude<Parameters<Verbs["send"]>[0], string>;
-export type Work = Parameters<Verbs["send"]>[1];
+export type AgentSpec = Parameters<Verbs["agent"]["create"]>[0];
+export type Work = Parameters<Verbs["agent"]["queue"]>[1];
 
 export interface Decks extends Verbs {
-	/** Where this connection reaches Decks. (\`url\` is the old verb that gives a card's address.) */
+	/** Where this connection reaches Decks. */
 	readonly address: string;
 	/** Call a verb by its name in the table, and get its value, notes and pictures. */
 	call(verb: string, args?: unknown[]): Promise<{ value: unknown; notes: string[]; images?: Array<{ data: string; mimeType: string }> }>;
-	/** The same verbs, for code written when they lived under \`stage\`. */
-	readonly stage: Verbs;
 	/** Hand work to the agent with this name, making it from the spec first when there is none. */
 	sendTo(agent: AgentSpec, work: Work | string): Promise<{ queued: true; position: number; name: string; made: boolean; agent?: string }>;
 	/**
@@ -114,7 +111,7 @@ export interface Decks extends Verbs {
 	/**
 	 * A canvas pass for one canvas (\`POST /api/passes\`): an hour, bound to this connection's token, with
 	 * your role there. A frame's calls send it as the bearer; its files are read at
-	 * \`/api/t/<pass>/card/<deck path>\` (or \`/board/\`, its old name, until ${OLD_NAMES_UNTIL}). Ask again at half its life.
+	 * \`/api/t/<pass>/card/<deck path>\`. Ask again at half its life.
 	 */
 	canvasPass(canvas: string): Promise<{ pass: string; role: "edit" | "view"; expires: number }>;
 	/** An app's address for a tab of its own, with an app pass in it (\`POST /api/passes { app }\`), good for a day. */
@@ -131,7 +128,6 @@ export interface Decks extends Verbs {
 	keepCanvasPass(canvas: string, onPass: (pass: { pass: string; role: "edit" | "view"; expires: number }) => void): { stop(): void };
 	/**
 	 * Every change as Decks broadcasts it (\`GET /api/v1/events\`), as in \`{ type: "card.changed", path, card }\`
-	 * (each also sent as \`board.changed\`, its old name, until ${OLD_NAMES_UNTIL}).
 	 * \`types\` keeps only some. With \`reconnect\` it is opened again after it ends or fails, until a
 	 * refusal, which calls \`refused\`. \`done\` settles when the stream ends for good; \`close\` stops it.
 	 */
@@ -168,19 +164,18 @@ export declare const VERBS: ReadonlyArray<readonly [string, readonly string[]]>;
 }
 
 export function verbList() {
-	const rows = ALL_VERBS.map((verb) => `\t[${JSON.stringify(verb.name)},[${verb.params.map((param) => JSON.stringify(`${param.name}${param.variadic ? "..." : param.optional ? "?" : ""}`)).join(",")}]],`);
+	const rows = VERBS.map((verb) => `\t[${JSON.stringify(verb.name)},[${verb.params.map((param) => JSON.stringify(`${param.name}${param.variadic ? "..." : param.optional ? "?" : ""}`)).join(",")}]],`);
 	return `export const VERBS = [\n${rows.join("\n")}\n];`;
 }
 
 export function verbsJson() {
 	return `${JSON.stringify(
-		ALL_VERBS.map((verb) => ({
+		VERBS.map((verb) => ({
 			name: verb.name,
 			command: commandOf(verb),
 			group: verb.group,
 			touches: verb.touches,
 			effect: verb.effect,
-			...(verb.alias ? { alias: verb.alias } : {}),
 			summary: verb.summary,
 			signature: signature(verb),
 			returns: verb.result ? tsOf(verb.result) : "void",
@@ -231,7 +226,6 @@ export function commandsMarkdown() {
 		lines.push("");
 		if (group === "web") lines.push("<!-- /web -->", "");
 	}
-	lines.push(`**Old names** (the board ones and the rest) still answer until ${OLD_NAMES_UNTIL}, each answer naming its new call.`, "");
 	return `${lines.join("\n").trimEnd()}\n`;
 }
 

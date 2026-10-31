@@ -9,15 +9,15 @@ type Point = { x: number; y: number };
 type CanvasOp = { op: "insert"; item: Item; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "update"; id: string; set?: Record<string, unknown>; at?: Corner; size?: Size } | { op: "replace"; id: string; item: Item } | { op: "delete"; id: string } | { op: "move"; id: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
-type Fit = { card: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board: string; canvas: string; w: number; h: number; notes: string };
+type Fit = { card: string; canvas: string; w: number; h: number; notes: string };
 type Screenshot = { file: string; width: number; height: number; box: Box; how?: string; note?: string };
-type Canvas = { name: string; title: string; open: string[]; cards: number; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
+type Canvas = { name: string; title: string; open: string[]; cards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
 type Card = { path: string; title: string; lastWrittenBy?: string };
-type Placement = { card: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board: string; canvas: string; box: Box; clipped?: boolean };
+type Placement = { card: string; canvas: string; box: Box; clipped?: boolean };
 type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
-type Message = { from: string; task: string; cards: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards: string[]; at: number; reply?: boolean };
+type Message = { from: string; task: string; cards: string[]; at: number; reply?: boolean };
 type Camera = { x: number; y: number; zoom: number };
-type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
+type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
 type AppKind = "static" | "build" | "server";
 type AppItem = { type: "app"; app: string };
 type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; ms: number; errors: string[]; pending?: true };
@@ -68,8 +68,8 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks agent inbox` · `decks.agent.inbox(): Message[]`. Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.
 - `decks agent list` · `decks.agent.list(options?: { workspace?: string }): Agent[]`. Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits for it.
 - `decks agent get` · `decks.agent.get(name: string): Agent`. Another agent, by name or id: kind, workspace, tags, state, home canvas.
-- `decks agent send` · `decks.agent.send(name: string, message: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }`. Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.
-- `decks agent queue` · `decks.agent.queue(name: string, work: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[]; reply?: boolean }): { queued: true; position: number }`. Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.
+- `decks agent send` · `decks.agent.send(name: string, message: { task: string; cards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }`. Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.
+- `decks agent queue` · `decks.agent.queue(name: string, work: { task: string; cards?: string[]; reply?: boolean }): { queued: true; position: number }`. Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.
 - `decks agent create` · `decks.agent.create(spec: { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; workspace?: string; tags?: string[]; canvas?: string }): Agent`. Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode", "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking` how hard it thinks as that kind names it, `mode` its permission mode, `canvas` its home canvas (a new one when left out).
 
 **View: what the person is looking at, moved only on purpose (no file changes)**
@@ -80,7 +80,7 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks view move` · `decks.view.move(camera: { x: number; y: number; zoom: number; animate?: boolean }): Camera`. Move the person's camera outright: { x, y, zoom }, zoom 1 is life size.
 - `decks view viewport` · `decks.view.viewport(): { width: number; height: number } | null`. The room the screen has, in CSS pixels, or null when no screen has said.
 - `decks view cursor` · `decks.view.cursor(card: string, at: Point | null): void`. A labelled dot on a card, at the card's coordinates; null removes it.
-- `decks view reload` · `decks.view.reload(options: { card?: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board?: string; canvas?: string }): { reloaded: number }`. Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.
+- `decks view reload` · `decks.view.reload(options: { card?: string; canvas?: string }): { reloaded: number }`. Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.
 
 **Apps: folders in apps/ that Decks serves, builds or runs**
 
@@ -89,7 +89,7 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks apps create` · `decks.apps.create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): { name: string; kind: AppKind; folder: string; files: string[]; item: AppItem; url: string; repo?: { branch: string; head: string }; next: string }`. A new app folder from a starter ("static" default, "node", "solid", "react", "next"), and the item that shows it on a canvas: decks.canvas.insert(item) places it.
 - `decks apps repo` · `decks.apps.repo(name: string): { branch: string; head: string; dirty?: number; remote?: string }`. Its git repository, made now with everything committed if the folder is not one yet: branch, last commit, changed files, origin.
 - `decks apps clone` · `decks.apps.clone(url: string, options?: { name?: string; title?: string }): { name: string; kind: AppKind; folder: string; item: AppItem; url: string; repo: { branch: string; head: string; remote?: string }; next: string }`. Take in an app from an https:// or git@host:path address, and the item that shows it on a canvas. Nothing is installed or run.
-- `decks apps board` · `decks.apps.board(name: string): AppItem`. The item that shows an app, { type: "app", app: name }, for an app whose folder you wrote yourself: decks.canvas.insert(item) places it.
+- `decks apps item` · `decks.apps.item(name: string): AppItem`. The item that shows an app, { type: "app", app: name }, for an app whose folder you wrote yourself: decks.canvas.insert(item) places it.
 - `decks apps build` · `decks.apps.build(name: string): AppOutcome`. Build it, waiting up to 15 s; `pending` means ask its status later.
 - `decks apps run` · `decks.apps.run(name: string): AppOutcome`. Start it, waiting up to 15 s.
 - `decks apps stop` · `decks.apps.stop(name: string): { stopped: boolean }`. Stop it.
@@ -124,5 +124,3 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks studio status` · `decks.studio.status(): { connected: boolean; url?: string }`. Whether this harness syncs with Decks Studio, and with which.
 - `decks studio disconnect` · `decks.studio.disconnect(): { connected: boolean }`. Stop syncing with Decks Studio and forget the key. Only the person can call it.
 - `decks now` · `decks.now(): { iso: string; timezone: string; words: string; epoch: number; [key: string]: unknown }`. The time where the person is.
-
-**Old names** (the board ones and the rest) still answer until 2026-11-30, each answer naming its new call.

@@ -1,4 +1,4 @@
-import { any, arr, bool, deprecated, int, lit, nul, num, obj, OLD_NAMES_UNTIL, opt, rec, str, union, type Schema } from "./schema.ts";
+import { any, arr, bool, int, lit, nul, num, obj, opt, rec, str, union, type Schema } from "./schema.ts";
 import {
 	Agent,
 	AgentKind,
@@ -7,7 +7,6 @@ import {
 	AppKind,
 	AppOutcome,
 	AppState,
-	Board,
 	Box,
 	Card,
 	Camera,
@@ -22,11 +21,9 @@ import {
 	PenItem,
 	Place,
 	Placement,
-	PlacedBoard,
 	Point,
 	Screenshot,
 	Size,
-	Sized,
 	WebTarget,
 } from "./types.ts";
 
@@ -50,9 +47,6 @@ import {
  * Calls are stateless: every canvas call takes an optional `canvas`, and left out it means
  * `decks.here()`. No call changes a "current canvas"; `agent.update({ canvas })` changes an
  * agent's home canvas, which is what `here()` answers for that agent.
- *
- * The old names (`ALIASES`) still work until 2026-11-30 (`OLD_NAMES_UNTIL`), each mapped onto its
- * new call, and every answer through one carries a note naming that call.
  */
 
 export type Effect = "change" | "read";
@@ -77,8 +71,6 @@ export interface Verb {
 	params: Param[];
 	/** What it answers with; absent when it answers with nothing. */
 	result?: Schema;
-	/** Set on an old name: the new call (or calls) it maps onto, in words. */
-	alias?: string;
 	/**
 	 * Where a card's call to it goes, from the canvas frame a card is drawn in (`@decks/canvas`,
 	 * `frame/inside/card-calls.ts`): `frame`, answered there, the person's view of that canvas; `canvas`,
@@ -376,7 +368,7 @@ export const VERBS: readonly Verb[] = [
 		...agentsChange,
 		summary:
 			"Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
-		params: [p("name", str()), p("message", obj({ task: str(), cards: opt(arr(str())), boards: opt(deprecated(arr(str()), "cards")) }))],
+		params: [p("name", str()), p("message", obj({ task: str(), cards: opt(arr(str())) }))],
 		result: obj({ delivered: bool(), turn: lit("running", "new", "queued"), position: opt(num()), note: opt(str()) }),
 	},
 	{
@@ -385,7 +377,7 @@ export const VERBS: readonly Verb[] = [
 		group: "agent",
 		...agentsChange,
 		summary: "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
-		params: [p("name", str()), p("work", obj({ task: str(), cards: opt(arr(str())), boards: opt(deprecated(arr(str()), "cards")), reply: opt(bool()) }))],
+		params: [p("name", str()), p("work", obj({ task: str(), cards: opt(arr(str())), reply: opt(bool()) }))],
 		result: obj({ queued: lit(true), position: num() }),
 	},
 	{
@@ -437,7 +429,7 @@ export const VERBS: readonly Verb[] = [
 		...screenChange,
 		summary:
 			"Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.",
-		params: [p("options", obj({ card: opt(str()), board: opt(deprecated(str(), "card")), canvas: opt(str()) }))],
+		params: [p("options", obj({ card: opt(str()), canvas: opt(str()) }))],
 		result: obj({ reloaded: num() }),
 	},
 
@@ -468,7 +460,7 @@ export const VERBS: readonly Verb[] = [
 		params: [p("url", str()), o("options", obj({ name: opt(str()), title: opt(str()) }))],
 		result: obj({ name: str(), kind: AppKind, folder: str(), item: AppItem, url: str(), repo: obj({ branch: str(), head: str(), remote: opt(str()) }), next: str() }),
 	},
-	{ name: "apps.board", group: "apps", ...outsideRead, summary: 'The item that shows an app, { type: "app", app: name }, for an app whose folder you wrote yourself: decks.canvas.insert(item) places it.', params: [p("name", str())], result: AppItem },
+	{ name: "apps.item", group: "apps", ...outsideRead, summary: 'The item that shows an app, { type: "app", app: name }, for an app whose folder you wrote yourself: decks.canvas.insert(item) places it.', params: [p("name", str())], result: AppItem },
 	{ name: "apps.build", group: "apps", ...outsideChange, summary: "Build it, waiting up to 15 s; `pending` means ask its status later.", params: [p("name", str())], result: AppOutcome },
 	{ name: "apps.run", group: "apps", ...outsideChange, summary: "Start it, waiting up to 15 s.", params: [p("name", str())], result: AppOutcome },
 	{ name: "apps.stop", group: "apps", ...outsideChange, summary: "Stop it.", params: [p("name", str())], result: obj({ stopped: bool() }) },
@@ -554,192 +546,10 @@ export const VERBS: readonly Verb[] = [
 	{ name: "now", card: "frame", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];
 
-/**
- * The old names, kept until 2026-11-30 (`OLD_NAMES_UNTIL`). Each takes what it always took and
- * answers as it always did, mapped onto the new call named in `alias`; every answer through one
- * carries a note naming that call, so a caller learns the new name from using the old, and the
- * server logs the first use of each (`stage/tool.ts`).
- */
-export const ALIASES: readonly Verb[] = [
-	// Boards are retired: a new one is a card (`card.*`), and these read a card or an old board alike.
-	{ name: "board.list", group: "card", ...deckRead, alias: "decks.card.list", summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
-	{
-		name: "board.create",
-		group: "card",
-		...deckChange,
-		alias: "decks.card.create",
-		summary: "Old name: writes a card in a canvas's own cards/, exactly as decks.card.create does, and answers it; it does not place it.",
-		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
-		result: Board,
-	},
-	{ name: "board.get", group: "card", ...deckRead, alias: "decks.card.get", summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
-	{ name: "board.canvases", group: "card", ...deckRead, alias: "decks.card.canvases", summary: "The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.", params: [p("board", str())], result: arr(Placement) },
-	{ name: "board.url", group: "card", ...deckRead, alias: "decks.card.url", summary: "The board's address, for a browser such as Playwright.", params: [p("board", str())], result: str() },
-	{
-		name: "newBoard",
-		group: "card",
-		...deckChange,
-		alias: "decks.card.create, then decks.canvas.insert",
-		summary: "Old name: now writes a card. Write a blank card and place it on your canvas at `at`; returns its path.",
-		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), at: opt(Corner) }))],
-		result: str(),
-	},
-	{
-		name: "fit",
-		group: "canvas",
-		...deckChange,
-		alias: "decks.canvas.fit",
-		summary: "Old name: size a board's height to its content on a canvas.",
-		params: [p("path", str()), o("options", obj({ canvas: opt(str()), margin: opt(num()) }))],
-		result: obj({ path: str(), w: num(), h: num(), content: opt(obj({ w: num(), h: num(), page: opt(num()) })) }),
-	},
-	{
-		name: "resize",
-		group: "canvas",
-		...deckChange,
-		alias: "decks.canvas.update(card, { size })",
-		summary: "Old name: set a board's size outright.",
-		params: [p("path", str()), p("size", obj({ w: opt(num()), h: opt(num()) }))],
-		result: Sized,
-	},
-	{ name: "report", group: "agent", ...agentsChange, alias: "decks.agent.claim", summary: "Old name: claim boards as your work.", params: [paths()], result: obj({ reported: arr(str()) }) },
-	{ name: "reload", group: "view", ...screenChange, alias: "decks.view.reload({ card })", summary: "Old name: reload a board's page.", params: [p("path", str())] },
-	{ name: "boards", group: "canvas", ...deckRead, alias: "decks.canvas.read, or decks.card.list", summary: "Old name: every board, placed as your canvas has them.", params: [], result: arr(PlacedBoard) },
-	{
-		name: "show",
-		group: "view",
-		...screenChange,
-		alias: 'decks.canvas.insert({ type: "card", card }) to place it, then decks.view.focus',
-		summary: "Old name: put boards on your canvas and move the camera to them.",
-		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, o("options", obj({ fit: opt(lit("board", "all")), highlight: opt(str()), animate: opt(bool()), at: opt(Corner) }))],
-		result: obj({ shown: arr(str()) }),
-	},
-	{ name: "hide", group: "canvas", ...deckChange, alias: "decks.canvas.delete", summary: "Old name: take boards off your canvas.", params: [paths()] },
-	{ name: "move", group: "canvas", ...deckChange, alias: "decks.canvas.move(card, { at })", summary: "Old name: move a board on your canvas.", params: [p("path", str()), p("at", Point)], result: PlacedBoard },
-	{ name: "cursor", group: "view", ...screenChange, alias: "decks.view.cursor", summary: "Old name: a labelled dot on a board.", params: [p("path", str()), p("at", union(Point, nul))] },
-	{
-		name: "camera",
-		group: "view",
-		...screenChange,
-		alias: "decks.view.camera to read, decks.view.move to move",
-		summary: "Old name: read the camera, or move it with { x, y, zoom }.",
-		params: [o("at", obj({ x: num(), y: num(), zoom: num() })), o("options", obj({ animate: opt(bool()) }))],
-		result: union(obj({ x: num(), y: num(), zoom: num() }), nul),
-	},
-	{ name: "viewport", group: "view", ...screenRead, alias: "decks.view.viewport", summary: "Old name: the room the screen has.", params: [], result: union(obj({ width: num(), height: num() }), nul) },
-	{
-		name: "screenshot",
-		group: "canvas",
-		...deckRead,
-		alias: "decks.canvas.screenshot",
-		summary: "Old name: a picture of your canvas or part of it.",
-		params: [o("options", obj({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")), live: opt(bool()) }))],
-		result: obj({ file: str(), width: num(), height: num(), box: Box, how: opt(str()), note: opt(str()) }),
-	},
-	{
-		name: "stages",
-		group: "card",
-		...deckRead,
-		alias: "decks.canvas.list",
-		summary: "Old name: every canvas and who has it open.",
-		params: [],
-		result: arr(obj({ name: str(), title: str(), open: arr(str()), boards: num(), mine: opt(lit(true)) })),
-	},
-	{
-		name: "open",
-		group: "agent",
-		...agentsChange,
-		alias: "decks.agent.update({ canvas }), then decks.view.goto",
-		summary: "Old name: make another canvas your home and show it.",
-		params: [p("name", str())],
-		result: obj({ stage: str(), boards: arr(str()) }),
-	},
-	{ name: "newStage", group: "card", ...deckChange, alias: "decks.canvas.create, then decks.agent.update({ canvas })", summary: "Old name: make an empty canvas and move to it.", params: [p("title", str())], result: obj({ stage: str() }) },
-	{ name: "title", group: "canvas", ...deckChange, alias: "decks.canvas.rename, or decks.here() to read", summary: "Old name: name your canvas, or read its name.", params: [o("title", str())], result: obj({ stage: str(), title: str() }) },
-	{
-		name: "pen.read",
-		group: "canvas",
-		...deckRead,
-		alias: "decks.canvas.read (a frame file: decks.canvas.read({ frame }))",
-		summary: "Old name: your canvas's drawing, or any .pen file by `path`.",
-		params: [o("path", str())],
-		result: obj({ stage: opt(str()), file: str(), ref: opt(str()), version: str(), error: opt(str()), children: arr(any()) }),
-	},
-	{
-		name: "pen.edit",
-		group: "canvas",
-		...deckChange,
-		alias: "decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables; a frame file with { frame })",
-		summary: "Old name: edit your canvas's drawing, or any .pen file by `path`, all or nothing.",
-		params: [p("edits", arr(PenEdit)), o("options", obj({ path: opt(str()) }))],
-		result: obj({ rev: opt(num()), file: opt(str()), ref: opt(str()), results: arr(obj({ op: str(), id: str(), box: opt(Box), note: opt(str()) })) }),
-	},
-	{ name: "pen.create", group: "card", ...deckChange, alias: "decks.frame.create", summary: "Old name: a new .pen file in frames/.", params: [p("path", str()), o("item", PenItem)], result: obj({ file: str(), ref: opt(str()), id: str() }) },
-	{
-		name: "pen.save",
-		group: "canvas",
-		...deckChange,
-		alias: "decks.canvas.save",
-		summary: "Old name: save an item as a frame.",
-		params: [p("id", str()), p("path", str()), o("options", obj({ replace: opt(bool()) }))],
-		result: obj({ frame: str(), ref: str(), replaced: bool(), overwrote: bool() }),
-	},
-	{ name: "pen.file", group: "canvas", ...deckRead, alias: "decks.canvas.file", summary: "Old name: your canvas's .pen file.", params: [], result: str() },
-	{
-		name: "me",
-		group: "agent",
-		...agentsChange,
-		alias: "decks.agent.me to read, decks.agent.update to change",
-		summary: "Old name: who you are, read with nothing, changed with a patch.",
-		params: [o("patch", obj({ name: opt(str()), avatar: opt(union(obj({ emoji: str() }), obj({ svg: str() }))), tags: opt(arr(str())), workspace: opt(str()) }))],
-		result: obj({ name: str(), avatar: opt(str()), color: str(), tags: opt(arr(str())), workspace: opt(str()), avatarChanged: opt(str()) }),
-	},
-	{
-		name: "agents",
-		group: "agent",
-		...agentsRead,
-		alias: "decks.agent.list",
-		summary: "Old name: every agent.",
-		params: [o("options", obj({ filter: opt(obj({ workspace: opt(str()) })) }))],
-		result: arr(obj({ id: str(), name: str(), me: bool(), state: str(), kind: str(), tags: arr(str()), workspace: opt(str()), queued: num() })),
-	},
-	{
-		name: "send",
-		group: "agent",
-		...agentsChange,
-		alias: "decks.agent.queue (and decks.agent.create to make the agent first; decks.agent.send now delivers at once)",
-		summary: "Old name: queue work for an agent, making it first from { name, kind }.",
-		params: [
-			p("to", union(str(), obj({ name: str(), kind: opt(AgentKind), model: opt(str()), thinking: opt(str()), mode: opt(AgentMode), tags: opt(arr(str())), workspace: opt(str()) }))),
-			p("work", obj({ task: str(), boards: opt(arr(str())), reply: opt(bool()) })),
-		],
-		result: obj({ queued: lit(true), position: num(), agent: opt(str()), name: opt(str()) }),
-	},
-	{
-		name: "queue",
-		group: "agent",
-		...agentsRead,
-		alias: "decks.agent.inbox",
-		summary: "Old name: what is waiting in an agent's queue.",
-		params: [o("agentId", str())],
-		result: arr(obj({ from: str(), fromName: str(), task: str(), boards: arr(str()), at: num() })),
-	},
-	{ name: "url", group: "card", ...deckRead, alias: "decks.card.url", summary: "Old name: a board's address.", params: [p("path", str())], result: str() },
-	{ name: "resolve", group: "card", ...deckRead, alias: "decks.file.url", summary: "Old name: a file's address for a board.", params: [p("file", str())], result: str() },
-];
+/** A call by its name: `canvas.insert`. */
+export const VERB_BY_NAME: ReadonlyMap<string, Verb> = new Map(VERBS.map((verb) => [verb.name, verb]));
 
-/** The new calls and the old names together: everything `/api/v1/<name>` answers. */
-export const ALL_VERBS: readonly Verb[] = [...VERBS, ...ALIASES];
-
-/** A call by its name, `canvas.insert`, or an old name, `pen.edit`. */
-export const VERB_BY_NAME: ReadonlyMap<string, Verb> = new Map(ALL_VERBS.map((verb) => [verb.name, verb]));
-
-/** The note an answer through an old name carries. */
-export function aliasNote(verb: Verb): string | undefined {
-	return verb.alias ? `${verb.name} is an old name, removed on ${OLD_NAMES_UNTIL}: use ${verb.alias}.` : undefined;
-}
-
-/** The command-line name of a call: `canvas.insert` -> `canvas insert`, `newBoard` -> `new-board`. */
+/** The command-line name of a call: `canvas.insert` -> `canvas insert`, `canvas.copyShared` -> `canvas copy-shared`. */
 export function commandOf(verb: Verb): string[] {
 	return verb.name.split(".").map((part) => part.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`));
 }

@@ -9,7 +9,7 @@ import type { Verb } from "./verbs.ts";
  * caller is usually a model, and the next line it writes should be the right call.
  *
  * Unknown keys in an object are refused: `{ titel: "…" }` is a typo, and a typo that is quietly
- * ignored makes a board with no title and no explanation.
+ * ignored makes a card with no title and no explanation.
  */
 export function checkArgs(verb: Verb, args: readonly unknown[]): string | undefined {
 	const params = verb.params;

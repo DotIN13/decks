@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ALIASES, aliasNote, ALL_VERBS, checkArgs, commandOf, jsonSchemaOf, Placement, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
+import { checkArgs, commandOf, jsonSchemaOf, Placement, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
 
-test("the table has every call of the redesign, each named once, and the old names apart", () => {
-	assert.equal(new Set(ALL_VERBS.map((verb) => verb.name)).size, ALL_VERBS.length, "no name twice, old or new");
+test("the table has every call of the redesign, each named once", () => {
+	assert.equal(new Set(VERBS.map((verb) => verb.name)).size, VERBS.length, "no name twice");
 	const names = new Set(VERBS.map((verb) => verb.name));
 	for (const name of [
 		"canvas.read", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy", "canvas.clip", "canvas.paste", "canvas.variables", "canvas.batch",
@@ -11,18 +11,17 @@ test("the table has every call of the redesign, each named once, and the old nam
 		"card.list", "card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url",
 		"agent.me", "agent.update", "here", "agent.claim", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create",
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
-		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
+		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.item", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
 		"web.status", "web.pairing", "web.repair", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
 		"ports", "now", "pair.code", "studio.connect", "studio.status", "studio.disconnect",
 	]) assert.ok(names.has(name), `${name} is in the table`);
 	assert.equal(VERBS.length, 77);
-	assert.ok(VERBS.every((verb) => !verb.alias), "no new call is an alias");
-	assert.ok(ALIASES.every((verb) => verb.alias && !names.has(verb.name)), "every old name says its new call and is not a new name");
+	assert.equal(VERB_BY_NAME.size, VERBS.length, "a name finds only the table's calls");
 });
 
 test("every call says what it touches and whether it changes it, in the redesign's groups", () => {
 	const groups = new Set(["canvas", "card", "agent", "view", "apps", "web", "misc"]);
-	for (const verb of ALL_VERBS) {
+	for (const verb of VERBS) {
 		assert.ok(["deck", "screen", "agents", "outside"].includes(verb.touches), verb.name);
 		assert.ok(["change", "read"].includes(verb.effect), verb.name);
 		assert.ok(groups.has(verb.group), verb.name);
@@ -51,39 +50,36 @@ test("arguments that fit pass, and the wrong ones get a sentence with the signat
 	assert.match(checkArgs(insert, [{ type: "note" }, { besides: "x" }])!, /has no key "besides"/);
 	assert.match(checkArgs(insert, [])!, /canvas\.insert needs item/);
 
-	const create = VERB_BY_NAME.get("board.create")!;
+	const create = VERB_BY_NAME.get("card.create")!;
 	assert.equal(checkArgs(create, [{ title: "T" }]), undefined);
 	assert.match(checkArgs(create, [{ titel: "T" }])!, /options\.title is missing/);
 	assert.match(checkArgs(create, [{ title: "T", format: "slides" }])!, /has no key "format"/, "there are no slide decks");
-	assert.match(checkArgs(create, [{ title: "T", at: { x1: 0, y1: 0 } }])!, /has no key "at"/, "a new board is not placed");
+	assert.match(checkArgs(create, [{ title: "T", at: { x1: 0, y1: 0 } }])!, /has no key "at"/, "a new card is not placed");
 
-	const move = VERB_BY_NAME.get("move")!;
-	assert.match(checkArgs(move, ["boards/a.html"])!, /move needs at\. move\(path: string, at: Point\)/);
+	const cursor = VERB_BY_NAME.get("view.cursor")!;
+	assert.match(checkArgs(cursor, ["cards/a/index.html"])!, /view\.cursor needs at\. view\.cursor\(card: string, at: Point \| null\)/);
 });
 
 test("left-out optionals may be sent as null, but a null that means something is kept", () => {
-	assert.equal(checkArgs(VERB_BY_NAME.get("camera")!, [null, null]), undefined);
+	assert.equal(checkArgs(VERB_BY_NAME.get("view.camera")!, [null]), undefined);
 	assert.equal(checkArgs(VERB_BY_NAME.get("view.cursor")!, ["boards/a.html", null]), undefined);
 	assert.equal(checkArgs(VERB_BY_NAME.get("canvas.fit")!, ["boards/a.html", { margin: null }]), undefined);
-	assert.match(checkArgs(VERB_BY_NAME.get("board.list")!, [1])!, /takes 0 arguments/);
+	assert.match(checkArgs(VERB_BY_NAME.get("card.list")!, [1, 2])!, /takes 0 arguments/);
 });
 
-test("batch ops are checked op by op, and so are the old pen edits", () => {
+test("batch ops are checked op by op, pen edits among them", () => {
 	const batch = VERB_BY_NAME.get("canvas.batch")!;
 	assert.equal(checkArgs(batch, [[{ op: "insert", item: { type: "note", id: "n1" }, below: "boards/a.html" }, { op: "update", id: "n1", set: { content: "yo" } }, { op: "delete", id: "n2" }]]), undefined);
 	assert.ok(checkArgs(batch, [[{ op: "explode", id: "n1" }]]));
-	const edit = VERB_BY_NAME.get("pen.edit")!;
-	assert.equal(checkArgs(edit, [[{ op: "insert", node: { type: "note", id: "n1", text: "hi" }, box: { x1: 0, y1: 0 } }]]), undefined);
+	assert.equal(checkArgs(batch, [[{ op: "insert", node: { type: "note", id: "n1", text: "hi" }, box: { x1: 0, y1: 0 } }]]), undefined);
 });
 
 test("shapes print as TypeScript, named ones by name", () => {
 	assert.equal(signature(VERB_BY_NAME.get("view.focus")!), "view.focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean })");
 	assert.equal(tsOf(VERB_BY_NAME.get("card.list")!.result!), "Card[]");
-	assert.equal(tsOf(VERB_BY_NAME.get("board.list")!.result!), "Board[]", "the old name keeps the old type name");
-	assert.equal(tsOf(VERB_BY_NAME.get("board.canvases")!.result!), "Placement[]");
+	assert.equal(tsOf(VERB_BY_NAME.get("card.canvases")!.result!), "Placement[]");
 	assert.match(tsOf(VERB_BY_NAME.get("card.get")!.result!, true), /^\{ path: string; title: string; lastWrittenBy\?: string \}$/);
-	// An old field beside its new name prints as deprecated, until the day it goes.
-	assert.match(tsOf(Placement, true), /card: string; \/\*\* @deprecated Use card; this name is removed on 2026-11-30\. \*\/ board: string/);
+	assert.equal(tsOf(Placement, true), "{ card: string; canvas: string; box: Box; clipped?: boolean }", "no board field beside card");
 });
 
 test("JSON Schema writes named shapes out and refuses unknown keys", () => {
@@ -93,22 +89,19 @@ test("JSON Schema writes named shapes out and refuses unknown keys", () => {
 	assert.equal(schema.additionalProperties, false);
 });
 
-test("command names are noun then verb, and old names keep theirs", () => {
+test("command names are noun then verb", () => {
 	assert.deepEqual(commandOf(VERB_BY_NAME.get("canvas.insert")!), ["canvas", "insert"]);
 	assert.deepEqual(commandOf(VERB_BY_NAME.get("agent.send")!), ["agent", "send"]);
-	assert.deepEqual(commandOf(VERB_BY_NAME.get("newBoard")!), ["new-board"]);
-	assert.deepEqual(commandOf(VERB_BY_NAME.get("pen.edit")!), ["pen", "edit"]);
+	assert.deepEqual(commandOf(VERB_BY_NAME.get("canvas.copyShared")!), ["canvas", "copy-shared"]);
 });
 
-test("an old name's note names the new call", () => {
-	assert.match(aliasNote(VERB_BY_NAME.get("pen.edit")!)!, /pen\.edit is an old name, removed on 2026-11-30: use decks\.canvas\.batch/);
-	// No old name points at another old name: each goes straight to a card call.
-	for (const old of ALIASES) assert.doesNotMatch(old.alias!, /decks\.board\.|type: "board"/, old.name);
-	assert.match(aliasNote(VERB_BY_NAME.get("open")!)!, /agent\.update\(\{ canvas \}\), then decks\.view\.goto/);
-	assert.equal(aliasNote(VERB_BY_NAME.get("canvas.insert")!), undefined);
-	for (const old of ["newBoard", "fit", "show", "hide", "move", "boards", "pen.read", "pen.edit", "pen.create", "pen.save", "pen.file", "stages", "open", "newStage", "title", "me", "agents", "send", "queue", "report", "reload", "url", "resolve", "camera", "viewport", "screenshot", "cursor"]) {
-		assert.ok(VERB_BY_NAME.get(old)?.alias, `${old} still answers, as an alias`);
+test("the names from before cards are gone", () => {
+	for (const old of ["board.list", "board.create", "board.get", "board.canvases", "board.url", "apps.board", "newBoard", "fit", "show", "hide", "move", "boards", "pen.read", "pen.edit", "pen.create", "pen.save", "pen.file", "stages", "open", "newStage", "title", "me", "agents", "send", "queue", "report", "reload", "url", "resolve", "camera", "viewport", "screenshot", "cursor"]) {
+		assert.equal(VERB_BY_NAME.get(old), undefined, `${old} is not a call`);
 	}
+	const fields = (verb: string, param: number) => Object.keys((VERB_BY_NAME.get(verb)!.params[param]!.schema as { properties: object }).properties);
+	assert.ok(!fields("agent.send", 1).includes("boards") && !fields("agent.queue", 1).includes("boards"), "a hand-off names cards");
+	assert.ok(!fields("view.reload", 0).includes("board"), "a reload names a card");
 });
 
 test("the SDK's generated files match the table", async () => {

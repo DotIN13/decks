@@ -11,8 +11,7 @@
  *     await decks.canvas.insert({ type: "note", content: "why?" }, { below: path });
  *     await decks.canvas.fit(path);
  *
- * Every canvas call takes `{ canvas }` last; left out, it is `decks.here()`. The old names
- * (`board.*`, `newBoard`, `show`, `pen.edit`, …) still work until 2026-11-30, and say their new call.
+ * Every canvas call takes `{ canvas }` last; left out, it is `decks.here()`.
  *
  * Who is calling is the token each call carries (`Authorization: Bearer`), and nothing else: an
  * agent's harness token (`DECKS_TOKEN`, which Decks sets in each agent's shell), an app server's (the
@@ -94,7 +93,7 @@ export const VERBS = [
 	["apps.create",["name","options?"]],
 	["apps.repo",["name"]],
 	["apps.clone",["url","options?"]],
-	["apps.board",["name"]],
+	["apps.item",["name"]],
 	["apps.build",["name"]],
 	["apps.run",["name"]],
 	["apps.stop",["name"]],
@@ -120,39 +119,6 @@ export const VERBS = [
 	["studio.status",[]],
 	["studio.disconnect",[]],
 	["now",[]],
-	["board.list",[]],
-	["board.create",["options"]],
-	["board.get",["board"]],
-	["board.canvases",["board"]],
-	["board.url",["board"]],
-	["newBoard",["options"]],
-	["fit",["path","options?"]],
-	["resize",["path","size"]],
-	["report",["path..."]],
-	["reload",["path"]],
-	["boards",[]],
-	["show",["target...","options?"]],
-	["hide",["path..."]],
-	["move",["path","at"]],
-	["cursor",["path","at"]],
-	["camera",["at?","options?"]],
-	["viewport",[]],
-	["screenshot",["options?"]],
-	["stages",[]],
-	["open",["name"]],
-	["newStage",["title"]],
-	["title",["title?"]],
-	["pen.read",["path?"]],
-	["pen.edit",["edits","options?"]],
-	["pen.create",["path","item?"]],
-	["pen.save",["id","path","options?"]],
-	["pen.file",[]],
-	["me",["patch?"]],
-	["agents",["options?"]],
-	["send",["to","work"]],
-	["queue",["agentId?"]],
-	["url",["path"]],
-	["resolve",["file"]],
 ];
 // </generated:verbs>
 
@@ -160,12 +126,12 @@ const env = (name) => (typeof process !== "undefined" && process.env ? process.e
 
 /**
  * In a page the server is the page's own, under whatever prefix it is at: an app's
- * `/app/<name>/`, a card's `/api/card/<path>` (or `/api/board/<path>`, its old prefix), a second
+ * `/app/<name>/`, a card's `/api/card/<path>`, a second
  * server's `/c/<id>/`.
  */
 function fromPage() {
 	if (typeof location === "undefined") return {};
-	const at = /^(.*?)\/(?:app\/[a-z0-9][a-z0-9-]*(?:\/|$)|api\/(?:card|board)\/)/.exec(location.pathname);
+	const at = /^(.*?)\/(?:app\/[a-z0-9][a-z0-9-]*(?:\/|$)|api\/card\/)/.exec(location.pathname);
 	return { url: `${location.origin}${at ? at[1] : ""}` };
 }
 
@@ -302,7 +268,7 @@ export function connect(options = {}) {
 	/**
 	 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to
 	 * this connection's token. Its calls send it as the bearer; its files are read at
-	 * `pageUrl("/api/t/<pass>/card/<deck path>")` (`/board/`, the old prefix, works until 2026-11-30).
+	 * `pageUrl("/api/t/<pass>/card/<deck path>")`.
 	 * Ask again at half its life (`keepCanvasPass`).
 	 */
 	async function canvasPass(canvas) {
@@ -329,11 +295,9 @@ export function connect(options = {}) {
 
 	return {
 		...tree,
-		/** Where this connection reaches Decks. (`url` is the old verb that gives a card's address.) */
+		/** Where this connection reaches Decks. */
 		address: base,
 		call,
-		/** The same verbs, for code written against the SDK when they lived under `stage`. */
-		stage: tree,
 		/** Hand work to the agent with this name, making it from the spec first when there is none; it waits in its queue. */
 		async sendTo(spec, work) {
 			const have = (await tree.agent.list()).some((one) => one.name === spec.name);
@@ -426,7 +390,7 @@ export function connect(options = {}) {
 		},
 		/**
 		 * Every change as Decks broadcasts it (`GET /api/v1/events`): `onEvent` hears each frame, as
-		 * in `{ type: "card.changed", path, card }` (also sent as `board.changed` until 2026-11-30). `types` keeps only some. Read with fetch, so the
+		 * in `{ type: "card.changed", path, card }`. `types` keeps only some. Read with fetch, so the
 		 * token goes in its header, never the address. With `reconnect` a stream that ends or fails is
 		 * opened again, a little later each time up to 15 s, until a refusal (401, 403), which calls
 		 * `refused`. Answers with a way to stop.

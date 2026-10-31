@@ -15,7 +15,6 @@ const BIN = fileURLToPath(new URL("../bin/decks", import.meta.url));
 const MCP = fileURLToPath(new URL("../mcp/server.mjs", import.meta.url));
 /** The verb table the SDK and the MCP server are generated from: the counts below come from it, not from a number typed here. */
 const TABLE = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
-const CURRENT = TABLE.filter((verb) => !verb.alias);
 
 /** A stand-in for Decks' /api/v1: records each call and answers from a small table of verbs. */
 async function fakeDecks() {
@@ -26,8 +25,6 @@ async function fakeDecks() {
 		"canvas.batch": ([ops]) => ({ ok: true, value: ops.map((op) => ({ op: op.op, id: op.id ?? "n1" })), notes: [] }),
 		"view.focus": (args) => ({ ok: true, value: { canvas: "plan", target: args[0] }, notes: [] }),
 		"canvas.fit": () => ({ ok: false, error: "canvases/plan/cards/x/index.html is not on the canvas.", notes: [] }),
-		// An old name, kept until 2026-11-30: it answers as it did, with the note naming its new call.
-		newBoard: ([options]) => ({ ok: true, value: `canvases/plan/cards/${options.title.toLowerCase().replace(/\W+/g, "-")}/index.html`, notes: ["newBoard is an old name, removed on 2026-11-30: use decks.card.create, then decks.canvas.insert."] }),
 	};
 	const server = createServer((req, res) => {
 		let body = "";
@@ -63,17 +60,19 @@ async function fakeDecks() {
 }
 
 test("the SDK has every verb in the table, groups nested", () => {
-	assert.deepEqual(VERBS.map(([name]) => name), TABLE.map((verb) => verb.name), `${CURRENT.length} calls and ${TABLE.length - CURRENT.length} old names, as in the table`);
+	assert.deepEqual(VERBS.map(([name]) => name), TABLE.map((verb) => verb.name), `the ${TABLE.length} calls of the table`);
 	const decks = connect({ url: "http://127.0.0.1:1", token: "dk_h_x" });
 	assert.equal(typeof decks.canvas.insert, "function");
 	assert.equal(typeof decks.card.create, "function");
 	assert.equal(typeof decks.agent.send, "function");
 	assert.equal(typeof decks.here, "function");
-	assert.equal(typeof decks.newBoard, "function", "an old name is still a function until 2026-11-30");
-	assert.equal(typeof decks.board.create, "function");
-	assert.equal(typeof decks.pen.edit, "function");
 	assert.equal(typeof decks.apps.build, "function");
-	assert.equal(decks.stage.card, decks.card, "the old decks.stage is the same verbs");
+	// The names from before cards are gone, and so is the old decks.stage.
+	assert.equal(decks.newBoard, undefined);
+	assert.equal(decks.board, undefined);
+	assert.equal(decks.pen, undefined);
+	assert.equal(decks.stage, undefined);
+	assert.ok(TABLE.every((verb) => !/^(board\.|newBoard$|boards$|pen\.)/.test(verb.name) && !("alias" in verb)), "no old name in the table");
 });
 
 test("a verb posts its arguments with the caller's token, and answers with the value; notes go where asked", async () => {
@@ -87,9 +86,6 @@ test("a verb posts its arguments with the caller's token, and answers with the v
 		await decks.view.focus("canvases/plan/cards/a/index.html", undefined);
 		assert.deepEqual(fake.seen.at(-1), { verb: "view.focus", args: ["canvases/plan/cards/a/index.html"], token: "Bearer dk_h_wren", agent: undefined, app: undefined, person: undefined }, "a trailing undefined stays absent, and no header names the caller");
 		await assert.rejects(decks.canvas.fit("canvases/plan/cards/x/index.html"), (error) => error instanceof DecksError && error.status === 422 && /not on the canvas/.test(error.message));
-		// An old name still works until 2026-11-30, and its note names the new call.
-		assert.equal(await decks.newBoard({ title: "Q3 revenue" }), "canvases/plan/cards/q3-revenue/index.html");
-		assert.match(notes.at(-1), /newBoard is an old name, removed on 2026-11-30: use decks\.card\.create/);
 		const refused = connect({ url: fake.url, fetch: async () => new Response("Every request to this harness carries a token.", { status: 401 }) });
 		await assert.rejects(refused.card.list(), (error) => error.status === 401 && /carries a token/.test(error.message), "the gate's sentence comes through");
 	} finally {
@@ -169,28 +165,22 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 	assert.deepEqual(of(["here"]), ["here", []]);
 	assert.deepEqual(of(["card", "create", "--title", "Q3"]), ["card.create", [{ title: "Q3" }]]);
 	assert.deepEqual(of(["view", "reload", "--card", "cards/a/index.html"]), ["view.reload", [{ card: "cards/a/index.html" }]]);
-	// The old names still parse as they did, until 2026-11-30.
-	assert.deepEqual(of(["board", "create", "--title", "Q3"]), ["board.create", [{ title: "Q3" }]]);
-	assert.deepEqual(of(["view", "reload", "--board", "boards/a.html"]), ["view.reload", [{ board: "boards/a.html" }]]);
-	assert.deepEqual(of(["new-board", "--title", "Q3 revenue", "--at.x1", "0", "--at.y1", "160"]), ["newBoard", [{ title: "Q3 revenue", at: { x1: 0, y1: 160 } }]]);
-	assert.deepEqual(of(["move", "boards/a.html", '{"x":10,"y":20}']), ["move", ["boards/a.html", { x: 10, y: 20 }]]);
-	assert.deepEqual(of(["move", "boards/a.html", "--x", "10", "--y", "20"]), ["move", ["boards/a.html", { x: 10, y: 20 }]]);
-	assert.deepEqual(of(["hide", "boards/a.html", "boards/b.html"]), ["hide", [["boards/a.html", "boards/b.html"]]]);
-	assert.deepEqual(of(["hide", "boards/a.html"]), ["hide", ["boards/a.html"]]);
+	// The names from before cards are not commands now, and the old flag is refused.
+	for (const old of [["board", "create"], ["new-board"], ["move"], ["hide"], ["show"], ["pen", "edit"], ["camera"], ["send"]]) assert.equal(verbOf(old), undefined, old.join(" "));
+	assert.throws(() => of(["view", "reload", "--board", "boards/a.html"]), /has no flag --board/);
+	assert.deepEqual(of(["canvas", "move", "n1", "--at.x1", "10", "--at.y1", "20"]), ["canvas.move", ["n1", { at: { x1: 10, y1: 20 } }]]);
+	assert.deepEqual(of(["canvas", "delete", "n1"]), ["canvas.delete", ["n1"]]);
 	// A list of cards is several words or one JSON list, for every call that takes one.
 	assert.deepEqual(of(["agent", "claim", '["cards/a/index.html","cards/b/index.html"]']), ["agent.claim", [["cards/a/index.html", "cards/b/index.html"]]]);
 	assert.deepEqual(of(["agent", "claim", "cards/a/index.html", "cards/b/index.html"]), ["agent.claim", [["cards/a/index.html", "cards/b/index.html"]]]);
 	assert.deepEqual(of(["view", "focus", "cards/a/index.html", "cards/b/index.html", "--canvas", "plan"]), ["view.focus", [["cards/a/index.html", "cards/b/index.html"], { canvas: "plan" }]]);
 	assert.deepEqual(of(["view", "focus", '["title","p4"]']), ["view.focus", [["title", "p4"]]]);
 	assert.deepEqual(of(["view", "focus", "cards/a/index.html"]), ["view.focus", ["cards/a/index.html"]]);
-	assert.deepEqual(of(["show", "boards/a.html", "--fit", "all"]), ["show", ["boards/a.html", { fit: "all" }]]);
-	assert.deepEqual(of(["pen", "edit", '[{"op":"delete","id":"n1"}]']), ["pen.edit", [[{ op: "delete", id: "n1" }]]]);
-	assert.deepEqual(of(["camera"]), ["camera", []]);
-	assert.deepEqual(of(["camera", "--x", "0", "--y", "0", "--zoom", "1"]), ["camera", [{ x: 0, y: 0, zoom: 1 }]]);
-	assert.deepEqual(of(["title", "Q3 numbers"]), ["title", ["Q3 numbers"]]);
-	assert.deepEqual(of(["send", "Wren", "--task", "Label doc-7"]), ["send", ["Wren", { task: "Label doc-7" }]]);
-	assert.deepEqual(of(["move", "--args", '["boards/a.html",{"x":1,"y":2}]']), ["move", ["boards/a.html", { x: 1, y: 2 }]]);
-	assert.throws(() => of(["new-board", "--colour", "red"]), /has no flag --colour/);
+	assert.deepEqual(of(["view", "camera"]), ["view.camera", []]);
+	assert.deepEqual(of(["view", "move", "--x", "0", "--y", "0", "--zoom", "1"]), ["view.move", [{ x: 0, y: 0, zoom: 1 }]]);
+	assert.deepEqual(of(["canvas", "rename", "Q3 numbers"]), ["canvas.rename", ["Q3 numbers"]]);
+	assert.deepEqual(of(["canvas", "move", "--args", '["n1",{"at":{"x1":1,"y1":2}}]']), ["canvas.move", ["n1", { at: { x1: 1, y1: 2 } }]]);
+	assert.throws(() => of(["card", "create", "--colour", "red"]), /has no flag --colour/);
 });
 
 test("the decks command prints the value to stdout and notes to stderr, and fails with exit 1", async () => {
@@ -208,17 +198,15 @@ test("the decks command prints the value to stdout and notes to stderr, and fail
 		assert.deepEqual(JSON.parse(edited.stdout), [{ op: "delete", id: "n9" }]);
 
 		await assert.rejects(run(BIN, ["canvas", "fit", "canvases/plan/cards/x/index.html"], { env }), (error) => error.code === 1 && /not on the canvas/.test(error.stderr));
-		// An old name, until 2026-11-30: a string as it is, ready for $(...), and its note on stderr.
-		const old = await run(BIN, ["new-board", "--title", "Q3 revenue"], { env });
-		assert.equal(old.stdout, "canvases/plan/cards/q3-revenue/index.html\n");
-		assert.match(old.stderr, /newBoard is an old name, removed on 2026-11-30/);
+		// An old name is no command now: refused with exit 1, pointing at the list, and nothing is sent.
+		const calls = fake.seen.length;
+		await assert.rejects(run(BIN, ["new-board", "--title", "Q3 revenue"], { env }), (error) => error.code === 1 && /no command "new-board --title"\. decks --help lists them/.test(error.stderr));
+		await assert.rejects(run(BIN, ["board", "create", "--title", "Q3"], { env }), (error) => error.code === 1 && /no command "board create"/.test(error.stderr));
+		assert.equal(fake.seen.length, calls, "no call reached Decks");
 		const help = await run(BIN, ["--help"], { env });
 		assert.match(help.stdout, /canvas insert +Add an item to the canvas\./);
 		assert.match(help.stdout, /\ncard:\n  card list /, "the card group");
-		assert.match(help.stdout, /Old names, until 2026-11-30: .*\bboard create, .*\bnew-board, /);
-		assert.doesNotMatch(help.stdout, /\n  new-board /, "old names are not listed as commands");
-		const oldHelp = await run(BIN, ["help", "new-board"], { env });
-		assert.match(oldHelp.stdout, /An old name, removed on 2026-11-30: use decks\.card\.create, then decks\.canvas\.insert/);
+		assert.doesNotMatch(help.stdout, /old name|new-board|\bboard create/i, "no old name is listed");
 	} finally {
 		await fake.close();
 	}
@@ -240,9 +228,9 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		child.kill();
 		const [init, list, call] = output.trim().split("\n").map((line) => JSON.parse(line));
 		assert.equal(init.result.protocolVersion, "2025-06-18");
-		assert.equal(list.result.tools.length, CURRENT.length, "the new calls only");
+		assert.equal(list.result.tools.length, TABLE.length, "every call");
 		assert.ok(list.result.tools.some((tool) => tool.name === "decks_canvas_insert"));
-		assert.ok(!list.result.tools.some((tool) => tool.name === "decks_pen_edit"), "old names are not listed");
+		assert.ok(!list.result.tools.some((tool) => /^decks_(pen|board)_|^decks_new_board$/.test(tool.name)), "no old name");
 		const insert = list.result.tools.find((tool) => tool.name === "decks_canvas_insert");
 		assert.deepEqual(insert.inputSchema.required, ["item"]);
 		assert.equal(call.result.isError, false);
@@ -253,7 +241,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 	}
 });
 
-test("DECKS_TOOLS narrows the tools to groups, and board still means the card group until 2026-11-30", async () => {
+test("DECKS_TOOLS narrows the tools to groups; board, the card group's old name, is no group now", async () => {
 	const listed = async (groups) => {
 		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: "http://127.0.0.1:1", DECKS_TOKEN: "dk_h_x", DECKS_TOOLS: groups } });
 		let output = "";
@@ -263,10 +251,10 @@ test("DECKS_TOOLS narrows the tools to groups, and board still means the card gr
 		child.kill();
 		return JSON.parse(output.trim()).result.tools.map((tool) => tool.name).sort();
 	};
-	const cards = CURRENT.filter((verb) => verb.group === "card").map((verb) => `decks_${verb.name.replace(/\./g, "_")}`).sort();
+	const cards = TABLE.filter((verb) => verb.group === "card").map((verb) => `decks_${verb.name.replace(/\./g, "_")}`).sort();
 	assert.ok(cards.includes("decks_card_create"));
 	assert.deepEqual(await listed("card"), cards);
-	assert.deepEqual(await listed("board"), cards, "the old group name");
+	assert.deepEqual(await listed("board"), [], "the old group name names nothing");
 });
 
 /** A fetch that records each request and answers from `answer(url, init)`, for the doors that are not verbs. */

@@ -48,14 +48,6 @@ export const lit = (...values: (string | number | boolean)[]): Schema => ({ enum
 export const arr = (items: Schema, description?: string): Schema => ({ type: "array", items, ...(description ? { description } : {}) });
 export const union = (...options: Schema[]): Schema => ({ anyOf: options });
 
-/** The day the old board names (verbs, fields, routes, events) stop answering. */
-export const OLD_NAMES_UNTIL = "2026-11-30";
-
-/**
- * An old field kept beside its new name until `OLD_NAMES_UNTIL`: the same shape, described as
- * deprecated, which TypeScript prints as `@deprecated` on the field.
- */
-export const deprecated = (schema: Schema, use: string): Schema => ({ ...schema, description: `@deprecated Use ${use}; this name is removed on ${OLD_NAMES_UNTIL}.` });
 export const opt = (schema: Schema): Optional => ({ optional: schema });
 
 /** An object; a property wrapped in `opt` may be left out. `rest` allows other keys. */
@@ -75,7 +67,7 @@ export function obj(properties: Record<string, Schema | Optional>, rest?: Schema
 /** A map of string keys to one shape: `Record<string, T>`. */
 export const rec = (value: Schema | true): Schema => ({ type: "object", properties: {}, required: [], additional: value });
 
-/** Give a shape a name, so TypeScript prints `Board` rather than the whole object each time. */
+/** Give a shape a name, so TypeScript prints `Card` rather than the whole object each time. */
 export function named<S extends Schema>(name: string, schema: S, description?: string): S {
 	return { ...schema, $name: name, ...(description ? { description } : {}) };
 }
@@ -106,7 +98,7 @@ export function tsOf(schema: Schema, expand = false): string {
 			return `${wrap(tsOf(schema.items))}[]`;
 		case "object": {
 			const fields = Object.entries(schema.properties).map(
-				([name, shape]) => `${!shape.$name && shape.description?.startsWith("@deprecated") ? `/** ${shape.description} */ ` : ""}${key(name)}${schema.required.includes(name) ? "" : "?"}: ${tsOf(shape)}`,
+				([name, shape]) => `${key(name)}${schema.required.includes(name) ? "" : "?"}: ${tsOf(shape)}`,
 			);
 			if (schema.additional) fields.push(`[key: string]: ${schema.additional === true ? "unknown" : tsOf(schema.additional)}`);
 			if (fields.length === 0) return "Record<string, never>";

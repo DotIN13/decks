@@ -1,10 +1,10 @@
-import { any, arr, bool, deprecated, int, lit, named, num, obj, opt, OLD_NAMES_UNTIL, rec, str, union } from "./schema.ts";
+import { any, arr, bool, int, lit, named, num, obj, opt, rec, str, union } from "./schema.ts";
 
 /**
  * The named shapes the verbs share. Each prints as its name in the SDK's TypeScript and is
  * declared there once. The ones the design names (`Card`, `Placement`, `Canvas`, `Fit`,
  * `Screenshot`, `Agent`, `Message`, `Camera`, `AppState`, `AppOutcome`, `Item`) are the
- * "Types" column of the SDK redesign; the rest are the shapes the old names still answer with.
+ * "Types" column of the SDK redesign; the rest are the shapes their calls take.
  */
 
 export const Box = named("Box", obj({ x1: num(), y1: num(), x2: num(), y2: num() }), "A box on a canvas: both corners, so an edge is never a sum.");
@@ -17,22 +17,19 @@ export const Size = named("Size", obj({ w: opt(num()), h: opt(num()) }), "A widt
 
 export const Card = named("Card", obj({ path: str(), title: str(), lastWrittenBy: opt(str()) }), "A card in the deck: its index.html's path. `title` is the finding it states.");
 
-/** The old name of `Card`, answered by the old `board.*` names until the day they go. */
-export const Board = named("Board", obj({ path: str(), title: str(), lastWrittenBy: opt(str()) }), `@deprecated Use Card; this name is removed on ${OLD_NAMES_UNTIL}. A card (or an old board) in the deck.`);
-
 export const Placement = named(
 	"Placement",
-	obj({ card: str(), board: deprecated(str(), "card"), canvas: str(), box: Box, clipped: opt(bool()) }),
+	obj({ card: str(), canvas: str(), box: Box, clipped: opt(bool()) }),
 	"A card on one canvas: where it sits and how big it is there. `clipped` means its content runs past that box.",
 );
 
 export const Canvas = named(
 	"Canvas",
-	obj({ name: str(), title: str(), open: arr(str()), cards: num(), boards: deprecated(num(), "cards"), shared: opt(obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) })), studio: opt(str()) }),
+	obj({ name: str(), title: str(), open: arr(str()), cards: num(), shared: opt(obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) })), studio: opt(str()) }),
 	"A canvas, how many cards are on it, and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas> for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the Studio canvas it syncs with.",
 );
 
-export const Fit = named("Fit", obj({ card: str(), board: deprecated(str(), "card"), canvas: str(), w: num(), h: num(), notes: str() }), "What the browser measured while fitting a card.");
+export const Fit = named("Fit", obj({ card: str(), canvas: str(), w: num(), h: num(), notes: str() }), "What the browser measured while fitting a card.");
 
 export const Screenshot = named(
 	"Screenshot",
@@ -63,7 +60,7 @@ export const Agent = named(
 
 export const Message = named(
 	"Message",
-	obj({ from: str(), task: str(), cards: arr(str()), boards: deprecated(arr(str()), "cards"), at: num(), reply: opt(bool()) }),
+	obj({ from: str(), task: str(), cards: arr(str()), at: num(), reply: opt(bool()) }),
 	"A hand-off in an inbox: who sent it, the task, the cards it names, when, and whether they want a reply.",
 );
 
@@ -100,26 +97,6 @@ export const CanvasOp = named(
 	"One change in a batch: the same as the call of that name, with the item or id in the op.",
 );
 
-// --- shapes the old names answer with ------------------------------------------------------
-
-export const PlacedBoard = named(
-	"PlacedBoard",
-	obj({
-		path: str(),
-		title: str(),
-		x: num(),
-		y: num(),
-		w: num(),
-		h: num(),
-		box: Box,
-		content: opt(obj({ w: num(), h: num() })),
-		clipped: opt(bool()),
-		inContext: arr(str()),
-		lastWrittenBy: opt(str()),
-	}),
-	"A board as the old `boards` call has it, placed on the caller's canvas.",
-);
-
 export const PenItem = named("PenItem", obj({ type: str(), id: opt(str()), children: opt(arr(any())) }, true), "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields.");
 
 export const PenEdit = named(
@@ -148,8 +125,6 @@ export const AppState = named(
 		kind: AppKind,
 		status: AppStatus,
 		url: str(),
-		/** Old: the board apps used to be shown by, which names no file now; kept one release for Studio's app list. */
-		board: str(),
 		port: opt(num()),
 		error: opt(str()),
 		seenAt: opt(num()),
@@ -164,4 +139,3 @@ export const AppOutcome = named("AppOutcome", obj({ ok: bool(), status: AppStatu
 export const AgentKind = lit("pi", "claude", "opencode", "opencode2", "antigravity");
 export const AgentMode = lit("manual", "acceptEdits", "plan", "auto");
 
-export const Sized = obj({ path: str(), w: num(), h: num() });
