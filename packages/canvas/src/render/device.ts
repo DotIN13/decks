@@ -96,15 +96,16 @@ export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean 
  * A card stays live: in Chromium on its own layer (measured: 0 to 6 late frames of 495 on layers,
  * 97 of 300 off); in WebKit, which gets no layers, covering it with its picture was measured on a
  * simulated iPad and changed nothing a pinch costs, so it stays live there too, and `?card-pictures=1`
- * tries the other way. An app's window (a whole page in a sandboxed frame, repainted at every camera
- * step when it animates: 1,280 paints in a two-second pan) and a document's editor (laid out at every
- * step of a zoom) are covered everywhere.
+ * tries the other way. An app stays live as a card does, the person's choice (2026-10-31): its window
+ * is a whole page in a sandboxed frame, repainted at every camera step when it animates (1,280 paints
+ * in a two-second pan), which is the cost of seeing it move. A document's editor, laid out at every
+ * step of a zoom, is covered everywhere.
  */
 export type Moving = "live" | "cover";
 export const MOVING: Record<BrowserEngine, { card: Moving; app: Moving; document: Moving }> = {
-	webkit: { card: "live", app: "cover", document: "cover" },
-	chromium: { card: "live", app: "cover", document: "cover" },
-	other: { card: "live", app: "cover", document: "cover" },
+	webkit: { card: "live", app: "live", document: "cover" },
+	chromium: { card: "live", app: "live", document: "cover" },
+	other: { card: "live", app: "live", document: "cover" },
 };
 
 /**
