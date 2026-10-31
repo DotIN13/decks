@@ -103,10 +103,11 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		if (!ask || address()) return;
 		void ask(props.app).then(setAddress);
 	});
-	// What the app saves in its browser storage (`decks-storage.js`), from its own iframe only.
+	// What the app's own iframe says (`decks-storage.js`): what it saved in its browser storage, and a wheel it had no use for.
 	const onMessage = (event: MessageEvent) => {
 		if (!frame || event.source !== frame.contentWindow) return;
 		const data = event.data as { type?: unknown; key?: unknown; value?: unknown } | null;
+		if (data?.type === "decks-wheel") return forwardWheel(frame, data as unknown as ForwardedWheel);
 		if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
 		canvasHost().apps?.store?.(props.app, data.key, typeof data.value === "string" ? data.value : null);
 	};
@@ -181,6 +182,25 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 			</Show>
 		</div>
 	);
+}
+
+/** A wheel the app's page could not scroll with, as `decks-storage.js` hands it up: the app page's viewport pixels. */
+type ForwardedWheel = { dx: number; dy: number; mode?: number; x: number; y: number; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean };
+
+/**
+ * A wheel from inside an app's iframe, replayed on the stage where the pointer is: the canvas pans or
+ * zooms with it as it does over a card whose insides cannot scroll (`input.ts`, `ownInput`). The point
+ * is the app page's, turned into the frame's through the iframe's box on the screen, which is scaled by
+ * the camera's zoom.
+ */
+function forwardWheel(frame: HTMLIFrameElement, wheel: ForwardedWheel): void {
+	const stage = frame.closest(".stage") ?? document.querySelector(".stage");
+	if (!stage) return;
+	const box = frame.getBoundingClientRect();
+	const scale = frame.clientWidth > 0 ? box.width / frame.clientWidth : 1;
+	const clientX = box.left + Number(wheel.x || 0) * scale;
+	const clientY = box.top + Number(wheel.y || 0) * scale;
+	stage.dispatchEvent(new WheelEvent("wheel", { deltaX: Number(wheel.dx) || 0, deltaY: Number(wheel.dy) || 0, deltaMode: Number(wheel.mode) || 0, clientX, clientY, ctrlKey: !!wheel.ctrlKey, metaKey: !!wheel.metaKey, shiftKey: !!wheel.shiftKey, bubbles: true, cancelable: true }));
 }
 
 const scripts = new Map<string, Promise<void>>();

@@ -247,6 +247,31 @@ const under = await canvas.evaluate(({ x, y }) => {
 	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
 }, clickAt);
 say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
+// A wheel inside the selected app that its page cannot scroll with pans the canvas, and a pinch zooms it, as over a card.
+at("wheel in app");
+const appFrame = page.frames().find((one) => !one.isDetached() && one.url().includes("/app/t/") && one.url().includes("/small-app-"));
+say("the app's page is loaded in its iframe", !!appFrame, page.frames().map((f) => f.url().slice(0, 60)).join(" | "));
+if (appFrame) {
+	const camBefore = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+	await appFrame.evaluate(() => {
+		for (let i = 0; i < 6; i++) document.body.dispatchEvent(new WheelEvent("wheel", { deltaX: 40, deltaY: 0, clientX: 200, clientY: 300, bubbles: true, cancelable: true }));
+	});
+	const panned = await until(async () => {
+		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+		return Math.abs(cam.x - camBefore.x) > 20 ? cam : undefined;
+	}, 4000);
+	say("a wheel inside the live app that its page cannot use pans the canvas", !!panned, `camera x ${camBefore.x} -> ${panned?.x ?? (await canvas.evaluate(() => globalThis.__decksRust.camera.x))}`);
+	await appFrame.evaluate(() => {
+		for (let i = 0; i < 6; i++) document.body.dispatchEvent(new WheelEvent("wheel", { deltaX: 0, deltaY: -30, ctrlKey: true, clientX: 200, clientY: 300, bubbles: true, cancelable: true }));
+	});
+	const zoomed = await until(async () => {
+		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+		return Math.abs(cam.zoom - camBefore.zoom) > 0.02 ? cam : undefined;
+	}, 4000);
+	say("…and a pinch inside it zooms the canvas", !!zoomed, `zoom ${camBefore.zoom} -> ${zoomed?.zoom ?? (await canvas.evaluate(() => globalThis.__decksRust.camera.zoom))}`);
+	await view(0.6);
+	await rest();
+}
 // --- one press in a document selects it and acts ----------------------------------------------------------
 at("document press");
 const docCentre = await canvas.evaluate((path) => {
