@@ -51,7 +51,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 			canvases: async (path: string) => {
 				needBoard(path);
 				const pens = needPens();
-				const out: Array<{ board: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
+				const out: Array<{ card: string; board: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
 				const file = service.fileBoard(path);
 				/*
 				 * A board in a canvas's folder is on that canvas and no other (`deck/layout.ts`), so this answers
@@ -71,7 +71,8 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "fr
 					if (!held) continue;
 					const content = (home ? file : service.fileBoard(own))?.content;
 					const clipped = content ? content.w > held.w || content.h > held.h : undefined;
-					out.push({ board: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
+					// `board` is `card`'s old name, answered beside it until 2026-11-30.
+					out.push({ card: own, board: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
 				}
 				return out;
 			},

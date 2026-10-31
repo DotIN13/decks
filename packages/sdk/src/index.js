@@ -6,13 +6,13 @@
  * answers with the value:
  *
  *     import { decks } from "@decks/sdk";        // DECKS_URL and DECKS_TOKEN from the environment
- *     const { path } = await decks.board.create({ title: "Q3 revenue is up a fifth" });
- *     await decks.canvas.insert({ type: "board", board: path }, { at: { x1: 0, y1: 0 } });
+ *     const { path } = await decks.card.create({ title: "Q3 revenue is up a fifth" });
+ *     await decks.canvas.insert({ type: "card", card: path }, { at: { x1: 0, y1: 0 } });
  *     await decks.canvas.insert({ type: "note", content: "why?" }, { below: path });
  *     await decks.canvas.fit(path);
  *
  * Every canvas call takes `{ canvas }` last; left out, it is `decks.here()`. The old names
- * (`newBoard`, `show`, `pen.edit`, …) still work for one release, and say their new call.
+ * (`board.*`, `newBoard`, `show`, `pen.edit`, …) still work until 2026-11-30, and say their new call.
  *
  * Who is calling is the token each call carries (`Authorization: Bearer`), and nothing else: an
  * agent's harness token (`DECKS_TOKEN`, which Decks sets in each agent's shell), an app server's (the
@@ -75,7 +75,7 @@ export const VERBS = [
 	["agent.me",[]],
 	["agent.update",["patch"]],
 	["here",[]],
-	["agent.claim",["boards..."]],
+	["agent.claim",["cards..."]],
 	["agent.inbox",[]],
 	["agent.list",["options?"]],
 	["agent.get",["name"]],
@@ -87,7 +87,7 @@ export const VERBS = [
 	["view.camera",[]],
 	["view.move",["camera"]],
 	["view.viewport",[]],
-	["view.cursor",["board","at"]],
+	["view.cursor",["card","at"]],
 	["view.reload",["options"]],
 	["apps.list",[]],
 	["apps.status",["name"]],
@@ -160,11 +160,12 @@ const env = (name) => (typeof process !== "undefined" && process.env ? process.e
 
 /**
  * In a page the server is the page's own, under whatever prefix it is at: an app's
- * `/app/<name>/`, a board's `/api/board/<path>`, a second server's `/c/<id>/`.
+ * `/app/<name>/`, a card's `/api/card/<path>` (or `/api/board/<path>`, its old prefix), a second
+ * server's `/c/<id>/`.
  */
 function fromPage() {
 	if (typeof location === "undefined") return {};
-	const at = /^(.*?)\/(?:app\/[a-z0-9][a-z0-9-]*(?:\/|$)|api\/board\/)/.exec(location.pathname);
+	const at = /^(.*?)\/(?:app\/[a-z0-9][a-z0-9-]*(?:\/|$)|api\/(?:card|board)\/)/.exec(location.pathname);
 	return { url: `${location.origin}${at ? at[1] : ""}` };
 }
 
@@ -301,7 +302,8 @@ export function connect(options = {}) {
 	/**
 	 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to
 	 * this connection's token. Its calls send it as the bearer; its files are read at
-	 * `pageUrl("/api/t/<pass>/board/<deck path>")`. Ask again at half its life (`keepCanvasPass`).
+	 * `pageUrl("/api/t/<pass>/card/<deck path>")` (`/board/`, the old prefix, works until 2026-11-30).
+	 * Ask again at half its life (`keepCanvasPass`).
 	 */
 	async function canvasPass(canvas) {
 		const said = await request("/api/passes", { body: { canvas } });
@@ -327,7 +329,7 @@ export function connect(options = {}) {
 
 	return {
 		...tree,
-		/** Where this connection reaches Decks. (`url` is the verb that gives a board's address.) */
+		/** Where this connection reaches Decks. (`url` is the old verb that gives a card's address.) */
 		address: base,
 		call,
 		/** The same verbs, for code written against the SDK when they lived under `stage`. */
@@ -424,7 +426,7 @@ export function connect(options = {}) {
 		},
 		/**
 		 * Every change as Decks broadcasts it (`GET /api/v1/events`): `onEvent` hears each frame, as
-		 * in `{ type: "board.changed", path, board }`. `types` keeps only some. Read with fetch, so the
+		 * in `{ type: "card.changed", path, card }` (also sent as `board.changed` until 2026-11-30). `types` keeps only some. Read with fetch, so the
 		 * token goes in its header, never the address. With `reconnect` a stream that ends or fails is
 		 * opened again, a little later each time up to 15 s, until a refusal (401, 403), which calls
 		 * `refused`. Answers with a way to stop.

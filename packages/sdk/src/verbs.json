@@ -8,7 +8,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "read",
-  "summary": "Everything on the canvas, cards included, each with its box; an item cut by a frame round it that clips says `clipped: \"partly\"` (some of its box is outside) or `\"fully\"` (none is inside), as does a text whose words overflow its fixed width and height. A card is { type: \"card\", card: <path>, box } (an old board, { type: \"board\", board }); every other item has pen.dev's own fields. Read it before placing anything. `frame: \"frames/<name>\"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a board's path, or an id inside an instance such as \"card-1/label\") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name's value in, for the light theme or `theme` ({ mode: \"dark\" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids \"ref/child\"; `geometry` adds a path's or shape's `outline`, an SVG path in its own space (0,0 its top-left corner).",
+  "summary": "Everything on the canvas, cards included, each with its box; an item cut by a frame round it that clips says `clipped: \"partly\"` (some of its box is outside) or `\"fully\"` (none is inside), as does a text whose words overflow its fixed width and height. A card is { type: \"card\", card: <path>, box } (an old board, { type: \"board\", board }); every other item has pen.dev's own fields. Read it before placing anything. `frame: \"frames/<name>\"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a card's path, or an id inside an instance such as \"card-1/label\") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name's value in, for the light theme or `theme` ({ mode: \"dark\" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids \"ref/child\"; `geometry` adds a path's or shape's `outline`, an SVG path in its own space (0,0 its top-left corner).",
   "signature": "canvas.read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> })",
   "returns": "{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; values?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }",
   "params": [
@@ -2033,12 +2033,12 @@
    "card",
    "list"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "Every card in the deck, placed or not.",
   "signature": "card.list()",
-  "returns": "Board[]",
+  "returns": "Card[]",
   "params": []
  },
  {
@@ -2047,12 +2047,12 @@
    "card",
    "create"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "summary": "Write a blank card in a canvas's own cards/ (`canvas`, or your own canvas) and return it: a folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js, data.json). Placing it is the canvas's job (decks.canvas.insert({ type: \"card\", card: path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you design, drawn in the canvas's own page.",
   "signature": "card.create(options: { title: string; w?: number; h?: number; canvas?: string })",
-  "returns": "Board",
+  "returns": "Card",
   "params": [
    {
     "name": "options",
@@ -2087,12 +2087,12 @@
    "card",
    "get"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "A card's path and title (the finding it states), and who last wrote it.",
   "signature": "card.get(card: string)",
-  "returns": "Board",
+  "returns": "Card",
   "params": [
    {
     "name": "card",
@@ -2109,7 +2109,7 @@
    "card",
    "canvases"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "The canvas this card is on, with its place and size there.",
@@ -2131,7 +2131,7 @@
    "card",
    "url"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "The card's address as a page of its own, for a browser such as Playwright.",
@@ -2153,7 +2153,7 @@
    "canvas",
    "list"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "Every canvas in the deck, and which agents have it open.",
@@ -2167,7 +2167,7 @@
    "canvas",
    "create"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "summary": "A new, empty canvas, named from a title. Nobody moves to it: agent.update({ canvas }) makes it your home, view.goto shows it.",
@@ -2221,7 +2221,7 @@
    "frame",
    "create"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "summary": "A new reusable .pen file at `path` (\"frames/ui/button\"), with `item` as its one reusable item, in your canvas's own frames/. Placed on that canvas with { type: \"ref\", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck's own frames/ placed on a canvas is copied into it.",
@@ -2268,7 +2268,7 @@
    "file",
    "url"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "summary": "A file on disk, as the address a card embeds.",
@@ -2389,11 +2389,11 @@
   "touches": "agents",
   "effect": "change",
   "summary": "Say these cards carry your work, without showing them: you become their writer.",
-  "signature": "agent.claim(boards: string | string[])",
+  "signature": "agent.claim(cards: string | string[])",
   "returns": "string[]",
   "params": [
    {
-    "name": "boards",
+    "name": "cards",
     "variadic": true,
     "type": "string | string[]",
     "schema": {
@@ -2487,7 +2487,7 @@
   "touches": "agents",
   "effect": "change",
   "summary": "Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
-  "signature": "agent.send(name: string, message: { task: string; boards?: string[] })",
+  "signature": "agent.send(name: string, message: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[] })",
   "returns": "{ delivered: boolean; turn: \"running\" | \"new\" | \"queued\"; position?: number; note?: string }",
   "params": [
    {
@@ -2499,18 +2499,25 @@
    },
    {
     "name": "message",
-    "type": "{ task: string; boards?: string[] }",
+    "type": "{ task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[] }",
     "schema": {
      "type": "object",
      "properties": {
       "task": {
        "type": "string"
       },
-      "boards": {
+      "cards": {
        "type": "array",
        "items": {
         "type": "string"
        }
+      },
+      "boards": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "@deprecated Use cards; this name is removed on 2026-11-30."
       }
      },
      "required": [
@@ -2531,7 +2538,7 @@
   "touches": "agents",
   "effect": "change",
   "summary": "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
-  "signature": "agent.queue(name: string, work: { task: string; boards?: string[]; reply?: boolean })",
+  "signature": "agent.queue(name: string, work: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[]; reply?: boolean })",
   "returns": "{ queued: true; position: number }",
   "params": [
    {
@@ -2543,18 +2550,25 @@
    },
    {
     "name": "work",
-    "type": "{ task: string; boards?: string[]; reply?: boolean }",
+    "type": "{ task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[]; reply?: boolean }",
     "schema": {
      "type": "object",
      "properties": {
       "task": {
        "type": "string"
       },
-      "boards": {
+      "cards": {
        "type": "array",
        "items": {
         "type": "string"
        }
+      },
+      "boards": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "@deprecated Use cards; this name is removed on 2026-11-30."
       },
       "reply": {
        "type": "boolean"
@@ -2789,11 +2803,11 @@
   "touches": "screen",
   "effect": "change",
   "summary": "A labelled dot on a card, at the card's coordinates; null removes it.",
-  "signature": "view.cursor(board: string, at: Point | null)",
+  "signature": "view.cursor(card: string, at: Point | null)",
   "returns": "void",
   "params": [
    {
-    "name": "board",
+    "name": "card",
     "type": "string",
     "schema": {
      "type": "string"
@@ -2838,25 +2852,26 @@
   "touches": "screen",
   "effect": "change",
   "summary": "Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.",
-  "signature": "view.reload(options: { board: string; canvas?: string })",
+  "signature": "view.reload(options: { card?: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board?: string; canvas?: string })",
   "returns": "{ reloaded: number }",
   "params": [
    {
     "name": "options",
-    "type": "{ board: string; canvas?: string }",
+    "type": "{ card?: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board?: string; canvas?: string }",
     "schema": {
      "type": "object",
      "properties": {
-      "board": {
+      "card": {
        "type": "string"
+      },
+      "board": {
+       "type": "string",
+       "description": "@deprecated Use card; this name is removed on 2026-11-30."
       },
       "canvas": {
        "type": "string"
       }
      },
-     "required": [
-      "board"
-     ],
      "additionalProperties": false
     }
    }
@@ -3181,7 +3196,7 @@
   "group": "apps",
   "touches": "outside",
   "effect": "read",
-  "summary": "Open it in the server's browser and say what is wrong: what fit is to a board. Read `verdict`; `file` is a picture.",
+  "summary": "Open it in the server's browser and say what is wrong: what fit is to a card. Read `verdict`; `file` is a picture.",
   "signature": "apps.check(name: string)",
   "returns": "{ verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }",
   "params": [
@@ -3706,7 +3721,7 @@
    "board",
    "list"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.card.list",
@@ -3721,11 +3736,11 @@
    "board",
    "create"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "alias": "decks.card.create",
-  "summary": "Old name: now writes a card, as decks.card.create does, in a canvas's own cards/ (`canvas`, or your own canvas), and returns it; placing it is the canvas's job (decks.canvas.insert({ type: \"card\", card: path }, { beside })). The title is the finding, as a sentence.",
+  "summary": "Old name: writes a card in a canvas's own cards/, exactly as decks.card.create does, and answers it; it does not place it.",
   "signature": "board.create(options: { title: string; w?: number; h?: number; canvas?: string })",
   "returns": "Board",
   "params": [
@@ -3762,7 +3777,7 @@
    "board",
    "get"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.card.get",
@@ -3785,7 +3800,7 @@
    "board",
    "canvases"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.card.canvases",
@@ -3808,7 +3823,7 @@
    "board",
    "url"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.card.url",
@@ -3830,7 +3845,7 @@
   "command": [
    "new-board"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "alias": "decks.card.create, then decks.canvas.insert",
@@ -3946,7 +3961,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "alias": "decks.canvas.update(board, { size })",
+  "alias": "decks.canvas.update(card, { size })",
   "summary": "Old name: set a board's size outright.",
   "signature": "resize(path: string, size: { w?: number; h?: number })",
   "returns": "{ path: string; w: number; h: number }",
@@ -4017,7 +4032,7 @@
   "group": "view",
   "touches": "screen",
   "effect": "change",
-  "alias": "decks.view.reload({ board })",
+  "alias": "decks.view.reload({ card })",
   "summary": "Old name: reload a board's page.",
   "signature": "reload(path: string)",
   "returns": "void",
@@ -4039,7 +4054,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "read",
-  "alias": "decks.canvas.read, or decks.board.list",
+  "alias": "decks.canvas.read, or decks.card.list",
   "summary": "Old name: every board, placed as your canvas has them.",
   "signature": "boards()",
   "returns": "PlacedBoard[]",
@@ -4053,7 +4068,7 @@
   "group": "view",
   "touches": "screen",
   "effect": "change",
-  "alias": "decks.canvas.insert({ type: \"board\", board }) to place it, then decks.view.focus",
+  "alias": "decks.canvas.insert({ type: \"card\", card }) to place it, then decks.view.focus",
   "summary": "Old name: put boards on your canvas and move the camera to them.",
   "signature": "show(target: string | string[], options?: { fit?: \"board\" | \"all\"; highlight?: string; animate?: boolean; at?: Corner })",
   "returns": "{ shown: string[] }",
@@ -4179,7 +4194,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "alias": "decks.canvas.move(board, { at })",
+  "alias": "decks.canvas.move(card, { at })",
   "summary": "Old name: move a board on your canvas.",
   "signature": "move(path: string, at: Point)",
   "returns": "PlacedBoard",
@@ -4414,7 +4429,7 @@
   "command": [
    "stages"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.canvas.list",
@@ -4450,7 +4465,7 @@
   "command": [
    "new-stage"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "alias": "decks.canvas.create, then decks.agent.update({ canvas })",
@@ -4864,7 +4879,7 @@
    "pen",
    "create"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "change",
   "alias": "decks.frame.create",
@@ -5189,10 +5204,10 @@
   "command": [
    "url"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
-  "alias": "decks.board.url",
+  "alias": "decks.card.url",
   "summary": "Old name: a board's address.",
   "signature": "url(path: string)",
   "returns": "string",
@@ -5211,7 +5226,7 @@
   "command": [
    "resolve"
   ],
-  "group": "board",
+  "group": "card",
   "touches": "deck",
   "effect": "read",
   "alias": "decks.file.url",

@@ -21,34 +21,34 @@ export type CanvasOp = { op: "insert"; item: Item; at?: Corner; beside?: string;
 export type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 /** One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields. */
 export type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
-/** What the browser measured while fitting a board. */
-export type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
+/** What the browser measured while fitting a card. */
+export type Fit = { card: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board: string; canvas: string; w: number; h: number; notes: string };
 /** A saved image of a canvas, or of part of it. */
 export type Screenshot = { file: string; width: number; height: number; box: Box; how?: string; note?: string };
 /**
- * A canvas and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas>
- * for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls
- * it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the
- * Studio canvas it syncs with.
+ * A canvas, how many cards are on it, and who has it open. `name` is its folder (canvases/<name>/,
+ * or shared/<owner>/<canvas> for one a friend shared, in shared/canvases/) and never changes;
+ * `title` is what the person calls it. `shared` says who shared a friend's canvas and whether you
+ * may edit it; `studio` is the Studio canvas it syncs with.
  */
-export type Canvas = { name: string; title: string; open: string[]; boards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
-/** A board file in the deck. `title` is the finding it states. */
-export type Board = { path: string; title: string; lastWrittenBy?: string };
+export type Canvas = { name: string; title: string; open: string[]; cards: number; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
+/** A card in the deck: its index.html's path. `title` is the finding it states. */
+export type Card = { path: string; title: string; lastWrittenBy?: string };
 /**
- * A board on one canvas: where it sits and how big it is there. `clipped` means its content runs
+ * A card on one canvas: where it sits and how big it is there. `clipped` means its content runs
  * past that box.
  */
-export type Placement = { board: string; canvas: string; box: Box; clipped?: boolean };
+export type Placement = { card: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board: string; canvas: string; box: Box; clipped?: boolean };
 /**
  * Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how
  * much is waiting for it.
  */
 export type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
 /**
- * A hand-off in an inbox: who sent it, the task, the boards it names, when, and whether they want a
+ * A hand-off in an inbox: who sent it, the task, the cards it names, when, and whether they want a
  * reply.
  */
-export type Message = { from: string; task: string; boards: string[]; at: number; reply?: boolean };
+export type Message = { from: string; task: string; cards: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards: string[]; at: number; reply?: boolean };
 /** Where a screen looks on a canvas, and its zoom (1 is life size). */
 export type Camera = { x: number; y: number; zoom: number };
 export type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
@@ -58,10 +58,12 @@ export type AppItem = { type: "app"; app: string };
 export type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; ms: number; errors: string[]; pending?: true };
 /** A field or button: its label, { ref: "e42" } from read, or { name, nth }. */
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
+/** @deprecated Use Card; this name is removed on 2026-11-30. A card (or an old board) in the deck. */
+export type Board = { path: string; title: string; lastWrittenBy?: string };
 /** A board as the old `boards` call has it, placed on the caller's canvas. */
 export type PlacedBoard = { path: string; title: string; x: number; y: number; w: number; h: number; box: Box; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string };
 
-/** Every call Decks answers: the new names, and the old ones kept for one release (marked deprecated). */
+/** Every call Decks answers: the new names, and the old ones kept until 2026-11-30 (marked deprecated). */
 export interface Verbs {
 	/**
 	 * The canvas a call means when it names none: your home canvas for an agent, the card's canvas for
@@ -82,25 +84,25 @@ export interface Verbs {
 	newBoard(options: { title: string; w?: number; h?: number; at?: Corner }): Promise<string>;
 	/** Old name: size a board's height to its content on a canvas. @deprecated Use decks.canvas.fit. */
 	fit(path: string, options?: { canvas?: string; margin?: number }): Promise<{ path: string; w: number; h: number; content?: { w: number; h: number; page?: number } }>;
-	/** Old name: set a board's size outright. @deprecated Use decks.canvas.update(board, { size }). */
+	/** Old name: set a board's size outright. @deprecated Use decks.canvas.update(card, { size }). */
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 	/** Old name: claim boards as your work. @deprecated Use decks.agent.claim. */
 	report(path: string | string[]): Promise<{ reported: string[] }>;
-	/** Old name: reload a board's page. @deprecated Use decks.view.reload({ board }). */
+	/** Old name: reload a board's page. @deprecated Use decks.view.reload({ card }). */
 	reload(path: string): Promise<void>;
 	/**
 	 * Old name: every board, placed as your canvas has them. @deprecated Use decks.canvas.read, or
-	 * decks.board.list.
+	 * decks.card.list.
 	 */
 	boards(): Promise<PlacedBoard[]>;
 	/**
 	 * Old name: put boards on your canvas and move the camera to them. @deprecated Use
-	 * decks.canvas.insert({ type: "board", board }) to place it, then decks.view.focus.
+	 * decks.canvas.insert({ type: "card", card }) to place it, then decks.view.focus.
 	 */
 	show(target: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean; at?: Corner }): Promise<{ shown: string[] }>;
 	/** Old name: take boards off your canvas. @deprecated Use decks.canvas.delete. */
 	hide(path: string | string[]): Promise<void>;
-	/** Old name: move a board on your canvas. @deprecated Use decks.canvas.move(board, { at }). */
+	/** Old name: move a board on your canvas. @deprecated Use decks.canvas.move(card, { at }). */
 	move(path: string, at: Point): Promise<PlacedBoard>;
 	/** Old name: a labelled dot on a board. @deprecated Use decks.view.cursor. */
 	cursor(path: string, at: Point | null): Promise<void>;
@@ -145,7 +147,7 @@ export interface Verbs {
 	send(to: string | { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; tags?: string[]; workspace?: string }, work: { task: string; boards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number; agent?: string; name?: string }>;
 	/** Old name: what is waiting in an agent's queue. @deprecated Use decks.agent.inbox. */
 	queue(agentId?: string): Promise<{ from: string; fromName: string; task: string; boards: string[]; at: number }[]>;
-	/** Old name: a board's address. @deprecated Use decks.board.url. */
+	/** Old name: a board's address. @deprecated Use decks.card.url. */
 	url(path: string): Promise<string>;
 	/** Old name: a file's address for a board. @deprecated Use decks.file.url. */
 	resolve(file: string): Promise<string>;
@@ -157,7 +159,7 @@ export interface Verbs {
 		 * <path>, box } (an old board, { type: "board", board }); every other item has pen.dev's own
 		 * fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its
 		 * items in its own space; this and the item calls below take `frame` in place of `canvas`, and a
-		 * change to a frame shows on every canvas placing it. `of` (an id, a board's path, or an id inside
+		 * change to a frame shows on every canvas placing it. `of` (an id, a card's path, or an id inside
 		 * an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that
 		 * many levels of children (0: the items alone), and an item whose children were left out says how
 		 * many in `childCount`. `resolve` works values out instead of reading them as written, each off by
@@ -310,7 +312,7 @@ export interface Verbs {
 	};
 	card: {
 		/** Every card in the deck, placed or not. */
-		list(): Promise<Board[]>;
+		list(): Promise<Card[]>;
 		/**
 		 * Write a blank card in a canvas's own cards/ (`canvas`, or your own canvas) and return it: a
 		 * folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css,
@@ -318,9 +320,9 @@ export interface Verbs {
 		 * path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you
 		 * design, drawn in the canvas's own page.
 		 */
-		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Board>;
+		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Card>;
 		/** A card's path and title (the finding it states), and who last wrote it. */
-		get(card: string): Promise<Board>;
+		get(card: string): Promise<Card>;
 		/** The canvas this card is on, with its place and size there. */
 		canvases(card: string): Promise<Placement[]>;
 		/** The card's address as a page of its own, for a browser such as Playwright. */
@@ -350,7 +352,7 @@ export interface Verbs {
 		 */
 		update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Promise<Agent>;
 		/** Say these cards carry your work, without showing them: you become their writer. */
-		claim(boards: string | string[]): Promise<string[]>;
+		claim(cards: string | string[]): Promise<string[]>;
 		/**
 		 * Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you
 		 * with your next message.
@@ -368,12 +370,12 @@ export interface Verbs {
 		 * runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be
 		 * steered mid-turn gets it queued, and the answer says delivered: false.
 		 */
-		send(name: string, message: { task: string; boards?: string[] }): Promise<{ delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }>;
+		send(name: string, message: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[] }): Promise<{ delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }>;
 		/**
 		 * Put work in the agent's queue, taken up after the turn it is running. Returns at once; with
 		 * `reply: true` its report comes back to you.
 		 */
-		queue(name: string, work: { task: string; boards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number }>;
+		queue(name: string, work: { task: string; cards?: string[]; /** @deprecated Use cards; this name is removed on 2026-11-30. */ boards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number }>;
 		/**
 		 * Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode",
 		 * "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking`
@@ -397,13 +399,13 @@ export interface Verbs {
 		/** The room the screen has, in CSS pixels, or null when no screen has said. */
 		viewport(): Promise<{ width: number; height: number } | null>;
 		/** A labelled dot on a card, at the card's coordinates; null removes it. */
-		cursor(board: string, at: Point | null): Promise<void>;
+		cursor(card: string, at: Point | null): Promise<void>;
 		/**
 		 * Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every
 		 * canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No
 		 * file changes.
 		 */
-		reload(options: { board: string; canvas?: string }): Promise<{ reloaded: number }>;
+		reload(options: { card?: string; /** @deprecated Use card; this name is removed on 2026-11-30. */ board?: string; canvas?: string }): Promise<{ reloaded: number }>;
 	};
 	apps: {
 		/** Every app in the deck's apps/ folder, with its state. */
@@ -446,7 +448,7 @@ export interface Verbs {
 		/** Its recent output. */
 		logs(name: string, options?: { tail?: number }): Promise<string[]>;
 		/**
-		 * Open it in the server's browser and say what is wrong: what fit is to a board. Read `verdict`;
+		 * Open it in the server's browser and say what is wrong: what fit is to a card. Read `verdict`;
 		 * `file` is a picture.
 		 */
 		check(name: string): Promise<{ verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }>;
@@ -503,10 +505,8 @@ export interface Verbs {
 		/** Every board file in the deck, placed or not. @deprecated Use decks.card.list. */
 		list(): Promise<Board[]>;
 		/**
-		 * Old name: now writes a card, as decks.card.create does, in a canvas's own cards/ (`canvas`, or
-		 * your own canvas), and returns it; placing it is the canvas's job (decks.canvas.insert({ type:
-		 * "card", card: path }, { beside })). The title is the finding, as a sentence. @deprecated Use
-		 * decks.card.create.
+		 * Old name: writes a card in a canvas's own cards/, exactly as decks.card.create does, and answers
+		 * it; it does not place it. @deprecated Use decks.card.create.
 		 */
 		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Board>;
 		/**
@@ -579,7 +579,7 @@ export type AgentSpec = Exclude<Parameters<Verbs["send"]>[0], string>;
 export type Work = Parameters<Verbs["send"]>[1];
 
 export interface Decks extends Verbs {
-	/** Where this connection reaches Decks. (`url` is the verb that gives a board's address.) */
+	/** Where this connection reaches Decks. (`url` is the old verb that gives a card's address.) */
 	readonly address: string;
 	/** Call a verb by its name in the table, and get its value, notes and pictures. */
 	call(verb: string, args?: unknown[]): Promise<{ value: unknown; notes: string[]; images?: Array<{ data: string; mimeType: string }> }>;
@@ -605,7 +605,7 @@ export interface Decks extends Verbs {
 	/**
 	 * A canvas pass for one canvas (`POST /api/passes`): an hour, bound to this connection's token, with
 	 * your role there. A frame's calls send it as the bearer; its files are read at
-	 * `/api/t/<pass>/board/<deck path>`. Ask again at half its life.
+	 * `/api/t/<pass>/card/<deck path>` (or `/board/`, its old name, until 2026-11-30). Ask again at half its life.
 	 */
 	canvasPass(canvas: string): Promise<{ pass: string; role: "edit" | "view"; expires: number }>;
 	/** An app's address for a tab of its own, with an app pass in it (`POST /api/passes { app }`), good for a day. */
@@ -621,7 +621,8 @@ export interface Decks extends Verbs {
 	/** Keep a canvas pass for a canvas while it is shown: asked for at once, again at half its life, when a page comes back into view past that, and thirty seconds after one that failed. */
 	keepCanvasPass(canvas: string, onPass: (pass: { pass: string; role: "edit" | "view"; expires: number }) => void): { stop(): void };
 	/**
-	 * Every change as Decks broadcasts it (`GET /api/v1/events`), as in `{ type: "board.changed", path, board }`.
+	 * Every change as Decks broadcasts it (`GET /api/v1/events`), as in `{ type: "card.changed", path, card }`
+	 * (each also sent as `board.changed`, its old name, until 2026-11-30).
 	 * `types` keeps only some. With `reconnect` it is opened again after it ends or fails, until a
 	 * refusal, which calls `refused`. `done` settles when the stream ends for good; `close` stops it.
 	 */

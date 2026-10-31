@@ -35,7 +35,7 @@ export interface VerbContext {
 	/** A canvas as a caller names it (folder, title, or `canvases/<name>/canvas.pen`), or `here()` when it names none. */
 	canvasOf(asked?: unknown): string;
 	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
-	canvasRow(name: string): { name: string; title: string; open: string[]; boards: number };
+	canvasRow(name: string): { name: string; title: string; open: string[]; cards: number; boards: number };
 	/** The canvas the request says it was made on, for this one call (`StageTool.call`). */
 	callOn: { stage?: string };
 }
@@ -187,11 +187,11 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 	const canvasRow = (name: string) => {
 		const pens = needPens();
 		const mine = agent.stageName?.();
-		let boards = 0;
+		let cards = 0;
 		try {
-			boards = pens.boards(name).length;
+			cards = pens.boards(name).length;
 		} catch {
-			/* a canvas whose file does not parse holds no boards we can count */
+			/* a canvas whose file does not parse holds no cards we can count */
 		}
 		const shared = pens.sharing(name);
 		return {
@@ -204,7 +204,9 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 				.agents()
 				.filter((other) => (other.id === agent.id && !agent.board ? mine : other.stage) === name)
 				.map((other) => other.name),
-			boards,
+			cards,
+			// `cards`' old name, answered beside it until 2026-11-30.
+			boards: cards,
 		};
 	};
 	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, here, cornerOf, reportPlace, askedWorkspace, hereCanvas, canvasOf, canvasRow, callOn };

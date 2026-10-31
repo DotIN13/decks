@@ -6,7 +6,7 @@
 // Run: node --import tsx scripts/gen-sdk.mjs        Check only: node --import tsx scripts/gen-sdk.mjs --check
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { ALIASES, ALL_VERBS, commandOf, jsonSchemaOf, namesIn, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
+import { ALL_VERBS, commandOf, jsonSchemaOf, namesIn, OLD_NAMES_UNTIL, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const sdk = `${root}packages/sdk/src/`;
@@ -42,7 +42,7 @@ export function declarations() {
 	}
 	let out = HEADER;
 	for (const [name, schema] of named) out += `${schema.description ? doc(schema.description, "") : ""}export type ${name} = ${tsOf(schema, true)};\n`;
-	out += "\n/** Every call Decks answers: the new names, and the old ones kept for one release (marked deprecated). */\nexport interface Verbs {\n";
+	out += `\n/** Every call Decks answers: the new names, and the old ones kept until ${OLD_NAMES_UNTIL} (marked deprecated). */\nexport interface Verbs {\n`;
 	const groups = new Map();
 	for (const verb of ALL_VERBS) {
 		if (verb.name.includes(".")) {
@@ -88,7 +88,7 @@ export type AgentSpec = Exclude<Parameters<Verbs["send"]>[0], string>;
 export type Work = Parameters<Verbs["send"]>[1];
 
 export interface Decks extends Verbs {
-	/** Where this connection reaches Decks. (\`url\` is the verb that gives a board's address.) */
+	/** Where this connection reaches Decks. (\`url\` is the old verb that gives a card's address.) */
 	readonly address: string;
 	/** Call a verb by its name in the table, and get its value, notes and pictures. */
 	call(verb: string, args?: unknown[]): Promise<{ value: unknown; notes: string[]; images?: Array<{ data: string; mimeType: string }> }>;
@@ -114,7 +114,7 @@ export interface Decks extends Verbs {
 	/**
 	 * A canvas pass for one canvas (\`POST /api/passes\`): an hour, bound to this connection's token, with
 	 * your role there. A frame's calls send it as the bearer; its files are read at
-	 * \`/api/t/<pass>/board/<deck path>\`. Ask again at half its life.
+	 * \`/api/t/<pass>/card/<deck path>\` (or \`/board/\`, its old name, until ${OLD_NAMES_UNTIL}). Ask again at half its life.
 	 */
 	canvasPass(canvas: string): Promise<{ pass: string; role: "edit" | "view"; expires: number }>;
 	/** An app's address for a tab of its own, with an app pass in it (\`POST /api/passes { app }\`), good for a day. */
@@ -130,7 +130,8 @@ export interface Decks extends Verbs {
 	/** Keep a canvas pass for a canvas while it is shown: asked for at once, again at half its life, when a page comes back into view past that, and thirty seconds after one that failed. */
 	keepCanvasPass(canvas: string, onPass: (pass: { pass: string; role: "edit" | "view"; expires: number }) => void): { stop(): void };
 	/**
-	 * Every change as Decks broadcasts it (\`GET /api/v1/events\`), as in \`{ type: "board.changed", path, board }\`.
+	 * Every change as Decks broadcasts it (\`GET /api/v1/events\`), as in \`{ type: "card.changed", path, card }\`
+	 * (each also sent as \`board.changed\`, its old name, until ${OLD_NAMES_UNTIL}).
 	 * \`types\` keeps only some. With \`reconnect\` it is opened again after it ends or fails, until a
 	 * refusal, which calls \`refused\`. \`done\` settles when the stream ends for good; \`close\` stops it.
 	 */
@@ -198,7 +199,7 @@ export function verbsJson() {
 
 const GROUP_TITLES = {
 	canvas: "Canvas: every call takes { canvas }; left out, it is decks.here()",
-	board: "Cards and the deck: files in the deck folder",
+	card: "Cards and the deck: files in the deck folder",
 	agent: "Agent: you, or another agent",
 	view: "View: what the person is looking at, moved only on purpose (no file changes)",
 	apps: "Apps: folders in apps/ that Decks serves, builds or runs",
@@ -230,8 +231,7 @@ export function commandsMarkdown() {
 		lines.push("");
 		if (group === "web") lines.push("<!-- /web -->", "");
 	}
-	lines.push("**Old names**, kept for one release; each answer through one names its new call:", "");
-	lines.push(ALIASES.map((verb) => `\`${verb.name}\` → ${verb.alias}`).join("; ") + ".", "");
+	lines.push(`**Old names** (the board ones and the rest) still answer until ${OLD_NAMES_UNTIL}, each answer naming its new call.`, "");
 	return `${lines.join("\n").trimEnd()}\n`;
 }
 

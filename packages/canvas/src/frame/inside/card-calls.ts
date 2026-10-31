@@ -57,16 +57,18 @@ export function cardCalls(deps: CardCallDeps): (verb: string, args: unknown[], c
 				return { canvas: deps.canvas, target };
 			}
 			case "view.reload": {
-				const board = ((args[0] ?? {}) as { board?: unknown }).board;
-				if (typeof board !== "string") throw new CallRefused('view.reload names a card: { board: "<path>" }.', "refused");
-				deps.reload(board);
+				// `board` is `card`'s old name, taken until 2026-11-30.
+				const asked = (args[0] ?? {}) as { card?: unknown; board?: unknown };
+				const card = asked.card ?? asked.board;
+				if (typeof card !== "string") throw new CallRefused('view.reload names a card: { card: "<path>" }.', "refused");
+				deps.reload(card);
 				return { reloaded: 1 };
 			}
 			case "view.cursor":
 				// A labelled dot is an agent's; a card draws its own pointer.
 				return undefined;
 			case "here":
-				return { name: deps.canvas, title: deps.canvas, open: [], boards: 0 };
+				return { name: deps.canvas, title: deps.canvas, open: [], cards: 0, boards: 0 };
 			case "now": {
 				const now = new Date();
 				return { iso: now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, words: now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }), epoch: now.getTime() };

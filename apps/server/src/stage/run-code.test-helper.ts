@@ -1,6 +1,6 @@
 import type { StageTool } from "./tool.ts";
 
-const OLD_NAME = / is an old name, kept for one release: use /;
+const OLD_NAME = / is an old name, removed on 2026-11-30: use /;
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...names: string[]) => (...args: unknown[]) => Promise<unknown>;
 

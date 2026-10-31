@@ -301,7 +301,7 @@ test("a board is the agent's once it is named: newBoard, fit, a one-board show a
 	const reported = await runCode(tool, `return await stage.report(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"])`);
 	assert.match(reported.text, /"reported"/);
 	assert.equal(worked.length, 4);
-	assert.match((await runCode(tool, `return await stage.report("boards/none.html")`)).text, /No such board/);
+	assert.match((await runCode(tool, `return await stage.report("boards/none.html")`)).text, /No such card/);
 	assert.equal(worked.length, 4);
 	cleanup();
 });

@@ -188,12 +188,16 @@ test("an old name still answers as it did, and says its new call", async () => {
 	try {
 		const listed = await must("boards");
 		assert.ok(Array.isArray(listed.value));
-		assert.ok(listed.notes.some((note) => /boards is an old name, kept for one release: use decks\.canvas\.read/.test(note)), listed.notes.join("\n"));
+		assert.ok(listed.notes.some((note) => /boards is an old name, removed on 2026-11-30: use decks\.canvas\.read/.test(note)), listed.notes.join("\n"));
 		const read = await must("pen.read");
 		assert.ok(Array.isArray(read.value.children), "pen.read keeps its old shape");
 		assert.ok(read.notes.some((note) => /decks\.canvas\.read/.test(note)));
 		const fresh = await must("canvas.read");
 		assert.ok(!fresh.notes.some((note) => /old name/.test(note)), "a new call carries no such note");
+		// A canvas says its cards, and its boards (the old name) beside them, until 2026-11-30.
+		const here = (await must("here")).value;
+		assert.equal(typeof here.cards, "number");
+		assert.equal(here.boards, here.cards);
 	} finally {
 		cleanup();
 	}
@@ -209,7 +213,11 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 		assert.equal(theirs.length, 1);
 		assert.equal(theirs[0].task, "Read the plan");
 		assert.equal(theirs[0].from, agent.name);
-		assert.deepEqual(theirs[0].boards, ["boards/a.html"]);
+		assert.deepEqual(theirs[0].cards, ["boards/a.html"]);
+		assert.deepEqual(theirs[0].boards, ["boards/a.html"], "the old field, until 2026-11-30");
+		// `cards` is the hand-off's name for what it names; `boards` is still taken.
+		await must("agent.queue", ["Rune", { task: "And this one", cards: ["boards/b.html"] }]);
+		assert.deepEqual((await must("agent.inbox", [], as(other.id))).value[1].cards, ["boards/b.html"]);
 
 		const seen: string[] = [];
 		(other as unknown as { prompt: (text: string) => Promise<void> }).prompt = async (text: string) => {

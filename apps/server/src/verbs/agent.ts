@@ -3,7 +3,7 @@ import { agentsVerbs } from "./agents.ts";
 import type { VerbContext } from "./context.ts";
 
 /**
- * Who works: you (`agent.me`, `agent.update`), the canvas a call means (`here`), the boards you
+ * Who works: you (`agent.me`, `agent.update`), the canvas a call means (`here`), the cards you
  * claim, your inbox, the other agents, and handing work over: `send` delivers now, `queue` waits
  * for the turn running to end, `create` makes an agent first.
  */
@@ -50,6 +50,12 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 		};
 	};
 
+	/** The cards a hand-off names: `cards`, or `boards`, its old name, until 2026-11-30 (both: together, once each). */
+	const namedCards = (work: { cards?: string[]; boards?: string[] }): string[] | undefined => {
+		if (!work.cards && !work.boards) return undefined;
+		return [...new Set([...(work.cards ?? []), ...(work.boards ?? [])])];
+	};
+
 	return {
 		here: async () => canvasRow(canvasOf()),
 		agent: {
@@ -68,14 +74,15 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				const avatarChanged = (said as { avatarChanged?: string } | undefined)?.avatarChanged;
 				return { ...me(), ...(avatarChanged ? { avatarChanged } : {}) };
 			},
-			claim: async (boards: string | string[]) => {
-				const paths = Array.isArray(boards) ? boards : [boards];
-				for (const one of paths) if (!service.fileBoard(one)) throw new Error(`No such board: ${one}`);
+			claim: async (cards: string | string[]) => {
+				const paths = Array.isArray(cards) ? cards : [cards];
+				for (const one of paths) if (!service.fileBoard(one)) throw new Error(`No such card: ${one}`);
 				for (const one of paths) agent.worked?.(one);
 				return paths;
 			},
 			inbox: async () => {
-				const handed = agent.queue().map((item) => ({ from: item.fromName, task: item.task, boards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) }));
+				// `boards` is `cards`' old name, answered beside it until 2026-11-30.
+				const handed = agent.queue().map((item) => ({ from: item.fromName, task: item.task, cards: item.boards, boards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) }));
 				return handed;
 			},
 			list: async (options?: { workspace?: string }) => {
@@ -86,22 +93,24 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 					.map(asAgent);
 			},
 			get: async (name: string) => asAgent(find(name)),
-			send: async (name: string, message: { task: string; boards?: string[] }) => {
+			send: async (name: string, message: { task: string; cards?: string[]; boards?: string[] }) => {
 				if (!message?.task?.trim()) throw new Error("A message needs a task: what to do.");
 				const to = find(name);
+				const cards = namedCards(message);
 				if (!agent.deliver) {
 					// A caller with no way to deliver (a test host) queues, and says so.
-					const queued = agent.send(to.id, { task: message.task, ...(message.boards ? { boards: message.boards } : {}) });
+					const queued = agent.send(to.id, { task: message.task, ...(cards ? { boards: cards } : {}) });
 					return { delivered: false, turn: "queued" as const, position: queued.position, note: "This caller cannot deliver at once, so the work was queued." };
 				}
-				const answer = agent.deliver(to.id, { task: message.task, ...(message.boards ? { boards: message.boards } : {}) });
+				const answer = agent.deliver(to.id, { task: message.task, ...(cards ? { boards: cards } : {}) });
 				if (answer.note) notes.push(answer.note);
 				return answer;
 			},
-			queue: async (name: string, work: { task: string; boards?: string[]; reply?: boolean }) => {
+			queue: async (name: string, work: { task: string; cards?: string[]; boards?: string[]; reply?: boolean }) => {
 				if (!work?.task?.trim()) throw new Error("Queued work needs a task: what to do.");
 				const to = find(name);
-				const { queued, position } = agent.send(to.id, { task: work.task, ...(work.boards ? { boards: work.boards } : {}), ...(work.reply ? { reply: true } : {}) });
+				const cards = namedCards(work);
+				const { queued, position } = agent.send(to.id, { task: work.task, ...(cards ? { boards: cards } : {}), ...(work.reply ? { reply: true } : {}) });
 				return { queued, position };
 			},
 			create: async (spec: { name: string; kind?: string; model?: string; thinking?: string; mode?: string; workspace?: string; tags?: string[]; canvas?: string }) => {

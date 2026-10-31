@@ -2,24 +2,24 @@
 /**
  * `decks`: every Decks verb as a command, for an agent's shell and anyone else's.
  *
- *     decks canvas read | jq -r '.items[] | select(.type=="board") | .board'
- *     p=$(decks board create --title "Q3 revenue is up a fifth" | jq -r .path)
- *     decks canvas insert --type board --board "$p" --at.x1 0 --at.y1 0
+ *     decks canvas read | jq -r '.items[] | select(.type=="card") | .card'
+ *     p=$(decks card create --title "Q3 revenue is up a fifth" | jq -r .path)
+ *     decks canvas insert --type card --card "$p" --at.x1 0 --at.y1 0
  *     decks canvas fit "$p" --canvas launch-plan
  *     decks canvas delete n1
  *     echo '[...]' | decks canvas batch -
  *
  * Commands are noun then verb (`decks canvas insert`, `decks agent send`); `--canvas` names the
  * canvas, and left out it is the one `decks here` says; `--frame frames/<name>` points the item
- * calls at a frame file instead. The old names (`decks show`, `decks pen
- * edit`, …) still work for one release, and say their new command.
+ * calls at a frame file instead. The old names (`decks board create`, `decks show`, `decks pen
+ * edit`, …) still work until 2026-11-30, and say their new command.
  *
  * A verb's plain arguments (a path, a name) are words; an object argument's keys are flags, with a
  * dot for a key inside a key (`--at.x1 0`); anything else is JSON, and `-` reads it from stdin.
  * `--args '<JSON list>'` gives every argument as JSON at once.
  *
  * The value goes to stdout: a string as it is, anything else as JSON. The notes a verb adds (what
- * `canvas fit` measured, where a board went) go to stderr, and a refusal goes to stderr with exit code 1.
+ * `canvas fit` measured, where a card went) go to stderr, and a refusal goes to stderr with exit code 1.
  * Who is calling is the token the command carries: `DECKS_TOKEN`, which Decks sets in every agent's
  * shell and every app server's environment, or the person's, which `decks login` keeps in
  * `~/.decks/token` for each harness. Where Decks is is `DECKS_URL`, else this machine at
@@ -169,7 +169,7 @@ export function verbOf(words) {
 export function help(verb) {
 	if (verb) {
 		const lines = [`decks ${verb.command.join(" ")}`, "", `  ${verb.signature}: ${verb.returns}`, "", wrap(verb.summary, "  "), ""];
-		if (verb.alias) lines.push(`  An old name, kept for one release: use ${verb.alias}.`, "");
+		if (verb.alias) lines.push(`  An old name, removed on 2026-11-30: use ${verb.alias}.`, "");
 		for (const param of verb.params) lines.push(`  ${param.name}${param.optional ? " (optional)" : ""}: ${param.type}`);
 		const objects = verb.params.filter((param) => param.schema.type === "object" && param.schema.properties);
 		if (objects.length) lines.push("", `  Flags: ${objects.flatMap((param) => Object.keys(param.schema.properties).map((key) => `--${key}`)).join(" ")}`);
@@ -188,7 +188,7 @@ export function help(verb) {
 		for (const one of verbs) lines.push(`  ${one.command.join(" ").padEnd(18)} ${firstSentence(one.summary)}`);
 		lines.push("");
 	}
-	lines.push(`Old names, for one release: ${VERBS.filter((verb) => verb.alias).map((verb) => verb.command.join(" ")).join(", ")}.`, "");
+	lines.push(`Old names, until 2026-11-30: ${VERBS.filter((verb) => verb.alias).map((verb) => verb.command.join(" ")).join(", ")}.`, "");
 	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
 	lines.push("decks login [code] signs this terminal in as the person: with no code on the harness's own machine, else with a code from decks pair code; decks logout signs it out.");
 	lines.push("decks help <command> says more about one. DECKS_URL says where Decks is; DECKS_TOKEN, or the token decks login kept, says who is calling.");
@@ -287,7 +287,7 @@ export function argsOf(verb, words) {
 		if (args[index] !== undefined) continue;
 		if (param.variadic) {
 			const rest = positional.slice(next);
-			// One word may be the list itself, as JSON: '["boards/a.html","boards/b.html"]'.
+			// One word may be the list itself, as JSON: '["cards/a/index.html","cards/b/index.html"]'.
 			args[index] = rest.length === 1 ? valueOf(rest[0], param.schema) : rest;
 			next = positional.length;
 			break;

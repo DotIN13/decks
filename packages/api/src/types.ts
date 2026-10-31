@@ -1,8 +1,8 @@
-import { any, arr, bool, int, lit, named, num, obj, opt, rec, str, union } from "./schema.ts";
+import { any, arr, bool, deprecated, int, lit, named, num, obj, opt, OLD_NAMES_UNTIL, rec, str, union } from "./schema.ts";
 
 /**
  * The named shapes the verbs share. Each prints as its name in the SDK's TypeScript and is
- * declared there once. The ones the design names (`Board`, `Placement`, `Canvas`, `Fit`,
+ * declared there once. The ones the design names (`Card`, `Placement`, `Canvas`, `Fit`,
  * `Screenshot`, `Agent`, `Message`, `Camera`, `AppState`, `AppOutcome`, `Item`) are the
  * "Types" column of the SDK redesign; the rest are the shapes the old names still answer with.
  */
@@ -15,21 +15,24 @@ export const Size = named("Size", obj({ w: opt(num()), h: opt(num()) }), "A widt
 
 // --- the redesign's types -------------------------------------------------------------------
 
-export const Board = named("Board", obj({ path: str(), title: str(), lastWrittenBy: opt(str()) }), "A board file in the deck. `title` is the finding it states.");
+export const Card = named("Card", obj({ path: str(), title: str(), lastWrittenBy: opt(str()) }), "A card in the deck: its index.html's path. `title` is the finding it states.");
+
+/** The old name of `Card`, answered by the old `board.*` names until the day they go. */
+export const Board = named("Board", obj({ path: str(), title: str(), lastWrittenBy: opt(str()) }), `@deprecated Use Card; this name is removed on ${OLD_NAMES_UNTIL}. A card (or an old board) in the deck.`);
 
 export const Placement = named(
 	"Placement",
-	obj({ board: str(), canvas: str(), box: Box, clipped: opt(bool()) }),
-	"A board on one canvas: where it sits and how big it is there. `clipped` means its content runs past that box.",
+	obj({ card: str(), board: deprecated(str(), "card"), canvas: str(), box: Box, clipped: opt(bool()) }),
+	"A card on one canvas: where it sits and how big it is there. `clipped` means its content runs past that box.",
 );
 
 export const Canvas = named(
 	"Canvas",
-	obj({ name: str(), title: str(), open: arr(str()), boards: num(), shared: opt(obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) })), studio: opt(str()) }),
-	"A canvas and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas> for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the Studio canvas it syncs with.",
+	obj({ name: str(), title: str(), open: arr(str()), cards: num(), boards: deprecated(num(), "cards"), shared: opt(obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) })), studio: opt(str()) }),
+	"A canvas, how many cards are on it, and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas> for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the Studio canvas it syncs with.",
 );
 
-export const Fit = named("Fit", obj({ board: str(), canvas: str(), w: num(), h: num(), notes: str() }), "What the browser measured while fitting a board.");
+export const Fit = named("Fit", obj({ card: str(), board: deprecated(str(), "card"), canvas: str(), w: num(), h: num(), notes: str() }), "What the browser measured while fitting a card.");
 
 export const Screenshot = named(
 	"Screenshot",
@@ -60,8 +63,8 @@ export const Agent = named(
 
 export const Message = named(
 	"Message",
-	obj({ from: str(), task: str(), boards: arr(str()), at: num(), reply: opt(bool()) }),
-	"A hand-off in an inbox: who sent it, the task, the boards it names, when, and whether they want a reply.",
+	obj({ from: str(), task: str(), cards: arr(str()), boards: deprecated(arr(str()), "cards"), at: num(), reply: opt(bool()) }),
+	"A hand-off in an inbox: who sent it, the task, the cards it names, when, and whether they want a reply.",
 );
 
 export const Camera = named("Camera", obj({ x: num(), y: num(), zoom: num() }), "Where a screen looks on a canvas, and its zoom (1 is life size).");

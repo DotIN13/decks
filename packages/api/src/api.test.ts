@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ALIASES, aliasNote, ALL_VERBS, checkArgs, commandOf, jsonSchemaOf, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
+import { ALIASES, aliasNote, ALL_VERBS, checkArgs, commandOf, jsonSchemaOf, Placement, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
 
 test("the table has every call of the redesign, each named once, and the old names apart", () => {
 	assert.equal(new Set(ALL_VERBS.map((verb) => verb.name)).size, ALL_VERBS.length, "no name twice, old or new");
@@ -21,7 +21,7 @@ test("the table has every call of the redesign, each named once, and the old nam
 });
 
 test("every call says what it touches and whether it changes it, in the redesign's groups", () => {
-	const groups = new Set(["canvas", "board", "agent", "view", "apps", "web", "misc"]);
+	const groups = new Set(["canvas", "card", "agent", "view", "apps", "web", "misc"]);
 	for (const verb of ALL_VERBS) {
 		assert.ok(["deck", "screen", "agents", "outside"].includes(verb.touches), verb.name);
 		assert.ok(["change", "read"].includes(verb.effect), verb.name);
@@ -78,9 +78,12 @@ test("batch ops are checked op by op, and so are the old pen edits", () => {
 
 test("shapes print as TypeScript, named ones by name", () => {
 	assert.equal(signature(VERB_BY_NAME.get("view.focus")!), "view.focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean })");
-	assert.equal(tsOf(VERB_BY_NAME.get("board.list")!.result!), "Board[]");
+	assert.equal(tsOf(VERB_BY_NAME.get("card.list")!.result!), "Card[]");
+	assert.equal(tsOf(VERB_BY_NAME.get("board.list")!.result!), "Board[]", "the old name keeps the old type name");
 	assert.equal(tsOf(VERB_BY_NAME.get("board.canvases")!.result!), "Placement[]");
-	assert.match(tsOf(VERB_BY_NAME.get("board.get")!.result!, true), /^\{ path: string; title: string; lastWrittenBy\?: string \}$/);
+	assert.match(tsOf(VERB_BY_NAME.get("card.get")!.result!, true), /^\{ path: string; title: string; lastWrittenBy\?: string \}$/);
+	// An old field beside its new name prints as deprecated, until the day it goes.
+	assert.match(tsOf(Placement, true), /card: string; \/\*\* @deprecated Use card; this name is removed on 2026-11-30\. \*\/ board: string/);
 });
 
 test("JSON Schema writes named shapes out and refuses unknown keys", () => {
@@ -98,7 +101,9 @@ test("command names are noun then verb, and old names keep theirs", () => {
 });
 
 test("an old name's note names the new call", () => {
-	assert.match(aliasNote(VERB_BY_NAME.get("pen.edit")!)!, /pen\.edit is an old name.*decks\.canvas\.batch/);
+	assert.match(aliasNote(VERB_BY_NAME.get("pen.edit")!)!, /pen\.edit is an old name, removed on 2026-11-30: use decks\.canvas\.batch/);
+	// No old name points at another old name: each goes straight to a card call.
+	for (const old of ALIASES) assert.doesNotMatch(old.alias!, /decks\.board\.|type: "board"/, old.name);
 	assert.match(aliasNote(VERB_BY_NAME.get("open")!)!, /agent\.update\(\{ canvas \}\), then decks\.view\.goto/);
 	assert.equal(aliasNote(VERB_BY_NAME.get("canvas.insert")!), undefined);
 	for (const old of ["newBoard", "fit", "show", "hide", "move", "boards", "pen.read", "pen.edit", "pen.create", "pen.save", "pen.file", "stages", "open", "newStage", "title", "me", "agents", "send", "queue", "report", "reload", "url", "resolve", "camera", "viewport", "screenshot", "cursor"]) {

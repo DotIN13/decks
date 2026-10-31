@@ -1,4 +1,4 @@
-import { any, arr, bool, int, lit, nul, num, obj, opt, rec, str, union, type Schema } from "./schema.ts";
+import { any, arr, bool, deprecated, int, lit, nul, num, obj, OLD_NAMES_UNTIL, opt, rec, str, union, type Schema } from "./schema.ts";
 import {
 	Agent,
 	AgentKind,
@@ -9,6 +9,7 @@ import {
 	AppState,
 	Board,
 	Box,
+	Card,
 	Camera,
 	Canvas,
 	CanvasOp,
@@ -40,8 +41,8 @@ import {
  * The calls are named noun then verb (`canvas.insert`, `agent.send`), in the groups of the SDK
  * redesign. Two fields sort them by what a shared canvas cares about:
  *
- * - `touches`: what the call acts on. `deck` is the deck's files (a canvas's .pen file, a board
- *   file, a frame); `screen` is what the person sees in every open Decks page, with no file
+ * - `touches`: what the call acts on. `deck` is the deck's files (a canvas's .pen file, a card,
+ *   a frame); `screen` is what the person sees in every open Decks page, with no file
  *   changes; `agents` is agent records and messages; `outside` is apps, the shared Chrome tab,
  *   ports and the clock.
  * - `effect`: `change` if it changes what it touches, `read` if it only reads.
@@ -50,13 +51,13 @@ import {
  * `decks.here()`. No call changes a "current canvas"; `agent.update({ canvas })` changes an
  * agent's home canvas, which is what `here()` answers for that agent.
  *
- * The old names (`ALIASES`) still work for one release, each mapped onto its new call, and every
- * answer through one carries a note naming that call.
+ * The old names (`ALIASES`) still work until 2026-11-30 (`OLD_NAMES_UNTIL`), each mapped onto its
+ * new call, and every answer through one carries a note naming that call.
  */
 
 export type Effect = "change" | "read";
 export type Touches = "deck" | "screen" | "agents" | "outside";
-export type Group = "canvas" | "board" | "agent" | "view" | "apps" | "web" | "misc";
+export type Group = "canvas" | "card" | "agent" | "view" | "apps" | "web" | "misc";
 
 export interface Param {
 	name: string;
@@ -118,7 +119,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'Everything on the canvas, cards included, each with its box; an item cut by a frame round it that clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside), as does a text whose words overflow its fixed width and height. A card is { type: "card", card: <path>, box } (an old board, { type: "board", board }); every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a board\'s path, or an id inside an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name\'s value in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids "ref/child"; `geometry` adds a path\'s or shape\'s `outline`, an SVG path in its own space (0,0 its top-left corner).',
+			'Everything on the canvas, cards included, each with its box; an item cut by a frame round it that clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside), as does a text whose words overflow its fixed width and height. A card is { type: "card", card: <path>, box } (an old board, { type: "board", board }); every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a card\'s path, or an id inside an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name\'s value in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids "ref/child"; `geometry` adds a path\'s or shape\'s `outline`, an SVG path in its own space (0,0 its top-left corner).',
 		params: [onItems({ of: opt(str()), depth: opt(int()), resolve: opt(obj({ variables: opt(bool()), instances: opt(bool()), geometry: opt(bool()) })), theme: opt(rec(str())) })],
 		result: obj({ canvas: opt(str()), frame: opt(str()), title: opt(str()), file: opt(str()), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), values: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
 	},
@@ -293,24 +294,24 @@ export const VERBS: readonly Verb[] = [
 	},
 
 	// --- cards and the deck: files in the deck folder -------------------------------------------
-	{ name: "card.list", group: "board", ...deckRead, summary: "Every card in the deck, placed or not.", params: [], result: arr(Board) },
+	{ name: "card.list", group: "card", ...deckRead, summary: "Every card in the deck, placed or not.", params: [], result: arr(Card) },
 	{
 		name: "card.create",
 		card: "canvas",
-		group: "board",
+		group: "card",
 		...deckChange,
 		summary:
 			'Write a blank card in a canvas\'s own cards/ (`canvas`, or your own canvas) and return it: a folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js, data.json). Placing it is the canvas\'s job (decks.canvas.insert({ type: "card", card: path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you design, drawn in the canvas\'s own page.',
 		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
-		result: Board,
+		result: Card,
 	},
-	{ name: "card.get", card: "canvas", group: "board", ...deckRead, summary: "A card's path and title (the finding it states), and who last wrote it.", params: [p("card", str())], result: Board },
-	{ name: "card.canvases", card: "canvas", group: "board", ...deckRead, summary: "The canvas this card is on, with its place and size there.", params: [p("card", str())], result: arr(Placement) },
-	{ name: "card.url", card: "canvas", group: "board", ...deckRead, summary: "The card's address as a page of its own, for a browser such as Playwright.", params: [p("card", str())], result: str() },
-	{ name: "canvas.list", group: "board", ...deckRead, summary: "Every canvas in the deck, and which agents have it open.", params: [], result: arr(Canvas) },
+	{ name: "card.get", card: "canvas", group: "card", ...deckRead, summary: "A card's path and title (the finding it states), and who last wrote it.", params: [p("card", str())], result: Card },
+	{ name: "card.canvases", card: "canvas", group: "card", ...deckRead, summary: "The canvas this card is on, with its place and size there.", params: [p("card", str())], result: arr(Placement) },
+	{ name: "card.url", card: "canvas", group: "card", ...deckRead, summary: "The card's address as a page of its own, for a browser such as Playwright.", params: [p("card", str())], result: str() },
+	{ name: "canvas.list", group: "card", ...deckRead, summary: "Every canvas in the deck, and which agents have it open.", params: [], result: arr(Canvas) },
 	{
 		name: "canvas.create",
-		group: "board",
+		group: "card",
 		...deckChange,
 		summary: "A new, empty canvas, named from a title. Nobody moves to it: agent.update({ canvas }) makes it your home, view.goto shows it.",
 		params: [p("title", str())],
@@ -328,13 +329,13 @@ export const VERBS: readonly Verb[] = [
 	{
 		name: "frame.create",
 		card: "canvas",
-		group: "board",
+		group: "card",
 		...deckChange,
 		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in your canvas\'s own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck\'s own frames/ placed on a canvas is copied into it.',
 		params: [p("path", str()), o("item", PenItem)],
 		result: obj({ file: str(), ref: opt(str()), id: str() }),
 	},
-	{ name: "file.url", card: "canvas", group: "board", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
+	{ name: "file.url", card: "canvas", group: "card", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
 
 	// --- agent: who works --------------------------------------------------------------------
 	{ name: "agent.me", card: "page", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
@@ -356,7 +357,7 @@ export const VERBS: readonly Verb[] = [
 		params: [],
 		result: Canvas,
 	},
-	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these cards carry your work, without showing them: you become their writer.", params: [paths("boards")], result: arr(str()) },
+	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these cards carry your work, without showing them: you become their writer.", params: [paths("cards")], result: arr(str()) },
 	{ name: "agent.inbox", card: "page", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
 	{
 		name: "agent.list",
@@ -375,7 +376,7 @@ export const VERBS: readonly Verb[] = [
 		...agentsChange,
 		summary:
 			"Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.",
-		params: [p("name", str()), p("message", obj({ task: str(), boards: opt(arr(str())) }))],
+		params: [p("name", str()), p("message", obj({ task: str(), cards: opt(arr(str())), boards: opt(deprecated(arr(str()), "cards")) }))],
 		result: obj({ delivered: bool(), turn: lit("running", "new", "queued"), position: opt(num()), note: opt(str()) }),
 	},
 	{
@@ -384,7 +385,7 @@ export const VERBS: readonly Verb[] = [
 		group: "agent",
 		...agentsChange,
 		summary: "Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.",
-		params: [p("name", str()), p("work", obj({ task: str(), boards: opt(arr(str())), reply: opt(bool()) }))],
+		params: [p("name", str()), p("work", obj({ task: str(), cards: opt(arr(str())), boards: opt(deprecated(arr(str()), "cards")), reply: opt(bool()) }))],
 		result: obj({ queued: lit(true), position: num() }),
 	},
 	{
@@ -428,7 +429,7 @@ export const VERBS: readonly Verb[] = [
 		result: Camera,
 	},
 	{ name: "view.viewport", card: "frame", group: "view", ...screenRead, summary: "The room the screen has, in CSS pixels, or null when no screen has said.", params: [], result: union(obj({ width: num(), height: num() }), nul) },
-	{ name: "view.cursor", card: "frame", group: "view", ...screenChange, summary: "A labelled dot on a card, at the card's coordinates; null removes it.", params: [p("board", str()), p("at", union(Point, nul))] },
+	{ name: "view.cursor", card: "frame", group: "view", ...screenChange, summary: "A labelled dot on a card, at the card's coordinates; null removes it.", params: [p("card", str()), p("at", union(Point, nul))] },
 	{
 		name: "view.reload",
 		card: "frame",
@@ -436,7 +437,7 @@ export const VERBS: readonly Verb[] = [
 		...screenChange,
 		summary:
 			"Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.",
-		params: [p("options", obj({ board: str(), canvas: opt(str()) }))],
+		params: [p("options", obj({ card: opt(str()), board: opt(deprecated(str(), "card")), canvas: opt(str()) }))],
 		result: obj({ reloaded: num() }),
 	},
 
@@ -485,7 +486,7 @@ export const VERBS: readonly Verb[] = [
 		name: "apps.check",
 		group: "apps",
 		...outsideRead,
-		summary: "Open it in the server's browser and say what is wrong: what fit is to a board. Read `verdict`; `file` is a picture.",
+		summary: "Open it in the server's browser and say what is wrong: what fit is to a card. Read `verdict`; `file` is a picture.",
 		params: [p("name", str())],
 		result: obj({ verdict: str(), url: opt(str()), title: opt(str()), errors: arr(str()), failed: opt(arr(str())), words: opt(num()), file: opt(str()) }),
 	},
@@ -554,29 +555,29 @@ export const VERBS: readonly Verb[] = [
 ];
 
 /**
- * The old names, kept for one release. Each takes what it always took and answers as it always
- * did, mapped onto the new call named in `alias`; every answer through one carries a note naming
- * that call, so a caller learns the new name from using the old.
+ * The old names, kept until 2026-11-30 (`OLD_NAMES_UNTIL`). Each takes what it always took and
+ * answers as it always did, mapped onto the new call named in `alias`; every answer through one
+ * carries a note naming that call, so a caller learns the new name from using the old, and the
+ * server logs the first use of each (`stage/tool.ts`).
  */
 export const ALIASES: readonly Verb[] = [
 	// Boards are retired: a new one is a card (`card.*`), and these read a card or an old board alike.
-	{ name: "board.list", group: "board", ...deckRead, alias: "decks.card.list", summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
+	{ name: "board.list", group: "card", ...deckRead, alias: "decks.card.list", summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
 	{
 		name: "board.create",
-		group: "board",
+		group: "card",
 		...deckChange,
 		alias: "decks.card.create",
-		summary:
-			'Old name: now writes a card, as decks.card.create does, in a canvas\'s own cards/ (`canvas`, or your own canvas), and returns it; placing it is the canvas\'s job (decks.canvas.insert({ type: "card", card: path }, { beside })). The title is the finding, as a sentence.',
+		summary: "Old name: writes a card in a canvas's own cards/, exactly as decks.card.create does, and answers it; it does not place it.",
 		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
 		result: Board,
 	},
-	{ name: "board.get", group: "board", ...deckRead, alias: "decks.card.get", summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
-	{ name: "board.canvases", group: "board", ...deckRead, alias: "decks.card.canvases", summary: "The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.", params: [p("board", str())], result: arr(Placement) },
-	{ name: "board.url", group: "board", ...deckRead, alias: "decks.card.url", summary: "The board's address, for a browser such as Playwright.", params: [p("board", str())], result: str() },
+	{ name: "board.get", group: "card", ...deckRead, alias: "decks.card.get", summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
+	{ name: "board.canvases", group: "card", ...deckRead, alias: "decks.card.canvases", summary: "The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.", params: [p("board", str())], result: arr(Placement) },
+	{ name: "board.url", group: "card", ...deckRead, alias: "decks.card.url", summary: "The board's address, for a browser such as Playwright.", params: [p("board", str())], result: str() },
 	{
 		name: "newBoard",
-		group: "board",
+		group: "card",
 		...deckChange,
 		alias: "decks.card.create, then decks.canvas.insert",
 		summary: "Old name: now writes a card. Write a blank card and place it on your canvas at `at`; returns its path.",
@@ -596,25 +597,25 @@ export const ALIASES: readonly Verb[] = [
 		name: "resize",
 		group: "canvas",
 		...deckChange,
-		alias: "decks.canvas.update(board, { size })",
+		alias: "decks.canvas.update(card, { size })",
 		summary: "Old name: set a board's size outright.",
 		params: [p("path", str()), p("size", obj({ w: opt(num()), h: opt(num()) }))],
 		result: Sized,
 	},
 	{ name: "report", group: "agent", ...agentsChange, alias: "decks.agent.claim", summary: "Old name: claim boards as your work.", params: [paths()], result: obj({ reported: arr(str()) }) },
-	{ name: "reload", group: "view", ...screenChange, alias: "decks.view.reload({ board })", summary: "Old name: reload a board's page.", params: [p("path", str())] },
-	{ name: "boards", group: "canvas", ...deckRead, alias: "decks.canvas.read, or decks.board.list", summary: "Old name: every board, placed as your canvas has them.", params: [], result: arr(PlacedBoard) },
+	{ name: "reload", group: "view", ...screenChange, alias: "decks.view.reload({ card })", summary: "Old name: reload a board's page.", params: [p("path", str())] },
+	{ name: "boards", group: "canvas", ...deckRead, alias: "decks.canvas.read, or decks.card.list", summary: "Old name: every board, placed as your canvas has them.", params: [], result: arr(PlacedBoard) },
 	{
 		name: "show",
 		group: "view",
 		...screenChange,
-		alias: 'decks.canvas.insert({ type: "board", board }) to place it, then decks.view.focus',
+		alias: 'decks.canvas.insert({ type: "card", card }) to place it, then decks.view.focus',
 		summary: "Old name: put boards on your canvas and move the camera to them.",
 		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, o("options", obj({ fit: opt(lit("board", "all")), highlight: opt(str()), animate: opt(bool()), at: opt(Corner) }))],
 		result: obj({ shown: arr(str()) }),
 	},
 	{ name: "hide", group: "canvas", ...deckChange, alias: "decks.canvas.delete", summary: "Old name: take boards off your canvas.", params: [paths()] },
-	{ name: "move", group: "canvas", ...deckChange, alias: "decks.canvas.move(board, { at })", summary: "Old name: move a board on your canvas.", params: [p("path", str()), p("at", Point)], result: PlacedBoard },
+	{ name: "move", group: "canvas", ...deckChange, alias: "decks.canvas.move(card, { at })", summary: "Old name: move a board on your canvas.", params: [p("path", str()), p("at", Point)], result: PlacedBoard },
 	{ name: "cursor", group: "view", ...screenChange, alias: "decks.view.cursor", summary: "Old name: a labelled dot on a board.", params: [p("path", str()), p("at", union(Point, nul))] },
 	{
 		name: "camera",
@@ -637,7 +638,7 @@ export const ALIASES: readonly Verb[] = [
 	},
 	{
 		name: "stages",
-		group: "board",
+		group: "card",
 		...deckRead,
 		alias: "decks.canvas.list",
 		summary: "Old name: every canvas and who has it open.",
@@ -653,7 +654,7 @@ export const ALIASES: readonly Verb[] = [
 		params: [p("name", str())],
 		result: obj({ stage: str(), boards: arr(str()) }),
 	},
-	{ name: "newStage", group: "board", ...deckChange, alias: "decks.canvas.create, then decks.agent.update({ canvas })", summary: "Old name: make an empty canvas and move to it.", params: [p("title", str())], result: obj({ stage: str() }) },
+	{ name: "newStage", group: "card", ...deckChange, alias: "decks.canvas.create, then decks.agent.update({ canvas })", summary: "Old name: make an empty canvas and move to it.", params: [p("title", str())], result: obj({ stage: str() }) },
 	{ name: "title", group: "canvas", ...deckChange, alias: "decks.canvas.rename, or decks.here() to read", summary: "Old name: name your canvas, or read its name.", params: [o("title", str())], result: obj({ stage: str(), title: str() }) },
 	{
 		name: "pen.read",
@@ -673,7 +674,7 @@ export const ALIASES: readonly Verb[] = [
 		params: [p("edits", arr(PenEdit)), o("options", obj({ path: opt(str()) }))],
 		result: obj({ rev: opt(num()), file: opt(str()), ref: opt(str()), results: arr(obj({ op: str(), id: str(), box: opt(Box), note: opt(str()) })) }),
 	},
-	{ name: "pen.create", group: "board", ...deckChange, alias: "decks.frame.create", summary: "Old name: a new .pen file in frames/.", params: [p("path", str()), o("item", PenItem)], result: obj({ file: str(), ref: opt(str()), id: str() }) },
+	{ name: "pen.create", group: "card", ...deckChange, alias: "decks.frame.create", summary: "Old name: a new .pen file in frames/.", params: [p("path", str()), o("item", PenItem)], result: obj({ file: str(), ref: opt(str()), id: str() }) },
 	{
 		name: "pen.save",
 		group: "canvas",
@@ -723,8 +724,8 @@ export const ALIASES: readonly Verb[] = [
 		params: [o("agentId", str())],
 		result: arr(obj({ from: str(), fromName: str(), task: str(), boards: arr(str()), at: num() })),
 	},
-	{ name: "url", group: "board", ...deckRead, alias: "decks.board.url", summary: "Old name: a board's address.", params: [p("path", str())], result: str() },
-	{ name: "resolve", group: "board", ...deckRead, alias: "decks.file.url", summary: "Old name: a file's address for a board.", params: [p("file", str())], result: str() },
+	{ name: "url", group: "card", ...deckRead, alias: "decks.card.url", summary: "Old name: a board's address.", params: [p("path", str())], result: str() },
+	{ name: "resolve", group: "card", ...deckRead, alias: "decks.file.url", summary: "Old name: a file's address for a board.", params: [p("file", str())], result: str() },
 ];
 
 /** The new calls and the old names together: everything `/api/v1/<name>` answers. */
@@ -735,7 +736,7 @@ export const VERB_BY_NAME: ReadonlyMap<string, Verb> = new Map(ALL_VERBS.map((ve
 
 /** The note an answer through an old name carries. */
 export function aliasNote(verb: Verb): string | undefined {
-	return verb.alias ? `${verb.name} is an old name, kept for one release: use ${verb.alias}.` : undefined;
+	return verb.alias ? `${verb.name} is an old name, removed on ${OLD_NAMES_UNTIL}: use ${verb.alias}.` : undefined;
 }
 
 /** The command-line name of a call: `canvas.insert` -> `canvas insert`, `newBoard` -> `new-board`. */

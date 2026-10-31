@@ -661,7 +661,7 @@ function brief(task: string, boards: string[], deck: Deck, person?: boolean): st
 	if (boards.length > 0) {
 		parts.push(
 			"",
-			`You have been handed ${boards.length === 1 ? "a board" : `${boards.length} boards`}. These are the plan of record: they are what the user is looking at, and reporting means updating them rather than only describing what you did.`,
+			`You have been handed ${boards.length === 1 ? "a card" : `${boards.length} cards`}. These are the plan of record: they are what the user is looking at, and reporting means updating them rather than only describing what you did.`,
 		);
 		for (const path of boards) {
 			try {
@@ -676,7 +676,7 @@ function brief(task: string, boards: string[], deck: Deck, person?: boolean): st
 	if (person) return parts.join("\n");
 	parts.push(
 		"",
-		"Boards you changed are listed with this work only if you named them: `decks canvas fit`, or `decks agent claim <paths>`.",
+		"Cards you changed are listed with this work only if you named them: `decks canvas fit`, or `decks agent claim <paths>`.",
 		"When you are done, reply with a short report: what you changed, and anything the parent agent needs to decide.",
 	);
 	return parts.join("\n");

@@ -594,7 +594,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);
-				return { board: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
+				// `board` is `card`'s old name, answered beside it until 2026-11-30.
+				return { card: sized.path, board: sized.path, canvas, w: sized.w, h: sized.h, notes: said };
 			},
 			save: async (id: string, frame: string, options?: { canvas?: string; replace?: boolean }) => {
 				const name = canvasOf(options?.canvas);

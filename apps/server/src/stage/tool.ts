@@ -27,7 +27,7 @@ import { canvasVerbs } from "../verbs/canvas.ts";
 import { boardVerbs } from "../verbs/board.ts";
 import { agentVerbs } from "../verbs/agent.ts";
 import { viewVerbs } from "../verbs/view.ts";
-import { aliasNote, VERB_BY_NAME } from "@decks/api";
+import { aliasNote, OLD_NAMES_UNTIL, VERB_BY_NAME } from "@decks/api";
 
 /**
  * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person, a board or an app.
@@ -261,6 +261,16 @@ function guidelines(): string[] {
 }
 const GUIDELINES = guidelines();
 
+/** The old names used since the server started: each is logged the first time, so whoever still calls one can be found before 2026-11-30. */
+const oldNamesSeen = new Set<string>();
+
+/** Log an old name's first use in this process (`ALIASES` in @decks/api). */
+export function logOldName(name: string, use: string): void {
+	if (oldNamesSeen.has(name)) return;
+	oldNamesSeen.add(name);
+	console.warn(`[decks] the old name ${name} was called; it is removed on ${OLD_NAMES_UNTIL}: use ${use}.`);
+}
+
 export function createStageTool(deps: {
 	stage: StageService;
 	agent: StageAgentHooks;
@@ -278,7 +288,7 @@ export function createStageTool(deps: {
 	 * routes and these handlers cannot disagree about a verb's name or its arguments.
 	 */
 	const stage: Stage = {
-		// The old names, kept for one release (`ALIASES` in @decks/api); each answer says its new call.
+		// The old names, kept until 2026-11-30 (`ALIASES` in @decks/api); each answer says its new call.
 		...boardsVerbs(ctx),
 		...stageVerbs(ctx),
 		...stagesVerbs(ctx),
@@ -299,12 +309,12 @@ export function createStageTool(deps: {
 	 * one implementation of each; the rest keep their own code, for the answer shape and placement
 	 * their callers were written against (`ALIASES` in @decks/api says which new call each maps to).
 	 */
-	stage.url = (path) => stage.board.url(path);
+	stage.url = (path) => stage.card.url(path);
 	stage.resolve = (file) => stage.file.url(file);
 	stage.viewport = () => stage.view.viewport();
 	stage.cursor = (path, at) => stage.view.cursor(path, at);
 	stage.reload = async (path) => {
-		await stage.view.reload({ board: path });
+		await stage.view.reload({ card: path });
 	};
 	stage.report = async (path) => ({ reported: await stage.agent.claim(path) });
 	stage.pen = {
@@ -362,7 +372,10 @@ export function createStageTool(deps: {
 			// An old name says its new call, every time, so a caller learns it from using the old.
 			const known = VERB_BY_NAME.get(name);
 			const renamed = known ? aliasNote(known) : undefined;
-			if (renamed) said.push(renamed);
+			if (renamed) {
+				said.push(renamed);
+				logOldName(name, known!.alias!);
+			}
 			ctx.callOn.stage = undefined;
 			if (!agent.person) {
 				const unsaid = identityReminder(agent.identity(), { afterCall: true });
