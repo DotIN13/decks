@@ -40,7 +40,7 @@ export function sharedHeaders(res: Response): void {
 	res.setHeader("Referrer-Policy", "no-referrer");
 }
 
-/** The wildcard segment of `/api/board/*path`, as one forward-slashed string. */
+/** The wildcard segment of `/api/card/*path`, as one forward-slashed string. */
 export function wildcard(req: Request): string {
 	const raw = (req.params as Record<string, string | string[]>).path;
 	return Array.isArray(raw) ? raw.join("/") : String(raw ?? "");

@@ -45,10 +45,10 @@ test("a deck path is written back as the canvas's own reference, and refused whe
 });
 
 test("lib/ is served beside every canvas's boards, and the deck's parts beside its own canvases'", () => {
-	assert.equal(path(servedAs("canvases/plan/lib/board.css")), "lib/board.css");
+	assert.equal(path(servedAs("canvases/plan/lib/board.css")), "lib/card.css", "an old page's board.css is card.css");
 	assert.equal(path(servedAs("canvases/plan/assets/a.png")), "assets/a.png");
 	assert.equal(path(servedAs("canvases/plan/docs/n.md")), "docs/n.md");
-	assert.equal(path(servedAs("shared/canvases/ada/plan/lib/board.js")), "lib/board.js");
+	assert.equal(path(servedAs("shared/canvases/ada/plan/lib/board.js")), "lib/card.js");
 	assert.equal(path(servedAs("shared/canvases/ada/plan/assets/a.png")), "shared/canvases/ada/plan/assets/a.png");
 	assert.ok("refused" in servedAs("shared/canvases/ada/plan/apps/review/index.html"));
 	assert.equal(path(servedAs("canvases/plan/boards/a.html")), "canvases/plan/boards/a.html");

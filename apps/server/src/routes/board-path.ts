@@ -12,7 +12,7 @@ import { cardModuleAnswer, cardPageAnswer } from "./cards.ts";
 import { asyncRoute, isBoardPath, sharedHeaders, wildcard, type RouteDeps } from "./shared.ts";
 
 /**
- * `/api/card/*path`, and `/api/board/*path`, its old name, kept until 2026-11-30: the deck's files at
+ * `/api/card/*path`: the deck's files at
  * the address a card, a board or an asset is read from. The
  * request is matched in one order: a card's script (`cards.ts`), the file resolved and given its
  * headers, a card's page (`cards.ts`), an old board's page (`board-pages.ts`), and the file itself
@@ -27,7 +27,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * URL and lands back here, on the same guard.
 	 */
 	api.get(
-		["/card/*path", "/board/*path"],
+		"/card/*path",
 		asyncRoute(async (req, res) => {
 			// A card's folder at a version (`cards/sales@<rev>/`, `@decks/card-host`) is the folder.
 			const asked = unstampCard(wildcard(req));

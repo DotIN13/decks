@@ -37,7 +37,7 @@ const MAX_H = 12_000;
 export async function renderSnapshot(thumbs: PictureService, origin: string, ask: SnapshotAsk): Promise<Buffer> {
 	const w = Math.max(160, Math.min(4000, Math.round(ask.w)));
 	const h = Math.max(120, Math.min(MAX_H, Math.round(ask.h)));
-	const address = `${origin}/api/board/${ask.path.split("/").map(encodeURIComponent).join("/")}?snapshot=${randomUUID()}`;
+	const address = `${origin}/api/card/${ask.path.split("/").map(encodeURIComponent).join("/")}?snapshot=${randomUUID()}`;
 	return thumbs.borrow(async (browser) => {
 		const context = await browser.newContext({ viewport: { width: w, height: Math.min(h, 2000) }, deviceScaleFactor: wholeScale({ w, h }), colorScheme: ask.scheme, reducedMotion: "reduce", javaScriptEnabled: true });
 		try {

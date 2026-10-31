@@ -79,7 +79,7 @@ test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and t
 		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${done.body.token}` });
 		assert.equal(allowed.status, 200);
 		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
-		const board = await fetch(`${base}/board/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
+		const board = await fetch(`${base}/card/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
 		assert.equal(board.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
 	} finally {
 		cleanup();
@@ -231,17 +231,17 @@ test("Studio trades its token for a canvas pass, and a frame from Studio reads t
 
 		// A frame's reads: another site, and no Origin.
 		const frame = { "sec-fetch-site": "cross-site", "sec-fetch-dest": "image" };
-		const a = await fetch(`${base}/t/${pass}/board/canvases/${one}/files/a.txt`, { headers: frame });
+		const a = await fetch(`${base}/t/${pass}/card/canvases/${one}/files/a.txt`, { headers: frame });
 		assert.equal(a.status, 200);
 		assert.equal(await a.text(), one);
 		assert.equal(a.headers.get("referrer-policy"), "no-referrer", "the pass in its address is not sent on");
-		assert.equal((await fetch(`${base}/board/canvases/${one}/files/a.txt`, { headers: frame })).status, 401, "no pass");
-		assert.equal((await fetch(`${base}/t/${pass}/board/canvases/${two}/files/a.txt`, { headers: frame })).status, 401, "one's pass, for two");
+		assert.equal((await fetch(`${base}/card/canvases/${one}/files/a.txt`, { headers: frame })).status, 401, "no pass");
+		assert.equal((await fetch(`${base}/t/${pass}/card/canvases/${two}/files/a.txt`, { headers: frame })).status, 401, "one's pass, for two");
 		assert.equal((await fetch(`${base}/t/${pass}/v1/events`, { headers: frame })).status, 401, "a pass in an address reads files, not the API");
 
 		// Revoking the token ends its passes.
 		app.tokens.revoke(app.tokens.idOf(token)!);
-		assert.equal((await fetch(`${base}/t/${pass}/board/canvases/${one}/files/a.txt`, { headers: frame })).status, 401);
+		assert.equal((await fetch(`${base}/t/${pass}/card/canvases/${one}/files/a.txt`, { headers: frame })).status, 401);
 	} finally {
 		cleanup();
 	}

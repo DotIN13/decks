@@ -91,7 +91,7 @@ test("the doors and the public files are open without a token; no page, file or 
 		assert.equal(hello.paired, false);
 		assert.equal((await fetch(`${origin}/api/sdk/decks.mjs`)).status, 200);
 		for (const site of ["same-origin", "cross-site", "none"]) {
-			for (const path of ["/api/board/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html", "/api/revision/abc/boards/a.html"]) {
+			for (const path of ["/api/card/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html", "/api/revision/abc/boards/a.html"]) {
 				assert.equal((await fetch(`${origin}${path}`, { headers: { "sec-fetch-site": site, "sec-fetch-dest": "image" } })).status, 401, `${path} from ${site}: every read carries a pass or a token`);
 			}
 		}
@@ -131,8 +131,8 @@ test("a board has no token: the routes that made one are gone, and a person's to
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
 		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/a.html" })).status, 404);
 		assert.equal((await post("/api/v1/board-token", person, { path: "boards/a.html" })).status, 404);
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: person })).status, 200);
-		assert.equal((await post("/api/tickets", person, { paths: ["/api/board/boards/a.html"] })).status, 404, "no tickets at all");
+		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: person })).status, 200);
+		assert.equal((await post("/api/tickets", person, { paths: ["/api/card/boards/a.html"] })).status, 404, "no tickets at all");
 	} finally {
 		cleanup();
 	}
@@ -143,12 +143,12 @@ test("the harness's own Chromium reads what it draws on a pass it made for no ca
 	try {
 		const { HARNESS_ID } = await import("./passes.ts");
 		const own = bearer(app.passes.canvas("", "view", HARNESS_ID).pass);
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: own })).status, 200);
-		assert.equal((await post("/api/v1/boards", own)).status, 403, "no verb");
+		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: own })).status, 200);
+		assert.equal((await post("/api/v1/card.list", own)).status, 403, "no verb");
 		assert.equal((await fetch(`${origin}/api/deck`, { headers: own })).status, 403, "nothing of the person's");
 		// Made by anyone else, a pass for no canvas is nothing.
 		const person = app.tokens.issue({ kind: "person" });
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: bearer(app.passes.canvas("", "view", person.id).pass) })).status, 401);
+		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: bearer(app.passes.canvas("", "view", person.id).pass) })).status, 401);
 	} finally {
 		cleanup();
 	}
@@ -165,7 +165,7 @@ test("the opencode plugin trades its server's secret and a session for that sess
 		const traded = await post("/api/tokens/session", bearer("server-secret"), { sessionID: "ses_1" });
 		assert.equal(traded.status, 200);
 		assert.equal(traded.body.token, app.bridge.issue(agent.id), "the agent's own token");
-		assert.equal((await post("/api/v1/me", bearer(String(traded.body.token)))).status, 200);
+		assert.equal((await post("/api/v1/agent.me", bearer(String(traded.body.token)))).status, 200);
 	} finally {
 		cleanup();
 	}

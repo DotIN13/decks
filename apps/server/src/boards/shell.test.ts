@@ -20,15 +20,15 @@ test("the shell is a board the loader can read back", () => {
 });
 
 /*
- * The nested case, and the reason the lib paths are absolute. `/api/board/boards/a/b.md` is
- * two directories deeper than `/api/board/boards/b.md`, so a relative `../lib/board.css`
+ * The nested case, and the reason the lib paths are absolute. `/api/card/boards/a/b.md` is
+ * two directories deeper than `/api/card/boards/b.md`, so a relative `../lib/card.css`
  * would resolve to a different place for each — and the deeper one would 404 with no sign
  * beyond an unstyled board.
  */
 test("a nested board reaches the same primitives as a top-level one", () => {
 	const nested = renderShell({ path: "boards/talks/2026/notes.md", shell: "content", title: "N", w: 720, h: 400 });
-	assert.match(nested, /href="\/api\/lib\/board\.css"/);
-	assert.match(nested, /src="\/api\/lib\/board\.js"/);
+	assert.match(nested, /href="\/api\/lib\/card\.css"/);
+	assert.match(nested, /src="\/api\/lib\/card\.js"/);
 	// And the file is addressed relative to the board's own URL, exactly as an `<img src>`
 	// on a component board would be — so it resolves beside the board, not beside the deck.
 	assert.match(nested, /data-embed="notes\.md\?raw=1"/);

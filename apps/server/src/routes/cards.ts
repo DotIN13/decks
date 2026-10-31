@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Response } from "express";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { cardModules, cardPage, readDeckImports } from "../cards/cards.ts";
 import { canvasOfPath, isCardPath, isSharedCanvas } from "../deck/layout.ts";
 import { libVersion, versionLibRefs } from "../deck/lib-version.ts";
@@ -10,7 +10,7 @@ import { boardHeaders } from "../files/serve.ts";
 import type { App } from "../app.ts";
 
 /**
- * A card's two answers under `/api/board/*path` (`board-path.ts`): one of its scripts, and its page.
+ * A card's two answers under `/api/card/*path` (`board-path.ts`): one of its scripts, and its page.
  * Each returns true when it answered the request.
  */
 
@@ -34,7 +34,7 @@ export async function cardModuleAnswer(app: App, asked: string, requested: strin
 }
 
 /** A card opened by itself, or pictured: the piece in a page of its own (`cards/cards.ts`). */
-export async function cardPageAnswer(app: App, asked: string, requested: string, target: string, board: Board | undefined, raw: boolean, res: Response): Promise<boolean> {
+export async function cardPageAnswer(app: App, asked: string, requested: string, target: string, board: Page | undefined, raw: boolean, res: Response): Promise<boolean> {
 	if (raw || !isCardPath(requested)) return false;
 	const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
 	const mapFile = resolveServed(app.deck.path, "assets/importmap.json");

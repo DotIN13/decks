@@ -7,7 +7,7 @@ import { join } from "node:path";
  *
  * A **canvas pass** (`dk_cp_…`) is what the canvas frame holds for its one canvas, in Decks and in
  * the harness's own picture-taking page: its calls carry it as `Authorization: Bearer`, and its files,
- * pictures, modules and sheets carry it in their address, `/api/t/<pass>/board/canvases/<name>/…`,
+ * pictures, modules and sheets carry it in their address, `/api/t/<pass>/card/canvases/<name>/…`,
  * since an image or a module cannot send a header. It is asked for with a harness token
  * (`POST /api/passes`) and is bound to that token: it works only while the token does, so signing out
  * ends it. It names a role, view or edit, and every use reads the person's role on the canvas now: a
@@ -184,7 +184,7 @@ export class Passes {
 }
 
 /**
- * The folder a canvas keeps its files in, as `/api/board/` serves it: `canvases/plan/`, or a friend's
+ * The folder a canvas keeps its files in, as `/api/card/` serves it: `canvases/plan/`, or a friend's
  * `shared/canvases/ana/trip/` for the canvas `shared/ana/trip`.
  */
 export function canvasFolder(canvas: string): string {
@@ -194,12 +194,12 @@ export function canvasFolder(canvas: string): string {
 
 /**
  * Whether a canvas pass reaches a GET of this path (decoded, as the route sees it): a file in the
- * canvas's folder (`/api/card/<folder>…`, or `/api/board/…`, the old prefix), its picture (`/api/thumb/<folder>…`), or a card or board
+ * canvas's folder (`/api/card/<folder>…`), its picture (`/api/thumb/<folder>…`), or a card or board
  * placed on the canvas from elsewhere (`placed`), by its own path. Every part plain: never `..`, `.`, or a
  * hidden folder.
  */
 export function passCovers(canvas: string, path: string, placed: (deckPath: string) => boolean = () => false): boolean {
-	const route = /^\/api\/(card|board|thumb)\/(.+)$/.exec(path);
+	const route = /^\/api\/(card|thumb)\/(.+)$/.exec(path);
 	if (!route) return false;
 	const rest = route[2]!;
 	if (!rest.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
@@ -236,8 +236,7 @@ export function passSecret(dataDir: string): Buffer {
 }
 
 /**
- * A pass carried in the path rather than a header, `/api/t/<pass>/card/<path>` (or `/board/`, the old
- * prefix, until 2026-11-30): what a canvas frame's
+ * A pass carried in the path rather than a header, `/api/t/<pass>/card/<path>`: what a canvas frame's
  * files, pictures, modules and sheets are read at, so every relative address they load carries it too.
  * Answers the pass and the path as the route sees it.
  */

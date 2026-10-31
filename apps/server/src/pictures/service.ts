@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Board } from "@decks/protocol";
+import type { Page as DeckPage } from "@decks/protocol";
 import { compress, encoder, type Level } from "./astc.ts";
 import { compressedName, LEVELS, squeezed, wireEncoding, wireName, type WireEncoding } from "./compress.ts";
 import {
@@ -54,7 +54,7 @@ export type { PageViews };
  * is the board's own scripts and not the browser; and pictures that are wrong in ways a
  * thumbnail cannot hide. `color-mix()` and translucent colours paint black, so the grid and
  * every card border are solid black; KaTeX's exponents land beside the line; words overprint
- * ("deessp", "1,0002 m"); and one board in five never reached `__boardReady` and held the
+ * ("deessp", "1,0002 m"); and one board in five never reached `__cardReady` and held the
  * page for thirty seconds (`import.meta` in a worker). Its download is also two binaries of
  * 100MB, which is what Chromium's headless shell costs. It is its own layout and paint
  * engine, and a picture of a board has to be the board.
@@ -102,7 +102,7 @@ export interface ThumbHost {
 	/** How long a changed board is left to settle. For tests; `SETTLE_MS` otherwise. */
 	settleMs?: number;
 	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
-	boards?: () => Board[];
+	boards?: () => DeckPage[];
 	/** The cards on any canvas: the only ones the indexer keeps pictures of, since nothing else draws them. */
 	placed?: () => ReadonlySet<string>;
 	/**
@@ -130,7 +130,7 @@ export interface PictureProgress {
 const INDEXERS = 2;
 
 interface Job {
-	board: Board;
+	board: DeckPage;
 	scheme: ThumbScheme;
 	file: string;
 	kind: ThumbKind;
@@ -254,7 +254,7 @@ export class PictureService {
 	 * now if missing: the first request for a compressed picture finds it on disk instead of waiting
 	 * for the encoder (about 80 ms a 480 px card, 40 to 100 a 192, with the server's Chrome up).
 	 */
-	private async ahead(board: Board, scheme: ThumbScheme): Promise<void> {
+	private async ahead(board: DeckPage, scheme: ThumbScheme): Promise<void> {
 		const files: string[] = [];
 		for (const width of [...AHEAD_WIDTHS].reverse()) files.push(await this.picture(board, scheme, width, () => false, true));
 		if (!this.compressedWanted()) return;
@@ -373,7 +373,7 @@ export class PictureService {
 	}
 
 	/** The cards the indexer keeps pictures of: those on a canvas (`placed`), or every one when the host does not say. */
-	private indexed(): Board[] {
+	private indexed(): DeckPage[] {
 		const all = this.host.boards?.() ?? [];
 		const placed = this.host.placed?.();
 		return placed ? all.filter((board) => placed.has(board.path)) : all;
@@ -403,8 +403,8 @@ export class PictureService {
 	private lastScheme: ThumbScheme | undefined;
 
 	/** The cards and schemes without one of their far rungs (`AHEAD_WIDTHS`) of the current revision. */
-	private missing(have: Set<string>): Array<{ board: Board; scheme: ThumbScheme }> {
-		const out: Array<{ board: Board; scheme: ThumbScheme }> = [];
+	private missing(have: Set<string>): Array<{ board: DeckPage; scheme: ThumbScheme }> {
+		const out: Array<{ board: DeckPage; scheme: ThumbScheme }> = [];
 		const boards = this.indexed();
 		for (const scheme of this.indexSchemes()) {
 			for (const board of boards) {
@@ -439,7 +439,7 @@ export class PictureService {
 	 * a page. Rejects when there is no Chromium, or the board would not draw.
 	 */
 	/** A card's whole picture, taken now if nobody has taken it. */
-	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false): Promise<string> {
+	get(board: DeckPage, scheme: ThumbScheme, gone: () => boolean = () => false): Promise<string> {
 		this.asked(scheme);
 		return this.ask(board, scheme, gone, false, "whole");
 	}
@@ -460,7 +460,7 @@ export class PictureService {
 	 * otherwise taken straight from the page, and any other is cut from the next taken one up.
 	 * `ahead` is the background's: a browser's request is taken before it.
 	 */
-	async picture(board: Board, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
+	async picture(board: DeckPage, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
 		const whole = join(this.host.dir, thumbName(board.path, board.rev, scheme, "whole"));
 		if (size === "whole") return this.ask(board, scheme, gone, ahead, "whole");
 		const target = smallName(whole, size);
@@ -483,7 +483,7 @@ export class PictureService {
 	 * two pages at a time, reached it: zooming out over dozens of boards after a look change was a
 	 * screen of empty rectangles filling in over a minute.
 	 */
-	nearest(board: Board, scheme: ThumbScheme, size: "whole" | number): { file: string; exact: boolean } | undefined {
+	nearest(board: DeckPage, scheme: ThumbScheme, size: "whole" | number): { file: string; exact: boolean } | undefined {
 		const want = size === "whole" ? Number.POSITIVE_INFINITY : size;
 		const whole = thumbName(board.path, board.rev, scheme, "whole");
 		const exact = size === "whole" ? whole : smallName(whole, size);
@@ -520,11 +520,11 @@ export class PictureService {
 	/**
 	 * A board changed: retake its picture once it has stopped changing.
 	 *
-	 * Called for every `board.changed`, which includes changes that are not to the file (who
+	 * Called for every `card.changed`, which includes changes that are not to the file (who
 	 * wrote it, when it was last seen). Those cost one `existsSync`, because the revision is the
 	 * same and so is the picture's name.
 	 */
-	changed(board: Board): void {
+	changed(board: DeckPage): void {
 		if (this.broken) return;
 		clearTimeout(this.settling.get(board.path));
 		const timer = setTimeout(() => {
@@ -562,7 +562,7 @@ export class PictureService {
 		return this.schemes;
 	}
 
-	private ask(board: Board, scheme: ThumbScheme, gone: () => boolean, ahead: boolean, kind: ThumbKind, width = SMALL_TAKEN): Promise<string> {
+	private ask(board: DeckPage, scheme: ThumbScheme, gone: () => boolean, ahead: boolean, kind: ThumbKind, width = SMALL_TAKEN): Promise<string> {
 		const file = join(this.host.dir, thumbName(board.path, board.rev, scheme, kind, width));
 		if (existsSync(file)) return Promise.resolve(file);
 		if (this.broken) return Promise.reject(new Error(this.broken));
@@ -668,14 +668,14 @@ export class PictureService {
 		try {
 			const page = lease?.page ?? (await context.newPage());
 			if (lease) await page.setViewportSize({ width: clip.width, height: tall });
-			const url = `${this.host.origin()}/api/board/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
+			const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
 			await page.goto(url, { waitUntil: "load", timeout: 20_000 });
 			/*
 			 * `board.js` sets this after fonts, markdown, maths and diagrams. A board that never says
 			 * so is drawn as it stands: a late picture beats none. The background waits less for one:
 			 * two such boards were an eighth of a sweep's time.
 			 */
-			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
+			await page.waitForFunction("window.__cardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
 			let shotClip = clip;
 			const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
 			// Never below what the card says it is: a picture cropped under its box would be a different card from the one on the canvas.
@@ -747,7 +747,7 @@ export class PictureService {
 	 * anything wider than the board, and any script error. Nothing is returned for a view that
 	 * is fine, and nothing at all when there is no Chromium, because this is advice.
 	 */
-	async views(board: Board): Promise<PageViews | undefined> {
+	async views(board: DeckPage): Promise<PageViews | undefined> {
 		if (this.broken) return undefined;
 		clearTimeout(this.idle);
 		let browser: Browser;

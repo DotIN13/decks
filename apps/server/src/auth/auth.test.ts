@@ -200,11 +200,12 @@ test("the gate's open list: the doors and the Decks page and its files; no comma
 	assert.ok(!isPublic("POST", "/"));
 	assert.ok(!isPublic("GET", "/api/deck"));
 	assert.ok(!isPublic("GET", "/api/v1/events"));
-	for (const path of ["/api/board/boards/a.html", "/api/thumb/boards/a.html", "/api/f/x.png", "/api/avatar/a1", "/api/stage-thumb/plan", "/c/abc123/api/board/boards/a.html"]) assert.ok(!isPublic("GET", path), path);
+	for (const path of ["/api/card/boards/a.html", "/api/board/boards/a.html", "/api/thumb/boards/a.html", "/api/f/x.png", "/api/avatar/a1", "/api/stage-thumb/plan", "/c/abc123/api/card/boards/a.html"]) assert.ok(!isPublic("GET", path), path);
 	// What the harness's own Chromium reads, on its own pass: reads alone.
-	assert.ok(harnessReads("GET", "/api/board/boards/a.html"));
+	assert.ok(harnessReads("GET", "/api/card/boards/a.html"));
+	assert.ok(!harnessReads("GET", "/api/board/boards/a.html"), "the old prefix is gone");
 	assert.ok(harnessReads("GET", "/api/stage-pen/x"));
-	assert.ok(!harnessReads("POST", "/api/board/boards/a.html"));
+	assert.ok(!harnessReads("POST", "/api/card/boards/a.html"));
 	assert.ok(!harnessReads("GET", "/api/agents/a1/history"));
 	assert.ok(!harnessReads("GET", "/api/harness"));
 });

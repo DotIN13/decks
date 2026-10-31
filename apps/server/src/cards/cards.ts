@@ -67,7 +67,7 @@ export function cardPage(input: { path: string; source: string; title: string; w
 	<meta charset="utf-8" />
 	<title>${escapeHtml(input.title)}</title>
 	<meta name="board" content='${JSON.stringify({ w: input.w })}' />
-	<link rel="stylesheet" href="../../lib/board.css" />
+	<link rel="stylesheet" href="../../lib/card.css" />
 	<script type="importmap">
 ${withDeckImports(input.deckImports)}
 	</script>
@@ -84,7 +84,7 @@ ${withDeckImports(input.deckImports)}
 		} catch (error) { console.error(url, error); }
 	}
 </script>
-<script src="../../lib/board.js"></script>
+<script src="../../lib/card.js"></script>
 </body>
 </html>
 `;

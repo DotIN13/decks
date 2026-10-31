@@ -125,7 +125,7 @@ export function appPictureBoard(html: string, owner: string, picture: string | u
 		<meta charset="utf-8" />
 		<title>${title}</title>
 		<meta name="board" content='${meta}' />
-		<link rel="stylesheet" href="${lib}/board.css" />
+		<link rel="stylesheet" href="${lib}/card.css" />
 	</head>
 	<body class="board">
 		<h1>${title}</h1>

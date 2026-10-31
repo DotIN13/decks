@@ -74,11 +74,11 @@ export function renderShell(spec: ShellSpec): string {
 		<meta charset="utf-8" />
 		<title>${escapeText(spec.title)}</title>
 		<meta name="board" content='${escapeAttribute(meta)}' />
-		<link rel="stylesheet" href="${LIB}/board.css" />
+		<link rel="stylesheet" href="${LIB}/card.css" />
 	</head>
 	<body class="board board-shell">
 ${body}
-		<script src="${LIB}/board.js"></script>
+		<script src="${LIB}/card.js"></script>
 	</body>
 </html>
 `;

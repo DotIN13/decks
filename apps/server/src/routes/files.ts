@@ -5,7 +5,7 @@ import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts
 import { basename, join, relative, resolve, sep } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } from "../deck/roots.ts";
-import { canvasFolder, canvasNameOk } from "../deck/layout.ts";
+import { canvasFolder, canvasNameOk, libName } from "../deck/layout.ts";
 import { browse } from "../files/browse.ts";
 import { filePreview, previewKind } from "../files/preview.ts";
 import { boardHeaders, quarantine } from "../files/serve.ts";
@@ -22,7 +22,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * The board primitives, reachable from a document not served under `/board`.
 	 *
 	 * A revision preview is served at `/api/revision/<sha>`, so the `../lib/board.css` in
-	 * its own markup resolves to `/api/lib/board.css` — not to `/api/board/lib/board.css`,
+	 * its own markup resolves to `/api/lib/board.css` (served as `card.css`) — not to `/api/card/lib/card.css`,
 	 * where the deck's copy lives. Without this alias a previewed board arrived as unstyled
 	 * HTML with `board.js` missing, so the time machine looked like it worked (the text was
 	 * right) while showing nothing like the board it was previewing.
@@ -31,7 +31,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/lib/*path",
 		asyncRoute(async (req, res) => {
 			const versioned = splitLibVersion(wildcard(req));
-			const target = resolveServed(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
+			// A page written before cards asks for board.css and board.js: they are card.css and card.js.
+			const target = resolveServed(app.deck.path, join("lib", libName(versioned?.file ?? wildcard(req))));
 			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(wildcard(req));
 			boardHeaders(res);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
@@ -70,9 +71,9 @@ export function register(api: Router, { app }: RouteDeps): void {
 			const target = resolveFileRequest(app.deck.roots, { path: requested });
 			if (!existsSync(target) || !statSync(target).isFile()) throw new NotFound(requested);
 			quarantine(res, target);
-			// A web page outside the deck that is its board, with the bridge in it, as one inside the deck gets (`/board/*path`).
+			// A web page outside the deck that is its board, with the bridge in it, as one inside the deck gets (`/card/*path`).
 			if (req.query.guest !== undefined && /\.html?$/i.test(target)) {
-				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}board/lib/embed-guest.js`));
+				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}card/lib/embed-guest.js`));
 				return;
 			}
 			await sendFile(res, target);
