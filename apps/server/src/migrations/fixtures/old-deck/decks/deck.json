@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "name": "Old deck",
+  "boards": {
+    "boards/plan.html": { "x": 0, "y": 0 }
+  }
+}

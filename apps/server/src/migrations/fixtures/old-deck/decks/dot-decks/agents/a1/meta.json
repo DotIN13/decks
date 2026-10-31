@@ -1,0 +1,10 @@
+{
+	"id": "a1",
+	"name": "Wren",
+	"stage": "agent-3",
+	"isolated": true,
+	"isolatedStages": ["agent-3"],
+	"context": ["boards/plan.html", "boards/risks.html"],
+	"inPlay": ["boards/plan.html"],
+	"positions": { "boards/plan.html": { "x": 0, "y": 0 } }
+}

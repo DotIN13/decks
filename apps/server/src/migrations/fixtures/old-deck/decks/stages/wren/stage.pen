@@ -1,0 +1,7 @@
+{
+  "version": "2.11",
+  "children": [
+    { "type": "browser", "id": "risks", "name": "risks", "x": 0, "y": 0, "width": 600, "height": 400, "url": "../../boards/risks.html", "metadata": { "type": "decks.board", "path": "boards/risks.html" } },
+    { "type": "browser", "id": "kept", "name": "kept", "x": 700, "y": 0, "width": 1000, "height": 300, "url": "../../stages/wren/boards/kept.html", "metadata": { "type": "decks.board", "path": "stages/wren/boards/kept.html" } }
+  ]
+}

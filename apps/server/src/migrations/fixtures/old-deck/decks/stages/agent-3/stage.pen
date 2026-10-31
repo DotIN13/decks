@@ -1,0 +1,25 @@
+{
+  "version": "2.11",
+  "children": [
+    { "type": "browser", "id": "plan", "name": "plan", "x": 0, "y": 0, "width": 1000, "height": 700, "url": "../../boards/plan.html", "metadata": { "type": "decks.board", "path": "boards/plan.html" } },
+    { "type": "browser", "id": "risks", "name": "risks", "x": 1080, "y": 0, "width": 600, "height": 400, "url": "../../boards/risks.html", "metadata": { "type": "decks.board", "path": "boards/risks.html" } },
+    { "type": "browser", "id": "notes", "name": "notes", "x": 1080, "y": 480, "width": 760, "height": 240, "url": "../../boards/notes.html", "metadata": { "type": "decks.board", "path": "boards/notes.html" } },
+    { "type": "browser", "id": "paper", "name": "notes.md", "x": 0, "y": 800, "width": 800, "height": 900, "url": "../../boards/paper.html", "metadata": { "type": "decks.board", "path": "boards/paper.html" } },
+    { "type": "browser", "id": "review", "name": "Review", "x": 900, "y": 800, "width": 900, "height": 640, "url": "../../boards/apps/review.html", "metadata": { "type": "decks.board", "path": "boards/apps/review.html" } },
+    { "type": "browser", "id": "pdf", "name": "sample.pdf", "x": 0, "y": 1800, "width": 800, "height": 1000, "url": "../../boards/sample-pdf.html", "metadata": { "type": "decks.board", "path": "boards/sample-pdf.html" } },
+    { "type": "browser", "id": "chrome", "name": "Your Chrome", "x": 900, "y": 1800, "width": 420, "height": 200, "url": "../../boards/your-chrome.html", "metadata": { "type": "decks.board", "path": "boards/your-chrome.html" } },
+    { "type": "browser", "id": "site", "name": "A framed site", "x": 900, "y": 2100, "width": 800, "height": 500, "url": "../../boards/embed-site.html", "metadata": { "type": "decks.board", "path": "boards/embed-site.html" } },
+    {
+      "type": "frame", "id": "group", "name": "Reading", "x": 2000, "y": 0, "width": 700, "height": 640,
+      "children": [
+        { "type": "browser", "id": "pinned", "name": "notes.md, pinned", "x": 40, "y": 60, "width": 600, "height": 500, "url": "../../boards/pinned-doc.html", "metadata": { "type": "decks.board", "path": "boards/pinned-doc.html" } }
+      ]
+    },
+    {
+      "type": "frame", "id": "md", "name": "Card", "x": 2000, "y": 800, "width": 360, "height": 200, "metadata": { "type": "decks.card" },
+      "children": [ { "type": "text", "id": "md-text", "content": "# To do\n\n- ship the plan" } ]
+    },
+    { "type": "text", "id": "label", "x": 0, "y": -80, "content": "Auth refresh", "fontSize": 32 },
+    { "type": "connector", "id": "arrow", "source": { "id": "plan" }, "target": { "id": "risks" } }
+  ]
+}

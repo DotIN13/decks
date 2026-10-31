@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Auth refresh — the plan</title>
+		<meta name="board" content='{"w":1000,"h":700,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<style>
+			body.board { background: var(--b-bg); }
+			:root { --plan-accent: #c46a00; }
+			.step { color: var(--plan-accent); }
+		</style>
+	</head>
+	<body class="board">
+		<div class="doc" data-id="body">
+			<h1>One refresh, two tabs</h1>
+			<p class="step" id="count">Steps: 0</p>
+			<img src="../assets/chart.svg" alt="the chart" />
+			<p>The risks are on <a href="risks.html">their own board</a>; the library keeps <a href="free.html">a spare</a>.</p>
+			<button data-eval="ship" data-value="v1">Ship it</button>
+		</div>
+		<script>
+			let steps = 0;
+			setInterval(() => {
+				steps += 1;
+				document.getElementById("count").textContent = `Steps: ${steps}`;
+			}, 1000);
+		</script>
+		<script type="text/decks-eval" data-for="ship">
+			await stage.send(`Ship ${event.value} of the plan`);
+		</script>
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
