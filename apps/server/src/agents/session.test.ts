@@ -446,7 +446,9 @@ test("the queue drains once the agent has been quiet, one item at a time", async
 	agent.enqueue(item("first", ["boards/plan.html"]));
 	agent.enqueue(item("second"));
 
-	await settle(80);
+	// Two quiet spells of 10 ms each: waited for rather than timed, since a loaded machine (the whole
+	// suite at once) can take longer than any fixed sleep to fire both.
+	for (let tries = 0; tries < 100 && agent.ran.length < 2; tries++) await settle(20);
 	// The brief is composed when the item runs, so the board source is the one that exists
 	// then — here the stub just names what it was handed.
 	assert.deepEqual(agent.ran, ["first [boards/plan.html]", "second"]);

@@ -81,14 +81,15 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 		}
 		if (node.type !== "browser" || !isPageTag(meta?.type) || typeof meta.path !== "string") continue;
 		let reference = referenceFor(name, meta.path);
+		let deckPath = meta.path;
 		if ("refused" in reference) {
 			if (!adopt) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
-			const copied = adopt.board(name, meta.path);
-			reference = referenceFor(name, copied);
+			deckPath = adopt.board(name, meta.path);
+			reference = referenceFor(name, deckPath);
 			if ("refused" in reference) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
 		}
-		// A board copied in may have landed as a card (`copy-in.ts`): its tag follows its path.
-		node.metadata = { ...meta, type: isCardPath(reference.path) ? CARD_ITEM : (meta.type as string), path: reference.path };
+		// A board copied in may have landed as a card (`copy-in.ts`): its tag follows its path in the deck.
+		node.metadata = { ...meta, type: isCardPath(deckPath) ? CARD_ITEM : (meta.type as string), path: reference.path };
 		node.url = urlFor(name, reference.path);
 	}
 	if (adopt?.frame) for (const ref of frameRefsOf(out)) adopt.frame(name, ref);
