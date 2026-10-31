@@ -16,7 +16,7 @@ const EVERY_MS = 1000;
 
 /**
  * How far the server has got keeping the far rungs of every card on a canvas:
- * a row in the ⋯ menu. The server takes what is missing in the background (`ThumbService.index`);
+ * a row in the ⋯ menu. The server takes what is missing in the background (`PictureService.index`);
  * this asks how far it has got each second, and only while the menu is open, since the menu's
  * contents exist only then.
  */

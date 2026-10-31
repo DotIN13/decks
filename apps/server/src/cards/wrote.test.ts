@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { DeckState, ServerMessage } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
-import { BoardService } from "./service.ts";
+import { CardService } from "./service.ts";
 
-function serviceOn(root: string): { deck: Deck; service: BoardService; sent: ServerMessage[] } {
+function serviceOn(root: string): { deck: Deck; service: CardService; sent: ServerMessage[] } {
 	const deck = Deck.open(root);
 	const sent: ServerMessage[] = [];
-	const service = new BoardService(deck, {
+	const service = new CardService(deck, {
 		send: (message) => void sent.push(message),
 		state: () => ({ boards: deck.boards }) as unknown as DeckState,
 		removed: () => {},

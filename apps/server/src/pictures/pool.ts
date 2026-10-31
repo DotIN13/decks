@@ -1,6 +1,6 @@
 /**
  * The server's Chromium: the Playwright types the pictures use, the launch with WebGPU, and the
- * harness's own pass given to its reads (`withOwnReads`). The pages it holds are leased by `ThumbService`.
+ * harness's own pass given to its reads (`withOwnReads`). The pages it holds are leased by `PictureService`.
  */
 
 export type Playwright = typeof import("playwright");

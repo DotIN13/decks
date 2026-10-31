@@ -392,7 +392,7 @@ async function appCaller(app: App, name: string, allowedOnce: Set<string>): Prom
 	// Trusted under `apps/<name>` as it always was, so an "Always allow" given before still holds.
 	const key = `apps/${name}`;
 	const board = appActor(name);
-	if (!app.evalTrust.allows(key) && !allowedOnce.has(key)) {
+	if (!app.appTrust.allows(key) && !allowedOnce.has(key)) {
 		const answer = await conversationFor(app, { board }).bridge.choose({
 			title: "Let this app use the stage?",
 			message: `The app ${name} wants to call stage verbs: write cards, move the canvas, message agents.`,
@@ -402,7 +402,7 @@ async function appCaller(app: App, name: string, allowedOnce: Set<string>): Prom
 				{ label: "No", description: "Refuse its calls" },
 			],
 		});
-		if (answer === "Always allow this app") app.evalTrust.allow(key);
+		if (answer === "Always allow this app") app.appTrust.allow(key);
 		else if (answer === "Allow until Decks restarts") allowedOnce.add(key);
 		else return { status: 403, error: `The person did not let ${name} use the stage.` };
 	}

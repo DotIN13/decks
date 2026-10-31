@@ -396,7 +396,7 @@
 	}
 
 	/*
-	 * The board pictures' progress (`chrome/PictureProgress.tsx`): a reading in the ⋯ menu, not a
+	 * The card pictures' progress (`chrome/PictureProgress.tsx`): a reading in the ⋯ menu, not a
 	 * place to go, so it does not light up under the pointer. Its bar is the row's own width.
 	 */
 	.popover [data-row].picture-progress:hover {

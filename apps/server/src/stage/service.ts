@@ -54,7 +54,7 @@ export interface StageHost {
 	broadcast(message: ServerMessage): void;
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
 	stagesChanged?(): void;
-	/** Say who last wrote a board, as the person's own edits do (`BoardService.wrote`). */
+	/** Say who last wrote a board, as the person's own edits do (`CardService.wrote`). */
 	wrote?(path: string, who: string): void;
 	/** Give a canvas a name; the first name anyone chooses names its folder too (`stage-admin.ts`). Returns the folder. */
 	retitle?(name: string, title: string): string;
@@ -147,7 +147,7 @@ export class StageService {
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
 	shots: StageShots | undefined;
-	/** The server's own picture of a whole board, fresh from its file (`pictures/thumbs.ts`): what a screenshot falls back to. */
+	/** The server's own picture of a whole board, fresh from its file (`pictures/service.ts`): what a screenshot falls back to. */
 	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;
 
 	constructor(

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import { compress, encoder, MAGIC, type Level } from "./astc.ts";
-import { compressedName, SMALL_WIDTHS, keptWidth, squeezed, wireEncoding, wireName } from "./thumbs.ts";
+import { compressedName, SMALL_WIDTHS, keptWidth, squeezed, wireEncoding, wireName } from "./service.ts";
 
 /** A picture's sizes, top half red and bottom half blue, each half the one before down to one pixel. */
 function levels(width: number, height: number): Level[] {

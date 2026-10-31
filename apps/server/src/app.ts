@@ -8,15 +8,15 @@ import { runtimeLib } from "@decks/runtime";
 import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
-import { BoardService } from "./boards/service.ts";
-import { EvalTrust } from "./auth/app-trust.ts";
+import { CardService } from "./cards/service.ts";
+import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
-import { SMALL_WIDTHS, ThumbService } from "./pictures/thumbs.ts";
+import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./verbs/router.ts";
@@ -83,7 +83,7 @@ export class App {
 	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
-	readonly boards: BoardService;
+	readonly boards: CardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
 	/** Google Docs opened as document pages, kept in step through a markdown mirror (`google/docs.ts`). */
@@ -115,7 +115,7 @@ export class App {
 	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
 	readonly passes: Passes;
 	/** Which boards may run their own code, and the list the first question writes (`auth/app-trust.ts`). */
-	readonly evalTrust: EvalTrust;
+	readonly appTrust: AppTrust;
 	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
 	placedOn(path: string, canvas: string): boolean {
 		return boardOnCanvas(this, path, canvas);
@@ -128,7 +128,7 @@ export class App {
 	readonly bridge: StageBridge;
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
-	readonly thumbs: ThumbService;
+	readonly thumbs: PictureService;
 	/** Stage pictures drawn without a browser (`stage/native-shots.ts`). */
 	readonly nativeShots: NativeShots;
 	private hub: Hub | undefined;
@@ -173,13 +173,13 @@ export class App {
 			passSecret(config.dataDir),
 		);
 		this.bridge = new StageBridge(this.tokens);
-		this.evalTrust = new EvalTrust(config.dataDir);
-		this.boards = new BoardService(deck, {
+		this.appTrust = new AppTrust(config.dataDir);
+		this.boards = new CardService(deck, {
 			send: (message) => {
 				this.send(message);
 			},
 			/*
-			 * The arrangement, not the deck — `BoardService` broadcasts a board on every write, and the
+			 * The arrangement, not the deck — `CardService` broadcasts a board on every write, and the
 			 * loader's copy of one has no place of its own any more. It asks rather than is handed the
 			 * positions so that the seeding `stageState` does happens on this path too.
 			 */
@@ -302,7 +302,7 @@ export class App {
 		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
 		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.
 		 */
-		this.thumbs = new ThumbService({
+		this.thumbs = new PictureService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
 			boards: () => this.deck.boards,
@@ -313,7 +313,7 @@ export class App {
 		});
 		this.thumbs.indexLater();
 		/*
-		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
+		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the card pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
 		 * Vite in development, whose port the dev scripts put in `DECKS_WEB_PORT`.
 		 */
@@ -973,7 +973,7 @@ export class App {
 	send(message: ServerMessage): void {
 		/*
 		 * Every change to a board is announced through here, whoever made it, which makes it
-		 * the one place to keep the board's picture up with it (`pictures/thumbs.ts`).
+		 * the one place to keep the board's picture up with it (`pictures/service.ts`).
 		 */
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);

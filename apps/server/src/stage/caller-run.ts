@@ -1,6 +1,6 @@
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
-import type { BoardService } from "../boards/service.ts";
+import type { CardService } from "../cards/service.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import { boardActor } from "./caller-actor.ts";
 import type { StageService } from "./service.ts";
@@ -18,7 +18,7 @@ import { createStageTool, type StageTool } from "./tool.ts";
 export interface CallerRun {
 	agents: Registry;
 	cameras: Cameras;
-	boards: BoardService;
+	boards: CardService;
 	stage: StageService;
 	port: number;
 }

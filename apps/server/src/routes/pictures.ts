@@ -11,17 +11,17 @@ import { asyncRoute, wildcard, sendFile, harnessId, type RouteDeps } from "./sha
 import express, { type Router } from "express";
 
 /**
- * Pictures: of every card (`pictures/thumbs.ts`), of a stage, a canvas as a bundle, a stage's .pen for `shot.html`, and a page drawn from a snapshot.
+ * Pictures: of every card (`pictures/service.ts`), of a stage, a canvas as a bundle, a stage's .pen for `shot.html`, and a page drawn from a snapshot.
  */
 export function register(api: Router, { app }: RouteDeps): void {
-	/** How far the server has got keeping a picture of every board (`ThumbService.index`), for the ⋯ menu. */
+	/** How far the server has got keeping a picture of every board (`PictureService.index`), for the ⋯ menu. */
 	api.get("/pictures", (_req, res) => {
 		res.setHeader("Cache-Control", "no-store");
 		res.json(app.thumbs.progress());
 	});
 
 	/**
-	 * A picture of a card (`pictures/thumbs.ts`): `whole=1`, and `w=` one of the ladder's rungs
+	 * A picture of a card (`pictures/service.ts`): `whole=1`, and `w=` one of the ladder's rungs
 	 * (`SMALL_WIDTHS`) or none for the whole picture; `astc=1` for it compressed for the GPU.
 	 *
 	 * `v` is the revision the canvas knows, and it is only there to make the URL a new one when the

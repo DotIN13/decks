@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Board } from "@decks/protocol";
-import { pageClip, THUMB_WIDTH, thumbName, ThumbService } from "./thumbs.ts";
+import { pageClip, THUMB_WIDTH, thumbName, PictureService } from "./service.ts";
 
 /**
  * The picture service, with a browser that is a list of what it was asked.
@@ -72,7 +72,7 @@ test("a picture's name is safe for a file system and changes with the revision a
 test("two at a time, the newest request first, and the picture is kept on disk", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	const asked = ["a", "b", "c", "d"].map((name) => thumbs.get(board(`boards/${name}.html`), "light"));
 	await tick();
 	assert.equal(chrome.waiting(), 2, "two pages are open");
@@ -100,7 +100,7 @@ test("two at a time, the newest request first, and the picture is kept on disk",
 test("everybody asking for one picture shares one page, and a newer revision removes the older picture", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	const both = [thumbs.get(board("boards/a.html", 1), "dark"), thumbs.get(board("boards/a.html", 1), "dark")];
 	await tick();
 	await chrome.release();
@@ -121,7 +121,7 @@ test("everybody asking for one picture shares one page, and a newer revision rem
 test("a request whose browser has gone is not drawn", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	const kept = [thumbs.get(board("boards/a.html"), "light"), thumbs.get(board("boards/b.html"), "light")];
 	let gone = false;
 	const left = thumbs.get(board("boards/c.html"), "light", () => gone);
@@ -139,7 +139,7 @@ test("a request whose browser has gone is not drawn", async () => {
 test("with no Chromium the first request says so, and the rest are refused at once", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	let launches = 0;
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => {
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => {
 		launches++;
 		throw new Error("Executable doesn't exist at /nowhere\nrun npx playwright install");
 	});
@@ -153,7 +153,7 @@ test("with no Chromium the first request says so, and the rest are refused at on
 test("a changed board is pictured again once it settles, in the schemes somebody has asked for, behind any browser's request", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, settleMs: 10 }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, settleMs: 10 }, async () => chrome.browser);
 
 	// Nobody has asked for a picture in any scheme yet, so there is nothing to keep up.
 	thumbs.changed(board("boards/a.html", 1));
@@ -202,7 +202,7 @@ test("a changed board is pictured again once it settles, in the schemes somebody
 test("a deleted board's pictures are deleted with it", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	const both = [thumbs.get(board("boards/a.html"), "light"), thumbs.get(board("boards/b.html"), "dark")];
 	await tick();
 	await chrome.release();
@@ -216,7 +216,7 @@ test("a deleted board's pictures are deleted with it", async () => {
 test("a flow document is measured in the page and pictured to that height, without changing the board's size", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	// The record still carries the 240px placeholder; the page says 1234.
 	const flow = board("boards/notes.html", 3, 720, 240);
 	const asked = thumbs.get(flow, "light");
@@ -238,7 +238,7 @@ test("each rung of the ladder has a name of its own beside the whole picture", a
 
 test("what stands in for a picture: this revision at the nearest size, else the newest earlier revision", () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => fake().browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir }, async () => fake().browser);
 	const a = board("boards/a.html", 4);
 	assert.equal(thumbs.nearest(a, "light", 192), undefined, "nothing at all: the caller waits");
 	// An earlier revision's whole picture, from before a look change.
@@ -264,7 +264,7 @@ test("a whole picture somebody asks for is taken before the background's small o
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const boards = ["a", "b", "c", "d"].map((n) => board(`boards/${n}.html`));
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
 	const sweep = thumbs.index();
 	await tick();
 	const asked = thumbs.picture(board("boards/z.html"), "light", "whole");
@@ -283,7 +283,7 @@ test("the indexer takes every board's small pictures, not its whole one, and say
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const boards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	const thumbs = new PictureService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
 	assert.deepEqual(thumbs.progress(), { total: 3, ready: 0, working: false, failed: 0 });
 	const sweep = thumbs.index();
 	await tick();

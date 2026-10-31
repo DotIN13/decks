@@ -15,7 +15,7 @@ export function stageBoardsDir(stage: string): string {
 }
 
 /** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `canvases/<name>/boards/…`. */
-export function inBoardFolder(path: string): boolean {
+export function inPageFolder(path: string): boolean {
 	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/(?:boards|cards)\/.+/.test(path) || /^shared\/canvases\/[^/]+\/[^/]+\/(?:boards|cards)\/.+/.test(path);
 }
 
@@ -23,7 +23,7 @@ export function inBoardFolder(path: string): boolean {
  * Every board folder in a deck, deck-relative: `boards`, `frames` when it is there (saved frames,
  * and any page kept beside them), then each stage's that exists.
  */
-export function boardFolders(deck: string): string[] {
+export function pageFolders(deck: string): string[] {
 	const folders = ["boards"];
 	if (existsSync(join(deck, "frames"))) folders.push("frames");
 	const stages = join(deck, "canvases");

@@ -2,7 +2,7 @@ import type { Board } from "@decks/protocol";
 import type { BrowserContext } from "./pool.ts";
 
 /** What pressing a board's controls found: how many there are, and the views that go wrong. */
-export interface BoardViews {
+export interface PageViews {
 	controls: number;
 	/** How tall the board is in the view it opens on, which is the view its height was measured in. */
 	opening: number;
@@ -40,18 +40,18 @@ const PRESS_EVERY_CONTROL = `(async () => {
 })()`;
 
 /**
- * Press every control on a board and say which views break it (`ThumbService.views`, which lends
+ * Press every control on a board and say which views break it (`PictureService.views`, which lends
  * the browser, makes the context at the board's width and counts the work): every control pressed
  * in turn (`PRESS_EVERY_CONTROL`), and the first script errors kept. Undefined when the page fails.
  */
-export async function pressEveryControl(context: BrowserContext, board: Board, origin: string, readyMs: number): Promise<BoardViews | undefined> {
+export async function pressEveryControl(context: BrowserContext, board: Board, origin: string, readyMs: number): Promise<PageViews | undefined> {
 	try {
 		const page = await context.newPage();
 		const errors: string[] = [];
 		page.on("pageerror", (error) => errors.push(error.message.split("\n")[0] ?? ""));
 		await page.goto(`${origin}/api/board/${board.path.split("/").map(encodeURIComponent).join("/")}`, { waitUntil: "load", timeout: readyMs });
 		await page.waitForFunction("window.__boardReady === true", undefined, { timeout: readyMs }).catch(() => {});
-		const pressed = (await page.evaluate(PRESS_EVERY_CONTROL)) as { controls: number; opening: number; views: BoardViews["views"] };
+		const pressed = (await page.evaluate(PRESS_EVERY_CONTROL)) as { controls: number; opening: number; views: PageViews["views"] };
 		return { controls: pressed.controls, opening: pressed.opening, views: pressed.views, errors: errors.slice(0, 3) };
 	} catch {
 		return undefined;

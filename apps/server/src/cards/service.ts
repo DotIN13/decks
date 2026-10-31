@@ -8,7 +8,7 @@ import type { Deck } from "../deck/loader.ts";
 import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
 
 /**
- * What the shell has to do for the board service, and nothing else.
+ * What the shell has to do for the card service, and nothing else.
  *
  * The service owns files and revisions; who hears about a change is the shell's business.
  * Narrowed to an interface rather than handed the `Registry`, for the reason
@@ -16,7 +16,7 @@ import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
  * an agent is, only that something wants telling.
  */
 export interface BoardHooks {
-	/** To every browser. `board.changed` is the message this service exists to send. */
+	/** To every browser. `board.changed` (and `card.changed` beside it, `App.send`) is the message this service exists to send. */
 	send(message: ServerMessage): void;
 	/**
 	 * The deck as the focused stage sees it — where every board on it sits for the conversation being
@@ -32,7 +32,8 @@ export interface BoardHooks {
 }
 
 /**
- * The board files: writing them, revisioning them, and deleting them.
+ * The card files (and the old boards a deck still holds): writing them, revisioning them, and
+ * deleting them. It lived in boards/ as the board service; the board parts go with step 6.
  *
  * This was 340 lines of `app.ts` sitting between the WebSocket router and the account
  * panel, and it is the only part of the server that writes a file a person did not name.
@@ -49,7 +50,7 @@ export interface BoardHooks {
  * The hooks are the only way out: this class does not broadcast anything itself, because
  * what a `board.changed` means is different for a browser and for an agent.
  */
-export class BoardService {
+export class CardService {
 	readonly revisions: Revisions;
 	private readonly authors: Authors;
 	private readonly seenAt: Seen;

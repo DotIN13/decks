@@ -335,7 +335,7 @@ export function createCameraController(host: CameraHost) {
 		/*
 		 * Our own frame coming back (`writeCamera` put it on screen and then told the app) is already
 		 * drawn: placing it again drew nothing new but posted the camera to the worker and looked for
-		 * board pictures a second time each frame. A resize still re-frames.
+		 * card pictures a second time each frame. A resize still re-frames.
 		 */
 		const v = host.view();
 		const w = written;

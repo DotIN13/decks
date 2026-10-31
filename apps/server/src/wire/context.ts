@@ -3,8 +3,8 @@ import type { GoogleDocs } from "../google/docs.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
-import type { BoardService } from "../boards/service.ts";
-import type { EvalTrust } from "../auth/app-trust.ts";
+import type { CardService } from "../cards/service.ts";
+import type { AppTrust } from "../auth/app-trust.ts";
 import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
@@ -73,7 +73,7 @@ export interface PendingStage {
 export interface WireContext {
 	readonly deck: Deck;
 	/** Writing, editing and deleting boards — `boards/service.ts`. */
-	readonly boards: BoardService;
+	readonly boards: CardService;
 	/** Documents open as pages, typed into and kept in step with their files (`@decks/docs`). */
 	readonly docs: DocService;
 	/** Google Docs linked as document pages (`google/docs.ts`). */
@@ -96,7 +96,7 @@ export interface WireContext {
 	/** The `stage.pen` frame for one agent, when its stage has a drawing (`stage/pens.ts`). */
 	penMessage(agentId: string): ServerMessage | undefined;
 	/** Which boards may run their own code, and the list the question writes (`auth/app-trust.ts`). */
-	readonly evalTrust: EvalTrust;
+	readonly appTrust: AppTrust;
 	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
 	readonly port: number;
 

@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Which boards this install has allowed to run their own code.
+ * Which apps (and, from before cards, which boards) this install has allowed to call the stage
+ * verbs: keys like `apps/<name>`. Was `EvalTrust`, from when boards ran code through data-eval.
  *
  * A board's code calls the stage verbs an agent has (`stage/caller-run.ts`), deliberately,
  * because the agent that wrote the board already has `bash`. What is new here is the *trigger*:
@@ -18,7 +19,7 @@ import { join } from "node:path";
  * question the first time a board asks to run; the answer "Always allow this board" is what
  * calls `allow`. Nothing here decides anything.
  */
-export class EvalTrust {
+export class AppTrust {
 	private readonly file: string;
 	private readonly allowed: Set<string>;
 

@@ -237,7 +237,7 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static" }));
 		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
 		// Let it in ahead, so no question waits on a person.
-		app.evalTrust.allow("apps/notes");
+		app.appTrust.allow("apps/notes");
 
 		// An app's server holds a pass for its run; a run that is not the app's (it stopped) is nobody.
 		const runs: Record<string, string> = { notes: "run1", nothing: "run2" };

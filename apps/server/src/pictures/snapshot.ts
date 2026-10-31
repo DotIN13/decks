@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { wholeScale, wholeShot } from "./ladder.ts";
-import type { ThumbService } from "./thumbs.ts";
+import type { PictureService } from "./service.ts";
 
 /**
  * A picture of a board as a reader left it, drawn by the server's Chrome from a snapshot of the
@@ -34,7 +34,7 @@ const RESTORE = `(async () => {
 /** The tallest a snapshot is drawn, in board pixels, as a whole picture is. */
 const MAX_H = 12_000;
 
-export async function renderSnapshot(thumbs: ThumbService, origin: string, ask: SnapshotAsk): Promise<Buffer> {
+export async function renderSnapshot(thumbs: PictureService, origin: string, ask: SnapshotAsk): Promise<Buffer> {
 	const w = Math.max(160, Math.min(4000, Math.round(ask.w)));
 	const h = Math.max(120, Math.min(MAX_H, Math.round(ask.h)));
 	const address = `${origin}/api/board/${ask.path.split("/").map(encodeURIComponent).join("/")}?snapshot=${randomUUID()}`;

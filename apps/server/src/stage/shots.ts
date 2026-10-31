@@ -29,7 +29,7 @@ type Browser = import("playwright").Browser;
  * Drawn natively when it can be (`native-shots.ts`): the stage engine's own painter on this
  * machine's graphics card, the drawing over each board's picture of its current revision, with no
  * browser. Otherwise — a PDF, live boards asked for, math, a picture it cannot load, a board not yet
- * pictured — taken in the server's own Chromium, the one the dashboard's board pictures come from,
+ * pictured — taken in the server's own Chromium, the one the dashboard's card pictures come from,
  * loading `shot.html`, a page that draws one stage the way the canvas does: the drawing under and
  * over the boards, and the boards themselves, live, between them. `how` says which. Nobody's open
  * canvas is used.
@@ -253,7 +253,7 @@ export class StageShots {
 	 * A small picture of a whole stage, for the manager's cards, taken once per revision.
 	 *
 	 * Kept on disk by name, revision and scheme, exactly as a board's picture is
-	 * (`pictures/thumbs.ts`) and for the same reason: the picture is the expensive part, a browser
+	 * (`pictures/service.ts`) and for the same reason: the picture is the expensive part, a browser
 	 * asks for it by a URL carrying the revision, and an unchanged stage never misses. Older
 	 * revisions of the same stage are removed as they are replaced, so the folder is one file per
 	 * stage per scheme rather than a history nobody reads.

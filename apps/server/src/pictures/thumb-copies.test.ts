@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { smallName, thumbName, webpSize, webpWidth } from "./thumbs.ts";
+import { smallName, thumbName, webpSize, webpWidth } from "./service.ts";
 
 test("a smaller copy is named beside its whole picture, keeping the look", () => {
 	const whole = thumbName("boards/a.html", 7, "light", "whole");

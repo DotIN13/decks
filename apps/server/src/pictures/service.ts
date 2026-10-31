@@ -28,7 +28,7 @@ import {
 	type ThumbScheme,
 } from "./ladder.ts";
 import { launchChromium, withOwnReads, type Browser, type BrowserContext, type Page } from "./pool.ts";
-import { pressEveryControl, type BoardViews } from "./views.ts";
+import { pressEveryControl, type PageViews } from "./views.ts";
 
 /*
  * The picture service is split by job: the Chrome it uses (`pool.ts`), the ladder of sizes and the
@@ -38,7 +38,7 @@ import { pressEveryControl, type BoardViews } from "./views.ts";
 export { compressedName, squeezed, wireEncoding, wireName, type WireEncoding };
 export { AHEAD_WIDTHS, keptWidth, PICTURE_LOOK, pageClip, pictureType, SMALL_TAKEN, SMALL_WIDTHS, smallName, TAKEN_WIDTHS, THUMB_WIDTH, thumbName, webpSize, webpWidth, wholeScale, wholeShot, type ThumbKind, type ThumbScheme };
 export { withOwnReads };
-export type { BoardViews };
+export type { PageViews };
 
 
 /**
@@ -114,7 +114,7 @@ export interface ThumbHost {
 	extraOrigins?: () => string[];
 }
 
-/** How far the indexer has got (`ThumbService.progress`), for the app's ⋯ menu. */
+/** How far the indexer has got (`PictureService.progress`), for the app's ⋯ menu. */
 export interface PictureProgress {
 	/** Cards on a canvas times the schemes pictures are kept in. */
 	total: number;
@@ -155,7 +155,7 @@ const TAKE_MS = 45_000;
 const RESIZE_MS = 20_000;
 
 
-export class ThumbService {
+export class PictureService {
 	private browser: Promise<Browser> | undefined;
 	private idle: ReturnType<typeof setTimeout> | undefined;
 	private running = 0;
@@ -634,7 +634,7 @@ export class ThumbService {
 			browser = await this.browser;
 		} catch (error) {
 			this.browser = undefined;
-			this.broken = `No Chromium to take board pictures with: ${(error as Error).message.split("\n")[0]}`;
+			this.broken = `No Chromium to take card pictures with: ${(error as Error).message.split("\n")[0]}`;
 			// Everything still queued is waiting on the same missing browser.
 			for (const waiting of this.queue.splice(0)) {
 				this.byFile.delete(waiting.file);
@@ -747,7 +747,7 @@ export class ThumbService {
 	 * anything wider than the board, and any script error. Nothing is returned for a view that
 	 * is fine, and nothing at all when there is no Chromium, because this is advice.
 	 */
-	async views(board: Board): Promise<BoardViews | undefined> {
+	async views(board: Board): Promise<PageViews | undefined> {
 		if (this.broken) return undefined;
 		clearTimeout(this.idle);
 		let browser: Browser;

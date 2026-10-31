@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { boardFolders } from "./stage-boards.ts";
+import { pageFolders } from "./stage-boards.ts";
 import { isCardPath, pageName } from "./layout.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckPen, DeckState } from "@decks/protocol";
@@ -269,7 +269,7 @@ export class Deck {
 			if (!root.exists) this.warnings.push(`Root ${root.path} does not exist; embeds under it will not resolve.`);
 		}
 
-		const found = boardFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
+		const found = pageFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
 		/*
 		 * No positions in the scan. Where a board sits is a stage's business now and this is only the
 		 * list of boards; `arrange` gives them a place when they are sent.
@@ -295,7 +295,7 @@ export class Deck {
 	 * server restarts.
 	 */
 	resync(): { changed: Board[]; removed: string[] } {
-		const found = boardFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
+		const found = pageFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
 		const changed: Board[] = [];
 
 		const removed: string[] = [];

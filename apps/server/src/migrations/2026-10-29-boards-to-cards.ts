@@ -209,7 +209,7 @@ export function boardToCard(html: string, links: Map<string, string>, placed?: {
 /**
  * How tall a board's page last measured, laid out at width `w`, when the deck knows: a browser's
  * reading of this revision (`.decks/heights.json`, from when browsers sized boards), or the height of
- * its picture of this revision, which was taken at the height its page measured (`pictures/thumbs.ts`).
+ * its picture of this revision, which was taken at the height its page measured (`pictures/service.ts`).
  * A board's item kept the height somebody once gave it, often the 240 px a new board starts at, while
  * its page grew past it; the card it becomes is given the page's height, so it opens whole.
  */
