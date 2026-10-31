@@ -91,7 +91,7 @@ test("the doors and the public files are open without a token; no page, file or 
 		assert.equal(hello.paired, false);
 		assert.equal((await fetch(`${origin}/api/sdk/decks.mjs`)).status, 200);
 		for (const site of ["same-origin", "cross-site", "none"]) {
-			for (const path of ["/api/card/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html", "/api/revision/abc/boards/a.html"]) {
+			for (const path of ["/api/card/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html"]) {
 				assert.equal((await fetch(`${origin}${path}`, { headers: { "sec-fetch-site": site, "sec-fetch-dest": "image" } })).status, 401, `${path} from ${site}: every read carries a pass or a token`);
 			}
 		}
@@ -131,7 +131,14 @@ test("a board has no token: the routes that made one are gone, and a person's to
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
 		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/a.html" })).status, 404);
 		assert.equal((await post("/api/v1/board-token", person, { path: "boards/a.html" })).status, 404);
-		assert.equal((await fetch(`${origin}/api/card/boards/a.html`, { headers: person })).status, 200);
+		const page = await fetch(`${origin}/api/card/boards/a.html`, { headers: person });
+		assert.equal(page.status, 200);
+		// An old board's page is its file, sandboxed as a card from someone else is: nothing put in it.
+		assert.match(page.headers.get("content-security-policy") ?? "", /^sandbox allow-scripts\b(?!.*allow-same-origin)/);
+		assert.equal(await page.text(), `<!doctype html><html><head><title>A</title><meta name="board" content='{"w":400,"h":300}' /></head><body></body></html>`);
+		assert.equal((await post("/api/boards/delete", person, { path: "boards/a.html" })).status, 404, "no board delete for another front end");
+		// No revision preview: the address falls through to the page, as any unknown one does.
+		assert.doesNotMatch((await fetch(`${origin}/api/revision/abc`, { headers: person })).headers.get("cache-control") ?? "", /immutable/, "no revision preview");
 		assert.equal((await post("/api/tickets", person, { paths: ["/api/card/boards/a.html"] })).status, 404, "no tickets at all");
 	} finally {
 		cleanup();

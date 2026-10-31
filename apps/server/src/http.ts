@@ -19,7 +19,7 @@ import { Relay } from "./share/relay.ts";
 import { asyncRoute } from "./routes/shared.ts";
 import { register as registerAgents } from "./routes/agents.ts";
 import { register as registerApps } from "./routes/apps.ts";
-import { register as registerBoardPath } from "./routes/board-path.ts";
+import { register as registerCardPath } from "./routes/card-path.ts";
 import { register as registerDeck } from "./routes/deck.ts";
 import { register as registerFiles } from "./routes/files.ts";
 import { register as registerGoogle } from "./routes/google.ts";
@@ -109,7 +109,7 @@ export function createHttpApp(app: App): Express {
 	registerAgents(api, deps);
 	registerHarness(api, deps);
 	registerDeck(api, deps);
-	registerBoardPath(api, deps);
+	registerCardPath(api, deps);
 	registerPictures(api, deps);
 	registerFiles(api, deps);
 	registerGoogle(api, deps);

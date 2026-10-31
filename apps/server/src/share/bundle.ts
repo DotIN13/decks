@@ -3,20 +3,17 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 import type { Page } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
-import { renderShell } from "../boards/shell.ts";
 import type { ThumbScheme } from "../pictures/ladder.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 
 /**
  * A canvas as one file: what a Decks with no server needs to draw it (`web/src/connections`).
  *
- * The zip holds three folders and a manifest:
+ * The zip holds two folders and a manifest:
  *
- * - `deck/` is files as they sit in the deck, at their deck paths: the stage's folder, the boards on
- *   it, every file those boards name by a relative path, and the whole of `lib/`, since a board's
- *   runtime and styles are there.
- * - `served/` is what the server *renders* rather than sends for a board: a `.md` or a foreign page
- *   wrapped in its shell (`boards/shell.ts`).
+ * - `deck/` is files as they sit in the deck, at their deck paths: the stage's folder, the cards on
+ *   it (an old board goes as its file, as the harness serves it), every file those name by a relative
+ *   path, and the whole of `lib/`, since the card runtime and styles are there.
  * - `pictures/` is each board's whole picture in both schemes, so the canvas has something to draw
  *   for a board before its page is opened, which is what it always draws first.
  *
@@ -35,8 +32,6 @@ export interface BundleManifest {
 	pen: { doc: PenDocument; base: string };
 	/** Every board on the stage, placed where the stage has it. */
 	boards: Page[];
-	/** Board paths whose page is in `served/` rather than `deck/`. */
-	served: string[];
 	/** Board path → scheme → zip path of its picture. */
 	pictures: Record<string, Partial<Record<ThumbScheme, string>>>;
 }
@@ -139,8 +134,6 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 	const { deckPath } = source;
 	const stageRel = relative(deckPath, source.stage.dir).split(sep).join("/");
 	const files = new Set<string>();
-	const served: ZipEntry[] = [];
-	const servedPaths: string[] = [];
 
 	for (const file of filesUnder(deckPath, "lib")) files.add(file);
 	for (const file of filesUnder(deckPath, stageRel)) files.add(file);
@@ -165,11 +158,6 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		if (isFile(join(deckPath, board.path))) {
 			files.add(board.path);
 			queue.push(board.path);
-		}
-		if (board.shell) {
-			const html = renderShell({ path: board.path, shell: board.shell, title: board.title, w: board.w, h: board.h });
-			served.push({ name: `served/${board.path}`, data: Buffer.from(html, "utf8") });
-			servedPaths.push(board.path);
 		}
 	}
 	const scanned = new Set<string>();
@@ -223,10 +211,9 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		stage: { name: posix.basename(stageRel), title: source.stage.title, rev: source.stage.rev },
 		pen: { doc: source.stage.doc, base: `${stageRel}/` },
 		boards,
-		served: servedPaths,
 		pictures,
 	};
-	const bytes = zip([{ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") }, ...entries, ...served, ...pictureEntries]);
+	const bytes = zip([{ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") }, ...entries, ...pictureEntries]);
 	return { manifest, bytes };
 }
 

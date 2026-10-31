@@ -10,7 +10,7 @@ import { boardHeaders } from "../files/serve.ts";
 import type { App } from "../app.ts";
 
 /**
- * A card's two answers under `/api/card/*path` (`board-path.ts`): one of its scripts, and its page.
+ * A card's two answers under `/api/card/*path` (`card-path.ts`): one of its scripts, and its page.
  * Each returns true when it answered the request.
  */
 

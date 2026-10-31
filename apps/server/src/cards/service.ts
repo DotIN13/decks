@@ -32,8 +32,8 @@ export interface BoardHooks {
 }
 
 /**
- * The card files (and the old boards a deck still holds): writing them, revisioning them, and
- * deleting them. It lived in boards/ as the board service; the board parts go with step 6.
+ * The card files: writing them, revisioning them, and deleting them. Old boards left in a deck
+ * (the library's, a friend's) are only read: a library board is copied in as a card when placed.
  *
  * This was 340 lines of `app.ts` sitting between the WebSocket router and the account
  * panel, and it is the only part of the server that writes a file a person did not name.
@@ -266,10 +266,10 @@ export class CardService {
 	/**
 	 * Why a board may not be changed, or undefined when it may: a board in the library (`boards/`, on
 	 * no canvas) is read and copied from, and a friend's canvas shared with you to view follows theirs
-	 * (`deck/layout.ts`). The app boards and the boards the harness makes for itself stay writable.
+	 * (`deck/layout.ts`).
 	 */
 	readOnly(path: string): string | undefined {
-		if (/^boards\//.test(path) && !/^boards\/(?:apps|documents|files)\//.test(path) && path !== "boards/your-chrome.html") {
+		if (/^boards\//.test(path)) {
 			return `${path} is in the library, on no canvas, and is read only: place it on a canvas (decks canvas insert copies it in) and change the copy.`;
 		}
 		return this.viewOnly(path);

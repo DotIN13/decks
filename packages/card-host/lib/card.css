@@ -863,10 +863,8 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
  * ── Documents: `.doc` ─────────────────────────────────────────────────────────────────
  *
  * The block a board's content flows in: the width of the board, as tall as what is in it, with
- * the board's margin as its padding. A board this app wrote holds its content in one of these;
- * a markdown file or a page from somewhere else is wrapped in one by the server
- * (`boards/shell.ts`, the `.board-shell` body). `.board.flow`, on boards written earlier, is
- * just a word on the body now.
+ * the board's margin as its padding. A board this app wrote holds its content in one of these.
+ * `.board.flow`, on boards written earlier, is just a word on the body now.
  */
 .board .doc {
 	display: block;
@@ -898,19 +896,6 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	overflow: visible;
 	height: auto;
 	padding: 0;
-}
-
-/*
- * Except a page from somewhere else, which is drawn in a sandboxed, opaque-origin iframe that
- * nothing outside can measure: it fills the frame, and the board keeps the height it was given.
- */
-.board-shell .doc[data-framed],
-.board-shell .doc[data-framed] > .embed-body {
-	height: 100vh;
-}
-
-.board-shell .doc[data-framed] > .embed-body > iframe {
-	height: 100%;
 }
 
 /*

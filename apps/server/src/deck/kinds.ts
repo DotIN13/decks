@@ -14,12 +14,11 @@
  * - **a document that says `class="board"`** is ours, and needs nothing: board.css,
  *   board.js and its own blocks. Served as it is, same origin, and it measures its own
  *   height like any other board.
- * - **`.md`** is `content`: not a document, so it is wrapped in a synthesised shell that
- *   renders it into itself (`boards/shell.ts`).
- * - **an HTML file with no board class** is `foreign`: a saved page or an export. It gets a
- *   shell as well, and inside a *sandboxed* frame — it may carry scripts, and a document
- *   from somewhere else must not run in the deck's own origin. The price is that a sandboxed
- *   frame has no measurable height, so that one board keeps the height its file states.
+ * - **`.md`** is `content`: not a document. It used to be wrapped in a shell that rendered it;
+ *   an old board's page is served as its file now, so this only says what the file is.
+ * - **an HTML file with no board class** is `foreign`: a saved page or an export, from
+ *   somewhere else. A sandboxed page has no measurable height, so that one board keeps the
+ *   height its file states (`FOREIGN_H`).
  */
 
 const MARKDOWN = /\.mdx?$/i;

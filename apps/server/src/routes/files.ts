@@ -19,13 +19,8 @@ import express, { type Router } from "express";
  */
 export function register(api: Router, { app }: RouteDeps): void {
 	/**
-	 * The board primitives, reachable from a document not served under `/board`.
-	 *
-	 * A revision preview is served at `/api/revision/<sha>`, so the `../lib/board.css` in
-	 * its own markup resolves to `/api/lib/board.css` (served as `card.css`) — not to `/api/card/lib/card.css`,
-	 * where the deck's copy lives. Without this alias a previewed board arrived as unstyled
-	 * HTML with `board.js` missing, so the time machine looked like it worked (the text was
-	 * right) while showing nothing like the board it was previewing.
+	 * The card runtime and styles at one absolute address, `/api/lib/…`, for a page not served
+	 * under `/api/card/` (the reader's service worker answers the same address, `sw.js`).
 	 */
 	api.get(
 		"/lib/*path",

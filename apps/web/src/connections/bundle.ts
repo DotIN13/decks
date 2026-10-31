@@ -22,7 +22,6 @@ export interface BundleManifest {
 	stage: { name: string; title: string; rev: number };
 	pen: { doc: PenDocument; base: string };
 	boards: Page[];
-	served: string[];
 	pictures: Record<string, { light?: string; dark?: string }>;
 }
 

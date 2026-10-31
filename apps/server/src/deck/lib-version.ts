@@ -54,7 +54,7 @@ export function libVersion(deckPath: string, now = Date.now()): string {
 
 /**
  * A board's markup with its `href` and `src` references into `lib/` given the version: the relative
- * `../lib/` a board writes, at any depth, and the absolute `/api/lib/` a rendered shell uses. Only
+ * `../lib/` a board writes, at any depth, and the absolute `/api/lib/` a page outside `/api/card/` uses. Only
  * attributes are touched, so a board that shows `href="../lib/board.css"` as text, escaped, keeps it.
  */
 export function versionLibRefs(html: string, version: string): string {

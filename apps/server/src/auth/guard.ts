@@ -101,7 +101,7 @@ export function isPublic(method: string, path: string): boolean {
  * picture (`pictures/service.ts`, `stage/shots.ts`): what its own pass reaches (`passes.ts`, made for no
  * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
-const OWN_READS = /^\/api\/(?:(?:card|f|thumb|stage-thumb|stage-pen|avatar|revision|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
+const OWN_READS = /^\/api\/(?:(?:card|f|thumb|stage-thumb|stage-pen|avatar|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
 
 export function harnessReads(method: string, path: string): boolean {
 	return (method === "GET" || method === "HEAD") && OWN_READS.test(path);
