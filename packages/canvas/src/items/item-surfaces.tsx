@@ -1,6 +1,6 @@
 import { mountDocPage } from "@decks/docs/page";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { INTERACTIVE, scrollsInside } from "./card.ts";
+import { ownInput } from "./input.ts";
 import { canvasHost } from "../host.ts";
 import { scheme } from "../lib/theme.ts";
 
@@ -8,20 +8,6 @@ import { scheme } from "../lib/theme.ts";
  * The two items with no file of their own that the stage places as it places a card (`drawing.ts`'s
  * `itemKind`): a document, edited where it sits, and an app, opened in a tab of its own.
  */
-
-/** What a press, a wheel or a key inside one of these is: the item's own, the way a card's is (`card-surface.tsx`). */
-function ownEvents(host: HTMLElement, selected: () => boolean, onSelect: () => void): void {
-	host.addEventListener("pointerdown", (event) => {
-		if (event.pointerType === "touch") return;
-		// A press on one of its own controls is that control's: selecting first would take the click it makes.
-		const control = event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
-		if (!control && !selected()) onSelect();
-		event.stopPropagation();
-	});
-	for (const type of ["pointerup", "click", "dblclick", "contextmenu"]) host.addEventListener(type, (event) => (event as PointerEvent).pointerType !== "touch" && event.stopPropagation());
-	host.addEventListener("wheel", (event) => !event.ctrlKey && scrollsInside(event.composedPath(), host, event.deltaX, event.deltaY) && event.stopPropagation(), { passive: true });
-	for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
-}
 
 /**
  * A document item (`decks.document`): the document editor (`@decks/docs/page`) in the item's place, its
@@ -59,7 +45,8 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 	});
 	onMount(() => {
 		props.ref?.();
-		ownEvents(host, () => props.selected, props.onSelect);
+		// A press, a wheel or a key inside the document: the one rule every awake item follows (`input.ts`).
+		ownInput(host, host, { selected: () => props.selected, onSelect: props.onSelect });
 		const line = canvasHost().documents;
 		if (!line) {
 			host.textContent = "Documents open in the canvas frame.";
@@ -130,7 +117,12 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 	let statusTimer: ReturnType<typeof setInterval> | undefined;
 	onMount(() => {
 		props.ref?.();
-		ownEvents(host, () => props.selected, props.onSelect);
+		/*
+		 * The same rule on the window's bar and body (`input.ts`); the app's own page inside the iframe is the
+		 * exception, by choice: it takes the pointer only once the item is selected (`pointer-events` below),
+		 * so a press on an unselected app selects it first, and the next one is the app's.
+		 */
+		ownInput(host, host, { selected: () => props.selected, onSelect: props.onSelect });
 		addEventListener("message", onMessage);
 		readStatus();
 		statusTimer = setInterval(readStatus, 10_000);

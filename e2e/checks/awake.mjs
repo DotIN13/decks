@@ -241,6 +241,31 @@ const under = await canvas.evaluate(({ x, y }) => {
 	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
 }, clickAt);
 say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
+// --- one press in a document selects it and acts ----------------------------------------------------------
+at("document press");
+const docCentre = await canvas.evaluate((path) => {
+	const c = globalThis.__decksCards().find((one) => one.path === path);
+	const cam = globalThis.__decksRust.camera;
+	const r = document.querySelector(".stage").getBoundingClientRect();
+	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
+}, docPaths[0]);
+await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), docCentre);
+await rest();
+await until(async () => (await canvas.evaluate(() => globalThis.__t.state())).documents >= 1, 8000);
+const docBox = await canvas.evaluate((path) => {
+	const r = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path)?.getBoundingClientRect();
+	return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : undefined;
+}, docPaths[0]);
+say("the document is awake under the middle, with its editor", !!docBox, JSON.stringify(docBox));
+if (docBox) {
+	await page.mouse.click(frameBox.x + docBox.x + docBox.width / 2, frameBox.y + docBox.y + docBox.height * 0.5);
+	const picked = await until(async () => canvas.evaluate((path) => [...document.querySelectorAll('.card-node[data-selected="true"]')].some((n) => n.dataset.path === path), docPaths[0]), 3000);
+	const focusIn = await canvas.evaluate((path) => {
+		const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
+		return !!node && node.contains(document.activeElement);
+	}, docPaths[0]);
+	say("one press inside the document selects it and reaches its editor, as a press in a card does", !!picked && focusIn, `selected ${!!picked}, focus inside ${focusIn}`);
+}
 say("no page errors", errors.length === 0, errors.join(" | "));
 await page.close().catch(() => {});
 // The harness's socket would keep the process alive.

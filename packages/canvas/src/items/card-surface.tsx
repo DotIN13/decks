@@ -1,5 +1,6 @@
 import { createEffect, on, onCleanup, untrack } from "solid-js";
-import { INTERACTIVE, isCardSheet, mountCard, scrollsInside, type MountedCard } from "./card.ts";
+import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
+import { ownInput } from "./input.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { cardLoader } from "./card-load.ts";
 import { scheme } from "../lib/theme.ts";
@@ -15,19 +16,15 @@ export function cardShot(path: string): CardShot | undefined {
 
 /**
  * A card's surface in its slot on the stage (`item-slot.tsx`): a host element whose shadow root holds the
- * card (`card.ts`). A card's events reach the stage as they are; this only decides which of them are
- * the card's own.
+ * card (`card.ts`). A card's events reach the stage as they are; which of them are the card's own is
+ * the one rule every awake item follows (`input.ts`, `ownInput`), decided on the card's root, not its
+ * host: from outside a closed root an event's path stops at the host, so nothing there can tell a
+ * press on the card's button from one on its background.
  *
- * Decided on the card's root, not its host: from outside a closed root an event's path stops at the
- * host, so nothing there can tell a press on the card's button from one on its background.
- *
- * - **A mouse or pen press** inside the card is the card's: it never starts a marquee or a pan, and it
- *   selects the card. The card moves by its bar and its edge.
- * - **A finger** pans the canvas across a card, unless it lands on one of the card's controls.
- * - **A wheel** scrolls what inside the card can take it, and pans the canvas otherwise; a pinch always zooms.
- * - **Keys** typed into the card's own fields stay in it, so Delete in a text box deletes a letter, not the card.
- * - **Its buttons** are the card's own module's: they act through `card.decks` (`card.ts`), answered
- *   where the host says (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
+ * What is a card's alone: its links, which open beside it or in a tab (`followLink`), the words
+ * selected in it, read for a comment (`readWords`), and its buttons, which are the card's own
+ * module's and act through `card.decks` (`card.ts`), answered where the host says
+ * (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
  */
 export function CardSurface(props: {
 	page: string;
@@ -129,40 +126,9 @@ export function CardSurface(props: {
 		mounted?.dispose();
 	});
 
-	const own = (event: Event) => event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
-	const editable = (event: Event) => {
-		const target = event.composedPath()[0];
-		return target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.localName));
-	};
-	/** What the card's own root hears, and how much of it goes on to the stage. */
+	/** What the card's own root hears: the one rule (`ownInput`), and the card's links and words. */
 	const listen = (root: ShadowRoot, element: HTMLElement) => {
-		root.addEventListener("pointerdown", (event) => {
-			const press = event as PointerEvent;
-			if (press.pointerType === "touch") {
-				/*
-				 * A finger's press goes on to the stage, which pans or pinches with it, and picks the card
-				 * as a finger on a board's picture does; a press on the card's own controls keeps it.
-				 */
-				if (own(press)) press.stopPropagation();
-				else if (press.isPrimary && !props.selected) props.onSelect();
-				return;
-			}
-			if (press.button !== 0 && press.button !== 2) return;
-			if (press.button === 0 && (press.shiftKey || press.metaKey) && !own(press) && props.onAddPress?.(press, element)) return;
-			if (!props.selected) props.onSelect();
-			press.stopPropagation();
-		});
-		for (const type of ["pointerup", "click", "dblclick", "contextmenu"]) root.addEventListener(type, (event) => (event as PointerEvent).pointerType !== "touch" && event.stopPropagation());
-		root.addEventListener(
-			"wheel",
-			(event) => {
-				const wheel = event as WheelEvent;
-				if (wheel.ctrlKey) return;
-				if (scrollsInside(wheel.composedPath(), element, wheel.deltaX, wheel.deltaY)) wheel.stopPropagation();
-			},
-			{ passive: true },
-		);
-		for (const type of ["keydown", "keyup", "keypress"]) root.addEventListener(type, (event) => editable(event) && event.stopPropagation());
+		ownInput(root, element, { selected: () => props.selected, onSelect: () => props.onSelect(), onAddPress: props.onAddPress });
 		root.addEventListener("click", (event) => followLink(event as MouseEvent));
 		// A selection ends with a press let go, or a key with Shift: a moment later, it is read.
 		const readSoon = () => void setTimeout(() => readWords(root), 0);
