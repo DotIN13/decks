@@ -63,6 +63,8 @@ say("after a pencil stroke, the glass lets fingers through", await canvas.evalua
 const glass = await canvas.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".stage-ink"), { x: box.width * 0.3, y: box.height * 0.4 });
 say("a finger over the canvas finds the stage, not the glass", !glass);
 
+// A touch within half a second of the pencil's lift is taken for a palm (`StageInk.tsx`, `PALM_AFTER_MS`): the finger comes after it.
+await page.waitForTimeout(700);
 const before = await scroll();
 const from = { x: box.x + box.width * 0.4, y: box.y + box.height * 0.5 };
 await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [from] });

@@ -3,7 +3,7 @@
  * (`device.ts`, `PICTURES`: 192 / 480 / 800 on a big GPU, 192 / 480 on a small one;
  * `picture-ladder.ts`), and the GPU makes its smaller sizes. Zooming in at rest fetches a higher rung,
  * only for cards that need one; zooming back out fetches nothing. Over the budget, pictures shrink on
- * the GPU (`fitPictures`), with no request either. Chromium (a big GPU) and WebKit as an iPhone (a
+ * the GPU (`fitPictures`), with no request either. Chromium (a big GPU) and WebKit as an iPad (a
  * small one).
  */
 import { canvasFrame, open, resetStage, say, settle } from "../harness.mjs";
@@ -20,9 +20,14 @@ function watchCopies(page) {
 	});
 	return asked;
 }
-/** WebKit as an iPhone, as a real one reports itself: Playwright's says it is a Mac with no touch. */
-function asIPhone() {
-	Object.defineProperty(Navigator.prototype, "platform", { get: () => "iPhone" });
+/**
+ * WebKit as an iPad, as a real one reports its kind: a tablet, whose GPU is small (192 / 480). A phone
+ * fetches only 192 (`PICTURES.phone`, `device.test.ts`), which has no higher rung to zoom in to.
+ */
+function asIPad() {
+	Object.defineProperty(Navigator.prototype, "platform", { get: () => "iPad" });
+	const agent = navigator.userAgent.replace(/iPhone/g, "iPad");
+	Object.defineProperty(Navigator.prototype, "userAgent", { get: () => agent });
 }
 /** Each card's rung, as asked or held, whichever is more. */
 const held = (frame) =>
@@ -49,7 +54,7 @@ for (const target of TARGETS) {
 	const name = target.label;
 	const ladder = target.slug === "chromium" ? [192, 480, 800] : [192, 480];
 	await resetStage();
-	const { browser, page, errors } = await open({ ...target.open, cards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
+	const { browser, page, errors } = await open({ ...target.open, cards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPad})();` });
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
 	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
