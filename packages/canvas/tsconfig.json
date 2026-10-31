@@ -9,5 +9,5 @@
 		"noEmit": true,
 		"types": ["vite/client", "@webgpu/types", "node"]
 	},
-	"include": ["src", "demo"]
+	"include": ["src"]
 }

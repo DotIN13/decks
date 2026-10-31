@@ -62,6 +62,8 @@ const CHECKS = [
 	 * and the bar's own menu all ask the canvas which board is selected.
 	 */
 	{ file: "selection.mjs", needsAgent: false },
+	/* A card that is news, selected: the frame says it was read, and its dot goes. */
+	{ file: "news-seen.mjs", needsAgent: false },
 	/*
 	 * A link on a card: a board in the deck opens beside the card that linked to it, anything
 	 * else opens in a tab, and neither of them navigates the canvas frame.

@@ -81,7 +81,7 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  *
  * ### Presentational
  *
- * No socket, no app state: boards in, `onPick` out. The panel is a picture of what it is
+ * No socket, no app state: boards in, `onPickItem` out. The panel is a picture of what it is
  * given, and everything with a rule behind it — which board is in which section, what the
  * search matches — is in `panel-groups.ts`, where it can be tested without a DOM.
  */
@@ -129,16 +129,6 @@ export function LeftPanel(props: {
 	/** Folded is gone. Owned by the pill's button, so the two can never disagree. */
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onPick: (board: Board) => void;
-	/**
-	 * Delete a board's file. Absent means no row has a delete on it.
-	 *
-	 * Every row has it, in all three sections: a board is a board wherever it is listed, and
-	 * a rule that depends on which heading it is under is a rule to remember.
-	 */
-	onDelete?: (board: Board) => void;
-	/** Take a board off the canvas, keeping the file. */
-	onHide?: (board: Board) => void;
 	/**
 	 * A stamp that means "find a board now": take the cursor into the search field.
 	 *
@@ -162,8 +152,6 @@ export function LeftPanel(props: {
 	chats?: AgentChat[];
 	identities?: Record<string, Identity>;
 	unread?: Record<string, number>;
-	/** Boards that are news, each in its writer's colour: the dot at the end of the row. */
-	news?: Record<string, string>;
 	onFocusAgent?: (id: string) => void;
 	/** Make an agent in a workspace (`undefined` for none) — the `+` on a heading of the workspace cut. */
 	onNewAgent?: (workspace: string | undefined, kind: AgentKind) => void;

@@ -2,16 +2,14 @@ import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, typ
 import type { Board, Camera } from "@decks/protocol";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { render } from "solid-js/web";
 import { fitInto, frames } from "./camera/camera.ts";
 import { topBoxes } from "./model/boxes.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
-import { canvasBox, watchInsets } from "./camera/insets.ts";
+import { canvasBox } from "./camera/insets.ts";
 import { boardsAhead, boardsOf, createDrawing } from "./model/drawing.ts";
 import { stageMeasure } from "./render/measure.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
-import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ui/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./ui/PenBar.tsx";
@@ -28,17 +26,14 @@ export function fitAll(doc: PenDocument, view: { width: number; height: number }
 	return fitInto(topBoxes(doc, look), view, canvasBox(view));
 }
 
-let insetsWatched = false;
-
 /** The empty picture: a board with no picture source is drawn as a blank sheet. */
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
 
 
 /**
  * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
- * drawing's tools and properties, and ink. `mountCanvas` puts one in an element for any page; a
- * Solid app (the canvas frame, `frame/frame.tsx`) makes one where its layout wants the stage, with its
- * own mode and ink given in `state`.
+ * drawing's tools and properties, and ink. The canvas frame (`frame/inside/frame.tsx`) makes it where
+ * its layout wants the stage, with its own mode and ink given in `state`.
  *
  * One canvas to a page: the tools and the host's answers are module state, as they are in the
  * Decks app.
@@ -170,10 +165,8 @@ export function createEditor(
 					: {}),
 			}
 		: {};
-	const commenting = { ...(options.onComment ? { onComment: options.onComment } : {}), ...(options.onPillMore ? { onPillMore: options.onPillMore } : {}) };
 
 	const tools = createRoot((done) => {
-		createEffect(on(penTool, (tool) => options.onTool?.(tool), { defer: true }));
 		createEffect(on(penSelection, (ids) => options.onSelection?.(ids), { defer: true }));
 		return done;
 	});
@@ -185,7 +178,7 @@ export function createEditor(
 		return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
 	});
 	/*
-	 * Owned by whoever makes the editor (mountCanvas's own root, or the host's component), never by
+	 * Owned by whoever makes the editor (the canvas frame's render root), never by
 	 * an effect that runs again: made in Studio's effect once, the boards stopped following the
 	 * drawing, so a board moved once and then stayed where the stage last saw it.
 	 */
@@ -217,8 +210,6 @@ export function createEditor(
 			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
 			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
 			glide={ownGlide()}
-			boardPill={true}
-			{...(options.onProperties ? { onProperties: options.onProperties } : {})}
 			opening={{ get camera() {
 				return asked ?? opening;
 			} }}
@@ -241,7 +232,7 @@ export function createEditor(
 			onMove={moveBoard}
 			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.boards.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.boards!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
 			shots={() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK })}
-			{...commenting}
+			{...(options.onComment ? { onComment: options.onComment } : {})}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}
 		/>
@@ -333,60 +324,4 @@ export function createEditor(
 		},
 	};
 	return { handle, surface, root, dispose: () => handle.dispose() };
-}
-
-/**
- * Mount the Decks canvas in `host`: the stage, its camera, the drawing's tools and properties,
- * and ink, editing a `.pen` document held here. Every change the person makes is applied here at
- * once and reported to `onEdits` (or, with `document`, handed to the host); `setDocument` takes
- * one from elsewhere. Any page can use it; a Solid app can use `createEditor` in its own tree.
- */
-export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHandle {
-	/*
-	 * What the host's panels cover, so a fit frames into the canvas between them and the camera
-	 * keeps what is picked clear of them: each panel standing beside the canvas says so with
-	 * `data-inset="left"` (or right, top, bottom), as the Decks app's do. Once a page.
-	 */
-	if (!insetsWatched && typeof document !== "undefined") {
-		insetsWatched = true;
-		watchInsets();
-	}
-	/*
-	 * The scheme on the host, and on the page's root as the Decks app does: the menus and panels the
-	 * canvas opens in a portal on <body> read their colours from there.
-	 */
-	const rootScheme = document.documentElement.dataset.colorScheme;
-	// What the canvas asks its host (`host.ts`); a Solid app making the editor itself answers them itself.
-	const base = options.base ?? (typeof location === "undefined" ? "/" : location.href);
-	const answers: Partial<CanvasHost> = {
-		fileUrl: options.resolveUrl ?? ((path) => new URL(path, new URL(base, typeof location === "undefined" ? "http://canvas.invalid/" : location.href)).href),
-		canWrite: () => !options.readOnly,
-		boardLink: options.boardLink ?? (() => undefined),
-		iconUrl: options.icons,
-		// A host that reads deck files by path reads the drawing's pictures the same way.
-		...(options.resolveUrl ? { pictureUrl: (url: string) => options.resolveUrl!(url) } : {}),
-	};
-	setCanvasHost(answers);
-	let made!: Editor;
-	const disposeRender = render(() => {
-		made = createEditor({
-			...options,
-			size: () => ({ width: host.clientWidth, height: host.clientHeight }),
-			onScheme: (scheme) => {
-				host.dataset.colorScheme = scheme;
-				document.documentElement.dataset.colorScheme = scheme;
-			},
-		});
-		return made.root();
-	}, host);
-	return {
-		...made.handle,
-		dispose() {
-			made.dispose();
-			disposeRender();
-			delete host.dataset.colorScheme;
-			if (rootScheme === undefined) delete document.documentElement.dataset.colorScheme;
-			else document.documentElement.dataset.colorScheme = rootScheme;
-		},
-	};
 }

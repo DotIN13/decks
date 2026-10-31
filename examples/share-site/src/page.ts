@@ -1,7 +1,8 @@
-import { mountCanvas } from "@decks/canvas";
+import { createEditor, type Editor } from "@decks/canvas";
 import "@decks/canvas/canvas.css";
 import { CanvasFollower } from "@decks/hub/follower";
 import { serialize, type PenDocument, type PenEdit } from "@decks/pen";
+import { render } from "solid-js/web";
 import { LiveEvent, syncPath, syncRoutes, type CanvasAnswer, type Changes, type EditsAnswer, type SyncCanvas } from "@decks/sync-protocol";
 
 /*
@@ -20,10 +21,18 @@ const canvas = canvases[0] ?? (await call<{ canvas: SyncCanvas }>("POST", syncRo
 const opened = (await call<CanvasAnswer>("GET", syncPath(syncRoutes.canvas.path, { id: canvas.id }))) as Extract<CanvasAnswer, { pen: unknown }>;
 document.getElementById("who")!.textContent = `${canvas.title} · rev ${opened.rev}`;
 
-const engine = mountCanvas(document.getElementById("canvas")!, {
-	text: serialize(opened.pen as unknown as PenDocument),
-	onEdits: (edits) => void save(edits),
-});
+// The editor in the page's own Solid tree, filling #canvas; every edit is the page's to save.
+const host = document.getElementById("canvas")!;
+let editor!: Editor;
+render(() => {
+	editor = createEditor({
+		text: serialize(opened.pen as unknown as PenDocument),
+		size: () => ({ width: host.clientWidth, height: host.clientHeight }),
+		onEdits: (edits) => void save(edits),
+	});
+	return editor.root();
+}, host);
+const engine = editor.handle;
 
 // The page's side of syncing: the hub's follower applies others' edits and sends the page's in order.
 const follower = new CanvasFollower(

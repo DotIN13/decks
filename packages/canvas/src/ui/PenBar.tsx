@@ -42,7 +42,7 @@ export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key?
 ];
 
 export function PenBar(props: {
-	/** Draw the column of tools. Default: true; a host with its own tools turns it off (`mountCanvas`). */
+	/** Draw the column of tools. Default: true; a host with its own tools turns it off. */
 	tools?: boolean;
 	doc: PenDocument | undefined;
 	onEdit: (ops: unknown[]) => void;

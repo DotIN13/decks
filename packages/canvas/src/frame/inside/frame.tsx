@@ -3,7 +3,7 @@ import { createSignal, untrack } from "solid-js";
 import { dismissMenus } from "@decks/ui";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
-import { createEditor } from "../../mount.tsx";
+import { createEditor } from "../../editor.tsx";
 import type { Editor, StageComment } from "../../types.ts";
 import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
 import { drawing, setDrawing } from "../../edit/ink.ts";
@@ -37,7 +37,7 @@ import { PROTOCOL, peer, type CardSlot, type FrameEnd, type Hello, type Page, ty
 export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView } = {}): void {
 	const parent = window.parent;
 	if (parent === window) throw new Error("The canvas frame runs inside the app's page.");
-	// The canvas's own styles are scoped to it (`canvas.css`, `.decks-canvas`), as `mountCanvas` scopes them.
+	// The canvas's own styles are scoped to it (`canvas.css`, `.decks-canvas`), as the editor's root is.
 	root.classList.add("decks-canvas");
 	const onStart = (event: MessageEvent<StartMessage>) => {
 		// Only the parent's answer, with its port: nothing else is read, then or later.
@@ -570,15 +570,12 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		if (data.ink) setDrawing(data.ink.on);
 	});
 	end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
-	end.on("fit", () => handle.fit());
 	end.on("select", (data) => (data.page ? selectCard(data.page) : handle.select(data.ids)));
-	end.on("step", (data) => (data.direction === "undo" ? handle.undo() : handle.redo()));
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
 	end.answer("edit", (data) => {
 		handle.edit(data.ops);
 		return true as const;
 	});
-	end.answer("read", () => handle.drawn());
 
 	/*
 	 * Files dropped from outside the browser: never opened in place (a dropped file's default is to

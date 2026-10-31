@@ -12,4 +12,3 @@ export * from "../ui/keycaps.ts";
 export * from "../lib/theme.ts";
 export * from "../render/engine.ts";
 
-export { isNews } from "../items/news.ts";

@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and one mount function for any host",
+	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and the canvas frame that holds them",
 	"exports": {
 		".": "./src/index.ts",
 		"./comments": "./src/public/comments.ts",
@@ -18,7 +18,6 @@
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"src/**/*.test.ts\"",
-		"demo": "vite --config demo/vite.config.ts",
 		"build:css": "node scripts/build-css.mjs",
 		"build:lib": "node ../../scripts/build-solid-lib.mjs ."
 	},

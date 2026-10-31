@@ -1,6 +1,6 @@
 /*
- * What the Decks app's shell gives the canvas, for a host that mounts it on its own
- * (`mountCanvas`): a box to fill, the page's type and colours, and the floating panel's card.
+ * What the Decks app's shell gives the canvas, for a page that holds it on its own (the canvas
+ * frame's root, `.decks-canvas`): a box to fill, the page's type and colours, and the floating panel's card.
  * The Decks app has these in `shell.css`, `panel.css` and `index.css`, and does not import this.
  */
 @layer components {

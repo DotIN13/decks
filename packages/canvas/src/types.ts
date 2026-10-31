@@ -3,13 +3,12 @@ import type { Board, Camera } from "@decks/protocol";
 import type { Accessor, JSX } from "solid-js";
 import type { ViewStorage } from "./camera/agent-views.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
-import type { CanvasHost } from "./host.ts";
 import type { InkTool } from "./edit/ink.ts";
 import type { PenTool } from "./edit/pen-tools.ts";
 
 /*
  * The editor's types, apart from the code that makes it: what a host gives it and gets back
- * (`mount.tsx`, `createEditor` and `mountCanvas`), and what the stage reports (`stage/Stage.tsx`).
+ * (`editor.tsx`, `createEditor`), and what the stage reports (`stage/Stage.tsx`).
  * The frame's protocol and an app's chrome read these without importing either.
  */
 
@@ -35,7 +34,7 @@ export interface StageComment {
 /** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */
 export type InkRequest = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
-/** What a host gives `mountCanvas`. Only `text` is needed. */
+/** What the canvas frame gives `createEditor`. Only `text` is needed. */
 export interface CanvasOptions {
 	/** The drawing: a `.pen` file's text (`canvas.pen`). */
 	text: string;
@@ -87,12 +86,6 @@ export interface CanvasOptions {
 	 * canvas): normally the URL of the folder the `.pen` file is in. Default: the page's address.
 	 */
 	base?: string;
-	/** Where a deck file is read (an image or a file opened in a tab). Default: `path` against `base`. */
-	resolveUrl?: (path: string, rev?: number) => string;
-	/** Where an icon's SVG is, before the CDN is asked. */
-	icons?: (library: string, name: string, weight: number) => string | undefined;
-	/** A link on the drawing that names a board this host opens on the canvas: that board's path. */
-	boardLink?: (href: string, base: string) => string | undefined;
 	/** `edit` (the default) to change the drawing, `browse` to read it and draw ink over it. */
 	mode?: "edit" | "browse";
 	/** Nothing can be changed: no tools, no edits. */
@@ -144,23 +137,17 @@ export interface CanvasOptions {
 	 * likes) and says whether it did; the board then leaves the drawing. Absent: no Delete on the pill.
 	 */
 	onDeleteBoard?: (path: string) => boolean | void | Promise<boolean | void>;
-	/** The host's own menu on the pill (its ⋯): for a board by its path, or for drawn items by their ids. Absent: no ⋯. */
-	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/**
 	 * Ink selected, and the pill's Make a drawing, Make a board or Send pressed (`Stage`'s `onInk`): the host
 	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;
 	inkAgent?: () => string | undefined;
-	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
-	onProperties?: () => void;
-	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
-	onTool?: (tool: PenTool) => void;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
 	onSelection?: (ids: readonly string[]) => void;
 }
 
-/** A mounted canvas. */
+/** The editor's handle, inside the canvas frame (and to an app's chrome there, `frame/chrome.ts`). */
 export interface CanvasHandle {
 	/**
 	 * A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no
@@ -221,7 +208,7 @@ export interface CanvasHandle {
 /**
  * State a host keeps itself and the editor reads and writes (the Decks app's camera, selection and
  * mode are the app's own): each a getter and a setter. What is not given, the editor keeps. The
- * framed editor (`frame/host.tsx`) keeps all of it in step with its frame; `createEditor` itself
+ * framed editor (`frame/outside/host.tsx`) keeps all of it in step with its frame; `createEditor` itself
  * takes only the mode and the ink (`EditorOwnState`), which is what the canvas frame keeps.
  */
 export interface EditorState {
@@ -242,8 +229,6 @@ export interface EditorState {
 	 * and `scope`, which drawing it is (the canvas): one of another scope drops the edits on their way.
 	 */
 	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string; writer?: DrawingWriter } | undefined>;
-	/** Where the canvas opens: undefined while the host does not know yet. */
-	opening?: Accessor<{ camera?: Camera } | undefined>;
 }
 
 /** What of `EditorState` the editor made in a host's own tree reads: the mode and the ink. */
@@ -254,7 +239,7 @@ export interface Editor {
 	handle: CanvasHandle;
 	/** The stage alone, for a host that lays out its own work area and tool bars (the Decks app). */
 	surface: () => JSX.Element;
-	/** The whole editor: the stage in its work area, the drawing's tools and ink (`mountCanvas`). */
+	/** The whole editor: the stage in its work area, the drawing's tools and ink (the frame with no chrome of its own). */
 	root: () => JSX.Element;
 	dispose(): void;
 }

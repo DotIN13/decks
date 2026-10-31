@@ -103,13 +103,9 @@ export type StageProps = {
 	 */
 	glide?: { token: number; ms: number };
 	selected?: string;
-	/** The selected board gets the action pill (`BoardCallout`): boards have no title bars, so this is where their actions are. */
-	boardPill?: boolean;
-	/** The pill's Properties, for a host with its own properties panel; absent, the canvas's own opens. */
-	onProperties?: () => void;
 	/**
 	 * What draws one placed item's slot: the stage says where it is and what it may do, the host adds
-	 * what it knows of its file (`item-slot.tsx`, `mount.tsx`).
+	 * what it knows of its file (`item-slot.tsx`, `editor.tsx`).
 	 */
 	frame: Component<StageBoardProps>;
 	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
@@ -125,8 +121,6 @@ export type StageProps = {
 	/** The board dragged to a new size, in board units. The file is what changes. */
 	onResize?: (path: string, size: { w: number; h: number }) => void;
 	onHide?: (path: string) => void;
-	/** The host's own menu for what a pill is on: a board by its path, or drawn items by their ids. */
-	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/**
 	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a board of it,
 	 * or send it as it is, to be read and acted on. Without both, the pill has no such actions.
@@ -139,7 +133,7 @@ export type StageProps = {
 	stageName?: string | undefined;
 	/** The boards that are news, by path, each with the colour its glow is drawn in (`board/glow.ts`). */
 	news?: Record<string, string>;
-	/** A board that was news was read on the canvas. */
+	/** A card that was news was looked at (selected): said once for each change of it. */
 	onRead?: (path: string) => void;
 	/** So the server can answer `decks.view.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
@@ -607,6 +601,22 @@ export function Stage(props: StageProps) {
 		if (!id || !card || !isCard(card)) return undefined;
 		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: editor.textEditing.cardInner(card) };
 	};
+
+	/*
+	 * Looking at a card that is news reads it: selected (a press on it, or the page putting the selection
+	 * back), it is said to be read (`onRead`) once for each change of it, and its dot goes when the host
+	 * hears that it was. A change after that is news again, and selecting it says so again.
+	 */
+	const readFor = new Map<string, string>();
+	createEffect(() => {
+		const path = props.selected;
+		if (!path || !props.onRead || !props.news?.[path]) return;
+		const board = untrack(() => props.boards.find((one) => one.path === path));
+		const change = `${board?.rev ?? 0}|${board?.namedAt ?? 0}|${board?.modifiedAt ?? 0}`;
+		if (readFor.get(path) === change) return;
+		readFor.set(path, change);
+		props.onRead(path);
+	});
 
 	const armPenTool = (tool: PenTool) => {
 		// The board palette's tool goes down first: picking one of its tools puts this one down.

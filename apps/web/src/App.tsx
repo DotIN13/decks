@@ -30,14 +30,13 @@ import { notice } from "./state/notices.ts";
 import { boardsOpen, boardsStarted, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
 import { destination, destinationLabel, stripMention, withoutName } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
-import { isNews } from "./panel/board-news.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
 import { commentBlock, withComments } from "./markup/comments.ts";
 import { addComment, adoptFormerComments, cleanFrameComment, cleanFrameInk, cleanFramePills, removeComment, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
-import { createFramedEditor, type CanvasHandle } from "@decks/canvas";
+import { createFramedEditor, type FramedHandle } from "@decks/canvas";
 import { canvasPass, cardAgentCall } from "./board/canvas-frame.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -150,19 +149,6 @@ export function App() {
 		onCleanup(() => removeEventListener("pagehide", away));
 	});
 
-	/*
-	 * The boards that are news, each in its writer's colour: what the canvas draws a glow round
-	 * until the board is read there (`board/glow.ts`). The same rule as the sidebar's mark, so a
-	 * board glows on the canvas exactly when it is marked in the list.
-	 */
-	const newsGlow = createMemo(() => {
-		const out: Record<string, string> = {};
-		for (const board of state.boards) {
-			if (!isNews(board)) continue;
-			out[board.path] = (board.lastWrittenBy && state.identities[board.lastWrittenBy]?.color) || "var(--color-accent)";
-		}
-		return out;
-	});
 	/*
 	 * The bar's destination, decided in one place.
 	 *
@@ -1137,7 +1123,7 @@ export function App() {
 
 
 	/** The editor on screen (`createFramedEditor`), for what this app asks of it from outside: the scheme, a selection. */
-	const [editorHandle, setEditorHandle] = createSignal<CanvasHandle>();
+	const [editorHandle, setEditorHandle] = createSignal<FramedHandle>();
 	/** The drawn items selected on the canvas, for the panel's Canvas tab. */
 	const [penSelected, setPenSelected] = createSignal<string[]>([]);
 	/**
@@ -1250,7 +1236,6 @@ export function App() {
 		 * hands over: drafts for the composer, a card's agent calls, apps, uploads, views for other agents.
 		 */
 		const editor = createFramedEditor({
-			text: "",
 			// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
 			dark: untrack(scheme) === "dark",
 			toolbar: false,
@@ -1453,7 +1438,6 @@ export function App() {
 				*/}
 				<LeftPanel
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
-					news={newsGlow()}
 					boards={state.boards}
 					{...(stagePen()?.doc ? { canvasDoc: stagePen()!.doc } : {})}
 					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
@@ -1508,18 +1492,6 @@ export function App() {
 					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
 					onAgentRename={(id, name) => send({ type: "agent.rename", id, name })}
 					onAbortAgent={(id) => send({ type: "agent.abort", id })}
-					onPick={(board) => playAndFrame(board.path)}
-					/*
-					 * Delete the file.
-					 *
-					 * Nothing is cleaned up here on purpose: the board leaves the deck when the
-					 * server says `board.changed … removed`, which is the same message the watcher
-					 * sends when a board is deleted from a shell — so there is one path out of the
-					 * deck rather than an optimistic one beside it. The selection and the canvas
-					 * follow from that, where they already did.
-					 */
-					onDelete={(board) => send({ type: "board.delete", path: board.path })}
-					onHide={(board) => void act("canvas.delete", [board.path])}
 					apps={apps()}
 					onAppsOpen={loadApps}
 					onApp={async (app, action) => {

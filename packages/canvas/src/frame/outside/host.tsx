@@ -1,9 +1,9 @@
-import { serialize, type PenDocument } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { dismissMenus } from "@decks/ui";
-import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../../types.ts";
+import type { EditorState, StageComment } from "../../types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
+import type { InkTool } from "../../edit/ink.ts";
 import { insets } from "../../camera/insets.ts";
 import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
 
@@ -71,25 +71,92 @@ export interface CanvasPass {
 /** How long after a failed renewal it is asked for again. */
 const RETRY_MS = 30_000;
 
-type Options = CanvasOptions & { state?: EditorState; frame: FrameHostOptions };
+/** What a page gives `createFramedEditor`: how the canvas looks, the page's state kept in step with it, and what it hears from it. */
+export interface FramedEditorOptions {
+	/** The canvas on screen, by name: the frame is made again, on a pass for it, when it changes. */
+	canvasName: () => string | undefined;
+	/** Draw in the dark scheme. Default: light. */
+	dark?: boolean;
+	/** `edit` (the default) to change the drawing, `browse` to read it and draw ink over it. */
+	mode?: "edit" | "browse";
+	/** Nothing can be changed: no tools, no edits. */
+	readOnly?: boolean;
+	/** The frame draws the canvas's own column of tools (when it has no chrome of its own). Default: true. */
+	toolbar?: boolean;
+	/** Where the camera starts, unless `state.camera` says. */
+	camera?: Camera;
+	/** The page's own camera, selection, mode and ink (and its copy of the drawing), kept in step with the frame. */
+	state?: EditorState;
+	boards?: {
+		/** A link on a card to another of the deck: open it, and say whether this page has it. */
+		onOpenLink?(path: string, from: string): boolean;
+	};
+	/** The camera came to rest after the person moved it. */
+	onCamera?: (camera: Camera) => void;
+	/** The card selected, or none. */
+	onSelect?: (path: string | undefined) => void;
+	/** The drawn items selected changed (their ids). */
+	onSelection?: (ids: readonly string[]) => void;
+	/** How big the canvas is on screen, when it changes. */
+	onViewport?: (viewport: { width: number; height: number }) => void;
+	/** Cards or items dragged onto the page's composer, to talk about them. */
+	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>) => void;
+	/** A comment from a frame with no chrome of its own (its pill's Comment): the page opens its own box. */
+	onComment?: (comment: StageComment) => void;
+	/** Export drawn items as a picture. */
+	onExport?: (ids: string[]) => void;
+	frame: FrameHostOptions;
+}
+
+/** What the page can do to its framed canvas: what the Decks app and Decks Studio call. */
+export interface FramedHandle {
+	/** Apply pen operations as the person's edit. */
+	edit(ops: unknown[]): void;
+	/** Select these drawn items, or none. */
+	select(ids: readonly string[]): void;
+	setDark(dark: boolean): void;
+	setMode(mode: "edit" | "browse"): void;
+	/** Ink on or off. */
+	setDrawing(on: boolean, tool?: InkTool): void;
+	/** Take a tool in hand: `select` puts it down. */
+	setTool(tool: PenTool): void;
+	/** Paste what this page's clipboard had: a copy of items (`@decks/pen`'s clip, as JSON) or words. */
+	paste(data: { clip?: string; text?: string }): void;
+	/** Move the camera there, gliding unless `ms` is 0. */
+	glide(camera: Camera, ms?: number): void;
+	/** The camera as the frame last said it, and moving it. */
+	camera(): Camera;
+	setCamera(camera: Camera): void;
+	/** A card's file changed: it loads again. */
+	reloadBoard(path: string): void;
+	/** Always false: the page keeps the views, not the frame. */
+	readonly restored: boolean;
+	dispose(): void;
+}
+
+/** The framed editor: its handle, and the frame to put where the canvas goes. */
+export interface FramedEditor {
+	handle: FramedHandle;
+	surface: () => JSX.Element;
+	dispose(): void;
+}
+
+type Options = FramedEditorOptions;
 
 /**
- * The editor in a sandboxed frame (`protocol.ts`), made as `createEditor` makes it, so a host can take
- * one for the other: the same options and state, the same handle, its stage in a frame. The canvas runs
- * in the frame; this end keeps it in step with the host's state, turns its messages into the host's
- * callbacks, and answers what it asks.
+ * The editor in a sandboxed frame (`protocol.ts`): the canvas runs in the frame (`bootFrame`); this end
+ * keeps it in step with the host's state, turns its messages into the host's callbacks, and answers
+ * what it asks.
  *
  * One frame for one canvas: when the host moves to another canvas the frame is made again, on a ticket
  * for that canvas.
  */
-export function createFramedEditor(options: Options): Editor {
+export function createFramedEditor(options: Options): FramedEditor {
 	const state = options.state;
 	const [end, setEnd] = createSignal<PageEnd>();
 	const [frameAt, setFrameAt] = createSignal<HTMLIFrameElement>();
 	/** The last of each the frame said, so this end does not say it back. */
 	let fromFrame: { camera?: Camera; selected?: string; mode?: "edit" | "browse" } = {};
-	let drawn: PenDocument | undefined;
-	let tool: PenTool = "select";
 	let localCamera: Camera = untrack(() => state?.camera?.[0]()) ?? options.camera ?? { x: 0, y: 0, zoom: 1 };
 	let darkNow = options.dark === true;
 	let modeNow: "edit" | "browse" = options.mode ?? "edit";
@@ -149,8 +216,6 @@ export function createFramedEditor(options: Options): Editor {
 		if (cancelled()) return;
 		const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
 		const pen = untrack(() => state?.pen?.());
-		const doc = pen?.doc;
-		drawn = doc;
 		const stored: Record<string, string> = {};
 		if (storage) {
 			const prefix = storeKey(canvas);
@@ -327,7 +392,6 @@ export function createFramedEditor(options: Options): Editor {
 				(pen) => {
 					// The drawing is the frame's own to read (`backend.ts`); this page's copy is only for its panels.
 					if (!pen) return;
-					drawn = pen.doc;
 					const page = end();
 					if (page && pen.writer) page.emit("busy", { writer: pen.writer });
 				},
@@ -462,15 +526,9 @@ export function createFramedEditor(options: Options): Editor {
 		);
 	};
 
-	const handle: CanvasHandle = {
-		// The frame follows the drawing itself, from the harness: nothing of it is passed on from here.
-		setDocument: () => {},
-		applyEdits: () => true,
-		refused: () => {},
-		drawn: () => drawn ?? { version: "2.14", children: [] } as unknown as PenDocument,
+	// The frame follows the drawing itself, from the harness or Studio: nothing of it is passed on from here.
+	const handle: FramedHandle = {
 		glide: (camera, ms) => end()?.emit("camera", { camera, glide: ms ?? 400 }),
-		document: () => drawn ?? ({ version: "2.14", children: [] } as unknown as PenDocument),
-		text: () => (drawn ? serialize(drawn) : ""),
 		setDark: (dark) => {
 			darkNow = dark;
 			end()?.emit("look", { dark });
@@ -480,16 +538,9 @@ export function createFramedEditor(options: Options): Editor {
 			end()?.emit("look", { mode });
 		},
 		setDrawing: (onOff) => end()?.emit("tool", { ink: { on: onOff } }),
-		setTool: (next) => {
-			tool = next;
-			end()?.emit("tool", { tool: next });
-		},
-		tool: () => tool,
-		fit: () => end()?.emit("fit", {}),
-		select: (ids) => end()?.emit("select", { ids }),
+		setTool: (next) => end()?.emit("tool", { tool: next }),
+		select: (ids) => end()?.emit("select", { ids: [...ids] }),
 		edit: (ops) => void end()?.call("edit", { ops }),
-		undo: () => end()?.emit("step", { direction: "undo" }),
-		redo: () => end()?.emit("step", { direction: "redo" }),
 		camera: () => localCamera,
 		setCamera: (camera) => {
 			localCamera = camera;
@@ -503,5 +554,5 @@ export function createFramedEditor(options: Options): Editor {
 			setEnd(undefined);
 		},
 	};
-	return { handle, surface, root: surface, dispose: () => handle.dispose() };
+	return { handle, surface, dispose: () => handle.dispose() };
 }

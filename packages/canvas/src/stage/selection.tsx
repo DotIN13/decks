@@ -316,7 +316,7 @@ export function createSelection(deps: SelectionDeps) {
 				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
-			<Show when={props.boardPill && !props.drawing ? calloutBoard() : undefined} keyed>
+			<Show when={!props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout
 						board={board}
@@ -329,7 +329,6 @@ export function createSelection(deps: SelectionDeps) {
 						onOpen={() => pushCamera(frame([boxOf(board)]))}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 						{...(props.onDeleteBoard ? { onDelete: () => props.onDeleteBoard?.(board.path) } : {})}
-						{...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ path: board.path }, anchor) } : {})}
 						{...(props.onComment
 							? {
 									onComment: () =>
@@ -385,9 +384,7 @@ export function createSelection(deps: SelectionDeps) {
 											}
 										: {}),
 									onDuplicate: () => penDuplicate(),
-									...(props.onProperties ? { onProperties: props.onProperties } : {}),
 									onDelete: () => penDeleteSelected(),
-									...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: items().ids }, anchor) } : {}),
 								}
 							: {})}
 					/>
@@ -428,7 +425,6 @@ export function createSelection(deps: SelectionDeps) {
 							penEdit(ops);
 							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "stage", ids: made });
 						}}
-						{...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: held().ids }, anchor) } : {})}
 						onDelete={() => {
 							penEdit(held().ids.map((id) => ({ op: "delete", id })));
 							setInkSelection(undefined);

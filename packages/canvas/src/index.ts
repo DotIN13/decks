@@ -1,20 +1,17 @@
 /**
- * The Decks canvas, for any host: `mountCanvas` puts the whole editor in an element, editing a
- * `.pen` document, and reports the person's edits; `createEditor` makes the same editor in a Solid
- * host's own tree (the Decks app). The Decks app mounts the parts itself
- * (`Stage.tsx`, `pen/PenBar.tsx`, …, through `@decks/canvas/<path>`).
+ * The Decks canvas, for any host: the canvas frame (`bootFrame`, in a sandboxed page of its own) and
+ * the page's end of it (`createFramedEditor`); `createEditor` makes the editor itself in a Solid tree,
+ * as the frame does.
  */
-export { createEditor, fitAll, mountCanvas, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./mount.tsx";
+export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor.tsx";
 export type { InkTool } from "./edit/ink.ts";
-export { boardsOf, createDrawing, type Drawing, type DrawingOptions } from "./model/drawing.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
-export { ItemSlot, type ItemSlotExtras, type StageBoardProps } from "./items/item-slot.tsx";
-export { Stage, type InkRequest, type StageComment, type StageShots } from "./stage/Stage.tsx";
+export type { InkRequest, StageComment } from "./types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./edit/pen-tools.ts";
 export type { DocEdits, DrawingWriter } from "./render/types.ts";
 // The canvas frame (`frame/`): the canvas in a sandboxed page of its own, and the protocol to it.
 export { bootFrame } from "./frame/inside/frame.tsx";
 export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
-export { CallRefused, PROTOCOL, peer, type FrameCalls, type FrameToPage, type Message, type Page as FramePage, type PageCalls, type PageEnd, type PageToFrame, type Start as FrameStart } from "./frame/protocol.ts";
-export { createFramedEditor, type CanvasPass, type FrameHostOptions } from "./frame/outside/host.tsx";
+export { CallRefused, type FrameCalls } from "./frame/protocol.ts";
+export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./frame/outside/host.tsx";

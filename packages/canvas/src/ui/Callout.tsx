@@ -6,12 +6,10 @@ import { canvasHost } from "../host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
-import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Trash from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import Scan from "lucide-solid/icons/scan";
-import Ellipsis from "lucide-solid/icons/ellipsis";
 import Shapes from "lucide-solid/icons/shapes";
 import LayoutTemplate from "lucide-solid/icons/layout-template";
 import Send from "lucide-solid/icons/send";
@@ -42,12 +40,9 @@ export function BoardCallout(props: {
 	onHide?: () => void;
 	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
 	onComment?: () => void;
-	/** For drawn items: copy them, show their properties, take them off the canvas. */
+	/** For drawn items: copy them, take them off the canvas. */
 	onDuplicate?: () => void;
-	onProperties?: () => void;
 	onDelete?: () => void;
-	/** The host's own menu for what the pill is on, opened under this button (its box on screen). */
-	onMore?: (anchor: DOMRect) => void;
 	/**
 	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or send it as it
 	 * is, for the agent to read and act on (a command written by hand is carried out). First, in words.
@@ -196,16 +191,6 @@ export function BoardCallout(props: {
 			<Show when={props.onDuplicate}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Duplicate" title="Duplicate" onClick={() => props.onDuplicate?.()}>
 					<Icon of={Copy} size={16} />
-				</button>
-			</Show>
-			<Show when={props.onProperties}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => props.onProperties?.()}>
-					<Icon of={SlidersHorizontal} size={16} />
-				</button>
-			</Show>
-			<Show when={props.onMore}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="More" title="More" onClick={(e) => props.onMore?.(e.currentTarget.getBoundingClientRect())}>
-					<Icon of={Ellipsis} size={16} />
 				</button>
 			</Show>
 			<Show when={props.onDelete}>

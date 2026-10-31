@@ -4,7 +4,7 @@ import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
 
 /**
- * The drawing a mounted canvas edits (`mount.tsx`): the document, the person's edits applied to it
+ * The drawing a canvas edits (`editor.tsx`): the document, the person's edits applied to it
  * with `@decks/pen` as the Decks server applies them (arrows routed again after each), their undo
  * and redo, and every change reported as the edits that make it (`diff`).
  *

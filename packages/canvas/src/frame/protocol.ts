@@ -1,4 +1,3 @@
-import type { PenDocument } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
 import type { PenTool } from "../edit/pen-tools.ts";
 import type { Insets } from "../camera/insets.ts";
@@ -85,9 +84,7 @@ export interface PageToFrame {
 	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number; /** Where the page's composer is on the frame's screen (null: not shown): a drag let go over it mentions what it carries. */ composer?: Rect | null };
 	tool: { tool?: PenTool; ink?: { on: boolean } };
 	camera: { camera: Camera; glide?: number };
-	fit: Record<string, never>;
 	select: { ids: readonly string[]; page?: string };
-	step: { direction: "undo" | "redo" };
 	/** Who writes on the drawing now: what it is drawing is shown in their colour, with their name. */
 	busy: { writer?: { name?: string; color: string } };
 	/** A press or Escape on the page, which the frame does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
@@ -99,7 +96,6 @@ export interface PageToFrame {
 /** The calls the page makes of the frame, and what each answers. */
 export type PageCalls = {
 	edit: { data: { ops: unknown[] }; value: true };
-	read: { data: Record<string, never>; value: PenDocument };
 };
 
 /**

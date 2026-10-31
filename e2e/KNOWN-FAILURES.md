@@ -61,7 +61,7 @@ edits-wait.
 
 ### Still worth knowing
 
-- per-agent: a new canvas frame opens on the camera its host last put it at (`mount.tsx`), fixed 2026-10-29.
+- per-agent: a new canvas frame opens on the camera its host last put it at (`editor.tsx`), fixed 2026-10-29.
 - stage-gestures: "a scroll during a drag keeps the items and the board under the cursor" was seen once under load; a
   timing flake.
 - pen-stage: `__decksEngine.stats()` can report tiles 0 while the canvas is drawn (`__decksSheet.shown` > 0); the check
