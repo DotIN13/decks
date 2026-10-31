@@ -1,4 +1,4 @@
-import type { PenDocument, PenNode } from "@decks/pen";
+import type { PenDocument, PenEdit, PenNode } from "@decks/pen";
 
 /**
  * What changed on a canvas since an agent last heard, as the lines put in front of its next message.
@@ -13,11 +13,17 @@ import type { PenDocument, PenNode } from "@decks/pen";
 /** Who wrote a canvas: the person (an edit from a page), an agent (its own call), or the file itself. */
 export type Author = { kind: "person" } | { kind: "agent"; id: string } | { kind: "file" };
 
-/** One write of a canvas: its revision, its author, and the items it touched. */
+/**
+ * One write of a canvas: its revision, its author, the items it touched, and the edits that made it
+ * from the revision before (`@decks/pen`'s `diff`), with the names the browser gave its own among them
+ * (`made`). The edits are what a browser or another harness holding the revision before is sent.
+ */
 export interface ChangeRecord {
 	rev: number;
 	by: Author;
 	ids: string[];
+	edits: PenEdit[];
+	made?: string[];
 }
 
 /** The most lines a note has before it says how many more. */

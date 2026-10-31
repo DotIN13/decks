@@ -374,3 +374,48 @@ test("an edit whose own variables op already defines them (as the canvas sends o
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("every write is logged with its edits: changesSince and editsSince answer them, the change published is the log's, and a gap falls back to comparing drawings", () => {
+	const dir = deck();
+	const heard: Array<[string, PenEntry]> = [];
+	const pens = new StagePens(dir, (name, entry) => heard.push([name, entry]));
+	const wrote: Array<{ name: string; rev: number; ops: string[]; by: string }> = [];
+	pens.wrote = (name, change) => wrote.push({ name, rev: change.rev, ops: change.edits.map((e) => e.op), by: change.by.kind });
+	try {
+		const name = pens.claim("Log");
+		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a", content: "one" }, box: { x1: 0, y1: 0 } }]);
+		const first = pens.get(name).rev;
+		// The drawing was sent whole once; what follows is the log's edits, revision by revision.
+		pens.changes([""], name);
+		pens.edit(name, [{ op: "update", id: "a", set: { content: "two" } }]);
+		pens.edit(name, [{ op: "insert", node: { type: "note", id: "b", content: "b" }, box: { x1: 400, y1: 0 } }]);
+		const now = pens.get(name).rev;
+		assert.equal(now, first + 2);
+		const since = pens.changesSince(name, first);
+		assert.deepEqual(since.map((r) => [r.rev, r.by.kind, r.ids]), [[first + 1, "person", ["a"]], [first + 2, "person", ["b"]]]);
+		assert.deepEqual(since.map((r) => r.edits.map((e) => e.op)), [["set"], ["insert"]]);
+		const span = pens.editsSince(name, first)!;
+		assert.equal(span.from, first);
+		assert.equal(span.rev, now);
+		assert.deepEqual(span.edits.map((e) => e.op), ["set", "insert"]);
+		assert.equal(pens.editsSince(name, -1), undefined, "a revision from before the log has no edits to offer");
+		// Published from the log: the delta from the revision last sent carries exactly those edits, in order.
+		const [delta] = pens.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }> }>;
+		assert.equal(delta!.type, "stage.pen.delta");
+		assert.deepEqual([delta!.from, delta!.rev], [first, now]);
+		assert.deepEqual(delta!.edits.map((e) => e.op), ["set", "insert"]);
+		assert.deepEqual(wrote.map((w) => [w.rev, w.by, w.ops]), [[first, "person", ["insert"]], [first + 1, "person", ["set"]], [first + 2, "person", ["insert"]]]);
+		// A hand edit of the file is read back with a revision of its own but no logged edits: the next change is worked out from the drawings.
+		const file = pens.fileOf(name);
+		writeFileSync(file, JSON.stringify({ version: "2.14", children: [{ type: "note", id: "a", content: "by hand", x: 0, y: 0 }] }));
+		const hand = pens.get(name);
+		assert.equal(hand.rev, now + 1);
+		assert.equal(pens.editsSince(name, now), undefined);
+		const [fallback] = pens.changes([""], name) as Array<{ from: number; rev: number; edits: Array<{ op: string; id?: string }> }>;
+		assert.deepEqual([fallback!.from, fallback!.rev], [now, now + 1]);
+		assert.ok(fallback!.edits.some((e) => e.op === "remove" && e.id === "b"), "the drawings compared say b went");
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

@@ -6,7 +6,7 @@ import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
 import { runAtOpen } from "../migrations/index.ts";
 import { movedPath } from "../migrations/2026-10-16-stages-to-canvases.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
-import { apply, ARROW, baseTheme, withDecksColors, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, themeFrom, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
+import { apply, ARROW, baseTheme, withDecksColors, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, themeFrom, walk, type Frame, type Op, type OpResult, type PenDocument, type PenEdit, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
 
 /** What a read may ask for beyond the whole file: one item, a depth, values worked out, in a theme such as { mode: "dark" } (`read.ts`). */
 export type ReadMore = Omit<ReadOptions, "theme" | "measure"> & { theme?: Record<string, string> };
@@ -138,25 +138,52 @@ export class StagePens {
 	private readonly changeLogs = new Map<string, ChangeRecord[]>();
 	private readonly writtenBy = new Map<string, Set<string>>();
 
-	/** A write of a canvas, kept for whoever is told about it next. */
-	private record(name: string, before: PenDocument | undefined, after: PenDocument, rev: number, by: Author): void {
+	/**
+	 * Hears every write of a canvas as it is logged: its revision, the edits that made it and who made
+	 * it (`app.ts` forwards them to Studio for a canvas kept there).
+	 */
+	wrote?: (name: string, change: ChangeRecord) => void;
+
+	/**
+	 * A write of a canvas, kept for whoever is told about it next: the edits from the revision before
+	 * (worked out once here, for the log, the browsers and Studio alike), with the names the browsers
+	 * gave the edits of theirs this revision is the first to have.
+	 */
+	private record(name: string, before: PenDocument | undefined, after: PenDocument, rev: number, by: Author, made?: string[]): ChangeRecord {
 		// A canvas's first write is from nothing.
-		const ids = [...new Set(diff(before ?? emptyDocument(), after).flatMap((edit) => ("id" in edit ? [edit.id] : [])))];
-		if (ids.length === 0) return;
+		const edits = diff(before ?? emptyDocument(), after);
+		const ids = [...new Set(edits.flatMap((edit) => ("id" in edit ? [edit.id] : [])))];
+		const record: ChangeRecord = { rev, by, ids, edits, ...(made?.length ? { made } : {}) };
 		const log = this.changeLogs.get(name) ?? [];
-		log.push({ rev, by, ids });
+		log.push(record);
 		if (log.length > CHANGE_LOG) log.splice(0, log.length - CHANGE_LOG);
 		this.changeLogs.set(name, log);
-		if (by.kind === "agent") {
+		if (ids.length && by.kind === "agent") {
 			const set = this.writtenBy.get(by.id) ?? new Set<string>();
 			set.add(name);
 			this.writtenBy.set(by.id, set);
 		}
+		if (edits.length) this.wrote?.(name, record);
+		return record;
 	}
 
 	/** The writes of a canvas after revision `rev`, oldest first. */
 	changesSince(name: string, rev: number): ChangeRecord[] {
 		return (this.changeLogs.get(name) ?? []).filter((record) => record.rev > rev);
+	}
+
+	/**
+	 * The edits that take a canvas from revision `from` to `to` (the current one when left out), from
+	 * the log: one list, the revisions' edits in order, with the browsers' names for theirs. `undefined`
+	 * when the log does not hold every revision between (one came before this server started, or more
+	 * than `CHANGE_LOG` writes ago): the drawing is read whole then.
+	 */
+	editsSince(name: string, from: number, to = this.get(name).rev): { from: number; rev: number; edits: PenEdit[]; made: string[] } | undefined {
+		if (to < from) return undefined;
+		const records = (this.changeLogs.get(name) ?? []).filter((record) => record.rev > from && record.rev <= to);
+		if (records.length !== to - from) return undefined;
+		for (let i = 0; i < records.length; i += 1) if (records[i]!.rev !== from + i + 1) return undefined;
+		return { from, rev: to, edits: records.flatMap((record) => record.edits), made: records.flatMap((record) => record.made ?? []) };
 	}
 
 	/** The canvases this agent wrote since it last asked. */
@@ -1098,7 +1125,12 @@ export class StagePens {
 		const made = this.takeMade(name);
 		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name, this.madeLately.get(name) ?? made));
 		const doc = this.withImported(name, entry.doc);
-		const edits = diff(before.doc, doc);
+		/*
+		 * From the log when it holds every revision since the one sent: the edits as each write worked them
+		 * out, which Studio and the agents' notes get too. Else (a frame of the canvas changed, no revision;
+		 * a revision from before this server) the two drawings, imports and all, are compared.
+		 */
+		const edits = (entry.rev > before.rev ? this.editsSince(name, before.rev, entry.rev)?.edits : undefined) ?? diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });
 		const base = `${fileUrl(this.folderOf(name))}/`;
 		const by = this.writers.get(name);
@@ -1129,12 +1161,11 @@ export class StagePens {
 		const previous = this.cache.get(name);
 		const entry = { doc, rev: (previous?.rev ?? 0) + 1, mtime: statSync(file).mtimeMs, text };
 		this.cache.set(name, entry);
-		// An agent's call says so (`penWriter`); any other write here is the person's, from a page.
-		const author = penWriter.getStore();
-		this.record(name, previous?.doc, doc, entry.rev, author ? { kind: "agent", id: author } : { kind: "person" });
 		const by = penEditBy.getStore();
 		if (by) this.made.set(name, [...(this.made.get(name) ?? []), by]);
+		// An agent's call says so (`penWriter`); any other write here is the person's, from a page.
 		const writer = penWriter.getStore();
+		this.record(name, previous?.doc, doc, entry.rev, writer ? { kind: "agent", id: writer } : { kind: "person" }, by ? [by] : undefined);
 		if (writer) this.writers.set(name, writer);
 		this.changed(name, entry);
 		return entry;
