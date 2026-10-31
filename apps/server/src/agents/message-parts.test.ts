@@ -33,7 +33,7 @@ test("parts from a browser are kept as `MessagePart`s, anything else dropped", (
 		null,
 		{ type: "text", text: "x".repeat(30_000) },
 	])!;
-	assert.deepEqual(cleaned[0], { type: "mention", kind: "board", id: "boards/a.html", name: "boards/a.html", from: "you" });
+	assert.deepEqual(cleaned[0], { type: "mention", kind: "card", id: "boards/a.html", name: "boards/a.html", from: "you" }, "a pill kept before cards says board, and is read as a card's");
 	assert.equal(cleaned.length, 2);
 	assert.equal((cleaned[1] as { text: string }).text.length, 20_000);
 });

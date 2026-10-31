@@ -128,7 +128,7 @@ test("each device's board list carries its own conversation's arrangement", () =
 		assert.deepEqual(plan(last(phone, "deck.state")), [900, 400]);
 
 		// And a board moved on the laptop lands on the laptop's conversation, not the phone's.
-		app.handle({ type: "board.move", path: "boards/plan.html", x: 64, y: 64 }, replyTo(laptop), laptop);
+		app.handle({ type: "card.move", path: "boards/plan.html", x: 64, y: 64 }, replyTo(laptop), laptop);
 		assert.deepEqual(app.agents.get(one)?.positions()["boards/plan.html"], { x: 64, y: 64 });
 		assert.deepEqual(app.agents.get(two)?.positions()["boards/plan.html"], { x: 900, y: 400 });
 	} finally {

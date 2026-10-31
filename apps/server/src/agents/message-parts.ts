@@ -12,7 +12,7 @@ const PARTS_LIMIT = 200;
 const TEXT_LIMIT = 20_000;
 const FIELD_LIMIT = 2_000;
 const ITEMS_LIMIT = 50;
-const KINDS = ["comment", "board", "item", "file"];
+const KINDS = ["comment", "card", "item", "file"];
 
 const str = (value: unknown, limit = FIELD_LIMIT) => (typeof value === "string" ? value.slice(0, limit) : undefined);
 
@@ -27,12 +27,14 @@ export function cleanParts(raw: unknown): MessagePart[] | undefined {
 			if (text) out.push({ type: "text", text });
 			continue;
 		}
-		if (value.type !== "mention" || !KINDS.includes(value.kind as string)) continue;
+		// A pill kept before cards says "board": it is a card's.
+		const kind = value.kind === "board" ? "card" : value.kind;
+		if (value.type !== "mention" || !KINDS.includes(kind as string)) continue;
 		const id = str(value.id);
 		if (!id) continue;
 		const mention: MessageMention = {
 			type: "mention",
-			kind: value.kind as MessageMention["kind"],
+			kind: kind as MessageMention["kind"],
 			id,
 			name: str(value.name) || id,
 			from: value.from === "canvas" ? "canvas" : "you",

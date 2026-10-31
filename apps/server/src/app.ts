@@ -5,7 +5,7 @@ import { runAtOpen } from "./migrations/index.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
-import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
+import type { Page, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
@@ -120,7 +120,7 @@ export class App {
 	placedOn(path: string, canvas: string): boolean {
 		return boardOnCanvas(this, path, canvas);
 	}
-	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
+	/** The port this server is on, so a card's `decks.card.url()` answers like an agent's. */
 	get port(): number {
 		return this.config.port;
 	}
@@ -714,8 +714,8 @@ export class App {
 				}
 				this.send(
 					board
-						? { type: "board.changed", path: change.path, rev: board.rev, board: this.placed(board) }
-						: { type: "board.changed", path: change.path, rev: 0, removed: true },
+						? { type: "card.changed", path: change.path, rev: board.rev, card: this.placed(board) }
+						: { type: "card.changed", path: change.path, rev: 0, removed: true },
 				);
 				return;
 			}
@@ -754,13 +754,13 @@ export class App {
 		const { changed, removed } = this.deck.resync();
 		for (const board of changed) {
 			this.boards.recordRevision(board.path);
-			this.send({ type: "board.changed", path: board.path, rev: board.rev, board: this.placed(board) });
+			this.send({ type: "card.changed", path: board.path, rev: board.rev, card: this.placed(board) });
 		}
 		for (const path of removed) {
 			// A dead path left in a context silently empties the rail and the canvas.
 			this.agents.boardRemoved(path);
 			this.boards.forgetBoard(path);
-			this.send({ type: "board.changed", path, rev: 0, removed: true });
+			this.send({ type: "card.changed", path, rev: 0, removed: true });
 		}
 	}
 
@@ -915,7 +915,7 @@ export class App {
 	 *
 	 * **It never creates an agent.** `Registry.focused()` mints one on demand for a deck nobody has
 	 * spoken to, which is right for a prompt and wrong here: this is called from broadcast paths, and a
-	 * `board.changed` must not start a runtime as a side effect of being sent. No stage means the
+	 * `card.changed` must not start a runtime as a side effect of being sent. No stage means the
 	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
 	 */
 	stageState(asked?: DeckAgent): DeckState {
@@ -966,7 +966,7 @@ export class App {
 	 * that has the board already. A broadcast that carried the loader's copy instead would put the board
 	 * at the origin for everybody, because the loader's boards have no place of their own any more.
 	 */
-	private placed(board: Board): Board {
+	private placed(board: Page): Page {
 		return this.stageState().boards.find((one) => one.path === board.path) ?? board;
 	}
 
@@ -975,19 +975,12 @@ export class App {
 		 * Every change to a board is announced through here, whoever made it, which makes it
 		 * the one place to keep the board's picture up with it (`pictures/service.ts`).
 		 */
-		if (message.type === "board.changed") {
+		if (message.type === "card.changed") {
 			if (message.removed) this.thumbs.forget(message.path);
-			else if (message.board) this.thumbs.changed(message.board);
+			else if (message.card) this.thumbs.changed(message.card);
 		}
 		this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
-		// The card's name for the same change, said beside it; `board.changed` goes on 2026-11-30.
-		if (message.type === "board.changed") {
-			const { type: _type, board, ...rest } = message;
-			const twin: ServerMessage = { type: "card.changed", ...rest, ...(board ? { card: board } : {}) };
-			this.hub?.each((view) => this.forView(twin, view));
-			for (const listener of this.listeners) listener(twin);
-		}
 	}
 
 	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `verbs/router.ts`). */
@@ -1038,7 +1031,7 @@ export class App {
 	 * A broadcast as one browser should see it.
 	 *
 	 * Three frames depend on which conversation is on screen: `agents` names it, and `deck.state` and
-	 * `board.changed` carry that stage's arrangement. They are built for the registry's focus, which is
+	 * `card.changed` carry that stage's arrangement. They are built for the registry's focus, which is
 	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */
@@ -1056,11 +1049,6 @@ export class App {
 				return { ...message, focused: own.id };
 			case "deck.state":
 				return { ...message, deck: this.stageState(own) };
-			case "board.changed": {
-				if (!message.board) return message;
-				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
-				return placed ? { ...message, board: { ...message.board, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
-			}
 			case "card.changed": {
 				if (!message.card) return message;
 				const placed = this.stageState(own).boards.find((one) => one.path === message.path);

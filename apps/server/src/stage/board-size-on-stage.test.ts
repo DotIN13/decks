@@ -35,7 +35,7 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		const shown = () => app.stage.boards(one.id).find((board) => board.path === mine)!;
 		assert.deepEqual([shown().w, shown().h], [900, 400], "it joins at its file's size");
 
-		app.handle({ type: "board.extent", path: mine, rev: shown().rev, w: 900, h: 690 }, () => {});
+		app.handle({ type: "card.extent", path: mine, rev: shown().rev, w: 900, h: 690 }, () => {});
 		assert.equal(shown().h, 400, "a reading sizes nothing");
 
 		one.setSize(PATH, { h: 520 });
@@ -108,14 +108,14 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		// The person drags the copy that is on the canvas they are looking at.
 		const shown = app.pens.copyOf(first, PATH);
 
-		app.handle({ type: "board.move", path: shown, x: 4000, y: 3000, stage: first }, () => {});
-		app.handle({ type: "board.resize", path: shown, h: 777, stage: first }, () => {});
+		app.handle({ type: "card.move", path: shown, x: 4000, y: 3000, stage: first }, () => {});
+		app.handle({ type: "card.resize", path: shown, h: 777, stage: first }, () => {});
 		await settle();
 		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
 		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
 		assert.equal(app.deck.board(shown)?.h, 777, "the drag writes the board's own file, as a fit does");
 
-		app.handle({ type: "board.hide", path: shown, stage: first }, () => {});
+		app.handle({ type: "card.hide", path: shown, stage: first }, () => {});
 		await settle();
 		assert.equal(on(first), undefined, "a hide takes it off the named canvas");
 		assert.ok(on(second), "and leaves it on the other");
@@ -136,13 +136,13 @@ test("a person's drag to a shorter board sends only the new height, so the canva
 		const send = app.send.bind(app);
 		const shown = app.pens.copyOf(one.stageName()!, PATH);
 		app.send = (message) => {
-			if (message.type === "board.changed" && message.path === shown && message.board) heights.push(message.board.h);
+			if (message.type === "card.changed" && message.path === shown && message.card) heights.push(message.card.h);
 			send(message);
 		};
-		app.handle({ type: "board.resize", path: shown, h: 450, stage: one.stageName()! }, () => {});
+		app.handle({ type: "card.resize", path: shown, h: 450, stage: one.stageName()! }, () => {});
 		await settle();
 		assert.ok(heights.length > 0, "the change is sent");
-		assert.deepEqual([...new Set(heights)], [450], "every board.changed carries the new height, none the old 600");
+		assert.deepEqual([...new Set(heights)], [450], "every card.changed carries the new height, none the old 600");
 	} finally {
 		cleanup();
 	}

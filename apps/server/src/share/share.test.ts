@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { readZip } from "../../../web/src/connections/zip.ts";
 import { buildBundle } from "./bundle.ts";
 import { zip } from "./zip.ts";
@@ -17,8 +17,8 @@ test("a zip written here is read back by the browser's reader, stored and deflat
 	assert.deepEqual(await files[1]!.bytes(), random);
 });
 
-function board(path: string, extra: Partial<Board> = {}): Board {
-	return { path, title: path, x: 0, y: 0, w: 1000, h: 400, rev: 1, ...extra } as Board;
+function board(path: string, extra: Partial<Page> = {}): Page {
+	return { path, title: path, x: 0, y: 0, w: 1000, h: 400, rev: 1, ...extra } as Page;
 }
 
 test("a bundle carries the stage, its boards, what they name, lib, and pictures, and leaves out other boards", async () => {
@@ -35,7 +35,7 @@ test("a bundle carries the stage, its boards, what they name, lib, and pictures,
 	writeFileSync(join(deck, "canvases/plan/photo.jpg"), "jpg");
 	const picture = join(deck, "pic.webp");
 	writeFileSync(picture, "webp");
-	const records: Record<string, Board> = { "boards/a.html": board("boards/a.html", { lastWrittenBy: "agent-1", namedAt: Date.now() }), "boards/b.md": board("boards/b.md", { shell: "content" }) };
+	const records: Record<string, Page> = { "boards/a.html": board("boards/a.html", { lastWrittenBy: "agent-1", namedAt: Date.now() }), "boards/b.md": board("boards/b.md", { shell: "content" }) };
 
 	const { manifest, bytes } = await buildBundle({
 		deckPath: deck,

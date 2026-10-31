@@ -1,7 +1,7 @@
 import { CANVAS_FILE } from "../stage/canvas-files.ts";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import { renderShell } from "../boards/shell.ts";
 import type { ThumbScheme } from "../pictures/ladder.ts";
@@ -34,7 +34,7 @@ export interface BundleManifest {
 	/** The drawing with its imports resolved, and the folder its image fills are read against, deck-relative. */
 	pen: { doc: PenDocument; base: string };
 	/** Every board on the stage, placed where the stage has it. */
-	boards: Board[];
+	boards: Page[];
 	/** Board paths whose page is in `served/` rather than `deck/`. */
 	served: string[];
 	/** Board path → scheme → zip path of its picture. */
@@ -44,7 +44,7 @@ export interface BundleManifest {
 export interface BundleSource {
 	deckPath: string;
 	deckName: string;
-	board(path: string): Board | undefined;
+	board(path: string): Page | undefined;
 	stage: {
 		dir: string;
 		title: string;
@@ -53,7 +53,7 @@ export interface BundleSource {
 		boards: Array<{ path: string; x: number; y: number; w: number; h: number }>;
 	};
 	/** A picture of a board already on disk, or one taken within the time left; undefined when neither. */
-	picture(board: Board, scheme: ThumbScheme): Promise<string | undefined>;
+	picture(board: Page, scheme: ThumbScheme): Promise<string | undefined>;
 }
 
 /** Larger files are left out: a bundle is for sending, and a video on a board can be fetched from where it lives. */
@@ -149,7 +149,7 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 		if (target && !/\.x?html?$/i.test(target) && isFile(join(deckPath, target))) files.add(target);
 	}
 
-	const boards: Board[] = [];
+	const boards: Page[] = [];
 	for (const spot of source.stage.boards) {
 		const board = source.board(spot.path);
 		if (!board) continue;

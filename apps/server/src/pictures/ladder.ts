@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Board } from "@decks/protocol";
+import type { Page as DeckPage } from "@decks/protocol";
 import type { Page } from "./pool.ts";
 
 /**
@@ -26,7 +26,7 @@ export const THUMB_WIDTH = 720;
  * picture stays sharp on a 2x screen up to life size (`canvas/pen/scene.ts` decodes it at the size
  * it is drawn). Capped at 2048 px wide and 16M pixels in all, and never below the card's width.
  */
-export function wholeScale(board: Pick<Board, "w" | "h">): number {
+export function wholeScale(board: Pick<DeckPage, "w" | "h">): number {
 	const w = Math.max(200, Math.round(board.w));
 	const h = Math.max(150, Math.min(Math.round(board.h), WHOLE_MAX_H));
 	return Math.max(THUMB_WIDTH / w, Math.min(2, 2048 / w, Math.sqrt(16_000_000 / (w * h))));
@@ -125,7 +125,7 @@ export function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "
 export const RETIRED = new RegExp(`-whole-w(?!(?:${SMALL_WIDTHS.join("|")})(?:-l\\d+)?\\.)\\d+(-l\\d+)?\\.(webp|astc(\\.br|\\.gz)?)$|^[0-9a-f]{16}-\\d+-(light|dark)(-\\d+)?(-l\\d+)?\\.jpg$`);
 
 /** The window a card is laid out in, and the clip a picture of it takes: its width, and its height up to `WHOLE_MAX_H`. */
-export function pageClip(card: Pick<Board, "w" | "h">): { width: number; height: number } {
+export function pageClip(card: Pick<DeckPage, "w" | "h">): { width: number; height: number } {
 	const width = Math.max(200, Math.round(card.w));
 	return { width, height: Math.max(150, Math.min(Math.round(card.h), WHOLE_MAX_H)) };
 }

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Board, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
+import type { Page, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
@@ -29,7 +29,7 @@ import type { AppCheck } from "../apps/check.ts";
 
 export interface StageHost {
 	/** Write a board's file, record the revision, and tell everyone. */
-	writeBoard(path: string, html: string): Board;
+	writeBoard(path: string, html: string): Page;
 	/** Delete a board's file, keeping its last revision, and tell everyone; the refusal's words, if it is refused. */
 	deleteBoard?(path: string): string | undefined;
 	/** What the canvas last measured of this board, if what it measured was this revision. */
@@ -68,7 +68,7 @@ export interface StageHost {
 	 * On the host rather than the deck because the deck stopped having an arrangement: the position
 	 * belongs to an agent, and the host is what holds one.
 	 */
-	place(agentId: string, path: string, x: number, y: number): Board | undefined;
+	place(agentId: string, path: string, x: number, y: number): Page | undefined;
 	/**
 	 * Every board as one stage sees it — the arrangement, not the loader's zeroes.
 	 *
@@ -82,7 +82,7 @@ export interface StageHost {
 	 * test can build one without a stage behind it. `StageService.boards` falls back to the deck's
 	 * own list; no id means the conversation on screen, which is what a board's own code gets.
 	 */
-	boards?(agentId?: string): Board[];
+	boards?(agentId?: string): Page[];
 
 }
 
@@ -161,12 +161,12 @@ export class StageService {
 	}
 
 	/** A board as its file has it (whether it fills its frame), not as a stage places it. */
-	fileBoard(path: string): Board | undefined {
+	fileBoard(path: string): Page | undefined {
 		return this.deck.board(path);
 	}
 
 	/** Every board file in the deck, as its file has it, placed anywhere or nowhere. */
-	allBoards(): Board[] {
+	allBoards(): Page[] {
 		return [...this.deck.boards];
 	}
 
@@ -178,7 +178,7 @@ export class StageService {
 	/** Tell every browser a board changed on this agent's stage, as that stage now places it. */
 	announce(agentId: string, path: string): void {
 		const board = this.boards(agentId).find((one) => one.path === path);
-		if (board) this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
+		if (board) this.host.broadcast({ type: "card.changed", path: board.path, rev: board.rev, card: board });
 	}
 
 	/** Name a canvas (`StageHost.retitle`); without a host that can, only its title changes. */
@@ -200,7 +200,7 @@ export class StageService {
 	// --- reads --------------------------------------------------------------------
 
 	/** Every board, placed as the asking agent's stage has them. */
-	boards(agentId?: string): Board[] {
+	boards(agentId?: string): Page[] {
 		const holders = this.host.agents();
 		/*
 		 * The host's arrangement when there is one, and the deck's own list when there is not.
@@ -256,15 +256,15 @@ export class StageService {
 	 * called: a background agent tidying its own canvas moved a board on yours instead, and its own
 	 * stayed where it was.
 	 */
-	move(agentId: string, path: string, at: { x: number; y: number }): Board {
+	move(agentId: string, path: string, at: { x: number; y: number }): Page {
 		const board = this.host.place(agentId, path, at.x, at.y);
 		if (!board) throw new Error(`No such board: ${path}`);
-		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
+		this.host.broadcast({ type: "card.changed", path: board.path, rev: board.rev, card: board });
 		return board;
 	}
 
 	/** Write a card's file (a canvas's `cards/`), recorded and announced as a board's write is. */
-	writeCard(path: string, html: string): Board {
+	writeCard(path: string, html: string): Page {
 		return this.host.writeBoard(path, html);
 	}
 
@@ -276,7 +276,7 @@ export class StageService {
 	 * Here the deck's own record is refreshed as part of the write, so a resize can never
 	 * be a change the canvas does not know about.
 	 */
-	resize(path: string, size: { w?: number; h?: number }): Board {
+	resize(path: string, size: { w?: number; h?: number }): Page {
 		const board = this.deck.board(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
@@ -300,7 +300,7 @@ export class StageService {
 	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
 	 * back was the frame's own width, so every fit added the margin and grew the board by 48px.
 	 */
-	async fit(path: string, options?: { margin?: number; w?: number }): Promise<{ board: Board; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
+	async fit(path: string, options?: { margin?: number; w?: number }): Promise<{ board: Page; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);

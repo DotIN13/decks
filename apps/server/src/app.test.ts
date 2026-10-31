@@ -39,7 +39,7 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(before.clipped, undefined);
 
 		// Laid out at the board's own 900: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
-		app.handle({ type: "board.extent", path: TALL, rev: before.rev, w: 648, h: 690, at: 900 }, () => {});
+		app.handle({ type: "card.extent", path: TALL, rev: before.rev, w: 648, h: 690, at: 900 }, () => {});
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
 		/*
@@ -69,7 +69,7 @@ test("a measurement of a version that has been rewritten is not reported", async
 	const { app, cleanup } = open();
 	try {
 		const board = boardOf(app);
-		app.handle({ type: "board.extent", path: TALL, rev: board.rev + 1, w: 648, h: 690 }, () => {});
+		app.handle({ type: "card.extent", path: TALL, rev: board.rev + 1, w: 648, h: 690 }, () => {});
 		assert.equal(boardOf(app).content, undefined, "a reading of a document we no longer hold says nothing");
 
 		await assert.rejects(app.stage.fit(TALL), /put it on the canvas/);

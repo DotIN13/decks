@@ -60,11 +60,6 @@ export interface AppState {
 	status: AppStatus;
 	/** Where it is reached, on Decks' own address. */
 	url: string;
-	/**
-	 * Old: the board an app used to be shown by (`boards/apps/<name>.html`), which names no file now.
-	 * Kept one release because Studio's app list (`@decks/sync-protocol`'s `HarnessApp`) requires it.
-	 */
-	board: string;
 	port?: number;
 	/** What went wrong, in a line, when it is broken. */
 	error?: string;
@@ -113,7 +108,7 @@ interface Running {
 type Job = Promise<AppOutcome>;
 
 export class Apps {
-	private readonly states = new Map<string, Omit<AppState, "name" | "title" | "kind" | "url" | "board">>();
+	private readonly states = new Map<string, Omit<AppState, "name" | "title" | "kind" | "url">>();
 	private readonly logs = new Map<string, string[]>();
 	private readonly running = new Map<string, Running>();
 	private readonly jobs = new Map<string, Job>();
@@ -188,7 +183,7 @@ export class Apps {
 		const manifest = this.manifest(name);
 		const kept = this.states.get(name) ?? { status: this.idleStatus(name, manifest) };
 		const version = this.version(name, manifest, kept.at);
-		return { name, title: manifest.title ?? name, kind: manifest.kind, url: `/app/${name}/`, board: `boards/apps/${name}.html`, ...kept, ...(version ? { version } : {}) };
+		return { name, title: manifest.title ?? name, kind: manifest.kind, url: `/app/${name}/`, ...kept, ...(version ? { version } : {}) };
 	}
 
 	private version(name: string, manifest: AppManifest, at: number | undefined): number | undefined {
@@ -248,7 +243,7 @@ export class Apps {
 		}
 	}
 
-	private set(name: string, patch: Partial<Omit<AppState, "name" | "title" | "kind" | "url" | "board">>): void {
+	private set(name: string, patch: Partial<Omit<AppState, "name" | "title" | "kind" | "url">>): void {
 		const was = this.states.get(name) ?? { status: this.firstStatus(name) };
 		const next = { ...was, ...patch };
 		for (const key of Object.keys(patch) as Array<keyof typeof patch>) if (patch[key] === undefined) delete next[key];

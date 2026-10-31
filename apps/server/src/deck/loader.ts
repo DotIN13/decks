@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { pageFolders } from "./stage-boards.ts";
 import { isCardPath, pageName } from "./layout.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import type { Board, DeckPen, DeckState } from "@decks/protocol";
+import type { Page, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
 import { fillsOf, isBoardFile, liveKindOf, shellFor } from "./kinds.ts";
@@ -48,7 +48,7 @@ export class Deck {
 	 * seeds nothing, which is the end state the migration is for.
 	 */
 	private seeds: Record<string, { x: number; y: number }> = {};
-	private boardsByPath = new Map<string, Board>();
+	private boardsByPath = new Map<string, Page>();
 	/**
 	 * `mtime:size` per board file, so `resync` can skip what has not moved.
 	 *
@@ -64,7 +64,7 @@ export class Deck {
 	 * **A stated height is a floor, not a ceiling.** It is what a drag or a `decks.canvas.fit` wrote, and the
 	 * browser's measurement raises the board above it whenever the content needs more room — so a board
 	 * can be given space under its last box and can still never clip. Kept here rather than on the
-	 * `Board` because nothing outside this file has a use for it: what everything else wants is `h`,
+	 * `Page` because nothing outside this file has a use for it: what everything else wants is `h`,
 	 * which is already the answer.
 	 */
 	private floors = new Map<string, number>();
@@ -132,11 +132,11 @@ export class Deck {
 		return this.resolved;
 	}
 
-	get boards(): Board[] {
+	get boards(): Page[] {
 		return [...this.boardsByPath.values()].sort((a, b) => a.path.localeCompare(b.path));
 	}
 
-	board(path: string): Board | undefined {
+	board(path: string): Page | undefined {
 		return this.boardsByPath.get(normalizeBoardPath(path));
 	}
 
@@ -204,7 +204,7 @@ export class Deck {
 		positions?: Record<string, { x: number; y: number }>,
 		onPlace?: (path: string, at: { x: number; y: number }) => void,
 		onCanvas?: readonly string[],
-	): Board[] {
+	): Page[] {
 		/*
 		 * What the layout is measured against, and what is worth writing down.
 		 *
@@ -219,8 +219,8 @@ export class Deck {
 		 */
 		const shown = onCanvas ? new Set(onCanvas) : undefined;
 		const keeping = (path: string) => !shown || shown.has(path);
-		const placed: Board[] = [];
-		const unplaced: Board[] = [];
+		const placed: Page[] = [];
+		const unplaced: Page[] = [];
 		for (const board of this.boards) {
 			const own = positions?.[board.path];
 			/*
@@ -294,9 +294,9 @@ export class Deck {
 	 * the canvas keeps showing a version that is no longer on disk, silently, until the
 	 * server restarts.
 	 */
-	resync(): { changed: Board[]; removed: string[] } {
+	resync(): { changed: Page[]; removed: string[] } {
 		const found = pageFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
-		const changed: Board[] = [];
+		const changed: Page[] = [];
 
 		const removed: string[] = [];
 
@@ -321,7 +321,7 @@ export class Deck {
 	}
 
 	/** Re-read one board after a change, keeping everything else as it is. */
-	refresh(boardPath: string): Board | undefined {
+	refresh(boardPath: string): Page | undefined {
 		const path = normalizeBoardPath(boardPath);
 		const absolute = join(this.path, path);
 		if (!existsSync(absolute)) {
@@ -378,7 +378,7 @@ export class Deck {
 
 
 
-	private describe(path: string): Board {
+	private describe(path: string): Page {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
 		// A stub that draws itself from `postMessage`, if this is one.
@@ -524,7 +524,7 @@ function scanBoards(dir: string, deckRoot: string): string[] {
  * board the agent just wrote appears next to its siblings instead of on top of
  * one, and dragging it somewhere makes that position permanent.
  */
-function autoPlace(boards: Board[], existing: Board[]): void {
+function autoPlace(boards: Page[], existing: Page[]): void {
 	if (boards.length === 0) return;
 	const startY = existing.length > 0 ? Math.max(...existing.map((b) => b.y + b.h)) + GUTTER : 0;
 	let x = existing.length > 0 ? Math.min(...existing.map((b) => b.x)) : 0;

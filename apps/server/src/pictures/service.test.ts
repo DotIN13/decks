@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { pageClip, THUMB_WIDTH, thumbName, PictureService } from "./service.ts";
 
 /**
@@ -16,7 +16,7 @@ import { pageClip, THUMB_WIDTH, thumbName, PictureService } from "./service.ts";
  */
 type Browser = import("playwright").Browser;
 
-const board = (path: string, rev = 1, w = 1000, h = 2000): Board => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [] }) as Board;
+const board = (path: string, rev = 1, w = 1000, h = 2000): Page => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [] }) as Page;
 
 function fake() {
 	const opened: Array<{ url: string; viewport: unknown; scale: unknown; scheme: unknown }> = [];

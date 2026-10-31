@@ -122,7 +122,7 @@ function withFrontMatterWidth(source: string, size: { w?: number; h?: number }):
 /**
  * Whether `after` is `before` with only the size in its `<meta name="board">` tag changed: the write a
  * fit or a person's resize makes. A page showing the board already has it, or is given it, so it is
- * not reloaded for it (`board.changed`'s `sized`).
+ * not reloaded for it (`card.changed`'s `sized`).
  */
 export function onlySizeChanged(path: string, before: string, after: string): boolean {
 	if (!HTML_FILE.test(path) || before === after) return false;

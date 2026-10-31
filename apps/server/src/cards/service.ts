@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { dirname, join } from "node:path";
-import type { Board, DeckState, ServerMessage } from "@decks/protocol";
+import type { Page, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "../deck/snapshots.ts";
 import { Authors, Seen } from "../deck/authors.ts";
 import type { Deck } from "../deck/loader.ts";
@@ -16,7 +16,7 @@ import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
  * an agent is, only that something wants telling.
  */
 export interface BoardHooks {
-	/** To every browser. `board.changed` (and `card.changed` beside it, `App.send`) is the message this service exists to send. */
+	/** To every browser. `card.changed` is the message this service exists to send. */
 	send(message: ServerMessage): void;
 	/**
 	 * The deck as the focused stage sees it — where every board on it sits for the conversation being
@@ -48,7 +48,7 @@ export interface BoardHooks {
  *   headless server has no readings, and the deck is what is on disk.
  *
  * The hooks are the only way out: this class does not broadcast anything itself, because
- * what a `board.changed` means is different for a browser and for an agent.
+ * what a `card.changed` means is different for a browser and for an agent.
  */
 export class CardService {
 	readonly revisions: Revisions;
@@ -98,7 +98,7 @@ export class CardService {
 		board.lastWrittenBy = who;
 		board.namedAt = now;
 		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, lastWrittenBy: who, namedAt: now } });
+		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: { ...placed, lastWrittenBy: who, namedAt: now } });
 	}
 
 	/**
@@ -122,7 +122,7 @@ export class CardService {
 		this.seenAt.set(path, at);
 		board.seenAt = at;
 		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, seenAt: at } });
+		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: { ...placed, seenAt: at } });
 	}
 
 	/** Put the stored bylines back on the deck's records: the loader re-describes boards from disk and knows no authors. */
@@ -155,10 +155,10 @@ export class CardService {
 		const board = this.deck.refresh(path);
 		if (!board) return;
 		this.revisions.record(path, readFileSync(this.deck.fileOf(path), "utf8"));
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board) });
 	}
 
-	private placed(board: Board): Board {
+	private placed(board: Page): Page {
 		return this.hooks.state().boards.find((one) => one.path === board.path) ?? board;
 	}
 
@@ -255,7 +255,7 @@ export class CardService {
 	 * The rules are the caller's, not this one's: a flow document's height is its content, so
 	 * that caller sends one dimension.
 	 */
-	resize(path: string, size: { w?: number; h?: number }): Board {
+	resize(path: string, size: { w?: number; h?: number }): Page {
 		const board = this.deck.board(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
@@ -293,7 +293,7 @@ export class CardService {
 		return viewOnlySentence(typeof title === "string" && title ? title : at.name, owner, at.name);
 	}
 
-	writeBoard(path: string, html: string): Board {
+	writeBoard(path: string, html: string): Page {
 		const refused = this.readOnly(path);
 		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
@@ -306,7 +306,7 @@ export class CardService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		// Only the size in its tag: the pages showing it keep their document (`frames.ts`).
 		const sized = before !== undefined && onlySizeChanged(path, before, html);
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board), ...(sized ? { sized: true as const } : {}) });
+		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;
 	}
 
@@ -352,7 +352,7 @@ export class CardService {
 		this.forgetExtent(path);
 		this.authors.forget(path);
 		this.seenAt.forget(path);
-		this.hooks.send({ type: "board.changed", path, rev: 0, removed: true });
+		this.hooks.send({ type: "card.changed", path, rev: 0, removed: true });
 	}
 
 	/** Store a board's current bytes as a revision; used right after an agent writes. */

@@ -28,11 +28,11 @@ test("an agent's byline and act time reach every browser, are on disk, and come 
 	service.wrote("boards/plan.html", "agent-1", 1000);
 	service.wrote("boards/plan.html", "agent-1", 2000);
 	service.wrote("boards/none.html", "agent-1", 3000);
-	const changes = sent.filter((message) => message.type === "board.changed");
+	const changes = sent.filter((message) => message.type === "card.changed");
 	assert.equal(changes.length, 2, "the same act twice says nothing, a later act does, and a board that is not there says nothing");
-	assert.equal(changes[0]?.type === "board.changed" && changes[0].board?.lastWrittenBy, "agent-1");
-	assert.equal(changes[0]?.type === "board.changed" && changes[0].board?.namedAt, 1000);
-	assert.equal(changes[1]?.type === "board.changed" && changes[1].board?.namedAt, 2000);
+	assert.equal(changes[0]?.type === "card.changed" && changes[0].card?.lastWrittenBy, "agent-1");
+	assert.equal(changes[0]?.type === "card.changed" && changes[0].card?.namedAt, 1000);
+	assert.equal(changes[1]?.type === "card.changed" && changes[1].card?.namedAt, 2000);
 	assert.match(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /"boards\/plan\.html": \{\s*"who": "agent-1",\s*"at": 2000\s*\}/);
 
 	// The loader re-describes boards from disk and knows no authors.
@@ -62,7 +62,7 @@ test("a board the person has read is stamped once, and a later write makes it ne
 	// A clock behind the disk still clears the mark.
 	service.seen("boards/plan.html", modified - 5000);
 	service.seen("boards/plan.html");
-	const changes = sent.filter((message) => message.type === "board.changed");
+	const changes = sent.filter((message) => message.type === "card.changed");
 	assert.equal(changes.length, 1, "the second look says nothing");
 	assert.equal(deck.board("boards/plan.html")?.seenAt, modified);
 	assert.equal(serviceOn(root).deck.board("boards/plan.html")?.seenAt, modified, "kept across a restart");
