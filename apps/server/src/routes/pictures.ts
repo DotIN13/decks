@@ -2,7 +2,8 @@ import { normalizeBoardPath } from "../deck/schema.ts";
 import { UploadRefused } from "../files/upload.ts";
 import { boardOnCanvas } from "../verbs/router.ts";
 import { renderSnapshot } from "../pictures/snapshot.ts";
-import { squeezed, wireEncoding } from "../pictures/compress.ts";
+import { compressedName, squeezed, wireEncoding } from "../pictures/compress.ts";
+import { existsSync } from "node:fs";
 import { keptWidth, pictureType } from "../pictures/ladder.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "../share/bundle.ts";
@@ -73,6 +74,17 @@ export function register(api: Router, { app }: RouteDeps): void {
 				if (gone) return;
 				const kept = req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache";
 				// Compressed for the GPU, when the canvas takes it (`astc=1`) and this machine can make it; else the WebP.
+				// The brotli copy as it is on disk, for a browser that undoes brotli: the daily clean keeps only that one.
+				const encoding = wireEncoding(req.headers["accept-encoding"]);
+				const ready = wantsPacked && encoding === "br" ? `${compressedName(file)}.br` : undefined;
+				if (ready && existsSync(ready)) {
+					res.setHeader("Cache-Control", kept);
+					res.setHeader("Vary", "Accept-Encoding");
+					res.type("application/vnd.decks.astc");
+					res.setHeader("Content-Encoding", "br");
+					await sendFile(res, ready);
+					return;
+				}
 				const packed = wantsPacked ? await app.thumbs.compressed(file) : undefined;
 				if (gone) return;
 				if (packed) {
@@ -80,7 +92,6 @@ export function register(api: Router, { app }: RouteDeps): void {
 					res.setHeader("Vary", "Accept-Encoding");
 					res.type("application/vnd.decks.astc");
 					// Squeezed on disk (`wireName`), a third to a half of the bytes, for a browser that undoes brotli or gzip.
-					const encoding = wireEncoding(req.headers["accept-encoding"]);
 					const wire = encoding ? await squeezed(packed, encoding) : undefined;
 					if (gone) return;
 					if (wire) res.setHeader("Content-Encoding", encoding!);

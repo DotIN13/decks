@@ -1,4 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { brotliDecompressSync } from "node:zlib";
+import { cleanPictures } from "./clean.ts";
 import { join } from "node:path";
 import type { Page as DeckPage } from "@decks/protocol";
 import { compress, encoder, type Level } from "./astc.ts";
@@ -252,7 +254,7 @@ export class PictureService {
 	}
 	private compressedWanted(): boolean {
 		if (!encoder()) return false;
-		return (this.packedWanted ??= this.listDir().some((name) => name.endsWith(".astc")));
+		return (this.packedWanted ??= this.listDir().some((name) => name.endsWith(".astc") || name.endsWith(".astc.br")));
 	}
 
 	/**
@@ -264,7 +266,7 @@ export class PictureService {
 		const files: string[] = [];
 		for (const width of [...AHEAD_WIDTHS].reverse()) files.push(await this.picture(board, scheme, width, () => false, true));
 		if (!this.compressedWanted()) return;
-		for (const file of files) if (!(await this.compressed(file))) throw new Error(`${file} could not be compressed`);
+		for (const file of files) if (!this.hasCompressed(file) && !(await this.compressed(file))) throw new Error(`${file} could not be compressed`);
 	}
 
 	/**
@@ -278,7 +280,7 @@ export class PictureService {
 		for (const width of SMALL_WIDTHS) {
 			if (job.kind === "small" && width !== taken && (TAKEN_WIDTHS.includes(width) || from(width) !== taken)) continue;
 			const copy = width === taken ? job.file : await this.smaller(job.file, width, true, smallName(whole, width));
-			if (typeof copy === "string" && this.compressedWanted()) await this.compressed(copy);
+			if (typeof copy === "string" && this.compressedWanted() && !this.hasCompressed(copy)) await this.compressed(copy);
 		}
 	}
 
@@ -290,6 +292,15 @@ export class PictureService {
 	async compressed(file: string): Promise<string | undefined> {
 		const target = compressedName(file);
 		if (existsSync(target)) return target;
+		// The daily clean keeps only the brotli copy (`clean.ts`): unpacked again for a browser that takes no brotli.
+		if (existsSync(`${target}.br`)) {
+			try {
+				writeFileSync(target, brotliDecompressSync(readFileSync(`${target}.br`)));
+				return target;
+			} catch {
+				/* a broken copy is made again below */
+			}
+		}
 		if (!encoder()) return undefined;
 		const known = this.compressing.get(target);
 		if (known) return known;
@@ -373,6 +384,43 @@ export class PictureService {
 		}
 	}
 
+	/** A picture's compressed copy is on disk, plain or as its brotli copy. */
+	hasCompressed(file: string): boolean {
+		const target = compressedName(file);
+		return existsSync(target) || existsSync(`${target}.br`);
+	}
+
+	/**
+	 * Clean the pictures folder once a day, at four in the morning where this machine is, never at
+	 * start (`clean.ts`): pictures of pages the deck no longer has, of an earlier look, and plain
+	 * compressed copies beside their brotli ones. Put off by half an hour while pictures are being made.
+	 */
+	private cleanTimer: NodeJS.Timeout | undefined;
+	cleanDaily(): void {
+		const next = (ms: number) => {
+			clearTimeout(this.cleanTimer);
+			this.cleanTimer = setTimeout(run, ms);
+			this.cleanTimer.unref?.();
+		};
+		const untilFour = () => {
+			const at = new Date();
+			at.setHours(4, 0, 0, 0);
+			if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+			return at.getTime() - Date.now();
+		};
+		const run = () => {
+			if (this.sweeping || this.running > 0 || this.queue.length > 0 || this.compressing.size > 0) return next(30 * 60_000);
+			const pages = (this.host.boards?.() ?? []).map((board) => board.path);
+			// No pages read means the deck is not loaded: never take that as every page gone.
+			if (pages.length > 0) {
+				const done = cleanPictures(this.host.dir, pages);
+				if (done.removed) console.log(`[decks] card pictures: cleaned ${done.removed} files, ${(done.bytes / 1048576).toFixed(1)} MB (${done.orphans} of pages gone, ${done.oldLooks} of an old look, ${done.plainPacked} plain compressed copies)`);
+			}
+			next(untilFour());
+		};
+		next(untilFour());
+	}
+
 	/** Copies at widths the ladder no longer has, and the old gallery's pictures: nothing asks for them. */
 	private dropRetired(): void {
 		for (const name of this.listDir()) if (RETIRED.test(name)) rmSync(join(this.host.dir, name), { force: true });
@@ -416,7 +464,7 @@ export class PictureService {
 			for (const board of boards) {
 				const whole = thumbName(board.path, board.rev, scheme, "whole");
 				const packed = this.compressedWanted();
-				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)) && (!packed || have.has(compressedName(smallName(whole, width)))))) continue;
+				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)) && (!packed || have.has(compressedName(smallName(whole, width))) || have.has(`${compressedName(smallName(whole, width))}.br`)))) continue;
 				// A picture this sweep could not take is not missing again until the board changes.
 				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
 				out.push({ board, scheme });
@@ -842,6 +890,7 @@ export class PictureService {
 
 	dispose(): void {
 		clearTimeout(this.idle);
+		clearTimeout(this.cleanTimer);
 		for (const timer of this.settling.values()) clearTimeout(timer);
 		this.settling.clear();
 		for (const job of this.queue.splice(0)) for (const one of job.waiting) one.reject(new Error("the server is closing"));

@@ -314,6 +314,7 @@ export class App {
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`),
 		});
 		this.thumbs.indexLater();
+		this.thumbs.cleanDaily();
 		/*
 		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the card pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
