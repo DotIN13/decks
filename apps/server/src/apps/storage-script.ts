@@ -14,6 +14,20 @@
  */
 export const STORAGE_SCRIPT = "decks-storage.js";
 
+/**
+ * A page of an app opened in the canvas frame, with the stand-in loaded first: an app that never added
+ * the script tag (most, written before it) read `localStorage` at its first line and stopped there, so
+ * the frame adds it to every page it serves there. A page that has the tag keeps its own.
+ */
+export function withStorage(html: string, src: string): string {
+	if (html.includes(STORAGE_SCRIPT)) return html;
+	const tag = `<script src="${src}"></script>`;
+	const head = /<head\b[^>]*>/i.exec(html);
+	if (head) return html.slice(0, head.index + head[0].length) + tag + html.slice(head.index + head[0].length);
+	const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
+	return doctype ? doctype[0] + tag + html.slice(doctype[0].length) : tag + html;
+}
+
 export function storageScript(name: string): string {
 	return `/* Decks: browser storage for the app ${name} (decks-storage.js). */
 (() => {

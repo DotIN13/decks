@@ -4,7 +4,8 @@ import type { Duplex } from "node:stream";
 import type { Response } from "express";
 import { bearerOf, fromAnotherSite, originOf, queryTokenOf } from "../auth/guard.ts";
 import { APP_NAME, type Apps } from "./service.ts";
-import { STORAGE_SCRIPT, storageScript } from "./storage-script.ts";
+import { STORAGE_SCRIPT, storageScript, withStorage } from "./storage-script.ts";
+import { readFile } from "node:fs/promises";
 
 /**
  * `/app/<name>/…`: an app on Decks' own address (`service.ts`).
@@ -138,6 +139,17 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			plain(res, 404, `apps/${at.name} has no file at ${at.inner}.${built}`);
 			return true;
 		}
+		// In the canvas frame a page gets the browser storage stand-in whether or not it asked (`withStorage`).
+		if (inFrame && /\.html?$/i.test(file)) {
+			void readFile(file, "utf8").then(
+				(html) => {
+					res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+					res.end(withStorage(html, `${base}/${STORAGE_SCRIPT}`));
+				},
+				(error: Error) => plain(res, 500, error.message),
+			);
+			return true;
+		}
 		if (typeof res.sendFile === "function") {
 			res.sendFile(file, { dotfiles: "allow", cacheControl: false, headers: { "cache-control": "no-cache" } }, (error) => {
 				if (error && !res.headersSent) plain(res, 500, error.message);
@@ -153,13 +165,27 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			return;
 		}
 		const path = manifest.prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`;
-		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: forwarded(req, base, paired) }, (answer) => {
+		const sent = forwarded(req, base, paired);
+		// A page read whole to add the storage stand-in to (`withStorage`) comes plain, not compressed.
+		if (inFrame) delete sent["accept-encoding"];
+		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: sent }, (answer) => {
 			const headers = { ...answer.headers };
 			// A redirect the app made to its own root goes back inside its address.
 			const location = headers.location;
 			if (!manifest.prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//")) headers.location = `${base}${location}`;
 			// Its own CORS answer would fight the one above, which is what lets its origin-less page read it.
 			if (inFrame) for (const key of Object.keys(headers)) if (key.startsWith("access-control-")) delete headers[key];
+			if (inFrame && /^text\/html/i.test(String(headers["content-type"] ?? "")) && !headers["content-encoding"]) {
+				const parts: Buffer[] = [];
+				answer.on("data", (part: Buffer) => parts.push(part));
+				answer.on("end", () => {
+					const html = withStorage(Buffer.concat(parts).toString("utf8"), `${base}/${STORAGE_SCRIPT}`);
+					delete headers["content-length"];
+					res.writeHead(answer.statusCode ?? 502, headers);
+					res.end(html);
+				});
+				return;
+			}
 			res.writeHead(answer.statusCode ?? 502, headers);
 			answer.pipe(res);
 		});
