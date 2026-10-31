@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { createEffect, createSignal } from "solid-js";
 import { boxOf, canvasBox, fitInto } from "@decks/canvas/camera";
 import { moveCamera } from "../state/camera.ts";
@@ -20,7 +20,7 @@ import { send } from "../state/socket.ts";
  * out how the board you are now looking at relates to the one you were. a fit stays
  * instant, because a keyboard shortcut is a hand and a chat switch is a change of context.
  */
-export const flyToPages = (boards: Board[], options?: { animate?: boolean }) => {
+export const flyToPages = (boards: Page[], options?: { animate?: boolean }) => {
 	if (boards.length === 0) return;
 	const stage = document.querySelector(".stage, iframe.canvas-frame");
 	if (!stage) return;
@@ -28,7 +28,7 @@ export const flyToPages = (boards: Board[], options?: { animate?: boolean }) => 
 	moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
 };
 
-export const flyTo = (board: Board) => {
+export const flyTo = (board: Page) => {
 	setSelected(board.path);
 	flyToPages([board], { animate: true });
 };
@@ -37,8 +37,8 @@ const move = (path: string, x: number, y: number) => {
 	// Optimistic, and in place: the board is already where it was dropped, and the
 	// server's answer confirms it. Replacing the object here would re-create the
 	// row and reload the document that is sitting in it.
-	const index = state.boards.findIndex((board) => board.path === path);
-	if (index >= 0) setState("boards", index, { x, y });
+	const index = state.pages.findIndex((board) => board.path === path);
+	if (index >= 0) setState("pages", index, { x, y });
 	void act("canvas.move", [path, { at: { x1: x, y1: y } }]);
 };
 
@@ -54,7 +54,7 @@ const move = (path: string, x: number, y: number) => {
  * So the flight waits for two frames from the server, in the order they are sent: the deck
  * state, which carries the new place, and the context, which says the board is on the canvas.
  */
-export function createFraming(stagePages: () => Board[]) {
+export function createFraming(stagePages: () => Page[]) {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
@@ -72,7 +72,7 @@ export function createFraming(stagePages: () => Board[]) {
 			return;
 		}
 		if (!stagePages().some((one) => one.path === wanted.path)) return;
-		const board = state.boards.find((one) => one.path === wanted.path);
+		const board = state.pages.find((one) => one.path === wanted.path);
 		if (!board) return;
 		setFraming(undefined);
 		flyTo(board);
@@ -100,7 +100,7 @@ export function createFraming(stagePages: () => Board[]) {
  * zooming out; text too small to read is not answerable at all.
  */
 export const openLinkedPage = (path: string, from: string): boolean => {
-	if (!state.boards.some((one) => one.path === path)) {
+	if (!state.pages.some((one) => one.path === path)) {
 		notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
 		return false;
 	}
@@ -114,11 +114,11 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 	const onCanvas = () => playing().find((one) => one === path || (one.startsWith("canvases/") && one.split("/").slice(2).join("/") === `boards/${rest}`));
 	const opening = !onCanvas();
 	const land = (at: string) => {
-		const board = state.boards.find((one) => one.path === at);
-		const source = state.boards.find((one) => one.path === from);
+		const board = state.pages.find((one) => one.path === at);
+		const source = state.pages.find((one) => one.path === from);
 		if (opening && source) move(at, source.x + source.w + 32, source.y);
 		setSelected(at);
-		const placed = state.boards.find((one) => one.path === at) ?? board;
+		const placed = state.pages.find((one) => one.path === at) ?? board;
 		if (placed) flyToPages([placed], { animate: true });
 	};
 	const there = onCanvas();
@@ -131,7 +131,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 	const started = performance.now();
 	const wait = () => {
 		const copy = onCanvas();
-		if (copy && state.boards.some((one) => one.path === copy)) return land(copy);
+		if (copy && state.pages.some((one) => one.path === copy)) return land(copy);
 		if (performance.now() - started < 4000) setTimeout(wait, 60);
 	};
 	wait();

@@ -1,5 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Board, StageCall } from "@decks/protocol";
+import type { Page, StageCall } from "@decks/protocol";
 import type { CardShot } from "../../items/card-snapshot.ts";
 
 /**
@@ -9,7 +9,7 @@ import type { CardShot } from "../../items/card-snapshot.ts";
  */
 export interface Backend {
 	/** The drawing as it is now: its document, the folder its fills are read against, its revision. */
-	drawing(): Promise<{ doc: PenDocument; base: string; rev: number; by?: string; cards: Board[]; /** Which harness keeps the canvas, as a copy on the clipboard names it. */ harness?: string }>;
+	drawing(): Promise<{ doc: PenDocument; base: string; rev: number; by?: string; cards: Page[]; /** Which harness keeps the canvas, as a copy on the clipboard names it. */ harness?: string }>;
 	/** Follow the canvas's stream until stopped, coming back after a drop. Answers what stops it. */
 	follow(hear: (message: Heard) => void): () => void;
 	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
@@ -30,7 +30,7 @@ export interface Backend {
 export type Heard =
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
-	| { type: "card.changed"; path: string; rev: number; card?: Board; removed?: boolean; sized?: true }
+	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
 	| { type: "stage.call"; call: StageCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
@@ -52,7 +52,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 		async drawing() {
 			const response = await fetch(`${base}/stage-pen/${encodeURIComponent(canvas)}`, { headers: headers(), cache: "no-store" });
 			if (!response.ok) throw new Error(`The canvas ${canvas} did not load: ${response.status} ${await response.text().catch(() => "")}`.trim());
-			return (await response.json()) as { doc: PenDocument; base: string; rev: number; by?: string; cards: Board[]; harness?: string };
+			return (await response.json()) as { doc: PenDocument; base: string; rev: number; by?: string; cards: Page[]; harness?: string };
 		},
 
 		follow(hear) {

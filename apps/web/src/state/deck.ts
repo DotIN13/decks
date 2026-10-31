@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Page, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { trackZoneWith } from "../lib/time.ts";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
@@ -42,7 +42,8 @@ export interface Notice {
 function createDeck() {
 	return createStore<{
 		deck?: DeckState;
-		boards: Board[];
+		/** The deck's cards (and the old boards a canvas still holds), from `deck.state` and each `card.changed`. */
+		pages: Page[];
 		notices: Notice[];
 		/** One entry per agent, so switching chats (M5) is a lookup and not a fetch. */
 		chats: AgentChat[];
@@ -97,7 +98,7 @@ function createDeck() {
 		 */
 		activeAccount: string;
 	}>({
-		boards: [],
+		pages: [],
 		notices: [],
 		chats: [],
 		identities: {},
@@ -187,7 +188,7 @@ export const preview = () => (state.focused ? state.agents[state.focused]?.previ
 export function resetDeck(): void {
 	setState({
 		deck: undefined,
-		boards: [],
+		pages: [],
 		notices: [],
 		chats: [],
 		focused: undefined,

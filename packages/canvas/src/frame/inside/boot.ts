@@ -1,5 +1,5 @@
 import { createSignal, untrack } from "solid-js";
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import type { Editor, StageComment } from "../../types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";
@@ -9,7 +9,7 @@ import { pagesOf } from "../../model/drawing.ts";
 import { pageItems } from "../../model/boxes.ts";
 import { createBackend } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
-import type { FrameEnd, Page, Rect, Start } from "../protocol.ts";
+import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
 
 /**
  * What the frame holds once `start` has come: who keeps the canvas, the drawing first read, the
@@ -41,10 +41,10 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		if (data.files) filesBase = data.files.base;
 		if (data.pictures) picturesAt = data.pictures;
 	});
-	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Board[] } : await backend.drawing();
+	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Page[] } : await backend.drawing();
 	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
-	const own = (path: string): Page["trust"] => (path.startsWith("shared/") ? "friend" : "own");
-	const [pages, setPages] = createSignal<Page[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
+	const own = (path: string): FramePage["trust"] => (path.startsWith("shared/") ? "friend" : "own");
+	const [pages, setPages] = createSignal<FramePage[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
 	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
 	const [dark, setDark] = createSignal(start.look.dark);
@@ -225,6 +225,6 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 }
 
 /** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
-function cardsOf(doc: PenDocument, trust: (path: string) => Page["trust"]): Page[] {
+function cardsOf(doc: PenDocument, trust: (path: string) => FramePage["trust"]): FramePage[] {
 	return pageItems(doc).map((item) => ({ path: item.path!, title: item.name ?? item.path!.split("/").slice(-2).join("/"), rev: 0, ...item.box, inContext: [], ...(item.type === "decks.card" ? { card: true as const } : {}), trust: trust(item.path!) }));
 }

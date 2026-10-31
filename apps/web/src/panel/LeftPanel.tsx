@@ -1,7 +1,7 @@
 import { insetsOnly } from "@decks/canvas/camera";
 import { Switcher } from "../connections/Switcher.tsx";
 import { can } from "../connections/backend.ts";
-import type { Board, DeckPen } from "@decks/protocol";
+import type { Page, DeckPen } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import AppWindow from "lucide-solid/icons/app-window";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -108,7 +108,7 @@ export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
 	ask?: { tab: PanelTab; at: number };
 	/** Every board there is. The list is all of them, in three sections. */
-	boards: Board[];
+	boards: Page[];
 	/** The `.pen` files in `boards/` and `frames/`, listed after the boards; a press places one on the stage. */
 	pens?: DeckPen[];
 	onPlacePen?: (pen: DeckPen) => void;

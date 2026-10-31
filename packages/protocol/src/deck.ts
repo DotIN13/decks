@@ -38,7 +38,11 @@ export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string
 	{ id: "whisper-1", label: "Whisper", note: "$0.006 a minute; the older model." },
 ];
 
-export interface Board {
+/**
+ * A card on a canvas, or an old board a canvas still holds (a friend's, drawn as its picture): its file, its
+ * place and size, and what the canvas marks on it. `Board` is its old name.
+ */
+export interface Page {
 	/** Deck-relative, forward slashes on every platform: "boards/plan.html". */
 	path: string;
 	title: string;
@@ -140,6 +144,9 @@ export interface Board {
 	seenAt?: number;
 }
 
+/** @deprecated `Page`, its old name, kept until 2026-11-30. */
+export type Board = Page;
+
 /** A `.pen` file kept with the boards: in `boards/` or `frames/`, placed on a stage by a ref to its path. */
 export interface DeckPen {
 	/** Deck-relative, with `.pen`: `frames/ui/button.pen`. */
@@ -155,7 +162,7 @@ export interface DeckState {
 	/** Absolute path of the open deck. */
 	path: string;
 	name: string;
-	boards: Board[];
+	boards: Page[];
 	roots: Root[];
 	/** The `.pen` files in `boards/` and `frames/`, sorted by path. */
 	pens?: DeckPen[];

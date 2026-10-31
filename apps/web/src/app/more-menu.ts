@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import Eraser from "lucide-solid/icons/eraser";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
@@ -16,7 +16,7 @@ import { setOps, setSettings } from "../state/ui.ts";
  * a flow board shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
  * up and everything still moves, sizes and snaps.
  */
-export const moreItems = (stagePages: () => Board[]) => [
+export const moreItems = (stagePages: () => Page[]) => [
 	{
 		label: "Clear the canvas",
 		icon: Eraser,

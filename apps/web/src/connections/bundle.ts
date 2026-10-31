@@ -1,4 +1,4 @@
-import type { AgentChat, Board, ClientMessage, ServerMessage } from "@decks/protocol";
+import type { AgentChat, Page, ClientMessage, ServerMessage } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import { api, connections, newId, saveConnections, type Connection } from "./connection.ts";
 import { readZip } from "./zip.ts";
@@ -21,7 +21,7 @@ export interface BundleManifest {
 	from: string;
 	stage: { name: string; title: string; rev: number };
 	pen: { doc: PenDocument; base: string };
-	boards: Board[];
+	boards: Page[];
 	served: string[];
 	pictures: Record<string, { light?: string; dark?: string }>;
 }

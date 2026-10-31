@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { basename, matches, panelSections } from "./panel-groups.ts";
 
 /*
@@ -9,7 +9,7 @@ import { basename, matches, panelSections } from "./panel-groups.ts";
  * disagrees with the rows under it, or or a board the canvas holds turning up twice.
  */
 
-const board = (path: string, title = path): Board => ({
+const board = (path: string, title = path): Page => ({
 	path,
 	title,
 	x: 0,

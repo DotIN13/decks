@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { boxOf, fitInto, frames } from "./camera.ts";
 
 /**
@@ -56,7 +56,7 @@ export interface AgentView {
 export function viewOnSwitch(input: {
 	view: AgentView | undefined;
 	playing: string[];
-	boards: Board[];
+	boards: Page[];
 	viewport: { width: number; height: number };
 	region: { x: number; y: number; width: number; height: number };
 }): Camera | undefined {

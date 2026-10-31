@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { PageView } from "../edit/index.ts";
 import { CardSurface } from "./card-surface.tsx";
@@ -17,7 +17,7 @@ const EDGE_IN_PX = COARSE ? 6 : 4;
  * knows of the item's file (`ItemSlotExtras`).
  */
 export interface ItemSlotProps {
-	board: Board;
+	board: Page;
 	/** The camera's zoom: an edge band is sized in screen pixels. */
 	zoom: number;
 	/** Whether the item is awake: a card near the window, a document or an app (`Stage`'s `livePaths`). */

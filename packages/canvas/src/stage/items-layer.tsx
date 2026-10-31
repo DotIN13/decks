@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf, INTERACT_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
@@ -286,7 +286,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** Whether a board is in `nearPaths`: each board is told only when its own answer changes. */
 	const isNear = createSelector(nearPaths, (path: string, near) => near.has(path));
 	/** On screen, or within a window of it: the R-tree's answer, not each board's own arithmetic. */
-	const isVisible = (board: Board) => isNear(board.path);
+	const isVisible = (board: Page) => isNear(board.path);
 
 	/** At or above this device's live zoom (`INTERACT_ZOOM`): items near the window have their slots, title and all. */
 	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
@@ -334,7 +334,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * has no node: 400 of them cost a pan step 10 ms of the page's time, and each camera step reached
 	 * every one. The stage finds the one under a press itself (`editor/dom/pointer.ts`, `pictureUnder`).
 	 */
-	const rendered = createMemo<readonly Board[]>((was) => {
+	const rendered = createMemo<readonly Page[]>((was) => {
 		const boards = props.boards;
 		if (view().width === 0) return was ?? [];
 		/*
@@ -462,7 +462,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	};
 
 	/** One placed item's slot: the host's, told where it is and what it may do. */
-	const pageNode = (board: Board) => (
+	const pageNode = (board: Page) => (
 		<Frame
 			board={board}
 			zoom={ctl.zoom()}

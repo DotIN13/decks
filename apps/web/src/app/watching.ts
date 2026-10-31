@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 
 /**
  * The half of a board's news mark that only a browser can answer.
@@ -12,7 +12,7 @@ import type { Board } from "@decks/protocol";
  * reading a board in the focus view already follows.
  */
 export function watchedBeingNamed(
-	board: Pick<Board, "lastWrittenBy" | "namedAt" | "seenAt">,
+	board: Pick<Page, "lastWrittenBy" | "namedAt" | "seenAt">,
 	place: { focused?: string },
 ): boolean {
 	// No act, no watch: a file event says nothing about who was where.

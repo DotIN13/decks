@@ -133,18 +133,18 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * as new objects. `reconcile` keyed on the path updates the boards that
 					 * changed and leaves the rest — and their documents — alone.
 					 */
-					setState("boards", reconcile(message.deck.boards, { key: "path", merge: false }));
+					setState("pages", reconcile(message.deck.boards, { key: "path", merge: false }));
 					hooks.landed();
 					return;
 				case "board.sized": {
 					// One number on one board; the rest of the deck, and this board's document, are as they were.
-					const index = state.boards.findIndex((existing) => existing.path === message.path);
-					if (index !== -1 && state.boards[index]!.h !== message.h) setState("boards", index, "h", message.h);
+					const index = state.pages.findIndex((existing) => existing.path === message.path);
+					if (index !== -1 && state.pages[index]!.h !== message.h) setState("pages", index, "h", message.h);
 					return;
 				}
 				case "card.changed": {
 					if (message.removed) {
-						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
+						setState("pages", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
 					if (!message.card) return;
@@ -167,11 +167,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// the board on screen, on every change to the deck, showing the very
 					// bytes the live DOM already has. Merging leaves the identity alone and
 					// updates only the fields that moved.
-					const index = state.boards.findIndex((existing) => existing.path === board.path);
+					const index = state.pages.findIndex((existing) => existing.path === board.path);
 					if (index === -1) {
-						setState("boards", (boards) => [...boards, board].sort((a, b) => a.path.localeCompare(b.path)));
+						setState("pages", (boards) => [...boards, board].sort((a, b) => a.path.localeCompare(b.path)));
 					} else {
-						setState("boards", index, reconcile(board, { merge: true }));
+						setState("pages", index, reconcile(board, { merge: true }));
 					}
 					return;
 				}
@@ -419,7 +419,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						const screen = stageOf(state.focused)?.name;
 						// A cursor, a reload or a card's picture names a card: the frame answers when that card is on the canvas it shows.
 						if ((message.call.op === "cursor" || message.call.op === "reload" || message.call.op === "shot") && typeof args?.path === "string") {
-							if (state.boards.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
+							if (state.pages.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
 						} else {
 							const on = typeof args?.stage === "string" ? args.stage : stageOf(message.call.agentId)?.name;
 							if (on && on === screen) return;
@@ -445,7 +445,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					let value: unknown;
 					try {
 						value = runStageCall(message.call, {
-							boards: () => state.boards,
+							boards: () => state.pages,
 							viewport: () => {
 								const stage = document.querySelector("iframe.canvas-frame");
 								return { width: stage?.clientWidth ?? 0, height: stage?.clientHeight ?? 0 };

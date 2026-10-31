@@ -34,7 +34,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	const pickItem = (item: CanvasItem) => {
 		if (item.board) {
 			const name = stageOf(state.focused)?.name;
-			const path = state.boards.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
+			const path = state.pages.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
 			if (path) return playAndFrame(path);
 		}
 		untrack(editorHandle)?.select([item.id]);
@@ -50,7 +50,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 		moveCamera({ zoom, x: cx - (region.x + region.width / 2 - view.width / 2) / zoom, y: cy - (region.y + region.height / 2 - view.height / 2) / zoom }, { animate: true });
 	};
 	/** A board's or card's title by its path, for the name on a pill's card. */
-	const titleOf = (path: string) => state.boards.find((one) => one.path === path)?.title;
+	const titleOf = (path: string) => state.pages.find((one) => one.path === path)?.title;
 	/** A drawn item's name by its id, as the layers list calls it: its own name, or a few of its words. */
 	const itemName = (id: string) => canvasItems(stagePen()?.doc).items.find((one) => one.id === id)?.label;
 	/**
@@ -66,7 +66,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),
 		);
 		if (item) return pickItem(item);
-		const board = state.boards.find((one) => one.path === target);
+		const board = state.pages.find((one) => one.path === target);
 		if (board) return flyTo(board);
 		notice("info", "That is not on this canvas.");
 	};

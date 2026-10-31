@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import type { PenTool } from "../edit/pen-tools.ts";
 import type { Insets } from "../camera/insets.ts";
 
@@ -67,7 +67,7 @@ export interface Start {
 }
 
 /** A card or a board on the canvas, as the frame draws it. */
-export type Page = Board & { trust?: "own" | "friend" };
+export type FramePage = Page & { trust?: "own" | "friend" };
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };

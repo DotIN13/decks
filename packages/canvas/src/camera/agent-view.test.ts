@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./agent-view.ts";
 
 /*
@@ -9,7 +9,7 @@ import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./agent-view.ts";
  * and a selection restored around a board that had been hidden since.
  */
 
-const board = (path: string, x: number, y: number): Board => ({
+const board = (path: string, x: number, y: number): Page => ({
 	path,
 	title: path,
 	x,

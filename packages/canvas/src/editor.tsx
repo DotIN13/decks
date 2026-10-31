@@ -1,5 +1,5 @@
 import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { fitInto, frames } from "./camera/camera.ts";
@@ -156,7 +156,7 @@ export function createEditor(
 		? {
 				onPenEdit: edit,
 				onResize: resizePage,
-				onHide: (path: string) => (options.boards?.onHide ? options.boards.onHide(path) : removePage(path)),
+				onHide: (path: string) => (options.pages?.onHide ? options.pages.onHide(path) : removePage(path)),
 				...(options.onDeleteCard
 					? {
 							onDeleteCard: (path: string) => {
@@ -188,26 +188,26 @@ export function createEditor(
 	 * Decks app's store keeps them: the stage keys each board's slot on its object, and a fresh list
 	 * on every edit rebuilt every slot and reloaded every board's page after any drag.
 	 */
-	const [boards, setBoards] = createStore<Board[]>([]);
+	const [pages, setPages] = createStore<Page[]>([]);
 	/*
 	 * A host's list may be a store of its own (the Decks app's): read whole here, every board and
 	 * field, so this follows it; reconciling a store's proxy reads it untracked, and the boards would
 	 * show only when something else happened to run this again.
 	 */
 	createComputed(() => {
-		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : pagesOf(doc());
+		const given = options.pages?.list ? options.pages.list().map((board) => ({ ...board })) : pagesOf(doc());
 		// The host's own list is its server's: a board the person moved, sized or took off is shown so until the server has it.
-		setBoards(reconcile(options.boards?.list && drawing.waiting() ? pagesAhead(given, drawing.given(), doc()) : given, { key: "path" }));
+		setPages(reconcile(options.pages?.list && drawing.waiting() ? pagesAhead(given, drawing.given(), doc()) : given, { key: "path" }));
 	});
 	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
 	const stageView = () => (
 		<Stage
 			mode={mode()}
-			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
-			{...(options.boards?.onOpenLink ? { onOpenPage: options.boards.onOpenLink } : {})}
-			news={options.boards?.news?.() ?? {}}
-			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
+			{...(options.pages?.onExtent ? { onExtent: options.pages.onExtent } : {})}
+			{...(options.pages?.onOpenLink ? { onOpenPage: options.pages.onOpenLink } : {})}
+			news={options.pages?.news?.() ?? {}}
+			{...(options.pages?.onRead ? { onRead: options.pages.onRead } : {})}
 			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
 			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
 			glide={ownGlide()}
@@ -216,7 +216,7 @@ export function createEditor(
 			} }}
 			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
 			onTool={() => setPenTool("select")}
-			boards={boards}
+			boards={pages}
 			pen={pen()}
 			{...editing}
 			onPenStep={step}
@@ -231,8 +231,8 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={movePage}
-			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.boards.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.boards!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
-			shots={() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK })}
+			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.pages?.page?.(slot.board.path)} {...(options.pages?.cardScripts && !options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.pages.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
+			shots={() => ({ picture: (board, scheme) => options.pages?.picture?.(board.path, scheme) ?? BLANK })}
 			{...(options.onComment ? { onComment: options.onComment } : {})}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}

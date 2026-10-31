@@ -1,11 +1,11 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import type { AppAction, PanelApp } from "../panel/AppRow.tsx";
 import { ask } from "../state/confirm.ts";
 import { act } from "../state/decks.ts";
 
 /** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
-export function createAppsPanel(stagePages: () => Board[], frameWhenPlaced: (path: string) => void) {
+export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path: string) => void) {
 	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
 	const loadApps = () =>
 		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {

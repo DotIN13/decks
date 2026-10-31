@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 
 /** How long a board stays news without being read: a day, after which it is simply there. */
 const CHANGED_WITHIN = 24 * 60 * 60 * 1000;
@@ -16,7 +16,7 @@ const CHANGED_WITHIN = 24 * 60 * 60 * 1000;
  * about, with one exception — the person's own act, when it is also the newest, is not news to
  * them. `seenAt` is when they last looked, on any device.
  */
-export function isNews(board: Board, now = Date.now()): boolean {
+export function isNews(board: Page, now = Date.now()): boolean {
 	const named = board.namedAt ?? 0;
 	const file = board.modifiedAt ?? 0;
 	/*

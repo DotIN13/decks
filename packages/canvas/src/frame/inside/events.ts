@@ -1,7 +1,7 @@
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { dismissMenus } from "@decks/ui";
-import type { Board, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, StageCall } from "@decks/protocol";
 import { setDrawing } from "../../edit/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { runStageCall } from "../../camera/stage-ops.ts";
@@ -91,7 +91,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		let value: unknown;
 		try {
 			value = runStageCall(call, {
-				boards: () => untrack(pages) as Board[],
+				boards: () => untrack(pages) as Page[],
 				viewport: () => ({ width: innerWidth, height: innerHeight }),
 				focused: () => untrack(agent),
 				stageOnScreen: () => start.canvas.name,

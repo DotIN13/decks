@@ -1,5 +1,5 @@
 import { apply, arrowEndItem, withDecksColors, baseTheme, diff, editDocument, isArrow, parse, placements, reroute, walk, type Frame, type MeasureText, type PenDocument, type PenEdit, type PenNode, type Placed } from "@decks/pen";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
 
@@ -100,8 +100,8 @@ export const pagePath = (node: PenNode) => {
 const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 
 /** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
-export function pagesOf(doc: PenDocument): Board[] {
-	const boards: Board[] = [];
+export function pagesOf(doc: PenDocument): Page[] {
+	const boards: Page[] = [];
 	for (const node of doc.children ?? []) {
 		if (!isPage(node)) continue;
 		boards.push({
@@ -126,12 +126,12 @@ export function pagesOf(doc: PenDocument): Board[] {
  * until the host's drawing (`given`) and so its list have it too. Boards the edits do not touch, and
  * fields the drawing does not hold (a height the page raised), are the list's.
  */
-export function pagesAhead(list: Board[], given: PenDocument, shown: PenDocument): Board[] {
+export function pagesAhead(list: Page[], given: PenDocument, shown: PenDocument): Page[] {
 	if (given === shown) return list;
 	const byPath = (doc: PenDocument) => new Map(pagesOf(doc).map((board) => [board.path, board]));
 	const was = byPath(given);
 	const now = byPath(shown);
-	const out: Board[] = [];
+	const out: Page[] = [];
 	for (const board of list) {
 		const a = was.get(board.path);
 		const b = now.get(board.path);

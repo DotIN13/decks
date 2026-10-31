@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
@@ -29,7 +29,7 @@ const GAP = 10;
  * actions (a new tab, hide) are not offered.
  */
 export function PageCallout(props: {
-	board?: Board;
+	board?: Page;
 	/** What the pill sits over, on the stage: the board's box, or the drawn items' together. */
 	box: { x: number; y: number; w: number; h: number };
 	/** What a screen reader calls it. */

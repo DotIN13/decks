@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { createEffect, onCleanup, onMount, untrack } from "solid-js";
 import { boxOf, canvasBox, createLanding, type CameraOwner } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
@@ -15,7 +15,7 @@ export interface LandingInputs {
 	views: () => AgentViews;
 	/** The drawing on screen: its doc and the canvas it is (`stagePen`). */
 	stagePen: () => { doc: Parameters<typeof placements>[0]; scope?: string } | undefined;
-	stagePages: () => Board[];
+	stagePages: () => Page[];
 	/** How many deck frames have arrived. */
 	deckSeen: () => number;
 }

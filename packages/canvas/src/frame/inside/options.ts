@@ -1,6 +1,6 @@
 import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
-import type { Board } from "@decks/protocol";
+import type { Page } from "@decks/protocol";
 import type { createEditor } from "../../editor.tsx";
 import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
 import { drawing } from "../../edit/ink.ts";
@@ -203,8 +203,8 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 				});
 			},
 		} }),
-		boards: {
-			list: () => ctx.places() as Board[],
+		pages: {
+			list: () => ctx.places() as Page[],
 			page: (path) => {
 				// A document or an app item has no page to load: it is drawn in place, and only needs saying it may be.
 				if (path.startsWith("item:")) return path;

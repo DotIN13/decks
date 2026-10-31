@@ -12,7 +12,7 @@ import type {
 	RuntimeInfo,
 	ThinkingLevel,
 } from "./chat.ts";
-import type { Board, DeckSettings, DeckState } from "./deck.ts";
+import type { Board, DeckSettings, DeckState, Page } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 
@@ -316,7 +316,7 @@ export type ServerMessage =
 	 * `board.changed` under the card's name, `card` in place of `board`: sent beside it for every
 	 * change (`App.send`). `board.changed`, its old name, is sent until 2026-11-30.
 	 */
-	| { type: "card.changed"; path: string; rev: number; card?: Board; removed?: boolean; sized?: true }
+	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

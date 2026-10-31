@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import { Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
@@ -73,7 +73,7 @@ export type StageProps = {
 	 * `camera` means nothing was remembered, so the canvas fits what it has.
 	 */
 	opening?: { camera?: Camera };
-	boards: Board[];
+	boards: Page[];
 	/**
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
 	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera. `edits`, when the

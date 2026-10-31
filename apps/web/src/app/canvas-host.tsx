@@ -67,7 +67,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			inking: drawing,
 		},
 		canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
-		boards: { onOpenLink: openLinkedPage },
+		pages: { onOpenLink: openLinkedPage },
 		onViewport: () => reportCameraSoon(camera()),
 		onExport: exportPicture,
 		onRefer: frameRefer,

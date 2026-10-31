@@ -1,4 +1,4 @@
-import type { Board, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, StageCall } from "@decks/protocol";
 import { boxOf, fit } from "./camera.ts";
 
 /**
@@ -15,7 +15,7 @@ import { boxOf, fit } from "./camera.ts";
  */
 
 export interface StageOpsHost {
-	boards(): Board[];
+	boards(): Page[];
 	viewport(): { width: number; height: number };
 	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
 	focused(): string | undefined;

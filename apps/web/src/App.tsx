@@ -1,7 +1,7 @@
 import { FpsMeter, showFps } from "./perf/fps.tsx";
 import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
 import { queuedFor } from "./state/queued.ts";
-import type { Board, ThinkingLevel } from "@decks/protocol";
+import type { Page, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import {createComputed, createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
@@ -265,18 +265,18 @@ export function App() {
 	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
 	 * loading it again.
 	 */
-	const [shownPages, setShownPages] = createStore<Board[]>([]);
+	const [shownPages, setShownPages] = createStore<Page[]>([]);
 	createComputed(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
-		const list = state.boards
+		const list = state.pages
 			.filter((board) => playing.has(board.path))
 			.map((board) => {
 				// A copy of its own: the merge below writes into this store's objects, never into the deck's.
-				return JSON.parse(JSON.stringify(board)) as Board;
+				return JSON.parse(JSON.stringify(board)) as Page;
 			});
 		setShownPages(reconcile(list, { key: "path", merge: true }));
 	});
-	const stagePages = (): Board[] => shownPages;
+	const stagePages = (): Page[] => shownPages;
 
 	/*
 	 * What `handleFrame` may touch (`app/socket-messages.ts`). **Three fields**, and each has a reason
@@ -636,7 +636,7 @@ export function App() {
 				*/}
 				<LeftPanel
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
-					boards={state.boards}
+					boards={state.pages}
 					{...(stagePen()?.doc ? { canvasDoc: stagePen()!.doc } : {})}
 					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
 					selectedItems={penSelected()}

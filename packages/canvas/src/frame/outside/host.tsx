@@ -87,7 +87,7 @@ export interface FramedEditorOptions {
 	camera?: Camera;
 	/** The page's own camera, selection, mode and ink (and its copy of the drawing), kept in step with the frame. */
 	state?: EditorState;
-	boards?: {
+	pages?: {
 		/** A link on a card to another of the deck: open it, and say whether this page has it. */
 		onOpenLink?(path: string, from: string): boolean;
 	};
@@ -396,7 +396,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 		});
 		// A shortcut the canvas did not take, played on this page as if typed here.
 		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
-		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
+		page.answer("open", (data) => options.pages?.onOpenLink?.(data.path, data.from) ?? false);
 		page.answer("agent", (data) => {
 			if (!options.frame.agent) throw new CallRefused("This page answers no card's agent calls.", "refused");
 			return options.frame.agent(data);

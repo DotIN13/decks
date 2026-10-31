@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Board, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, StageCall } from "@decks/protocol";
 import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
 
 /*
@@ -15,7 +15,7 @@ import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
  * into a board's document, and nothing here asks for one — so this runs as a plain unit test.
  */
 
-const board = (path: string, x: number, y: number): Board => ({ path, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
+const board = (path: string, x: number, y: number): Page => ({ path, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
 
 function host(focused: string | undefined, hands = false) {
 	const moved: Camera[] = [];

@@ -1,5 +1,5 @@
 import type { Frame, PenDocument, PenEdit } from "@decks/pen";
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 import type { Accessor, JSX } from "solid-js";
 import type { ViewStorage } from "./camera/agent-views.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
@@ -15,7 +15,7 @@ import type { PenTool } from "./edit/pen-tools.ts";
 /** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
 export interface StageShots {
 	/** The picture of a board or a card, as an address the sheet can fetch. */
-	picture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string;
+	picture(board: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
 }
 
 /** What a comment is about (`Stage`'s `onComment`). */
@@ -52,7 +52,7 @@ export interface CanvasOptions {
 	 * the sheet that draws every board and every card not awake. A board is only ever its picture: the
 	 * canvas runs no board's page. Absent: they are drawn as empty frames.
 	 */
-	boards?: {
+	pages?: {
 		/** A card's address (its `index.html`); for a document or an app item, anything at all. */
 		page?(path: string): string | undefined;
 		picture?(path: string, scheme: "light" | "dark"): string | undefined;
@@ -69,7 +69,7 @@ export interface CanvasOptions {
 		 * The host's own records of the boards (their revision, format and title), as its server keeps
 		 * them, in place of the ones read off the drawing. Read reactively.
 		 */
-		list?(): Board[];
+		list?(): Page[];
 		/** A card measured itself: its size and how it reads, for the host's agents (`decks.canvas.fit`). */
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void;
 		/** A link on a card to a board or card of the deck: open it, and say whether this host has it. */

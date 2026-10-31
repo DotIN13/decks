@@ -1,4 +1,4 @@
-import type { Board, DeckPen } from "@decks/protocol";
+import type { Page, DeckPen } from "@decks/protocol";
 
 /**
  * What the boards panel lists, and which of its three sections each board belongs to.
@@ -41,7 +41,7 @@ export type SectionKind = "canvas" | "held" | "deck";
 
 /** One board, and the two things a row's appearance depends on. */
 export interface PanelRow {
-	board: Board;
+	board: Page;
 	/** A `.pen` file listed among the boards (`board` then carries its path and name), placed on the stage by a press. */
 	pen?: DeckPen;
 	/** In play: gets the accent dot. */
@@ -62,7 +62,7 @@ export interface PanelSection {
 
 export interface PanelInput {
 	/** Every board there is. The third section is this, minus the two above it. */
-	boards: Board[];
+	boards: Page[];
 	/** Boards the canvas took off and keeps a place for, newest first: the second section. */
 	kept?: string[];
 	/** What is up on the canvas: the first section. */
@@ -88,7 +88,7 @@ export function basename(path: string): string {
  * `AllBoards` gives: a deck's boards are named by the person who asked for them, so the
  * thing they type is usually a word that is really in the name.
  */
-export function matches(board: Board, needle: string): boolean {
+export function matches(board: Page, needle: string): boolean {
 	if (!needle) return true;
 	return `${board.title}\n${basename(board.path)}`.toLowerCase().includes(needle);
 }
@@ -122,7 +122,7 @@ export function panelSections(input: PanelInput): PanelSection[] {
 
 	const sections: PanelSection[] = [];
 
-	const pick = (paths: string[], make: (board: Board) => PanelRow): PanelRow[] =>
+	const pick = (paths: string[], make: (board: Page) => PanelRow): PanelRow[] =>
 		paths.flatMap((path) => {
 			const board = known.get(path);
 			if (!board || !matches(board, needle)) return [];
@@ -148,7 +148,7 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	const rest: PanelRow[] = input.boards.filter((board) => !claimed.has(board.path) && !copied.has(board.path) && matches(board, needle)).map((board) => ({ board, onCanvas: false, dim: false }));
 	// A pen file stands among the boards, in path order: a row whose `board` is just its path and name.
 	for (const pen of input.pens ?? []) {
-		const board = { path: pen.path, title: pen.title } as Board;
+		const board = { path: pen.path, title: pen.title } as Page;
 		if (matches(board, needle)) rest.push({ board, pen, onCanvas: false, dim: false });
 	}
 	rest.sort((a, b) => a.board.path.localeCompare(b.board.path));

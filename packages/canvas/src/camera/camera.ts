@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol";
 
 /**
  * The camera, and the two conversions everything else is built on.
@@ -252,7 +252,7 @@ export function fitInto(
 	};
 }
 
-export const boxOf = (board: Board) => ({ x: board.x, y: board.y, w: board.w, h: board.h });
+export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: board.h });
 
 /**
  * Where to stand when you arrive on a stage you have not been on: the middle of its work.
