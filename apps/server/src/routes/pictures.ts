@@ -5,6 +5,7 @@ import { renderSnapshot } from "../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../pictures/compress.ts";
 import { existsSync } from "node:fs";
 import { keptWidth, pictureType } from "../pictures/ladder.ts";
+import type { AppPage } from "../pictures/service.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "../share/bundle.ts";
 import { actsAsPerson } from "../auth/principal.ts";
@@ -30,10 +31,25 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * card as it is now. 400 for a width the ladder does not have, 503 when there is no Chromium
 	 * here, 404 for no such card.
 	 */
+	/*
+	 * An app placed on the canvas asking (`apps/<name>`): pictured as the canvas frame runs it, at its
+	 * address there with a pass made for that canvas and the token behind the frame's pass. Its picture
+	 * is kept for an hour, then taken again: what an app shows is its data, which changes without a file.
+	 */
+	const appPage = (path: string, req: express.Request): AppPage | undefined => {
+		const name = /^apps\/([^/]+)$/.exec(path)?.[1];
+		if (!name || !app.apps.exists(name)) return undefined;
+		const principal = (req as { principal?: { kind?: string; canvas?: string } }).principal;
+		const token = (req as { tokenId?: string }).tokenId;
+		if (principal?.kind !== "canvas" || !principal.canvas || !token) return undefined;
+		const pass = app.passes.appCanvas(name, principal.canvas, token);
+		return { path, title: name, rev: Math.floor(Date.now() / 3_600_000), x: 0, y: 0, w: 1100, h: 722, item: "app", app: name, opens: `/app/t/${pass}/${name}/` } as AppPage;
+	};
 	api.get(
 		"/thumb/*path",
 		asyncRoute(async (req, res) => {
-			const board = app.deck.board(normalizeBoardPath(wildcard(req)));
+			const asked = normalizeBoardPath(wildcard(req));
+			const board = app.deck.board(asked) ?? appPage(asked, req);
 			if (!board) {
 				res.status(404).end();
 				return;

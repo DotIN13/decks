@@ -30,6 +30,8 @@ export interface ItemSlotProps {
 	 * a sleeping card's slot does. Its scripts go on running: a card has no way to be paused.
 	 */
 	asleep?: boolean | undefined;
+	/** The sheet is drawing this item's picture over it: only then does an asleep card hide, so it never leaves bare canvas for a frame. */
+	covered?: boolean | undefined;
 	selected: boolean;
 	/**
 	 * Its surface is showing, or has stopped showing. Until it says so the sheet keeps the item's
@@ -165,7 +167,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			data-path={props.board.path}
 			data-selected={props.selected}
 			data-inert={!shown() || props.asleep}
-			data-asleep={props.asleep ? "" : undefined}
+			data-asleep={props.asleep && props.covered ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
@@ -216,7 +218,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 					<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 				<Show when={awake() && props.board.item === "app"}>
-					<AppSurface app={props.board.app ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+					<AppSurface app={props.board.app ?? ""} path={props.board.path} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 			</div>
 		</div>

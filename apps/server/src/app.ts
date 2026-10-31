@@ -118,6 +118,9 @@ export class App {
 	readonly appTrust: AppTrust;
 	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
 	placedOn(path: string, canvas: string): boolean {
+		// An app's picture (`apps/<name>`) is the canvas's to read when the app is placed on it.
+		const app = /^apps\/([^/]+)$/.exec(path)?.[1];
+		if (app && this.stage.pens) return canvasHolds(this.stage.pens, canvas, appActor(app));
 		return boardOnCanvas(this, path, canvas);
 	}
 	/** The port this server is on, so a card's `decks.card.url()` answers like an agent's. */
@@ -306,6 +309,7 @@ export class App {
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
 			boards: () => this.deck.boards,
+			apps: () => this.apps.list().map((one) => one.name),
 			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.boards(name).map((one) => one.path))),
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
 			reader: () => this.passes.canvas("", "view", HARNESS_ID).pass,

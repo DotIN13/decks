@@ -81,6 +81,17 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 
 /** The apps running inside the canvas now, by surface: at most `APPS[DEVICE].live`, the selected one always. */
 const [liveApps, setLiveApps] = createSignal<ReadonlySet<number>>(new Set());
+/** The app items whose window is showing the app itself, by item path: the others are drawn by the sheet as their pictures (`items-layer.tsx`). */
+const [shownApps, setShownApps] = createSignal<ReadonlyMap<string, number>>(new Map());
+export const appShowing = (path: string) => (shownApps().get(path) ?? 0) > 0;
+const markShown = (path: string, on: boolean) =>
+	setShownApps((was) => {
+		const next = new Map(was);
+		const count = (next.get(path) ?? 0) + (on ? 1 : -1);
+		if (count > 0) next.set(path, count);
+		else next.delete(path);
+		return next;
+	});
 let surfaces = 0;
 
 /**
@@ -91,7 +102,7 @@ let surfaces = 0;
  * they are yours. Elsewhere, or past the device's budget of running apps, it is the bar and Open, which
  * the host's page does in a tab of its own. The green light opens a tab either way.
  */
-export function AppSurface(props: { app: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
+export function AppSurface(props: { app: string; path: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
 	let frame: HTMLIFrameElement | undefined;
 	const me = ++surfaces;
@@ -118,16 +129,33 @@ export function AppSurface(props: { app: string; selected: boolean; onSelect: ()
 		if (data?.type !== "decks-storage" || typeof data.key !== "string") return;
 		canvasHost().apps?.store?.(props.app, data.key, typeof data.value === "string" ? data.value : null);
 	};
+	// Whether it runs, asked again while the window is up: a server app starts when it is first opened here.
+	const readStatus = () =>
+		void canvasHost()
+			.apps?.status(props.app)
+			.then((got) => setAbout(got ?? {}))
+			.catch(() => setAbout((was) => was ?? {}));
+	let statusTimer: ReturnType<typeof setInterval> | undefined;
 	onMount(() => {
 		props.ref?.();
 		ownEvents(host, () => props.selected, props.onSelect);
 		addEventListener("message", onMessage);
-		void canvasHost()
-			.apps?.status(props.app)
-			.then((got) => setAbout(got ?? {}))
-			.catch(() => setAbout({}));
+		readStatus();
+		statusTimer = setInterval(readStatus, 10_000);
+	});
+	// The window shows the app once its frame has loaded; until then, and when it runs elsewhere, the sheet shows its picture.
+	let saidShown = false;
+	const [loaded, setLoaded] = createSignal(false);
+	createEffect(() => {
+		const on = !!url() && loaded();
+		if (on === saidShown) return;
+		saidShown = on;
+		markShown(props.path, on);
+		if (on) readStatus();
 	});
 	onCleanup(() => {
+		clearInterval(statusTimer);
+		if (saidShown) markShown(props.path, false);
 		removeEventListener("message", onMessage);
 		const now = new Set(liveApps());
 		if (now.delete(me)) setLiveApps(now);
@@ -177,6 +205,7 @@ export function AppSurface(props: { app: string; selected: boolean; onSelect: ()
 					sandbox="allow-scripts allow-forms allow-modals allow-downloads"
 					allow="clipboard-read; clipboard-write; fullscreen"
 					style={{ "pointer-events": props.selected ? "auto" : "none" }}
+					on:load={() => setLoaded(true)}
 				/>
 			</Show>
 		</div>

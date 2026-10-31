@@ -3,6 +3,7 @@ import { For, Show, createEffect, createMemo, createSelector, createSignal, on, 
 import { boxOf, INTERACT_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { canvasHost, openInTab } from "../host.ts";
+import { appShowing } from "../items/item-surfaces.tsx";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseLive, NO_LIVE_CARDS, sameLive, type LiveCards } from "../items/live-cards.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
@@ -190,12 +191,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// A document or an app item draws itself at any zoom and has no picture (`item-surfaces.tsx`).
-						live: board.item !== undefined || live.has(board.path),
+						// A document draws itself at any zoom; an app only while its window shows the app, and is its picture otherwise (`item-surfaces.tsx`).
+						live: board.item === "document" || (board.item === "app" ? appShowing(board.path) : live.has(board.path)),
 						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// A card not live is its picture.
-						picture: board.item ? "" : props.shots().picture(board, look),
+						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item ? "" : props.shots().picture(board, look),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
 				}),
@@ -205,6 +206,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.carrying = setCarriedPages;
+	/** The cards the sheet is drawing as their pictures, as of the frame on screen (`StageEngine.pictured`). */
+	const [picturedNow, setPicturedNow] = createSignal<ReadonlySet<string>>(new Set());
+	penLayer.pictured = setPicturedNow;
 	/*
 	 * An item a drag carries while the sheet draws it as its picture (not awake): its picture goes with the drag, so its slot waits unseen too, or its
 	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).
@@ -325,6 +329,38 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const keptPaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().kept), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});
+	/*
+	 * Cards just let go, kept on the page until the sheet draws their pictures over them: put away at once,
+	 * a card left a frame or more of bare canvas in its place (the sheet still had a hole there, or its
+	 * picture was not drawn yet), a flicker each time one went to sleep. A second at most.
+	 */
+	const [leaving, setLeaving] = createSignal<ReadonlyMap<string, number>>(new Map());
+	let awakeBefore = new Set<string>();
+	createEffect(() => {
+		const now = new Set([...livePaths(), ...keptPaths()]);
+		const gone = [...awakeBefore].filter((path) => !now.has(path));
+		awakeBefore = now;
+		const at = performance.now();
+		setLeaving((was) => {
+			const next = new Map([...was].filter(([path]) => !now.has(path)));
+			for (const path of gone) next.set(path, at);
+			return next.size === was.size && [...next.keys()].every((path) => was.has(path)) ? was : next;
+		});
+	});
+	createEffect(() => {
+		const drawn = picturedNow();
+		const left = leaving();
+		if (left.size === 0) return;
+		const at = performance.now();
+		const next = new Map([...left].filter(([path, since]) => !drawn.has(path) && at - since < 1000));
+		if (next.size !== left.size) setLeaving(next);
+		else if (next.size) setTimeout(() => setLeaving((was) => new Map([...was].filter(([, since]) => performance.now() - since < 1000))), 1000);
+	});
+	const leavingPaths = createMemo<ReadonlySet<string>>(() => new Set(leaving().keys()), new Set(), {
+		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
+	});
+	const isLeaving = createSelector(leavingPaths, (path: string, paths) => paths.has(path));
+	const isPictured = createSelector(picturedNow, (path: string, paths) => paths.has(path));
 	const isKept = createSelector(keptPaths, (path: string, paths) => paths.has(path));
 	/** Whether a card is awake: each slot is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
@@ -365,6 +401,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		keep(props.selected);
 		for (const path of livePaths()) keep(path);
 		for (const path of keptPaths()) keep(path);
+		for (const path of leavingPaths()) keep(path);
 		for (const path of editor.heldPages()) keep(path);
 		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
 		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
@@ -470,8 +507,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		<Frame
 			board={board}
 			zoom={ctl.zoom()}
-			mounted={board.item !== undefined || isLive(board.path) || isKept(board.path)}
-			asleep={isKept(board.path)}
+			mounted={board.item !== undefined || isLive(board.path) || isKept(board.path) || isLeaving(board.path)}
+			asleep={isKept(board.path) || isLeaving(board.path)}
+			covered={isPictured(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}

@@ -83,7 +83,8 @@
  * document's editor and an app's window (`item-surfaces.tsx`). Each is as much a page to redraw at every
  * step of a zoom, and was redrawn at each one before it was named here.
  */
-.stage[data-scaling="true"] .card-node :is(.card-host, .document-surface, .app-surface) {
+/* Not an app's window: its frame is a layer of its own already, and adding and dropping one round it at each zoom made the app repaint, a white flash at its edges. */
+.stage[data-scaling="true"] .card-node :is(.card-host, .document-surface) {
 	will-change: transform;
 }
 /*
@@ -1817,7 +1818,12 @@
 		width: 100%;
 		min-height: 0;
 		border: 0;
-		background: #fff;
+		/* The window's own colour while the app loads or repaints, never a white edge on a dark canvas. */
+		background: var(--app-bg);
+		color-scheme: light;
+	}
+	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-frame {
+		color-scheme: dark;
 	}
 	:where(.decks-canvas, .decks-layer) .document-surface .dp {
 		height: 100%;

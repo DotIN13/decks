@@ -272,6 +272,8 @@ export function guard(gate: Gate) {
 			if (pass && path !== undefined && passCovers(pass.canvas, path, (deckPath) => gate.placedOn?.(deckPath, pass.canvas) ?? false)) {
 				req.url = carried.rest;
 				req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
+				// The token behind the pass, as for one in the header: an app's picture opens the app on a pass bound to it (`routes/pictures.ts`).
+				req.tokenId = pass.by;
 				// The pass in the page's address is not sent on as the Referer of what it loads.
 				res.setHeader("Referrer-Policy", "no-referrer");
 				/*

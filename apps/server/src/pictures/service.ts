@@ -109,6 +109,8 @@ export interface ThumbHost {
 	settleMs?: number;
 	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
 	boards?: () => DeckPage[];
+	/** The deck's apps, by name: their pictures (`apps/<name>`) are kept by the daily clean. */
+	apps?: () => string[];
 	/** The cards on any canvas: the only ones the indexer keeps pictures of, since nothing else draws them. */
 	placed?: () => ReadonlySet<string>;
 	/**
@@ -121,6 +123,10 @@ export interface ThumbHost {
 	/** Where the web app's pages are (`measure.html`): Vite's in development; `origin` when not said. */
 	webOrigin?: () => string;
 }
+
+/** An app's page to picture (`apps/<name>`), carrying the address it opens at on a canvas. */
+export type AppPage = DeckPage & { opens?: string };
+const opens = (page: DeckPage): string | undefined => (page as AppPage).opens;
 
 /** How far the indexer has got (`PictureService.progress`), for the app's ⋯ menu. */
 export interface PictureProgress {
@@ -410,7 +416,7 @@ export class PictureService {
 		};
 		const run = () => {
 			if (this.sweeping || this.running > 0 || this.queue.length > 0 || this.compressing.size > 0) return next(30 * 60_000);
-			const pages = (this.host.boards?.() ?? []).map((board) => board.path);
+			const pages = [...(this.host.boards?.() ?? []).map((board) => board.path), ...(this.host.apps?.() ?? []).map((name) => `apps/${name}`)];
 			// No pages read means the deck is not loaded: never take that as every page gone.
 			if (pages.length > 0) {
 				const done = cleanPictures(this.host.dir, pages);
@@ -737,6 +743,15 @@ export class PictureService {
 				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
 				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
 				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
+			} else if (opens(job.board)) {
+				/*
+				 * An app on a canvas (`apps/<name>`), pictured as it runs in the canvas frame: at its address
+				 * there, with the pass made for that canvas (`routes/pictures.ts`), so its pages, data and storage
+				 * stand-in are the ones the frame shows. Given a moment to fetch and draw what it shows first.
+				 */
+				await page.goto(`${this.host.origin()}${opens(job.board)}`, { waitUntil: "load", timeout: 20_000 });
+				await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+				await page.waitForTimeout(400);
 			} else {
 				// Anything else pictured (a friend's old board, the page a picture card links to) is a page of its own.
 				const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
