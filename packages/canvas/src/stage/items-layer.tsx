@@ -5,12 +5,12 @@ import type { CameraController } from "../camera/controller.ts";
 import { canvasHost, openInTab } from "../host.ts";
 import { appShowing } from "../items/item-surfaces.tsx";
 import MediaPlayer from "../items/MediaPlayer.tsx";
-import { chooseLive, NO_LIVE_CARDS, sameLive, type LiveCards } from "../items/live-cards.ts";
+import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
-import { CARDS, DEVICE } from "../render/device.ts";
+import { AWAKE, DEVICE } from "../render/device.ts";
 import { drawing } from "../edit/ink.ts";
 import { scheme } from "../lib/theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
@@ -48,8 +48,8 @@ export type ItemsLayerDeps = {
 export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame, gestures } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
-	/** How many cards are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
-	const CARD_BUDGET = CARDS[DEVICE];
+	/** How many of each kind are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
+	const BUDGET = AWAKE[DEVICE];
 	/**
 	 * A pinch on pictures: while the scale moves, the awake cards are hidden and the sheet draws each as
 	 * its picture, so the page stretches one sheet and lays out, paints and layers no card.
@@ -191,9 +191,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// A document draws itself at any zoom; an app only while its window shows the app and the camera is still, and is its picture otherwise (`item-surfaces.tsx`):
+						// A document while its editor shows; an app only while its window shows the app and the camera is still, and is its picture otherwise (`item-surfaces.tsx`):
 						// an app that animates repainted its window at every step of a pan.
-						live: board.item === "document" || (board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path)),
+						live: board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path),
 						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// A card not live is its picture.
@@ -308,21 +308,24 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const corner = toWorld(cam, v, { x: -v.width, y: -v.height });
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
+	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
+	const awakeItems = createMemo<readonly AwakeItem[]>(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, kind: board.card ? "card" : board.item })));
 	/*
-	 * Which cards are awake (`items/live-cards.ts`): chosen from the camera at rest, so nothing mounts or
-	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, cut to this
-	 * device's budget, none below `CARD_LIVE_ZOOM`, and the selected card at any zoom. Every other card
-	 * sleeps as its picture. A board is never awake: the sheet draws it as its picture, and the canvas
-	 * runs no board's page. A document or an app item is always awake (`item-surfaces.tsx`).
+	 * Which items are awake (`items/awake.ts`): chosen from the camera at rest, so nothing mounts or
+	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, each kind
+	 * cut to this device's budget, none below `LIVE_ZOOM`, and the selected item at any zoom. Every other
+	 * card, app or document sleeps as its picture. A board is never awake: the sheet draws it as its
+	 * picture, and the canvas runs no board's page.
 	 */
-	const cardChoice = createMemo<LiveCards>((was) => {
+	const cardChoice = createMemo<Awake>((was) => {
 		const v = view();
 		if (v.width === 0) return was;
-		const next = chooseLive({ index: pageIndex(), items: props.boards, rest: ctl.rest(), view: v, selected: props.selected, budget: CARD_BUDGET, was });
-		return sameLive(was, next) ? was : next;
-	}, NO_LIVE_CARDS);
-	/** For the browser checks and `scripts/card-zoom.mjs`: the cards chosen awake and kept asleep. */
-	(globalThis as { __decksLiveCards?: () => LiveCards }).__decksLiveCards = () => untrack(cardChoice);
+		const next = chooseAwake({ index: pageIndex(), items: awakeItems(), rest: ctl.rest(), view: v, selected: props.selected, budget: BUDGET, was });
+		return sameAwake(was, next) ? was : next;
+	}, NO_AWAKE);
+	/** For the browser checks: the items chosen awake and kept asleep, of every kind. */
+	(globalThis as { __decksLiveCards?: () => Awake; __decksAwake?: () => Awake }).__decksLiveCards = () => untrack(cardChoice);
+	(globalThis as { __decksAwake?: () => Awake }).__decksAwake = () => untrack(cardChoice);
 	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});
@@ -404,8 +407,6 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		for (const path of keptPaths()) keep(path);
 		for (const path of leavingPaths()) keep(path);
 		for (const path of editor.heldPages()) keep(path);
-		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
-		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
 		const next = [...found]
 			.sort((a, b) => a - b)
 			.map((at) => boards[at]!);
@@ -508,8 +509,9 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		<Frame
 			board={board}
 			zoom={ctl.zoom()}
-			mounted={board.item !== undefined || isLive(board.path) || isKept(board.path) || isLeaving(board.path)}
+			mounted={isLive(board.path) || isKept(board.path) || isLeaving(board.path)}
 			asleep={isKept(board.path) || isLeaving(board.path)}
+			kept={isKept(board.path)}
 			covered={isPictured(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}

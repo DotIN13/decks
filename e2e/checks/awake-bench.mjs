@@ -67,17 +67,18 @@ const deck = await deckState();
 const written = writeAwakeCanvas(deck.path);
 say("the awake canvas is written into the deck", written.cards === 100 && written.apps === 8 && written.documents === 4, JSON.stringify(written));
 
-/** The world point where a window at `zoom` sees the most placed items. */
+/** The world point where a window at `zoom` sees the most placed items, apps and documents counting for four each, so the spot has every kind in view. */
 const busiest = (pen, zoom) => {
-	const items = pen.children.filter((n) => n.type === "browser").map((n) => ({ x: n.x ?? 0, y: n.y ?? 0, w: n.width ?? 1000, h: n.height ?? 700 }));
+	const items = pen.children.filter((n) => n.type === "browser").map((n) => ({ x: n.x ?? 0, y: n.y ?? 0, w: n.width ?? 1000, h: n.height ?? 700, weight: n.metadata?.type === "decks.card" ? 1 : 4 }));
 	const vw = W / zoom;
 	const vh = H / zoom;
-	let best = { n: -1, x: 0, y: 0 };
+	let best = { n: -1, score: -1, x: 0, y: 0 };
 	for (const b of items) {
 		const cx = b.x + b.w / 2;
 		const cy = b.y + b.h / 2;
-		const n = items.filter((o) => o.x < cx + vw / 2 && o.x + o.w > cx - vw / 2 && o.y < cy + vh / 2 && o.y + o.h > cy - vh / 2).length;
-		if (n > best.n) best = { n, x: cx, y: cy };
+		const seen = items.filter((o) => o.x < cx + vw / 2 && o.x + o.w > cx - vw / 2 && o.y < cy + vh / 2 && o.y + o.h > cy - vh / 2);
+		const score = seen.reduce((sum, o) => sum + o.weight, 0);
+		if (score > best.score) best = { n: seen.length, score, x: cx, y: cy };
 	}
 	return best;
 };

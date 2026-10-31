@@ -102,7 +102,7 @@
  * A card let go lately and kept asleep with its root (`items/live-cards.ts`, `kept`): not laid out, painted
  * or pressed, while the sheet draws its picture over it; shown again at once when it wakes.
  */
-.card-node[data-asleep] .card-surface {
+.card-node[data-asleep] :is(.card-surface, .document-surface, .app-surface) {
 	content-visibility: hidden;
 }
 	/*
@@ -1822,12 +1822,7 @@
 		background: var(--app-bg);
 		color-scheme: light;
 	}
-	/*
-	 * A running app scrolled far off: kept, so it never reloads, but not drawn. An app that animates
-	 * (a playhead, a clock) had the canvas repaint it at every step of every pan wherever the camera was.
-	 */
-	:where(.decks-canvas, .decks-layer) .app-surface[data-away] .app-surface-frame,
-	/* While the camera moves the sheet draws the app's picture over it (`items-layer.tsx`): once it does, the window is not drawn under it. */
+	/* While the camera moves, or asleep, the sheet draws the app's picture over it (`items-layer.tsx`): once it does, the window is not drawn under it. */
 	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .app-surface-frame {
 		/* Not drawn at all: hidden by visibility, its page went on painting each frame; a frame not displayed is not rendered, and is not reloaded either. */
 		display: none;

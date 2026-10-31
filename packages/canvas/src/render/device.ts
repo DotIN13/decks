@@ -171,15 +171,13 @@ export async function readGpuClass(): Promise<GpuClass> {
  * scripts of; an iPad or a phone has one thread and a hard memory ceiling for all of it.
  */
 /**
- * A device's apps inside the canvas (`items/item-surfaces.tsx`): how many run at once, the one selected
- * always among them. Each is a whole page with its own scripts, in Safari on the canvas's one thread.
+ * A device's awake items (`items/awake.ts`): how many of each kind are awake at once besides the
+ * selected one, the nearest the middle of the screen, and how many let go keep their surfaces, asleep,
+ * so that coming back to one is instant. A card is a root of elements this one page lays out and
+ * paints; an app a whole page of its own in a sandboxed frame, a document an editor; an iPad or a
+ * phone has one thread and a hard memory ceiling for all of it.
  */
-export const APPS: Record<DeviceKind, { live: number }> = {
-	computer: { live: 2 },
-	mobile: { live: 1 },
-};
-
-export const CARDS: Record<DeviceKind, { live: number; kept: number }> = {
-	computer: { live: 12, kept: 4 },
-	mobile: { live: 3, kept: 2 },
+export const AWAKE: Record<DeviceKind, { live: { card: number; app: number; document: number }; kept: number }> = {
+	computer: { live: { card: 12, app: 2, document: 2 }, kept: 4 },
+	mobile: { live: { card: 3, app: 1, document: 1 }, kept: 2 },
 };

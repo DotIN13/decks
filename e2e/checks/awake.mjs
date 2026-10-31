@@ -80,7 +80,10 @@ await canvas.evaluate(() => {
 			const cards = globalThis.__decksCards?.() ?? [];
 			return {
 				nodes: cards.filter((c) => c.node).map((c) => c.path).sort(),
-				apps: [...document.querySelectorAll(".world .card-node")].filter((n) => n.querySelector(".app-surface[data-live]")).map((n) => n.dataset.path).sort(),
+				// Apps whose window shows the app and whose node is live: a kept app keeps its window loaded, hidden under its picture.
+				apps: [...document.querySelectorAll('.world .card-node[data-state="live"]')].filter((n) => n.querySelector(".app-surface[data-live]")).map((n) => n.dataset.path).sort(),
+				kept: [...document.querySelectorAll('.world .card-node[data-state="kept"]')].map((n) => n.dataset.path).sort(),
+				states: Object.fromEntries([...document.querySelectorAll(".world .card-node")].map((n) => [n.dataset.path, `${n.dataset.state}/${n.querySelector(".app-surface")?.dataset.live ?? "-"}/${n.querySelector(".app-surface-body p")?.textContent?.slice(0, 40) ?? ""}`])),
 				documents: document.querySelectorAll(".world .document-surface").length,
 				cardHosts: document.querySelectorAll(".world .card-host").length,
 			};
@@ -92,7 +95,11 @@ const rest = (ms = 900, cap = 12000) =>
 	canvas.evaluate(
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
-			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".stage")?.dataset.moving]);
+			const cam = () => {
+				const c = globalThis.__decksRust?.camera;
+				return c ? [Math.round(c.x), Math.round(c.y), Math.round(c.zoom * 1000)] : null;
+			};
+			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".stage")?.dataset.moving, cam()]);
 			let last = snap();
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
@@ -129,6 +136,8 @@ say("at 30% no item of any kind has a node: every card, app and document is its 
 at("60%");
 await view(0.6);
 await rest();
+// Apps load their windows after the rest: wait for the budget's two, up to a few seconds.
+await until(async () => (await canvas.evaluate(() => globalThis.__t.state())).apps.length >= 2, 8000);
 state = await canvas.evaluate(() => globalThis.__t.state());
 const nearApps = await canvas.evaluate(() => {
 	const r = document.querySelector(".stage").getBoundingClientRect();
@@ -152,8 +161,9 @@ const third = await canvas.evaluate((path) => {
 }, nearApps[2]);
 await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), third);
 await rest();
+await until(async () => (await canvas.evaluate(() => globalThis.__t.state())).apps.includes(nearApps[2]), 8000);
 state = await canvas.evaluate(() => globalThis.__t.state());
-say("panned so the third app is under the middle, it runs, and the farthest app sleeps", state.apps.includes(nearApps[2]) && state.apps.length === 2, JSON.stringify(state.apps));
+say("panned so the third app is under the middle, it runs, and the farthest app sleeps, kept under its picture", state.apps.includes(nearApps[2]) && state.apps.length === 2 && state.kept.some((path) => /^item:aa/.test(path)) && !state.apps.includes(state.kept.find((path) => /^item:aa/.test(path))), `live ${JSON.stringify(state.apps)} kept ${JSON.stringify(state.kept)}`);
 
 // --- nothing mounts mid-pinch -----------------------------------------------------------------------------
 at("pinch");
@@ -175,14 +185,39 @@ await rest();
 await view(0.6);
 await rest();
 at("select first");
-const takes = () => canvas.evaluate(() => [...document.querySelectorAll(".app-surface-frame")].map((f) => getComputedStyle(f).pointerEvents));
+const takes = () => canvas.evaluate(() => [...document.querySelectorAll('.card-node[data-state="live"] .app-surface-frame')].map((f) => getComputedStyle(f).pointerEvents));
 const before = await takes();
 say("before it is selected a running app takes no pointer", before.length > 0 && before.every((p) => p === "none"), JSON.stringify(before));
 const frameBox = await page.locator("iframe.canvas-frame").boundingBox();
-const box = await canvas.locator(".app-surface[data-live]").first().boundingBox();
-await page.mouse.click(frameBox.x + box.x + box.width / 2, frameBox.y + box.y + box.height * 0.6);
+// Where the first running app's window is, as the frame sees it now (a locator's box can be stale after a glide).
+const rectNow = () =>
+	canvas.evaluate(() => {
+		const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
+		const stage = document.querySelector(".stage");
+		const c = globalThis.__decksRust?.camera;
+		return r ? { x: r.x, y: r.y, width: r.width, height: r.height, scroll: [stage?.scrollLeft, stage?.scrollTop], camera: c && [Math.round(c.x), Math.round(c.y), c.zoom] } : undefined;
+	});
+// Centred on the screen first: the page's side panel floats over the frame's left edge, and a press there is the panel's.
+const centre = await canvas.evaluate(() => {
+	const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
+	const cam = globalThis.__decksRust.camera;
+	const stage = document.querySelector(".stage").getBoundingClientRect();
+	return { x: cam.x + (r.x - stage.x + r.width / 2) / cam.zoom, y: cam.y + (r.y - stage.y + r.height / 2) / cam.zoom };
+});
+await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), centre);
+await rest();
+const box = await rectNow();
+const moved = box;
+const clickAt = { x: box.x + box.width / 2, y: box.y + box.height * 0.7 };
+await page.mouse.click(frameBox.x + clickAt.x, frameBox.y + clickAt.y);
 const after = await until(async () => ((await takes()).includes("auto") ? await takes() : undefined), 4000);
-say("…selected, its window takes the pointer", !!after && after.includes("auto"), JSON.stringify(after ?? (await takes())));
+const under = await canvas.evaluate(({ x, y }) => {
+	const el = document.elementFromPoint(x, y);
+	const node = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node");
+	const r = node?.getBoundingClientRect();
+	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
+}, clickAt);
+say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
 say("no page errors", errors.length === 0, errors.join(" | "));
 await page.close().catch(() => {});
 // The harness's socket would keep the process alive.

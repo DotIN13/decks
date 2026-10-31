@@ -3,6 +3,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import type { PageView } from "../edit/index.ts";
 import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
+import { surfaceState } from "./awake.ts";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
@@ -20,7 +21,7 @@ export interface ItemSlotProps {
 	board: Page;
 	/** The camera's zoom: an edge band is sized in screen pixels. */
 	zoom: number;
-	/** Whether the item is awake: a card near the window, a document or an app (`Stage`'s `livePaths`). */
+	/** Whether the item is awake: a card, an app or a document chosen near the window (`items/awake.ts`). */
 	mounted: boolean;
 	/** Whether the item is on screen or within a window of it. */
 	visible: boolean;
@@ -30,6 +31,8 @@ export interface ItemSlotProps {
 	 * a sleeping card's slot does. Its scripts go on running: a card has no way to be paused.
 	 */
 	asleep?: boolean | undefined;
+	/** Asleep and kept (`items/awake.ts`, `kept`), rather than on its way out: for the node's `data-state`. */
+	kept?: boolean | undefined;
 	/** The sheet is drawing this item's picture over it: only then does an asleep card hide, so it never leaves bare canvas for a frame. */
 	covered?: boolean | undefined;
 	selected: boolean;
@@ -166,6 +169,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			class="card-node plain-card"
 			data-path={props.board.path}
 			data-selected={props.selected}
+			data-state={surfaceState({ live: awake() && !props.asleep, kept: !!props.kept, leaving: !!props.asleep && !props.kept, shown: shown() })}
 			data-inert={!shown() || props.asleep}
 			data-asleep={props.asleep && props.covered ? "" : undefined}
 			data-covered={props.covered ? "" : undefined}

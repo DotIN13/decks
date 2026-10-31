@@ -2,7 +2,6 @@ import { mountDocPage } from "@decks/docs/page";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { INTERACTIVE, scrollsInside } from "./card.ts";
 import { canvasHost } from "../host.ts";
-import { APPS, DEVICE } from "../render/device.ts";
 import { scheme } from "../lib/theme.ts";
 
 /**
@@ -79,8 +78,6 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 	return <div class="document-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%", overflow: "auto", background: "var(--b-bg, #fff)" }} />;
 }
 
-/** The apps running inside the canvas now, by surface: at most `APPS[DEVICE].live`, the selected one always. */
-const [liveApps, setLiveApps] = createSignal<ReadonlySet<number>>(new Set());
 /** The app items whose window is showing the app itself, by item path: the others are drawn by the sheet as their pictures (`items-layer.tsx`). */
 const [shownApps, setShownApps] = createSignal<ReadonlyMap<string, number>>(new Map());
 export const appShowing = (path: string) => (shownApps().get(path) ?? 0) > 0;
@@ -92,35 +89,29 @@ const markShown = (path: string, on: boolean) =>
 		else next.delete(path);
 		return next;
 	});
-let surfaces = 0;
 
 /**
  * An app item (`decks.app`): the app's bar on the canvas, and below it the app itself, running in a
  * sandboxed iframe, where the host can open it here (`CanvasHost.apps.inCanvas`: on a canvas that is yours
- * alone, its pass in its address). It takes the pointer once the item is selected, as a card does once
- * entered; before that a press selects it and a wheel pans the canvas. Its cards' scripts may reach it:
- * they are yours. Elsewhere, or past the device's budget of running apps, it is the bar and Open, which
- * the host's page does in a tab of its own. The green light opens a tab either way.
+ * alone, its pass in its address). Mounted only while the item is awake (`items/awake.ts`: near the
+ * screen, within the device's budget of apps, or selected), and its picture on the sheet otherwise.
+ * It takes the pointer once the item is selected, as a card does once entered; before that a press
+ * selects it and a wheel pans the canvas. Its cards' scripts may reach it: they are yours. Where the
+ * host cannot open it here it is the bar and Open, which the host's page does in a tab of its own.
+ * The green light opens a tab either way.
  */
 export function AppSurface(props: { app: string; path: string; visible: boolean; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
 	let frame: HTMLIFrameElement | undefined;
-	const me = ++surfaces;
 	const [about, setAbout] = createSignal<{ title?: string; status?: string }>();
 	const [address, setAddress] = createSignal<{ url: string } | { tab: string }>();
 	const open = () => canvasHost().apps?.open(props.app);
 	const inCanvas = () => canvasHost().apps?.inCanvas;
-	// Running here: once it has a place in the budget, kept until the item goes, so it never reloads under you.
-	const live = () => liveApps().has(me);
-	createEffect(() => {
-		if (!inCanvas() || live()) return;
-		const now = liveApps();
-		// Only one near the screen starts (or the chosen one): an app far off was running, and painting, for nobody.
-		if (props.selected || (props.visible && now.size < APPS[DEVICE].live)) setLiveApps(new Set([...now, me]));
-	});
+	// Running here whenever mounted: which apps are mounted is the chooser's (`items/awake.ts`), and a kept one stays until it is let go of.
+	const live = () => !!inCanvas();
 	createEffect(() => {
 		const ask = inCanvas();
-		if (!live() || !ask || address()) return;
+		if (!ask || address()) return;
 		void ask(props.app).then(setAddress);
 	});
 	// What the app saves in its browser storage (`decks-storage.js`), from its own iframe only.
@@ -158,15 +149,13 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		clearInterval(statusTimer);
 		if (saidShown) markShown(props.path, false);
 		removeEventListener("message", onMessage);
-		const now = new Set(liveApps());
-		if (now.delete(me)) setLiveApps(now);
 	});
 	const url = () => {
 		const got = address();
 		return got && "url" in got ? got.url : undefined;
 	};
 	return (
-		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} data-away={url() && !props.visible && !props.selected ? "true" : undefined} on:dblclick={() => !url() && open()}>
+		<div class="app-surface" ref={(element) => (host = element)} data-live={url() ? "true" : undefined} on:dblclick={() => !url() && open()}>
 			{/* A window's title bar, as macOS draws one: the lights, the name in the middle, whether it runs. */}
 			<div class="app-surface-bar">
 				<span class="app-surface-lights">

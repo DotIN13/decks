@@ -11,8 +11,8 @@ import type { Page, Camera } from "@decks/protocol";
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 4;
 
-/** The live zoom, on every device. */
-const LIVE_ZOOM = 0.5;
+/** The slot zoom, on every device. */
+const SLOT_ZOOM = 0.5;
 
 /**
  * The zoom from which the items near the window have slots of their own: a title bar to drag them by
@@ -23,18 +23,18 @@ const LIVE_ZOOM = 0.5;
  * the callers.
  */
 export function interactZoom(_device?: { coarse: boolean; short: number }): number {
-	return LIVE_ZOOM;
+	return SLOT_ZOOM;
 }
 
 /** This device's slot zoom (`interactZoom`). */
 export const INTERACT_ZOOM = interactZoom();
 
 /**
- * The zoom below which no card is live, except the selected one: the engine draws every card as its
- * picture (`items/live-cards.ts`). Under 40% a card's words are too small to read or press, and a live
- * card is a root of elements the page lays out and paints at every step of a pinch.
+ * The zoom below which no item is awake, except the selected one: the engine draws every card, app and
+ * document as its picture (`items/awake.ts`). Under 40% an item's words are too small to read or press,
+ * and an awake item is a surface the page lays out and paints at every step of a pinch.
  */
-export const CARD_LIVE_ZOOM = 0.4;
+export const LIVE_ZOOM = 0.4;
 
 export interface Viewport {
 	width: number;
