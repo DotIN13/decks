@@ -44,7 +44,13 @@ export async function wholeShot(page: Page, clip: { width: number; height: numbe
 	if (context && typeof context.newCDPSession === "function") {
 		const cdp = await context.newCDPSession(page);
 		try {
-			const { data } = await cdp.send("Page.captureScreenshot", { format: "webp", quality: 88, clip: { x: 0, y: 0, width: clip.width, height: clip.height, scale }, captureBeyondViewport: true });
+			/*
+			 * A whole number of image rows: a height that comes out fractional at this scale (730 at 0.436
+			 * is 318.5) gets a last row half of whatever is under the card, which the canvas draws on down
+			 * to a taller box's foot as a grey bar. Just under the whole number, so rounding either way keeps it.
+			 */
+			const height = (Math.max(1, Math.floor(clip.height * scale)) - 1e-3) / scale;
+			const { data } = await cdp.send("Page.captureScreenshot", { format: "webp", quality: 88, clip: { x: 0, y: 0, width: clip.width, height, scale }, captureBeyondViewport: true });
 			return Buffer.from(data, "base64");
 		} finally {
 			await cdp.detach().catch(() => {});
@@ -82,10 +88,10 @@ export const PICTURE_LOOK = 3;
  * web app's `measure.html` as the canvas frame draws it (`mountCard`, card.css before the card's own
  * styles), where it was a page of its own; every card's picture is taken again once. Old boards and
  * friends' pages keep `PICTURE_LOOK`, so the pictures an old deck's migration reads keep their names.
- * 5: the smaller rungs end on a whole row (`SHRINK`), where their last row was half transparent and drawn
+ * 5 and 6: every picture ends on a whole row (`SHRINK`, `wholeShot`), where a last row could be half transparent, drawn
  * on down to a taller box's foot as a grey bar.
  */
-export const CARD_LOOK = 5;
+export const CARD_LOOK = 6;
 /** A card, as the canvas frame and `measure.html` tell one: the `index.html` of a folder in a `cards/`. */
 export const CARD_PATH = /(?:^|\/)cards\/[^/]+\/index\.html$/i;
 /** The look a picture of this page is named with: `CARD_LOOK` for a card, `PICTURE_LOOK` for any other page. */
