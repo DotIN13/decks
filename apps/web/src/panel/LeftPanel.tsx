@@ -645,7 +645,7 @@ export function LeftPanel(props: {
 				data-inset={props.open ? "left" : undefined}
 				data-open={props.open ? "true" : "false"}
 				aria-hidden={!props.open}
-				aria-label="Boards"
+				aria-label="Side panel"
 				/*
 				 * A stationary column, not a card: it runs the full height of the window at the
 				 * left edge, with the deck mark on top, and never moves while the middle slides.
@@ -989,7 +989,7 @@ export function LeftPanel(props: {
 						<div class="panel-section v3-items" data-kind="canvas">
 							<Show when={boardItems().length > 0}>
 								<div class="v3-sec">
-									<span>Boards</span>
+									<span>Cards</span>
 									<span class="flex-1" />
 									<span class="v3-sec-n tabular-nums">{boardItems().length}</span>
 								</div>

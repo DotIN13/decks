@@ -42,17 +42,17 @@ function pointerGroups(): Group[] {
 			rows: [
 				{ keys: "two-finger scroll", what: "pan the canvas" },
 				{ keys: "pinch · ⌘-wheel", what: "zoom about the pointer" },
-				{ keys: "space-drag", what: "pan from anywhere, including over a board" },
+				{ keys: "space-drag", what: "pan from anywhere, including over a card" },
 				{ keys: "+ · -", what: "zoom about the centre" },
 				{ keys: "0", what: "fit everything on the canvas on screen" },
-				{ keys: "1", what: "fit the selected board" },
+				{ keys: "1", what: "fit the selected card" },
 			],
 		},
 		{
-			title: "Reading a board",
+			title: "Reading a card",
 			rows: [
 				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
-				{ keys: "the brush", what: "draw on the board: pen, marker, eraser, lasso" },
+				{ keys: "the brush", what: "draw on the card: pen, marker, eraser, lasso" },
 				{ keys: "⌘Z · ⇧⌘Z", what: "undo · redo a stroke, while drawing" },
 				{ keys: "⌫", what: "delete the strokes the lasso holds" },
 				{ keys: "Escape", what: "put the pen down" },
@@ -64,7 +64,7 @@ function pointerGroups(): Group[] {
 				{ keys: "V", what: "select, drag and resize" },
 				{ keys: "R · O · F", what: "a rectangle · an ellipse · a frame" },
 				{ keys: "N · C · T · A", what: "a note · a card · words · an arrow" },
-				{ keys: "drop a file on a board", what: "embed it where it landed" },
+				{ keys: "drop a file on a card", what: "embed it where it landed" },
 			],
 		},
 		{
@@ -77,17 +77,17 @@ function pointerGroups(): Group[] {
 				{ keys: "⌘D", what: "duplicate it" },
 				{ keys: "[ · ]", what: "send behind · bring in front" },
 				{ keys: "⌫", what: "delete it" },
-				{ keys: "⌘Z", what: "undo on this board" },
+				{ keys: "⌘Z", what: "undo on this card" },
 				{ keys: "Escape", what: "let the selection go" },
 			],
 		},
 		{
-			title: "Boards and the conversation",
+			title: "Cards and the conversation",
 			rows: [
-				{ keys: "drag a board's title", what: "move the board" },
-				{ keys: "the board's ×", what: "take it off the canvas, keeping it in context" },
-				{ keys: "the panel buttons", what: "the agents · the boards they are holding" },
-				{ keys: "the grid button", what: "every board in the deck, searchable" },
+				{ keys: "drag a card's title", what: "move the card" },
+				{ keys: "the card's ×", what: "take it off the canvas, keeping it in context" },
+				{ keys: "the panel buttons", what: "the agents · the cards they are holding" },
+				{ keys: "the grid button", what: "every card in the deck, searchable" },
 				{ keys: "the speech-bubble button", what: "the conversation, opened and closed" },
 				{ keys: "click a turn on the right spine", what: "the conversation at that turn" },
 				{ keys: "/", what: "commands, in the input bar" },
@@ -109,10 +109,10 @@ function touchGroups(): Group[] {
 			],
 		},
 		{
-			title: "Reading a board",
+			title: "Reading a card",
 			rows: [
 				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
-				{ keys: "the brush", what: "draw on the board: pen, marker, eraser, lasso" },
+				{ keys: "the brush", what: "draw on the card: pen, marker, eraser, lasso" },
 				{ keys: "a pencil", what: "draws with its pressure, and from then on a finger moves the canvas" },
 				{ keys: "two fingers", what: "always the canvas, even while drawing" },
 			],
@@ -134,10 +134,10 @@ function touchGroups(): Group[] {
 			],
 		},
 		{
-			title: "Boards and the conversation",
+			title: "Cards and the conversation",
 			rows: [
-				{ keys: "drag a board's title", what: "move the board" },
-				{ keys: "swipe in from the left edge", what: "the boards and agents rail" },
+				{ keys: "drag a card's title", what: "move the card" },
+				{ keys: "swipe in from the left edge", what: "the cards and agents rail" },
 				{ keys: "swipe in from the right edge", what: "the conversation" },
 				{ keys: "swipe the conversation right", what: "put it away" },
 				{ keys: "the two title-bar buttons", what: "the same two panels, either way" },
@@ -231,10 +231,10 @@ export function CanvasOps(props: { onClose: () => void }) {
 				</div>
 
 				{/* Said once, at the bottom, because it is the rule behind half the rows above:
-				    below `INTERACT_ZOOM` a board is its picture, except the selected one, whose page works. */}
+				    below `INTERACT_ZOOM` a card is its picture, except the selected one, whose page works. */}
 				<Show when={canHover()}>
 					<footer class="border-t border-line px-3 py-[9px] text-note leading-normal text-faint">
-						Zoomed out far enough, a board is a picture on a map: drag it to move it. The board you select keeps its page, and works at any zoom.
+						Zoomed out far enough, a card is a picture on a map: drag it to move it. The card you select keeps its page, and works at any zoom.
 					</footer>
 				</Show>
 			</div>

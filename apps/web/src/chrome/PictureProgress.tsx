@@ -69,7 +69,7 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 				<Icon of={Images} size={15} />
 			</span>
 			<span class="flex min-w-0 flex-1 flex-col gap-[4px]">
-				<span class="row-label">Board pictures</span>
+				<span class="row-label">Card pictures</span>
 				<Show when={!done()}>
 					<span class="picture-progress-track" aria-hidden="true">
 						<span class="picture-progress-fill" style={{ width: `${share()}%` }} />

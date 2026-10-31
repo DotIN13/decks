@@ -294,7 +294,7 @@ function TimeSettings() {
 /** The frame-rate meter (`perf/fps.tsx`). */
 function BoardSettings() {
 	return (
-		<SetGroup label="Boards" group="renderer">
+		<SetGroup label="Canvas" group="renderer">
 			<SetRow title="Frame rate" sub="A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.">
 				<button class="sw-switch" type="button" role="switch" aria-label="Show the frame rate" aria-checked={showFps()} data-on={showFps()} onClick={() => chooseShowFps(!showFps())} />
 			</SetRow>

@@ -51,7 +51,7 @@ export function commentBlock(comments: BoardComment[]): string {
 	const drawn = comments.every((comment) => comment.items?.length);
 	const head = drawn
 		? comments.length === 1 ? "A comment on items drawn on a canvas:" : `${comments.length} comments on items drawn on a canvas:`
-		: comments.length === 1 ? "A comment on a board. The quoted words are what I selected:" : `${comments.length} comments on boards. The quoted words are what I selected:`;
+		: comments.length === 1 ? "A comment on a card. The quoted words are what I selected:" : `${comments.length} comments on cards. The quoted words are what I selected:`;
 	const items = comments.map((comment, index) => commentItem(comment, index + 1));
 	return `${head}\n\n${items.join("\n\n")}`;
 }
@@ -68,8 +68,8 @@ export function commentItem(comment: BoardComment, n: number): string {
 		return `${n}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
 	}
 	const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
-	// No quote: a comment on the whole board, from its pill.
-	if (!comment.quote) return `${n}. ${where}, the whole board${said}`;
+	// No quote: a comment on the whole card, from its pill.
+	if (!comment.quote) return `${n}. ${where}, the whole card${said}`;
 	return `${n}. ${where}\n   > ${comment.quote}${said}`;
 }
 

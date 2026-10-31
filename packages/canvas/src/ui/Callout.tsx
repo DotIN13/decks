@@ -161,9 +161,9 @@ export function BoardCallout(props: {
 							<Icon of={Shapes} size={15} />
 							Make a drawing
 						</button>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a board from it, in its place`} onClick={() => ink().onBoard()}>
+						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onBoard()}>
 							<Icon of={LayoutTemplate} size={15} />
-							Make a board
+							Make a card
 						</button>
 						<button type="button" role="menuitem" class="callout-word callout-ask" title={`${ink().agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => ink().onSend()}>
 							<Icon of={Send} size={15} />
@@ -173,7 +173,7 @@ export function BoardCallout(props: {
 					</>
 				)}
 			</Show>
-			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the board to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
+			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the card to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
 			<Show when={props.board && !props.board.live ? props.board : undefined}>
@@ -184,7 +184,7 @@ export function BoardCallout(props: {
 				)}
 			</Show>
 			<Show when={props.onComment}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.board ? "Comment on this board" : "Comment on this"} onClick={() => props.onComment?.()}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.board ? "Comment on this card" : "Comment on this"} onClick={() => props.onComment?.()}>
 					<Icon of={MessageSquarePlus} size={16} />
 				</button>
 			</Show>

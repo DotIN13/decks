@@ -111,7 +111,7 @@ export function CommentPopup(props: {
 			>
 				<Show
 					when={props.target.quote}
-					fallback={<div class="comment-quote" data-whole="true">On the whole board{props.target.title ? `: ${props.target.title}` : ""}</div>}
+					fallback={<div class="comment-quote" data-whole="true">On the whole card{props.target.title ? `: ${props.target.title}` : ""}</div>}
 				>
 					<div class="comment-quote" title={props.target.quote}>
 						{props.target.quote}

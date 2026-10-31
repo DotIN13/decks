@@ -175,7 +175,7 @@ test("a show of nothing this canvas has is an error, not a camera move", () => {
 	const { api, moved } = host("A");
 	const result = runStageCall(call("A", "show", { paths: ["boards/gone.html"], items: [] }), api) as { error?: string };
 
-	assert.match(result.error ?? "", /none of those boards/);
+	assert.match(result.error ?? "", /none of those cards/);
 	assert.equal(moved.length, 0);
 });
 

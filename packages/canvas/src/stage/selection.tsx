@@ -221,7 +221,7 @@ export function createSelection(deps: SelectionDeps) {
 		const first = penLayer.placed.get(ids[0]!)?.node;
 		const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 		const name = boards
-			? [count(boards, "board"), ids.length ? count(ids.length, "item") : ""].filter(Boolean).join(", ")
+			? [count(boards, "card"), ids.length ? count(ids.length, "item") : ""].filter(Boolean).join(", ")
 			: ids.length > 1
 				? `${ids.length} items`
 				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
@@ -322,7 +322,7 @@ export function createSelection(deps: SelectionDeps) {
 						board={board}
 						box={boxOf(board)}
 						obstacles={() => pillObstacles(boxOf(board))}
-						label={`${board.title}: board actions`}
+						label={`${board.title}: card actions`}
 						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
 						camera={ctl.settled()}
 						view={view()}

@@ -667,8 +667,8 @@ export function AgentPill(props: {
 				class="icon-button"
 				data-on={props.boardsOpen ? "soft" : undefined}
 				aria-pressed={props.boardsOpen}
-				title="Boards (⌘\)"
-				aria-label={props.boardsOpen ? "Hide the boards panel" : "Show the boards panel"}
+				title="Side panel (⌘\)"
+				aria-label={props.boardsOpen ? "Hide the side panel" : "Show the side panel"}
 				onClick={() => props.onToggleBoards()}
 			>
 				<Icon of={PanelLeft} size={15} />
@@ -777,8 +777,8 @@ export function AgentPill(props: {
 					class="icon-button"
 					data-on={props.mode === "browse" && !props.drawing ? "true" : undefined}
 					aria-pressed={props.mode === "browse" && !props.drawing}
-					title="Browse: read the boards, move and retype what is drawn"
-					aria-label="Browse the boards"
+					title="Browse: read the cards, move and retype what is drawn"
+					aria-label="Browse the cards"
 					onClick={() => {
 						props.onDrawing(false);
 						props.onMode("browse");

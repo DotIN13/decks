@@ -15,10 +15,10 @@ test("the agent reads where, the words, and the comment, and the list says what 
 	assert.equal(commentBlock([]), "");
 	assert.equal(
 		commentBlock([comment()]),
-		"A comment on a board. The quoted words are what I selected:\n\n1. boards/plan.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
 	);
 	const two = commentBlock([comment(), comment({ id: "c2", component: undefined, text: "Why?\nSay more." })]);
-	assert.match(two, /^2 comments on boards\./);
+	assert.match(two, /^2 comments on cards\./);
 	assert.match(two, /2\. boards\/plan\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
 });
 
@@ -55,7 +55,7 @@ test("the popup sits under the selection, above it when there is no room, and ne
 test("a comment on the whole board has no quote, and says so", () => {
 	assert.equal(
 		commentBlock([comment({ quote: "", component: undefined })]),
-		"A comment on a board. The quoted words are what I selected:\n\n1. boards/plan.html, the whole board\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, the whole card\n   Two sentences, please.",
 	);
 });
 

@@ -362,7 +362,7 @@ export function ToolColumn(props: {
 				{tool({ id: "select", label: "Select", key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
 				{tool({ id: "view", label: "Hand or highlight", icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
 				<span class="v3-rule" aria-hidden="true" />
-				{tool({ id: "board", label: "Board", key: "D", icon: () => SquarePlus, on: on.board, family: "board", onClick: (b) => openMenu("board", b) })}
+				{tool({ id: "board", label: "Card", key: "D", icon: () => SquarePlus, on: on.board, family: "board", onClick: (b) => openMenu("board", b) })}
 				{tool({ id: "note", label: "Note", key: "N", icon: () => StickyNote, on: on.note, onClick: () => (on.note() ? select() : arm("note")) })}
 				{tool({ id: "text", label: "Text", key: "T", icon: () => Type, on: on.text, onClick: () => (on.text() ? select() : arm("text")) })}
 				{tool({ id: "shape", label: "Shape", key: "R", icon: shapeIcon, on: on.shape, family: "shape", onClick: (b) => openMenu("shape", b) })}

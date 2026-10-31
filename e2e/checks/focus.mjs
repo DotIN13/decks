@@ -34,7 +34,7 @@ say("the pill's Comment opens the box straight away, not the small button", stra
 if (!straight) await canvas.locator(".comment-popup .comment-start").click().catch(() => {});
 await canvas.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
 const whole = await canvas.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
-say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole board"), JSON.stringify(whole));
+say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole card"), JSON.stringify(whole));
 await page.keyboard.type("Shorter, please.");
 await page.keyboard.press("Enter");
 const chip = await page

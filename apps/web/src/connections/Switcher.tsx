@@ -53,7 +53,7 @@ async function reachable(one: Connection): Promise<Reach> {
 function kindNote(one: Connection): string {
 	if (one.kind === "here") return location.host;
 	if (one.kind === "server") return new URL(one.base).host;
-	return `file · ${one.boards} board${one.boards === 1 ? "" : "s"}`;
+	return `file · ${one.boards} card${one.boards === 1 ? "" : "s"}`;
 }
 
 export function Switcher(props: { label?: string } = {}) {

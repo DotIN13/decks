@@ -179,8 +179,8 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 // --- a sent message, read back from its text (one sent before parts were kept) -------------
 
 const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
-	[/^A comment on a board\. The quoted words are what I selected:$/, () => 1],
-	[/^(\d+) comments on boards\. The quoted words are what I selected:$/, (m) => Number(m[1])],
+	[/^A comment on a (?:card|board)\. The quoted words are what I selected:$/, () => 1],
+	[/^(\d+) comments on (?:cards|boards)\. The quoted words are what I selected:$/, (m) => Number(m[1])],
 	[/^A comment on items drawn on a canvas:$/, () => 1],
 	[/^(\d+) comments on items drawn on a canvas:$/, (m) => Number(m[1])],
 ];
@@ -197,7 +197,8 @@ function readEntry(lines: string[], n: number): WaitingComment {
 		comment.quote = drawn[3] ?? "";
 	} else {
 		let where = first;
-		if (where.endsWith(", the whole board")) where = where.slice(0, -", the whole board".length);
+		const whole = [", the whole card", ", the whole board"].find((end) => where.endsWith(end));
+		if (whole) where = where.slice(0, -whole.length);
 		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
 		const inside = /^(.*), in #(\S+)$/.exec(where);
 		comment.board = inside ? inside[1]! : where;

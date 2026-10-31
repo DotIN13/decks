@@ -231,7 +231,7 @@ export function StageManager(props: {
 								type="text"
 								spellcheck={false}
 								placeholder="Find a canvas"
-								title="Matches a canvas's name, the words on its boards and notes, and who is on it"
+								title="Matches a canvas's name, the words on its cards and notes, and who is on it"
 								value={query()}
 								onInput={(event) => setQuery(event.currentTarget.value)}
 								onKeyDown={(event) => {
@@ -344,7 +344,7 @@ function StageCard(props: {
 	const boards = () => stage().boards;
 	// A friend's canvas says whose it is, and whether you may change it (`shared/canvases/<owner>/<canvas>`).
 	const sharedBy = () => (stage().shared ? `Shared by ${stage().shared!.owner}${stage().shared!.role === "view" ? ", to view" : ""}` : undefined);
-	const meta = () => [sharedBy(), boards() === 0 ? "Empty" : `${boards()} board${boards() === 1 ? "" : "s"}`, since(stage().changedAt)].filter(Boolean).join(" · ");
+	const meta = () => [sharedBy(), boards() === 0 ? "Empty" : `${boards()} card${boards() === 1 ? "" : "s"}`, since(stage().changedAt)].filter(Boolean).join(" · ");
 	const [broken, setBroken] = createSignal(false);
 
 	return (
@@ -412,7 +412,7 @@ function StageCard(props: {
 					<button
 						type="button"
 						class="stage-confirm"
-						title="Deletes the canvas, its drawing and any boards kept in its own folder. The deck's own boards stay."
+						title="Deletes the canvas, its drawing and the cards kept in its own folder."
 						onClick={() => {
 							setConfirming(false);
 							props.onDelete(stage().name);

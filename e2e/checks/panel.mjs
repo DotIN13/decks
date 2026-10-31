@@ -68,14 +68,14 @@ try {
 	say("the tabs are 30px and the field 32px", header.strip === 30 && header.field === 32, JSON.stringify(header));
 
 	/*
-	 * The Canvas tab is what is on this canvas: one row per board under "Boards", and the
+	 * The Canvas tab is what is on this canvas: one row per card under "Cards", and the
 	 * heading's count is the rows'. The stage's own list (`__decksBoards`) is the reference.
 	 */
 	// The stage is in the canvas frame.
 	const onStage = await (await canvasFrame(page)).evaluate(() => (window.__decksBoards?.() ?? []).length);
 	const listed = await page.evaluate((stage) => {
 		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
-		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Boards"));
+		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Cards"));
 		return {
 			rows: rows.length,
 			names: rows.map((row) => row.textContent.trim()),

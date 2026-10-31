@@ -101,7 +101,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 				(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
 					Boolean(item) && typeof (item as { id?: unknown }).id === "string" && typeof (item as { box?: { w?: unknown } }).box?.w === "number",
 			);
-			if (boards.length === 0 && items.length === 0) return { error: "none of those boards are on the canvas" };
+			if (boards.length === 0 && items.length === 0) return { error: "none of those cards are on the canvas" };
 
 			const shown = [...boards.map((board) => board.path), ...items.map((item) => item.id)];
 			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
