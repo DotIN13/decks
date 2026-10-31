@@ -191,7 +191,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		if (!placed) laid.set(doc, (placed = placements(doc, { theme: baseTheme(doc, look()), ...(measure ? { measure } : {}) })));
 		return placed;
 	};
-	const boardsBy = (doc: PenDocument, placed: ReadonlyMap<string, Placed>) => {
+	const pagesBy = (doc: PenDocument, placed: ReadonlyMap<string, Placed>) => {
 		const byPath = new Map<string, string>();
 		for (const node of walk(doc.children ?? [])) if (isPage(node)) byPath.set(pagePath(node), node.id);
 		return (name: string): Frame | undefined => {
@@ -210,8 +210,8 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	const rerouted = (prev: PenDocument, next: PenDocument) => {
 		const placed = layoutOf(next);
 		const before = layoutOf(prev);
-		const prevBoard = boardsBy(prev, before);
-		const nextPage = boardsBy(next, placed);
+		const prevPage = pagesBy(prev, before);
+		const nextPage = pagesBy(next, placed);
 		const prevNodes = new Map<string, PenNode>();
 		for (const node of walk(prev.children ?? [])) prevNodes.set(node.id, node);
 		const parents = new Map<string, string>();
@@ -230,7 +230,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			if (JSON.stringify(was.metadata) !== JSON.stringify(arrow.metadata)) return true;
 			const meta = arrow.metadata as { from?: unknown; to?: unknown };
 			const names = [arrowEndItem(meta.from), arrowEndItem(meta.to), parents.get(arrow.id)];
-			return names.some((name) => name !== undefined && !same(before.get(name)?.box ?? prevBoard(name), placed.get(name)?.box ?? nextPage(name)));
+			return names.some((name) => name !== undefined && !same(before.get(name)?.box ?? prevPage(name), placed.get(name)?.box ?? nextPage(name)));
 		};
 		reroute(next, placed, nextPage, undefined, touched);
 		return next;

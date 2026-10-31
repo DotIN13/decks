@@ -228,7 +228,7 @@ export function createEditor(host: EditorHost) {
 			return [...(pageDrag()?.paths ?? []), ...(sized === undefined ? [] : [sized])];
 		},
 		/** The board whose size is being dragged, if one is. */
-		resizingBoard: () => pageResize()?.path,
+		resizingPage: () => pageResize()?.path,
 		/**
 		 * The board size the sheet should draw, while one is dragged: a board shown as a picture
 		 * (not `live`) is drawn by the sheet, and one an arrow ends on is followed by the arrow. A

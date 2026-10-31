@@ -401,7 +401,7 @@ body {
 		color: #ffffff;
 	}
 	.v3-tool[data-on="true"][data-open="true"],
-	.v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+	.v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="card"]) {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
@@ -1744,7 +1744,7 @@ body {
 		z-index: 1;
 	}
 	.v3-tools .v3-tool[data-on="true"],
-	.v3-tools .v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+	.v3-tools .v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="card"]) {
 		background: transparent;
 		color: #ffffff;
 	}

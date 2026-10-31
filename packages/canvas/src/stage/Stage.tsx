@@ -400,7 +400,7 @@ export function Stage(props: StageProps) {
 			mode: () => props.mode,
 			tool: penTool,
 			spaceHeld: () => grabbing(),
-			boardsNear: (at) =>
+			pagesNear: (at) =>
 				items.pageIndex()
 					.search({ x: at.x, y: at.y, w: 0, h: 0 })
 					.sort((a, b) => a - b)

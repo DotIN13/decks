@@ -57,7 +57,7 @@ import { Icon } from "../ui/icons.tsx";
  * `.pen-tools` wherever it is.
  */
 
-type Family = "view" | "board" | "shape" | "arrow";
+type Family = "view" | "card" | "shape" | "arrow";
 type Choice = { id: string; label: string; icon: LucideIcon; key?: string; rule?: boolean; pick: () => void };
 
 const SHAPE_ICONS: Record<string, LucideIcon> = { Rectangle: Square, Ellipse: Circle, Triangle, Diamond, Star };
@@ -140,7 +140,7 @@ export function ToolColumn(props: {
 	const on = {
 		select: () => !drawing() && !handTool() && penTool() === "select" && props.mode !== "edit",
 		view: () => !drawing() && penTool() === "select" && (handTool() || props.mode === "edit"),
-		board: () => penTool() === "card",
+		card: () => penTool() === "card",
 		note: () => penTool() === "note",
 		text: () => penTool() === "text",
 		shape: () => ["rectangle", "ellipse", "shape", "frame", "icon"].includes(penTool()) || isLine(),
@@ -166,7 +166,7 @@ export function ToolColumn(props: {
 				{ id: "hand", label: "Hand", icon: Hand, key: "H", pick: () => view("hand") },
 				{ id: "highlight", label: "Select with highlights", icon: SquareDashedMousePointer, key: "E", pick: () => view("highlight") },
 			];
-		if (family === "board")
+		if (family === "card")
 			return [
 				{ id: "document", label: "Markdown card", icon: FileText, key: "D", pick: () => arm("card") },
 				{ id: "app", label: "App", icon: AppWindow, pick: () => props.onApps() },
@@ -221,7 +221,7 @@ export function ToolColumn(props: {
 	const current = (family: Family): string | undefined => {
 		const tool = penTool();
 		if (family === "view") return !on.view() ? undefined : handTool() ? "hand" : "highlight";
-		if (family === "board") return tool === "card" ? "document" : undefined;
+		if (family === "card") return tool === "card" ? "document" : undefined;
 		if (family === "arrow") return on.arrow() ? penArrowStyle().route : undefined;
 		if (!on.shape()) return undefined;
 		if (isLine()) return "line";
@@ -246,7 +246,7 @@ export function ToolColumn(props: {
 	/** A family's press puts its last choice in hand, then opens the menu of the others. */
 	const armLast = (family: Family) => {
 		if (family === "view") return view(lastView());
-		if (family === "board") return arm("card");
+		if (family === "card") return arm("card");
 		if (family === "arrow") return arrow(penArrowStyle().heads === "none" ? { route: "straight" } : penArrowStyle());
 		const last = lastShape();
 		if (last === "line") return line();
@@ -362,7 +362,7 @@ export function ToolColumn(props: {
 				{tool({ id: "select", label: "Select", key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
 				{tool({ id: "view", label: "Hand or highlight", icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
 				<span class="v3-rule" aria-hidden="true" />
-				{tool({ id: "board", label: "Card", key: "D", icon: () => SquarePlus, on: on.board, family: "board", onClick: (b) => openMenu("board", b) })}
+				{tool({ id: "card", label: "Card", key: "D", icon: () => SquarePlus, on: on.card, family: "card", onClick: (b) => openMenu("card", b) })}
 				{tool({ id: "note", label: "Note", key: "N", icon: () => StickyNote, on: on.note, onClick: () => (on.note() ? select() : arm("note")) })}
 				{tool({ id: "text", label: "Text", key: "T", icon: () => Type, on: on.text, onClick: () => (on.text() ? select() : arm("text")) })}
 				{tool({ id: "shape", label: "Shape", key: "R", icon: shapeIcon, on: on.shape, family: "shape", onClick: (b) => openMenu("shape", b) })}

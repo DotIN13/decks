@@ -508,7 +508,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const SETTLE_MS = 2500;
 	const sizingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	createEffect(() => {
-		const held = editor.resizingBoard();
+		const held = editor.resizingPage();
 		const grew: string[] = [];
 		for (const board of props.boards) {
 			const size = `${board.w}x${board.h}`;

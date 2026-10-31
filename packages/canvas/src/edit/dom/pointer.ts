@@ -75,7 +75,7 @@ export type PointerHost = {
 	tool: () => PenTool;
 	spaceHeld: () => boolean;
 	/** The boards near a stage point, in file order (the stage's spatial index): candidates for the picture under it. */
-	boardsNear: (at: Pt) => readonly PageBox[];
+	pagesNear: (at: Pt) => readonly PageBox[];
 	/** The boards that have a node of their own to take a press. */
 	rendered: () => ReadonlySet<string>;
 	/** The item open for typing, whose blocks have no grip. */
@@ -156,7 +156,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	const pictureUnder = (event: Client): string | undefined => {
 		const at = worldAt(event);
 		// The spatial index finds the few boards near the point; core decides among them, in paint order.
-		return pictureAt(host.boardsNear(at), at, host.rendered());
+		return pictureAt(host.pagesNear(at), at, host.rendered());
 	};
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
