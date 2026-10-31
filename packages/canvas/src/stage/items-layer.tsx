@@ -337,7 +337,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	}, NO_AWAKE);
 	/** For the browser checks: the items chosen awake and kept asleep, of every kind. */
 	(globalThis as { __decksLiveCards?: () => Awake; __decksAwake?: () => Awake }).__decksLiveCards = () => untrack(cardChoice);
-	(globalThis as { __decksAwake?: () => Awake }).__decksAwake = () => untrack(cardChoice);
+	(globalThis as { __decksAwake?: () => Awake & { selected?: string | undefined; hover?: string | undefined; held: string[] } }).__decksAwake = () => ({ ...untrack(cardChoice), selected: props.selected, hover: untrack(editor.hoverPicture), held: [...untrack(editor.heldPages)] });
 	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});

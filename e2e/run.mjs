@@ -206,6 +206,8 @@ const CHECKS = [
 	{ file: "awake-bench.mjs", needsAgent: false, named: true },
 	/* The one surface lifecycle: cards, apps and documents wake, sleep, picture and take a press by one rule. */
 	{ file: "awake.mjs", needsAgent: false },
+	/* Pictures of a drag in flight, for looking at (AWAKE_SHOTS=<folder>). Run only when named. */
+	{ file: "awake-drag.mjs", needsAgent: false, named: true },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },

@@ -381,8 +381,16 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	let hoverAt: Pt | undefined;
 	let hoverPoint: Client | undefined;
 	let hoverLights = false;
+	/** The sleeping item whose node the pointer is on (`onHover`). */
+	let hoverNode: string | undefined;
 	const onHover = (event: PointerEvent) => {
 		if (event.pointerType !== "touch") editor.hover({ alt: event.altKey });
+		/*
+		 * The pointer on a sleeping item's own node (its bar above the box, its edge band): the item
+		 * stays hovered, though the point is outside its picture and the target is not the canvas, or
+		 * the node would go as the pointer reached the bar it is there for.
+		 */
+		hoverNode = (event.target as Element | null)?.closest?.(".card-node[data-state='picture']")?.getAttribute("data-path") ?? undefined;
 		const decided = decideHover({
 			pointer: event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse",
 			editable: host.editable(),
@@ -398,7 +406,12 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (decided.do === "none") return;
 		if (decided.do === "clear") {
 			hoverAt = undefined;
-			editor.hover({ ...(decided.block ? { block: undefined } : {}), item: undefined, picture: undefined, link: false });
+			/*
+			 * The sleeping item under the pointer keeps its node through a press: its bar is what the press
+			 * is on, and the bar's own handler runs after this one (Solid delegates it to the document), so
+			 * clearing it here took the node away before the press could move or select the item.
+			 */
+			editor.hover({ ...(decided.block ? { block: undefined } : {}), item: undefined, ...(event.buttons === 0 ? { picture: hoverNode } : {}), link: false });
 			return;
 		}
 		hoverAt = worldAt(event);
@@ -407,15 +420,15 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		hoverFrame ??= requestAnimationFrame(() => {
 			hoverFrame = undefined;
 			const href = hoverAt ? host.linkAt(hoverAt) : undefined;
-			// Browsing, the hand over a link and a card block's grip, but no outline.
+			// Browsing, the hand over a link and a card block's grip, but no outline; the sleeping item under the pointer still, which gets its bar to move it by (`items-layer.tsx`, `rendered`).
 			if (!hoverLights) {
-				editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined, item: undefined, picture: undefined });
+				editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined, item: undefined, picture: (hoverAt && hoverPoint && host.mode() !== "edit" ? pictureUnder(hoverPoint) : undefined) ?? hoverNode });
 				return;
 			}
 			editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined });
 			const hit = hoverAt ? pickAtHere(hoverAt) : undefined;
 			// A board with no node says nothing when the pointer is over it, so the stage asks.
-			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: !hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined });
+			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: (!hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined) ?? hoverNode });
 		});
 	};
 	onCleanup(() => {

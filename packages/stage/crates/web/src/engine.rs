@@ -510,7 +510,8 @@ impl Page {
 		for board in cards {
 			let carried = self.carry.0.contains(&board.path);
 			let picture = self.pictures.get(&board.picture);
-			if board.live && !(carried && picture.is_some()) {
+			// A live item is drawn here only while a drag carries it: as its picture, or as its paper and title until it has one.
+			if board.live && !carried {
 				continue;
 			}
 			let (dx, dy) = if carried { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
@@ -539,13 +540,14 @@ impl Page {
 					over.push(Op::Shape { shape: part(tall, [r, r, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
 					over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, r, r]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
 				}
-				if board.live {
-					carrying.push(board.path.clone());
-				} else {
-					pictured.push(board.path.clone());
-				}
 			} else if !board.title.is_empty() {
 				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
+			}
+			// Drawn here, so its node stays unseen: carried, or asleep as its picture or its placeholder.
+			if board.live {
+				carrying.push(board.path.clone());
+			} else {
+				pictured.push(board.path.clone());
 			}
 			// Its title above it, as a sleeping item's bar reads: only where a 12 px line is more than a smudge.
 			if picture.is_some() && !board.title.is_empty() && s * 12.0 >= 5.0 {
