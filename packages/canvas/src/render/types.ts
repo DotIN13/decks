@@ -49,6 +49,9 @@ export interface SceneCard {
 	news?: string;
 	/** Draw the news mark as an outline: the board has no page to draw its glow. */
 	glow?: boolean;
+	/** Its title and kind, painted on its paper while it has no picture (`engine.rs`, `frame`). */
+	title?: string;
+	kind?: "card" | "app" | "document" | "board";
 }
 
 /** A stroke of ink the drawing does not hold yet, as the page shaped it (`strokeShape`), in stage pixels. */

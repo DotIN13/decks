@@ -743,6 +743,16 @@ export class PictureService {
 				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
 				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
 				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
+			} else if (job.board.item === "document") {
+				/*
+				 * A document (`docs/<file>.md`): its file rendered as a card by `measure.html` (`document=1`), markdown
+				 * set in a card's root with card.css, in the scheme asked for, as tall as it comes to.
+				 */
+				const query = new URLSearchParams({ path: job.board.path, w: String(clip.width), h: String(clip.height), scheme: job.scheme, picture: "1", document: "1" });
+				await page.goto(`${(this.host.webOrigin ?? this.host.origin)()}/measure.html?${query}`, { waitUntil: "load", timeout: 20_000 });
+				await page.waitForFunction("window.__cardReady === true || typeof window.__measureFailed === 'string'", undefined, { timeout: CARD_READY_MS }).catch(() => {});
+				const tallAs = await page.evaluate<number>("Number(window.__cardHeight) || 0").catch(() => 0);
+				if (tallAs > 0) shotClip = pageClip({ w: job.board.w, h: Math.max(tallAs, job.board.h) });
 			} else if (opens(job.board)) {
 				/*
 				 * An app on a canvas (`apps/<name>`), pictured as it runs in the canvas frame: at its address

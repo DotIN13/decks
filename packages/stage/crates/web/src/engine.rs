@@ -499,6 +499,7 @@ impl Page {
 		// The boards with no live page (and those a drag carries): picture, or paper until it comes.
 		let mut over = DrawList::new(Color::TRANSPARENT);
 		let paper = if self.scene.dark { [0.118, 0.118, 0.125, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
+		let mut placeholders: Vec<Placeholder> = Vec::new();
 		let mut pictured = Vec::new();
 		let mut carrying = Vec::new();
 		// A drag's ghost is the lifted items alone: no boards.
@@ -540,6 +541,8 @@ impl Page {
 				} else {
 					pictured.push(board.path.clone());
 				}
+			} else if !board.title.is_empty() {
+				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
 			}
 			if let Some(colour) = board.news.filter(|_| board.glow) {
 				over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
@@ -549,6 +552,30 @@ impl Page {
 			self.pictured = pictured;
 			self.carrying = carrying;
 			self.marks = self.marks.wrapping_add(1);
+		}
+		/*
+		 * A card, an app or a document with no picture yet: its kind and its title on its paper, in the
+		 * scheme's ink, so it is never a bare rectangle; the same for every kind. Set at the screen's
+		 * scale, as the lifted items' words are, so the glyph texture holds what they need.
+		 */
+		if !placeholders.is_empty() {
+			let skip = HashSet::new();
+			let pictures = &self.pictures;
+			let image = |url: &str| pictures.get(url);
+			let ctx = Context::new(&self.scene, &skip, &image).with_text(&self.text, &self.atlas);
+			let dark = self.scene.dark;
+			let mut labels: Vec<Op> = Vec::new();
+			for _ in 0..3 {
+				self.atlas.borrow_mut().begin();
+				labels.clear();
+				for p in &placeholders {
+					paint_placeholder(&ctx, p, s, dark, &mut labels);
+				}
+				if !self.atlas.borrow_mut().take_overflow() {
+					break;
+				}
+			}
+			over.ops.extend(labels);
 		}
 		/*
 		 * Over: the tiles, one per place of the window's grid at the scale wanted. The level shown is
@@ -1518,7 +1545,7 @@ mod tests {
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
 		page.pictures.held.insert("card:boards/x.html".into(), (900, 400, 300));
-		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
+		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new() };
 		page.cards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
@@ -1744,6 +1771,55 @@ pub struct CardPlace {
 	/// The writer's colour when the board is news, and whether to draw its outline here.
 	pub news: Option<[f32; 4]>,
 	pub glow: bool,
+	/// Its title and kind ("card", "app", "document", "board"), painted on its paper while it has no picture.
+	pub title: String,
+	pub kind: String,
+}
+
+/// A card with no picture yet, as `frame` found it: its paper on the screen, to paint its title and kind on.
+struct Placeholder {
+	x: f32,
+	y: f32,
+	w: f32,
+	h: f32,
+	title: String,
+	kind: String,
+}
+
+/// A placeholder's words: the kind small and faint at the top-left, the title under it, cut to the paper.
+/// `scale` is the screen's (zoom times the device's pixels), `p` the paper in screen pixels.
+fn paint_placeholder(ctx: &Context, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	// In the paper's own units (stage units at zoom 1), inset from its corner; nothing on a paper too small for a word.
+	let (w, h) = (p.w as f64 / scale, p.h as f64 / scale);
+	let pad = 40.0_f64.min(w / 8.0).min(h / 8.0);
+	if w - pad * 2.0 < 60.0 || h - pad * 2.0 < 40.0 {
+		return;
+	}
+	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
+	let faint = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
+	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, p.y as f64]);
+	// A hairline round the paper: on a dark canvas the paper is nearly the ground's colour, and the words alone would float.
+	ops.push(Op::Shape { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [12.0 * scale as f32; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y), paint: stage_paint::list::Paint::Solid(Color::straight([faint[0], faint[1], faint[2], 0.35], 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
+	let kind = match p.kind.as_str() {
+		"app" => "App",
+		"document" => "Document",
+		"board" => "Board",
+		_ => "Card",
+	};
+	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };
+	let big = stage_scene::layout::TextStyle { family: "Inter".into(), size: 26.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let kind_laid = text.lay_words(kind, &small, Some((w - pad * 2.0) as f32), stage_text::Align::Left, false, false);
+	stage_paint::painter::draw_laid(ctx, &kind_laid, (pad, pad), &[Color::straight(faint, 1.0)], &m, ops);
+	let title_top = pad + kind_laid.height as f64 + 8.0;
+	if h - title_top - pad < 20.0 {
+		return;
+	}
+	let title = text.lay_words(&p.title, &big, Some((w - pad * 2.0) as f32), stage_text::Align::Left, false, false);
+	// Cut at the paper's foot: a long title on a short paper shows its first lines.
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
+	stage_paint::painter::draw_laid(ctx, &title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
+	ops.push(Op::PopClip);
 }
 
 #[cfg(test)]

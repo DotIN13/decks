@@ -1822,6 +1822,10 @@
 		background: var(--app-bg);
 		color-scheme: light;
 	}
+	/* A document covered by its picture while the camera moves (`items-layer.tsx`): its editor is not painted under it, and lays out nothing at each step. */
+	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .document-surface {
+		visibility: hidden;
+	}
 	/* While the camera moves, or asleep, the sheet draws the app's picture over it (`items-layer.tsx`): once it does, the window is not drawn under it. */
 	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .app-surface-frame {
 		/* Not drawn at all: hidden by visibility, its page went on painting each frame; a frame not displayed is not rendered, and is not reloaded either. */

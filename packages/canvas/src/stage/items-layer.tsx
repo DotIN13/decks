@@ -191,13 +191,16 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// A document while its editor shows; an app only while its window shows the app and the camera is still, and is its picture otherwise (`item-surfaces.tsx`):
-						// an app that animates repainted its window at every step of a pan.
-						live: board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path),
-						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
+						// A card while its surface shows; an app or a document only while its surface shows and the camera is still, and its picture otherwise
+						// (`item-surfaces.tsx`): an app that animates repainted its window at every step of a pan, and a document's editor laid out at every step of a zoom.
+						live: board.item === "app" ? appShowing(board.path) && !(moving() || panning() || scaling() || gliding()) : board.item === "document" ? live.has(board.path) && !(moving() || panning() || scaling() || gliding()) : live.has(board.path),
+						// An awake item's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
-						// A card not live is its picture.
-						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item ? "" : props.shots().picture(board, look),
+						// An item not live is its picture: a card's own, an app's as the frame runs it, a document's of its file.
+						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item === "document" && board.file ? props.shots().picture({ path: board.file, rev: board.rev }, look) : board.item ? "" : props.shots().picture(board, look),
+						// Painted on its paper until its picture comes.
+						title: board.title,
+						kind: board.card ? "card" : (board.item ?? "board"),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
 				}),
@@ -210,6 +213,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** The cards the sheet is drawing as their pictures, as of the frame on screen (`StageEngine.pictured`). */
 	const [picturedNow, setPicturedNow] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.pictured = setPicturedNow;
+	/** For the browser checks: the items the sheet is drawing as their pictures now. */
+	(globalThis as { __decksPictured?: () => string[] }).__decksPictured = () => [...untrack(picturedNow)];
 	/*
 	 * An item a drag carries while the sheet draws it as its picture (not awake): its picture goes with the drag, so its slot waits unseen too, or its
 	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).

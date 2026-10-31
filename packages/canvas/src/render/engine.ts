@@ -1295,14 +1295,14 @@ export class StageEngine {
 	setCards(cards: readonly SceneCard[]): void {
 		const was = this.placedCards;
 		this.placedCards = cards;
-		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture]));
+		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture, b.title, b.kind]));
 		if (key === this.cardKey || !this.page) {
 			// The same boxes as the ones the index was made for: it answers for these too.
 			if (key === this.cardKey && this.indexed === was) this.indexed = cards;
 			return;
 		}
 		this.cardKey = key;
-		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow })));
+		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind })));
 		this.cardsSent.calls++;
 		this.cardsSent.bytes += sent.length;
 		this.page.setCards(sent);

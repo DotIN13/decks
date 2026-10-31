@@ -3,9 +3,11 @@ import { UploadRefused } from "../files/upload.ts";
 import { boardOnCanvas } from "../verbs/router.ts";
 import { renderSnapshot } from "../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../pictures/compress.ts";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { keptWidth, pictureType } from "../pictures/ladder.ts";
 import type { AppPage } from "../pictures/service.ts";
+import type { Page as DeckPage } from "@decks/protocol";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "../share/bundle.ts";
 import { actsAsPerson } from "../auth/principal.ts";
@@ -45,11 +47,27 @@ export function register(api: Router, { app }: RouteDeps): void {
 		const pass = app.passes.appCanvas(name, principal.canvas, token);
 		return { path, title: name, rev: Math.floor(Date.now() / 3_600_000), x: 0, y: 0, w: 1100, h: 722, item: "app", app: name, opens: `/app/t/${pass}/${name}/` } as AppPage;
 	};
+	/*
+	 * A document placed on a canvas asking (`docs/<file>.md`, any markdown file of the deck): pictured as
+	 * its file rendered the way a card is (`measure.html?document=1`), its revision the file's last change,
+	 * so a document asleep on the canvas shows its words, not bare paper.
+	 */
+	const docPage = (path: string): DeckPage | undefined => {
+		if (!/\.(?:md|markdown)$/i.test(path) || path.split("/").some((part) => part === "" || part === "." || part === "..")) return undefined;
+		const file = join(app.deck.path, path);
+		let changed: number;
+		try {
+			changed = statSync(file).mtimeMs;
+		} catch {
+			return undefined;
+		}
+		return { path, title: path.split("/").pop() ?? path, rev: Math.floor(changed), x: 0, y: 0, w: 1000, h: 700, item: "document", file: path } as DeckPage;
+	};
 	api.get(
 		"/thumb/*path",
 		asyncRoute(async (req, res) => {
 			const asked = normalizeBoardPath(wildcard(req));
-			const board = app.deck.board(asked) ?? appPage(asked, req);
+			const board = app.deck.board(asked) ?? appPage(asked, req) ?? docPage(asked);
 			if (!board) {
 				res.status(404).end();
 				return;

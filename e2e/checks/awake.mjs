@@ -46,6 +46,9 @@ const seven = await canvas
 	.then(() => true)
 	.catch(() => false);
 say("the stage shows the seven items", seven, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+// A look at the placeholders, before their pictures come (`AWAKE_SHOTS=<folder>`).
+const shots = process.env.AWAKE_SHOTS;
+if (shots) await page.screenshot({ path: `${shots}/awake-opening.png` });
 
 await canvas.evaluate(() => {
 	const stage = () => document.querySelector(".stage");
@@ -115,6 +118,10 @@ const rest = (ms = 900, cap = 12000) =>
 		{ ms, cap },
 	);
 await canvas.waitForFunction(() => !!globalThis.__decksRust?.camera, undefined, { timeout: 20000 }).catch(() => {});
+if (shots) {
+	await page.waitForTimeout(400);
+	await page.screenshot({ path: `${shots}/awake-engine-up.png` });
+}
 const items = await canvas.evaluate(() => globalThis.__decksCards().map((c) => c.path));
 const appPaths = items.filter((p) => /^item:aa/.test(p));
 const docPaths = items.filter((p) => /^item:ad/.test(p));
@@ -131,6 +138,22 @@ await view(0.3);
 await rest();
 let state = await canvas.evaluate(() => globalThis.__t.state());
 say("at 30% no item of any kind has a node: every card, app and document is its picture", state.nodes.length === 0 && state.apps.length === 0 && state.documents === 0 && state.cardHosts === 0, JSON.stringify(state));
+// The sheet draws the document's picture, once the server has made one (its file rendered as a card).
+const docPictured = await until(async () => (await canvas.evaluate(() => globalThis.__decksPictured?.() ?? [])).includes(docPaths[0]), 20000);
+say("…and the document is drawn as its picture, of its file", !!docPictured, JSON.stringify(await canvas.evaluate(() => globalThis.__decksPictured?.() ?? [])));
+if (shots) {
+	await page.screenshot({ path: `${shots}/awake-30.png` });
+	// The document, centred at 30%, as its picture.
+	const doc = await canvas.evaluate((path) => {
+		const c = globalThis.__decksCards().find((one) => one.path === path);
+		const cam = globalThis.__decksRust.camera;
+		const r = document.querySelector(".stage").getBoundingClientRect();
+		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
+	}, docPaths[0]);
+	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.3, y - 900 / 2 / 0.3), doc);
+	await rest();
+	await page.screenshot({ path: `${shots}/awake-doc.png` });
+}
 
 // --- at 60%: everything near is awake, within its kind's budget ---------------------------------------
 at("60%");

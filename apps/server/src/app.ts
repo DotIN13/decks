@@ -45,7 +45,7 @@ import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
-import { appActor, canvasHolds } from "./stage/caller-run.ts";
+import { appActor, canvasHolds, canvasHoldsDocument } from "./stage/caller-run.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -121,6 +121,8 @@ export class App {
 		// An app's picture (`apps/<name>`) is the canvas's to read when the app is placed on it.
 		const app = /^apps\/([^/]+)$/.exec(path)?.[1];
 		if (app && this.stage.pens) return canvasHolds(this.stage.pens, canvas, appActor(app));
+		// A document's file is the canvas's to picture when a document item naming it is placed there (`routes/pictures.ts`, `docPage`).
+		if (/\.(?:md|markdown)$/i.test(path) && this.stage.pens && canvasHoldsDocument(this.stage.pens, canvas, path)) return true;
 		return boardOnCanvas(this, path, canvas);
 	}
 	/** The port this server is on, so a card's `decks.card.url()` answers like an agent's. */

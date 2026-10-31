@@ -53,9 +53,42 @@ const FIRST_MS = 1000;
 const STILL_NO_SCRIPT_MS = 300;
 
 const isCard = /(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path);
+/** A document's file (`document=1`): markdown, rendered as a card is for its picture. */
+const isDocument = query.get("document") === "1";
 
-if (isCard) void measureCard();
+if (isDocument) void measureDocument();
+else if (isCard) void measureCard();
 else measurePage();
+
+/**
+ * A document's picture: its markdown fetched as the file it is, set with `marked` inside a card's
+ * root with card.css, so a document asleep on the canvas shows its words as its editor sets them.
+ */
+async function measureDocument(): Promise<void> {
+	let source: string;
+	try {
+		const response = await fetch(address, { cache: "no-cache" });
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		source = await response.text();
+	} catch (error) {
+		measureWindow.__measureFailed = `the document could not be read: ${error instanceof Error ? error.message : String(error)}`;
+		return;
+	}
+	const { marked } = await import("marked");
+	const body = marked.parse(source, { gfm: true, breaks: false, async: false }) as string;
+	const html = `<style>.doc { padding: 40px 48px; font-size: 17px; line-height: 1.5 } .doc > :first-child { margin-top: 0 }</style><div class="doc">${body}</div>`;
+	const host = document.createElement("div");
+	host.className = "card-host";
+	Object.assign(host.style, { width: `${w}px`, height: `${h}px` });
+	document.body.append(host);
+	const card = mountCard(host, { html, url: address, path, trusted: false, theme, size: { w, h } });
+	let height = 0;
+	card.onHeight((next) => (height = next));
+	await card.drawn;
+	await new Promise((done) => setTimeout(done, STILL_NO_SCRIPT_MS));
+	measureWindow.__measured = { w, h: height, at: w, page: height };
+	if (picture) void ready(host, height);
+}
 
 async function measureCard(): Promise<void> {
 	const raw = new URL(address);

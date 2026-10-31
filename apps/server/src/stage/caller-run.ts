@@ -55,6 +55,16 @@ export function canvasHolds(pens: StageService["pens"], canvas: string | undefin
 	}
 }
 
+/** Whether a canvas holds a document item naming this file (`decks.document`, its `metadata.path`): its picture is then the canvas's to read. */
+export function canvasHoldsDocument(pens: StageService["pens"], canvas: string | undefined, file: string): boolean {
+	if (!pens || !canvas) return false;
+	try {
+		return (pens.get(canvas).doc.children ?? []).some((node) => node.type === "browser" && (node.metadata as { type?: unknown } | undefined)?.type === "decks.document" && (node.metadata as { path?: unknown }).path === file);
+	} catch {
+		return false;
+	}
+}
+
 /**
  * The conversation a run acts for: one on the board's own canvas. That is the canvas the press came
  * from when the browser names it, or else one holding the board, the agent on screen first; only a
