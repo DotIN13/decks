@@ -33,11 +33,20 @@ export { CANVASES, OWN_PARTS, SHARED_CANVASES };
 /** The deck's folders a canvas may point at by their deck path. */
 export const DECK_PARTS = ["assets", "docs", "apps"] as const;
 /**
- * The card runtime (`@decks/card-host`'s `lib/`: board.css, theme.css, board.js and the live pages),
- * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/board.css`
+ * The card runtime (`@decks/card-host`'s `lib/`: card.css, theme.css, card.js and the live pages),
+ * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/card.css`
  * and an old board's `../lib/board.css` both find it.
  */
 export const LIB = "lib";
+
+/**
+ * A file of `lib/` by the name a page asked for: `board.css` and `board.js`, which pages written
+ * before cards ask for, are `card.css` and `card.js` (at a version too, `~ab12/board.css`). The same
+ * rule as `@decks/card-host`'s `libName`.
+ */
+export function libName(rest: string): string {
+	return rest.replace(/(^|\/)board\.(css|js)$/, "$1card.$2");
+}
 
 /**
  * The sandbox a friend's page runs in: scripts, forms, pop-ups, dialogs and downloads, and never
@@ -186,7 +195,7 @@ export function urlFor(name: string, reference: string): string {
 /**
  * The file a board's page asks for, through a canvas's folder, as the deck path it is.
  *
- * A board in `canvases/plan/boards/` asks for `../lib/board.css`, which is `canvases/plan/lib/board.css`:
+ * A board in `canvases/plan/boards/` asks for `../lib/board.css`, which is `lib/card.css` (`libName`):
  * the deck's `lib/`, served there so a board moved into a canvas needs no rewrite. The same for the
  * deck's `assets/`, `docs/` and `apps/` from one of this deck's own canvases. A friend's canvas gets
  * the deck's `lib/` too, but its `assets/` and `docs/` are the copies in its own folder, and nothing
@@ -194,10 +203,10 @@ export function urlFor(name: string, reference: string): string {
  */
 export function servedAs(path: string): Resolution {
 	const at = canvasOfPath(path);
-	if (!at) return { path };
+	if (!at) return { path: path.startsWith(`${LIB}/`) ? `${LIB}/${libName(path.slice(LIB.length + 1))}` : path };
 	const [top, ...rest] = at.rest.split("/");
 	if (!rest.length) return { path };
-	if (top === LIB) return { path: `${LIB}/${rest.join("/")}` };
+	if (top === LIB) return { path: `${LIB}/${libName(rest.join("/"))}` };
 	if (isSharedCanvas(at.name)) {
 		if (top === "apps") return { refused: "apps are not shared with a canvas" };
 		return { path };
@@ -214,9 +223,6 @@ export function isPagePath(path: string): boolean {
 	const at = canvasOfPath(clean);
 	return !!at && (at.rest.startsWith("boards/") || isCardPath(clean));
 }
-
-/** @deprecated `isPagePath`; the old name answers until 2026-11-30. */
-export const isBoardPagePath = isPagePath;
 
 /**
  * Whether a deck path is a card: the `index.html` of a folder in a canvas's own `cards/`

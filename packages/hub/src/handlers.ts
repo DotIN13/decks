@@ -136,7 +136,7 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 		if (!bytes) throw new HubError(404, "No such blob.");
 		return new Response(bytes as unknown as ArrayBuffer, { status: 200, headers: { "Content-Type": "application/octet-stream" } });
 	});
-	/** What a harness serves (its apps and their boards), so pages know which harness to show an app's board from. */
+	/** What a harness serves (its apps), so pages know which harness to show an app from. */
 	route("PUT", "/sync/v1/inventory", async (req, { who }) => {
 		if (!store.setInventory || !who.harness) throw new HubError(404, "This service keeps no inventory.");
 		const got = Inventory.safeParse(await bodyOf(req));

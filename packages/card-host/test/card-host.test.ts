@@ -1,10 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { libFile, passes } from "../src/index.ts";
+import { libFile, libName, passes } from "../src/index.ts";
 
-test("lib serves board.css and board.js, and nothing outside", () => {
-	assert.match(libFile("board.css")!.type, /text\/css/);
-	assert.ok(libFile("board.js")!.bytes.length > 1000);
+test("lib serves card.css and card.js, and nothing outside", () => {
+	assert.match(libFile("card.css")!.type, /text\/css/);
+	assert.ok(libFile("card.js")!.bytes.length > 1000);
+	// A page from before cards asks for them by their old names, and gets them.
+	assert.deepEqual(libFile("board.css")!.bytes, libFile("card.css")!.bytes);
+	assert.deepEqual(libFile("board.js")!.bytes, libFile("card.js")!.bytes);
+	assert.equal(libName("~ab12/board.css"), "~ab12/card.css", "at a version too");
+	assert.equal(libName("fonts/board.css.woff2"), "fonts/board.css.woff2");
 	assert.equal(libFile("../package.json"), undefined);
 	assert.equal(libFile("nope.js"), undefined);
 });

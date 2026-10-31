@@ -53,7 +53,7 @@ export async function startSite(o: SiteOptions, port = 0): Promise<{ server: Ser
 	const server = createServer(async (req, res) => {
 		try {
 			if (await sync(req, res)) return;
-			// The board runtime, for boards on the canvas (`../lib/board.css`).
+			// The card runtime (`../../lib/card.css`), which an old board asks for as `../lib/board.css` (`libFile` reads it as card.css).
 			if (req.url?.startsWith("/lib/")) {
 				const f = libFile(decodeURIComponent(req.url.slice(5).split("?")[0]!));
 				if (f) return res.writeHead(200, { ...LIVE_CARD_HEADERS, "Content-Type": f.type }).end(f.bytes);

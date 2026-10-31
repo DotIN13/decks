@@ -128,9 +128,9 @@ const versions = Object.fromEntries(
 writeFileSync(
 	join(out, "VENDORED.md"),
 	[
-		"# Vendored board primitives",
+		"# Vendored card primitives",
 		"",
-		"Copied here by `npm run vendor` in the decks repo. `board.css` and `board.js`",
+		"Copied here by `npm run vendor` in the decks repo. `card.css` and `card.js`",
 		"are Decks' own; everything else is upstream, unmodified except for the two",
 		"renames noted in `scripts/vendor.mjs`.",
 		"",

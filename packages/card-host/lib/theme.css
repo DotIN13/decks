@@ -3,13 +3,13 @@
  *
  * A board that brings its own design links this file alone. It gives the page the app's
  * light and dark palettes (the app sets `data-theme` on <html>; with nothing set, the
- * system preference decides) and the two font stacks. `board.css` imports it, so the
+ * system preference decides) and the two font stacks. `card.css` imports it, so the
  * component vocabulary and a hand-made page read the same palette.
  *
  * It styles one element, at the end of the file: `body.board` does not scroll. That is not
  * a choice a board gets to make — the stage does the panning, and a board whose document
  * is a few pixels taller than the rectangle the canvas gave it grows a scrollbar instead
- * of saying so. `board.css` has always stated it; a page that links this file alone was
+ * of saying so. `card.css` has always stated it; a page that links this file alone was
  * getting it from neither.
  */
 /*
@@ -123,7 +123,7 @@
 	/* Syntax, in six families rather than a colour per token type: the words a language is
 	   built from, the values it holds, the names it calls, the types it declares, the
 	   attributes a reader follows, and the prose about the code. A seventh colour is a
-	   palette nobody can read. `board.js` writes the `hljs-*` classes onto the spans; the
+	   palette nobody can read. `card.js` writes the `hljs-*` classes onto the spans; the
 	   map from those to these is in the code section below. */
 	--b-code-comment: var(--b-faint);
 	--b-code-keyword: var(--b-purple-700);
@@ -201,7 +201,7 @@
  * the camera, and a picture of the board shows a scrollbar instead of the work. So anything
  * past the edge is simply not drawn, and `stage.fit` is how a writer finds out.
  *
- * `board.css` repeats this on `body.board` for the component vocabulary. It is here as well
+ * `card.css` repeats this on `body.board` for the component vocabulary. It is here as well
  * because a page that brings its own design links this file and nothing else.
  */
 body.board {

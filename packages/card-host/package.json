@@ -1,7 +1,7 @@
 {
   "name": "@decks/card-host",
   "version": "0.1.0",
-  "description": "What a Decks card needs to run anywhere: the card runtime (board.css, theme.css, board.js, the live pages and their libraries, in lib/), how a card's scripts are named and served, and the rules for serving cards in a sandbox with signed read passes",
+  "description": "What a Decks card needs to run anywhere: the card runtime (card.css, theme.css, card.js, the live pages and their libraries, in lib/), how a card's scripts are named and served, and the rules for serving cards in a sandbox with signed read passes",
   "license": "MIT",
   "type": "module",
   "exports": {

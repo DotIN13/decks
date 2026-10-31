@@ -45,8 +45,8 @@ export type SyncFile = z.infer<typeof SyncFile>;
 export const PutFile = z.object({ path: z.string(), version: z.number(), current: z.boolean(), hash: z.string() });
 export type PutFile = z.infer<typeof PutFile>;
 
-/** An app a harness serves, and the board that shows it (`boards/apps/<name>.html`). */
-export const HarnessApp = z.object({ name: z.string().max(200), title: z.string().max(200), kind: z.string().max(80), board: z.string().max(500) });
+/** An app a harness serves. (A harness from before cards also says a `board`, which is dropped.) */
+export const HarnessApp = z.object({ name: z.string().max(200), title: z.string().max(200), kind: z.string().max(80) });
 export type HarnessApp = z.infer<typeof HarnessApp>;
 
 /** What a harness says it serves (`PUT /sync/v1/inventory`): its apps, at most 500. */

@@ -10,7 +10,7 @@
  * CSS (flex, grid), as wide as its `<meta>` says and as tall as what is in it. Nothing here
  * is placed by coordinates.
  *
- * `board.js` renders markdown, maths, diagrams, PDFs, embeds and code — the last of these
+ * `card.js` renders markdown, maths, diagrams, PDFs, embeds and code — the last of these
  * coloured from the `--b-code-*` tokens in the palette below, so syntax is in the same
  * palette as everything else and light and dark are decided in the same two places.
  */
@@ -30,7 +30,7 @@ body {
 /*
  * The board itself: a page as wide as its `<meta>` says, and as tall as its content.
  *
- * The height is the content's. `board.js` sets the meta's `h`, if there is one, as a floor
+ * The height is the content's. `card.js` sets the meta's `h`, if there is one, as a floor
  * (`min-height`), and the canvas measures the page and draws the board that tall, so nothing
  * is clipped and nothing scrolls inside the frame — the canvas does the panning.
  */
@@ -275,7 +275,7 @@ pre code {
 /* --- code, coloured --------------------------------------------------------- */
 
 /*
- * Syntax arriving as `hljs-*` classes on spans `board.js` put inside a `pre` or a `code`.
+ * Syntax arriving as `hljs-*` classes on spans `card.js` put inside a `pre` or a `code`.
  *
  * The highlighter is vendored with its grammars and *without* a theme, which is the whole
  * reason this file has the last word on what a string looks like: these are the board's own
@@ -448,7 +448,7 @@ table.table,
 
 /*
  * A board that is the file (`data-bare`): no frame round it, the file edge to edge under a bar
- * of its own — the name, what it is, and the reload button (`board.js`, `chrome`).
+ * of its own — the name, what it is, and the reload button (`card.js`, `chrome`).
  */
 .embed[data-bare] {
 	border: 0;
@@ -484,7 +484,7 @@ table.table,
 }
 
 /*
- * In the app's focus view, a board that is one file has its bar as the view's header (`board.js`,
+ * In the app's focus view, a board that is one file has its bar as the view's header (`card.js`,
  * `watchFocus`): the height of the app's header, with room at each end for the app's controls laid
  * over it, and the file under it centred clear of the conversation when that is open.
  */
@@ -679,7 +679,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	color: var(--b-fg);
 }
 
-/* A page is an `<img>` once rendered (`stillPicture` in `board.js`); the canvas is transient. */
+/* A page is an `<img>` once rendered (`stillPicture` in `card.js`); the canvas is transient. */
 .embed .page {
 	display: block;
 	width: 100%;

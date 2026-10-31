@@ -5,7 +5,7 @@
  *
  * An `[data-embed]` HTML file is mounted in a sandboxed iframe, one document deeper than
  * the board and in an opaque origin, so the canvas cannot listen for the wheel events
- * that happen over it (DESIGN §4, §7). Without this, board.js covers the frame with a
+ * that happen over it (DESIGN §4, §7). Without this, card.js covers the frame with a
  * veil and asks for a click before the page gets the pointer at all — correct for a page
  * it knows nothing about, and a nuisance for a demo written in this very deck.
  *

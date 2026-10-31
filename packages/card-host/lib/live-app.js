@@ -373,7 +373,7 @@ export function mountLiveApp(host, options) {
 		state.textContent = "Restarting";
 		dot.style.background = COLOURS.starting;
 		try {
-			// A command, so asked of the page around this board, as a button's verb is (`board.js`, `boardStage`).
+			// A command, so asked of the page around this board, as a button's verb is (`card.js`, `boardStage`).
 			const stage = await options.stage();
 			await stage.apps.restart(name);
 		} catch (error) {

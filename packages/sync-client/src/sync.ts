@@ -56,7 +56,7 @@ export interface SyncOptions {
 	 * This harness's apps (`apps/service.ts`), told to Studio so it can list them beside the
 	 * canvases. Absent: nothing is told.
 	 */
-	inventory?: () => Array<{ name: string; title: string; kind: string; board: string }>;
+	inventory?: () => Array<{ name: string; title: string; kind: string }>;
 	/**
 	 * A harness token for a Studio person's browser, when Studio asks for one over the live socket
 	 * (`token.ask`): issued by the harness for that person, bound to Studio's origin, with when it lapses
@@ -982,7 +982,7 @@ export class HarnessSync {
 		if (!this.o.inventory) return;
 		let apps;
 		try {
-			apps = this.o.inventory().map(({ name, title, kind, board }) => ({ name, title, kind, board }));
+			apps = this.o.inventory().map(({ name, title, kind }) => ({ name, title, kind }));
 		} catch (error) {
 			this.log(`no app list: ${(error as Error).message}`);
 			return;

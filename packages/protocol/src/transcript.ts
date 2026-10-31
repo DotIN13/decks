@@ -1,11 +1,12 @@
 /**
- * A thing put into a message as a pill (`@decks/agent-ui` `composer/draft.ts`): a comment, a board or
- * card, a drawn item, a file. Kept with the message as it was sent, so the conversation draws the same
- * pill with the same card after a reload and on another device, without reading it back out of the text.
+ * A thing put into a message as a pill (`@decks/agent-ui` `composer/draft.ts`): a comment, a card (or
+ * an old board), a drawn item, a file. Kept with the message as it was sent, so the conversation draws
+ * the same pill with the same card after a reload and on another device, without reading it back out of
+ * the text. A message saved before cards says `"board"` for a card: whoever reads one reads it as `"card"`.
  */
 export interface MessageMention {
 	type: "mention";
-	kind: "comment" | "board" | "item" | "file";
+	kind: "comment" | "card" | "item" | "file";
 	/** The comment's id, a board's or a file's path, an item's id on the stage. */
 	id: string;
 	/** What it is called: the board or card a comment is on, the board's title, the item's name, the file's name. */

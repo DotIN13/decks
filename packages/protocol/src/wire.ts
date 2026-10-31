@@ -12,7 +12,7 @@ import type {
 	RuntimeInfo,
 	ThinkingLevel,
 } from "./chat.ts";
-import type { Board, DeckSettings, DeckState, Page } from "./deck.ts";
+import type { DeckSettings, DeckState, Page } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 
@@ -88,19 +88,19 @@ import type { WebStatus } from "./web.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
-	| { type: "board.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
+	| { type: "card.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
 	/**
-	 * A board dragged to a new size by the person holding the mouse.
+	 * A card dragged to a new size by the person holding the mouse.
 	 *
-	 * Where the number *lives* is the server's to decide rather than the browser's: a board's
-	 * size is written into its own `<meta>` tag. Either dimension on its own is allowed, and a height written there is a
-	 * floor — the content raises it when it needs more room, and never clips.
+	 * Where the number *lives* is the server's to decide rather than the browser's. Either dimension
+	 * on its own is allowed, and a height written there is a floor — the content raises it when it
+	 * needs more room, and never clips.
 	 */
-	| { type: "board.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
+	| { type: "card.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
 	/**
-	 * How much room this board's content takes, measured in the frame that is showing it.
+	 * How much room this card's content takes, measured in the frame that is showing it.
 	 *
-	 * The browser is the only thing that can answer this — it is the only place the board
+	 * The browser is the only thing that can answer this — it is the only place the card
 	 * is laid out — so the reading travels the other way from most of this file. It
 	 * carries the `rev` it was taken at, because a measurement of a document that has
 	 * since been rewritten is not a measurement of anything.
@@ -108,23 +108,12 @@ export type ClientMessage =
 	 * `h` is the room the content needs: the page's own height. `page` is the same number; a
 	 * reading without it (an older frame) is fitted with a margin under it.
 	 */
-	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
-	/** Put a board on the canvas / take it off again. The context is untouched either way. */
-	| { type: "board.play"; path: string; /** The stage on screen. */ stage?: string }
-	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */
-	| { type: "board.seen"; path: string }
-	| { type: "board.hide"; path: string; /** The stage on screen. */ stage?: string }
-	/**
-	 * The same six under the card's name: what `board.move`, `board.resize`, `board.extent`,
-	 * `board.play`, `board.seen` and `board.hide` do, for a card. The board names are answered too
-	 * until 2026-11-30.
-	 */
-	| { type: "card.move"; path: string; x: number; y: number; stage?: string }
-	| { type: "card.resize"; path: string; w?: number; h?: number; stage?: string }
-	| { type: "card.extent"; path: string; rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
-	| { type: "card.play"; path: string; stage?: string }
+	| { type: "card.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the card out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
+	/** Put a card on the canvas / take it off again. The context is untouched either way. */
+	| { type: "card.play"; path: string; /** The stage on screen. */ stage?: string }
+	/** The person looked at this card (on the canvas, or in the focus view): clears its "changed" mark. */
 	| { type: "card.seen"; path: string }
-	| { type: "card.hide"; path: string; stage?: string }
+	| { type: "card.hide"; path: string; /** The stage on screen. */ stage?: string }
 	/**
 	 * A document put on the canvas from the file picker: an item that opens the file as a page you type
 	 * into (`{ type: "browser", metadata: { type: "decks.document", path } }`), at `at` (its top-left
@@ -137,7 +126,7 @@ export type ClientMessage =
 	 * Delete a board's file from the deck.
 	 *
 	 * The one message in this protocol that destroys something a person wrote, so it is worth
-	 * being exact about what it is not. It is **not** `board.hide`, which takes a board off
+	 * being exact about what it is not. It is **not** `card.hide`, which takes a card off
 	 * the canvas and leaves the agent holding it. This unlinks the HTML.
 	 *
 	 * What survives is the content-addressed copy in `.decks/revisions` — every version the
@@ -311,12 +300,8 @@ export type ServerMessage =
 	 * started reports a different catalogue.
 	 */
 	| { type: "runtimes"; list: RuntimeInfo[] }
-	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; /** Only the size in the board's own tag changed: a page showing it keeps its document. */ sized?: true }
-	/**
-	 * `board.changed` under the card's name, `card` in place of `board`: sent beside it for every
-	 * change (`App.send`). `board.changed`, its old name, is sent until 2026-11-30.
-	 */
-	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
+	/** A card (or an old board a canvas still holds) was written or removed. */
+	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; /** Only the size in its own tag changed: a page showing it keeps its document. */ sized?: true }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

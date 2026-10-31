@@ -1,7 +1,7 @@
 /*
  * The board runtime: what turns a page of HTML into a board.
  *
- * A board's head asks for `board.css`, this file, and — on a board this app wrote — an import
+ * A board's head asks for `card.css`, this file, and — on a board this app wrote — an import
  * map. Anything it needs (markdown, maths, diagrams, PDFs) is fetched from the same `lib/`
  * directory the moment a component actually uses it, so a board of three stickies does not pay
  * for pdf.js and the agent does not have to remember which script tag goes with which component.
@@ -25,8 +25,7 @@
  * stay on the revision it loaded instead of reloading a whole board for one panel.
  *
  * It also owns the readiness flag. Every async mount is awaited, then
- * `window.__cardReady` goes true (and `window.__boardReady` with it, its name from
- * before cards, which the app and older scripts wait on) — which is what the app waits for before it
+ * `window.__cardReady` goes true — which is what the app waits for before it
  * measures a board, and what the agent's Playwright waits for before it takes a
  * picture. Without it a screenshot is a race, and the race is usually lost. A
  * re-render takes the flag down and puts it back for the same reason.
@@ -293,11 +292,11 @@
 	 * Opened as a plain file with no app above it, a board link opens in a tab as well: there
 	 * is nobody to ask, and a new tab beats losing the board being read.
 	 */
-	const BOARD_PREFIX = `${API}/board/`;
+	const BOARD_PREFIX = `${API}/card/`;
 	/** What a board file is called (`deck/kinds.ts`): the one thing about a board that a link can be read against. */
 	const BOARD_FILE = /\.(?:html?|mdx?)$/i;
 
-	/** The deck-relative path behind a `/api/board/…` URL, or null if it is not one. */
+	/** The deck-relative path behind a `/api/card/…` URL, or null if it is not one. */
 	function boardPathOf(url) {
 		if (url.origin !== location.origin || !url.pathname.startsWith(BOARD_PREFIX)) return null;
 		const path = url.pathname.slice(BOARD_PREFIX.length);
@@ -342,7 +341,7 @@
 		/*
 		 * **Relative means relative to the board** — the same rule `[data-embed]` follows, and
 		 * the reason a link and an embed of the same file agree about where it is. Everything
-		 * else is a URL and is left alone, which is also what keeps an absolute `/api/board/…`
+		 * else is a URL and is left alone, which is also what keeps an absolute `/api/card/…`
 		 * href working as the browser reads it.
 		 */
 		const target = /^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("/") ? raw : urlFor(raw);
@@ -389,7 +388,7 @@
 	 * presses on a board is a button. `data-value` wins where both exist: an author who wrote
 	 * one meant it.
 	 */
-	const BOARD_ROUTE = "/api/board/";
+	const BOARD_ROUTE = "/api/card/";
 
 	/*
 	 * A board's own code once called the stage with a token of its own, which the page around it asked
@@ -598,7 +597,7 @@
 	 * machine and plain on another is a board that reads differently to the person looking at
 	 * it and to the agent reading a screenshot of it.
 	 *
-	 * It carries the grammars and never a theme. The colours are `board.css`'s — the same
+	 * It carries the grammars and never a theme. The colours are `card.css`'s — the same
 	 * tokens as everything else on the board — so light and dark are decided by the same two
 	 * rules as the rest of the palette, and a board that styles itself does not fight a
 	 * third-party theme for the foreground colour of a string.
@@ -767,19 +766,19 @@
 	 * editing (DESIGN §7) — a markdown panel that could only be re-rendered by reload
 	 * would flash the whole board on every keystroke's worth of commit.
 	 *
-	 * `__boardReady` goes down for as long as it takes, because everything that waits
+	 * `__cardReady` goes down for as long as it takes, because everything that waits
 	 * for a board waits on that flag and a flag left true through a re-render is a
 	 * promise this file had quietly stopped keeping. `board:ready` is *not* dispatched
 	 * again: that event means the board finished loading, which happens once, and a
 	 * board's own `<script>` listening for it would run a second time.
 	 */
 	async function redraw(element, source) {
-		window.__boardReady = window.__cardReady = false;
+		window.__cardReady = false;
 		document.body.dataset.ready = "false";
 		try {
 			await drawSource(element, source);
 		} finally {
-			window.__boardReady = window.__cardReady = true;
+			window.__cardReady = true;
 			document.body.dataset.ready = "true";
 		}
 	}
@@ -935,7 +934,7 @@
 	 * pixels to the compositor as if something might have drawn on it — about 2ms per page at
 	 * 4× CPU throttle, paid on every step of every gesture for the life of the board. Nothing
 	 * ever draws on it again, so the same pixels as an `<img>` are a picture the compositor
-	 * keeps. The swap waits for the image to load, so `__boardReady` still means visible.
+	 * keeps. The swap waits for the image to load, so `__cardReady` still means visible.
 	 */
 	function stillPicture(canvas) {
 		return new Promise((resolve) => {
@@ -1310,9 +1309,9 @@
 				const { body, note } = chrome(host, "text", label);
 				/*
 				 * Asked for by range, so the truncation happens on the wire rather than in
-				 * memory: `/api/board` and `/api/f` both send with `acceptRanges`, and a
+				 * memory: `/api/card` and `/api/f` both send with `acceptRanges`, and a
 				 * board that fetched a 50MB log in full would stall every other mount
-				 * behind it — `__boardReady` waits for all of them.
+				 * behind it — `__cardReady` waits for all of them.
 				 *
 				 * A server that ignores the header answers 200 with everything, so the
 				 * slice below is the second half of the same guard.
@@ -1534,7 +1533,7 @@
 	 * A board that is one document or one file is laid out across the whole work area there, and its
 	 * own bar is the view's header: the app lays its controls over the two ends of the bar, and says on
 	 * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/Stage.tsx`). A board is in the app's own
-	 * origin, so it can read its frame's element; the bar's rules are in `board.css` and the document
+	 * origin, so it can read its frame's element; the bar's rules are in `card.css` and the document
 	 * page's (`.dp-bar`) are keyed to the same attribute.
 	 */
 	function watchFocus() {
@@ -1629,7 +1628,7 @@
 		 * and an element and no component to go with them.
 		 */
 		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
-		window.__boardReady = window.__cardReady = true;
+		window.__cardReady = true;
 		document.body.dataset.ready = "true";
 		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));
 	}

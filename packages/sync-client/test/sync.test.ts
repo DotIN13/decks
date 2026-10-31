@@ -77,13 +77,13 @@ test("the app list goes to Studio once on connecting, then only when it changes,
 	const old = await emptyStudio(404);
 	const oldDeck = mkdtempSync(join(tmpdir(), "decks-sync-old-"));
 	try {
-		let apps = [{ name: "trip", title: "Trip", kind: "server", board: "boards/apps/trip.html", status: "running" }];
+		let apps = [{ name: "trip", title: "Trip", kind: "server", status: "running" }];
 		const lines: string[] = [];
 		const sync = new HarnessSync({ deck, studio: studio.url, key: "dsk_x", inventory: () => apps, log: (line) => lines.push(line) });
 		await sync.sync();
 		await sync.sync();
-		assert.deepEqual(studio.told, [{ apps: [{ name: "trip", title: "Trip", kind: "server", board: "boards/apps/trip.html" }] }], "only the four fields, and once");
-		apps = [...apps, { name: "notes", title: "Notes", kind: "static", board: "boards/apps/notes.html", status: "running" }];
+		assert.deepEqual(studio.told, [{ apps: [{ name: "trip", title: "Trip", kind: "server" }] }], "only the three fields, and once");
+		apps = [...apps, { name: "notes", title: "Notes", kind: "static", status: "running" }];
 		await sync.sync();
 		assert.equal(studio.told.length, 2);
 		apps[0]!.status = "asleep";
