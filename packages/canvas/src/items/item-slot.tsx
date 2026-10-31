@@ -212,6 +212,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 						path={props.board.path}
 						trusted={props.cardScripts !== false && !props.board.path.startsWith("shared/")}
 						rev={props.board.rev}
+						sized={props.board.sized}
 						reload={props.reload}
 						size={size}
 						selected={props.selected}

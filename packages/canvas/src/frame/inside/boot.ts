@@ -90,6 +90,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	 * (`StagePens.boards`). A card placed or taken off that the list does not know yet is read again.
 	 */
 	let cardsReading = false;
+	/** How often the card list was read again from the harness (`placeCards`): for the checks. */
+	let cardsReads = 0;
 	function placeCards(): void {
 		const doc = made?.handle.drawn();
 		if (!doc) return;
@@ -101,6 +103,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		if (!same) {
 			if (cardsReading) return;
 			cardsReading = true;
+			cardsReads++;
 			void backend
 				.drawing()
 				.then((read) => setPages(read.cards.map((card) => ({ ...card, ...(boxes.get(card.path) ?? {}), trust: own(card.path) }))))
@@ -169,6 +172,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
 	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
+		cardsReads: () => cardsReads,
 		appStored,
 		appWatchers,
 		root,

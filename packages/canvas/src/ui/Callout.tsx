@@ -2,7 +2,7 @@ import type { Page, Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
-import { canvasHost } from "../host.ts";
+import { canvasHost, openInTab } from "../host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -36,6 +36,7 @@ export function PageCallout(props: {
 	label: string;
 	camera: Camera;
 	view: Viewport;
+	/** Fit the item to the screen. New tab is the host's to open (`openInTab`): inside the canvas frame a link opens none, the sandbox allows no popup, so the page opens it. */
 	onOpen: () => void;
 	onHide?: () => void;
 	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
@@ -178,7 +179,7 @@ export function PageCallout(props: {
 			</button>
 			<Show when={props.board && !props.board.live ? props.board : undefined}>
 				{(board) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { if (board().item === "app" && board().app) { event.preventDefault(); canvasHost().apps?.open(board().app!); } }}>
+				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (board().item === "app" && board().app) canvasHost().apps?.open(board().app!); else openInTab(canvasHost().fileUrl(board().path)); }}>
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}

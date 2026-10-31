@@ -163,7 +163,12 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		if (message.type === "card.changed") {
 			if (message.removed || !message.card) return;
 			const record = message.card;
-			setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust } : page)));
+			/*
+			 * A change of its size alone keeps the surface showing it: the record says so (`sized`), and a later
+			 * change of its words clears it. The same revision said again (the file watcher's word after the
+			 * writer's) is no new change, so what the first message said of it stands.
+			 */
+			setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust, ...(message.sized || (page.sized && page.rev === record.rev) ? { sized: true as const } : {}) } : page)));
 			return;
 		}
 		follower.hear(message);

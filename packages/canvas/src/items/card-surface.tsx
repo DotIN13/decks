@@ -1,4 +1,4 @@
-import { createEffect, on, onCleanup, untrack } from "solid-js";
+import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
 import { ownInput } from "./input.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
@@ -31,6 +31,8 @@ export function CardSurface(props: {
 	path: string;
 	trusted: boolean;
 	rev: number;
+	/** The revision is of a change of size alone: the card keeps the document it has (`Page.sized`). */
+	sized?: true | undefined;
 	reload?: number | undefined;
 	size: () => { w: number; h: number };
 	selected: boolean;
@@ -50,6 +52,9 @@ export function CardSurface(props: {
 	onWords?: ((words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
+	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
+	const made = ((globalThis as { __decksMade?: Record<string, { surfaces: number; mounts: number }> }).__decksMade ??= {});
+	(made[props.path] ??= { surfaces: 0, mounts: 0 }).surfaces++;
 	/*
 	 * The card's address with its folder stamped with its revision (`cards/sales@<rev>/index.html`,
 	 * `@decks/card-host`): what it imports beside it is then a new address at each version. A page keeps
@@ -76,6 +81,7 @@ export function CardSurface(props: {
 		},
 	});
 	const mount = (html: string) => {
+		made[props.path]!.mounts++;
 		mounted?.dispose();
 		// A closed root is made once per element: a new file gets a new element.
 		const fresh = document.createElement("div");
@@ -106,7 +112,24 @@ export function CardSurface(props: {
 		});
 		props.onShown();
 	};
-	createEffect(on(() => [props.page.replace(/[?#].*$/, ""), props.rev, props.reload] as const, () => loader.load()));
+	/*
+	 * Loaded again when its file changes, not when only its size in the file did (`sized`): a card
+	 * resized by its edge wrote its size into its own tag, and a new revision for that had the card
+	 * fetched, parsed and its scripts started over, mid-use. The revision still names its picture.
+	 */
+	/*
+	 * What a load is for, each kept as a memo so only a change of its value runs the load: the file's
+	 * address without its query (the host's carries the revision as one, so it is a new string at
+	 * every change of the card), the revision of the card's words, which stays while the file's
+	 * changes are of its size alone (`sized`: a card resized by its edge wrote its size into its own
+	 * tag, and that had the card fetched and its scripts started over, mid-use), and the host's reloads
+	 * of this card alone (its record of every card's is a new object at each). The revision still names
+	 * its picture.
+	 */
+	const pageKey = createMemo(() => props.page.replace(/[?#].*$/, ""));
+	const contentRev = createMemo<number>((was) => (props.sized && was !== undefined ? was : props.rev), props.rev);
+	const reloads = createMemo(() => props.reload);
+	createEffect(on(() => [pageKey(), contentRev(), reloads()] as const, () => loader.load()));
 	/*
 	 * The scheme and the size are read before the card is asked: a card mounts later than these run
 	 * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect

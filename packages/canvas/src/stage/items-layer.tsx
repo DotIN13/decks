@@ -277,7 +277,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			.map((board) => {
 				const a = toScreen(ctl.now(), view(), { x: board.x, y: board.y });
 				const b = toScreen(ctl.now(), view(), { x: board.x + board.w, y: board.y + board.h });
-				return { path: board.path, node: nodes.has(board.path), rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
+				return { path: board.path, node: nodes.has(board.path), rev: board.rev, sized: board.sized, rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
 	(globalThis as { __decksCards?: typeof cardsOnScreen }).__decksCards = cardsOnScreen;

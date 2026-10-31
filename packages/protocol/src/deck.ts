@@ -88,6 +88,11 @@ export interface Page {
 	item?: "document" | "app";
 	/** A document item's file, as the deck names it. */
 	file?: string;
+	/**
+	 * The last change of the card's file was its size alone (`card.changed`, `sized`): its revision is
+	 * new, for its picture, but a surface showing it keeps the document it has rather than loading again.
+	 */
+	sized?: true;
 	/** An app item's app, by name. */
 	app?: string;
 	x: number;

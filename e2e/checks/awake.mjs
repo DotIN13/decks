@@ -9,7 +9,8 @@
  * - a pinch mounts nothing mid-gesture: nodes come and go only at rest;
  * - a press in an app selects it first, and only then does its window take the pointer (the person's choice).
  */
-import { canvasFrame, deckState, nameOf, open, say, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, nameOf, open, say, socket } from "../harness.mjs";
+const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...(await asPerson()) }, body: JSON.stringify({ args }) })).json();
 import { writeAwakeCanvas } from "../awake-canvas.mjs";
 
 const CANVAS = "awake-small";
@@ -35,7 +36,7 @@ say("the small awake canvas is written", written.cards === 3 && written.apps ===
 
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const { page, errors } = await open({ width: 1400, height: 900, cards: false });
+const { page, context, errors } = await open({ width: 1400, height: 900, cards: false });
 /** Picture requests and their answers, for a failure to explain itself. */
 const pictureLog = [];
 page.on("response", (response) => {
@@ -177,6 +178,34 @@ const nearApps = await canvas.evaluate(() => {
 });
 say("at 60% the cards near the screen and the document are awake, with nodes", cardPaths.every((p) => state.nodes.includes(p)) && state.documents === 1 && state.cardHosts === 3, JSON.stringify(state));
 say("…and of three apps near, the two nearest the middle run (the computer's budget of two)", state.apps.length === 2 && state.apps.includes(nearApps[0]) && state.apps.includes(nearApps[1]), `${JSON.stringify(state.apps)} nearest ${JSON.stringify(nearApps)}`);
+// --- a resize keeps the card's document: its root stays, its scripts are not started over -------------------
+at("resize");
+const liveCard = cardPaths[0];
+const marked = await canvas.evaluate((path) => {
+	const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
+	const host = node?.querySelector(".card-host");
+	if (!host) return false;
+	host.dataset.mark = "before-resize";
+	node.dataset.mark = "before-resize";
+	return true;
+}, liveCard);
+say("the live card has its root, marked", marked);
+const sizeBefore = await canvas.evaluate((path) => globalThis.__decksCards().find((c) => c.path === path)?.rect.width, liveCard);
+const resized = await call("canvas.update", [liveCard, { size: { w: 900, h: 760 } }, { canvas: CANVAS }]);
+say("the card is resized by the API", resized.ok === true, JSON.stringify(resized.error ?? "").slice(0, 120));
+const grew = await until(async () => {
+	const w = await canvas.evaluate((path) => globalThis.__decksCards().find((c) => c.path === path)?.rect.width, liveCard);
+	return w !== sizeBefore ? w : undefined;
+}, 8000);
+say("…and the stage shows the new size", !!grew, `${sizeBefore} -> ${grew}`);
+await page.waitForTimeout(2500);
+const kept = await canvas.evaluate((path) => {
+	const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
+	const page = globalThis.__decksCards().find((c) => c.path === path);
+	return { node: node?.dataset.mark === "before-resize", host: node?.querySelector(".card-host")?.dataset.mark === "before-resize", sized: page?.sized, rev: page?.rev, nodesForPath: [...document.querySelectorAll(".world .card-node")].filter((n) => n.dataset.path === path).map((n) => n.dataset.mark ?? "-"), made: globalThis.__decksMade?.[path] };
+}, liveCard);
+say("…and the card keeps the document it had: the same root, its scripts not started over", kept.host, JSON.stringify(kept));
+
 say("…and a sleeping app has no node: it is its picture, not a bar and a button", !state.nodes.includes(nearApps[2]), JSON.stringify(state.nodes));
 
 // --- an app that becomes nearest takes a place ----------------------------------------------------------
@@ -247,6 +276,37 @@ const under = await canvas.evaluate(({ x, y }) => {
 	return { at: { x, y }, under: `${el?.tagName}.${el?.className?.toString().slice(0, 40)}`, node: node && { path: node.dataset.path, inert: node.dataset.inert, rect: [r.x, r.y, r.width, r.height].map(Math.round) }, selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path) };
 }, clickAt);
 say("…selected, its window takes the pointer", !!after && after.includes("auto"), `${JSON.stringify(after ?? (await takes()))} ${JSON.stringify(under)} box ${JSON.stringify(box)} after move ${JSON.stringify(moved)}`);
+// --- the pill's New tab opens the item in a tab, through the page: the frame's sandbox allows no popup ---------
+at("pill new tab");
+{
+	// Centred on the card first: it is off the screen after the app's section.
+	const middle = await canvas.evaluate((path) => {
+		const c = globalThis.__decksCards().find((one) => one.path === path);
+		const cam = globalThis.__decksRust.camera;
+		const st = document.querySelector(".stage").getBoundingClientRect();
+		return { x: cam.x + (c.rect.left - st.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - st.top + c.rect.height / 2) / cam.zoom };
+	}, cardPaths[0]);
+	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), middle);
+	await rest();
+	const r = await canvas.evaluate((path) => { const c = globalThis.__decksCards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, cardPaths[0]);
+	// Near its top: the selected app's pill sits over the card's foot.
+	await page.mouse.click(frameBox.x + r[0] + r[2] / 2, frameBox.y + r[1] + r[3] * 0.3);
+	const picked = await until(async () => ((await canvas.evaluate(() => globalThis.__decksAwake?.().selected)) === cardPaths[0] ? true : undefined), 5000);
+	const hit = await canvas.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y); return `${el?.tagName}.${el?.className?.toString().slice(0, 40)} in ${el?.closest?.(".card-node")?.dataset.path?.split("/").at(-2) ?? "-"}`; }, { x: r[0] + r[2] / 2, y: r[1] + r[3] * 0.3 });
+	say("a press on the card selects it", !!picked, `${String(await canvas.evaluate(() => globalThis.__decksAwake?.().selected))}; under the press: ${hit}`);
+	const pill = await until(async () => ((await canvas.locator('.card-callout a[aria-label="New tab"]').count()) > 0 ? true : undefined), 5000);
+	say("a press on a card shows its pill with New tab", !!pill);
+	if (pill) {
+		const opened = context.waitForEvent("page", { timeout: 6000 }).catch(() => undefined);
+		// Pressed as an element: the pill moves with the camera's settling, and Playwright waits for it to hold still.
+		const pressed = await canvas.locator('.card-callout a[aria-label="New tab"]').first().evaluate((el) => (el.click(), true), undefined, { timeout: 5000 }).catch((error) => String(error.message).slice(0, 80));
+		say("…its New tab is pressed", pressed === true, String(pressed));
+		const tab = await opened;
+		say("…and New tab opens the card in a tab of its own", !!tab && /awake-000/.test(tab.url()), tab ? tab.url().slice(0, 100) : "no page opened");
+		await tab?.close().catch(() => {});
+	}
+}
+
 // A wheel inside the selected app that its page cannot scroll with pans the canvas, and a pinch zooms it, as over a card.
 at("wheel in app");
 const appFrame = page.frames().find((one) => !one.isDetached() && one.url().includes("/app/t/") && one.url().includes("/small-app-"));
