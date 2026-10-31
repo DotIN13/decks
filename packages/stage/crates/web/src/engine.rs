@@ -522,6 +522,10 @@ impl Page {
 			if app {
 				windows.push(Window { x, y, w, h, title: board.title.clone(), status: board.status.clone() });
 			}
+			// Its title above it, in every state, live too, as the bar over it read: only where a 12 px line is more than a smudge; an app's name is on its window.
+			if !app && !board.title.is_empty() && s * 12.0 >= 5.0 {
+				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
+			}
 			// A live item is drawn here only while a drag carries it: as its picture, or as its paper and title until it has one.
 			if board.live && !carried {
 				continue;
@@ -557,10 +561,6 @@ impl Page {
 				carrying.push(board.path.clone());
 			} else {
 				pictured.push(board.path.clone());
-			}
-			// Its title above it, as a sleeping item's bar reads: only where a 12 px line is more than a smudge; an app's name is on its window.
-			if !app && picture.is_some() && !board.title.is_empty() && s * 12.0 >= 5.0 {
-				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
 			}
 			if let Some(colour) = board.news.filter(|_| board.glow) {
 				over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });

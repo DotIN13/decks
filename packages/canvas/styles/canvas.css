@@ -1648,11 +1648,11 @@
 	   it both start at the box's top. Sized in stage pixels, so it
 	   scales with the board and a zoom writes nothing to it. */
 	/*
-	 * A node that is not live (hovered or selected while asleep, kept, leaving, waking under its picture)
-	 * has its title painted by the engine above its picture (`engine.rs`, `paint_title`): its bar stays as
-	 * the grip to drag it by, but says nothing, or the title read twice.
+	 * Every item's title is painted by the engine above it, in every state (`engine.rs`, `paint_title`),
+	 * so it is always there while the item is on screen: the bar on the page stays as the grip to drag
+	 * the item by, but says nothing, or the title would read twice.
 	 */
-	.card-node:not([data-state="live"]) > .plain-card-bar {
+	.card-node > .plain-card-bar {
 		color: transparent;
 	}
 	.plain-card-bar {
