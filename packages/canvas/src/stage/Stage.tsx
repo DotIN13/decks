@@ -130,6 +130,8 @@ export type StageProps = {
 	inkAgent?: string;
 	/** The host's own layer in the world, in canvas units (`CanvasOptions.world`). */
 	world?: () => JSX.Element;
+	/** The stage's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
+	onEngine?: (engine: StageEngine) => void;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
@@ -356,6 +358,7 @@ export function Stage(props: StageProps) {
 	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
 	const penLayer = new StageEngine();
+	props.onEngine?.(penLayer);
 	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
 	penLayer.failed = (notice) => setEngineNotice(notice);

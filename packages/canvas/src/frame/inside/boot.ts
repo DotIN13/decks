@@ -9,6 +9,7 @@ import { pagesOf } from "../../model/drawing.ts";
 import { pageItems } from "../../model/boxes.ts";
 import { createBackend } from "./backend.ts";
 import { installPresence } from "./presence.ts";
+import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
 
@@ -75,6 +76,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
 	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`). */
 	const presence = studio ? undefined : installPresence({ camera, send: (one) => backend.presence(one), viewport: () => ({ width: innerWidth, height: innerHeight }) });
+	/** Marks over what agents draw, each for a moment in the agent's colour (`marks.ts`). */
+	const marks = installMarks();
 	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
 	let made: Editor | undefined;
 	const items = () => {
@@ -212,6 +215,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		reflect,
 		cursor,
 		presence,
+		marks,
 		setCursor,
 		places,
 		changed,

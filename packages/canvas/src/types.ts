@@ -172,6 +172,8 @@ export interface CanvasHandle {
 	refused(edit: string): void;
 	/** The drawing as it is shown now, the person's edits on their way included: read reactively. */
 	drawn(): PenDocument;
+	/** An item's box as the stage laid it out, in canvas units, with the item it is inside; undefined before the stage is up or for an id it has not placed. */
+	itemBox(id: string): { x: number; y: number; w: number; h: number; parent?: string | undefined } | undefined;
 	/** Move the camera there, gliding unless `ms` is 0: an agent showing the person something. */
 	glide(camera: Camera, ms?: number): void;
 	/** The drawing as it is now. */

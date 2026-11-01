@@ -1,4 +1,4 @@
-import { Show, For } from "solid-js";
+import { Show, For, createMemo } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../editor.tsx";
 import type { Editor } from "../../types.ts";
@@ -55,7 +55,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	};
 	/** Everyone else's pointer on this canvas (`presence.ts`), beside the agent's cursor: one list of cursors, each by its key. */
 	const others = () => [...(ctx.presence?.present() ?? new Map()).entries()];
-	const pointers = () => others().filter(([, one]) => one.pointer).map(([key, one]) => ({ key, cursor: { x: one.pointer!.x, y: one.pointer!.y, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : one.by.harness ? "Someone elsewhere" : "Another window"), color: one.by.color } }));
+	const labelOf = (by: { name?: string; kind: string; harness?: string }) => by.name ?? (by.kind === "agent" ? "An agent" : by.harness ? "Someone elsewhere" : "Another window");
+	/** The keys of the cursors to draw, stable while a cursor moves: each `AgentCursor` keeps its element and drifts, rather than being made anew at every point. */
+	const pointerKeys = createMemo(() => others().filter(([, one]) => one.pointer || one.leaving).map(([key]) => key), [] as string[], { equals: (was, next) => was.length === next.length && was.every((key, i) => key === next[i]) });
+	/** One cursor's point now, or null while it leaves (the cursor fades where it was). */
+	const pointerAt = (key: string) => {
+		const one = ctx.presence?.present().get(key);
+		return one?.pointer ? { x: one.pointer.x, y: one.pointer.y, label: labelOf(one.by), color: one.by.color } : null;
+	};
 	/** Everyone else's selection: the boxes of the top-level items they hold, outlined in their colour with their name. */
 	const outlines = () => {
 		const list: Array<{ key: string; x: number; y: number; w: number; h: number; color: string; label: string }> = [];
@@ -76,7 +83,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	};
 	/* Only while a cursor or an outline is out: nothing to see, nothing in the world. Placed in canvas units; the world's own transform scrolls and scales it. */
 	const cursors = () => (
-		<Show when={cursorAt() || pointers().length || outlines().length}>
+		<Show when={cursorAt() || pointerKeys().length || outlines().length || ctx.marks.list().length}>
 			<div class="frame-cursors" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none", "z-index": "5" }}>
 					<For each={outlines()}>
 						{(box) => (
@@ -88,7 +95,11 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 					<Show when={cursorAt()}>
 						<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
 					</Show>
-					<For each={pointers()}>{(one) => <AgentCursor cursor={one.cursor} zoom={camera().zoom} />}</For>
+					<For each={pointerKeys()}>{(key) => <AgentCursor cursor={pointerAt(key)} zoom={camera().zoom} />}</For>
+					{/* What agents just drew: a mark on each item, in its colour, for a moment (`marks.ts`, `styles/marks.css`). */}
+					<For each={ctx.marks.list()}>
+						{(mark) => <div class="edit-mark" data-kind={mark.kind} style={{ left: `${mark.x}px`, top: `${mark.y}px`, width: `${mark.w}px`, height: `${mark.h}px`, "--act": mark.color, "--zoom": camera().zoom }} />}
+					</For>
 			</div>
 		</Show>
 	);

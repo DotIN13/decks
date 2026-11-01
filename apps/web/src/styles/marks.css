@@ -67,6 +67,120 @@
 	}
 }
 	/*
+	 * What an agent just drew (`frame/inside/marks.ts`): a mark on each item it touched, drawn in the
+	 * stage's world in canvas units, so it is counter-scaled by `--zoom` like the cursor. An insert or
+	 * a change is printed: a band of the agent's colour sweeps across the item behind a bright head, a
+	 * fill and a glow fade, and the outline goes last. A move keeps only the outline, since the glide
+	 * already shows the travel; a delete dissolves where the item was. Reduced motion draws none.
+	 */
+	.edit-mark {
+	position: absolute;
+	z-index: 4;
+	box-sizing: border-box;
+	pointer-events: none;
+	--line-w: calc(1.5px / var(--zoom, 1));
+	--mark-r: calc(8px / var(--zoom, 1));
+	--glow: calc(20px / var(--zoom, 1));
+	--spread: calc(5px / var(--zoom, 1));
+	border-radius: var(--mark-r);
+	outline: var(--line-w) solid var(--act);
+	outline-offset: calc(var(--line-w) * 2);
+	overflow: hidden;
+	animation: mark-print 1400ms ease-out both;
+}
+	.edit-mark::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--act) 42%, transparent) 55%, transparent 100%);
+	background-size: 55% 100%;
+	background-repeat: no-repeat;
+	animation: mark-sweep 560ms ease-out both;
+}
+	/* The print head: a bright line at the front of the band. */
+	.edit-mark::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: calc(14px / var(--zoom, 1));
+	background: linear-gradient(90deg, transparent, rgb(255 255 255 / 92%) 50%, transparent);
+	animation: mark-head 560ms ease-out both;
+}
+	.edit-mark[data-kind="move"] {
+	animation: mark-outline 900ms ease-out both;
+}
+	.edit-mark[data-kind="delete"] {
+	transform-origin: center;
+	animation: mark-dissolve 700ms ease-in both;
+}
+	.edit-mark[data-kind="move"]::before,
+	.edit-mark[data-kind="move"]::after,
+	.edit-mark[data-kind="delete"]::before,
+	.edit-mark[data-kind="delete"]::after {
+	display: none;
+}
+	@keyframes mark-print {
+	0% {
+		background: color-mix(in srgb, var(--act) 24%, transparent);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--act) 65%, transparent);
+		outline-color: var(--act);
+	}
+	45% {
+		box-shadow: 0 0 var(--glow) var(--spread) color-mix(in srgb, var(--act) 40%, transparent);
+	}
+	100% {
+		background: transparent;
+		box-shadow: 0 0 var(--glow) var(--spread) transparent;
+		outline-color: transparent;
+	}
+}
+	@keyframes mark-sweep {
+	from {
+		background-position: -55% 0;
+	}
+	to {
+		background-position: 155% 0;
+	}
+}
+	@keyframes mark-head {
+	from {
+		left: -8%;
+		opacity: 1;
+	}
+	to {
+		left: 104%;
+		opacity: 0;
+	}
+}
+	@keyframes mark-outline {
+	0% {
+		outline-color: var(--act);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--act) 55%, transparent);
+	}
+	100% {
+		outline-color: transparent;
+		box-shadow: 0 0 var(--glow) var(--spread) transparent;
+	}
+}
+	@keyframes mark-dissolve {
+	0% {
+		opacity: 1;
+		transform: scale(1);
+		background: color-mix(in srgb, var(--act) 28%, transparent);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(0.9);
+		background: transparent;
+	}
+}
+	@media (prefers-reduced-motion: reduce) {
+	.edit-mark {
+		display: none;
+	}
+}
+	/*
  * An agent's cursor (`canvas/AgentCursor.tsx`): an arrow and a name tag in the agent's colour,
  * lightened, with dark words, as a design tool draws a collaborator. The drift is a transition on
  * `left`/`top`, which are stage coordinates, so it follows the canvas at any zoom; the

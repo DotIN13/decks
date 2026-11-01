@@ -1,5 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Page, Presence, PresenceBy, StageCall } from "@decks/protocol";
+import type { Page, Presence, PresenceBy, StageCall, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../items/card-snapshot.ts";
 import { openLine, type LineClient } from "./line.ts";
 
@@ -35,7 +35,7 @@ export interface Backend {
 /** What the line says about this canvas. */
 export type Heard =
 	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/src/stage/pens.ts`). */
-	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; error?: string }
+	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
@@ -148,7 +148,8 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
  */
 export function drawingFollower(handlers: {
 	whole(doc: PenDocument, base: string, made?: readonly string[]): void;
-	edits(edits: readonly PenEdit[], base: string, made?: readonly string[]): boolean;
+	/** `author` is who made the change, when the harness says (an agent's edits are marked and its cursor follows them). */
+	edits(edits: readonly PenEdit[], base: string, made?: readonly string[], author?: ChangeAuthor): boolean;
 	reread(): void;
 }) {
 	let rev = -1;
@@ -167,7 +168,7 @@ export function drawingFollower(handlers: {
 					handlers.whole(message.doc, message.base, message.made);
 				} else if (message.edits) {
 					if (message.rev <= rev) return;
-					if (message.from !== rev || !handlers.edits(message.edits, message.base, message.made)) {
+					if (message.from !== rev || !handlers.edits(message.edits, message.base, message.made, message.author)) {
 						handlers.reread();
 						return;
 					}

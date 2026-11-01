@@ -7,6 +7,7 @@ import { topBoxes } from "./model/boxes.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox } from "./camera/insets.ts";
+import type { StageEngine } from "./render/engine.ts";
 import { pagesAhead, pagesOf, createDrawing } from "./model/drawing.ts";
 import { stageMeasure } from "./render/measure.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
@@ -91,6 +92,8 @@ export function createEditor(
 	let glides = 0;
 	const { doc, edit, step, movePage, resizePage, removePage } = drawing;
 
+	/** The stage's engine, once the stage is made (`Stage` `onEngine`): the layout the handle answers from. */
+	let engine: StageEngine | undefined;
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
 		options.onCamera?.(next);
@@ -237,6 +240,7 @@ export function createEditor(
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}
 			{...(options.world ? { world: options.world } : {})}
+			onEngine={(made) => (engine = made)}
 		/>
 	);
 	const surface = () => stageView();
@@ -259,6 +263,7 @@ export function createEditor(
 	);
 
 	const handle: CanvasHandle = {
+		itemBox: (id) => engine?.boxOf(id),
 		setDocument: (next, at, made) => {
 			if (at !== undefined) setPenBase(at);
 			drawing.set(next, undefined, made);

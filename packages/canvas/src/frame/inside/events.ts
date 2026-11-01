@@ -1,5 +1,6 @@
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
+import { touchedBy } from "./marks.ts";
 import { dismissMenus } from "@decks/ui";
 import type { Page, Camera, StageCall } from "@decks/protocol";
 import { setDrawing } from "../../edit/ink.ts";
@@ -51,9 +52,25 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			handle.setDocument(serialize(doc), base, made);
 			changed();
 		},
-		edits: (edits, base, made) => {
+		edits: (edits, base, made, author) => {
+			// A deleted item's box is gone once the edits are in: read first.
+			const agent = author?.kind === "agent" && author.id ? author : undefined;
+			const before = new Map<string, ReturnType<typeof handle.itemBox>>();
+			if (agent) for (const edit of edits) if (edit.op === "remove") before.set(edit.id, handle.itemBox(edit.id));
 			const applied = handle.applyEdits(edits, base, made) !== false;
 			changed();
+			/*
+			 * An agent's edit is shown as its hand: a mark in its colour on each thing it touched, and its
+			 * cursor going to each in turn (`marks.ts`, `presence.ts`). Read from the change itself rather
+			 * than the agent's act, so the marks land with the drawing and a run of edits is one tour.
+			 */
+			if (applied && agent) {
+				const who = ctx.agents()[agent.id!];
+				const color = who?.color ?? "#3b5cf6";
+				const touched = touchedBy(edits, (id) => before.get(id), (id) => handle.itemBox(id));
+				ctx.marks.add(agent.id!, color, touched);
+				ctx.presence?.tour(agent.id!, { kind: "agent", id: agent.id!, name: who?.name ?? agent.name ?? "An agent", color }, touched.map((one) => ({ x: one.box.x, y: one.box.y })));
+			}
 			return applied;
 		},
 		reread: () => reread(),
@@ -164,8 +181,10 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
 		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
-		// An agent at work on a card: its cursor and outline, from the card's place on the drawing.
+		// An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
+		// draws on the canvas is marked from the drawing's own change instead (`edits` above).
 		if (message.type === "agent.act") {
+			if (message.what === "draw") return;
 			const page = untrack(pages).find((one) => one.path === message.path) ?? untrack(pages).find((one) => message.path.endsWith(one.path) || one.path.endsWith(message.path));
 			let id: string | undefined;
 			try {

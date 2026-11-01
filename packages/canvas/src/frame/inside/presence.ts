@@ -6,12 +6,22 @@ import { toWorld } from "../../camera/camera.ts";
 export interface Present extends Presence {
 	by: PresenceBy;
 	at: number;
+	/** On its way out: drawn fading, with no pointer, until it is dropped. */
+	leaving?: true;
 }
 
 /** How often at most this frame says where its pointer is. */
 export const POINTER_MS = 50;
 /** How long an agent's cursor stays on a card after its work there is done. */
 export const ACT_LINGER_MS = 2500;
+/** How long an agent's cursor stays on the last thing it drew, waiting for its next edit. */
+export const TOUR_LINGER_MS = 3200;
+/** How long the cursor rests on each thing an edit touched before moving to the next: its drift is 380 ms. */
+export const TOUR_STEP_MS = 340;
+/** More stops waiting than this and the older ones are skipped: the cursor keeps up with the agent rather than replaying. */
+export const TOUR_MOST = 6;
+/** How long a cursor is kept, pointer gone, for its fade out (`AgentCursor`, 600 ms). */
+export const LEAVE_MS = 650;
 
 /**
  * Presence: where everyone else on this canvas is, and where this frame is for them.
@@ -26,6 +36,26 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 	const [present, setPresent] = createSignal<Map<string, Present>>(new Map());
 	/** Agents' cursors on their way out, by key. */
 	const linger = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Each agent's tour: the stops still to make and the timer between them, by key. */
+	const tours = new Map<string, { stops: Array<{ x: number; y: number }>; timer?: ReturnType<typeof setTimeout> }>();
+	/** Let an agent's cursor go: fading first, then dropped. */
+	const letGo = (key: string) => {
+		setPresent((all) => {
+			const was = all.get(key);
+			if (!was) return all;
+			const next = new Map(all);
+			next.set(key, { ...was, pointer: undefined, leaving: true });
+			return next;
+		});
+		linger.set(key, setTimeout(() => {
+			linger.delete(key);
+			setPresent((all) => {
+				const next = new Map(all);
+				next.delete(key);
+				return next;
+			});
+		}, LEAVE_MS));
+	};
 	let last = 0;
 	let pointerOut = true;
 	const pointer = (event: PointerEvent) => {
@@ -65,11 +95,38 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 				next.set(key, { by, at: message.at, ...(pointer ? { pointer } : {}), selection: card?.id && message.phase === "start" ? [card.id] : [] });
 				return next;
 			});
-			if (message.phase === "done") linger.set(key, setTimeout(() => setPresent((all) => {
-				const next = new Map(all);
-				next.delete(key);
-				return next;
-			}), ACT_LINGER_MS));
+			if (message.phase === "done") linger.set(key, setTimeout(() => letGo(key), ACT_LINGER_MS));
+		},
+		/**
+		 * An agent's edit landed: its cursor goes to each thing it touched in turn, resting `TOUR_STEP_MS`
+		 * on each, and stays on the last for `TOUR_LINGER_MS` so a run of edits reads as one hand at
+		 * work rather than a cursor that comes and goes. Stops past `TOUR_MOST` are skipped, newest kept.
+		 */
+		tour(agentId: string, by: PresenceBy, stops: ReadonlyArray<{ x: number; y: number }>): void {
+			if (!stops.length) return;
+			const key = `act/agent/${agentId}`;
+			clearTimeout(linger.get(key));
+			linger.delete(key);
+			const tour = tours.get(key) ?? { stops: [] };
+			tours.set(key, tour);
+			tour.stops.push(...stops);
+			if (tour.stops.length > TOUR_MOST) tour.stops.splice(0, tour.stops.length - TOUR_MOST);
+			const step = () => {
+				const stop = tour.stops.shift();
+				if (!stop) {
+					tour.timer = undefined;
+					linger.set(key, setTimeout(() => letGo(key), TOUR_LINGER_MS));
+					return;
+				}
+				setPresent((all) => {
+					const next = new Map(all);
+					const was = next.get(key);
+					next.set(key, { by, at: Date.now(), pointer: stop, selection: was?.selection ?? [] });
+					return next;
+				});
+				tour.timer = setTimeout(step, TOUR_STEP_MS);
+			};
+			if (tour.timer === undefined) step();
 		},
 		/** What the line says of someone else. */
 		hear(message: ServerMessage): boolean {
@@ -93,6 +150,8 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 			return true;
 		},
 		dispose() {
+			for (const tour of tours.values()) clearTimeout(tour.timer);
+			for (const timer of linger.values()) clearTimeout(timer);
 			removeEventListener("pointermove", pointer, true);
 			removeEventListener("pointerleave", leave, true);
 			removeEventListener("blur", leave);

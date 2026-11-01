@@ -1417,6 +1417,12 @@ export class StageEngine {
 	 * move is for the apps and documents it covers, sends the live paths and nothing else (`setLive`). The
 	 * stage's own index over the cards (`index`, in the same order) is taken when given, so none is built here.
 	 */
+	/** An item's box as laid out, with the item it is inside: what a mark over an agent's edit is drawn at. */
+	boxOf(id: string): { x: number; y: number; w: number; h: number; parent?: string | undefined } | undefined {
+		const one = this.placed.get(id);
+		return one ? { x: one.box.x, y: one.box.y, w: one.box.w, h: one.box.h, ...(one.parent ? { parent: one.parent } : {}) } : undefined;
+	}
+
 	setCards(cards: readonly SceneCard[], index?: BoxIndex): void {
 		const was = this.placedCards;
 		this.placedCards = cards;
