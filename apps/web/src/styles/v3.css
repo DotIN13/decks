@@ -1539,9 +1539,13 @@ body {
 		max-width: 96px;
 		font-size: 15px;
 	}
+	/* The canvas's name gets the room the bar has, and the deck switcher, which the panel's head holds, gives it up. */
 	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
-		max-width: 96px;
+		max-width: none;
 		font-size: 15px;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-deck {
+		display: none;
 	}
 	/* The phone's `⋯`: the top-right menu, standing at the right end of the one bar. */
 	.v3-phone-more {
@@ -1639,15 +1643,16 @@ body {
 	.app[data-phone="true"] .v3-deck .switcher-name {
 		display: none;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] {
+	/* The row lives in the canvas frame, whose root carries the phone mark (`frame/inside/boot.ts`), not the app's. */
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] {
 		gap: 0;
 		padding: 0 4px;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-tool {
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] .v3-tool {
 		width: 38px;
 		height: 40px;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-rule {
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] .v3-rule {
 		margin: 0 1px;
 	}
 }
