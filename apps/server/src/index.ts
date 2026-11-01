@@ -63,7 +63,16 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
 	unlinked: (why) => {
 		if (revokeStudioTokens(app.tokens, { paired: why === "revoked" })) app.send(app.pairingMessage());
 	},
+	// A drawing from Studio is written through the canvas store, as Studio's: every frame hears it at once, and it is not sent back up.
+	remote: {
+		write: (name, text, by) => {
+			app.pens.writeFrom(name, text, { kind: "studio", id: by });
+			return true;
+		},
+	},
 });
+// Every write of a canvas, as logged: a canvas on Studio has its edits sent up at once (`HarnessSync.edited`).
+app.pens.wrote = (name, change) => studio.edited(name, change);
 
 /*
  * One upgrade listener, two websockets.

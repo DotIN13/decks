@@ -69,6 +69,12 @@ export interface SyncOptions {
 	 * (`apps/server/src/studio`). What was given through it should go.
 	 */
 	unlinked?: (why: "revoked" | "changed") => void;
+	/**
+	 * Where a drawing from Studio is written: through the harness's canvas store, which records the
+	 * write as Studio's (`by`, Studio's user id or "studio"), so what came down is not sent up again
+	 * (`edited`). Answers false to have the file written here instead. Absent: the file is written.
+	 */
+	remote?: { write(name: string, text: string, by: string): boolean };
 }
 
 interface CanvasState {
@@ -184,6 +190,8 @@ export class HarnessSync {
 	private latest = new Map<string, number>();
 	/** Edits that came inside live messages and are not applied yet, by canvas id. */
 	private inbox = new Map<string, { base: number; rev: number; changes: PenEdit[] }[]>();
+	/** Edits made here and not sent yet, by canvas name, as the canvas store logged them (`edited`). */
+	private outbox = new Map<string, PenEdit[][]>();
 	/** Canvases (by id) Studio says changed; canvases (by name) whose drawing, files or card pictures changed here. */
 	private pull = new Set<string>();
 	private dirtyPens = new Set<string>();
@@ -338,6 +346,13 @@ export class HarnessSync {
 			const name = byId.get(id);
 			if (!name) return this.pass();
 			pens.add(name);
+		}
+		// What was edited here goes up first, as logged: the file is compared only for what that missed.
+		for (const name of [...this.outbox.keys()]) {
+			const s = this.state.canvases[name];
+			const c = s && this.remote.get(s.id);
+			if (!c) return this.pass();
+			await this.pushEdits(name, c);
 		}
 		for (const name of new Set([...pens, ...files, ...pictures])) {
 			const s = this.state.canvases[name];
@@ -542,6 +557,8 @@ export class HarnessSync {
 	private async syncCanvas(name: string, remote: SyncCanvas) {
 		const s = this.state.canvases[name];
 		if (!s) return;
+		// Comparing the file finds every edit made here, the queued ones among them.
+		this.outbox.delete(name);
 		let base = this.baseOf(s.id);
 		const local = this.readLocal(name, base);
 		if (!local) return;
@@ -638,7 +655,7 @@ export class HarnessSync {
 	 * was read before Studio was asked; when it changed since (an agent wrote it meanwhile), those
 	 * changes are kept on top of Studio's and go up on the next pass.
 	 */
-	private writePen(name: string, text: string, was?: { text: string; size?: number; mtimeMs?: number }) {
+	private writePen(name: string, text: string, was?: { text: string; size?: number; mtimeMs?: number }, by = "studio") {
 		const path = join(this.folder(name), "canvas.pen");
 		let current: string | undefined;
 		let st;
@@ -663,8 +680,11 @@ export class HarnessSync {
 		}
 		if (current !== out) {
 			cost.canvases++;
-			mkdirSync(dirname(path), { recursive: true });
-			writeFileSync(path, out);
+			// Through the canvas store when the harness gives one: the write is recorded as Studio's and reaches every frame at once.
+			if (!this.o.remote?.write(name, out, by)) {
+				mkdirSync(dirname(path), { recursive: true });
+				writeFileSync(path, out);
+			}
 		}
 		const after = statSync(path);
 		if (out === text) this.penSeen.set(name, { size: after.size, mtimeMs: after.mtimeMs });
@@ -1000,6 +1020,61 @@ export class HarnessSync {
 		this.state.inventory = hash;
 	}
 
+	// ---- edits made here, sent as they are logged ----
+
+	/**
+	 * An edit made on this harness, as its canvas store logged it (`StagePens.wrote`): for a canvas on
+	 * Studio, the edits go up at once, with Studio's revision as their base, instead of waiting for the
+	 * file to be compared with the last agreed drawing (which stays as the repair for anything missed).
+	 * One Studio made (author `studio`, written through `remote.write`) is Studio's already.
+	 */
+	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void {
+		if (this.stopped || change.by.kind === "studio" || !change.edits.length) return;
+		if (!this.state.canvases[name]) return;
+		const list = this.outbox.get(name) ?? [];
+		list.push([...change.edits]);
+		this.outbox.set(name, list);
+		this.soon(0);
+	}
+
+	/**
+	 * The edits queued for one canvas, sent as one body against the revision agreed here, and Studio's
+	 * answer taken as a pass takes it: the drawing as Studio now has it (ours merged, and whatever else
+	 * came meanwhile) becomes the agreed one, and is written here only where it differs.
+	 */
+	private async pushEdits(name: string, remote: SyncCanvas) {
+		const queued = this.outbox.get(name) ?? [];
+		this.outbox.delete(name);
+		const s = this.state.canvases[name];
+		if (!s || !queued.length) return;
+		// Nothing of ours goes onto a canvas shared with us to view: the next pass says so of the file.
+		if (remote.role === "view") return;
+		const base = this.baseOf(s.id);
+		if (!base) {
+			this.dirtyPens.add(name);
+			return;
+		}
+		const edits = queued.flat();
+		this.pictureDue.add(name);
+		const r = await this.call("POST", `/sync/v1/canvases/${s.id}/edits`, { base: s.rev, edits, client: this.me });
+		if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
+		let next: { doc: PenDocument; rev: number };
+		if (r.pen) next = { doc: r.pen, rev: r.rev };
+		else if (r.base === s.rev) next = { doc: loosely(base.doc, r.changes ?? []), rev: r.rev };
+		else {
+			this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, r.rev));
+			next = await this.changesSince(s, base.doc);
+		}
+		if (next.rev === s.rev && !r.adjusted && !r.dropped) return; // Set what was already there: no revision, nothing to write.
+		const local = this.readLocal(name, base);
+		const text = serialize(next.doc);
+		this.writePen(name, text, local, "studio");
+		this.keepBase(s.id, next.doc, text);
+		s.rev = next.rev;
+		this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, s.rev));
+		this.save();
+	}
+
 	// ---- staying in step ----
 
 	/** What a live message asks for: one canvas, its files, or (the list changed) a full pass. */
@@ -1021,7 +1096,8 @@ export class HarnessSync {
 					this.inbox.set(e.id, list.slice(-500));
 				}
 				this.pull.add(e.id);
-				return this.soon(50);
+				// Applied the moment it arrives: the frames on this harness hear the change as the canvas store writes it.
+				return this.soon(0);
 			}
 			case "file": {
 				const name = Object.entries(this.state.canvases).find(([, s]) => s.id === e.canvas)?.[0];

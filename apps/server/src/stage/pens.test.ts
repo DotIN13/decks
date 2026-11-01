@@ -400,8 +400,11 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		assert.deepEqual(span.edits.map((e) => e.op), ["set", "insert"]);
 		assert.equal(pens.editsSince(name, -1), undefined, "a revision from before the log has no edits to offer");
 		// Published from the log: the delta from the revision last sent carries exactly those edits, in order.
-		const [delta] = pens.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }> }>;
-		assert.equal(delta!.type, "stage.pen.delta");
+		// Said first as canvas.changed, once for every client on the line, then as the tab's per-agent delta: the same edits.
+		const published = pens.changes([""], name) as Array<{ type: string; from: number; rev: number; edits: Array<{ op: string }>; author?: { kind: string } }>;
+		assert.deepEqual(published.map((m) => m.type), ["canvas.changed", "stage.pen.delta"]);
+		assert.equal(published[0]!.author?.kind, "person");
+		const delta = published[1];
 		assert.deepEqual([delta!.from, delta!.rev], [first, now]);
 		assert.deepEqual(delta!.edits.map((e) => e.op), ["set", "insert"]);
 		assert.deepEqual(wrote.map((w) => [w.rev, w.by, w.ops]), [[first, "person", ["insert"]], [first + 1, "person", ["set"]], [first + 2, "person", ["insert"]]]);
@@ -412,6 +415,7 @@ test("every write is logged with its edits: changesSince and editsSince answer t
 		assert.equal(hand.rev, now + 1);
 		assert.equal(pens.editsSince(name, now), undefined);
 		const [fallback] = pens.changes([""], name) as Array<{ from: number; rev: number; edits: Array<{ op: string; id?: string }> }>;
+		assert.equal((fallback as { type?: string }).type, "canvas.changed");
 		assert.deepEqual([fallback!.from, fallback!.rev], [now, now + 1]);
 		assert.ok(fallback!.edits.some((e) => e.op === "remove" && e.id === "b"), "the drawings compared say b went");
 	} finally {

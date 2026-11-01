@@ -11,7 +11,7 @@ import type { PenDocument, PenEdit, PenNode } from "@decks/pen";
  */
 
 /** Who wrote a canvas: the person (an edit from a page), an agent (its own call), or the file itself. */
-export type Author = { kind: "person" } | { kind: "agent"; id: string } | { kind: "file" };
+export type Author = { kind: "person" } | { kind: "agent"; id: string } | { kind: "file" } | { kind: "studio"; id: string };
 
 /**
  * One write of a canvas: its revision, its author, the items it touched, and the edits that made it
@@ -91,7 +91,7 @@ export function canvasNews(
 	const authorOf = new Map<string, Author>();
 	for (const record of records) for (const id of record.ids) authorOf.set(id, record.by);
 	// No record is a change from before this server started keeping them: someone, not a guess.
-	const who = (by: Author | undefined) => (!by ? "someone" : by.kind === "file" ? "a file edit" : by.kind === "person" ? "you" : nameOf(by.id));
+	const who = (by: Author | undefined) => (!by ? "someone" : by.kind === "file" ? "a file edit" : by.kind === "person" ? "you" : by.kind === "studio" ? "someone through Studio" : nameOf(by.id));
 	const mine = (by: Author | undefined) => by?.kind === "agent" && by.id === self;
 
 	type Change = { author: string; verb: string; node: PenNode; detail?: string };

@@ -104,6 +104,13 @@ const MADE_LATELY = 64;
  */
 export const penWriter = new AsyncLocalStorage<string>();
 
+/**
+ * Who a write is made for when it is neither the person's nor an agent's call: Studio's, bringing
+ * another harness's or browser's change down (`writeFrom`). Read when the drawing is written and kept
+ * on the log, so the sync does not send the change back up.
+ */
+export const penOrigin = new AsyncLocalStorage<Author>();
+
 /** Words measured as the page measures them (`text.ts`). */
 const measure = serverText.measure;
 
@@ -1174,6 +1181,15 @@ export class StagePens {
 		return this.write(name, toMemory(name, parse(text)));
 	}
 
+	/**
+	 * A drawing from Studio, written as it came and recorded as Studio's (`by`), so the sync does not
+	 * send it back up and the agents' notes say who. Allowed on a canvas shared with the person to view,
+	 * which they may not edit but Studio may change under them.
+	 */
+	writeFrom(name: string, text: string, by: Author): PenEntry {
+		return penOrigin.run(by, () => this.write(name, toMemory(name, parse(text)), { unchecked: true }));
+	}
+
 	/** What an agent reads: the file's items, each with its box on the stage. */
 	read(name: string, more: ReadMore = {}) {
 		const entry = this.get(name);
@@ -1181,8 +1197,8 @@ export class StagePens {
 		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.withImported(name, entry.doc), { theme: themeFrom(entry.doc, theme), measure, ...rest }) };
 	}
 
-	private write(name: string, doc: PenDocument): PenEntry {
-		this.mayWrite(name);
+	private write(name: string, doc: PenDocument, options: { unchecked?: boolean } = {}): PenEntry {
+		if (!options.unchecked) this.mayWrite(name);
 		const file = this.fileOf(name);
 		mkdirSync(this.folderOf(name), { recursive: true });
 		if (!this.watcher) this.watch();
@@ -1195,9 +1211,9 @@ export class StagePens {
 		this.cache.set(name, entry);
 		const by = penEditBy.getStore();
 		if (by) this.made.set(name, [...(this.made.get(name) ?? []), by]);
-		// An agent's call says so (`penWriter`); any other write here is the person's, from a page.
+		// Studio's (`penOrigin`), an agent's call (`penWriter`), or the person's, from a page.
 		const writer = penWriter.getStore();
-		this.record(name, previous?.doc, doc, entry.rev, writer ? { kind: "agent", id: writer } : { kind: "person" }, by ? [by] : undefined);
+		this.record(name, previous?.doc, doc, entry.rev, penOrigin.getStore() ?? (writer ? { kind: "agent", id: writer } : { kind: "person" }), by ? [by] : undefined);
 		if (writer) this.writers.set(name, writer);
 		this.changed(name, entry);
 		return entry;

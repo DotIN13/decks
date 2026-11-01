@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
+import type { PenEdit } from "@decks/pen";
 import { HarnessSync, type SyncOptions } from "@decks/sync-client";
 import type { TokenStore } from "../auth/tokens.ts";
 
@@ -16,6 +17,8 @@ export interface StudioLink {
 	stop(): Promise<void>;
 	/** Whether a sync is running, and to where. */
 	status(): { connected: boolean; url?: string };
+	/** An edit made here, as the canvas store logged it: sent up at once for a canvas on Studio (`HarnessSync.edited`). */
+	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void;
 }
 
 const DEFAULT_URL = "https://studio.decks.app";
@@ -120,7 +123,7 @@ export function startStudio(
 	harness?: string,
 	inventory?: SyncOptions["inventory"],
 	harnessToken?: SyncOptions["harnessToken"],
-	link: Pick<SyncOptions, "issueToken" | "unlinked"> = {},
+	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote"> = {},
 ): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
@@ -171,5 +174,6 @@ export function startStudio(
 			await sync?.stop();
 		},
 		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined }),
+		edited: (name, change) => sync?.edited(name, change),
 	};
 }
