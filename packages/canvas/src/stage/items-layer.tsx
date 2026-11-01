@@ -186,6 +186,14 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	});
 
 	/**
+	 * Whether the camera's motion covers an app or a document with its picture (`COVER`): read by the list
+	 * below through this memo, so where neither kind is covered (Chromium) the list does not depend on the
+	 * motion at all. Read directly, every pan and zoom rebuilt the whole list twice, at its first step and
+	 * at rest, to the same 112 cards: 17 ms each on a 4× slowed CPU, a dropped frame at either end.
+	 */
+	const covering = createMemo(() => (COVER.app || COVER.document) && (moving() || panning() || scaling() || gliding()));
+
+	/**
 	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
 	 *
 	 * A dragged board is where it was picked up, here: the sheet draws its picture once on the carried
@@ -204,6 +212,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		 * arrow, so those two are still sent at every step.
 		 */
 		const resize = editor.sheetResize((path) => live.has(path));
+		// How often this list is rebuilt, for `awake-bench.mjs` (`cardLists`): a camera step should not rebuild it.
+		(globalThis as { __decksCardLists?: number }).__decksCardLists = ((globalThis as { __decksCardLists?: number }).__decksCardLists ?? 0) + 1;
 		const sendCards = (cards: SceneCard[]) => {
 			/*
 			 * The engine draws the cards' pictures, and hears of every card: an arrow follows the card it
@@ -213,13 +223,15 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			 */
 			penLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
 		};
-		const inMotion = moving() || panning() || scaling() || gliding();
+		const inMotion = covering();
 		// Each card's item on the drawing, by its path: what the engine keeps a glide's offset under.
 		const itemIds = new Map<string, string>();
 		for (const placed of penLayer.placed.values()) {
 			const path = (placed.node.metadata as { path?: unknown } | undefined)?.path;
 			if (typeof path === "string") itemIds.set(path, placed.node.id);
 		}
+		// Read once: the host works it out over every page each time it is asked, and it was asked once per card.
+		const news = props.news;
 		sendCards(
 			props.boards
 				.map((board) => {
@@ -244,7 +256,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						title: board.title,
 						kind: board.card ? "card" : (board.item ?? "board"),
 						...(board.item === "app" && board.app ? { status: states.get(board.app) ?? "" } : {}),
-						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
+						...(news?.[board.path] ? { news: resolveColour(news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
 				}),
 		);

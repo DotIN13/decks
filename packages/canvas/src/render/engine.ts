@@ -1014,14 +1014,18 @@ export class StageEngine {
 				this.sendCamera();
 			}, FAST_HOLD_MS);
 		// A pan inside the sheet: the browser has scrolled it with the world, and there is nothing to draw (`drawRect`).
-		if (this.windowInSheet()) {
-			this.wantCardPictures();
-		} else {
+		if (!this.windowInSheet()) {
 			this.sheet = undefined;
 			this.draw();
 			this.sendCamera();
-			this.wantCardPictures();
 		}
+		/*
+		 * The pictures wanted, once a frame: a pinch's two fingers and a trackpad's wheel move the camera
+		 * two or three times a frame, and each asked the index and sorted the cards near the window again
+		 * (a tenth of a zoom's script time at 100 cards, for a list that could not have changed in between).
+		 */
+		this.picturesSoon = true;
+		this.tickSoon();
 		// The click shapes follow the window: written again once it leaves the area they cover.
 		const w = this.hitWindow;
 		if (w && this.placed.size) {
@@ -1133,6 +1137,8 @@ export class StageEngine {
 	 * two-event pinch, 1.2 for a wheel zoom).
 	 */
 	private dirty = false;
+	/** The pictures the cards near the window want, asked for at the next frame (`setCamera`). */
+	private picturesSoon = false;
 	private tickFrame = 0;
 	private tickSoon(): void {
 		if (this.tickFrame || this.disposed) return;
@@ -1141,6 +1147,10 @@ export class StageEngine {
 	private tick(): void {
 		this.tickFrame = 0;
 		if (this.disposed) return;
+		if (this.picturesSoon) {
+			this.picturesSoon = false;
+			this.wantCardPictures();
+		}
 		if (this.dirty) this.drawNow();
 		// A new frame's share of taking tiles in, spent after its draw (`takeTilesSoon`).
 		this.frameTaken = { ms: 0, bytes: 0, pictures: 0 };
