@@ -49,6 +49,7 @@ const CHECKS = [
 	 * `turn-bar.mjs` went with the spine itself, and `modes.mjs` and `inspector.mjs` went with
 	 * editing a board's page from the canvas.
 	 */
+	{ file: "empty-canvas-follows.mjs", needsAgent: false },
 	{ file: "panel.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "chat-content.mjs", needsAgent: false },

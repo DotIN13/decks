@@ -31,8 +31,8 @@ export interface LineClient {
 
 /**
  * The frame's end of the line (`server/src/line.ts`): one WebSocket to `/api/v1/socket` that carries
- * the frame's calls, the canvas's changes and the frame's own messages, in one envelope. It opens on
- * the first use, says `hello` with the token and what it watches, and comes back after a drop a little
+ * the frame's calls, the canvas's changes and the frame's own messages, in one envelope. It opens as
+ * it is made, says `hello` with the token and what it watches, and comes back after a drop a little
  * later each time (0.5 s to 10 s); messages sent while it is down wait for it. Calls carry an `id` and
  * are answered once under it (`answer`); a call on the line when it drops is answered with an error,
  * never sent again, since the harness may have taken it.
@@ -95,6 +95,12 @@ export function openLine(options: LineOptions): LineClient {
 		if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 		else queue.push(message);
 	};
+	/*
+	 * Opened now, not at the first message: a frame on a canvas with nothing on it has nothing to say
+	 * (no card to report seen or sized), and a line opened only by a message would never carry the
+	 * canvas's changes to it; what an agent put there showed only after a reload.
+	 */
+	ensure();
 
 	return {
 		send,
