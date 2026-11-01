@@ -25,7 +25,7 @@
  * - cardLists: how often the stage rebuilt the list of cards it hands the engine during the run (`items-layer.tsx`; should be about 0).
  */
 import { writeFileSync } from "node:fs";
-import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, open, say, socket } from "../harness.mjs";
 import { AWAKE_CANVAS, writeAwakeCanvas } from "../awake-canvas.mjs";
 
 const RUNS = Math.max(1, Number(process.env.AWAKE_BENCH_RUNS ?? 3));
@@ -34,6 +34,18 @@ const OUT = process.env.AWAKE_BENCH_OUT;
 const ONLY = (process.env.AWAKE_BENCH_ONLY ?? "pan,zoom").split(",");
 const PROFILE = process.env.AWAKE_BENCH_PROFILE;
 const TRACE = process.env.AWAKE_BENCH_TRACE;
+/** `AWAKE_BENCH_LAYERS=<file>`: the compositor's layers mid-zoom, with why each is one, written there. */
+const LAYERS = process.env.AWAKE_BENCH_LAYERS;
+/**
+ * `AWAKE_BENCH_PICTURES=1`: every card has its picture before anything is measured. The canvas is written
+ * into a fresh deck, so its cards have none, and the engine paints 100 placeholders instead of pictures,
+ * which is the uncommon case: a real canvas has placeholders only for new cards. The bench asks the server
+ * for each card's whole picture (two at a time, as the server takes them) and waits until the frame holds one
+ * for every card near the window; the rungs the frame then wants are cut from the whole ones.
+ */
+const PICTURES = process.env.AWAKE_BENCH_PICTURES === "1";
+/** `AWAKE_BENCH_PANEL=closed`: the side panel shut, to measure what its layers cost the compositor. */
+const PANEL = process.env.AWAKE_BENCH_PANEL;
 const W = 1500;
 const H = 950;
 const DPR = 2;
@@ -65,7 +77,7 @@ const at = (name) => {
 setTimeout(() => {
 	say(`the bench finished within four minutes (hung in: ${phase})`, false);
 	process.exit(1);
-}, 240_000).unref();
+}, PICTURES ? 600_000 : 240_000).unref();
 const median = (rows, key) => quantile(rows.map((r) => r[key]).filter((v) => typeof v === "number"), 0.5);
 
 // --- the canvas ---------------------------------------------------------------------------------------
@@ -120,7 +132,7 @@ setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1200);
 await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === AWAKE_CANVAS), 20000);
 at("reloading onto it");
 await page.reload({ waitUntil: "domcontentloaded" });
-const canvas = await canvasFrame(page, { timeout: 90000 }).catch((error) => {
+let canvas = await canvasFrame(page, { timeout: 90000 }).catch((error) => {
 	say("the canvas frame shows its stage", false, `${error.message}; page errors: ${errors.join(" | ")}; frames: ${page.frames().map((f) => f.url().slice(0, 60)).join(", ")}`);
 	process.exit(1);
 });
@@ -130,6 +142,46 @@ const shown = await canvas
 	.then(() => true)
 	.catch(() => false);
 say("the stage shows the awake canvas", shown, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+
+if (PICTURES) {
+	at("taking every card's picture");
+	// A card's path in the canvas file is from the canvas's own folder; the server's is from the deck.
+	const paths = pen.children.filter((n) => n.type === "browser" && n.metadata?.type === "decks.card").map((n) => (n.metadata.path.startsWith("canvases/") ? n.metadata.path : `canvases/${AWAKE_CANVAS}/${n.metadata.path}`));
+	const headers = await asPerson(API);
+	let done = 0;
+	let failed = 0;
+	const t0 = Date.now();
+	let why = "";
+	/** True once the card's own whole picture came: a stand-in (another size, sent while the real one is taken) means ask again. */
+	const take = async (path) => {
+		const url = `${API}/api/thumb/${path.split("/").map(encodeURIComponent).join("/")}?whole=1&scheme=dark`;
+		const response = await fetch(url, { headers }).catch((error) => (why ||= `${url}: ${error.message}`, undefined));
+		await response?.arrayBuffer().catch(() => {});
+		if (response?.ok && !response.headers.get("x-decks-stand-in")) return true;
+		if (response && !response.ok && !why) why = `${url}: ${response.status}`;
+		return false;
+	};
+	let queue = [...paths];
+	for (let round = 0; round < 4 && queue.length; round++) {
+		const again = [];
+		await Promise.all(Array.from({ length: 2 }, async () => {
+			for (let path = queue.shift(); path; path = queue.shift()) if (await take(path)) done++; else again.push(path);
+		}));
+		queue = again;
+		if (queue.length) await new Promise((r) => setTimeout(r, 2000));
+	}
+	failed = queue.length;
+	say(`every card has its picture (${done} of ${paths.length} taken in ${Math.round((Date.now() - t0) / 1000)} s)`, failed === 0, failed ? `${failed} still without; first: ${why}` : "");
+	// The frame hears of each picture as it is made (the sheet asks again); a reload is the sure way to a clean start with them.
+	await page.reload({ waitUntil: "domcontentloaded" });
+	canvas = await canvasFrame(page, { timeout: 90000 });
+	await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 112, undefined, { timeout: 30000 }).catch(() => {});
+}
+
+if (PANEL === "closed") {
+	await page.locator('button[aria-label="Hide the side panel"]').first().click({ timeout: 10000 });
+	await page.waitForTimeout(500);
+}
 
 await canvas.evaluate(() => {
 	const stage = () => document.querySelector(".stage");
@@ -205,11 +257,12 @@ const quiet = (ms = 1200, cap = 15000) =>
 	canvas.evaluate(
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
-			let last = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length]);
+			const pictures = () => globalThis.__decksEngine?.stats?.().pictures ?? 0;
+			let last = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
-				const now = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length]);
+				const now = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
 				const d = document.querySelector(".stage")?.dataset;
 				if (now !== last || d?.moving === "true" || d?.gliding === "true") {
 					last = now;
@@ -234,6 +287,24 @@ if (TRACE) cdp.on("Tracing.dataCollected", (event) => traced.push(...event.value
 const frameBox = await page.locator("iframe.canvas-frame").boundingBox();
 const point = { x: frameBox.x + frameBox.width / 2, y: frameBox.y + frameBox.height / 2 };
 
+/** The compositor's layers as they are now, each with its element and the reasons it is a layer (CDP `LayerTree`). */
+const describeLayers = async () => {
+	let layers = [];
+	const heard = new Promise((done) => cdp.once("LayerTree.layerTreeDidChange", (e) => done(e.layers ?? [])));
+	await cdp.send("LayerTree.enable");
+	layers = await Promise.race([heard, new Promise((r) => setTimeout(() => r([]), 1500))]);
+	await cdp.send("DOM.enable").catch(() => {});
+	const lines = [];
+	for (const layer of layers) {
+		const reasons = await cdp.send("LayerTree.compositingReasons", { layerId: layer.layerId }).then((r) => r.compositingReasonIds ?? r.compositingReasons ?? []).catch(() => []);
+		let node = "";
+		if (layer.backendNodeId) node = await cdp.send("DOM.describeNode", { backendNodeId: layer.backendNodeId }).then((r) => `${r.node.localName}${r.node.attributes ? "." + (r.node.attributes[r.node.attributes.indexOf("class") + 1] ?? "") : ""}`).catch(() => "?");
+		lines.push(`${String(layer.width).padStart(6)}×${String(layer.height).padEnd(6)} ${node.padEnd(28)} ${reasons.join(",")}${layer.drawsContent ? "" : " (draws nothing)"}`);
+	}
+	writeFileSync(LAYERS, `${layers.length} compositor layers mid-zoom:\n  ${lines.join("\n  ")}\n`);
+	await cdp.send("LayerTree.disable").catch(() => {});
+};
+
 /** One run: wheel input at 120 Hz for SECONDS, there and back; a pan or a pinch. */
 const run = async (kind) => {
 	const before = await metrics();
@@ -257,6 +328,10 @@ const run = async (kind) => {
 		if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 	}
 	await Promise.all(sent);
+	if (LAYERS && kind === "zoom" && !run.layersShown) {
+		run.layersShown = true;
+		await describeLayers();
+	}
 	await canvas.evaluate(() => new Promise((r) => setTimeout(r, 50)));
 	const got = await canvas.evaluate(() => globalThis.__bench.stop());
 	counting = false;
