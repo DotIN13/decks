@@ -214,12 +214,20 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			penLayer.setCards(cards, resize ? undefined : untrack(pageIndex));
 		};
 		const inMotion = moving() || panning() || scaling() || gliding();
+		// Each card's item on the drawing, by its path: what the engine keeps a glide's offset under.
+		const itemIds = new Map<string, string>();
+		for (const placed of penLayer.placed.values()) {
+			const path = (placed.node.metadata as { path?: unknown } | undefined)?.path;
+			if (typeof path === "string") itemIds.set(path, placed.node.id);
+		}
 		sendCards(
 			props.boards
 				.map((board) => {
 					const sized = resize?.path === board.path ? resize : undefined;
+					const id = itemIds.get(board.path) ?? [...itemIds].find(([path]) => board.path.endsWith(path))?.[1];
 					return {
 						path: board.path,
+						...(id ? { id } : {}),
 						x: sized?.x ?? board.x,
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,

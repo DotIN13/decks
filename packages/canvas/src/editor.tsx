@@ -176,7 +176,7 @@ export function createEditor(
 	const pen = createMemo(() => {
 		const now = doc();
 		const edits = drawing.editsTo(now);
-		return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
+		return { doc: now, base: penBase(), ...(edits ? { edits } : {}), ...(drawing.ownTo(now) ? { own: true as const } : {}) };
 	});
 	/*
 	 * Owned by whoever makes the editor (the canvas frame's render root), never by

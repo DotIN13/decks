@@ -35,6 +35,8 @@ export interface DrawingWriter {
 /** A card as the stage places it: its box, whether its page is showing, and its picture. */
 export interface SceneCard {
 	path: string;
+	/** Its item on the drawing, when known: a glide's offset is kept under it (`engine.rs`, `offsets`). */
+	id?: string;
 	x: number;
 	y: number;
 	w: number;

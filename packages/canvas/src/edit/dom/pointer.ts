@@ -17,6 +17,7 @@ import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, M
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
+import { glideShift } from "../core/overlay.ts";
 import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
 import type { Handle } from "../core/resize.ts";
 import type { SceneQuery } from "../core/scene.ts";
@@ -708,8 +709,28 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	};
 
 	/** What a board's frame reads of the editor and says back to it (`PageView`). */
+	/** The item on the drawing that is this page, by its path as the item names it or by its end. */
+	const pageItemId = (path: string): string | undefined => {
+		let ends: string | undefined;
+		for (const one of host.scene.items()) {
+			const own = (one.node.metadata as { path?: unknown } | undefined)?.path;
+			if (typeof own !== "string") continue;
+			if (own === path) return one.node.id;
+			if (!ends && path.endsWith(own)) ends = one.node.id;
+		}
+		return ends;
+	};
 	const pageView = (path: string): PageView => ({
-		shift: () => (editor.pageDrag()?.paths.includes(path) ? editor.pageDrag() : undefined),
+		// Carried by the page drag in hand, or gliding to where a change put its item (`editor.glide`, by the item or an ancestor's shift).
+		shift: () => {
+			const drag = editor.pageDrag()?.paths.includes(path) ? editor.pageDrag() : undefined;
+			const glide = editor.glide();
+			if (!glide?.size) return drag;
+			const id = pageItemId(path);
+			const gliding = id ? glideShift(glide, host.scene, id) : undefined;
+			if (!gliding || (!gliding.dx && !gliding.dy)) return drag;
+			return { dx: (drag?.dx ?? 0) + gliding.dx, dy: (drag?.dy ?? 0) + gliding.dy };
+		},
 		resized: () => (editor.pageResize()?.path === path ? editor.pageResize() : undefined),
 		hover: (on) => {
 			if (on) editor.hover({ board: path });

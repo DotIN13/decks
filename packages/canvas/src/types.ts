@@ -228,7 +228,7 @@ export interface EditorState {
 	 * With `document`: `made`, the person's edits it is the first to have (by the names `send` was given),
 	 * and `scope`, which drawing it is (the canvas): one of another scope drops the edits on their way.
 	 */
-	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string; writer?: DrawingWriter } | undefined>;
+	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string; writer?: DrawingWriter; /** The person's own edit or step, shown at once by their hand: nothing to glide. */ own?: true } | undefined>;
 }
 
 /** What of `EditorState` the editor made in a host's own tree reads: the mode and the ink. */

@@ -479,6 +479,7 @@ impl PageEngine {
 				let path = b.get("path")?.as_str()?.to_owned();
 				Some(crate::engine::CardPlace {
 					picture: format!("card:{path}"),
+					id: b.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
 					path,
 					x: n("x"),
 					y: n("y"),

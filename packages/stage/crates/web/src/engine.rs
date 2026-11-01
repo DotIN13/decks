@@ -512,7 +512,8 @@ impl Page {
 			let carried = self.carry.0.contains(&board.path);
 			let picture = self.pictures.get(&board.picture);
 			let app = board.kind == "app";
-			let (dx, dy) = if carried { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
+			// Carried by a drag, or gliding to where a change put it (`offsets`, kept under its item's id).
+			let (dx, dy) = if carried { (self.carry.1, self.carry.2) } else { self.offsets.get(&board.id).copied().unwrap_or((0.0, 0.0)) };
 			let place = Rect { x: board.x + dx, y: board.y + dy, w: board.w, h: board.h };
 			if !place.meets(&view) {
 				continue;
@@ -1569,7 +1570,7 @@ mod tests {
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
 		page.pictures.held.insert("card:boards/x.html".into(), (900, 400, 300));
-		let board = |live| CardPlace { path: "boards/x.html".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new(), status: String::new() };
+		let board = |live| CardPlace { path: "boards/x.html".into(), id: "x".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new(), status: String::new() };
 		page.cards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
@@ -1784,6 +1785,8 @@ impl ViewState {
 #[derive(Clone, Debug, Default)]
 pub struct CardPlace {
 	pub path: String,
+	/// The id of its item on the drawing: what a glide's offset is kept under (`offsets`).
+	pub id: String,
 	/// The address its picture is held under (`card:<path>`), made once with the place.
 	pub picture: String,
 	pub x: f64,

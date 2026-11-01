@@ -62,3 +62,31 @@ test("a glide eases out over 150 ms: all of the shift at the start, a little at 
 	assert.deepEqual(glideAt(shifts, 150).get("x"), { dx: 0, dy: -0 });
 	assert.equal(easeOut(2), 1);
 });
+
+test("every change glides: shifts come from where things were drawn, an appeared item rises in, and each frame decays them until under half a pixel", async () => {
+	const { decay, glideStep, shiftsFrom, RATE, FADE_RATE, RISE, MOST_GLIDING } = await import("./glide.ts");
+	// Half of what is left goes every ln2/k seconds.
+	assert.ok(Math.abs(decay(100, RATE, Math.LN2 / RATE) - 50) < 1e-9);
+	assert.ok(decay(100, RATE, 0.15) < 5, "a 100 px move is 95% there in 150 ms");
+	assert.ok(decay(1, FADE_RATE, 0.6) < 0.05, "a fade is done in about 600 ms");
+	const before = new Map([["a", { x: 0, y: 0, w: 10, h: 10 }], ["b", { x: 100, y: 0, w: 10, h: 10 }]]);
+	const after = new Map([["a", { x: 40, y: 0, w: 10, h: 10 }], ["b", { x: 100, y: 0, w: 10, h: 10 }], ["c", { x: 200, y: 0, w: 10, h: 10 }]]);
+	const shifts = shiftsFrom(before, (id) => after.get(id), () => undefined, ["c"]);
+	assert.deepEqual(shifts.get("a"), { dx: -40, dy: 0 }, "a is drawn 40 px back from where it lands");
+	assert.equal(shifts.has("b"), false, "b did not move");
+	assert.deepEqual(shifts.get("c"), { dx: 0, dy: RISE, fade: 1 }, "c appeared: low and transparent");
+	// Frames: the shift decays, the fade decays, and each ends by threshold.
+	let now = shifts;
+	let frames = 0;
+	while (now.size && frames < 200) {
+		now = glideStep(now, 1 / 60);
+		frames += 1;
+	}
+	assert.ok(frames > 5 && frames < 60, `done in ${frames} frames at 60 Hz`);
+	const one = glideStep(shifts, 1 / 60);
+	assert.ok(one.get("a")!.dx > -40 && one.get("a")!.dx < -25, "a frame in, a has moved some of the way");
+	assert.ok(one.get("c")!.fade! < 1 && one.get("c")!.dy < RISE, "c is rising and fading in");
+	// A whole canvas changing is not an edit: nothing glides.
+	const many = new Map([...Array(MOST_GLIDING + 1)].map((_, i) => [`i${i}`, { x: 0, y: 0, w: 1, h: 1 }]));
+	assert.equal(shiftsFrom(many, (id) => ({ x: 10, y: 0, w: 1, h: 1 }), () => undefined, []).size, 0);
+});

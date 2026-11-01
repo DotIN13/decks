@@ -24,7 +24,7 @@ import { docIndex, drawnNodes } from "../model/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords, type Words } from "./measure.ts";
-import { GLIDE_MS, glideAt, glideShifts } from "../camera/glide.ts";
+import { glideShifts, glideStep, shiftsFrom, type Shift } from "../camera/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { ENGINE, knownGpuClass, PICTURES, readGpuClass } from "./device.ts";
@@ -167,6 +167,15 @@ type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[
  */
 /** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
 const SHEET_MARGIN = 0.25;
+
+/**
+ * Whether changes glide at all: not when the person asked their system for less motion, and not when
+ * a check or a page turned it off (`__decksGlide = false`). A drop still lands where it is dropped.
+ */
+function glidesWanted(): boolean {
+	if ((globalThis as { __decksNoGlide?: boolean }).__decksNoGlide) return false;
+	return typeof matchMedia !== "function" || !matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 export class StageEngine {
 	private page: PageEngine | undefined;
@@ -585,7 +594,7 @@ export class StageEngine {
 	 * server's delta, a mounted canvas's own edit), else what `diff` finds; edits they cannot apply,
 	 * and the drawing goes whole.
 	 */
-	setDoc(doc: PenDocument | undefined, base: string, edits?: DocEdits): void {
+	setDoc(doc: PenDocument | undefined, base: string, edits?: DocEdits, own = false): void {
 		if (doc === this.doc && base === this.base) return;
 		const before = this.doc;
 		this.doc = doc;
@@ -601,6 +610,9 @@ export class StageEngine {
 			this.prefetchFonts();
 			return;
 		}
+		// Where everything is drawn now, glide included: what this drawing's changes glide from.
+		// The person's own edit (a key, a field) was drawn by their hand as it was made: nothing to glide.
+		const drawnBefore = this.settling || own ? undefined : this.drawnBoxes();
 		/*
 		 * A drawing that arrives ends any preview: whatever a drag was showing is now the drawing itself.
 		 * The page applies a preview to its own copy and takes it back after, so it is taken back before
@@ -626,8 +638,8 @@ export class StageEngine {
 		if (unhide) this.sendView();
 		this.laidOut();
 		this.needFonts();
-		// A drop that moved things glides them in from where they were let go, from this very frame.
-		const gliding = this.settling && this.startGlide();
+		// A drop that moved things glides them in from where they were let go, and any other change from where it was drawn, from this very frame.
+		const gliding = this.settling ? this.startGlide() : this.glideFrom(drawnBefore);
 		if (!gliding) this.draw();
 		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
 		if (this.cardsOnly && !this.carriedCount) this.landCards();
@@ -642,44 +654,100 @@ export class StageEngine {
 
 	/**
 	 * Where what a drop can move was let go (`settle`), and the glide in hand: each item's shift from
-	 * where it lands, and when it began.
+	 * where it lands (and, for one that appeared, how much of its transparency is left), and when the
+	 * last frame of it was.
 	 */
 	private landing: ReadonlyMap<string, Frame> | undefined;
-	private glide: { shifts: ReadonlyMap<string, { dx: number; dy: number }>; start: number; frame: number } | undefined;
+	private glide: { shifts: Map<string, Shift>; last: number; frame: number } | undefined;
+
+	/**
+	 * Where each item is drawn now: its laid-out box moved by the glide still in hand, its own shift
+	 * or the shift of the item it is inside. What a new drawing's changes glide from, so a change
+	 * that lands mid-glide goes on from where things are rather than jumping back.
+	 */
+	private drawnBoxes(): Map<string, Frame> {
+		const out = new Map<string, Frame>();
+		const shifts = this.glide?.shifts;
+		for (const [id, one] of this.placed) {
+			let shift: Shift | undefined;
+			for (let up: string | undefined = id; up && !shift; up = this.placed.get(up)?.parent) shift = shifts?.get(up);
+			out.set(id, shift ? { x: one.box.x + shift.dx, y: one.box.y + shift.dy, w: one.box.w, h: one.box.h } : one.box);
+		}
+		return out;
+	}
 
 	/**
 	 * The drawing that answers a drop is laid out: everything that moved glides from where it was let
-	 * go to where it is now (`editor/core/glide.ts`), drawn lifted with a shrinking offset for
-	 * `GLIDE_MS`, then put down. Shown before this drawing's first frame, so nothing is drawn where it
-	 * lands before it has glided there. False when nothing moved.
+	 * go to where it is now (`camera/glide.ts`). Shown before this drawing's first frame, so nothing is
+	 * drawn where it lands before it has glided there. False when nothing moved.
 	 */
 	private startGlide(): boolean {
 		const landing = this.landing;
 		this.landing = undefined;
 		if (!landing || !this.page) return false;
 		const shifts = glideShifts(landing, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent);
-		if (!shifts.size) return false;
+		return this.beginGlide(shifts);
+	}
+
+	/**
+	 * Any other new drawing (an agent's edit, a friend's through Studio, undo): everything drawn
+	 * somewhere else before glides from there, and what appeared rises in. Not while the camera moves
+	 * (it would fight the pan), not while a gesture is showing its own preview, and not for a change
+	 * of more than `MOST_GLIDING` items, which is a canvas changing whole.
+	 */
+	private glideFrom(before: Map<string, Frame> | undefined): boolean {
+		if (!before || !this.page || this.moving || this.shown !== undefined || !glidesWanted()) return false;
+		const appeared: string[] = [];
+		for (const [id, one] of this.placed) if (!one.parent && !before.has(id)) appeared.push(id);
+		const shifts = shiftsFrom(before, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent, appeared);
+		return this.beginGlide(shifts);
+	}
+
+	/**
+	 * Run a glide: each frame the shifts decay (`glideStep`) and what is left is shown as a preview,
+	 * the items lifted and drawn with their offset, an appeared one with its opacity still coming;
+	 * when nothing is left the preview ends, which puts the items down into the tiles.
+	 */
+	private beginGlide(shifts: Map<string, Shift>): boolean {
+		if (!shifts.size || !this.page) return false;
+		if (this.glide) cancelAnimationFrame(this.glide.frame);
+		// What glides now, for the checks (`smooth-edits.mjs`).
+		(globalThis as { __decksGlide?: () => Array<[string, Shift]> }).__decksGlide = () => (this.glide ? [...this.glide.shifts] : []);
 		this.settling = false;
-		const start = performance.now();
-		const first = glideAt(shifts, 0);
-		this.showPreview(first);
-		this.onGlide?.(first);
+		const show = (now: Map<string, Shift>) => {
+			const preview = new Map<string, PenPreview>();
+			const offsets = new Map<string, { dx: number; dy: number }>();
+			for (const [id, one] of now) {
+				offsets.set(id, { dx: one.dx, dy: one.dy });
+				const own = this.placed.get(id)?.node as { opacity?: unknown } | undefined;
+				const base = typeof own?.opacity === "number" ? own.opacity : 1;
+				preview.set(id, { dx: one.dx, dy: one.dy, ...(one.fade !== undefined ? { set: { opacity: Math.round(base * (1 - one.fade) * 1000) / 1000 } } : {}) });
+			}
+			this.showPreview(preview);
+			this.onGlide?.(offsets);
+		};
+		show(shifts);
 		const step = () => {
 			const glide = this.glide;
 			if (!glide || this.disposed) return;
-			const elapsed = performance.now() - glide.start;
-			if (elapsed >= GLIDE_MS) {
+			const now = performance.now();
+			const next = glideStep(glide.shifts, Math.min(0.1, (now - glide.last) / 1000));
+			glide.last = now;
+			if (!next.size) {
 				this.glide = undefined;
 				this.showPreview(undefined);
 				this.onGlide?.(undefined);
 				return;
 			}
-			const now = glideAt(glide.shifts, elapsed);
-			this.showPreview(now);
-			this.onGlide?.(now);
+			glide.shifts = next;
+			// What a frame of the glide costs the main thread (the preview, the lift, the arrows, the draw): for the checks.
+			const began = performance.now();
+			show(next);
+			const cost = (globalThis as { __decksGlideCost?: number[] }).__decksGlideCost;
+			if (cost) cost.push(performance.now() - began);
 			glide.frame = requestAnimationFrame(step);
 		};
-		this.glide = { shifts, start, frame: requestAnimationFrame(step) };
+		this.glide = { shifts, last: performance.now(), frame: requestAnimationFrame(step) };
 		return true;
 	}
 
@@ -1827,7 +1895,8 @@ export class StageEngine {
 	private showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		if (!this.page) return;
 		// Only moved: nothing the stage reads of the layout changes but the arrows bent, so it is told at the end.
-		this.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).length === 0));
+		// A fade in (`opacity` alone) changes no layout either.
+		this.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).every((key) => key === "opacity")));
 		if (moving?.size) {
 			const fresh = [...moving.keys()].filter((id) => !this.lifted.has(id));
 			if (fresh.length) {

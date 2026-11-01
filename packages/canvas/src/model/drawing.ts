@@ -38,6 +38,8 @@ export interface Drawing {
 	refused(edit: string): void;
 	/** The edits that made `doc` from the drawing before it, when it is the drawing now and they are known: the stage applies them. */
 	editsTo(doc: PenDocument): DocEdits | undefined;
+	/** Whether `doc` is the person's own edit or step, shown at once by their hand: nothing for the stage to glide. */
+	ownTo(doc: PenDocument): boolean;
 	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
 	movePage(path: string, x: number, y: number): void;
 	resizePage(path: string, size: { w: number; h: number }): void;
@@ -240,8 +242,11 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 
 	/** What made the drawing now from the one before, when known: `to` is the drawing they made. */
 	let made: (DocEdits & { to: PenDocument }) | undefined;
-	const show = (next: PenDocument, edits?: DocEdits) => {
+	/** The drawing the person's own edit or step last made: shown at once, by their hand, so it is nothing to glide. */
+	let ownDoc: PenDocument | undefined;
+	const show = (next: PenDocument, edits?: DocEdits, own = true) => {
 		made = edits ? { ...edits, to: next } : undefined;
+		ownDoc = own ? next : undefined;
 		setDoc(next);
 	};
 	/** Show `next` in place of what is shown, with what changed between them for the stage. */
@@ -437,7 +442,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		if (!hadPending && pending.length === 0) {
 			setWaiting(0);
 			// Nothing was shown ahead: the host's drawing as it gave it, with its own edits when they follow from what is shown.
-			show(next, edits && edits.from === wasShown ? edits : undefined);
+			show(next, edits && edits.from === wasShown ? edits : undefined, false);
 			return;
 		}
 		showOver(onTop(next));
@@ -561,6 +566,9 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		},
 		editsTo(at) {
 			return made && made.to === at ? { from: made.from, edits: made.edits } : undefined;
+		},
+		ownTo(at) {
+			return ownDoc === at;
 		},
 		movePage(path, x, y) {
 			const id = pageId(path);

@@ -80,7 +80,7 @@ export type StageProps = {
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
 	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
 	 */
-	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter };
+	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter; /** The person's own edit or step, drawn by their hand already: nothing to glide. */ own?: true };
 	/**
 	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire, `decks.canvas.batch` for an agent). Absent
 	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
@@ -341,7 +341,7 @@ export function Stage(props: StageProps) {
 	 * drew (the window and a margin round it), so a pan moves it with the world until it is drawn again.
 	 */
 	createEffect(() => {
-		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "", props.pen?.edits);
+		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "", props.pen?.edits, props.pen?.own === true);
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
 		if (untrack(penLive)) setPenLive(undefined);
 	});
