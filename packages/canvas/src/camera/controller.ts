@@ -174,14 +174,22 @@ export function createCameraController(host: CameraHost) {
 		if (cam.x !== localCamera.x || cam.y !== localCamera.y || cam.zoom !== localCamera.zoom) nowMoving();
 		lastMoved = performance.now();
 		localCamera = cam;
-		writeTransform(cam);
 		host.moved();
+		/*
+		 * Placed and published once a frame, however many events move the camera in it. A pinch's two
+		 * fingers and a trackpad's wheel send two or three a frame, and each placed the world and gave the
+		 * engine its camera (its transform, its timers, a message to the worker) for a picture the frame
+		 * never showed; the frame's callback runs before the browser paints, so the one placing lands in
+		 * the same frame the events did. A glide's or a coast's step is in a frame already and places at once (`placeNow`).
+		 */
 		pendingCamera = cam;
 		if (rafId === undefined) {
 			rafId = requestAnimationFrame(() => {
 				rafId = undefined;
-				host.publish(pendingCamera!);
+				const next = pendingCamera!;
 				pendingCamera = undefined;
+				writeTransform(next);
+				host.publish(next);
 			});
 		}
 	};
@@ -208,7 +216,8 @@ export function createCameraController(host: CameraHost) {
 			last = now;
 			v = step.v;
 			write(pan(localCamera, step.dx, step.dy));
-			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
+			// In an animation frame already: the world is placed and the drawing drawn now, in this frame, not at the next.
+			placeNow();
 			host.flush();
 			if (Math.hypot(v.vx, v.vy) < 0.01) {
 				coastRaf = undefined;
@@ -255,6 +264,11 @@ export function createCameraController(host: CameraHost) {
 		}
 	};
 
+	/** Place the camera written and not yet placed now: for a caller in an animation frame that flushes the drawing itself. */
+	const placeNow = () => {
+		if (pendingCamera) writeTransform(pendingCamera);
+	};
+
 	/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
 	const push = (cam: Camera) => {
 		cancelGlide();
@@ -296,7 +310,8 @@ export function createCameraController(host: CameraHost) {
 			if (mine !== glideToken) return;
 			const t = Math.min(1, (performance.now() - at) / ms);
 			write(t >= 1 ? to : between(from, to, curve(t)));
-			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
+			// In an animation frame already: the world is placed and the drawing drawn now, in this frame, not at the next.
+			placeNow();
 			host.flush();
 			if (t >= 1) {
 				glideRaf = undefined;
