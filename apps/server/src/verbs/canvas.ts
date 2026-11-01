@@ -9,6 +9,7 @@ import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
 import { fitOn } from "./fit.ts";
+import { documentItemPath } from "../docs/item-path.ts";
 import { shootOn } from "./shoot.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
@@ -139,6 +140,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 
 	/** The canvas the ops being turned into pen's are for, if a canvas: a board named from elsewhere is its copy there. */
 	let onCanvas: string | undefined;
+	/** What an item's document path was taken as (`docs/item-path.ts`): said with the call's notes. */
+	const docNotes: string[] = [];
+	/** A document item's path as the deck names its file, found or made in the canvas's files; the note says what was done. */
+	const documentPath = (given: string): string => {
+		const { path, note } = documentItemPath(service.deckPath(), onCanvas, given, { make: true });
+		if (note) docNotes.push(note);
+		return path;
+	};
 	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`StagePens.copyOf`). */
 	const ownOn = (path: string): string => (onCanvas ? needPens().copyOf(onCanvas, path) : path);
 
@@ -189,9 +198,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const label = named ?? (service.apps ? service.apps.state(name).title : name);
 				return { ...others, type: "browser", name: label, width: typeof width === "number" ? width : 1100, height: typeof height === "number" ? height : 760, metadata: { type: "decks.app", name } };
 			}
-			const file = typeof path === "string" ? path.trim() : "";
-			if (!file) throw new Error('A document item names its file: { type: "document", path: "docs/plan.md" }.');
+			const file = typeof path === "string" ? documentPath(path.trim()) : "";
+			if (!file) throw new Error('A document item names its file as the deck does: { type: "document", path: "canvases/<canvas>/files/notes.md" }.');
 			return { ...others, type: "browser", name: named ?? basename(file), width: typeof width === "number" ? width : 1000, height: typeof height === "number" ? height : 1100, metadata: { type: "decks.document", path: file } };
+		}
+		// A document item given as it reads back (`browser`, tagged `decks.document`): its path as the deck names the file, the same way.
+		if (item.type === "browser" && (item.metadata as { type?: unknown; path?: unknown } | undefined)?.type === "decks.document" && typeof (item.metadata as { path?: unknown }).path === "string") {
+			const meta = item.metadata as { path: string };
+			item = { ...item, metadata: { ...meta, path: documentPath(meta.path.trim()) } };
 		}
 		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
 		if (item.type === "card") {
@@ -420,6 +434,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		notes.push(...placedFor);
 		for (const result of results) if (result.note) notes.push(result.note);
 		notes.push(...warned);
+		notes.push(...docNotes.splice(0));
 		const byId = new Map<string, Record<string, unknown>>();
 		const index = (list: readonly Record<string, unknown>[]) => {
 			for (const node of list) {

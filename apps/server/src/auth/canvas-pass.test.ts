@@ -335,13 +335,15 @@ test("a document or an app item is placed by the person, not the frame, and the 
 		const short = await post("/api/v1/canvas.insert", person, { args: [{ type: "document", path: "plan.md" }, { canvas: one, at: { x1: 2000, y1: 0 } }] });
 		assert.equal(short.status, 200, "and by its short form, which becomes the item");
 		const made = (short.body as unknown as { value: { id: string; type: string; metadata: { type: string; path: string }; width: number; height: number } }).value;
-		assert.deepEqual([made.type, made.metadata, made.width, made.height], ["browser", { type: "decks.document", path: "plan.md" }, 1000, 1100]);
+		// A bare file name is taken as a file of the canvas's own, as the deck names it, and made empty there.
+		assert.deepEqual([made.type, made.metadata, made.width, made.height], ["browser", { type: "decks.document", path: `canvases/${one}/files/plan.md` }, 1000, 1100]);
 		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { set: { metadata: { type: "decks.document", path: "secret.md" } } }] })).status, 403, "the frame may not point it elsewhere");
 		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { at: { x1: 40, y1: 40 } }] })).status, 200, "but may move it");
-		assert.deepEqual([...app.documentsOn(one)].includes("notes.md"), true);
+		// A bare name was taken as a file of the canvas's own, made empty: the document is known by that name.
+		assert.equal(app.documentsOn(one).has(`canvases/${one}/files/notes.md`), true);
 		assert.equal((await post("/api/v1/doc", frame, { frame: "f1", message: { type: "doc.open", path: "deck.json" } })).status, 403, "a file no document item names");
-		assert.equal((await post("/api/v1/doc", frame, { frame: "f1", message: { type: "doc.open", path: "notes.md" } })).status, 200, "the one it names");
-		assert.equal((await post("/api/v1/doc", person, { frame: "f1", message: { type: "doc.open", path: "notes.md" } })).status, 403, "a tab sends documents on its socket");
+		assert.equal((await post("/api/v1/doc", frame, { frame: "f1", message: { type: "doc.open", path: `canvases/${one}/files/notes.md` } })).status, 200, "the one it names");
+		assert.equal((await post("/api/v1/doc", person, { frame: "f1", message: { type: "doc.open", path: `canvases/${one}/files/notes.md` } })).status, 403, "a tab sends documents on its socket");
 	} finally {
 		cleanup();
 	}

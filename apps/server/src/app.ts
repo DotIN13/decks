@@ -44,6 +44,7 @@ import { gitSync } from "./docs/git.ts";
 import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
+import { documentItemPath } from "./docs/item-path.ts";
 import { Writers } from "./docs/writers.ts";
 import { appActor, canvasHolds, canvasHoldsDocument } from "./stage/caller-run.ts";
 
@@ -1011,8 +1012,8 @@ export class App {
 	 * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
 	 * the document service keys it: the only files a canvas frame may open (`verbs/router.ts`).
 	 */
-	documentsOn(canvas: string): Set<string> {
-		const out = new Set<string>();
+	documentsOn(canvas: string): Map<string, string> {
+		const out = new Map<string, string>();
 		let doc: { children?: unknown[] } | undefined;
 		try {
 			doc = this.pens.get(canvas).doc as { children?: unknown[] };
@@ -1023,12 +1024,18 @@ export class App {
 			for (const node of nodes ?? []) {
 				const item = node as { type?: string; metadata?: { type?: string; path?: unknown }; children?: unknown[] };
 				if (item.type === "browser" && item.metadata?.type === "decks.document" && typeof item.metadata.path === "string" && item.metadata.path) {
-					out.add(item.metadata.path);
+					// The path as written on the item, and the file it means as the deck names it (an older item may name it from the canvas's folder): either opens the same file.
+					const given = item.metadata.path;
+					const { path } = documentItemPath(this.deck.path, canvas, given);
+					let key = path;
 					try {
-						out.add(resolveDoc(this.deck.roots, item.metadata.path).key);
+						key = resolveDoc(this.deck.roots, path).key;
 					} catch {
 						/* a file that does not resolve opens nothing */
 					}
+					out.set(given, key);
+					out.set(path, key);
+					out.set(key, key);
 				}
 				walk(item.children);
 			}

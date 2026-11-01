@@ -142,11 +142,14 @@ export function verbRoutes(app: App): express.Router {
 			res.status(400).json({ ok: false, error: "Send { frame, message }, a document message for a file on this canvas." });
 			return;
 		}
-		if (!app.documentsOn(req.principal.canvas).has(message.path)) {
+		const key = app.documentsOn(req.principal.canvas).get(message.path);
+		if (key === undefined) {
 			res.status(403).json({ ok: false, error: `${message.path} is not a document on this canvas.` });
 			return;
 		}
-		app.docs.handle(message as never, (answer) => app.tellStreams({ ...answer, frameTo: frame } as never));
+		// The file as the deck names it; an item that names it another way hears its answers under the name it used.
+		const given = message.path;
+		app.docs.handle({ ...message, path: key } as never, (answer) => app.tellStreams({ ...answer, ...((answer as { path?: unknown }).path === key ? { path: given } : {}), frameTo: frame } as never));
 		res.json({ ok: true });
 	});
 

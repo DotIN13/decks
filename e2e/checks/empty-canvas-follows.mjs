@@ -38,6 +38,12 @@ say("the agent inserted a document item", doc.ok, JSON.stringify(doc).slice(0, 1
 const seen2 = await until(() => canvas.evaluate(() => !!globalThis.__decksRust?.placed?.has("ecf-doc")).catch(() => false), 6000);
 say("the document shows in the frame without a reload", seen2, seen2 ? "seen" : "not seen in 6 s");
 
+// A document named from the canvas's folder, as agents do: stored as the deck names the file, the file made empty, and the item shown.
+const sloppy = await call("canvas.insert", [{ type: "document", id: "ecf-doc2", path: "files/china.md" }, { canvas: name, at: { x1: 800, y1: 600 } }]);
+const stored = sloppy.value?.metadata?.path;
+say("a document named from the canvas's folder is stored as the deck names it, with a note", sloppy.ok && stored === `canvases/${name}/files/china.md` && (sloppy.notes ?? []).some((n) => /files\/china\.md/.test(n)), JSON.stringify({ stored, notes: sloppy.notes }).slice(0, 300));
+const seen3 = await until(() => canvas.evaluate(() => !!globalThis.__decksRust?.placed?.has("ecf-doc2")).catch(() => false), 6000);
+say("…and it shows in the frame too", seen3, seen3 ? "seen" : "not seen in 6 s");
 say("no errors on the page", errors.length === 0, errors.join(" | ").slice(0, 300));
 link.close?.();
 await browser.close();

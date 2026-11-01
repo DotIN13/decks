@@ -20,9 +20,13 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   Older canvases also hold **boards** (`{ type: "board", board }`, HTML pages in `boards/`): they are
   read, moved and sized the same way, but boards are retired and new work is a card.
 - **Apps and documents** are items with no file of their own: `{ type: "app", app: "<name>" }` shows an
-  app from `apps/` (`decks apps list`), and `{ type: "document", path: "docs/plan.md" }` opens a
-  document as a page the person types into. Place them with `decks.canvas.insert` like a card; they
-  read back as `browser` items tagged `decks.app` and `decks.document`.
+  app from `apps/` (`decks apps list`), and `{ type: "document", path: "canvases/<canvas>/files/notes.md" }`
+  opens a document as a page the person types into. A document's `path` names the file **as the deck
+  does, from the deck's root** (`canvases/<canvas>/files/<name>.md` for a file of the canvas's own,
+  `docs/<name>.md` for the deck's): never an absolute path, never from the canvas's folder. A file not
+  there yet is made empty in the canvas's `files/` when the item is placed, so the person can type into
+  it at once. Place them with `decks.canvas.insert` like a card; they read back as `browser` items
+  tagged `decks.app` and `decks.document`.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
   cards — a note beside one, an arrow from one to the next, an outline round a group. Put an
   answer on a card; put the arrangement around it here.
