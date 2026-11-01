@@ -2,6 +2,7 @@ import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
+import { HELLO_MS } from "./line.ts";
 
 /**
  * What one connected browser is looking at.
@@ -41,6 +42,8 @@ export class Hub {
 		httpServer: Server,
 		private readonly onMessage: (message: ClientMessage, reply: (message: ServerMessage) => void, view: View) => void,
 		private readonly onConnect: (reply: (message: ServerMessage) => void, view: View) => void,
+		/** Whether a token opens a socket for the person (or a paired site), for a `hello` (`auth/guard.ts`, as `socketPrincipal` checks an address). */
+		private readonly opens: (token: string, headers: IncomingMessage["headers"]) => boolean = () => false,
 	) {
 		void httpServer;
 		this.server = new WebSocketServer({
@@ -59,18 +62,29 @@ export class Hub {
 				clientNoContextTakeover: true,
 			},
 		});
-		this.server.on("connection", (socket) => this.accept(socket));
 	}
 
-	/** The `/ws` upgrade, from the router in `index.ts`. */
-	handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
-		this.server.handleUpgrade(request, socket, head, (ws) => this.server.emit("connection", ws, request));
+	/**
+	 * The `/ws` upgrade, from the router in `index.ts`. `open` says the address carried a token that checked
+	 * out (the older way, for one release); without one the socket waits for `hello` with the token, its first message.
+	 */
+	handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, open = true): void {
+		this.server.handleUpgrade(request, socket, head, (ws) => this.accept(ws, request, open));
 	}
 
-	private accept(socket: WebSocket): void {
+	private accept(socket: WebSocket, request: IncomingMessage, open: boolean): void {
 		const view: View = {};
-		this.sockets.set(socket, view);
 		const reply = (message: ServerMessage) => send(socket, message);
+		let opened = false;
+		// Nothing is heard before the token, and a socket that never says it is closed.
+		const deadline = open ? undefined : setTimeout(() => socket.close(4401, "Say hello with a token first."), HELLO_MS);
+		deadline?.unref?.();
+		const begin = () => {
+			opened = true;
+			clearTimeout(deadline);
+			this.sockets.set(socket, view);
+			this.onConnect(reply, view);
+		};
 
 		socket.on("message", (data) => {
 			let message: ClientMessage;
@@ -78,6 +92,19 @@ export class Hub {
 				message = JSON.parse(String(data)) as ClientMessage;
 			} catch (error) {
 				reply({ type: "error", text: `Unreadable frame: ${(error as Error).message}` });
+				return;
+			}
+			if (message.type === "hello") {
+				// Checked on a socket already open too (an address's token, an earlier hello): a token that does not open it closes it.
+				if (typeof message.token !== "string" || !this.opens(message.token, request.headers)) {
+					socket.close(4401, "That token does not open the socket.");
+					return;
+				}
+				if (!opened) begin();
+				return;
+			}
+			if (!opened) {
+				socket.close(4401, "Say hello with a token first.");
 				return;
 			}
 			try {
@@ -91,10 +118,13 @@ export class Hub {
 			}
 		});
 
-		socket.on("close", () => this.sockets.delete(socket));
+		socket.on("close", () => {
+			clearTimeout(deadline);
+			this.sockets.delete(socket);
+		});
 		socket.on("error", () => this.sockets.delete(socket));
 
-		this.onConnect(reply, view);
+		if (open) begin();
 	}
 
 	broadcast(message: ServerMessage): void {

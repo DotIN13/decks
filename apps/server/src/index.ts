@@ -1,4 +1,4 @@
-import { socketPrincipal } from "./auth/guard.ts";
+import { socketPrincipal, verifyOn } from "./auth/guard.ts";
 import { actsAsPerson } from "./auth/principal.ts";
 import { extraHosts, hostAllowed } from "./auth/hosts.ts";
 import { writeCliToken, type CliToken } from "./auth/cli-token.ts";
@@ -40,6 +40,11 @@ const hub = new Hub(
 	httpServer,
 	(message, reply, view) => app.handle(message, reply, view),
 	(reply, view) => app.greet(reply, view),
+	// A hello's token opens the socket as an address's did: the person's or a paired site's.
+	(token, headers) => {
+		const seen = verifyOn(app, token, headers);
+		return seen.ok && (seen.principal.kind === "person" || seen.principal.kind === "site");
+	},
 );
 app.attach(hub);
 // The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`line.ts`).
@@ -109,14 +114,10 @@ httpServer.on("upgrade", (request, socket, head) => {
 	if (path === "/ws") {
 		/*
 		 * The socket runs the person's commands, so it is opened only with the person's token or a
-		 * paired site's, in its address (`decks_token`): from this machine as from anywhere (`auth/guard.ts`).
+		 * paired site's: in `hello`, its first message, or (the older way, for one release) in its
+		 * address (`decks_token`). A socket that says neither is closed (`ws.ts`).
 		 */
-		if (!socketPrincipal(app, request)) {
-			socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
-			socket.destroy();
-			return;
-		}
-		hub.handleUpgrade(request, socket, head);
+		hub.handleUpgrade(request, socket, head, socketPrincipal(app, request) !== undefined);
 	}
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
 	else if (

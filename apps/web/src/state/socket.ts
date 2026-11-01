@@ -1,7 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { batch } from "solid-js";
 import { BundleBackend } from "../connections/bundle.ts";
-import { active, socketUrl } from "../connections/connection.ts";
+import { active, socketToken, socketUrl } from "../connections/connection.ts";
 import { sessionStale } from "../lib/session.ts";
 
 /**
@@ -107,6 +107,9 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 
 		socket.onopen = () => {
 			attempt = 0;
+			// The token first, as the socket's own message: nothing is heard before it (`server/src/ws.ts`).
+			const token = socketToken();
+			if (token && here?.kind !== "bundle") socket?.send(JSON.stringify({ type: "hello", token } satisfies ClientMessage));
 			onStateChange(true);
 			while (queue.length > 0) socket?.send(JSON.stringify(queue.shift()));
 		};

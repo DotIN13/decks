@@ -16,6 +16,11 @@ const token = tag?.content || undefined;
 tag?.remove();
 
 /** The header to send on a request, or nothing on a page with no token. */
+/** This tab's token itself, for the socket's hello (`state/socket.ts`); undefined when the page was served with none. */
+export function sessionToken(): string | undefined {
+	return token;
+}
+
 export function authHeaders(): Record<string, string> {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 }

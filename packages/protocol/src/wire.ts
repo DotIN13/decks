@@ -87,6 +87,12 @@ import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { WebStatus } from "./web.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
 export type ClientMessage =
+	/**
+	 * The first message on a tab's socket (`/ws`): the token, which used to ride in the address as
+	 * `decks_token` (still taken, for one release). Nothing else is heard before it, and a socket that
+	 * does not say it in five seconds is closed. Taken by the hub itself (`server/src/ws.ts`), never dispatched.
+	 */
+	| { type: "hello"; token: string }
 	| { type: "deck.open"; path: string }
 	| { type: "card.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
 	/**

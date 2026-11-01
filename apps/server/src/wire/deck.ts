@@ -8,6 +8,8 @@ import type { WirePart } from "./context.ts";
  * answer back to the `stage.call` that is awaiting it.
  */
 export const deck = {
+	/** The socket's token, taken by the hub before any frame is dispatched (`ws.ts`): nothing to do here. */
+	hello: () => {},
 	"deck.open": (message, _reply, wire) => {
 		wire.openDeck(message.path);
 	},

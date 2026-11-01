@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { withToken } from "../lib/session.ts";
+import { sessionToken } from "../lib/session.ts";
 
 /**
  * Which backend this tab is talking to, and every one it knows.
@@ -185,16 +185,20 @@ export function newId(): string {
 	return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 10);
 }
 
-/** The socket for a server connection: its own host, with the token in the query, since a socket cannot carry headers. */
+/** The socket's address: a server connection's own host, or this server's. The token goes in the socket's first message (`socketToken`), never in the address. */
 export function socketUrl(): string {
 	const one = active();
 	if (one?.kind === "server") {
 		const base = new URL(one.base);
 		base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
 		base.pathname = `${base.pathname.replace(/\/+$/, "")}/ws`;
-		base.searchParams.set("decks_token", one.token);
 		return base.toString();
 	}
-	// This server's socket runs the person's commands, so it carries this tab's token (`lib/session.ts`).
-	return withToken(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+	return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+}
+
+/** The token the socket says hello with: the server connection's, or this tab's (`lib/session.ts`). */
+export function socketToken(): string | undefined {
+	const one = active();
+	return one?.kind === "server" ? one.token : sessionToken();
 }
