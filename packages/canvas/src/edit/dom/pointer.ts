@@ -43,13 +43,12 @@ export type PageView = {
 	/** The pointer came onto the board or its title bar, or left both: the hover outline. */
 	hover: (on: boolean) => void;
 	/**
-	 * A mouse or pen press on the title bar or the edge, offered to the editor first: it moves the
-	 * board with the rest of a selection and snaps it. True means it took the drag. `on` is the element
-	 * that follows the drag, when the press was heard somewhere that is not one (a card's own root).
+	 * A press on the item by any pointer (its bar, its edge, the cover over its page), offered to the
+	 * editor first: it moves the board with the rest of a selection and snaps it. True means it took the
+	 * drag. `on` is the element that follows the drag, when the press was heard somewhere that is not
+	 * one (a card's own root); `tapped` is called when it lifts without moving.
 	 */
-	press: (event: PointerEvent, on?: HTMLElement) => boolean;
-	/** A drag of the board's own (a finger on its edge): where it is carried, `null` when it ends. */
-	dragging: (at: Pt | null) => void;
+	press: (event: PointerEvent, on?: HTMLElement, tapped?: () => void) => boolean;
 	/** A press on the board: it is selected, alone unless it is part of the selection already. */
 	select: () => void;
 };
@@ -286,11 +285,14 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * Follow a press the editor took to its lift (`editor/core/gesture.ts`): each move and the lift
 	 * told to it, in stage coordinates. `on` captures the pointer, the stage unless said otherwise.
 	 */
-	const followEditor = (event: PointerEvent, on?: HTMLElement) =>
+	const followEditor = (event: PointerEvent, on?: HTMLElement, tapped?: () => void) =>
 		follow(
 			event,
 			(e) => editor.input({ type: "move", ...pointerInput(e, worldAt(e)) }),
-			(_moved, e) => editor.input({ type: "release", ...pointerInput(e, worldAt(e)) }),
+			(moved, e) => {
+				editor.input({ type: "release", ...pointerInput(e, worldAt(e)) });
+				if (!moved) tapped?.();
+			},
 			on,
 			() => editor.input({ type: "cancel" }),
 		);
@@ -329,13 +331,14 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	/**
 	 * A press on a board's title bar (`PageFrame`), with a mouse or a pen: the stage moves it, so it
 	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
-	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
+	 * selection or takes it out. A finger is put in the stage's pool (`fingerIn`), so a second one makes a pinch that puts the move back.
 	 */
-	const dragPage = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
+	const dragPage = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement, tapped?: () => void): boolean => {
 		if (event.button !== 0) return false;
 		event.stopPropagation();
 		event.preventDefault();
-		if (editor.input({ type: "press-board", path, ...pointerInput(event, worldAt(event)) })) followEditor(event, on);
+		fingerIn(event);
+		if (editor.input({ type: "press-board", path, ...pointerInput(event, worldAt(event)) })) followEditor(event, on, tapped);
 		return true;
 	};
 
@@ -852,8 +855,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			if (on) editor.hover({ board: path });
 			else if (untrack(editor.hoverPage) === path) editor.hover({ board: undefined });
 		},
-		press: (event, on) => (host.editable() ? dragPage(path, event, on) : false),
-		dragging: (at) => editor.setOwnDrag(at ? { path, ...at } : undefined),
+		press: (event, on, tapped) => (host.editable() ? dragPage(path, event, on, tapped) : false),
 		select: () => selectPage(path),
 	});
 
@@ -871,7 +873,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		onPointerMove: onHover,
 		onPointerLeave: onLeave,
 		onDblClick,
-		/** The presses on what the overlay draws (`OverlayLayer`). */
+		/** The presses on what the overlay draws (`HitLayer`). */
 		onGrip: dragBlock,
 		onHandle: resizeFrom,
 		onRadius: radiusFrom,

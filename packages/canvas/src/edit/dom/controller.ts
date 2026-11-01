@@ -212,14 +212,11 @@ export function createEditor(host: EditorHost) {
 	const pagePicks = part((now) => now.selection.boards);
 	const pageResize = part((now) => now.pageResize);
 	const pageDrag = part((now) => now.pageDrag);
-	const ownDrag = part((now) => now.ownDrag);
 
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {
 		const drag = pageDrag();
-		const held = ownDrag();
-		const board = held ? host.boards().find((one) => one.path === held.path) : undefined;
-		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
+		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : undefined;
 		// The boards' pictures are the engine's, and go with the drag there.
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
@@ -261,7 +258,6 @@ export function createEditor(host: EditorHost) {
 		drag: part((now) => now.drag),
 		shownDrag: shown,
 		pageDrag,
-		ownDrag,
 		resize: part((now) => now.resize),
 		shownResize,
 		pageResize,
@@ -281,7 +277,7 @@ export function createEditor(host: EditorHost) {
 		typing: part((now) => now.text?.id),
 
 		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
-		carrying: createMemo(() => !!pageDrag() || !!pageResize() || !!ownDrag()),
+		carrying: createMemo(() => !!pageDrag() || !!pageResize()),
 		/** The boards a gesture holds, which keep their nodes wherever the camera goes. */
 		heldPages: (): readonly string[] => {
 			const sized = pageResize()?.path;
@@ -338,7 +334,6 @@ export function createEditor(host: EditorHost) {
 		},
 		hover: (next: Partial<EditorState["hover"]>) =>
 			update((now) => ((Object.keys(next) as Array<keyof EditorState["hover"]>).every((key) => now.hover[key] === next[key]) ? now : { ...now, hover: { ...now.hover, ...next } })),
-		setOwnDrag: (at: EditorState["ownDrag"]) => update((now) => (now.ownDrag === at ? now : { ...now, ownDrag: at })),
 		setText: (text: TextSession | undefined) => update((now) => (now.text === text ? now : { ...now, text })),
 		setDraft: (draft: DraftBox | undefined) => update((now) => (now.draft === draft ? now : { ...now, draft })),
 		setHints: (hints: { joins?: readonly Rect[]; sides?: readonly SideHintBox[] }) => update((now) => ({ ...now, ...(hints.joins ? { joins: hints.joins } : {}), ...(hints.sides ? { sides: hints.sides } : {}) })),

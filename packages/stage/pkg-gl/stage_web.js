@@ -848,7 +848,8 @@ export class PageEngine {
     }
     /**
      * What the editor draws over the canvas (outlines, handles, guides, slots, drafts), painted by the
-     * engine last in every frame (`stage_paint::overlay`): the JSON `edit/core/overlay-json.ts` writes.
+     * engine last in every frame (`stage_paint::overlay`), from JSON. The page no longer sends one (the engine's
+     * editor paints its own, `editorPaint`); kept for a host that draws an overlay of its own.
      * @param {string} json
      */
     setOverlay(json) {

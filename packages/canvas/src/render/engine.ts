@@ -18,7 +18,6 @@ import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, 
 import { iconUrl, parseIcon } from "./icons.ts";
 import { pictureAddress } from "../host.ts";
 import { Recovery } from "./recovery.ts";
-import { snapMove, type Box, type Guide } from "../edit/snap.ts";
 import { boundsOf } from "../model/bounds.ts";
 import { docIndex, drawnNodes } from "../model/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
@@ -2420,9 +2419,6 @@ export class StageEngine {
 		return true;
 	}
 
-	snapMove(moving: Box, targets: readonly Box[], threshold: number): { dx: number; dy: number; guides: Guide[] } {
-		return snapMove(moving, targets, threshold);
-	}
 
 	dispose(): void {
 		this.disposed = true;

@@ -100,7 +100,7 @@ const SAMPLER = () => {
 				out[`board ${path}`] = b ? JSON.stringify([r(b.x + carrying.dx), r(b.y + carrying.dy), r(b.w), r(b.h)]) : "absent";
 			}
 			if (probe.outline) {
-				const o = document.querySelector(".pen-selection")?.getBoundingClientRect();
+				const o = globalThis.__decksOverlayRects()?.selection[0];
 				out.outline = o ? JSON.stringify([r(o.x), r(o.y), r(o.width), r(o.height)]) : "none";
 			}
 			return out;
@@ -326,9 +326,11 @@ async function run(engine, { all }) {
 				},
 				commit: async (arm) => {
 					const r = await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					// Hide answers the click, which is the release: armed between the press and it, as every other case is.
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+					await page.mouse.down();
 					await arm();
-					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+					await page.mouse.up();
 				},
 			});
 		}

@@ -3,7 +3,7 @@
  * from the page: no Solid, no DOM, no engine (`core/imports.test.ts` holds that).
  */
 import type { Frame } from "@decks/pen";
-import type { Guide } from "./snap.ts";
+import type { Guide } from "./wire.ts";
 import type { GestureSummary } from "./wire.ts";
 import type { TextSession } from "./text.ts";
 
@@ -76,8 +76,6 @@ export type EditorState = {
 	 * to the server, and until its answer the boards would otherwise be drawn back where they were.
 	 */
 	pageDrag?: { paths: readonly string[]; dx: number; dy: number; released?: PageDragLanding } | undefined;
-	/** A board moving itself, by a finger on its edge (`PageFrame`'s own drag). */
-	ownDrag?: { path: string; x: number; y: number } | undefined;
 	/** An item being resized as the pointer has it, and as the sheet has drawn it (a frame behind). */
 	resize?: ResizeBox | undefined;
 	shownResize?: ResizeBox | undefined;

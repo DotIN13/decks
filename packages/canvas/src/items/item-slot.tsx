@@ -47,7 +47,6 @@ export interface ItemSlotProps {
 	onLive?: (live: boolean) => void;
 	/** A drag carries this item's picture (`PenLayer.carry`): its surface waits, unseen, for the move to land. */
 	carried?: boolean;
-	onMove: (x: number, y: number) => void;
 	/** The stage's editor, as far as this item goes (`editor/dom/pointer.ts`, `PageView`). */
 	view: PageView;
 	onOpen: () => void;
@@ -57,8 +56,8 @@ export interface ItemSlotProps {
 	onOpenPage?: (path: string, from: string) => boolean;
 	/** Words selected in a card, to comment on: the stage gives this while you may. */
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
-	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
-	gestures: { claimTouch(id: number): void; pinching(): boolean };
+	/** The stage's fingers: a finger the item took is not the camera's. */
+	gestures: { claimTouch(id: number): void };
 	/**
 	 * On a touch screen an item's page is covered until it is activated (`items-layer.tsx`): a tap on the
 	 * cover selects, a drag anywhere on it moves the item, a pinch with a finger on it zooms the canvas,
@@ -101,54 +100,23 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 		const by = props.view.shift();
 		return by ? `translate(${by.dx}px, ${by.dy}px)` : undefined;
 	};
-	/** A press on the item, its bar or its edge: the editor takes it as a move of the selection, or it selects the item. */
+	/**
+	 * A press on the item, its bar, its edge or the cover over its live page, by any pointer: the
+	 * editor takes it (`dragPage`), as a move of the selection or a select, and a finger snaps as a
+	 * mouse does. A finger is the stage's too, claimed so the camera never pans with it, and a second
+	 * one makes a pinch that puts the move back. A finger's tap on an item already selected activates
+	 * it: its page takes the fingers from there.
+	 */
 	const press = (event: PointerEvent) => {
 		if (event.button !== 0) return;
-		// A finger on a sleeping item's surface, as on its bar: it selects, drags, or pinches with a second.
-		if (event.pointerType === "touch") return fingerDrag(event);
-		if (props.view.press(event)) return;
-		props.view.select();
+		const finger = event.pointerType === "touch";
+		if (finger) props.gestures.claimTouch(event.pointerId);
+		const tapped = finger && props.selected && !props.active && props.onActivate ? props.onActivate : undefined;
+		if (props.view.press(event, undefined, tapped)) return;
+		// Not the editor's (a canvas you only view): a press selects, and a tap on the selected item activates it.
+		if (tapped) tapped();
+		else props.view.select();
 	};
-	/*
-	 * A finger on the bar or the edge moves the item, and a second finger turns it into a pinch: the
-	 * stage counts the finger too (`claimTouch` keeps it from scrolling the stage). The item is carried
-	 * while the finger moves (`view.dragging`) and moved once, on the lift.
-	 */
-	const fingerDrag = (event: PointerEvent) => {
-		if (event.button !== 0) return;
-		props.gestures.claimTouch(event.pointerId);
-		event.preventDefault();
-		const wasSelected = props.selected;
-		props.view.select();
-		const from = { x: event.clientX, y: event.clientY };
-		const origin = { x: props.board.x, y: props.board.y };
-		const scale = props.zoom || 1;
-		let to: { x: number; y: number } | undefined;
-		let over = false;
-		const move = (next: PointerEvent) => {
-			if (next.pointerId !== event.pointerId) return;
-			if (props.gestures.pinching()) return finish(true);
-			to = { x: origin.x + (next.clientX - from.x) / scale, y: origin.y + (next.clientY - from.y) / scale };
-			props.view.dragging(to);
-		};
-		const finish = (abandon = false) => {
-			if (over) return;
-			over = true;
-			window.removeEventListener("pointermove", move);
-			window.removeEventListener("pointerup", end);
-			window.removeEventListener("pointercancel", end);
-			props.view.dragging(null);
-			if (!abandon && to) props.onMove(Math.round(to.x), Math.round(to.y));
-			// A tap, on the item already selected: activated, and its page takes the fingers from here.
-			else if (!abandon && !to && wasSelected && !props.active) props.onActivate?.();
-		};
-		const end = (done: PointerEvent) => done.pointerId === event.pointerId && finish();
-		window.addEventListener("pointermove", move);
-		window.addEventListener("pointerup", end);
-		window.addEventListener("pointercancel", end);
-	};
-	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
-	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));
 	/** Awake, and something the slot draws: a board has nothing here but its title. */
 	const awake = createMemo(() => props.mounted && props.page !== undefined && (!!props.board.card || !!props.board.item));
 	const [hovered, setHovered] = createSignal(false);
@@ -205,16 +173,16 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			<div class="shade" aria-hidden="true" />
 			{/* An app's name is on the window bar the engine paints, which is also what it is dragged by (`app-grip`). */}
 			<Show when={props.visible && props.board.item !== "app"}>
-				<div class="plain-card-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
+				<div class="plain-card-bar" title={props.board.path} onPointerDown={press} onDblClick={() => props.onOpen()}>
 					{props.board.title}
 				</div>
 			</Show>
 			<Show when={props.board.item === "app"}>
-				<div class="app-grip" title={props.board.title} style={{ height: `${APP_BAR}px` }} onPointerDown={grip} onDblClick={() => props.onOpen()} />
+				<div class="app-grip" title={props.board.title} style={{ height: `${APP_BAR}px` }} onPointerDown={press} onDblClick={() => props.onOpen()} />
 			</Show>
 			{/* The band along the edge of an awake item: a press inside it is the item's own, so this moves it. */}
 			<Show when={shown() && !props.asleep && (hovered() || props.selected)}>
-				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="card-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
+				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="card-edge" data-side={side} style={edgeBand(side)} onPointerDown={press} />}</For>
 			</Show>
 			{/* Always shown while they are off: it says why the card sits still, and turns them on. */}
 			<Show when={props.onScriptsOn && props.board.card}>
@@ -251,7 +219,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			</div>
 			{/* On a touch screen the page is covered until the item is activated: the cover selects, drags, pinches, and a second tap lifts it (`active`). */}
 			<Show when={COVERS && awake() && shown() && !props.asleep && !props.active}>
-				<div class="touch-cover" onPointerDown={grip} />
+				<div class="touch-cover" onPointerDown={press} />
 			</Show>
 		</div>
 	);

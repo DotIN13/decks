@@ -113,7 +113,6 @@ pub struct Input {
 	pub boards: Vec<PageBox>,
 	pub page_picks: Vec<String>,
 	pub page_drag: Option<(Vec<String>, Offset)>,
-	pub own_drag: Option<(String, Pt)>,
 	/// The board the app has selected.
 	pub selected: Option<String>,
 	pub page_resize: Option<(String, Rect)>,
@@ -228,9 +227,8 @@ pub fn selection_outlines(input: &Input, scene: &dyn Scene) -> Vec<Outline> {
 	}
 	if let Some(chosen) = input.selected.as_ref().filter(|chosen| !input.page_picks.contains(chosen)) {
 		if let Some(board) = input.boards.iter().find(|b| &b.path == chosen) {
-			let rect = match (&input.page_resize, &input.own_drag) {
-				(Some((path, sized)), _) if path == chosen => *sized,
-				(_, Some((path, at))) if path == chosen => Rect { x: at.x, y: at.y, w: board.w, h: board.h },
+			let rect = match &input.page_resize {
+				Some((path, sized)) if path == chosen => *sized,
 				_ => moved(board.rect(), shift_of(chosen)),
 			};
 			out.push(Outline { id: format!("page:{chosen}"), role: Role::Page, rect, round: true });
@@ -273,7 +271,7 @@ pub fn arrow_anchors(handles: Option<&Outline>, input: &Input, scene: &dyn Scene
 /// The selected board's box, when it alone is selected, can be resized, is not carried, and is big enough to wear handles.
 pub fn page_handles(outlines: &[Outline], input: &Input, rules: &Rules) -> Option<(String, Rect)> {
 	let [one] = outlines else { return None };
-	if !input.resizable || input.page_drag.is_some() || input.own_drag.is_some() || one.role != Role::Page || too_small_for_handles(&one.rect, input.zoom, rules) {
+	if !input.resizable || input.page_drag.is_some() || one.role != Role::Page || too_small_for_handles(&one.rect, input.zoom, rules) {
 		return None;
 	}
 	let path = one.id.strip_prefix("page:")?;

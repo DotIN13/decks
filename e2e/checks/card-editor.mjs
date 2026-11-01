@@ -456,7 +456,7 @@ const aim = { x: second.x + 60, y: second.y + second.height + 6 };
 await page.mouse.move(aim.x, aim.y, { steps: 14 });
 await settle(page, 200);
 // The selection's outline is drawn where the carried item is drawn.
-const carried = await canvas.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+const carried = await canvas.evaluate(() => globalThis.__decksOverlayRects()?.selection[0]);
 const looks = await canvas.evaluate(() => {
 	const ghost = document.querySelector(".pen-drag-ghost:not([hidden])");
 	const style = ghost && getComputedStyle(ghost);

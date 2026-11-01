@@ -131,6 +131,8 @@ const drawnWhereFileSays = (id) =>
 		}, { id, want });
 	}, 4000);
 const count = (selector) => canvas.evaluate((s) => document.querySelectorAll(s).length, selector);
+/** How many of one kind the engine paints over the canvas (`__decksOverlayRects`, `Stage.tsx`), those with `where`'s flags. */
+const drawn = (kind, where = {}) => canvas.evaluate(([k, w]) => (globalThis.__decksOverlayRects?.()?.[k] ?? []).filter((r) => Object.entries(w).every(([f, v]) => !!r[f] === v)).length, [kind, where]);
 /** A board's item on disk names it from the canvas's folder (`boards/x.html`); the stage names it from the deck. */
 const itemOf = (doc, path) => doc.children.find((n) => n.metadata?.path === path || n.metadata?.path === path.replace(/^canvases\/[^/]+\//, ""));
 
@@ -140,17 +142,17 @@ say("…and the tool column is there, select pressed: that is browsing", (await 
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
 await settle(page, 300);
-say("browsing draws no outline under the pointer", (await count(".pen-hover")) === 0);
+say("browsing draws no outline under the pointer", (await drawn("hover")) === 0);
 await page.mouse.move(room.x + 5, room.y + 5);
 
 await page.mouse.down();
 await page.mouse.move(room.x + 300, room.y + 100, { steps: 5 });
 await page.mouse.move(room.x + 470, room.y + 200, { steps: 5 });
-const live = await count(".pen-selection");
+const live = await drawn("selection");
 await page.mouse.up();
 // Two items and, while it was held, the marquee's own box.
 say("a drag on bare canvas is a marquee, picking what it goes round as it goes", live === 3, String(live));
-say("…and both items are selected after it", (await count(".pen-selection")) === 2);
+say("…and both items are selected after it", (await drawn("selection")) === 2);
 
 // --- moving the selection together, then with a board ---------------------------------------------
 const before = { a: item("g-a"), b: item("g-b") };
@@ -199,7 +201,7 @@ if (bar) {
 	await page.keyboard.down("Shift");
 	await page.mouse.click(bar.x, bar.y);
 	await page.keyboard.up("Shift");
-	say("Shift and a press on a board adds it to the selection", (await count(".pen-selection")) === 3, String(await count(".pen-selection")));
+	say("Shift and a press on a board adds it to the selection", (await drawn("selection")) === 3, String(await drawn("selection")));
 	const boardBefore = onDisk().children.find(isBoard);
 	await drawnWhereFileSays("g-a");
 	const a2 = await centre("g-a");
@@ -258,7 +260,7 @@ if (bar) {
 	link.send({ type: "card.move", path: bar.path, x: boardBefore.x, y: boardBefore.y });
 }
 await page.keyboard.press("Escape");
-say("Escape lets the whole selection go", (await count(".pen-selection")) === 0);
+say("Escape lets the whole selection go", (await drawn("selection")) === 0);
 
 // --- snapping ------------------------------------------------------------------------------------
 {
@@ -278,7 +280,7 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	await page.mouse.down();
 	await page.mouse.move(from.x + 10, from.y + wantDy / 2, { steps: 4 });
 	await page.mouse.move(from.x + 20, from.y + wantDy, { steps: 4 });
-	const guides = await count(".pen-guides line");
+	const guides = await drawn("guides");
 	await page.mouse.up();
 	say("a drag near another item's edge draws a guide", guides >= 1, String(guides));
 	const snapped = await until(() => item("g-b").y === a.y);
@@ -373,7 +375,7 @@ let ITEM_WASH = "";
 	await page.mouse.move(a.x, a.y);
 	await page.mouse.down();
 	await page.mouse.move(a.x + 60, a.y + 60, { steps: 4 });
-	const lit = await count(".pen-join");
+	const lit = await drawn("joins");
 	await page.mouse.move(free.x, free.y, { steps: 6 });
 	await page.mouse.up();
 	say("drawing an arrow lights up what its start joins", lit === 1, String(lit));
@@ -388,7 +390,7 @@ let ITEM_WASH = "";
 	say("…and the selected arrow has a handle on each end", !!end && (await count(".pen-handle[data-end]")) === 2);
 	// A line is shown by its ends, not by a rectangle round it: no box and no sizing handles.
 	const boxed = await canvas.evaluate(() => ({
-		selection: document.querySelectorAll(".pen-selection:not([data-page])").length,
+		selection: globalThis.__decksOverlayRects().selection.filter((r) => !r.page).length,
 		sizers: document.querySelectorAll(".pen-handle:not([data-end]):not([data-bend])").length,
 	}));
 	say("…and no box round it, since a box round a line says nothing", boxed.selection === 0 && boxed.sizers === 0, JSON.stringify(boxed));
@@ -398,7 +400,7 @@ let ITEM_WASH = "";
 		await page.mouse.down();
 		await page.mouse.move((end.x + b.x) / 2, (end.y + b.y) / 2, { steps: 4 });
 		await page.mouse.move(b.x, b.y, { steps: 4 });
-		const litEnd = await count(".pen-join");
+		const litEnd = await drawn("joins");
 		await page.mouse.up();
 		say("carrying an end over an item lights it up", litEnd === 1, String(litEnd));
 		const rejoined = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.to === "g-b");
@@ -440,7 +442,7 @@ let ITEM_WASH = "";
 		}, { type, id, x, y, target });
 	await touch("pointerdown", 31, a.x, a.y);
 	await touch("pointerup", 31, a.x, a.y);
-	say("a finger's tap selects an item", !!(await until(() => count(".pen-selection").then((n) => n === 1), 2000)));
+	say("a finger's tap selects an item", !!(await until(() => drawn("selection").then((n) => n === 1), 2000)));
 	const was = item("g-a").x;
 	m = await matrix();
 	await touch("pointerdown", 31, a.x, a.y);
@@ -458,18 +460,18 @@ let ITEM_WASH = "";
 	const bare = (await firstOnCanvas(await bareSpots())) ?? null;
 	if (bare) {
 		const target = ".stage";
-		await until(() => count(".pen-selection").then((n) => n === 1), 2000);
+		await until(() => drawn("selection").then((n) => n === 1), 2000);
 		// Out and back, resting before the lift, so the camera ends where it was for the checks after this one.
 		await touch("pointerdown", 31, bare.x, bare.y);
 		for (const dx of [8, 16, 24, 32, 24, 16, 8, 0]) await touch("pointermove", 31, bare.x + dx, bare.y, target);
 		await settle(page, 200);
 		await touch("pointerup", 31, bare.x, bare.y, target);
 		await settle(page, 300);
-		const kept = await count(".pen-selection");
+		const kept = await drawn("selection");
 		const back = (await firstOnCanvas(await bareSpots())) ?? null;
 		await touch("pointerdown", 31, back.x, back.y);
 		await touch("pointerup", 31, back.x, back.y, target);
-		const gone = await until(() => count(".pen-selection").then((n) => n === 0), 2000);
+		const gone = await until(() => drawn("selection").then((n) => n === 0), 2000);
 		say("a finger's pan over bare canvas keeps the item selected, and a tap there lets it go", kept === 1 && !!gone, JSON.stringify({ kept, bare, back }));
 	} else say("a finger's tap on bare canvas lets the item go", false, "no bare canvas on screen");
 	await page.keyboard.press("Escape");
@@ -543,9 +545,9 @@ let ITEM_WASH = "";
 	await drawnWhereFileSays("g-a");
 	const a = await centre("g-a");
 	await page.mouse.move(a.x, a.y);
-	say("in edit mode an item outlines itself under the pointer, before any press", !!(await until(() => count(".pen-hover:not([data-page])").then((n) => n === 1), 2000)));
+	say("in edit mode an item outlines itself under the pointer, before any press", !!(await until(() => drawn("hover", { page: false }).then((n) => n === 1), 2000)));
 	await page.mouse.move(room.x + 5, room.y + 5);
-	say("…and the outline goes when the pointer leaves it", !!(await until(() => count(".pen-hover").then((n) => n === 0), 2000)));
+	say("…and the outline goes when the pointer leaves it", !!(await until(() => drawn("hover").then((n) => n === 0), 2000)));
 	const spot = await firstOnCanvas(await canvas.evaluate(() => {
 		const out = [];
 		for (const one of window.__decksCards()) {
@@ -562,17 +564,16 @@ let ITEM_WASH = "";
 	if (spot) {
 		await page.mouse.move(spot.x, spot.y, { steps: 3 });
 		const outlined = await until(() => canvas.evaluate((path) => {
-			const hover = document.querySelector('.pen-hover[data-page="true"]');
+			const h = globalThis.__decksOverlayRects().hover.find((r) => r.page);
 			const n = document.querySelector(`.card-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect() ?? window.__decksCards().find((one) => one.path === path)?.rect;
-			if (!hover || !n) return undefined;
-			const h = hover.getBoundingClientRect();
-			return Math.abs(h.x - n.x) < 2 && Math.abs(h.width - n.width) < 2 ? { width: getComputedStyle(hover).boxShadow } : undefined;
+			if (!h || !n) return undefined;
+			return Math.abs(h.x - n.x) < 2 && Math.abs(h.width - n.width) < 2 ? { x: h.x, width: h.width } : undefined;
 		}, spot.path), 2000);
 		say("…and a board does too, round its own edge", !!outlined, JSON.stringify(outlined));
 		await editMode(page, false);
 		await page.mouse.move(spot.x - 4, spot.y + 4);
 		await settle(page, 200);
-		say("…and not when browsing", (await count(".pen-hover")) === 0);
+		say("…and not when browsing", (await drawn("hover")) === 0);
 	} else say("a board is on screen to hover", false);
 }
 
@@ -607,11 +608,12 @@ let ITEM_WASH = "";
 	if (target) {
 		await page.mouse.click(target.x, target.y);
 		const handles = () => canvas.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-page="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
-		const outline = () => canvas.evaluate(() => {
-			const box = document.querySelector('.pen-selection[data-page="true"]');
-			const m = new DOMMatrix(globalThis.__decksCameraTransform());
-			return box ? Math.round(Number.parseFloat(getComputedStyle(box).boxShadow.split(" ").at(-1)) * m.a * 10) / 10 : 0;
-		});
+		// The outline is the engine's, painted 1.5 px wide at any zoom (`stage_paint::overlay`): here, that it stays on the board.
+		const outline = () => canvas.evaluate((path) => {
+			const box = globalThis.__decksOverlayRects().selection.find((r) => r.page);
+			const card = window.__decksCards().find((one) => one.path === path)?.rect;
+			return !!box && !!card && Math.abs(box.x - card.x) < 2 && Math.abs(box.width - card.width) < 2;
+		}, target.path);
 		const near = await until(() => handles().then((h) => (h.length === 8 ? h : undefined)), 3000);
 		say("a selected board has an item's handles (eight)", !!near && near.every((w) => w === 9), JSON.stringify({ path: target.path, near }));
 		const nearLine = await outline();
@@ -619,7 +621,7 @@ let ITEM_WASH = "";
 		await settle(page, 700);
 		const far = await handles();
 		const farLine = await outline();
-		say("…the same size on screen when zoomed out, and so is the outline", far.length === near.length && far.every((w) => w === 9) && nearLine === 1.5 && farLine === 1.5, JSON.stringify({ near, far, nearLine, farLine }));
+		say("…the same size on screen when zoomed out, and the outline stays round the board", far.length === near.length && far.every((w) => w === 9) && nearLine && farLine, JSON.stringify({ near, far, nearLine, farLine }));
 		await page.keyboard.press("Control+Equal");
 		await settle(page, 500);
 		await page.keyboard.press("Escape");

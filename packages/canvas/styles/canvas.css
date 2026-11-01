@@ -217,32 +217,27 @@
 	position: absolute;
 }
 	/*
-	 * A board whose size changed from outside a drag (`Stage`'s `sizingPaths`): its box, its title
-	 * bar and its selection outline ease to the new size together, on the app's curve. Its page
+	 * A board whose size changed from outside a drag (`Stage`'s `sizingPaths`): its box and its title
+	 * bar ease to the new size together, on the app's curve. Its page
 	 * lays out at each step, which one board can afford for a quarter of a second.
 	 */
 	.card-node[data-sizing="true"],
 	.card-node[data-sizing="true"] > .surface,
-	.bar-layer .chrome[data-sizing="true"],
-	/*
-	 * The engine paints the outlines, handles, guides, slots and drafts with the drawing
-	 * (`stage_paint::overlay`, from the engine's own editor): the elements stay for the checks and as
-	 * hit areas (a handle still answers its 44 pt), but show nothing of their own. Opacity, not
-	 * visibility, so a check that asks whether a selection shows still gets yes.
-	 */
-	.stage[data-engine-overlays="true"] .world > :is(.pen-kin, .pen-selection, .pen-selection-box, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-measure, .pen-draft, .pen-draft-line, .pen-side) {
-	opacity: 0;
-}
-	.stage[data-engine-overlays="true"] .world > :is(.pen-handle, .pen-anchor) {
-	background: transparent !important;
-	box-shadow: none !important;
-	border-color: transparent !important;
-}
-	.world > .pen-selection[data-sizing="true"] {
+	.bar-layer .chrome[data-sizing="true"] {
 	transition:
 		width 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
 		height 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
 		opacity 180ms ease-out;
+}
+	/*
+	 * The engine paints the handles and anchors with the drawing (`stage_paint::overlay`, from the
+	 * engine's own editor), as it does the outlines, guides, slots and drafts, which have no element
+	 * at all: these stay as hit areas (a handle still answers its 44 pt) and show nothing of their own.
+	 */
+	.stage[data-engine-overlays="true"] .world > :is(.pen-handle, .pen-anchor) {
+	background: transparent !important;
+	box-shadow: none !important;
+	border-color: transparent !important;
 }
 	/* The eight handles sit at the final corners at once, so they wait out the easing and come back. */
 	.world[data-sizing="true"] > .pen-handle {
@@ -759,34 +754,8 @@
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
 }
-	.world > :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-measure, .pen-measure-tag, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	.world > :is(.pen-size, .pen-measure-tag, .pen-handle, .pen-text) {
 	z-index: 3;
-}
-	/*
-	 * What the selection, or the item under the pointer, sits in and holds (`editor/core/overlay.ts`,
-	 * `kinOutlines`): its parents in a light solid line, its children in a light dashed one. Lighter
-	 * than a hover and a selection, so the item itself is still the line that reads first.
-	 */
-	.world > .pen-kin {
-	position: absolute;
-	border-radius: 4px;
-	pointer-events: none;
-	outline: 1px solid var(--color-accent);
-	outline-offset: 0;
-	opacity: 0.45;
-}
-	.world > .pen-kin[data-kin="child"] {
-	outline-style: dashed;
-	opacity: 0.55;
-}
-	.world > .pen-kin[data-round="true"] {
-	border-radius: var(--radius-board, 12px);
-}
-	/* One box round everything selected, when there is more than one thing (each has its own thin line). */
-	.world > .pen-selection-box {
-	position: absolute;
-	border-radius: 4px;
-	pointer-events: none;
 }
 	/* The selection's size in pixels, under it, in the accent: drawn at screen size whatever the zoom. */
 	.world > .pen-size {
@@ -803,20 +772,6 @@
 	font-variant-numeric: tabular-nums;
 	pointer-events: none;
 }
-	/*
-	 * What the pointer is over, before a press (`Stage.tsx`): a thin line, thinner than a selection's,
-	 * the way a design tool answers "what would I pick here". What an arrow's end would join, while it
-	 * is carried, is the same box drawn heavier with a wash inside.
-	 */
-	.world > :is(.pen-hover, .pen-join) {
-	position: absolute;
-	border-radius: 4px;
-	pointer-events: none;
-}
-	.world > .pen-join {
-	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
 	/* A card's block's grip, in the card's margin, to drag the block by (`Stage.tsx`, `gripBox`). */
 	.world > .pen-grip {
 	position: absolute;
@@ -836,58 +791,7 @@
 	.world > .pen-grip:active { cursor: grabbing; }
 	.world > .pen-grip[data-hidden] { visibility: hidden; }
 	.world > .pen-grip svg { stroke-width: 1.75; flex: none; }
-	.world > .pen-insert {
-	position: absolute;
-	border-radius: 999px;
-	background: var(--color-accent);
-	pointer-events: none;
-}
-	/* The other places a drag could land near the pointer: dashed slot lines, and dashed frames that place what they hold. */
-	.world > .pen-slots {
-	position: absolute;
-	top: 0;
-	left: 0;
-	overflow: visible;
-	pointer-events: none;
-}
-	.world > .pen-slots line {
-	stroke: var(--color-accent);
-	stroke-linecap: round;
-	opacity: 0.7;
-}
-	.world > .pen-slot-frame {
-	position: absolute;
-	border-radius: 4px;
-	outline: 1.5px dashed var(--color-accent);
-	opacity: 0.6;
-	pointer-events: none;
-}
-	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
-	.world > :is(.pen-hover, .pen-selection):is([data-page="true"], [data-round="true"]) {
-	border-radius: var(--radius-board, 12px);
-}
-	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
-	.world > .pen-guides {
-	position: absolute;
-	top: 0;
-	left: 0;
-	overflow: visible;
-	pointer-events: none;
-}
-	.world > .pen-guides :is(line, path) {
-	stroke: #f24e1e;
-}
-	/* What Alt shows between the selection and the item under the pointer: red lines, and their lengths. */
-	.world > .pen-measure {
-	position: absolute;
-	top: 0;
-	left: 0;
-	overflow: visible;
-	pointer-events: none;
-}
-	.world > .pen-measure :is(line, rect) {
-	stroke: #f24e1e;
-}
+	/* The lengths on what Alt shows between the selection and the item under the pointer, and on a gap a drag repeats. */
 	.world > .pen-measure-tag {
 	position: absolute;
 	transform-origin: 0 0;
@@ -902,22 +806,9 @@
 	font-variant-numeric: tabular-nums;
 	pointer-events: none;
 }
-	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
-	.world > .pen-selection {
-	position: absolute;
-	border-radius: 4px;
-	pointer-events: none;
-	/* A selection fades in over 120 ms rather than appearing (`touch-rules.ts`, SELECTION_FADE_MS). */
-	animation: pen-select-in 120ms ease-out;
-}
-	@keyframes pen-select-in {
-	from {
-		opacity: 0;
-	}
-}
 	/* A single selection's eight handles, and what a tool is drawing before it is made. */
 	/*
-	 * Drawn at its screen size and scaled to the world by the zoom (`OverlayLayer.tsx`, `knob`), so its
+	 * Drawn at its screen size and scaled to the world by the zoom (`HitLayer.tsx`, `knob`), so its
 	 * 1.5px line and 2px corner are screen pixels at every zoom. The line is an inset shadow, not a
 	 * border, which a browser rounds to whole pixels.
 	 */
@@ -955,7 +846,7 @@
 	cursor: nwse-resize;
 }
 	/*
-	 * Under a finger a handle is a small dot, answering a finger's width round it (`OverlayLayer.tsx`,
+	 * Under a finger a handle is a small dot, answering a finger's width round it (`HitLayer.tsx`,
 	 * --hit). Only the four corners are drawn: the edges still answer a press (their hit zones stay),
 	 * but as bands with nothing to see, and the size label and the arrow anchors are not shown, so
 	 * a selection is a box with four dots and nothing else round it.
@@ -1151,20 +1042,6 @@
 	.world > .pen-player .pen-player-wave > i {
 	position: absolute;
 	border-radius: 99px;
-}
-	.world > .pen-draft {
-	position: absolute;
-	box-sizing: border-box;
-	border: 1.5px dashed var(--color-accent);
-	background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-	pointer-events: none;
-}
-	.world > .pen-draft[data-tool="ellipse"] {
-	border-radius: 50%;
-}
-	.world > .pen-draft-line {
-	position: absolute;
-	pointer-events: none;
 }
 	/* The drawing's tools (`pen/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
 	.pen-tools {
@@ -1573,7 +1450,7 @@
 	border-radius: 8px;
 	filter: drop-shadow(0 10px 14px rgb(0 0 0 / 22%));
 }
-	.stage[data-ghosting] :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-handle, .pen-anchor) { visibility: hidden; }
+	.stage[data-ghosting] :is(.pen-size, .pen-handle, .pen-anchor) { visibility: hidden; }
 	.pen-card-editor .pce-ghost {
 	position: absolute;
 	z-index: 5;

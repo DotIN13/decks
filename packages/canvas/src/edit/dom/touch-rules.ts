@@ -4,7 +4,7 @@ import { RULES } from "../../device/profile.ts";
 /**
  * The numbers that make the canvas feel right under a finger, read from the rules table (`device/rules.json`): how far a press may
  * wobble before it means to move, how big a handle is drawn and how far it answers, how long a hold
- * is, how close two taps are. The DOM layer reads them now (`pointer.ts`, `OverlayLayer.tsx`); the
+ * is, how close two taps are. The DOM layer reads them now (`pointer.ts`, `HitLayer.tsx`); the
  * engine reads the same ones once it paints the overlays, so the feel does not change when the
  * drawing moves. Apple asks for 44 pt targets and Google for 48 dp; a glyph may be smaller than
  * what answers the press, which is why a handle is drawn as a 10 pt dot and answers 44.
@@ -20,9 +20,6 @@ export const slopFor = (kind: string | PointerKind | undefined): number => DRAG_
 export const HANDLE_DOT_PX = RULES.handleSize;
 /** How wide a handle answers a press, in screen pixels, whatever it is drawn: a finger's width on touch. */
 export const HANDLE_HIT_PX = RULES.handleReach;
-
-/** The selection's outline and handles fade in over this long, rather than appearing. */
-export const SELECTION_FADE_MS = RULES.selectionFadeMs;
 
 /** A press held still this long is a hold: the item's menu, with a preview. */
 export const HOLD_MS = RULES.holdMs;

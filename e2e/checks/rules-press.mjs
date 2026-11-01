@@ -91,12 +91,12 @@ for (const f of FORMS.filter((one) => !only || only.includes(one.form))) {
 		const over = await t.middle("slop");
 		await t.mouse.move({ x: over.x - 30, y: over.y - 30 });
 		await t.mouse.move(over);
-		const hovered = await until(() => t.canvas.evaluate(() => !!document.querySelector(".pen-hover")), 3000);
+		const hovered = await until(() => t.canvas.evaluate(() => globalThis.__decksOverlayRects().hover.length > 0), 3000);
 		say(tag("a pointer over an item in edit mode outlines it"), !!hovered);
 	} else {
 		await t.select([]);
 		await t.fingers.tap(await t.middle("slop"));
-		const hovered = await t.canvas.evaluate(() => !!document.querySelector(".pen-hover"));
+		const hovered = await t.canvas.evaluate(() => globalThis.__decksOverlayRects().hover.length > 0);
 		say(tag("a finger on an item leaves no hover outline"), !hovered);
 	}
 

@@ -129,7 +129,6 @@ pub struct Rules {
 	pub slide_px: f64,
 	pub near_px: f64,
 	pub glide_ms: f64,
-	pub selection_fade_ms: f64,
 	/// The pill always below (touch) rather than either side (desk).
 	pub pill_below: bool,
 	pub nudge: f64,
@@ -144,7 +143,7 @@ pub struct Rules {
 
 /// Every row the editor reads, by its name in the file. The rest are the page's (chrome, pages, layers).
 pub const READ: &[&str] = &[
-	"press.slop-px", "tap.ms", "tap.px", "tap.second-ms", "tap.second-on-item", "tap.bare-second-ms", "tap.bare-second-px", "click.after-pan-ms", "click.after-make-ms", "hold.ms", "hold.on-item", "hold.on-bare", "hover.outline", "press.on-live-page", "drag.copy-with-alt", "handle.size-px", "handle.shape", "handle.which", "handle.reach-px", "handle.min-px", "handle.size-label", "arrow.anchors", "arrow.anchor-px", "arrow.anchor-out-px", "arrow.end-px", "arrow.bend-px", "line.reach-px", "edge.out-px", "edge.in-px", "snap.px", "snap.by-pointer", "snap.reading-gap-px", "arrow.join-px", "arrow.side-px", "arrow.slide-px", "drop.near-px", "glide.ms", "selection.fade-ms", "pill.place", "nudge.px", "nudge.shift-px", "duplicate.offset-px", "coast.by", "coast.tau-ms", "pinch.travel-px", "wheel.travel-px", "live.zoom",
+	"press.slop-px", "tap.ms", "tap.px", "tap.second-ms", "tap.second-on-item", "tap.bare-second-ms", "tap.bare-second-px", "click.after-pan-ms", "click.after-make-ms", "hold.ms", "hold.on-item", "hold.on-bare", "hover.outline", "press.on-live-page", "drag.copy-with-alt", "handle.size-px", "handle.shape", "handle.which", "handle.reach-px", "handle.min-px", "handle.size-label", "arrow.anchors", "arrow.anchor-px", "arrow.anchor-out-px", "arrow.end-px", "arrow.bend-px", "line.reach-px", "edge.out-px", "edge.in-px", "snap.px", "snap.by-pointer", "snap.reading-gap-px", "arrow.join-px", "arrow.side-px", "arrow.slide-px", "drop.near-px", "glide.ms", "pill.place", "nudge.px", "nudge.shift-px", "duplicate.offset-px", "coast.by", "coast.tau-ms", "pinch.travel-px", "wheel.travel-px", "live.zoom",
 ];
 
 fn table() -> &'static Value {
@@ -225,7 +224,6 @@ impl Rules {
 			slide_px: num("arrow.slide-px", form),
 			near_px: num("drop.near-px", form),
 			glide_ms: num("glide.ms", form),
-			selection_fade_ms: num("selection.fade-ms", form),
 			pill_below: word("pill.place", form) == "below",
 			nudge: num("nudge.px", form),
 			nudge_shift: num("nudge.shift-px", form),

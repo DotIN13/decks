@@ -14,7 +14,7 @@ import { canvasHost } from "../host.ts";
 import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../edit/pen-tools.ts";
 import { newCard } from "../model/card-frame.ts";
 import { Insert } from "./Insert.tsx";
-import type { Box } from "../edit/snap.ts";
+import type { Box } from "../edit/wire.ts";
 import type { PenTool, Pt } from "../edit/model.ts";
 import type { Join, NextId, Outline } from "../edit/wire.ts";
 import type { PenNode } from "@decks/pen";
@@ -162,7 +162,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 		if (opensWords(tool)) text.openPenText({ id, node, box }, true);
 	};
 
-	/** A press on one of an item's anchors (`OverlayLayer`): an arrow drawn from that side of it. */
+	/** A press on one of an item's anchors (`HitLayer`): an arrow drawn from that side of it. */
 	const fromAnchor = (event: PointerEvent, box: Outline, side: ArrowSide) => {
 		if (event.button !== 0) return;
 		event.preventDefault();

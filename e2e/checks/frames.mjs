@@ -125,17 +125,17 @@ if (spot) {
 		await page.mouse.down();
 		await page.mouse.move((from.x + into.x) / 2, (from.y + into.y) / 2, { steps: 6 });
 		await settle(page, 200);
-		const holding = await canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-page])").length);
+		const holding = await canvas.evaluate(() => globalThis.__decksOverlayRects().selection.filter((r) => !r.page).length);
 		say("the press picked the item up rather than starting a marquee", holding === 1, `outlines ${holding}`);
 		// The frame says it would take it, before anything is let go: the gesture has to be legible.
-		const lit = await canvas.evaluate(() => document.querySelectorAll('.pen-join[data-drop="frame"]').length);
+		const lit = await canvas.evaluate(() => globalThis.__decksOverlayRects().joins.filter((r) => r.drop).length);
 		await page.mouse.move(into.x, into.y, { steps: 6 });
 		await settle(page, 150);
 		const during = await canvas.evaluate(() => ({
-			joins: document.querySelectorAll(".pen-join").length,
-			drops: document.querySelectorAll('.pen-join[data-drop="frame"]').length,
+			joins: globalThis.__decksOverlayRects().joins.length,
+			drops: globalThis.__decksOverlayRects().joins.filter((r) => r.drop).length,
 			carried: globalThis.__decksPenBox?.("f-note")?.x,
-			selection: document.querySelectorAll(".pen-selection:not([data-page])").length,
+			selection: globalThis.__decksOverlayRects().selection.filter((r) => !r.page).length,
 		}));
 		await page.mouse.up();
 		const refused = link.received.filter((m) => m.type === "notice").map((m) => m.text);
@@ -279,9 +279,8 @@ if (spot) {
 				await page.mouse.move(gap.x, gap.y, { steps: 6 });
 				await settle(page, 200);
 				const line = await canvas.evaluate(() => {
-					const one = document.querySelector(".pen-insert");
-					if (!one) return undefined;
-					const box = one.getBoundingClientRect();
+					const box = globalThis.__decksOverlayRects().insert[0];
+					if (!box) return undefined;
 					return { w: Math.round(box.width), h: Math.round(box.height), y: Math.round(box.y) };
 				});
 				await page.mouse.up();

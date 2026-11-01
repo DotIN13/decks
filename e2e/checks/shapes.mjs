@@ -138,9 +138,11 @@ if (sv) {
 	 * canvas, which the page cannot read back.
 	 */
 	const drawn = async () => {
-		const box = await canvas.locator(".pen-selection").first().boundingBox();
-		if (!box) return "";
-		const clip = { x: box.x + 4, y: box.y + 4, width: Math.max(8, box.width - 8), height: Math.max(8, box.height - 8) };
+		// The outline the engine paints, in the canvas frame, moved to the page the screenshot is of.
+		const box = await canvas.evaluate(() => globalThis.__decksOverlayRects()?.selection[0]);
+		const frame = await (await canvas.frameElement()).boundingBox();
+		if (!box || !frame) return "";
+		const clip = { x: frame.x + box.x + 4, y: frame.y + box.y + 4, width: Math.max(8, box.width - 8), height: Math.max(8, box.height - 8) };
 		return createHash("sha1").update(await page.screenshot({ clip })).digest("hex");
 	};
 	const fillOf = () => onDisk().children.find((n) => n.id === made?.id)?.children?.find((n) => n.type === "path")?.fill;
@@ -279,9 +281,8 @@ if (room) {
 		await page.mouse.click(drawn.top.x + drawn.top.width / 2, drawn.top.y + drawn.top.height * 0.85);
 		await settle(page, 400);
 		const picked = await until(() => canvas.evaluate(() => {
-			const one = document.querySelector(".pen-selection:not([data-page])");
-			if (!one) return undefined;
-			const box = one.getBoundingClientRect();
+			const box = globalThis.__decksOverlayRects().selection.find((r) => !r.page);
+			if (!box) return undefined;
 			return { y: Math.round(box.y), h: Math.round(box.height) };
 		}));
 		say("clicking near the bottom of the upper one selects the upper one", !!picked && Math.abs(picked.y - drawn.top.y) <= 4, JSON.stringify({ picked, top: Math.round(drawn.top.y), under: Math.round(drawn.under.y) }));
@@ -460,7 +461,7 @@ if (diagonal) {
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
 		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
 		// The copy is selected once the drawing has it: the outline moves onto it.
-		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
+		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = globalThis.__decksOverlayRects()?.selection[0]; return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
 		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));

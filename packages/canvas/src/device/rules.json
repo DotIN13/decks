@@ -40,7 +40,6 @@
 		"arrow.slide-px": { "value": 18, "says": "An end slides along its side within this far." },
 		"drop.near-px": { "value": 200, "says": "Drop slots within this far of the pointer are drawn dashed; the one under it solid." },
 		"glide.ms": { "value": 150, "says": "What a drop moved glides to where it lands over this long." },
-		"selection.fade-ms": { "value": 120, "says": "The selection's outline fades in over this long." },
 		"pill.place": { "by": "form", "desk": "either", "tablet": "below", "phone": "below", "says": "The item's pill goes above or below on a desk, re-chosen when the item changes; on touch always below, placed once, hidden while dragging." },
 		"nudge.px": { "value": 1, "says": "An arrow key moves the selection this far." },
 		"nudge.shift-px": { "value": 10, "says": "With Shift." },

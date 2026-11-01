@@ -89,7 +89,6 @@ export type Rules = {
 	slidePx: number;
 	nearPx: number;
 	glideMs: number;
-	selectionFadeMs: number;
 	pillPlace: "either" | "below";
 	nudge: number;
 	nudgeShift: number;
@@ -153,7 +152,6 @@ export const NAMES: Record<keyof Rules, string> = {
 	slidePx: "arrow.slide-px",
 	nearPx: "drop.near-px",
 	glideMs: "glide.ms",
-	selectionFadeMs: "selection.fade-ms",
 	pillPlace: "pill.place",
 	nudge: "nudge.px",
 	nudgeShift: "nudge.shift-px",

@@ -669,13 +669,12 @@ export function createStageInput(deps: StageInputDeps) {
 		window.removeEventListener("pointercancel", onTouchEnd);
 	});
 
-	/** What an item's slot asks of the stage's fingers: a finger its bar or edge took carries the item, and the camera does not pan with it. */
+	/** What an item's slot asks of the stage's fingers: a finger it took is the editor's, and the camera does not pan with it. */
 	const gestures: ItemSlotProps["gestures"] = {
 		claimTouch: (id) => {
 			claimed.add(id);
 			keptTouches.add(id);
 		},
-		pinching: () => touches.count() > 1,
 	};
 
 	/**

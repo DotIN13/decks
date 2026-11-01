@@ -50,7 +50,7 @@ export function createStageEditor(host: StageEditorHost) {
 export type StageEditor = ReturnType<typeof createStageEditor>;
 
 export type { PageView, Openers } from "./dom/pointer.ts";
-export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";
+export { HitLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/HitLayer.tsx";
 export { TextEditor } from "./dom/TextEditing.tsx";
 export { InsertMenu } from "../ui/InsertMenu.tsx";
 export { tsScene, tsSeam } from "./scene-ts.ts";

@@ -6,8 +6,30 @@
  */
 import type { MediaItem, Op, PenNode } from "@decks/pen";
 import type { ArrowRoute, ArrowSide } from "@decks/pen";
-import type { Guide } from "./snap.ts";
 import type { Corners, Offset, PageBox, PenTool, PointerKind, Pt, Rect, ResizeBox, Mods } from "./model.ts";
+
+/** A box in stage units. */
+export interface Box {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/**
+ * A snapping guide the engine paints: an alignment (`kind: "line"`) or one measured gap between two
+ * boxes (`"gap"`). An alignment carries the points on it that line up (`points`), each marked with a
+ * ✕; a gap that is the reading gap between two boards says its size (`label`).
+ */
+export interface Guide {
+	kind: "line" | "gap";
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	points?: { x: number; y: number }[];
+	label?: string;
+}
 
 /** A pointer at a stage point (`at`) and on the screen (`client`), with its keys, its kind and its time. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };

@@ -76,7 +76,7 @@ pub fn frame(v: &Value) -> Frame {
 	}
 }
 
-/// What the page knows that the editor does not: `{ typing, panning, glide: [[id, dx, dy]], ownDrag: {path, x, y}, draft, hoverItem, hoverPage, alt, readOnly, notResizable, hints: { joins, sides } }`.
+/// What the page knows that the editor does not: `{ typing, panning, glide: [[id, dx, dy]], draft, hoverItem, hoverPage, alt, readOnly, notResizable, hints: { joins, sides } }`.
 pub fn extras(v: &Value) -> Extras {
 	let glide = v.get("glide").and_then(Value::as_array).map(|list| list.iter().filter_map(|one| Some((one.get(0)?.as_str()?.to_string(), Offset { dx: one.get(1)?.as_f64()?, dy: one.get(2)?.as_f64()? }))).collect()).unwrap_or_else(HashMap::new);
 	let hints = v.get("hints").cloned().unwrap_or(Value::Null);
@@ -84,7 +84,6 @@ pub fn extras(v: &Value) -> Extras {
 		typing: text(v, "typing"),
 		panning: flag(v, "panning"),
 		glide,
-		own_drag: v.get("ownDrag").filter(|d| d.is_object()).and_then(|d| Some((text(d, "path")?, Pt::new(num(d, "x"), num(d, "y"))))),
 		draft: v.get("draft").filter(|d| d.is_object()).map(|d| Draft { corners: Corners { x1: num(d, "x1"), y1: num(d, "y1"), x2: num(d, "x2"), y2: num(d, "y2") }, tool: text(d, "tool").unwrap_or_default() }),
 		hover_item: text(v, "hoverItem"),
 		hover_page: text(v, "hoverPage"),

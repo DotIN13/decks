@@ -21,7 +21,7 @@ import { ENGINE, LAYERS } from "../render/device.ts";
 import {
 	createStageEditor,
 	InsertMenu,
-	OverlayLayer,
+	HitLayer,
 	TextEditor,
 	tsScene,
 	tsSeam,
@@ -29,6 +29,8 @@ import {
 import { createStageInput } from "./input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
+import { answerOverlayRects } from "./on-screen.ts";
+import { insertBox } from "../edit/dom/places.ts";
 
 
 /**
@@ -53,7 +55,6 @@ import { createSelection } from "./selection.tsx";
  */
 export type { InkRequest, StageComment, StageShots } from "../types.ts";
 import type { InkRequest, StageComment, StageShots } from "../types.ts";
-import { RULES } from "../device/profile.ts";
 
 
 /** What the stage is given by its host. */
@@ -623,7 +624,7 @@ export function Stage(props: StageProps) {
 	penLayer.onGlide = editor.setGlide;
 
 	/* What is drawn over the selection and under the pointer, and the pills (`selection.tsx`). */
-	const selection = createSelection({ props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld: input.pressHeld, colours });
+	const selection = createSelection({ props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, penNode, pressHeld: input.pressHeld, colours });
 
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
@@ -664,6 +665,28 @@ export function Stage(props: StageProps) {
 		const r = element.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
+	/** Where what the engine paints over the canvas is on the screen (`on-screen.ts`): for Properties' popover, and the checks. */
+	const onScreen = (box: { x: number; y: number; w: number; h: number }) => {
+		const r = element!.getBoundingClientRect();
+		const a = toScreen(ctl.now(), view(), { x: box.x, y: box.y });
+		const b = toScreen(ctl.now(), view(), { x: box.x + box.w, y: box.y + box.h });
+		const x = r.left + a.x;
+		const y = r.top + a.y;
+		return { x, y, width: b.x - a.x, height: b.y - a.y, left: x, top: y, right: r.left + b.x, bottom: r.top + b.y };
+	};
+	answerOverlayRects(() => {
+		if (!element) return undefined;
+		const o = selection.overlay();
+		return {
+			selection: o.outlines.map((box) => ({ ...onScreen(box), page: box.role === "page", marquee: box.role === "marquee" })),
+			frame: o.selectionFrame ? [onScreen(o.selectionFrame)] : [],
+			hover: o.hover ? [{ ...onScreen(o.hover), page: !!o.hover.board }] : [],
+			joins: [...o.joins.map((box) => ({ ...onScreen(box), drop: false })), ...(o.drop ? [{ ...onScreen(o.drop), drop: true }] : [])],
+			insert: o.insert ? [onScreen(insertBox(o.insert, 3 / ctl.zoom()))] : [],
+			guides: o.guides.map((g) => onScreen({ x: Math.min(g.x1, g.x2), y: Math.min(g.y1, g.y2), w: Math.abs(g.x2 - g.x1), h: Math.abs(g.y2 - g.y1) })),
+		};
+	});
+	onCleanup(() => answerOverlayRects(undefined));
 	/** For the browser checks: the frame a drop at a point on the screen would go into, and its box. */
 	(globalThis as { __decksFrameUnder?: (clientX: number, clientY: number) => { frame: string | null; world: { x: number; y: number } } }).__decksFrameUnder = (clientX, clientY) => {
 		const world = worldAt({ clientX, clientY });
@@ -817,12 +840,10 @@ export function Stage(props: StageProps) {
 					}}
 				/>
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
-				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
-				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
-				<OverlayLayer
+				{/* What the hand presses over the canvas; the outlines and guides are the engine's, painted with the drawing. */}
+				<HitLayer
 					overlay={selection.overlay}
 					zoom={ctl.zoom()}
-					sizing={(path) => items.sizingPaths().has(path)}
 					onGrip={editor.onGrip}
 					onAnchor={editor.insert.fromAnchor}
 					onArrowEnd={editor.onArrowEnd}
@@ -832,7 +853,7 @@ export function Stage(props: StageProps) {
 					onPageHandle={editor.onPageHandle}
 				>
 					{items.player()}
-				</OverlayLayer>
+				</HitLayer>
 				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
 				{/*
 				 * The host's layer (others' cursors, outlines), in canvas units: in the world, so a pan carries it,

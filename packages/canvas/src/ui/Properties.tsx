@@ -45,11 +45,12 @@ import { Icon } from "@decks/ui";
 import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { RULES } from "../device/profile.ts";
+import { overlayRects } from "../stage/on-screen.ts";
+import { scheme } from "../lib/theme.ts";
+import { ICON_LIBRARIES } from "../render/icon-index.ts";
 
 /** Properties open from the pill or the hold menu, not with every selection (`properties.opens`): a tablet and a phone. */
 const FROM_PILL = RULES.propertiesOpen === "from-pill";
-import { scheme } from "../lib/theme.ts";
-import { ICON_LIBRARIES } from "../render/icon-index.ts";
 
 /**
  * The properties panel: everything about what is selected in the drawing, in the board inspector's
@@ -158,8 +159,8 @@ export function Properties(props: {
 	const PANEL_W = 276;
 	const place = () => {
 		if (!FROM_PILL || untrack(sheet) || typeof document === "undefined") return setAnchor(null);
-		const outline = document.querySelector(".world > .pen-selection, .world > .pen-selection-box");
-		const r = outline?.getBoundingClientRect();
+		// The box round the selection as the engine paints it, on the screen (`stage/on-screen.ts`).
+		const r = overlayRects()?.frame[0];
 		if (!r || r.width === 0) return setAnchor(null);
 		const top = Math.max(60, Math.min(r.top, innerHeight - 420));
 		// Clear of the pill too, which is centred under the selection and about 220 px wide (`Callout.tsx`): a narrow item's pill reaches past its sides.

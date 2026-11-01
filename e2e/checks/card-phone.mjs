@@ -185,7 +185,7 @@ for (let i = 1; i <= 16; i++) {
 	await page.waitForTimeout(16);
 }
 await settle(page, 150);
-ghost = await canvas.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+ghost = await canvas.evaluate(() => globalThis.__decksOverlayRects()?.selection[0]);
 await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 const placed = await until(() => {
 	const kids = cardNode()?.children?.map((n) => n.id) ?? [];

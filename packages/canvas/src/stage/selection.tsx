@@ -28,7 +28,6 @@ export type SelectionDeps = {
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
 	/** Send the person's edits to the drawing (`Stage.tsx`, `penEdit`). */
 	penEdit: (ops: unknown[]) => void;
-	freshIds: (...also: string[]) => () => string;
 	/** An item as the file has it (`Stage.tsx`, `penNode`). */
 	penNode: (id: string) => PenNode | undefined;
 	/** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
@@ -48,7 +47,7 @@ const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.s
  * items and the lasso, with what the pills do. Made inside `Stage`, after the editor, which it reads.
  */
 export function createSelection(deps: SelectionDeps) {
-	const { props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld } = deps;
+	const { props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, penNode, pressHeld } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
 
 	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
@@ -58,11 +57,10 @@ export function createSelection(deps: SelectionDeps) {
 
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
 	const selectMade = (made: string[]) => editor.selectMade(made);
-	const shownDrag = editor.shownDrag;
 	/**
 	 * Everything the editor draws over the canvas, painted by the engine with the drawing in one frame
 	 * (`crates/editor/src/overlay.rs`, from the engine's editor's state and what the page knows), and
-	 * answered as places for `OverlayLayer`'s hit areas and the pills. Asked again whenever any of it
+	 * answered as places for `HitLayer`'s hit areas and the pills. Asked again whenever any of it
 	 * may have changed: the editor's state, the zoom, the drawing, the hover, a glide, the words open.
 	 */
 	const painted = createMemo<Overlay>(
@@ -78,7 +76,6 @@ export function createSelection(deps: SelectionDeps) {
 				typing: editor.typing(),
 				panning: panning(),
 				glide: glide ? [...glide].map(([id, by]) => [id, by.dx, by.dy]) : [],
-				ownDrag: editor.ownDrag(),
 				draft: editor.draft(),
 				hoverItem: props.mode === "edit" ? editor.hoverItem() : undefined,
 				hoverPage: props.mode === "edit" && !picked ? hoverPage : undefined,
@@ -242,13 +239,9 @@ export function createSelection(deps: SelectionDeps) {
 		return { id, x: box.x, y: box.y + line.top + line.height / 2 };
 	});
 
-	/** One box round everything selected, with its size under it. */
-	const penFrame = part((o) => o.selectionFrame);
 
 	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
-	/** A dragged arrow handle's dashed route, where it sits. */
-	const routeShown = editor.route;
-	/** Everything the editor draws over the canvas, for `OverlayLayer`: the engine's, and the grip the page places itself. */
+	/** Everything the editor draws over the canvas, for `HitLayer`: the engine's, and the grip the page places itself. */
 	const overlay = createMemo<Overlay>(() => ({ ...painted(), grip: gripBox() }));
 
 	/** The pills: over the selected board, over drawn items or a group, and over the lasso's strokes. */

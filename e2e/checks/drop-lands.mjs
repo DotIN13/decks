@@ -270,7 +270,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 		globalThis.__frames = [];
 		globalThis.__sampling = true;
 		const sample = () => {
-			const outline = document.querySelector(".pen-selection")?.getBoundingClientRect();
+			const outline = globalThis.__decksOverlayRects()?.selection[0];
 			const drawn = globalThis.__decksPenBox?.("lift-b");
 			const shift = globalThis.__lastGlide?.get("lift-b");
 			if (shift && outline && drawn) {

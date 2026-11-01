@@ -273,10 +273,10 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	(globalThis as { __decksPictured?: () => string[] }).__decksPictured = () => [...untrack(picturedNow)];
 	/*
 	 * An item a drag carries while the sheet draws it as its picture (not awake): its picture goes with the drag, so its slot waits unseen too, or its
-	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).
+	 * title stayed on screen where the drag began.
 	 */
 	const draggedAsPicture = createMemo<ReadonlySet<string>>(() => {
-		const paths = [...(editor.pageDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
+		const paths = editor.pageDrag()?.paths ?? [];
 		const live = liveCards();
 		return new Set(paths.filter((path) => !live.has(path)));
 	});
@@ -590,7 +590,6 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			{...(props.onOpenPage ? { onOpenPage: props.onOpenPage } : {})}
 			view={editor.pageView(board.path)}
 			{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
-			onMove={(x, y) => props.onMove(board.path, x, y)}
 			onOpen={() => pushCamera(frame([boxOf(board)]))}
 			{...(props.onComment
 				? {
