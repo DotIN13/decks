@@ -1580,6 +1580,12 @@ body {
 		max-height: calc(42% - var(--frame-dock, 0px));
 		border-radius: 26px;
 	}
+	/* Opened as the drawer from the pill (`data-sheet`): the page's composer slides out of its way, so it sits on the foot of the screen, as an iOS sheet does. */
+	.decks-canvas[data-phone="true"] .props-panel.panel-float[data-sheet] {
+		bottom: 0;
+		max-height: 56%;
+		border-radius: 26px 26px 0 0;
+	}
 	/* About three quarters of a phone's width, so a good strip of the canvas stays in sight beside it. */
 	.app[data-phone="true"] .panel-shell.v3-panel {
 		width: min(74vw, 288px) !important;

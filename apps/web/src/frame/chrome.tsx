@@ -98,7 +98,10 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 				<PenTray onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => handle.edit(ids.map((id) => ({ op: "delete", id })))} />
 			</Show>
 			<Show when={!(drawing() && chrome.mode() === "browse")}>
-				<PenBar tools={false} doc={(chrome.revision(), handle.drawn())} onEdit={(ops) => handle.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => chrome.exportPicture(ids)} />
+				{/* The dock's height as a variable, for the properties sheet on a phone to sit above the composer (`properties.css`). */}
+				<div style={{ display: "contents", "--dock": `${chrome.dock()}px` }}>
+					<PenBar tools={false} doc={(chrome.revision(), handle.drawn())} onEdit={(ops) => handle.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => chrome.exportPicture(ids)} />
+				</div>
 			</Show>
 			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
 			<Show

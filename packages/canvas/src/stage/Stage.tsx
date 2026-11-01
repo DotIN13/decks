@@ -11,7 +11,8 @@ import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { StageInk } from "../edit/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
-import { penLive, penTool, setPenLive, setPenTool, type PenTool } from "../edit/pen-tools.ts";
+import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
+import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
 import { scheme } from "../lib/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
@@ -324,6 +325,10 @@ export function Stage(props: StageProps) {
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), canvasBox(view()));
 
+	/** A hold's menu, open at the finger (`ui/HoldMenu.tsx`): the items held, or none for bare canvas. */
+	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
+	/** A word to whoever hosts the stage, shown for a moment (the frame's `say`): what a two-finger tap did. */
+	const say = (text: string) => element.dispatchEvent(new CustomEvent("decks-say", { detail: text, bubbles: true }));
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
@@ -336,6 +341,16 @@ export function Stage(props: StageProps) {
 
 	/* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
 	const input = createStageInput({
+		onFingerTap: (fingers) => {
+			if (!props.onPenStep) return;
+			if (fingers === 2) {
+				props.onPenStep("undo");
+				say("Undone");
+			} else if (fingers === 3) {
+				props.onPenStep("redo");
+				say("Redone");
+			}
+		},
 		props,
 		element: () => element,
 		ctl,
@@ -444,6 +459,7 @@ export function Stage(props: StageProps) {
 			linkAt: (at) => penLayer.linkAt(at),
 			onSelect: (path) => props.onSelect(path),
 			fingers: () => input.touches.count(),
+			holdMenu: (menu) => setHoldMenu(menu),
 			claim: (pointer) => input.claimed.add(pointer),
 			beginTouch: (event) => input.beginTouch(event),
 			keepTouch: (event) => input.keptTouches.add(event.pointerId),
@@ -815,6 +831,27 @@ export function Stage(props: StageProps) {
 			</Show>
 			<InsertMenu menu={editor.insert} />
 			{selection.pills()}
+			<Show when={holdMenu()} keyed>
+				{(menu) => {
+					const node = menu.ids[0] ? penNode(menu.ids[0]) : undefined;
+					const words = node ? String((node as { content?: unknown; name?: unknown }).content ?? (node as { name?: unknown }).name ?? "") : "";
+					const preview = words ? words.slice(0, 80) : undefined;
+					const tops = () => props.pen?.doc?.children?.length ?? 0;
+					const actions: HoldAction[] = menu.ids.length
+						? [
+								{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
+								{ label: "Duplicate", run: () => selection.penDuplicate() },
+								{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
+								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.stageName ? `canvases/${props.stageName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
+							]
+						: [
+								{ label: "Add a shape…", run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
+								{ label: "Add an icon…", run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
+							];
+					return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
+				}}
+			</Show>
 			<Show when={props.drawing && props.onPenEdit}>
 				<StageInk
 					camera={props.camera}

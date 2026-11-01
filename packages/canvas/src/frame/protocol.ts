@@ -124,6 +124,8 @@ export interface FrameToPage {
 	"open-link": { href: string };
 	/** Open one of the app's own panels, beside the canvas (the apps list), or its file picker (`files`): the file chosen there is put in the middle of the view. */
 	panel: { name: "apps" | "files" };
+	/** A sheet is open over the canvas's foot (the properties drawer on a phone): the page's composer makes way for it, as under an iOS sheet, until it closes. */
+	sheet: { open: boolean };
 	/** Once the camera rests; or a view kept for another conversation (`agent`), for the page to keep as that agent's view and the harness to answer its `view.camera` by. */
 	camera: { camera: Camera; agent?: string; selected?: string };
 	viewport: { width: number; height: number };

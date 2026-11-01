@@ -496,11 +496,11 @@ export const gripHidden = (drag: Offset, resizing: boolean) => !!(drag.dx || dra
 /** The handles a board has: all eight (`resize.ts`, `pageResizeStep`). */
 export const pageHandleList = (): readonly Handle[] => HANDLES;
 
-/** A resize handle answers a press this many screen pixels across, whatever size it is drawn. */
+/** A resize handle answers a press this many screen pixels across under a pointer, whatever size it is drawn; a finger gets 44 (`dom/touch-rules.ts`). */
 export const HANDLE_HIT_PX = 15;
 
-/** How far a handle's hit zone reaches past its drawn box on each side, in stage pixels: `size` is the drawn width, in stage pixels. */
-export const hitReach = (size: number, zoom: number) => Math.max(0, (HANDLE_HIT_PX / zoom - size) / 2);
+/** How far a handle's hit zone reaches past its drawn box on each side, in stage pixels: `size` is the drawn width, in stage pixels, `hit` how wide it answers on the screen. */
+export const hitReach = (size: number, zoom: number, hit = HANDLE_HIT_PX) => Math.max(0, (hit / zoom - size) / 2);
 
 /** The top-left corner of a `size`-wide handle centred on its edge or corner of `box`. */
 export function handleAt(box: Rect, handle: Handle, size: number): Pt {

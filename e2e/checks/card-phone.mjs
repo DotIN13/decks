@@ -164,9 +164,15 @@ link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type:
 const picture = await until(() => canvas.evaluate(() => globalThis.__decksPenBox?.("phone-picture")));
 const first = await canvas.evaluate(() => globalThis.__decksPenBox?.("p-h"));
 const props = () => canvas.evaluate(() => !!document.querySelector(".props-panel"));
+/* On a phone the properties are a drawer, opened from the pill's Properties button, not with every selection (`Properties.tsx`, `touch-rules.ts`). */
+const openDrawer = async () => {
+	const button = await until(() => canvas.evaluate(() => { const b = document.querySelector(".stage-fixed > .card-callout [aria-label='Properties']"); const r = b?.getBoundingClientRect(); return r && r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined; }), 2000);
+	if (button) await page.touchscreen.tap(button.x, button.y);
+	return !!button;
+};
 await page.touchscreen.tap(picture.x + picture.width / 2, picture.y + picture.height / 2);
 await settle(page, 400);
-say("a tap on a picture selects it, and its properties show as on a desk", await until(props, 2000));
+say("a tap on a picture selects it, and its pill offers Properties, which opens the drawer", (await openDrawer()) && (await until(props, 2000)));
 const cdp = await page.context().newCDPSession(page);
 
 const point = (x, y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
@@ -195,7 +201,7 @@ const inCard = await until(async () => {
 });
 if (inCard) await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);
 await settle(page, 600);
-say("a tap on the picture in the card shows its properties", !!inCard && (await until(props, 2000)));
+say("a tap on the picture in the card selects it there, and the drawer opens from its pill", !!inCard && (await openDrawer()) && (await until(props, 2000)));
 
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-card" }] });
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-picture" }] });

@@ -674,8 +674,17 @@
  * appearing pushes the reply up instead of landing on top of it, and none of them has to
  * know the height of the others.
  */
+/* Under a sheet in the canvas frame (a phone's properties drawer): slid off the foot of the screen until it closes. */
+.dock[data-under] {
+	translate: 0 130%;
+	opacity: 0;
+	pointer-events: none;
+}
 .dock {
 	position: absolute;
+	transition:
+		translate 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+		opacity 160ms ease-out;
 	/*
 	 * Above the conversation, which is `--z-conversation` (9).
 	 *

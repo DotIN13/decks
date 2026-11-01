@@ -60,6 +60,8 @@ const [penIcon, setPenIcon] = createSignal<{ library: string; name: string }>({ 
  * position and size (`canvas/pen/Properties.tsx`). Set by the stage, which has the layout.
  */
 const [penBoxes, setPenBoxes] = createSignal<ReadonlyMap<string, { x: number; y: number; w: number; h: number }>>(new Map());
+/** On a touch screen the properties drawer opens only when asked, from the pill or the hold menu (`Properties.tsx`, `Callout.tsx`); elsewhere the panel shows with the selection. */
+const [propsOpen, setPropsOpen] = createSignal(false);
 
 /**
  * The insert panel (`canvas/pen/Insert.tsx`): open on its shapes or its icons. Opened from the tool
@@ -99,4 +101,4 @@ export type ArrowStyle = { route: "straight" | "curved" | "elbow"; heads?: "end"
 const [penArrowStyle, setPenArrowStyle] = createSignal<ArrowStyle>({ route: "curved" });
 
 export { handTool, setHandTool, penArrowStyle, setPenArrowStyle };
-export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping };
+export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, propsOpen, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping, setPropsOpen };

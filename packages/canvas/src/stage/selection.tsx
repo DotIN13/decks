@@ -435,5 +435,5 @@ export function createSelection(deps: SelectionDeps) {
 		</>
 	);
 
-	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, overlay, pills };
+	return { penHandles, pageHandles, radiusHandle, arrowEnds, penDeleteSelected, penDuplicate, overlay, pills };
 }

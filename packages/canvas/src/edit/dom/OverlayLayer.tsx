@@ -11,14 +11,14 @@ import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
 import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
 import { HANDLES, type Handle } from "../core/resize.ts";
+import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "./touch-rules.ts";
 
-/** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
-export const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+export { COARSE };
 /** Where an arrow anchor sits, in screen pixels: its centre this far out from the item's side, and this wide. */
 export const ANCHOR_OUT = 14;
 export const ANCHOR_PX = COARSE ? 16 : 10;
-/** A resize handle's width, in screen pixels. */
-export const HANDLE_PX = COARSE ? 16 : 9;
+/** A resize handle's width as drawn, in screen pixels (`touch-rules.ts`): a 10 px dot under a finger, answering 44. */
+export const HANDLE_PX = HANDLE_DOT_PX;
 
 export type OverlayHandlers = {
 	/** A press on a card block's grip. */
@@ -357,7 +357,7 @@ export function OverlayLayer(
 								<div
 									class="pen-handle"
 									data-handle={handle}
-									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
+									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom, HANDLE_HIT_PX) + 1.5 / props.zoom) * props.zoom}px` }}
 									onPointerDown={(event) => props.onHandle(event, handle)}
 								/>
 							);
@@ -393,7 +393,7 @@ export function OverlayLayer(
 									class="pen-handle"
 									data-handle={handle}
 									data-page={box().path}
-									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
+									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom, HANDLE_HIT_PX) + 1.5 / props.zoom) * props.zoom}px` }}
 									onPointerDown={(event) => props.onPageHandle(event, handle)}
 								/>
 							);

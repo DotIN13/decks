@@ -7,6 +7,7 @@ import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
+import { createFingerTaps } from "../edit/dom/finger-taps.ts";
 import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
@@ -22,6 +23,8 @@ const TOOL_KEYS: Record<string, "select"> = { v: "select" };
 
 /** What the stage's input needs of the stage around it. */
 export type StageInputDeps = {
+	/** Two or three fingers tapped together (`edit/dom/finger-taps.ts`): undo and redo on a touch screen. */
+	onFingerTap?: (fingers: number) => void;
 	props: StageProps;
 	/** The stage element, set once it is mounted. */
 	element: () => HTMLDivElement;
@@ -58,10 +61,27 @@ export function createStageInput(deps: StageInputDeps) {
 	const [pressHeld, setPressHeld] = createSignal(false);
 	onMount(() => {
 		const element = el();
+		/*
+		 * Two fingers tapped together undo, three redo (`edit/dom/finger-taps.ts`, `onFingerTap`): fingers
+		 * that land together, go nowhere and lift together, which a pinch, a pan and a hold are not.
+		 */
+		const taps = createFingerTaps();
 		const press = (event: PointerEvent) => {
 			if (!(event.target as Element | null)?.closest?.(".card-callout")) setPressHeld(true);
+			if (event.pointerType === "touch") taps.down(event.pointerId, event.clientX, event.clientY, performance.now());
 		};
-		const release = () => setPressHeld(false);
+		const travel = (event: PointerEvent) => {
+			if (event.pointerType === "touch") taps.move(event.pointerId, event.clientX, event.clientY);
+		};
+		const release = (event: PointerEvent) => {
+			setPressHeld(false);
+			if (event.pointerType !== "touch") return;
+			if (event.type === "pointercancel") return taps.cancel();
+			const fingers = taps.up(event.pointerId, performance.now());
+			if (fingers) deps.onFingerTap?.(fingers);
+		};
+		window.addEventListener("pointermove", travel, true);
+		onCleanup(() => window.removeEventListener("pointermove", travel, true));
 		element.addEventListener("pointerdown", press, { capture: true, passive: true });
 		/*
 		 * The hand (or Space held) pans from a press anywhere on the stage, whatever is selected: on an

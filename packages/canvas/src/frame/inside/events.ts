@@ -28,6 +28,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	 * copies the files a paste needs; on Studio, what needs no file.
 	 */
 	const harness = studio ? `studio:${start.backend.api}` : ((first as { harness?: string }).harness ?? `harness:${start.backend.api}`);
+	const say = sayer(root);
 	const clipboard = installClipboard({
 		handle,
 		canvas: start.canvas.name,
@@ -38,8 +39,12 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
 				end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
 			),
-		say: sayer(root),
+		say,
 	});
+	// What the stage asks said (a two-finger tap's "Undone"): the frame's own line at the foot.
+	root.addEventListener("decks-say", (event) => say(String((event as CustomEvent).detail ?? "")));
+	// A sheet open over the foot of the frame (a phone's properties drawer): the page's dock makes way for it.
+	document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }));
 	end.on("paste", (data) => clipboard.paste(data));
 
 	/*

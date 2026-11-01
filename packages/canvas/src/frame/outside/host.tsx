@@ -48,6 +48,8 @@ export interface FrameHostOptions {
 	composer?(): HTMLElement | undefined;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */
 	dock?(): number;
+	/** A sheet is open over the canvas's foot (the properties drawer on a phone), or closed again: the page's dock makes way for it. */
+	sheet?(open: boolean): void;
 	/** Each agent's name and colour, for what is new on the canvas. */
 	agents?(): Record<string, { name: string; color: string }>;
 	/** The conversation on screen, whose `decks view …` the frame carries out on its canvas. */
@@ -353,6 +355,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 			if (data.ink) options.frame.ink?.(data.ink);
 		});
 		page.on("panel", (data) => options.frame.panel?.(data.name));
+		page.on("sheet", (data) => options.frame.sheet?.(data.open));
 		page.on("refer", (data) => {
 			const composer = options.frame.composer?.();
 			if (!composer) return;

@@ -24,6 +24,8 @@ export interface CanvasHostInputs {
 	/** How far up from the bottom the dock reaches, and the composer's box. */
 	dockCover: () => number;
 	composerBox: () => HTMLElement | undefined;
+	/** A sheet in the canvas frame is open over the foot of the screen (a phone's properties drawer): the dock makes way. */
+	underSheet: (open: boolean) => void;
 	openAppsPanel: () => void;
 	files: ReturnType<typeof createFileDrops>;
 	frameWhenPlaced: (path: string) => void;
@@ -31,7 +33,7 @@ export interface CanvasHostInputs {
 
 /** The canvas: made once, as a component, so nothing read while it is made makes it again. */
 export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
-	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, openAppsPanel, files, frameWhenPlaced } = props.host;
+	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced } = props.host;
 	/**
 	 * A file of any kind, chosen in the file picker and placed in the middle of the view by what it is:
 	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
@@ -79,6 +81,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			agent: cardAgentCall,
 			dock: dockCover,
 			composer: composerBox,
+			sheet: underSheet,
 			openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"),
 			upload: ({ files: dropped, at, card }) => files.dropAt(at, dropped, card),
 			focused: () => state.focused,

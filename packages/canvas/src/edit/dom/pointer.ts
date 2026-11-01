@@ -13,7 +13,8 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
+import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
+import { HOLD_MS, slopFor } from "./touch-rules.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
@@ -99,6 +100,8 @@ export type PointerHost = {
 	madeAt: () => number;
 	/** A note at a screen point, open for typing: what the Note tool and a click there make (`InsertMenu`'s `noteAt`). */
 	noteAt: (event: Client) => void;
+	/** A finger held still for `HOLD_MS` (`touch-rules.ts`): the item's menu at the finger, or the canvas's with no item (`ui/HoldMenu.tsx`). */
+	holdMenu?: (menu: { ids: string[]; at: Pt; stage: Pt }) => void;
 	toggleMedia: (id: string, media: MediaItem) => void;
 	open: Openers;
 	/** The handles the overlay draws, as drawn, for the presses on them. */
@@ -169,7 +172,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	const onCanvas = (target: EventTarget | null) => target === host.element() || onDrawn(target);
 
 	/**
-	 * Follow one press to its release: `move` on each step past a 3px slop, `done` at the end.
+	 * Follow one press to its release: `move` on each step past the pointer's slop (`touch-rules.ts`: 3 px for a mouse, 8 for a finger), `done` at the end.
 	 *
 	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
 	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
@@ -185,12 +188,13 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			// Refused for a pointer the browser no longer has; the listeners still end the press.
 		}
 		const start = { x: event.clientX, y: event.clientY };
+		const slop = slopFor(event.pointerType);
 		let moved = false;
 		let last: PointerEvent | undefined;
 		let over = false;
 		const onMove = (e: PointerEvent) => {
 			if (e.pointerId !== event.pointerId || released(e)) return;
-			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < DRAG_SLOP_PX) return;
+			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < slop) return;
 			moved = true;
 			last = e;
 			move(e);
@@ -467,7 +471,15 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		const since = performance.now();
 		let pinched = false;
 		let travelled = false;
+		let held = false;
+		// A finger held still on bare canvas: the canvas's menu at the finger (`holdMenu`), and the lift does nothing more.
+		const hold = setTimeout(() => {
+			if (pinched || travelled || !host.holdMenu || !host.editable() || host.drawing()) return;
+			held = true;
+			host.holdMenu({ ids: [], at: from, stage: worldAt(event) });
+		}, HOLD_MS);
 		const done = () => {
+			clearTimeout(hold);
 			window.removeEventListener("pointermove", move);
 			window.removeEventListener("pointerup", up);
 			window.removeEventListener("pointercancel", done);
@@ -476,10 +488,12 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			if (e.pointerId !== pointer && e.pointerType === "touch") pinched = true;
 			// Judged on the furthest the finger went: a pan that comes back to where it began is still a pan.
 			else if (e.pointerId === pointer && Math.hypot(e.clientX - from.x, e.clientY - from.y) >= TAP_SLOP_PX) travelled = true;
+			if (pinched || travelled) clearTimeout(hold);
 		};
 		const up = (e: PointerEvent) => {
 			if (e.pointerId !== pointer) return;
 			done();
+			if (held) return;
 			if (pinched || travelled || performance.now() - since > TAP_MS) return;
 			batch(() => {
 				editor.select([]);
@@ -520,7 +534,24 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			host.keepTouch?.(event);
 		}
 		let moved = false;
+		let held = false;
+		/*
+		 * Held still for `HOLD_MS`: the item is selected and its menu opens at the finger (`holdMenu`); the
+		 * finger is claimed so the lift neither taps nor pans, and a carry it had begun is let go.
+		 */
+		const hold = setTimeout(() => {
+			if (moved || host.fingers() > 1 || !host.holdMenu) return;
+			held = true;
+			host.claim(pointer);
+			host.keepTouch?.(event);
+			if (carrying) editor.input({ type: "cancel" });
+			host.onSelect(undefined);
+			editor.pickPages([]);
+			editor.select([hit.id]);
+			host.holdMenu({ ids: [hit.id], at: from, stage: at });
+		}, HOLD_MS);
 		const done = () => {
+			clearTimeout(hold);
 			window.removeEventListener("pointermove", move);
 			window.removeEventListener("pointerup", up);
 			window.removeEventListener("pointercancel", cancel);
@@ -531,9 +562,12 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		};
 		const move = (e: PointerEvent) => {
 			if (e.pointerId !== pointer) return;
+			if (held) return;
 			// A second finger: this was the start of a pinch, and whatever it carried goes back.
 			if (host.fingers() > 1) return abandon();
-			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < TAP_SLOP_PX) return;
+			// A finger may wobble its slop (8 px) before it means to move; past it the carry begins.
+			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < slopFor("touch")) return;
+			clearTimeout(hold);
 			// The editor carries the selection from here (`editor/core/gesture.ts`, a finger's carry): picked up as it first moves.
 			if (!moved && carrying) editor.input({ type: "carry", from: { at, client: from }, ...pointerInput(e, worldAt(e)) });
 			moved = true;
@@ -543,6 +577,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		const up = (e: PointerEvent) => {
 			if (e.pointerId !== pointer) return;
 			done();
+			if (held) return;
 			if (moved) {
 				if (carrying) editor.input({ type: "release", ...pointerInput(e, worldAt(e)) });
 				else editor.input({ type: "cancel" });

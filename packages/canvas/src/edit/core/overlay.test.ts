@@ -108,8 +108,9 @@ test("a resize handle answers a press 15 screen pixels across: its hit zone reac
 	// A 9 px handle at 100% reaches 3 px past each side; at 50% one drawn 18 stage px wide hits 30, so 6.
 	assert.equal(hitReach(9, 1), 3);
 	assert.equal(hitReach(18, 0.5), 6);
-	// A finger's 16 px handle already covers it.
+	// A finger's 16 px handle already covers it; a 10 px dot answering 44 reaches 17 past each side.
 	assert.equal(hitReach(16, 1), 0);
+	assert.equal(hitReach(10, 1, 44), 17);
 });
 
 test("an arrow alone selected has its ends' handles, moved by the drag", () => {

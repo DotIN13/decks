@@ -171,6 +171,8 @@ export function App() {
 	/* The floats and the dock (`app/floats.ts`, `app/dock.ts`): the layout is read once the page has mounted. */
 	const floats = createFloats();
 	const dock = createDock({ phone: () => phone(), phoneChat: () => phoneChat(), setPhoneChat: (open, from) => setPhoneChat(open, from), viewWidth: () => viewWidth() }, floats);
+	/** A sheet is open in the canvas frame over the foot of the screen (a phone's properties drawer): the dock slides out of its way, as under an iOS sheet. */
+	const [underSheet, setUnderSheet] = createSignal(false);
 
 
 	/*
@@ -478,6 +480,7 @@ export function App() {
 		setEditorHandle,
 		dockCover: dock.dockCover,
 		composerBox: dock.composerBox,
+		underSheet: setUnderSheet,
 		openAppsPanel,
 		files,
 		frameWhenPlaced,
@@ -795,7 +798,7 @@ export function App() {
 				 * is the whole reason it is a row and not a chip that comes and goes: the box
 				 * you type into must not move between turns.
 				 */}
-				<div class="dock" ref={dock.watchDock}>
+				<div class="dock" ref={dock.watchDock} data-under={underSheet() ? "true" : undefined}>
 					{/* Only drawn while the bar is put away behind the right edge (a hard throw
 					    at it, `float.ts`): the one part of it left on screen, and the way back. */}
 					<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => dock.unstow()}>

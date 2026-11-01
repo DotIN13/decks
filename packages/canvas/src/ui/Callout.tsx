@@ -2,6 +2,9 @@ import type { Page, Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
+import { COARSE } from "../edit/dom/touch-rules.ts";
+import { setPropsOpen } from "../edit/pen-tools.ts";
+import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import { canvasHost, openInTab } from "../host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
@@ -108,6 +111,8 @@ export function PageCallout(props: {
 			{ from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
 		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
 		if (!slots.length) return { below: false, sure: false };
+		// Under a finger the pill goes below whenever below is on screen: never over what the hand holds, and the same place every time.
+		if (COARSE) return { below: slots.some((slot) => slot.below), sure: true };
 		const others = props.obstacles?.() ?? [];
 		const covered = (slot: { from: number; to: number }) => {
 			let area = 0;
@@ -138,6 +143,8 @@ export function PageCallout(props: {
 			if (untrack(() => props.hidden)) return setSide((one) => ({ ...one, sure: false }));
 			// The first time, at once: the pill has nowhere to be yet.
 			if (was === undefined || !untrack(side).sure) return setSide(untrack(choose));
+			// Placed once on touch: a change of the item's size does not send it to the other edge, so it never hops.
+			if (COARSE) return;
 			chooseSoon = setTimeout(() => setSide(untrack(choose)), 80);
 		}),
 	);
@@ -197,6 +204,12 @@ export function PageCallout(props: {
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}
+			</Show>
+			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
+			<Show when={COARSE && !props.board && !props.ink}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => setPropsOpen(true)}>
+					<Icon of={SlidersHorizontal} size={16} />
+				</button>
 			</Show>
 			<Show when={props.onComment}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.board ? "Comment on this card" : "Comment on this"} onClick={() => props.onComment?.()}>
