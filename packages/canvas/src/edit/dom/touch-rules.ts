@@ -28,5 +28,3 @@ export const SELECTION_FADE_MS = 120;
 
 /** A press held still this long is a hold: the item's menu, with a preview. */
 export const HOLD_MS = 450;
-/** Fingers down and up together within this long, with no travel, are a multi-finger tap. */
-export const TAP_WINDOW_MS = 250;

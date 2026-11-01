@@ -41,8 +41,6 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			),
 		say,
 	});
-	// What the stage asks said (a two-finger tap's "Undone"): the frame's own line at the foot.
-	root.addEventListener("decks-say", (event) => say(String((event as CustomEvent).detail ?? "")));
 	// A sheet open over the foot of the frame (a phone's properties drawer): the page's dock makes way for it.
 	document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }));
 	end.on("paste", (data) => clipboard.paste(data));

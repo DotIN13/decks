@@ -327,8 +327,6 @@ export function Stage(props: StageProps) {
 
 	/** A hold's menu, open at the finger (`ui/HoldMenu.tsx`): the items held, or none for bare canvas. */
 	const [holdMenu, setHoldMenu] = createSignal<{ ids: string[]; at: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
-	/** A word to whoever hosts the stage, shown for a moment (the frame's `say`): what a two-finger tap did. */
-	const say = (text: string) => element.dispatchEvent(new CustomEvent("decks-say", { detail: text, bubbles: true }));
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
@@ -341,16 +339,6 @@ export function Stage(props: StageProps) {
 
 	/* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
 	const input = createStageInput({
-		onFingerTap: (fingers) => {
-			if (!props.onPenStep) return;
-			if (fingers === 2) {
-				props.onPenStep("undo");
-				say("Undone");
-			} else if (fingers === 3) {
-				props.onPenStep("redo");
-				say("Redone");
-			}
-		},
 		props,
 		element: () => element,
 		ctl,
