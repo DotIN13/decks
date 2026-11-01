@@ -34,6 +34,12 @@ const OUT = process.env.AWAKE_BENCH_OUT;
 const ONLY = (process.env.AWAKE_BENCH_ONLY ?? "pan,zoom").split(",");
 const PROFILE = process.env.AWAKE_BENCH_PROFILE;
 const TRACE = process.env.AWAKE_BENCH_TRACE;
+/** `AWAKE_BENCH_ALLOC=<file>`: a sampling heap profile of the measured runs (what allocated, by function), summed by `scripts/alloc-shares.mjs`. */
+const ALLOC = process.env.AWAKE_BENCH_ALLOC;
+/** `AWAKE_BENCH_ZOOM=0.02,0.3`: the zoom's start and end (default 0.25 to 1), a hand's pinch over the whole canvas being 2% to 30%. */
+const [ZOOM_FROM, ZOOM_TO] = (process.env.AWAKE_BENCH_ZOOM ?? "0.25,1").split(",").map(Number);
+/** `AWAKE_BENCH_QUERY='pictures=small&device=mobile'`: added to the page's address, to measure one device's rules on another (`render/device.ts`). */
+const QUERY = process.env.AWAKE_BENCH_QUERY;
 /** `AWAKE_BENCH_LAYERS=<file>`: the compositor's layers mid-zoom, with why each is one, written there. */
 const LAYERS = process.env.AWAKE_BENCH_LAYERS;
 /**
@@ -131,7 +137,8 @@ link.send({ type: "agent.stage", id: agentId, stage: AWAKE_CANVAS });
 setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1200);
 await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === AWAKE_CANVAS), 20000);
 at("reloading onto it");
-await page.reload({ waitUntil: "domcontentloaded" });
+if (QUERY) await page.goto(`${page.url().split("?")[0]}?${QUERY}`, { waitUntil: "domcontentloaded" });
+else await page.reload({ waitUntil: "domcontentloaded" });
 let canvas = await canvasFrame(page, { timeout: 90000 }).catch((error) => {
 	say("the canvas frame shows its stage", false, `${error.message}; page errors: ${errors.join(" | ")}; frames: ${page.frames().map((f) => f.url().slice(0, 60)).join(", ")}`);
 	process.exit(1);
@@ -142,6 +149,7 @@ const shown = await canvas
 	.then(() => true)
 	.catch(() => false);
 say("the stage shows the awake canvas", shown, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+if (QUERY) say("the canvas frame carries the query", (await canvas.evaluate(() => location.search)).includes(QUERY.split("&")[0]), await canvas.evaluate(() => location.search));
 
 if (PICTURES) {
 	at("taking every card's picture");
@@ -173,7 +181,8 @@ if (PICTURES) {
 	failed = queue.length;
 	say(`every card has its picture (${done} of ${paths.length} taken in ${Math.round((Date.now() - t0) / 1000)} s)`, failed === 0, failed ? `${failed} still without; first: ${why}` : "");
 	// The frame hears of each picture as it is made (the sheet asks again); a reload is the sure way to a clean start with them.
-	await page.reload({ waitUntil: "domcontentloaded" });
+	if (QUERY) await page.goto(`${page.url().split("?")[0]}?${QUERY}`, { waitUntil: "domcontentloaded" });
+	else await page.reload({ waitUntil: "domcontentloaded" });
 	canvas = await canvasFrame(page, { timeout: 90000 });
 	await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 112, undefined, { timeout: 30000 }).catch(() => {});
 }
@@ -320,8 +329,8 @@ const run = async (kind) => {
 	const n = Math.round(SECONDS * 120);
 	const t0 = Date.now();
 	const sent = [];
-	// A pinch from 25% to 100% is a factor of 4 over n/2 steps: each step ctrl-wheel of ln(4)/(n/2) in the zoom's units (64 per e-fold, as the stage reads it).
-	const pinchStep = (64 * Math.log(4)) / (n / 2);
+	// A pinch from ZOOM_FROM to ZOOM_TO over n/2 steps: each step a ctrl-wheel of ln(to/from)/(n/2) in the zoom's units (64 per e-fold, as the stage reads it).
+	const pinchStep = (64 * Math.log(ZOOM_TO / ZOOM_FROM)) / (n / 2);
 	for (let i = 0; i < n; i++) {
 		const back = i >= n / 2 ? -1 : 1;
 		const event = kind === "pan" ? { type: "mouseWheel", x: point.x, y: point.y, deltaX: 12 * back, deltaY: 4 * back } : { type: "mouseWheel", x: point.x, y: point.y, deltaX: 0, deltaY: pinchStep * back, modifiers: 2 };
@@ -366,8 +375,8 @@ const run = async (kind) => {
 const result = { setup: { runs: RUNS, seconds: SECONDS, width: W, height: H, dpr: DPR, zoom: ZOOM, throttle: THROTTLE, spot }, scenarios: {} };
 for (const kind of ONLY) {
 	at(`${kind}: zooming`);
-	await canvas.evaluate((z) => globalThis.__bench.zoomTo(z), kind === "pan" ? ZOOM : 0.25);
-	await canvas.evaluate(({ x, y }) => globalThis.__bench.panTo(x, y), { x: spot.x - W / 2 / (kind === "pan" ? ZOOM : 0.25), y: spot.y - H / 2 / (kind === "pan" ? ZOOM : 0.25) });
+	await canvas.evaluate((z) => globalThis.__bench.zoomTo(z), kind === "pan" ? ZOOM : ZOOM_FROM);
+	await canvas.evaluate(({ x, y }) => globalThis.__bench.panTo(x, y), { x: spot.x - W / 2 / (kind === "pan" ? ZOOM : ZOOM_FROM), y: spot.y - H / 2 / (kind === "pan" ? ZOOM : ZOOM_FROM) });
 	at(`${kind}: resting`);
 	await quiet();
 	const live = await canvas.evaluate(() => globalThis.__bench.live());
@@ -378,6 +387,12 @@ for (const kind of ONLY) {
 		if (frameCdp && i === 0 && !profiling) {
 			profiling = true;
 			await frameCdp.send("Profiler.start");
+		}
+		if (ALLOC && i === 0 && !profiling) {
+			profiling = true;
+			await cdp.send("HeapProfiler.enable");
+			// Garbage counted too: by default the sampler reports only what is still alive when it stops, which is not what a collection pause is about.
+			await cdp.send("HeapProfiler.startSampling", { samplingInterval: 8192, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
 		}
 		if (TRACE && i === 0 && !profiling) {
 			profiling = true;
@@ -393,6 +408,11 @@ for (const kind of ONLY) {
 	say(`${kind} measured over ${RUNS} runs`, rows.length === RUNS, JSON.stringify(result.scenarios[kind]));
 }
 at("done");
+if (ALLOC && profiling) {
+	const { profile } = await cdp.send("HeapProfiler.stopSampling");
+	writeFileSync(ALLOC, JSON.stringify(profile));
+	console.error(`[awake-bench] allocation profile written to ${ALLOC}`);
+}
 if (TRACE && profiling) {
 	const ended = new Promise((done) => cdp.once("Tracing.tracingComplete", done));
 	await cdp.send("Tracing.end");
