@@ -261,11 +261,28 @@ export function editorOptions(ctx: FrameContext, reread: () => void): Parameters
 		onCamera: (moved) => {
 			ctx.setCamera(moved);
 			clearTimeout(restUntil);
-			restUntil = setTimeout(() => end.emit("camera", { camera: moved }), 250);
+			restUntil = setTimeout(() => {
+				end.emit("camera", { camera: moved });
+				ctx.presence?.camera(moved);
+			}, 250);
 		},
-		// What you point at, a comment, a sketch: drafts for the composer, which the page sends only on your Send.
-		onSelection: (ids) => end.emit("composer", { selection: { ids: [...ids] } }),
-		onSelect: (path) => end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } }),
+		// What you point at, a comment, a sketch: drafts for the composer, which the page sends only on your Send; and the others on the canvas see it.
+		onSelection: (ids) => {
+			end.emit("composer", { selection: { ids: [...ids] } });
+			ctx.presence?.selection(ids);
+		},
+		onSelect: (path) => {
+			end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } });
+			// A card selected is its item on the drawing, for the others on the canvas. Said once the editor is made: the first selection comes while it is being made.
+			queueMicrotask(() => {
+				try {
+					const item = path ? ((ctx.handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path) : undefined;
+					ctx.presence?.selection(item?.id ? [item.id] : []);
+				} catch {
+					/* the editor is not made yet: nothing is selected for anyone to see */
+				}
+			});
+		},
 		onViewport: (viewport) => end.emit("viewport", viewport),
 		onRefer: (pills) => end.emit("composer", { pills }),
 		onComment: (target) => {

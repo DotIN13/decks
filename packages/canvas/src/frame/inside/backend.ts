@@ -1,5 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Page, StageCall } from "@decks/protocol";
+import type { Page, Presence, PresenceBy, StageCall } from "@decks/protocol";
 import type { CardShot } from "../../items/card-snapshot.ts";
 import { openLine, type LineClient } from "./line.ts";
 
@@ -24,6 +24,8 @@ export interface Backend {
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
+	/** Where this frame is on its canvas, for the others on it (`presence.set`): only what changed. */
+	presence(presence: Presence): void;
 	/** A card written out as a page (`card-snapshot.ts`), drawn by the harness's Chrome (`/api/snapshot`): the picture, or why not. */
 	snapshot(path: string, shot: CardShot): Promise<{ mime: string; data: string } | { why: string }>;
 	/** A renewed token, for every request from now on. */
@@ -39,6 +41,8 @@ export type Heard =
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
 	| { type: "app.state"; name: string; title?: string; status: string }
+	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */
+	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
 	| { type: "stage.call"; call: StageCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
@@ -106,6 +110,11 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 		answer(id, value) {
 			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
 			line().send(error ? { type: "stage.result", id, error } : { type: "stage.result", id, value });
+		},
+
+		presence(presence) {
+			// Said only down an open line: where the pointer was while the line was down is not news when it comes back.
+			if (opened?.open()) opened.send({ type: "presence.set", canvas, ...presence });
 		},
 
 		async snapshot(path, shot) {

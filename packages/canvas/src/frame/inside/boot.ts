@@ -8,6 +8,7 @@ import { isNews } from "../../items/news.ts";
 import { pagesOf } from "../../model/drawing.ts";
 import { pageItems } from "../../model/boxes.ts";
 import { createBackend } from "./backend.ts";
+import { installPresence } from "./presence.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
 
@@ -72,6 +73,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	reflect();
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
+	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`). */
+	const presence = studio ? undefined : installPresence({ camera, send: (one) => backend.presence(one), viewport: () => ({ width: innerWidth, height: innerHeight }) });
 	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
 	let made: Editor | undefined;
 	const items = () => {
@@ -208,6 +211,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		narrow,
 		reflect,
 		cursor,
+		presence,
 		setCursor,
 		places,
 		changed,

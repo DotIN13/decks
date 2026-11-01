@@ -286,6 +286,24 @@ export type ClientMessage =
 	/** Unpair Decks Studio: its key is deleted, so the deck stops syncing, and every token given through it is taken back. Answered with `pairing`. */
 	| { type: "studio.unpair" };
 
+/**
+ * Where someone is on a canvas: the pointer in canvas units, the items selected, the camera. Each part
+ * is said when it changes; one left out is as it was, `null` is gone.
+ */
+export interface Presence {
+	pointer?: { x: number; y: number } | null;
+	selection?: string[];
+	camera?: Camera | null;
+}
+/** Who is present: a person on one line (by the line's id), or an agent; `harness` names the one they are on when it is not this one. */
+export interface PresenceBy {
+	kind: "person" | "agent";
+	id: string;
+	name?: string;
+	color: string;
+	harness?: string;
+}
+
 /** Who made one write of a canvas: the person (an edit from a page), an agent (its own call, by id), the file itself (a hand edit), or Studio (a change from another harness or browser, by Studio's user id). */
 export type ChangeAuthor = { kind: "person" | "agent" | "file" | "studio"; id?: string; name?: string };
 
@@ -311,7 +329,9 @@ export type LineClientMessage =
 	| { type: "doc"; message: DocClientMessage }
 	/** The person read this card (`card.seen`), or the frame measured it (`card.extent`). */
 	| { type: "card.seen"; path: string }
-	| { type: "card.extent"; path: string; rev: number; w: number; h: number; [key: string]: unknown };
+	| { type: "card.extent"; path: string; rev: number; w: number; h: number; [key: string]: unknown }
+	/** Where this line is on a watched canvas, at most twenty times a second; what it leaves out is as it was. */
+	| { type: "presence.set"; canvas: string; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null };
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
@@ -438,6 +458,8 @@ export type ServerMessage =
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; error?: string; base: string; made?: string[]; by?: string; author?: ChangeAuthor }
 	/** The line's answer to a `call`, under the call's `id` (`LineClientMessage`). */
 	| { type: "answer"; id: string; ok: boolean; value?: unknown; error?: string; notes?: string[] }
+	/** Someone else on a canvas moved, selected or looked elsewhere, or left (`gone`): never logged, never a revision. */
+	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null }
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
 	| { type: "hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**

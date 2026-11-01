@@ -42,7 +42,8 @@ const appFrameOf = (on) => on.frames().find((one) => !one.isDetached() && one.ur
 const appFrame = () => appFrameOf(page);
 const found = await until(async () => appFrame());
 say("the app runs inside the canvas frame, on the pass in its path", !!found, page.frames().map((one) => one.url().slice(0, 80)).join(" | "));
-const counted = await until(async () => (await appFrame()?.locator("#count").textContent())?.includes("Pressed 0"));
+// Each look waits a second at most: an app frame that is still loading has no #count yet, and the next look finds it.
+const counted = await until(async () => (await appFrame()?.locator("#count").textContent({ timeout: 1000 }))?.includes("Pressed 0"));
 say("…and its page loads there, scripts and all", !!counted);
 
 const canvas = await canvasFrame(page);
@@ -76,7 +77,7 @@ const again = await page.context().newPage();
 await again.goto(page.url());
 await canvasFrame(again);
 await call("view.focus", [id, { canvas: stageName }]);
-const back = await until(async () => (await appFrameOf(again)?.locator("#count").textContent())?.includes("Pressed 2"));
+const back = await until(async () => (await appFrameOf(again)?.locator("#count").textContent({ timeout: 1000 }))?.includes("Pressed 2"));
 say("opened again, the app has what it saved", !!back, String(await appFrameOf(again)?.locator("#count").textContent().catch(() => "")));
 await again.close();
 

@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import type { LineClientMessage, ServerMessage } from "@decks/protocol";
+import type { LineClientMessage, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { App } from "./app.ts";
 import { verifyOn } from "./auth/guard.ts";
@@ -14,9 +14,17 @@ export const HELLO_MS = 5_000;
 /** How often a line's token is checked again while it is open: a pass run out, signed out or unshared ends it. */
 const RECHECK_MS = 5_000;
 
+/** The colours lines are told apart by, one per line by its number: the canvas's own agent palette is a different set. */
+const COLORS = ["#2563eb", "#d946ef", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#0ea5e9", "#f97316"];
+
 /** Who a line is, and what it hears. */
 interface LineState {
+	/** This line's id, what its presence is known by (`PresenceBy.id`). */
+	id: string;
+	color: string;
 	principal?: Principal;
+	/** Where this line said it is, per canvas (`presence.set`), for whoever starts watching later and for the leave. */
+	present: Map<string, Presence>;
 	token?: string;
 	/** The canvases this line hears: their changes and their cards', apps' and documents' messages. */
 	watched: Set<string>;
@@ -44,6 +52,14 @@ interface LineState {
 export class Line {
 	private readonly server: WebSocketServer;
 	private readonly sockets = new Map<WebSocket, LineState>();
+	private lines = 0;
+	/**
+	 * Hears every presence a line says, and every leave, as `presence.changed` goes to the others: the
+	 * harness forwards a shared canvas's up to Studio (`studio/index.ts`).
+	 */
+	onPresence?: (message: Extract<ServerMessage, { type: "presence.changed" }>) => void;
+	/** What others on each canvas said, from elsewhere (Studio's harnesses and browsers), by their key: shown to a line that starts watching. */
+	private readonly elsewhere = new Map<string, Map<string, Extract<ServerMessage, { type: "presence.changed" }>>>();
 
 	constructor(private readonly app: App) {
 		this.server = new WebSocketServer({ noServer: true, perMessageDeflate: { threshold: 1024, serverNoContextTakeover: true, clientNoContextTakeover: true } });
@@ -57,7 +73,8 @@ export class Line {
 	}
 
 	private accept(socket: WebSocket, request: IncomingMessage): void {
-		const state: LineState = { watched: new Set(), all: false, headers: request.headers, remote: request.socket.remoteAddress };
+		this.lines += 1;
+		const state: LineState = { id: `l${this.lines.toString(36)}`, color: COLORS[this.lines % COLORS.length]!, present: new Map(), watched: new Set(), all: false, headers: request.headers, remote: request.socket.remoteAddress };
 		this.sockets.set(socket, state);
 		state.hello = setTimeout(() => socket.close(4401, "Say hello with a token first."), HELLO_MS);
 		state.hello.unref?.();
@@ -79,6 +96,8 @@ export class Line {
 			clearTimeout(state.hello);
 			clearInterval(state.recheck);
 			if (state.principal?.kind === "canvas") this.app.canvasFrames -= 1;
+			// Gone from every canvas it was present on.
+			for (const canvas of state.present.keys()) this.said({ type: "presence.changed", canvas, by: this.by(state), gone: true }, socket);
 		};
 		socket.on("close", gone);
 		socket.on("error", gone);
@@ -195,6 +214,14 @@ export class Line {
 				this.app.boards.noteExtent(message.path, { rev, w, h, ...extra });
 				return;
 			}
+			case "presence.set": {
+				const { type: _type, canvas, ...presence } = message;
+				if (typeof canvas !== "string" || !state.watched.has(canvas)) return;
+				const was = state.present.get(canvas) ?? {};
+				state.present.set(canvas, { ...was, ...(presence.pointer !== undefined ? { pointer: presence.pointer } : {}), ...(presence.selection ? { selection: presence.selection } : {}), ...(presence.camera !== undefined ? { camera: presence.camera } : {}) });
+				this.said({ type: "presence.changed", canvas, by: this.by(state), ...presence }, socket);
+				return;
+			}
 			default:
 				send(socket, { type: "notice", level: "warn", text: `The line does not know ${String((message as { type?: unknown }).type)}.` });
 		}
@@ -213,9 +240,42 @@ export class Line {
 			return;
 		}
 		state.watched.add(canvas);
+		// Who is on the canvas already: said to the newcomer as they last said it.
+		for (const [other, otherState] of this.sockets) if (other !== socket && otherState.principal && otherState.present.has(canvas)) send(socket, { type: "presence.changed", canvas, by: this.by(otherState), ...otherState.present.get(canvas)! });
+		for (const one of this.elsewhere.get(canvas)?.values() ?? []) send(socket, one);
 		if (typeof since !== "number") return;
 		const caught = this.app.pens.caughtUp(canvas, since);
 		if (caught) send(socket, caught);
+	}
+
+	/** Who a line is, in a presence: the person on it (a canvas pass, the person's own token) or the agent whose token it holds. */
+	private by(state: LineState): PresenceBy {
+		const principal = state.principal;
+		if (principal?.kind === "agent") {
+			const agent = this.app.agents.get(principal.id);
+			return { kind: "agent", id: principal.id, ...(agent ? { name: agent.name, color: agent.color } : { color: state.color }) };
+		}
+		return { kind: "person", id: state.id, color: state.color };
+	}
+
+	/** A presence said: to every other line watching that canvas, and to whoever listens for the harness (`onPresence`). */
+	private said(message: Extract<ServerMessage, { type: "presence.changed" }>, from?: WebSocket): void {
+		const text = JSON.stringify(message);
+		for (const [socket, state] of this.sockets) if (socket !== from && state.principal && state.watched.has(message.canvas) && socket.readyState === socket.OPEN) socket.send(text);
+		if (from) this.onPresence?.(message);
+	}
+
+	/**
+	 * Someone elsewhere (on Studio, or another harness through it) moved on a canvas kept here: said to
+	 * every line watching it, and kept for lines that start watching, until they go.
+	 */
+	present(message: Extract<ServerMessage, { type: "presence.changed" }>): void {
+		const key = `${message.by.harness ?? ""}/${message.by.kind}/${message.by.id}`;
+		const on = this.elsewhere.get(message.canvas) ?? new Map();
+		if (message.gone) on.delete(key);
+		else on.set(key, { ...(on.get(key) ?? {}), ...message });
+		this.elsewhere.set(message.canvas, on);
+		this.said(message);
 	}
 
 	/** A broadcast, to every line it concerns. */

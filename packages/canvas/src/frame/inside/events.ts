@@ -153,6 +153,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		);
 	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
+		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
 		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
 		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
 		if (message.type === "app.state") {

@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { Show, For } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../editor.tsx";
 import type { Editor } from "../../types.ts";
@@ -64,15 +64,46 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		const card = at ? pages().find((page) => page.path === at.path) : undefined;
 		return at && card ? { x: card.x + at.x, y: card.y + at.y, label: at.label, color: at.color } : null;
 	};
+	/** Everyone else's pointer on this canvas (`presence.ts`), beside the agent's cursor: one list of cursors, each by its key. */
+	const others = () => [...(ctx.presence?.present() ?? new Map()).entries()];
+	const pointers = () => others().filter(([, one]) => one.pointer).map(([key, one]) => ({ key, cursor: { x: one.pointer!.x, y: one.pointer!.y, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : one.by.harness ? "Someone elsewhere" : "Another window"), color: one.by.color } }));
+	/** Everyone else's selection: the boxes of the top-level items they hold, outlined in their colour with their name. */
+	const outlines = () => {
+		const list: Array<{ key: string; x: number; y: number; w: number; h: number; color: string; label: string }> = [];
+		let items: Array<{ id?: string; x?: number; y?: number; width?: number; height?: number }>;
+		try {
+			items = (ctx.handle().drawn().children ?? []) as unknown as typeof items;
+		} catch {
+			return list; // The editor is not made yet.
+		}
+		for (const [key, one] of others()) {
+			for (const id of one.selection ?? []) {
+				const item = items.find((candidate) => candidate.id === id);
+				if (!item || typeof item.x !== "number" || typeof item.y !== "number") continue;
+				list.push({ key: `${key}/${id}`, x: item.x, y: item.y, w: item.width ?? 0, h: item.height ?? 0, color: one.by.color, label: one.by.name ?? (one.by.kind === "agent" ? "An agent" : "Another window") });
+			}
+		}
+		return list;
+	};
 	/*
-	 * Only while an agent's cursor is out: its layer follows the camera, and drawn always it was written
+	 * Only while a cursor or an outline is out: its layer follows the camera, and drawn always it was written
 	 * at every step of every pan, a repaint and a new layer tree each time with nothing on it to see.
 	 */
 	const cursors = () => (
-		<Show when={cursorAt()}>
+		<Show when={cursorAt() || pointers().length || outlines().length}>
 			<div class="frame-cursors" style={{ position: "absolute", inset: "0", overflow: "hidden", "pointer-events": "none", "z-index": "5" }}>
 				<div style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", "will-change": "transform", transform: `translate(${innerWidth / 2}px, ${innerHeight / 2}px) scale(${camera().zoom}) translate(${-camera().x}px, ${-camera().y}px)` }}>
-					<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
+					<For each={outlines()}>
+						{(box) => (
+							<div class="frame-presence-outline" style={{ position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, border: `${1.5 / camera().zoom}px solid ${box.color}`, "border-radius": `${4 / camera().zoom}px`, "box-sizing": "border-box" }}>
+								<span style={{ position: "absolute", left: "0", bottom: "100%", transform: `scale(${1 / camera().zoom})`, "transform-origin": "0 100%", background: box.color, color: "#fff", font: "600 11px/1.4 system-ui, sans-serif", padding: "1px 6px", "border-radius": "4px 4px 4px 0", "white-space": "nowrap" }}>{box.label}</span>
+							</div>
+						)}
+					</For>
+					<Show when={cursorAt()}>
+						<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
+					</Show>
+					<For each={pointers()}>{(one) => <AgentCursor cursor={one.cursor} zoom={camera().zoom} />}</For>
 				</div>
 			</div>
 		</Show>

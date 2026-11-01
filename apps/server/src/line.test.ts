@@ -159,3 +159,44 @@ test("a canvas pass on the line hears its own canvas alone and calls only what a
 		await stop();
 	}
 });
+
+test("presence: a line's pointer and selection reach the other lines on the canvas, a newcomer is told who is there, and a leave is said", async () => {
+	const { app, connect, stop } = await open();
+	try {
+		const canvas = app.pens.claim("Room");
+		app.pens.edit(canvas, [{ op: "insert", node: { type: "note", id: "n", content: "n" }, box: { x1: 0, y1: 0 } }]);
+		const person = app.tokens.issue({ kind: "person" }, { label: "line test" }).token;
+		const rev = app.pens.get(canvas).rev;
+		const a = connect();
+		const b = connect();
+		await Promise.all([a.opened, b.opened]);
+		a.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
+		b.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
+		await Promise.all([a.next((m) => m.type === "hello"), b.next((m) => m.type === "hello")]);
+		a.send({ type: "presence.set", canvas, pointer: { x: 10, y: 20 } });
+		const seen = (await b.next((m) => m.type === "presence.changed")) as Extract<ServerMessage, { type: "presence.changed" }>;
+		assert.deepEqual(seen.pointer, { x: 10, y: 20 });
+		assert.equal(seen.by.kind, "person");
+		assert.ok(seen.by.color);
+		await new Promise((done) => setTimeout(done, 50));
+		assert.equal(a.heard.filter((m) => m.type === "presence.changed").length, 0, "never echoed to the one who said it");
+		a.send({ type: "presence.set", canvas, selection: ["n"] });
+		const selected = (await b.next((m) => m.type === "presence.changed" && m.selection !== undefined)) as Extract<ServerMessage, { type: "presence.changed" }>;
+		assert.deepEqual(selected.selection, ["n"]);
+		assert.equal(selected.by.id, seen.by.id);
+		// A third line that starts watching is told where a is, pointer and selection together.
+		const c = connect();
+		await c.opened;
+		c.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
+		const told = (await c.next((m) => m.type === "presence.changed")) as Extract<ServerMessage, { type: "presence.changed" }>;
+		assert.deepEqual([told.by.id, told.pointer, told.selection], [seen.by.id, { x: 10, y: 20 }, ["n"]]);
+		// a goes: the others hear it left.
+		a.ws.close();
+		const gone = (await b.next((m) => m.type === "presence.changed" && m.gone === true)) as Extract<ServerMessage, { type: "presence.changed" }>;
+		assert.equal(gone.by.id, seen.by.id);
+		b.ws.close();
+		c.ws.close();
+	} finally {
+		await stop();
+	}
+});
