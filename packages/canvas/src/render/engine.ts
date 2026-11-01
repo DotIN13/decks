@@ -12,7 +12,7 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
-import { baseTheme, diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "./font-files.ts";
 import { iconUrl, parseIcon } from "./icons.ts";
@@ -153,7 +153,7 @@ type LayoutChanges = {
 	all: boolean;
 	/** With `all`: every top-level item, its first paint order and how many items it holds. */
 	tops?: Array<[string, number, number]>;
-	roots: Array<{ id: string; base: number; items: Array<[string, number, number, number, number, string | null, number, ThemeState]>; cards: RootCard[] }>;
+	roots: Array<{ id: string; base: number; items: Array<[string, number, number, number, number, string | null, number, ThemeState, { geometry?: string | null; viewBox?: [number, number, number, number] | null }?]>; cards: RootCard[] }>;
 	removed: string[];
 	bases: Array<[string, number]>;
 };
@@ -195,6 +195,9 @@ export class StageEngine {
 	private hitWindow: Rect | undefined;
 	private bandZoom = 0;
 	private cardIndex = new BoxIndex([]);
+	/** The cards with a node in the DOM (awake, kept, selected, hovered: `items-layer.tsx`): only an item drawn over one of these needs a click shape. */
+	private nodePaths: ReadonlySet<string> | undefined;
+	private nodeIndex = new BoxIndex([]);
 	/** The boards `cardIndex` answers for, in its order: `boards` when it is up to date with them. */
 	private indexed: readonly SceneCard[] = [];
 	private cardBoxes = "";
@@ -696,7 +699,8 @@ export class StageEngine {
 	 * of more than `MOST_GLIDING` items, which is a canvas changing whole.
 	 */
 	private glideFrom(before: Map<string, Frame> | undefined): boolean {
-		if (!before || !this.page || this.moving || this.shown !== undefined || !glidesWanted()) return false;
+		// Not with a drag of cards in hand either: the server's answers to its steps land where the hand has them.
+		if (!before || !this.page || this.moving || this.shown !== undefined || this.carriedCount > 0 || this.cardsOnly || !glidesWanted()) return false;
 		const appeared: string[] = [];
 		for (const [id, one] of this.placed) if (!one.parent && !before.has(id)) appeared.push(id);
 		const shifts = shiftsFrom(before, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent, appeared);
@@ -709,6 +713,11 @@ export class StageEngine {
 	 * when nothing is left the preview ends, which puts the items down into the tiles.
 	 */
 	private beginGlide(shifts: Map<string, Shift>): boolean {
+		// An arrow never glides on its own: it is bent from its ends, which do (`bend`), and a route the server changed is drawn at once.
+		for (const id of [...shifts.keys()]) {
+			const node = this.placed.get(id)?.node;
+			if (node && isArrow(node)) shifts.delete(id);
+		}
 		if (!shifts.size || !this.page) return false;
 		if (this.glide) cancelAnimationFrame(this.glide.frame);
 		// What glides now, for the checks (`smooth-edits.mjs`).
@@ -820,9 +829,11 @@ export class StageEngine {
 			const was = this.laid.get(id);
 			const subset = new Map<string, Placed>();
 			const ids: Array<[string, number]> = [];
-			for (const [item, x, y, w, h, parent, i, theme] of items) {
-				const node = nodes.get(item);
+			for (const [item, x, y, w, h, parent, i, theme, route] of items) {
+				let node = nodes.get(item);
 				if (!node) continue;
+				// An arrow the engine routed after an edit (`reroute_after`): its click shape and bounds follow the route drawn, not the drawing's copy, which the server's answer brings up to date.
+				if (route && typeof route.geometry === "string" && route.geometry !== node.geometry) node = { ...node, geometry: route.geometry, ...(route.viewBox ? { viewBox: route.viewBox } : {}) };
 				subset.set(item, { node, box: { x, y, w, h }, parent: parent ?? undefined, theme, order: base + i + 1 });
 				ids.push([item, i]);
 			}
@@ -1026,13 +1037,8 @@ export class StageEngine {
 		 */
 		this.picturesSoon = true;
 		this.tickSoon();
-		// The click shapes follow the window: written again once it leaves the area they cover.
-		const w = this.hitWindow;
-		if (w && this.placed.size) {
-			const seen = this.windowRect(0);
-			const drifted = this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8);
-			if (drifted || seen.x < w.x || seen.y < w.y || seen.x + seen.w > w.x + w.w || seen.y + seen.h > w.y + w.h) this.writeHits();
-		}
+		// The click shapes' reach round a line is a screen width: written again once the zoom has drifted far from the one they were made at.
+		if (this.placed.size && this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8)) this.writeHits();
 	}
 
 	setMoving(moving: boolean): void {
@@ -1408,12 +1414,13 @@ export class StageEngine {
 		this.cardsSent.bytes += sent.length;
 		this.page.setCards(sent);
 		const boxes = cards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
+		this.indexed = cards;
 		if (boxes !== this.cardBoxes) {
 			this.cardBoxes = boxes;
 			this.cardIndex = index ?? new BoxIndex(cards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
+			this.indexNodes();
 			this.writeHits();
 		}
-		this.indexed = cards;
 		/*
 		 * A card whose picture changed (a new revision) is asked for again, against the card's own
 		 * address: the one fetched carries a rung (`&w=480`). The old picture stays drawn until the new
@@ -1456,6 +1463,8 @@ export class StageEngine {
 		if (!this.page) return;
 		this.page.carry(JSON.stringify(paths), offset.dx, offset.dy);
 		if (paths.length) {
+			// A drag of cards is a gesture too: a glide still in hand would put its arrows down under it.
+			this.endGlide();
 			this.cardsAnswered = false;
 			if (this.shown === undefined) {
 				this.cardsOnly = true;
@@ -1896,12 +1905,16 @@ export class StageEngine {
 	 */
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		// A gesture's own preview ends a glide still in hand: what it shows is where things are now.
-		if (this.glide) {
-			cancelAnimationFrame(this.glide.frame);
-			this.glide = undefined;
-			this.onGlide?.(undefined);
-		}
+		this.endGlide();
 		this.showPreview(moving);
+	}
+
+	/** End a glide in hand, where it is: the items it lifted stay lifted for whoever is showing them now. */
+	private endGlide(): void {
+		if (!this.glide) return;
+		cancelAnimationFrame(this.glide.frame);
+		this.glide = undefined;
+		this.onGlide?.(undefined);
 	}
 
 	private showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
@@ -2086,6 +2099,24 @@ export class StageEngine {
 	 * One invisible shape per drawn item over a board, near the window: a press on it is the drawing's,
 	 * and one beside it reaches the board. On bare canvas the stage has the press and the editor's pick (`editor/core/pick.ts`) answers.
 	 */
+	/**
+	 * Which cards have a node in the DOM, from the stage (`items-layer.tsx`, `renderedPaths`): an item
+	 * drawn over one of these needs a click shape to take the press from the card's page; over a
+	 * sleeping card, which is the engine's picture, a press reaches the stage itself and `pickAll` finds
+	 * the item. The shapes are written again when the set changes.
+	 */
+	setNodes(paths: ReadonlySet<string>): void {
+		const was = this.nodePaths;
+		if (was && was.size === paths.size && [...paths].every((path) => was.has(path))) return;
+		this.nodePaths = paths;
+		this.indexNodes();
+		this.writeHits();
+	}
+	private indexNodes(): void {
+		const paths = this.nodePaths;
+		this.nodeIndex = paths ? new BoxIndex(this.indexed.filter((b) => paths.has(b.path)).map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h }))) : this.cardIndex;
+	}
+
 	private writeHits(): void {
 		const svg = this.hits;
 		if (!svg) return;
@@ -2093,18 +2124,21 @@ export class StageEngine {
 		const band = (2 * BAND_PX) / this.camera.zoom;
 		this.bandZoom = this.camera.zoom;
 		const shapes: SVGElement[] = [];
-		const reach = this.view.width > 0 ? this.windowRect(1) : undefined;
-		this.hitWindow = reach;
-		const list = this.list();
-		const near = reach ? this.index().search(reach).map((at) => list[at]!) : list;
-		for (const placed of near) {
+		// Every item over a card with a node, wherever it is: few cards have one, so no window is kept and no pan writes the shapes again.
+		this.hitWindow = undefined;
+		const over = this.nodeIndex;
+		if (over.size === 0) {
+			svg.replaceChildren();
+			return;
+		}
+		for (const placed of this.list()) {
 			const { node, box } = placed;
 			if (node.type === "group" || isShape(node) || (node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type)))) continue;
 			let top = placed;
 			while (top.parent) top = this.placed.get(top.parent) ?? top;
 			if (top.parent) continue;
 			const bounds = this.bounds.get(node.id) ?? box;
-			if (this.cardIndex.search(bounds).length === 0) continue;
+			if (over.search(bounds).length === 0) continue;
 			let shape: SVGElement;
 			if (node.type === "ellipse") {
 				shape = document.createElementNS(NS, "ellipse");

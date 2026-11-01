@@ -484,6 +484,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		const kept = keptPaths();
 		return kept.size === 0 ? slotPaths() : new Set([...slotPaths()].filter((path) => !kept.has(path)));
 	});
+	// The engine writes click shapes only over cards with a node (`writeHits`): told the set as it changes.
+	createEffect(() => penLayer.setNodes(renderedPaths()));
 	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter((board) => ((board.card && !cardsHidden()) || board.item) && isVisible(board)).length <= LAYER_BUDGET);
 

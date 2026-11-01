@@ -149,9 +149,108 @@ impl Page {
 	/// shown fields are taken back first: the saved drawing is what is drawn from now on.
 	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
 		self.unpreview_fields();
+		let before = self.rects();
 		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
 		self.scene.update(&self.doc, Some(&applied), &self.text);
+		// Arrows follow what the edit moved, routed here as the server will route them.
+		let routed = self.reroute_after(&before, edits);
+		if !routed.is_empty() {
+			let applied = self.doc.apply(&routed).map_err(|e| e.0)?;
+			self.scene.update(&self.doc, Some(&applied), &self.text);
+		}
 		Ok(())
+	}
+
+	/// Every item's box on the stage by its id, and each page's (a card, a board, an app, a document)
+	/// by its path too: where an arrow's ends are, by the names its metadata gives them.
+	fn rects(&self) -> HashMap<String, Rect> {
+		let mut out = HashMap::new();
+		for root in &self.scene.roots {
+			for (item, place) in root.tree.items.iter().zip(&root.placed) {
+				out.insert(item.id.clone(), place.rect);
+				if let Some(path) = item.get("metadata").and_then(|m| m.get("path")).and_then(Value::as_str) {
+					out.entry(path.to_owned()).or_insert(place.rect);
+				}
+			}
+		}
+		out
+	}
+
+	/// The arrows an edit touched, routed again from where their ends are now, as the Decks server
+	/// routes them (`@decks/pen` `reroute`): an arrow the edit made or whose place, geometry, stroke
+	/// width or metadata it set, and any with an end (or a parent) whose box the edit moved or resized.
+	/// The others keep the server's route: routed again here, one that differed from the server's by
+	/// a pixel would move for the round trip and back. An arrow a gesture still holds lifted is routed
+	/// too: the gesture's own edit (its drop) arrives with the lift still on, and the drop lands it
+	/// where the edit put its ends. `before` is `rects` from before the edit; the answer is the field
+	/// changes to apply, none when every touched arrow already lies where its ends are.
+	fn reroute_after(&self, before: &HashMap<String, Rect>, edits: &[stage_doc::edits::Edit]) -> Vec<Change> {
+		use stage_doc::edits::Edit;
+		let mut written: HashSet<&str> = HashSet::new();
+		for edit in edits {
+			match edit {
+				Edit::Insert { id, .. } => {
+					written.insert(id);
+				}
+				Edit::Set { id, key, .. } if matches!(key.as_str(), "x" | "y" | "geometry" | "strokeWidth" | "metadata") => {
+					written.insert(id);
+				}
+				_ => {}
+			}
+		}
+		let now = self.rects();
+		let moved = |name: &str| before.get(name) != now.get(name);
+		let line = if self.doc.meta.get("variables").and_then(|v| v.get("decks-line")).is_some() { "$decks-line" } else { "#8a8f98" };
+		let mut changes = Vec::new();
+		for root in &self.scene.roots {
+			let items = &root.tree.items;
+			for item in items {
+				// Arrows in the document itself: an instance's copies are routed where they are defined.
+				if item.handle.is_none() || !arrows::is_arrow(&item.props) {
+					continue;
+				}
+				let Some(meta) = item.get("metadata") else { continue };
+				let parent = item.parent.map(|p| &items[p as usize]);
+				let parent_id = parent.map(|p| p.id.as_str());
+				let touched = written.contains(item.id.as_str()) || !before.contains_key(&item.id) || arrows::end_items(meta).iter().flatten().copied().chain(parent_id).any(|name| moved(name));
+				if !touched {
+					continue;
+				}
+				let find = |id: &str| now.get(id).copied();
+				let Some(points) = arrows::points(meta, &find) else { continue };
+				let (route, heads) = arrows::style(meta);
+				let stroke = item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0);
+				let shape = arrows::shape(&points, stroke, route, heads);
+				let origin = parent_id.and_then(|p| now.get(p)).map_or((0.0, 0.0), |r| (r.x, r.y));
+				let (x, y) = (arrows::round(shape.x - origin.0), arrows::round(shape.y - origin.1));
+				let num = |key: &str| item.get(key).and_then(Value::as_f64);
+				if num("x") == Some(x) && num("y") == Some(y) && item.get("geometry").and_then(Value::as_str) == Some(shape.geometry.as_str()) {
+					continue;
+				}
+				let set = |key: &str, value: Value| Change::Set { id: item.id.clone(), key: key.into(), value: Some(value) };
+				changes.extend([
+					set("x", json!(x)),
+					set("y", json!(y)),
+					set("width", json!(shape.width)),
+					set("height", json!(shape.height)),
+					set("viewBox", json!([0, 0, shape.width, shape.height])),
+					set("geometry", json!(shape.geometry)),
+				]);
+				// The fields the server fills in for an arrow its writer left bare: the tools' arrow grey, 2 px, round ends.
+				for (key, value) in [("stroke", json!(line)), ("strokeWidth", json!(2)), ("strokeLinecap", json!("round")), ("strokeLinejoin", json!("round"))] {
+					if item.get(key).is_none() {
+						changes.push(set(key, value));
+					}
+				}
+				// An arrow sits where its ends are, never where a row layout would put it.
+				if let Some(frame) = parent {
+					if frame.kind() == "frame" && frame.get("layout").and_then(Value::as_str).unwrap_or("horizontal") != "none" && item.get("layoutPosition").is_none() {
+						changes.push(set("layoutPosition", json!("absolute")));
+					}
+				}
+			}
+		}
+		changes
 	}
 
 	/// The whole drawing, as the server sent it: worked out as edits from the one held, so only what
@@ -286,7 +385,12 @@ impl Page {
 			let r = place.rect;
 			let parent = item.parent.map(|p| root.tree.items[p as usize].id.as_str());
 			let theme: serde_json::Map<String, Value> = place.theme.0.iter().map(|(k, v)| (k.clone(), Value::String(v.clone()))).collect();
-			items.push(json!([item.id, r.x, r.y, r.w, r.h, parent, i, theme]));
+			// An arrow's route is this engine's (`reroute_after`): the page's copy of the drawing may still hold the one before the edit.
+			if arrows::is_arrow(&item.props) {
+				items.push(json!([item.id, r.x, r.y, r.w, r.h, parent, i, theme, { "geometry": item.get("geometry"), "viewBox": item.get("viewBox") }]));
+			} else {
+				items.push(json!([item.id, r.x, r.y, r.w, r.h, parent, i, theme]));
+			}
 			if let Some(mut card) = self.card_json(item, place) {
 				card["i"] = json!(i);
 				cards.push(card);
@@ -1299,6 +1403,39 @@ mod tests {
 		page.preview(None).unwrap();
 		assert_eq!(geometry(&page, "ab"), before);
 		assert!(page.lifted.contains("ab"));
+	}
+
+	/// An edit routes the arrows it touches as the server will, from the laid-out drawing after it,
+	/// and leaves the others as the server routed them; an arrow a gesture holds is left to the gesture.
+	#[test]
+	fn an_edit_routes_the_arrows_it_touches_as_the_server_does() {
+		let stage = r#"{"version":"2.6","children":[
+			{"type":"rectangle","id":"a","x":0,"y":0,"width":100,"height":60},
+			{"type":"rectangle","id":"b","x":300,"y":0,"width":100,"height":60},
+			{"type":"rectangle","id":"c","x":0,"y":300,"width":100,"height":60},
+			{"type":"path","id":"ab","x":98,"y":24,"width":204,"height":12,"geometry":"M2 6 L202 6","strokeWidth":2,"metadata":{"type":"decks.arrow","from":"a","to":"b"}},
+			{"type":"path","id":"bc","x":0,"y":0,"width":10,"height":10,"geometry":"M0 0 L10 10","strokeWidth":2,"metadata":{"type":"decks.arrow","from":"b","to":"c","route":"elbow"}}
+		]}"#;
+		let mut page = Page::new(stage, false, "s").unwrap();
+		let field = |page: &Page, id: &str, key: &str| page.doc.get(id).unwrap().props.get(key).cloned();
+		let set = |id: &str, key: &str, value: Value| stage_doc::edits::Edit::Set { id: id.into(), key: key.into(), value: Some(value) };
+		// A field that moves nothing leaves every arrow, the wrongly placed `bc` included.
+		page.apply_edits(&[set("c", "fill", json!("#f00"))]).unwrap();
+		assert_eq!(field(&page, "ab", "geometry"), Some(json!("M2 6 L202 6")));
+		assert_eq!(field(&page, "bc", "geometry"), Some(json!("M0 0 L10 10")));
+		// Moving `c` routes `bc` from where `c` is now, elbowed as the server would, and leaves `ab`.
+		page.apply_edits(&[set("c", "y", json!(400))]).unwrap();
+		let find = |id: &str| match id { "b" => Some(Rect { x: 300.0, y: 0.0, w: 100.0, h: 60.0 }), "c" => Some(Rect { x: 0.0, y: 400.0, w: 100.0, h: 60.0 }), _ => None };
+		let meta = json!({"type":"decks.arrow","from":"b","to":"c","route":"elbow"});
+		let want = arrows::shape(&arrows::points(&meta, &find).unwrap(), 2.0, arrows::Route::Elbow, arrows::Heads::End);
+		assert_eq!(field(&page, "bc", "geometry"), Some(json!(want.geometry)));
+		assert_eq!(field(&page, "bc", "x"), Some(json!(arrows::round(want.x))));
+		assert_eq!(field(&page, "bc", "strokeLinecap"), Some(json!("round")), "the fields the server fills in");
+		assert_eq!(field(&page, "ab", "geometry"), Some(json!("M2 6 L202 6")), "an arrow away from what moved is left");
+		// An arrow a gesture holds lifted is routed too: its drop's edit arrives with the lift still on.
+		page.lift(&["ab".into()]);
+		page.apply_edits(&[set("a", "y", json!(100))]).unwrap();
+		assert_ne!(field(&page, "ab", "geometry"), Some(json!("M2 6 L202 6")));
 	}
 
 	#[test]

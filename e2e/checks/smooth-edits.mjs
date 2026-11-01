@@ -33,11 +33,11 @@ try {
 	const made = await call("canvas.insert", [{ type: "note", content: "glide me", width: 240 }, { at: { x1: 100, y1: 100 } }]);
 	say("a note is inserted", made.ok === true, JSON.stringify(made.error ?? ""));
 	const id = made.value?.id;
-	const rising = await sample(800);
+	const rising = await sample(1200);
 	const seen = rising.filter((f) => f.shifts.some(([one]) => one === id));
 	const first = seen[0]?.shifts.find(([one]) => one === id)?.[1];
 	say("the inserted note starts low and transparent", !!first && first.dy > 10 && first.fade !== undefined && first.fade > 0.5, JSON.stringify(first));
-	say("…and is in place and opaque within 800 ms (a fade takes about 600)", rising.at(-1).shifts.every(([one]) => one !== id), JSON.stringify(rising.at(-1).shifts).slice(0, 120));
+	say("…and is in place and opaque within 1.2 s (a fade takes about 600 ms, after the drawing arrives)", rising.at(-1).shifts.every(([one]) => one !== id), JSON.stringify(rising.at(-1).shifts).slice(0, 120));
 
 	// Moved by 400 px: the shift starts near −400 and shrinks every frame, with no frame moving it more than 30% of what was left.
 	const movedCall = call("canvas.move", [id, { at: { x1: 500, y1: 100 } }]);

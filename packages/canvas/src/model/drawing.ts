@@ -1,4 +1,4 @@
-import { apply, arrowEndItem, withDecksColors, baseTheme, diff, editDocument, isArrow, parse, placements, reroute, walk, type Frame, type MeasureText, type PenDocument, type PenEdit, type PenNode, type Placed } from "@decks/pen";
+import { apply, withDecksColors, baseTheme, diff, editDocument, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
@@ -186,59 +186,12 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	const redoStack: PenDocument[] = [];
 
 	const measure = options.measure;
-	/** Each drawing's layout, made once: an edit's drawing is the next edit's `prev`. */
-	const laid = new WeakMap<PenDocument, ReadonlyMap<string, Placed>>();
-	const layoutOf = (doc: PenDocument) => {
-		let placed = laid.get(doc);
-		if (!placed) laid.set(doc, (placed = placements(doc, { theme: baseTheme(doc, look()), ...(measure ? { measure } : {}) })));
-		return placed;
-	};
-	const pagesBy = (doc: PenDocument, placed: ReadonlyMap<string, Placed>) => {
-		const byPath = new Map<string, string>();
-		for (const node of walk(doc.children ?? [])) if (isPage(node)) byPath.set(pagePath(node), node.id);
-		return (name: string): Frame | undefined => {
-			const id = byPath.get(name);
-			return id ? placed.get(id)?.box : undefined;
-		};
-	};
 	/**
-	 * Arrows follow what they join: after an edit (`next`, made from `prev`), the arrows it touches
-	 * are routed again, as the Decks server routes them: one the edit made or changed, or with an end
-	 * (or the frame it is in) that the edit moved or resized. The others are left as `prev` has them,
-	 * which is as the server routed them: routed again here, on a layout of the page's own, any that
-	 * differs from the server's by a pixel would move for the round trip and back when its drawing
-	 * came, every arrow on the canvas at once.
+	 * `ops` applied to `prev` as the server applies them; throws when refused. The arrows an edit
+	 * touches are routed by the stage engine as it lays the edit out (`reroute_after`), as the server
+	 * routes them, so the page lays nothing out for them here.
 	 */
-	const rerouted = (prev: PenDocument, next: PenDocument) => {
-		const placed = layoutOf(next);
-		const before = layoutOf(prev);
-		const prevPage = pagesBy(prev, before);
-		const nextPage = pagesBy(next, placed);
-		const prevNodes = new Map<string, PenNode>();
-		for (const node of walk(prev.children ?? [])) prevNodes.set(node.id, node);
-		const parents = new Map<string, string>();
-		const note = (nodes: readonly PenNode[] | undefined, parent?: string) => {
-			for (const node of nodes ?? []) {
-				if (parent) parents.set(node.id, parent);
-				note(node.children, node.id);
-			}
-		};
-		note(next.children);
-		const same = (a: Frame | undefined, b: Frame | undefined) => (!a && !b) || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
-		const touched = (arrow: PenNode) => {
-			const was = prevNodes.get(arrow.id);
-			if (!was || !isArrow(was)) return true;
-			for (const field of ["x", "y", "geometry", "strokeWidth"] as const) if (was[field] !== arrow[field]) return true;
-			if (JSON.stringify(was.metadata) !== JSON.stringify(arrow.metadata)) return true;
-			const meta = arrow.metadata as { from?: unknown; to?: unknown };
-			const names = [arrowEndItem(meta.from), arrowEndItem(meta.to), parents.get(arrow.id)];
-			return names.some((name) => name !== undefined && !same(before.get(name)?.box ?? prevPage(name), placed.get(name)?.box ?? nextPage(name)));
-		};
-		reroute(next, placed, nextPage, undefined, touched);
-		return next;
-	};
-	/** `ops` applied to `prev` as the server applies them, arrows routed again; throws when refused. */
-	const applied = (prev: PenDocument, ops: unknown[]) => rerouted(prev, apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()), ...(measure ? { measure } : {}) }).doc);
+	const applied = (prev: PenDocument, ops: unknown[]) => apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()), ...(measure ? { measure } : {}) }).doc;
 
 	/** What made the drawing now from the one before, when known: `to` is the drawing they made. */
 	let made: (DocEdits & { to: PenDocument }) | undefined;
@@ -311,7 +264,6 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	/** The host's drawing with the edits still on their way on top; an edit that no longer applies is the host's to decide, and goes. */
 	const onTop = (base: PenDocument): PenDocument => {
 		let next = base;
-		let edited = false;
 		const kept: Pending[] = [];
 		for (const one of pending) {
 			if (one.to) {
@@ -324,7 +276,6 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			}
 			try {
 				next = apply(next, one.ops as Parameters<typeof apply>[1], { theme: baseTheme(next, look()), ...(measure ? { measure } : {}) }).doc;
-				edited = true;
 				kept.push(one);
 			} catch {
 				clearTimeout(one.timer);
@@ -332,8 +283,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		}
 		pending = kept;
 		setWaiting(kept.length);
-		// Arrows routed once over all of them, as each edit's own routing would leave them.
-		return edited ? rerouted(base, next) : next;
+		return next;
 	};
 	/** An edit on its way is no longer shown: made by now, refused, or given up on. */
 	const drop = (id: string) => {
