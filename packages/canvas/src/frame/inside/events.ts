@@ -106,7 +106,17 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 				rememberView: (id, to, selected) => end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
 				select: selectCard,
 				reload: (path) => handle.reloadCard(path),
-				cursor: (at) => ctx.setCursor(at),
+				cursor: (at) => {
+					if (!at) {
+						ctx.setCursor(null);
+						return true;
+					}
+					// The card by its path as the canvas has it, or by its end (a path given from the canvas's own folder).
+					const page = untrack(pages).find((one) => one.path === at.path) ?? untrack(pages).find((one) => at.path.endsWith(one.path) || one.path.endsWith(at.path));
+					if (!page) return false;
+					ctx.setCursor({ ...at, path: page.path });
+					return true;
+				},
 			});
 		} catch (error) {
 			value = { error: error instanceof Error ? error.message : String(error) };
@@ -154,6 +164,18 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
 		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
+		// An agent at work on a card: its cursor and outline, from the card's place on the drawing.
+		if (message.type === "agent.act") {
+			const page = untrack(pages).find((one) => one.path === message.path) ?? untrack(pages).find((one) => message.path.endsWith(one.path) || one.path.endsWith(message.path));
+			let id: string | undefined;
+			try {
+				id = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path && page?.path.endsWith(one.metadata.path))?.id;
+			} catch {
+				id = undefined;
+			}
+			ctx.presence?.act(message, page ? { id, x: page.x, y: page.y } : undefined);
+			return;
+		}
 		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
 		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
 		if (message.type === "app.state") {

@@ -210,6 +210,8 @@ const CHECKS = [
 	{ file: "awake-drag.mjs", needsAgent: false, named: true },
 	/* Two windows on one canvas see each other's pointer and selection over their lines, and a closed one leaves at once. */
 	{ file: "presence.mjs", needsAgent: false },
+	/* An agent's view.cursor on a card puts a named arrow in the frame, and null takes it away. */
+	{ file: "agent-cursor.mjs", needsAgent: false },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },

@@ -359,6 +359,8 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
 	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
+	// An agent at work on a card: the frame showing the canvas it is on draws the agent's cursor there.
+	if (message.type === "agent.act") return typeof message.path === "string" && boardOnCanvas(app, message.path, canvas);
 	// An app's state, for a canvas holding an item of that app.
 	if (message.type === "app.state") return typeof message.name === "string" && canvasHolds(app.stage.pens, canvas, appActor(message.name));
 	if (message.type === "card.changed") {

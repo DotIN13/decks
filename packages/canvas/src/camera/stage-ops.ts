@@ -49,7 +49,8 @@ export interface StageOpsHost {
 	rememberView(agentId: string, camera: Camera, selected?: string): void;
 	select(path: string | undefined): void;
 	reload(path: string): void;
-	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): void;
+	/** Put the agent's cursor at a point of a card, or take it away (null). Answers false when no card on this canvas has that path. */
+	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): boolean;
 }
 
 /**
@@ -160,7 +161,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 		case "cursor": {
 			if (typeof args.path !== "string") return { error: "cursor needs a path" };
 			const at = args.at as { x?: number; y?: number } | null;
-			host.cursor(
+			const found = host.cursor(
 				at && typeof at.x === "number" && typeof at.y === "number"
 					? {
 							path: args.path,
@@ -171,6 +172,8 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 						}
 					: null,
 			);
+			// A path no card on this canvas has would put the cursor nowhere, silently: the agent is told instead.
+			if (at && !found) return { error: `No card at ${args.path} is on this canvas: decks canvas read lists the ones that are.` };
 			return { cursor: at ? "shown" : "cleared" };
 		}
 

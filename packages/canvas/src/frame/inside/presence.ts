@@ -10,6 +10,8 @@ export interface Present extends Presence {
 
 /** How often at most this frame says where its pointer is. */
 export const POINTER_MS = 50;
+/** How long an agent's cursor stays on a card after its work there is done. */
+export const ACT_LINGER_MS = 2500;
 
 /**
  * Presence: where everyone else on this canvas is, and where this frame is for them.
@@ -22,6 +24,8 @@ export const POINTER_MS = 50;
  */
 export function installPresence(options: { camera: Accessor<Camera>; send: (presence: Presence) => void; viewport: () => { width: number; height: number } }) {
 	const [present, setPresent] = createSignal<Map<string, Present>>(new Map());
+	/** Agents' cursors on their way out, by key. */
+	const linger = new Map<string, ReturnType<typeof setTimeout>>();
 	let last = 0;
 	let pointerOut = true;
 	const pointer = (event: PointerEvent) => {
@@ -46,6 +50,27 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 		selection: (ids: readonly string[]) => options.send({ selection: [...ids] }),
 		/** The camera rests here. */
 		camera: (camera: Camera) => options.send({ camera }),
+		/**
+		 * An agent at work on a card (`agent.act`): its cursor at the card, or at the first box it drew,
+		 * and the card outlined in its colour, as a person's presence is; gone a moment after it is done.
+		 */
+		act(message: { agentId: string; phase: "start" | "done"; label: string; color: string; at: number; boxes?: Array<{ x1: number; y1: number }> }, card: { id?: string; x: number; y: number } | undefined): void {
+			const key = `act/agent/${message.agentId}`;
+			const by: PresenceBy = { kind: "agent", id: message.agentId, name: message.label, color: message.color };
+			const box = message.boxes?.[0];
+			const pointer = box ? { x: box.x1, y: box.y1 } : card ? { x: card.x + 28, y: card.y + 52 } : undefined;
+			clearTimeout(linger.get(key));
+			setPresent((all) => {
+				const next = new Map(all);
+				next.set(key, { by, at: message.at, ...(pointer ? { pointer } : {}), selection: card?.id && message.phase === "start" ? [card.id] : [] });
+				return next;
+			});
+			if (message.phase === "done") linger.set(key, setTimeout(() => setPresent((all) => {
+				const next = new Map(all);
+				next.delete(key);
+				return next;
+			}), ACT_LINGER_MS));
+		},
 		/** What the line says of someone else. */
 		hear(message: ServerMessage): boolean {
 			if (message.type !== "presence.changed") return false;

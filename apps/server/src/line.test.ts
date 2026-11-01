@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -140,6 +140,17 @@ test("a canvas pass on the line hears its own canvas alone and calls only what a
 		assert.deepEqual([hello.who, hello.canvas, hello.role], ["canvas", mine, "edit"]);
 		const noOther = (await frame.next((m) => m.type === "error")) as Extract<ServerMessage, { type: "error" }>;
 		assert.match(noOther.text, /hears no other canvas/);
+		// An agent at work on a card of this canvas is heard; one on a card elsewhere is not.
+		mkdirSync(join(app.deck.path, "canvases", mine, "cards", "one"), { recursive: true });
+		writeFileSync(join(app.deck.path, "canvases", mine, "cards", "one", "index.html"), "<!doctype html><title>One</title><p>one</p>");
+		app.deck.refresh(`canvases/${mine}/cards/one/index.html`);
+		app.pens.edit(mine, [{ op: "insert", node: { type: "browser", id: "card-1", metadata: { type: "decks.card", path: `canvases/${mine}/cards/one/index.html` } }, box: { x1: 500, y1: 0, x2: 900, y2: 300 } }]);
+		app.send({ type: "agent.act", agentId: "ag", path: `canvases/${mine}/cards/one/index.html`, phase: "start", what: "edit", label: "Loom", color: "#f00", at: 1 });
+		app.send({ type: "agent.act", agentId: "ag", path: `canvases/${other}/cards/two/index.html`, phase: "start", what: "edit", label: "Loom", color: "#f00", at: 2 });
+		const act = (await frame.next((m) => m.type === "agent.act")) as Extract<ServerMessage, { type: "agent.act" }>;
+		assert.equal(act.path, `canvases/${mine}/cards/one/index.html`);
+		await new Promise((done) => setTimeout(done, 50));
+		assert.equal(frame.heard.filter((m) => m.type === "agent.act").length, 1, "the other canvas's act is not heard");
 		// The other canvas changes: this line hears nothing of it. Its own: it does.
 		app.pens.edit(other, [{ op: "update", id: "o", set: { content: "oo" } }]);
 		app.pens.edit(mine, [{ op: "update", id: "m", set: { content: "mm" } }]);

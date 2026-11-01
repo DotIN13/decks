@@ -35,7 +35,7 @@ function host(focused: string | undefined, hands = false) {
 		rememberView: (agentId, camera, select) => remembered.push({ agentId, camera, ...(select ? { selected: select } : {}) }),
 		select: (path) => selected.push(path),
 		reload: () => {},
-		cursor: () => {},
+		cursor: () => true,
 		handsOn: () => hands,
 		offerView: (agentId, camera, select, what) => offered.push({ agentId, camera, ...(select ? { selected: select } : {}), what }),
 	};

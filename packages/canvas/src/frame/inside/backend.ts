@@ -41,6 +41,8 @@ export type Heard =
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
 	| { type: "app.state"; name: string; title?: string; status: string }
+	/** An agent at work on a card of this canvas (`server/src/agents/acts.ts`): its cursor follows the work (`presence.ts`). */
+	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: string; ids?: string[]; boxes?: Array<{ x1: number; y1: number; x2: number; y2: number }>; label: string; color: string; at: number }
 	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */
 	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
