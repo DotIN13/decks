@@ -29,7 +29,6 @@ const STILL_ASKING = new Set([
 	"packages/canvas/src/items/item-slot.tsx",
 	"packages/canvas/src/render/device.ts",
 	"packages/canvas/src/stage/Stage.tsx",
-	"packages/canvas/src/stage/selection.tsx",
 	"packages/canvas/src/ui/Callout.tsx",
 	"packages/canvas/src/ui/Properties.tsx",
 	"packages/canvas/styles/canvas.css",

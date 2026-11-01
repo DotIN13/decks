@@ -184,6 +184,9 @@ function glidesWanted(): boolean {
 	return typeof matchMedia !== "function" || !matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** What the editor in the engine answers a step with (`crates/editor/src/wire.rs`). */
+export type EditorAnswer = { ops: unknown[]; preview?: Array<[string, { dx: number; dy: number; w?: number; h?: number; radius?: number }]> | null; effects: Array<Record<string, unknown> & { do: string }>; state: Record<string, unknown> };
+
 export class StageEngine {
 	private page: PageEngine | undefined;
 	private worker: Worker | undefined;
@@ -1074,6 +1077,43 @@ export class StageEngine {
 
 	/** The editor's overlay as the engine paints it (`edit/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
 	private overlayJson: string | undefined;
+	/**
+	 * The canvas editor, which lives in the engine (`crates/editor`, `crates/web/src/editing.rs`): one
+	 * input in the editor's `Input` shape, with the page's frame, answered with the ops, the preview, the
+	 * effects and the editor's state (`edit/engine-editor.ts`). `undefined` before the engine has loaded.
+	 */
+	editorStep(input: unknown, frame: unknown): EditorAnswer | undefined {
+		if (!this.page) return undefined;
+		return JSON.parse(this.page.editorStep(JSON.stringify(input), JSON.stringify(frame))) as EditorAnswer;
+	}
+
+	/** Paint the editor's overlay into the next frame; answers its places, for the page's hit areas. */
+	editorPaint(frame: unknown, extras: unknown): unknown {
+		if (!this.page) return undefined;
+		const places = JSON.parse(this.page.editorPaint(JSON.stringify(frame), JSON.stringify(extras)));
+		// Drawn again only when what is painted changed: a pan or a hover that changes nothing draws nothing.
+		const painted = JSON.stringify(places?.painted ?? null);
+		if (painted !== this.paintedOverlay) {
+			this.paintedOverlay = painted;
+			this.draw();
+		}
+		return places;
+	}
+
+	/** One of the editor's other answers, by name: a pick, a drop slot, ops for a move or a make, a key, the selection. */
+	editorCall<T = unknown>(name: string, args: unknown = {}): T | undefined {
+		if (!this.page) return undefined;
+		return JSON.parse(this.page.editorCall(name, JSON.stringify(args))) as T;
+	}
+
+	/** Whether the engine has loaded, and the editor in it can answer. */
+	editorReady(): boolean {
+		return !!this.page;
+	}
+
+	/** What the editor's overlay last painted, to draw again only when it changes. */
+	private paintedOverlay = "";
+
 	setOverlay(json: string): boolean {
 		if (!this.page) return false;
 		if (json === this.overlayJson) return true;

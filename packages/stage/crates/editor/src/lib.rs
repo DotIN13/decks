@@ -9,7 +9,8 @@
 //! `model` (model.ts), `rules` (device/rules.ts), `scene` (scene.ts), `pen` (the pen predicates),
 //! `pick` (pick.ts), `snap` (edit/snap.ts), `snapping` (snapping.ts), `drop` (drop.ts),
 //! `resize` (resize.ts), `arrows` (arrows.ts), `ops` (ops.ts), `keys` (keys.ts),
-//! `overlay` (overlay.ts and overlay-json.ts), `dispatch` (dispatch.ts), `gesture` (gesture.ts).
+//! `overlay` (overlay.ts and overlay-json.ts), `dispatch` (dispatch.ts), `gesture` (gesture.ts), and
+//! `wire`, what crosses to the page in the TypeScript editor's own words.
 
 pub mod arrows;
 pub mod dispatch;
@@ -26,3 +27,4 @@ pub mod rules;
 pub mod scene;
 pub mod snap;
 pub mod snapping;
+pub mod wire;

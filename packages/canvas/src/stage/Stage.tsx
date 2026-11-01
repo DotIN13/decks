@@ -13,7 +13,6 @@ import { StageInk } from "../edit/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
-import { overlayJson } from "../edit/core/overlay-json.ts";
 import { rgbOf } from "../edit/dom/colours.ts";
 import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
@@ -576,23 +575,18 @@ export function Stage(props: StageProps) {
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
 	/*
 	 * The editor's outlines, handles and guides are painted by the engine with the drawing, in the same
-	 * frame (`edit/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
-	 * DOM's own are made invisible once the engine has them (`data-engine-overlays`, `canvas.css`).
+	 * frame, by the engine's own editor (`stage/selection.tsx`, `painted`), in the stage's colours read
+	 * again when the scheme changes. The DOM keeps only the hit areas, invisible (`data-engine-overlays`,
+	 * `canvas.css`).
 	 */
-	const [engineOverlays, setEngineOverlays] = createSignal(false);
+	const [colours, setColours] = createSignal<{ accent: [number, number, number]; guide: [number, number, number]; panel: [number, number, number] }>({ accent: [0.173, 0.361, 0.937], guide: [0.949, 0.306, 0.118], panel: [1, 1, 1] }, { equals: (a, b) => JSON.stringify(a) === JSON.stringify(b) });
 	createEffect(() => {
-		const dark = scheme();
+		scheme();
 		if (!element) return;
-		const colours = untrack(() => {
-			void dark;
-			const read = (name: string) => rgbOf(getComputedStyle(element).getPropertyValue(name).trim() || "#2563eb", element);
-			return { accent: read("--color-accent"), panel: rgbOf(getComputedStyle(element).getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] as [number, number, number] };
-		});
-		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT, endPx: RULES.arrowEnd, bendPx: RULES.arrowBend });
-		// For the rules checks: what the engine was last told to draw round the selection.
-		(globalThis as { __decksOverlay?: string }).__decksOverlay = json;
-		setEngineOverlays(penLayer.setOverlay(json));
+		const css = getComputedStyle(element);
+		setColours({ accent: rgbOf(css.getPropertyValue("--color-accent").trim() || "#2563eb", element), panel: rgbOf(css.getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] });
 	});
+	const engineOverlays = () => penDrawn() >= 0 && penLayer.editorReady();
 	penLayer.drawn = () => {
 		editor.textEditing.drawn();
 		/*
@@ -627,7 +621,7 @@ export function Stage(props: StageProps) {
 	penLayer.onGlide = editor.setGlide;
 
 	/* What is drawn over the selection and under the pointer, and the pills (`selection.tsx`). */
-	const selection = createSelection({ props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld: input.pressHeld });
+	const selection = createSelection({ props, ctl, view, editor, scene, penLayer, penDrawn, frame, penEdit, freshIds, penNode, pressHeld: input.pressHeld, colours });
 
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved

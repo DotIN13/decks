@@ -94,6 +94,20 @@ export class PageEngine {
      */
     compressedPictures(): boolean;
     /**
+     * One of the editor's other answers by name (`editing_wire::call`): a pick, a drop slot, ops, a key, the selection.
+     */
+    editorCall(name: string, args: string): string;
+    /**
+     * Paint the editor's overlay into the next frame, from its state and what the page knows (`editing_wire::extras`);
+     * answers the overlay's places, in the TypeScript `Overlay`'s shape, for the page's hit areas.
+     */
+    editorPaint(frame: string, extras: string): string;
+    /**
+     * One input to the editor, in the TypeScript editor's `Input` shape, with the page's frame (`editing_wire::frame`):
+     * `{ ops, preview?, effects, state }`. The preview is not applied: the page applies it, telling the worker what is lifted.
+     */
+    editorStep(input: string, frame: string): string;
+    /**
      * Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
      */
     evict(): string;
@@ -466,6 +480,9 @@ export interface InitOutput {
     readonly pageengine_carry: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_carrying: (a: number) => [number, number];
     readonly pageengine_compressedPictures: (a: number) => number;
+    readonly pageengine_editorCall: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly pageengine_editorPaint: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly pageengine_editorStep: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly pageengine_evict: (a: number) => [number, number];
     readonly pageengine_extent: (a: number) => [number, number];
     readonly pageengine_fadePictures: (a: number, b: number) => number;
@@ -554,8 +571,8 @@ export interface InitOutput {
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__111: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__112: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__114: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__115: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___web_sys_46aa44363d28b235___features__gen_Event__Event______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

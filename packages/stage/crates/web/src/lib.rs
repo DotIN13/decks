@@ -7,6 +7,7 @@
 
 pub mod engine;
 pub mod editing;
+pub mod editing_wire;
 pub mod editor_scene;
 pub mod wire;
 

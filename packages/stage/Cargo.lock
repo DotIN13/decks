@@ -1295,6 +1295,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
+ "kurbo",
  "serde_json",
  "stage-doc",
  "stage-editor",

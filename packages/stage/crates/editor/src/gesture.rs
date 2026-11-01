@@ -289,6 +289,22 @@ impl State {
 			self.page_drag = None;
 		}
 	}
+	/// A board size let go of is let go of once the board is at it: its write's revision has come (or it is
+	/// exactly the box already) and it is where the box is, as wide, and at least as tall. A board gone lets it go.
+	pub fn land_page_resize(&mut self, board: Option<(&PageBox, u64)>) {
+		let Some((path, held, Some((rev, _)))) = &self.page_resize else { return };
+		let Some((board, now)) = board.filter(|(b, _)| &b.path == path) else {
+			self.page_resize = None;
+			return;
+		};
+		let at = board.x == held.x && board.y == held.y && board.w == held.w;
+		if now == *rev && !(at && board.h == held.h) {
+			return;
+		}
+		if at && board.h >= held.h {
+			self.page_resize = None;
+		}
+	}
 	fn landed(&mut self) {
 		self.drag = ZERO;
 		self.resize = None;

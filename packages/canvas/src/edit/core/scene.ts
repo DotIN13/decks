@@ -70,4 +70,9 @@ export interface EngineSeam {
 	 * being typed, laid out as typed (`dom/TextEditing.tsx`). Given the page's own, it goes back.
 	 */
 	showDoc(doc: PenDocument | undefined, base: string): void;
+	/** The canvas editor in the engine (`render/engine.ts`, `editorStep`): `undefined` until the engine has loaded. */
+	editorStep(input: unknown, frame: unknown): { ops: unknown[]; preview?: Array<[string, PreviewChange]> | null; effects: Array<Record<string, unknown> & { do: string }>; state: Record<string, unknown> } | undefined;
+	editorPaint(frame: unknown, extras: unknown): unknown;
+	editorCall<T = unknown>(name: string, args?: unknown): T | undefined;
+	editorReady(): boolean;
 }

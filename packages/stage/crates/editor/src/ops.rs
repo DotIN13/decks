@@ -46,8 +46,12 @@ const ID_LENGTH: usize = 5;
 pub fn id_maker<S: Into<String>>(taken: impl IntoIterator<Item = S>) -> impl FnMut() -> String {
 	use std::hash::{BuildHasher, Hasher};
 	let mut used: HashSet<String> = taken.into_iter().map(Into::into).collect();
+	// Seeded without a clock, which a browser's wasm has none of in std: the hasher's keys, a count of the
+	// makers made so far and how many ids are taken. Uniqueness is checked against `used` anyway.
+	static MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 	let mut seed = std::collections::hash_map::RandomState::new().build_hasher();
-	seed.write_u64(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_nanos() as u64).unwrap_or(0));
+	seed.write_u64(MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+	seed.write_usize(used.len());
 	let mut state = seed.finish() | 1;
 	move || {
 		loop {

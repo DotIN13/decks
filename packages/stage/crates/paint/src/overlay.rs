@@ -7,10 +7,10 @@ use crate::list::{Affine, Align, Color, Op, Paint, Shape};
 use crate::mesh;
 use kurbo::BezPath;
 use lyon_tessellation::{LineCap, LineJoin};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The overlay as the page sends it, in canvas units; `kind` says how each piece is drawn.
-#[derive(Deserialize, Default, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Default, Clone, Debug, PartialEq)]
 pub struct Overlay {
 	/// The accent, the guides' red, and the panel colour handles are filled with: red, green, blue, 0 to 1.
 	#[serde(default = "accent_default")]
@@ -41,7 +41,7 @@ fn panel_default() -> [f32; 3] {
 
 /// A box, with its corner radius in canvas units: `kin`, `kin-child`, `selection`, `selection-thin`,
 /// `selection-box`, `hover`, `join`, `slot-frame`, `draft`, `draft-ellipse`, `measure`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct OverlayBox {
 	pub x: f64,
 	pub y: f64,
@@ -53,7 +53,7 @@ pub struct OverlayBox {
 }
 
 /// A line: `slot`, `insert`, `guide`, `measure`, `measure-dashed`, `draft`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct OverlayLine {
 	pub x1: f64,
 	pub y1: f64,
@@ -63,7 +63,7 @@ pub struct OverlayLine {
 }
 
 /// An SVG path in canvas units, from (`x`, `y`): `route`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct OverlayPath {
 	pub x: f64,
 	pub y: f64,
@@ -73,7 +73,7 @@ pub struct OverlayPath {
 
 /// A handle or a mark centred on a point, `px` screen pixels across: `handle` (a square), `handle-round`,
 /// `radius`, `end` (a free arrow end), `diamond` (a joined one), `bend`, `bend-bent`, `anchor`, `side`, `side-on`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct OverlayDot {
 	pub x: f64,
 	pub y: f64,

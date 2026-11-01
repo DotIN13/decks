@@ -10,29 +10,9 @@ import { firstLine } from "../render/look.ts";
 import { parseMarkdown } from "../model/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
 import type { StageEngine } from "../render/engine.ts";
-import {
-	ANCHOR_OUT,
-	ANCHOR_PX,
-	arrowAnchors,
-	arrowEnds as arrowEndsOf,
-	pageHandles as pageHandlesOf,
-	deleteOps,
-	distances as distancesOf,
-	dropBox as dropBoxOf,
-	duplicateOps,
-	gripBox as gripBoxOf,
-	gripHidden,
-	hoverBox as hoverBoxOf,
-	itemHandles,
-	kinOutlines,
-	radiusHandle as radiusHandleOf,
-	selectionFrame,
-	selectionOutlines,
-	type Overlay,
-	type StageEditor,
-	type tsScene,
-} from "../edit/index.ts";
+import { type Overlay, type StageEditor, type tsScene } from "../edit/index.ts";
 import type { StageProps } from "./Stage.tsx";
+import { RULES } from "../device/profile.ts";
 
 /** What the selection's drawing needs of the stage around it. */
 export type SelectionDeps = {
@@ -53,7 +33,14 @@ export type SelectionDeps = {
 	penNode: (id: string) => PenNode | undefined;
 	/** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
 	pressHeld: Accessor<boolean>;
+	/** The colours the engine paints the overlay in: the accent, the guides' red, the panel, red, green and blue from 0 to 1. */
+	colours: Accessor<{ accent: [number, number, number]; guide: [number, number, number]; panel: [number, number, number] }>;
 };
+
+/** Nothing drawn over the canvas: before the engine has loaded. */
+const EMPTY: Overlay = { outlines: [], kin: [], gripHidden: false, slots: [], slotFrames: [], joins: [], sides: [], guides: [] };
+/** Two answers alike: a part of the overlay that has not changed keeps its value, so nothing that reads it is touched. */
+const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * What is drawn over the selection and under the pointer: outlines, handles, anchors, the hover,
@@ -72,36 +59,48 @@ export function createSelection(deps: SelectionDeps) {
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
 	const selectMade = (made: string[]) => editor.selectMade(made);
 	const shownDrag = editor.shownDrag;
-	/** Where each selected item is now, moved by any drag and sized by any resize in progress (`editor/core/overlay.ts`). */
-	const penOutlines = createMemo(() => {
-		penDrawn();
-		return selectionOutlines(
-			{
-				selection: editor.items(),
-				typing: editor.typing(),
-				drag: shownDrag(),
-				glide: editor.glide(),
-				resize: editor.shownResize(),
-				boards: scene.boards(),
-				pagePicks: editor.pagePicks(),
-				pageDrag: editor.pageDrag(),
-				ownDrag: editor.ownDrag(),
-				selected: props.selected,
-				pageResize: editor.pageResize(),
-				marquee: editor.marquee(),
-			},
-			scene,
-		);
-	});
-	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, ctl.zoom()));
 	/**
-	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
-	 * made. So it is sized by its width alone: the two side handles, and no height written to the
-	 * file. Dragging a corner used to pin a height on it, and from then on its words were cut off or
-	 * swam in space.
+	 * Everything the editor draws over the canvas, painted by the engine with the drawing in one frame
+	 * (`crates/editor/src/overlay.rs`, from the engine's editor's state and what the page knows), and
+	 * answered as places for `OverlayLayer`'s hit areas and the pills. Asked again whenever any of it
+	 * may have changed: the editor's state, the zoom, the drawing, the hover, a glide, the words open.
 	 */
-	const penAnchors = createMemo(() => arrowAnchors(penHandles(), { editable: !!props.onPenEdit, drafting: !!editor.draft(), resizing: !!editor.resize() }, scene));
+	const painted = createMemo<Overlay>(
+		() => {
+			penDrawn();
+			const state = editor.state();
+			const hoverPage = editor.hoverPage() ?? editor.hoverPicture();
+			// A board picked up with the selection is part of it, not something to measure to or outline as hovered.
+			const picked = !!hoverPage && editor.pagePicks().includes(hoverPage);
+			const glide = editor.glide();
+			const frameOf = { zoom: ctl.zoom(), selected: props.selected, colours: deps.colours() };
+			const extras = {
+				typing: editor.typing(),
+				panning: panning(),
+				glide: glide ? [...glide].map(([id, by]) => [id, by.dx, by.dy]) : [],
+				ownDrag: editor.ownDrag(),
+				draft: editor.draft(),
+				hoverItem: props.mode === "edit" ? editor.hoverItem() : undefined,
+				hoverPage: props.mode === "edit" && !picked ? hoverPage : undefined,
+				alt: editor.altHeld(),
+				readOnly: !props.onPenEdit,
+				notResizable: !props.onResize,
+				hints: { joins: state.joins, sides: state.sides },
+			};
+			const places = penLayer.editorPaint(frameOf, extras) as (Overlay & { painted?: unknown }) | undefined;
+			if (!places) return EMPTY;
+			// For the rules checks: what the engine painted round the selection.
+			(globalThis as { __decksOverlay?: string }).__decksOverlay = JSON.stringify(places.painted ?? {});
+			return places;
+		},
+		EMPTY,
+		{ equals: same },
+	);
+	const part = <T,>(pick: (o: Overlay) => T) => createMemo(() => pick(painted()), undefined, { equals: same });
+	/** Where each selected item is now, moved by any drag and sized by any resize in progress. */
+	const penOutlines = part((o) => o.outlines);
+	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
+	const penHandles = part((o) => o.handles);
 	/*
 	 * Where each selected item is, for the properties panel's position and size: the box the stage
 	 * draws, kept current as the drawing changes (`state/pen-tools.ts`).
@@ -116,7 +115,7 @@ export function createSelection(deps: SelectionDeps) {
 		setPenBoxes(boxes);
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const pageHandles = createMemo(() => pageHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.pageDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
+	const pageHandles = part((o) => o.pageHandles);
 
 	/**
 	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
@@ -162,7 +161,7 @@ export function createSelection(deps: SelectionDeps) {
 		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
 	};
 	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
-	const penDeleteSelected = (selected = editor.items(), ops = deleteOps(selected, scene)) => {
+	const penDeleteSelected = (selected = editor.items(), ops: unknown[] = penLayer.editorCall<unknown[]>("delete-ops", { ids: selected }) ?? []) => {
 		if (!selected.length) return;
 		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
 		penLayer.hide(new Set(selected));
@@ -175,20 +174,18 @@ export function createSelection(deps: SelectionDeps) {
 	};
 
 	const penDuplicate = () => {
-		const { ops, made } = duplicateOps(scene, editor.items(), freshIds());
+		const { ops, made } = penLayer.editorCall<{ ops: unknown[]; made: string[] }>("duplicate-ops", { ids: editor.items() }) ?? { ops: [], made: [] };
 		penEdit(ops);
 		if (made.length) selectMade(made);
 	};
 
-	/** Where the frame a drag would drop into is, for the outline that says so. */
-	const dropBox = createMemo(() => dropBoxOf(editor.dropInto(), scene));
 
 	/**
 	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
 	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
 	 * corner, as it does in a drawing program, and every corner follows it.
 	 */
-	const radiusHandle = createMemo(() => radiusHandleOf(penHandles(), { editable: !!props.onPenEdit, resizing: !!editor.resize(), drag: editor.drag() }, scene));
+	const radiusHandle = part((o) => o.radius);
 	/**
 	 * The drawn items the same pill is for, when no board has it, or a group picked together, boards
 	 * among them: the box round all of it, and what to call it. Not while one is typed into (its
@@ -230,82 +227,29 @@ export function createSelection(deps: SelectionDeps) {
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
-	const arrowEnds = createMemo(() => {
-		penDrawn();
-		return arrowEndsOf({ selection: editor.items(), pagePicks: editor.pagePicks(), drag: shownDrag() }, scene);
-	});
+	const arrowEnds = part((o) => o.arrow);
 
-	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
+	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line (the page measures the line). */
 	const gripBox = createMemo(() => {
 		penDrawn();
-		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.pageDrag() || panning(), editing: props.mode === "edit" }, scene, (id, node) => {
-			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
-			const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
-			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
-		});
+		const id = editor.hoverBlock();
+		if (!id || !!editor.pageDrag() || panning()) return undefined;
+		const box = scene.box(id);
+		const node = scene.node(id);
+		if (!box || !node) return undefined;
+		const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
+		const line = firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
+		return { id, x: box.x, y: box.y + line.top + line.height / 2 };
 	});
 
-	/** The hovered item's box as it is drawn now, or the board under the pointer. */
-	const hoverBox = createMemo(() => {
-		penDrawn();
-		return hoverBoxOf(
-			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverPage() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.pageDrag() || panning(), boards: scene.boards(), glide: editor.glide() },
-			scene,
-		);
-	});
-
-	/** What the selection and the hovered item sit in and hold: light outlines round their parents and children. */
-	const kinBoxes = createMemo(() => {
-		penDrawn();
-		return kinOutlines(
-			{ selection: editor.items(), drag: shownDrag(), glide: editor.glide(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.pageDrag() || panning() || !!editor.gesture() },
-			scene,
-		);
-	});
 	/** One box round everything selected, with its size under it. */
-	const penFrame = createMemo(() => selectionFrame(penOutlines()));
-	/** Alt held over another item or board, in edit mode: the distances to it from the selection. */
-	const penDistances = createMemo(() => {
-		const over = hoverBox();
-		// A board picked up with the selection is part of it, not something to measure to.
-		const path = editor.hoverPage() ?? editor.hoverPicture();
-		const picked = !!over?.board && !!path && editor.pagePicks().includes(path);
-		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.pageDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
-	});
+	const penFrame = part((o) => o.selectionFrame);
 
 	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
 	/** A dragged arrow handle's dashed route, where it sits. */
 	const routeShown = editor.route;
-	/**
-	 * Everything the editor draws over the canvas (`editor/core/overlay.ts`), for `OverlayLayer`. Each
-	 * part keeps its own memo above, read here, so a part that has not changed hands the layer the
-	 * same value and nothing it draws is touched.
-	 */
-	const overlay = createMemo<Overlay>(() => ({
-		outlines: penOutlines(),
-		handles: penHandles(),
-		anchors: penAnchors(),
-		pageHandles: pageHandles(),
-		radius: radiusHandle(),
-		radiusDrag: editor.radius(),
-		arrow: arrowEnds(),
-		hover: hoverBox(),
-		kin: kinBoxes(),
-		selectionFrame: penFrame(),
-		distances: penDistances(),
-		grip: gripBox(),
-		gripHidden: gripHidden(editor.drag(), !!editor.resize()),
-		drop: dropBox(),
-		insert: editor.dropSlot()?.line,
-		slots: editor.dropNear()?.slots ?? [],
-		slotFrames: editor.dropNear()?.frames ?? [],
-		joins: editor.joins(),
-		sides: editor.sides(),
-		guides: editor.guides(),
-		draft: editor.draft(),
-		route: routeShown(),
-		endDraft: editor.endDraft(),
-	}));
+	/** Everything the editor draws over the canvas, for `OverlayLayer`: the engine's, and the grip the page places itself. */
+	const overlay = createMemo<Overlay>(() => ({ ...painted(), grip: gripBox() }));
 
 	/** The pills: over the selected board, over drawn items or a group, and over the lasso's strokes. */
 	const pills = () => (
@@ -351,7 +295,7 @@ export function createSelection(deps: SelectionDeps) {
 						box={items().box}
 						obstacles={() => pillObstacles(items().box)}
 						label={`${items().name}: actions`}
-						gap={penAnchors() ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : undefined}
+						gap={painted().anchors ? RULES.anchorOut + RULES.anchorSize / 2 + 6 : undefined}
 						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || editor.drag().dx !== 0 || editor.drag().dy !== 0 || !!editor.resize()}
 						camera={ctl.settled()}
 						view={view()}
@@ -421,7 +365,7 @@ export function createSelection(deps: SelectionDeps) {
 								}
 							: {})}
 						onDuplicate={() => {
-							const { ops, made } = duplicateOps(scene, held().ids, freshIds());
+							const { ops, made } = penLayer.editorCall<{ ops: unknown[]; made: string[] }>("duplicate-ops", { ids: held().ids }) ?? { ops: [], made: [] };
 							penEdit(ops);
 							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "stage", ids: made });
 						}}

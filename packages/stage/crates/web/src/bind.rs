@@ -204,13 +204,58 @@ pub struct PageEngine {
 	page: Page,
 	gpu: Option<Gpu>,
 	size: (u32, u32),
+	/// The canvas editor, kept beside the page (`editing.rs`).
+	editing: crate::editing::Editing,
 }
 
 #[wasm_bindgen]
 impl PageEngine {
 	#[wasm_bindgen(constructor)]
 	pub fn new(text: &str, dark: bool, session: &str) -> Result<PageEngine, JsError> {
-		Ok(PageEngine { page: Page::new(text, dark, session).map_err(err)?, gpu: None, size: (0, 0) })
+		Ok(PageEngine { page: Page::new(text, dark, session).map_err(err)?, gpu: None, size: (0, 0), editing: crate::editing::Editing::new(stage_editor::rules::Form::Desk) })
+	}
+
+	/// One input to the editor, in the TypeScript editor's `Input` shape, with the page's frame (`editing_wire::frame`):
+	/// `{ ops, preview?, effects, state }`. The preview is not applied: the page applies it, telling the worker what is lifted.
+	#[wasm_bindgen(js_name = editorStep)]
+	pub fn editor_step(&mut self, input: &str, frame: &str) -> String {
+		let input: serde_json::Value = serde_json::from_str(input).unwrap_or_default();
+		let frame = crate::editing_wire::frame(&serde_json::from_str(frame).unwrap_or_default());
+		self.editing.ids.refresh(&self.page);
+		let parsed = {
+			let scene = crate::editor_scene::EngineScene::with(&self.page, self.editing.editor.rules.line_reach / frame.zoom.max(1e-6), &self.editing.ids);
+			stage_editor::wire::input(&input, &scene)
+		};
+		let mut answer = match parsed {
+			Some(input) => {
+				let step = self.editing.decide(&self.page, input, &frame);
+				stage_editor::wire::step(&step)
+			}
+			None => serde_json::json!({ "ops": [], "effects": [] }),
+		};
+		answer["state"] = stage_editor::wire::state(&self.editing.editor.state);
+		answer.to_string()
+	}
+
+	/// Paint the editor's overlay into the next frame, from its state and what the page knows (`editing_wire::extras`);
+	/// answers the overlay's places, in the TypeScript `Overlay`'s shape, for the page's hit areas.
+	#[wasm_bindgen(js_name = editorPaint)]
+	pub fn editor_paint(&mut self, frame: &str, extras: &str) -> String {
+		let frame = crate::editing_wire::frame(&serde_json::from_str(frame).unwrap_or_default());
+		let extras = crate::editing_wire::extras(&serde_json::from_str(extras).unwrap_or_default());
+		self.editing.paint(&mut self.page, &frame, &extras);
+		let scene = crate::editor_scene::EngineScene::with(&self.page, self.editing.editor.rules.line_reach / frame.zoom.max(1e-6), &self.editing.ids);
+		let mut places = crate::editing_wire::drawn(&self.editing.drawn, &self.editing, &scene, &extras);
+		// What was painted, as the painter has it: for the browser checks to read.
+		places["painted"] = serde_json::to_value(&self.page.overlay).unwrap_or_default();
+		places.to_string()
+	}
+
+	/// One of the editor's other answers by name (`editing_wire::call`): a pick, a drop slot, ops, a key, the selection.
+	#[wasm_bindgen(js_name = editorCall)]
+	pub fn editor_call(&mut self, name: &str, args: &str) -> String {
+		let args: serde_json::Value = serde_json::from_str(args).unwrap_or_default();
+		crate::editing_wire::call(&mut self.editing, &self.page, name, &args).to_string()
 	}
 
 	#[wasm_bindgen(js_name = setGpu)]

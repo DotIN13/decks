@@ -28,7 +28,7 @@ export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll
 }
 
 /** What the editor tells the engine (`core/scene.ts`, `EngineSeam`), said to the TypeScript side of it. */
-export function tsSeam(engine: Pick<StageEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc">): EngineSeam {
+export function tsSeam(engine: Pick<StageEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc" | "editorStep" | "editorPaint" | "editorCall" | "editorReady">): EngineSeam {
 	return {
 		preview: (changes) => engine.preview(changes),
 		settle: (landing) => engine.settle(landing),
@@ -38,5 +38,9 @@ export function tsSeam(engine: Pick<StageEngine, "preview" | "settle" | "carry" 
 		linkAt: (point) => engine.linkAt(point),
 		muteText: (ids) => engine.muteText(ids),
 		showDoc: (doc, base) => engine.setDoc(doc, base),
+		editorStep: (input, frame) => engine.editorStep(input, frame) as ReturnType<EngineSeam["editorStep"]>,
+		editorPaint: (frame, extras) => engine.editorPaint(frame, extras),
+		editorCall: (name, args) => engine.editorCall(name, args),
+		editorReady: () => engine.editorReady(),
 	};
 }
