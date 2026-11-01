@@ -1535,9 +1535,12 @@ body {
 		height: 36px;
 		border-radius: 12px;
 	}
+	/* The agent is its face on a phone, as the panel's rows name it; the bar's room goes to the canvas's name. */
 	.app[data-phone="true"] .v3-topbar .v3-agent-name {
-		max-width: 96px;
-		font-size: 15px;
+		display: none;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-chip {
+		padding: 0 6px;
 	}
 	/* The canvas's name gets the room the bar has, and the deck switcher, which the panel's head holds, gives it up. */
 	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
