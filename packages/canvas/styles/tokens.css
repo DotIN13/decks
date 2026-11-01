@@ -308,8 +308,7 @@
  * load-bearing: unlayered CSS beats every layer, so a `:root` override inside the layer would
  * lose to the base values above it and touch targets would silently stay small.
  */
-@media (pointer: coarse) {
-	:root {
+	:root:where([data-touch]) {
 		/* 40, not 44: a 44px control in a 40px pill made every toolbar a row of squares
 		   taller than the bar, and two toolbars of them overlapped on a 390px phone. 40 is
 		   still a fingertip, and the pill grows to hold it. */
@@ -326,4 +325,3 @@
 		--row-radius: 26px;
 		--radius-item: 14px;
 	}
-}

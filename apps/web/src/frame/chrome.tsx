@@ -1,14 +1,13 @@
 import type { FrameChrome } from "@decks/canvas";
 import { insets } from "@decks/canvas/camera";
-import { RULES } from "@decks/canvas/device";
 import { PenBar } from "@decks/canvas/host";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { makeFloat } from "@decks/ui/float";
 import { createEffect, onCleanup, Show } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import { PenTray } from "./PenTray.tsx";
-import { ToolColumn } from "./ToolColumn.tsx";
-import { ZoomBar } from "./ZoomBar.tsx";
+import { formFor } from "./forms/index.ts";
 
 /**
  * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `frame/chrome.ts`):
@@ -104,19 +103,12 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 					<PenBar tools={false} doc={(chrome.revision(), handle.drawn())} onEdit={(ops) => handle.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => chrome.exportPicture(ids)} />
 				</div>
 			</Show>
-			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
-			<Show
-				when={chrome.narrow()}
-				fallback={<ToolColumn onStep={step} onFloat={floatTools} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
-			>
-				<div class="frame-tool-row" style={{ bottom: `${chrome.dock() + 8}px` }}>
-					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
-				</div>
-			</Show>
-			{/* The zoom bar where the rules have one (`zoom-bar`): a desk and a tablet, not a phone, which pinches. */}
-			<Show when={RULES.zoomBar}>
-				<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
-			</Show>
+			{/*
+				Where the tools and the zoom go is the form's (`frame/forms/`): a desk and a tablet a floating
+				column and the zoom bar, a phone a row above the page's dock and no zoom bar (`tools`, `zoom-bar`
+				in the rules table). The parts are the same; only the arrangement differs.
+			*/}
+			<Dynamic component={formFor(chrome.narrow())} chrome={chrome} floatTools={floatTools} step={step} setPen={setPen} />
 			<Show when={chrome.offer()} keyed>
 				{(offer) => (
 					<div class="v3-bar float pill frame-offer" role="status">

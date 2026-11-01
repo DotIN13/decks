@@ -36,7 +36,7 @@
 	 * the iOS shapes (`index.css`, the coarse tokens): a bar of tools reads as an instrument, not a
 	 * capsule. 22px around buttons of 16px, a 6px inset apart, so the two curves stay concentric.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		:is(.float.pill, .pen-tools, .stage-fixed > .card-callout, .notices, .popover) {
 			--radius-panel: 22px;
 			--control-radius: 16px;
@@ -710,7 +710,7 @@
 	 * The words then reflow left by that much as the × arrives — the one thing that moves
 	 * here, and it moves because the alternative is a gutter that never stops being there.
 	 */
-	@media (hover: hover) {
+	:where(:root:not([data-touch])) {
 		:is(.popover, .row-list) .row-act:has([data-yield]) > .close {
 			display: none;
 		}
@@ -740,7 +740,7 @@
 	 * row is 34px of touch target with room for both, and nothing is being pointed at to
 	 * justify hiding either.
 	 */
-	@media (hover: none) {
+	:where(:root[data-touch]) {
 		:is(.popover, .row-list) .row-act > .close {
 			opacity: 1;
 		}

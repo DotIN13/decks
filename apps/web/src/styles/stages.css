@@ -364,7 +364,7 @@
 	}
 
 	/* Under a finger there is no hover: the corner is always there, smaller, so the pictures still lead. */
-	@media (hover: none) {
+	:where(:root[data-touch]) {
 		.stage-acts {
 			top: 6px;
 			right: 6px;
@@ -493,7 +493,7 @@
 		gap: 6px;
 	}
 
-	@media (hover: none) {
+	:where(:root[data-touch]) {
 		.stage-keys {
 			display: none;
 		}

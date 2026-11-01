@@ -5,8 +5,10 @@ import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
 import { APP_BAR } from "../render/types.ts";
-import { COARSE } from "../edit/dom/touch-rules.ts";
 import { RULES } from "../device/profile.ts";
+
+/** A press on a live page is covered until the item is active (`press.on-live-page`: a tablet and a phone). */
+const COVERS = RULES.pressOnLivePage === "cover";
 
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
 const EDGE_OUT_PX = RULES.edgeOut;
@@ -244,11 +246,11 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 					<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 				<Show when={awake() && props.board.item === "app"}>
-					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COVERS ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 			</div>
 			{/* On a touch screen the page is covered until the item is activated: the cover selects, drags, pinches, and a second tap lifts it (`active`). */}
-			<Show when={COARSE && awake() && shown() && !props.asleep && !props.active}>
+			<Show when={COVERS && awake() && shown() && !props.asleep && !props.active}>
 				<div class="touch-cover" onPointerDown={grip} />
 			</Show>
 		</div>

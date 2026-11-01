@@ -296,7 +296,7 @@
 	 * glance; what is kept is the *active* agent's, which is in the pill with its ring, and
 	 * that is the one the window belongs to.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.agent-stack {
 			display: none;
 		}

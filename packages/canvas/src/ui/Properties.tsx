@@ -44,7 +44,10 @@ import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLiv
 import { Icon } from "@decks/ui";
 import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";
-import { COARSE } from "../edit/dom/touch-rules.ts";
+import { RULES } from "../device/profile.ts";
+
+/** Properties open from the pill or the hold menu, not with every selection (`properties.opens`): a tablet and a phone. */
+const FROM_PILL = RULES.propertiesOpen === "from-pill";
 import { scheme } from "../lib/theme.ts";
 import { ICON_LIBRARIES } from "../render/icon-index.ts";
 
@@ -149,10 +152,12 @@ export function Properties(props: {
 	 * when a pan or a pinch ends: to its right when there is room, else its left, else under it.
 	 */
 	const [narrow, setNarrow] = createSignal(typeof innerWidth === "number" && innerWidth < 600);
+	/** A sheet from the bottom (`properties: sheet`, a phone), or on a touch form a window too narrow for a popover. */
+	const sheet = () => RULES.properties === "sheet" || (FROM_PILL && narrow());
 	const [anchor, setAnchor] = createSignal<{ left: number; top: number } | null>(null);
 	const PANEL_W = 276;
 	const place = () => {
-		if (!COARSE || untrack(narrow) || typeof document === "undefined") return setAnchor(null);
+		if (!FROM_PILL || untrack(sheet) || typeof document === "undefined") return setAnchor(null);
 		const outline = document.querySelector(".world > .pen-selection, .world > .pen-selection-box");
 		const r = outline?.getBoundingClientRect();
 		if (!r || r.width === 0) return setAnchor(null);
@@ -166,7 +171,7 @@ export function Properties(props: {
 		return setAnchor({ left: Math.max(12, Math.min(r.left, innerWidth - PANEL_W - 12)), top: Math.min(r.bottom + 12, innerHeight - 420) });
 	};
 	onMount(() => {
-		if (!COARSE) return;
+		if (!FROM_PILL) return;
 		const onResize = () => { setNarrow(innerWidth < 600); place(); };
 		const settle = () => setTimeout(place, 0);
 		addEventListener("resize", onResize);
@@ -174,11 +179,11 @@ export function Properties(props: {
 		addEventListener("touchend", settle, true);
 		onCleanup(() => { removeEventListener("resize", onResize); removeEventListener("pointerup", settle, true); removeEventListener("touchend", settle, true); });
 	});
-	createEffect(on([penSelection, penBoxes], () => { if (COARSE) queueMicrotask(place); }));
+	createEffect(on([penSelection, penBoxes], () => { if (FROM_PILL) queueMicrotask(place); }));
 	// Nothing selected: the drawer is shut, so the next selection does not open it unasked.
 	createEffect(on(penSelection, (ids) => { if (!ids.length) setPropsOpen(false); }));
 	// The sheet open or shut, said to the page (`events.ts`, `decks-sheet`): its composer makes way, as under an iOS sheet.
-	createEffect(on(() => COARSE && narrow() && propsOpen() && penSelection().length > 0 && !penTyping(), (open, was) => {
+	createEffect(on(() => sheet() && propsOpen() && penSelection().length > 0 && !penTyping(), (open, was) => {
 		if (open === was || typeof document === "undefined") return;
 		document.dispatchEvent(new CustomEvent("decks-sheet", { detail: { open } }));
 	}));
@@ -515,8 +520,8 @@ export function Properties(props: {
 
 	/* It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`). */
 	return (
-		<Show when={selected().length > 0 && !penTyping() && (!COARSE || propsOpen())}>
-			<aside class="panel-float props-panel" aria-label="Properties" data-props data-sheet={COARSE && narrow() ? "true" : undefined} data-popover={COARSE && !narrow() && anchor() ? "true" : undefined} style={COARSE && !narrow() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
+		<Show when={selected().length > 0 && !penTyping() && (!FROM_PILL || propsOpen())}>
+			<aside class="panel-float props-panel" aria-label="Properties" data-props data-sheet={sheet() ? "true" : undefined} data-popover={FROM_PILL && !sheet() && anchor() ? "true" : undefined} style={FROM_PILL && !sheet() && anchor() ? { left: `${anchor()!.left}px`, top: `${anchor()!.top}px`, right: "auto" } : undefined}>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">
 						<Icon of={single() ? KIND_ICON[kindOf(single()!)] : Layers} size={14} />
@@ -538,7 +543,7 @@ export function Properties(props: {
 							/>
 						)}
 					</Show>
-					<button type="button" class="close" aria-label="Close" title={COARSE ? "Close" : "Let go of the selection"} onClick={() => (COARSE ? setPropsOpen(false) : setPenSelection([]))}>
+					<button type="button" class="close" aria-label="Close" title={FROM_PILL ? "Close" : "Let go of the selection"} onClick={() => (FROM_PILL ? setPropsOpen(false) : setPenSelection([]))}>
 						<Icon of={X} size={13} />
 					</button>
 				</header>

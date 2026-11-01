@@ -125,7 +125,7 @@
 		overflow-wrap: anywhere;
 		cursor: text;
 	}
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		[data-slot="composer-input"] {
 			font-size: 16px;
 		}
@@ -156,7 +156,7 @@
 	}
 
 	/* On a touch screen the row's controls are a fingertip high, and take the rounder corner with it. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.dock-row {
 			--control-radius: 999px;
 		}
@@ -222,7 +222,7 @@
 	 * 10px, and three 44px targets plus a 44px send button is a bar taller than the text
 	 * it belongs to.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.dock-row {
 			--control: 34px;
 			--control-md: 34px;
@@ -264,7 +264,7 @@
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 	}
 
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.send-button {
 			width: 40px;
 			height: 40px;

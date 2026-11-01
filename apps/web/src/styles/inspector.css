@@ -86,10 +86,10 @@
 	 * A `@media` block in this layer would normally be the trap `index.css` warns about — it
 	 * loses to a utility on the same element — but it is safe *here* precisely because no
 	 * utility in `Inspector.tsx` sets a minimum size on a swatch. The alternative, five
-	 * `pointer-coarse:min-h-[38px]` copies in the markup, is the duplication this file
+	 * `touch:min-h-[38px]` copies in the markup, is the duplication this file
 	 * exists to remove.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.tone {
 			min-width: 38px;
 			min-height: 38px;

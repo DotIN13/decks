@@ -1,5 +1,5 @@
 import type { PointerKind } from "../model.ts";
-import { RULES, TOUCH } from "../../device/profile.ts";
+import { RULES } from "../../device/profile.ts";
 
 /**
  * The numbers that make the canvas feel right under a finger, read from the rules table (`device/rules.json`): how far a press may
@@ -9,9 +9,6 @@ import { RULES, TOUCH } from "../../device/profile.ts";
  * drawing moves. Apple asks for 44 pt targets and Google for 48 dp; a glyph may be smaller than
  * what answers the press, which is why a handle is drawn as a 10 pt dot and answers 44.
  */
-
-/** Whether this is a touch form, a tablet or a phone (`device/profile.ts`): the column of the rules a finger reads. */
-export const COARSE = TOUCH;
 
 /** Before a press moves this far on the screen, it has not moved: a finger wobbles, a mouse does not. */
 export const DRAG_SLOP_BY_POINTER: Record<PointerKind, number> = RULES.slop;

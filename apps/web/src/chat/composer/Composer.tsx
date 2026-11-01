@@ -878,7 +878,7 @@ export function Composer(props: {
 			 * Which also means the row is not *only* keycaps again — but the argument for
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
-			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden" hidden>
+			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 touch:hidden" hidden>
 				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
 				<span class="flex-1" />
 				{/* The dial moved into the controls row (v3): this row stays for the hints only. */}

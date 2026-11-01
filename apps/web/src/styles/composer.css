@@ -8,7 +8,7 @@
  */
 @layer components {
 	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 	.set-row .chip-button {
 		--control-md: 34px;
 	}

@@ -1,4 +1,8 @@
 @import "tailwindcss";
+
+/* A touch device, by the rules table's mark on the root (device/profile.ts sets data-touch), not by
+ * asking the pointer: `touch:h-10` instead of Tailwind's own pointer-coarse variant. */
+@custom-variant touch (&:where(:root[data-touch] *));
 /*
  * The app's stylesheets, in cascade order — and this file is the entry point: the ladder, the
  * tokens, and the reset. Every region is a sheet of its own now, and this one holds no rule
@@ -69,9 +73,9 @@
  * **The corollary is the trap, and it is worth stating plainly: a `@media` block in here
  * loses to a utility on the same element.** A layer's precedence does not change inside a
  * media query — it is still the components layer — so `class="top-[58px]"` on the toasts
- * beat `@media (pointer: coarse) { .notices { top: 74px } }` and the rule silently did
+ * beat a touch-only `.notices { top: 74px }` in a media block and the rule silently did
  * nothing. Anything responsive about a utility-styled element has to be a variant in the
- * markup (`pointer-coarse:`), which is why those read oddly long in
+ * markup (`touch:`), which is why those read oddly long in
  * `App.tsx` and `Inspector.tsx`. The alternative — leaving the base declaration here too —
  * is fine, and is what the surfaces above with `env()` corners actually do; what does not
  * work is one property stated in both places.

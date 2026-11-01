@@ -314,12 +314,10 @@
 		outline-offset: 1px;
 	}
 
-	/* No hovering on a touchscreen, and this is the only route to the time machine — so it is
+	/* No hovering on a touch device (the root's data-touch mark), and this is the only route to the time machine — so it is
 	   simply there. After the rules above, so it wins. */
-	@media (pointer: coarse) {
-		.stream-rw {
-			opacity: 1;
-		}
+	:where(:root[data-touch]) .stream-rw {
+		opacity: 1;
 	}
 
 	/* --- what the agent did, inside its card ---------------------------------- */

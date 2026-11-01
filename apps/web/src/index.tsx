@@ -1,5 +1,7 @@
 /* @refresh reload */
 // First, before anything else runs: the tab's person token is read and its tag taken out of the page.
+// The device's form on the root element (`data-form`, `data-touch`), which the stylesheets ask instead of the pointer media queries.
+import "@decks/canvas/device";
 import "./perf/probe-relay.ts";
 import "./lib/session.ts";
 import { App } from "./App.tsx";

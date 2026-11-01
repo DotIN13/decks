@@ -214,13 +214,13 @@ export function Switcher(props: { label?: string } = {}) {
 							*/}
 							<div class="switcher-label">
 								<span>Server address</span>
-								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+								<label class="field h-8 flex-none rounded-lg touch:h-10 touch:px-2.5">
 									<input
 										type="text"
 										inputmode="url"
 										autocomplete="off"
 										spellcheck={false}
-										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint touch:text-[16px]"
 										placeholder="localhost:4329"
 										value={address()}
 										onInput={(event) => setAddress(event.currentTarget.value)}
@@ -232,13 +232,13 @@ export function Switcher(props: { label?: string } = {}) {
 								<span>
 									Pairing code <span class="text-faint">· only over the internet</span>
 								</span>
-								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+								<label class="field h-8 flex-none rounded-lg touch:h-10 touch:px-2.5">
 									<input
 										type="text"
 										inputmode="numeric"
 										autocomplete="one-time-code"
 										maxLength={6}
-										class="min-w-0 flex-1 border-0 bg-none text-ui tracking-[0.12em] text-fg outline-none placeholder:tracking-normal placeholder:text-faint pointer-coarse:text-[16px]"
+										class="min-w-0 flex-1 border-0 bg-none text-ui tracking-[0.12em] text-fg outline-none placeholder:tracking-normal placeholder:text-faint touch:text-[16px]"
 										placeholder="From decks pair code on that machine"
 										value={code()}
 										onInput={(event) => setCode(event.currentTarget.value)}
@@ -250,12 +250,12 @@ export function Switcher(props: { label?: string } = {}) {
 								<span>
 									Name <span class="text-faint">· optional</span>
 								</span>
-								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+								<label class="field h-8 flex-none rounded-lg touch:h-10 touch:px-2.5">
 									<input
 										type="text"
 										autocomplete="off"
 										maxLength={60}
-										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint touch:text-[16px]"
 										placeholder="What the server calls itself"
 										value={label()}
 										onInput={(event) => setLabel(event.currentTarget.value)}
@@ -314,12 +314,12 @@ export function Switcher(props: { label?: string } = {}) {
 											Renaming in the row itself. Its keys stop here: the menu listens on the document
 											for Escape and the arrows, and they mean the text while it is being typed.
 										*/}
-										<label class="field switcher-rename h-8 min-w-0 flex-1 rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+										<label class="field switcher-rename h-8 min-w-0 flex-1 rounded-lg touch:h-10 touch:px-2.5">
 											<input
 												ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
 												type="text"
 												maxLength={60}
-												class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+												class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint touch:text-[16px]"
 												placeholder={one.kind === "here" ? (ownName() ?? "This server") : one.label}
 												value={draftName()}
 												onInput={(event) => setDraftName(event.currentTarget.value)}

@@ -2,7 +2,6 @@ import type { Page, Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
-import { COARSE } from "../edit/dom/touch-rules.ts";
 import { RULES } from "../device/profile.ts";
 import { setPropsOpen } from "../edit/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
@@ -207,7 +206,7 @@ export function PageCallout(props: {
 				)}
 			</Show>
 			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
-			<Show when={COARSE && !props.board && !props.ink}>
+			<Show when={RULES.propertiesOpen === "from-pill" && !props.board && !props.ink}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => setPropsOpen(true)}>
 					<Icon of={SlidersHorizontal} size={16} />
 				</button>

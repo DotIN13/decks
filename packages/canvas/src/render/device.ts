@@ -120,10 +120,7 @@ export const MOVING = byEngine<{ card: Moving; app: Moving; document: Moving }>(
  */
 export type GpuClass = "big" | "small" | "phone";
 
-/** A phone, not a tablet: an iPhone or iPod, or an Android device that calls itself Mobile (Android tablets do not). */
-export function isPhone(facts: { platform: string; userAgent: string }): boolean {
-	return /iPhone|iPod/.test(facts.platform) || /iPhone|iPod/.test(facts.userAgent) || /Android.*Mobile/i.test(facts.userAgent);
-}
+export { isPhone } from "../device/profile.ts";
 
 export interface GpuFacts {
 	kind: DeviceKind;

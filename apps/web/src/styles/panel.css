@@ -44,7 +44,7 @@
 	 * selectable, Chrome on Android took a tap on one as picking out a word and offered its own
 	 * actions for it (an email to write, a search) over the panel. The search field stays a field.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.panel-shell,
 		.panel-shell button {
 			-webkit-touch-callout: none;
@@ -615,7 +615,7 @@
 	 * to end before — so the two buttons now *arrive* into the space the status gives up
 	 * (`[data-yield]` in `chrome.css`), and at rest the row ends with its words.
 	 */
-	@media (hover: hover) {
+	:where(:root:not([data-touch])) {
 		.agent-row > .agent-tagbtn {
 			display: none;
 		}
@@ -754,7 +754,7 @@
 		opacity: 1;
 	}
 
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		/* Both of them bigger for a finger, and both by the same amount — a 28px pen beside a
 		   22px × is the wobble again, one size up. */
 		.agent-tagbtn,
@@ -812,14 +812,14 @@
 	 * which is the thing this whole arrangement is here to stop. The first line reserves the
 	 * column itself now, and it is the only line that needs to.
 	 */
-	@media (hover: none) {
+	:where(:root[data-touch]) {
 		.row-list.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
 			padding-right: 4px;
 		}
 	}
 
 	/* A finger is not a cursor: the list's rows stand a little further apart where there is no hover. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.panel-list {
 			gap: 4px;
 		}

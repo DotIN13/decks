@@ -21,7 +21,7 @@ import { state } from "../state/deck.ts";
  */
 export function NoticeStrip() {
 	return (
-		<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 pointer-coarse:top-[74px]">
+		<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 touch:top-[74px]">
 			<For each={state.notices}>
 				{(item) => (
 					<div

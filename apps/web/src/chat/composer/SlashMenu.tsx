@@ -117,7 +117,7 @@ export function SlashMenu(props: {
 						data-flat="true"
 						data-current={props.activeIndex === index()}
 						data-index={index()}
-						class="pointer-coarse:min-h-[40px]"
+						class="touch:min-h-[40px]"
 						type="button"
 						role="option"
 						aria-selected={props.activeIndex === index()}

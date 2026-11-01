@@ -257,11 +257,9 @@
 	/*
  * With a pointer that hovers, the buttons take no room until the board or its bar is under it: the
  * title and the path have the whole bar at rest, and give way to the buttons on hover. A touch
- * screen has no hover, so there they are always shown (the (hover: none) rule below).
+ * screen has no hover, so there they are always shown (the data-touch rule below).
  */
-@media (hover: hover) {
-	
-}
+
 	
 	
 	
@@ -1228,7 +1226,7 @@
 	pointer-events: none;
 }
 	/* Under a finger the grip and the tab are finger-sized, and the tools 36px. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.pen-grip {
 			height: 22px;
 		}
@@ -1743,14 +1741,10 @@
 	outline-color: var(--color-warn);
 }
 	/* The same rules, under the same query. */
-	@media (hover: none) {
 	
-}
 
 	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
 	
-}
 }
 /* An item's slot (`item-slot.tsx`), in both the Decks app and any host of the canvas. */
 @layer components {

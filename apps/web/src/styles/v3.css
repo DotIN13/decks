@@ -117,7 +117,7 @@ body {
 	--fill: var(--color-grey-800);
 	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
 }
-@media (pointer: coarse) {
+:where(:root[data-touch]) {
 	.stage {
 		--radius-panel: 26px;
 	}
@@ -992,7 +992,7 @@ body {
 	.v3-chat .stream[data-shown] .stream-act:active {
 		background: var(--v3-bg3);
 	}
-	@media (hover: hover) {
+	:where(:root:not([data-touch])) {
 		.v3-chat .stream[data-shown] .stream-mine:not(:hover, :focus-within) .stream-act {
 			opacity: 0;
 		}
@@ -1597,7 +1597,7 @@ body {
 	}
 
 	/* A touch screen: bigger targets in the bars, as the iPad screens draw them. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.v3-bar.float.pill {
 			height: 52px;
 			border-radius: 20px;
@@ -1769,7 +1769,7 @@ body {
 	.v3-tool[data-open="true"]::after {
 		transform: translate(1px, 1px);
 	}
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.v3-tool-mark {
 			border-radius: 10px;
 		}
@@ -2819,7 +2819,7 @@ body {
 		background: var(--v3-bg3);
 		color: var(--v3-fg);
 	}
-	@media (hover: none) {
+	:where(:root[data-touch]) {
 		.v3-app-more {
 			opacity: 1;
 		}
@@ -3390,7 +3390,7 @@ body {
    tools beside it keep theirs), unmarked, and the conversation's top a 22px band across its middle
    with a small grip. */
 @layer components {
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.panel-resize {
 			right: -10px;
 			width: 30px;

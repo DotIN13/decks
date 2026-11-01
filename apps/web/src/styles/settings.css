@@ -270,7 +270,7 @@
 }
 
 	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 	.set-row {
 		min-height: 48px;
 	}

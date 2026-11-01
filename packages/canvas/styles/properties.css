@@ -31,7 +31,7 @@
 	 * On a touch screen (`Properties.tsx`): rows a finger's height; on a phone a sheet at the bottom
 	 * edge with a grab bar, sliding up; on a tablet a popover beside the selection, placed inline.
 	 */
-	@media (pointer: coarse) {
+	:where(:root[data-touch]) {
 		.props-panel {
 			--control: 40px;
 			--control-sm: 36px;
