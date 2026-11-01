@@ -564,6 +564,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return true;
 	};
 
+	/**
+	 * On a touch screen, the one item whose page takes the fingers (`item-slot.tsx`, `active`): activated by
+	 * a second tap on the selected item, and let go when the selection moves to anything else.
+	 */
+	const [activeItem, setActiveItem] = createSignal<string | undefined>();
+	createEffect(on(() => props.selected, (selected) => { if (selected !== untrack(activeItem)) setActiveItem(undefined); }));
 	/** One placed item's slot: the host's, told where it is and what it may do. */
 	const pageNode = (board: Page) => (
 		<Frame
@@ -577,6 +583,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
+			active={activeItem() === board.path}
+			onActivate={() => setActiveItem(board.path)}
 			gestures={gestures}
 			{...(props.onOpenPage ? { onOpenPage: props.onOpenPage } : {})}
 			view={editor.pageView(board.path)}

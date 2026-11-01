@@ -352,6 +352,18 @@
 	border-radius: var(--radius-board, 12px);
 	background: var(--bg);
 }
+	/* On a touch screen the page is covered until the item is activated (`item-slot.tsx`): a finger on it is the stage's. */
+	.card-node > .touch-cover {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	border-radius: var(--radius-board, 12px);
+	touch-action: none;
+}
+	/* Activated by a second tap: its page has the fingers, and a thin ring of the accent inside its edge says so until something else is selected. */
+	.card-node[data-active] > .surface {
+	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
 	/* A board's place among the others, which never moves (`Stage`): no box of its own. */
 	.world > .card-slot {
 	display: contents;

@@ -56,6 +56,9 @@ export function createStageInput(deps: StageInputDeps) {
 
 	/** A press is held on the canvas (not on a pill): the drawn items' pill steps aside until it lets go. */
 	const [pressHeld, setPressHeld] = createSignal(false);
+	/** When the stage last scrolled: within `COAST_MS` of it, with no finger down, the browser is still coasting after a flick. */
+	let lastScroll = 0;
+	const COAST_MS = 100;
 	onMount(() => {
 		const element = el();
 		const press = (event: PointerEvent) => {
@@ -108,7 +111,10 @@ export function createStageInput(deps: StageInputDeps) {
 		window.addEventListener("wheel", pinchOver, { capture: true, passive: false });
 		onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
 		// The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
-		const onScroll = deps.scrolled;
+		const onScroll = () => {
+			lastScroll = performance.now();
+			deps.scrolled();
+		};
 		element.addEventListener("scroll", onScroll, { passive: true });
 		onCleanup(() => element.removeEventListener("scroll", onScroll));
 		/*
@@ -413,6 +419,12 @@ export function createStageInput(deps: StageInputDeps) {
 	const carried = new Set<number>();
 	/** The gesture so far has been a pinch: its lift ends the moving state at once (`stoppedMoving`). */
 	let pinched = false;
+	/**
+	 * The first finger landed on a moving canvas and caught it (`beginTouch`): the browser was kept
+	 * from taking it for a scroll, so until it lifts this pool pans for it, and a second finger makes
+	 * the pinch as ever.
+	 */
+	let caught = false;
 	/** A finger, in the stage's own coordinates: the space the camera works in. */
 	const fingerOf = (event: PointerEvent): Finger => {
 		const at = stagePoint(event);
@@ -433,6 +445,7 @@ export function createStageInput(deps: StageInputDeps) {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
+				caught = false;
 				setPanning(false);
 				if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
 			}
@@ -444,6 +457,9 @@ export function createStageInput(deps: StageInputDeps) {
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
+		} else if (step.kind === "pan" && caught && !claimed.has(finger.id)) {
+			pushCamera(pan(ctl.now(), step.dx, step.dy));
+			deps.editor().panned();
 		}
 		return step;
 	};
@@ -497,6 +513,20 @@ export function createStageInput(deps: StageInputDeps) {
 			window.addEventListener("pointercancel", onTouchEnd);
 		}
 		carried.add(event.pointerId);
+		/*
+		 * A finger landing on a moving canvas catches it, as a hand catches a spinning list: an agent's
+		 * glide stops where it is, and the browser's own coast after a flick is not given the finger to
+		 * carry on with (`holdTouch` cancels its touch start, as for a kept finger), or on an iPad the
+		 * fingers that followed stayed the scroll's and no pinch could begin until it had run down. The
+		 * pool pans for the finger instead (`touch`, `caught`), and a second finger is a pinch as ever.
+		 */
+		if (touches.count() === 0) {
+			caught = ctl.gliding() || performance.now() - lastScroll < COAST_MS;
+			if (caught) {
+				ctl.cancelGlide();
+				keptTouches.add(event.pointerId);
+			}
+		}
 		touch("down", fingerOf(event));
 		try {
 			el().setPointerCapture(event.pointerId);

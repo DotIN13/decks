@@ -5,8 +5,8 @@ import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
 import { APP_BAR } from "../render/types.ts";
+import { COARSE } from "../edit/dom/touch-rules.ts";
 
-const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
 const EDGE_OUT_PX = COARSE ? 16 : 8;
 const EDGE_IN_PX = COARSE ? 6 : 4;
@@ -56,6 +56,14 @@ export interface ItemSlotProps {
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
 	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
 	gestures: { claimTouch(id: number): void; pinching(): boolean };
+	/**
+	 * On a touch screen an item's page is covered until it is activated (`items-layer.tsx`): a tap on the
+	 * cover selects, a drag anywhere on it moves the item, a pinch with a finger on it zooms the canvas,
+	 * and a second tap on the selected item activates it, so its page takes the fingers until something
+	 * else is selected. As an app's page is entered, for cards and documents too.
+	 */
+	active?: boolean;
+	onActivate?: () => void;
 }
 
 /** What a host adds to the slot: where a card's file is, and whether its scripts may run here. */
@@ -93,7 +101,9 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	/** A press on the item, its bar or its edge: the editor takes it as a move of the selection, or it selects the item. */
 	const press = (event: PointerEvent) => {
 		if (event.button !== 0) return;
-		if (event.pointerType !== "touch" && props.view.press(event)) return;
+		// A finger on a sleeping item's surface, as on its bar: it selects, drags, or pinches with a second.
+		if (event.pointerType === "touch") return fingerDrag(event);
+		if (props.view.press(event)) return;
 		props.view.select();
 	};
 	/*
@@ -105,6 +115,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 		if (event.button !== 0) return;
 		props.gestures.claimTouch(event.pointerId);
 		event.preventDefault();
+		const wasSelected = props.selected;
 		props.view.select();
 		const from = { x: event.clientX, y: event.clientY };
 		const origin = { x: props.board.x, y: props.board.y };
@@ -125,6 +136,8 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			window.removeEventListener("pointercancel", end);
 			props.view.dragging(null);
 			if (!abandon && to) props.onMove(Math.round(to.x), Math.round(to.y));
+			// A tap, on the item already selected: activated, and its page takes the fingers from here.
+			else if (!abandon && !to && wasSelected && !props.active) props.onActivate?.();
 		};
 		const end = (done: PointerEvent) => done.pointerId === event.pointerId && finish();
 		window.addEventListener("pointermove", move);
@@ -175,6 +188,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			data-asleep={props.asleep && props.covered ? "" : undefined}
 			data-covered={props.covered ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
+			data-active={props.active ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
 			style={{
@@ -229,9 +243,13 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 					<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 				<Show when={awake() && props.board.item === "app"}>
-					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
+					<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={() => setShown(true)} />
 				</Show>
 			</div>
+			{/* On a touch screen the page is covered until the item is activated: the cover selects, drags, pinches, and a second tap lifts it (`active`). */}
+			<Show when={COARSE && awake() && shown() && !props.asleep && !props.active}>
+				<div class="touch-cover" onPointerDown={grip} />
+			</Show>
 		</div>
 	);
 }
