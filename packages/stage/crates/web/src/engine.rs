@@ -588,7 +588,7 @@ impl Page {
 				self.atlas.borrow_mut().begin();
 				labels.clear();
 				for p in &placeholders {
-					paint_placeholder(&ctx, p, s, dark, &mut labels);
+					paint_placeholder(&ctx, &self.titles, p, s, dark, &mut labels);
 				}
 				for p in &titled {
 					paint_title(&ctx, &self.titles, p, s, dark, &mut labels);
@@ -1830,8 +1830,12 @@ struct Placeholder {
 }
 
 /// A placeholder's words: the kind small and faint at the top-left, the title under it, cut to the paper.
+///
+/// Laid in the paper's own units, so the layout is the same at every zoom: kept in `titles` by kind, title
+/// and the width it was laid to (`ph:` keys), as the titles are. Laying it fresh each frame cost a zoom over
+/// 100 pictureless cards a fifth of its main-thread time, nearly all of it text shaping and the allocation under it.
 /// `scale` is the screen's (zoom times the device's pixels), `p` the paper in screen pixels.
-fn paint_placeholder(ctx: &Context, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
 	let Some(text) = ctx.text else { return };
 	// In the paper's own units (stage units at zoom 1), inset from its corner; nothing on a paper too small for a word.
 	let (w, h) = (p.w as f64 / scale, p.h as f64 / scale);
@@ -1852,16 +1856,22 @@ fn paint_placeholder(ctx: &Context, p: &Placeholder, scale: f64, dark: bool, ops
 	};
 	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };
 	let big = stage_scene::layout::TextStyle { family: "Inter".into(), size: 26.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
-	let kind_laid = text.lay_words(kind, &small, Some((w - pad * 2.0) as f32), stage_text::Align::Left, false, false);
-	stage_paint::painter::draw_laid(ctx, &kind_laid, (pad, pad), &[Color::straight(faint, 1.0)], &m, ops);
-	let title_top = pad + kind_laid.height as f64 + 8.0;
+	// The width the words are laid to, to the unit: the paper's edges are snapped to the screen's pixels, so its width in paper units wavers by a fraction with the zoom.
+	let room = (w - pad * 2.0).round() as f32;
+	let mut titles = titles.borrow_mut();
+	let kind_height = {
+		let kind_laid = titles.entry(format!("ph-kind:{kind}:{room}")).or_insert_with(|| text.lay_words(kind, &small, Some(room), stage_text::Align::Left, false, false));
+		stage_paint::painter::draw_laid(ctx, kind_laid, (pad, pad), &[Color::straight(faint, 1.0)], &m, ops);
+		kind_laid.height as f64
+	};
+	let title_top = pad + kind_height + 8.0;
 	if h - title_top - pad < 20.0 {
 		return;
 	}
-	let title = text.lay_words(&p.title, &big, Some((w - pad * 2.0) as f32), stage_text::Align::Left, false, false);
+	let title = titles.entry(format!("ph:{kind}:{room}:{}", p.title)).or_insert_with(|| text.lay_words(&p.title, &big, Some(room), stage_text::Align::Left, false, false));
 	// Cut at the paper's foot: a long title on a short paper shows its first lines.
 	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
-	stage_paint::painter::draw_laid(ctx, &title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
+	stage_paint::painter::draw_laid(ctx, title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
 	ops.push(Op::PopClip);
 }
 
