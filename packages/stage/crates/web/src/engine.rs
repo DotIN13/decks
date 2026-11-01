@@ -64,6 +64,8 @@ pub struct Page {
 	/// Sleeping items' titles as laid, by title: one line each, laid once and painted every frame (`frame`).
 	pub titles: RefCell<HashMap<String, Laid>>,
 	pub pictures: Pictures,
+	/// What the editor draws over the canvas (`set_overlay`), painted last in every frame (`stage_paint::overlay`).
+	pub overlay: Option<stage_paint::overlay::Overlay>,
 	/// Pictures put whose sizes the layout has not yet taken in (`lay_out_pictures`).
 	pictures_unlaid: bool,
 	/// Items being moved: drawn here each frame, left out of the worker's tiles.
@@ -125,7 +127,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), titles: RefCell::new(HashMap::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
+		Ok(Page { overlay: None, pictures_unlaid: false, only_lifted: false, hide_lifted: false, cards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), titles: RefCell::new(HashMap::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -821,7 +823,18 @@ impl Page {
 			let target = Mat([s, 0.0, 0.0, s, -camera.x * s, -camera.y * s]);
 			paint_ink(&self.ink, &target, &mut over.ops);
 		}
+		// The editor's outlines, handles and guides, over everything and in the same frame (not on a ghost's frame).
+		if !self.only_lifted {
+			if let Some(overlay) = &self.overlay {
+				stage_paint::overlay::paint_overlay(overlay, camera.x, camera.y, s, &mut over.ops);
+			}
+		}
 		over
+	}
+
+	/// What the editor draws over the canvas, as `edit/core/overlay-json.ts` writes it; empty or bad JSON clears it.
+	pub fn set_overlay(&mut self, json: &str) {
+		self.overlay = stage_paint::overlay::Overlay::parse(json).filter(|o| !o.is_empty());
 	}
 
 	/// Lift items for a drag: the worker leaves them out of its tiles from now on.

@@ -13,6 +13,9 @@ import { StageInk } from "../edit/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
+import { overlayJson, rgbOf } from "../edit/core/overlay-json.ts";
+import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
+import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
 import { scheme } from "../lib/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
@@ -538,6 +541,23 @@ export function Stage(props: StageProps) {
 	});
 
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
+	/*
+	 * The editor's outlines, handles and guides are painted by the engine with the drawing, in the same
+	 * frame (`edit/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
+	 * DOM's own are made invisible once the engine has them (`data-engine-overlays`, `canvas.css`).
+	 */
+	const [engineOverlays, setEngineOverlays] = createSignal(false);
+	createEffect(() => {
+		const dark = scheme();
+		if (!element) return;
+		const colours = untrack(() => {
+			void dark;
+			const read = (name: string) => rgbOf(getComputedStyle(element).getPropertyValue(name).trim() || "#2563eb", element);
+			return { accent: read("--color-accent"), panel: rgbOf(getComputedStyle(element).getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] as [number, number, number] };
+		});
+		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
+		setEngineOverlays(penLayer.setOverlay(json));
+	});
 	penLayer.drawn = () => {
 		editor.textEditing.drawn();
 		/*
@@ -713,6 +733,7 @@ export function Stage(props: StageProps) {
 			tabindex={-1}
 			data-mode={props.mode}
 			data-engine="true"
+			data-engine-overlays={engineOverlays() ? "true" : undefined}
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
 			/* The scale is moving and the awake items go on layers (`canvas.css`), where this engine takes them (`LAYERS` in `render/device.ts`). */

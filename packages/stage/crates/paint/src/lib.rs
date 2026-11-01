@@ -5,6 +5,7 @@ pub mod backend;
 pub mod fixtures;
 pub mod list;
 pub mod mesh;
+pub mod overlay;
 pub mod painter;
 pub mod tiles;
 

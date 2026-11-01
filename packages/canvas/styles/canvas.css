@@ -224,6 +224,20 @@
 	.card-node[data-sizing="true"],
 	.card-node[data-sizing="true"] > .surface,
 	.bar-layer .chrome[data-sizing="true"],
+	/*
+	 * The engine paints the outlines, handles, guides, slots and drafts with the drawing
+	 * (`stage_paint::overlay`, `edit/core/overlay-json.ts`): the elements stay for the checks and as
+	 * hit areas (a handle still answers its 44 pt), but show nothing of their own. Opacity, not
+	 * visibility, so a check that asks whether a selection shows still gets yes.
+	 */
+	.stage[data-engine-overlays="true"] .world > :is(.pen-kin, .pen-selection, .pen-selection-box, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-measure, .pen-draft, .pen-draft-line, .pen-side) {
+	opacity: 0;
+}
+	.stage[data-engine-overlays="true"] .world > :is(.pen-handle, .pen-anchor) {
+	background: transparent !important;
+	box-shadow: none !important;
+	border-color: transparent !important;
+}
 	.world > .pen-selection[data-sizing="true"] {
 	transition:
 		width 280ms cubic-bezier(0.2, 0.7, 0.2, 1),

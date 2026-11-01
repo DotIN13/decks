@@ -526,6 +526,13 @@ impl PageEngine {
 		}
 	}
 
+	/// What the editor draws over the canvas (outlines, handles, guides, slots, drafts), painted by the
+	/// engine last in every frame (`stage_paint::overlay`): the JSON `edit/core/overlay-json.ts` writes.
+	#[wasm_bindgen(js_name = setOverlay)]
+	pub fn set_overlay(&mut self, json: &str) {
+		self.page.set_overlay(json);
+	}
+
 	/// Boards a drag carries (`["path", …]`), and how far.
 	pub fn carry(&mut self, paths: &str, dx: f64, dy: f64) {
 		self.page.carry = (ids(paths).into_iter().collect(), dx, dy);
