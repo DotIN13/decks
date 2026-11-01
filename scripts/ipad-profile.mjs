@@ -37,12 +37,20 @@ if (!device) throw new Error("No iPad plugged in (xcrun devicectl list devices)"
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 // Safari, started afresh on the page: a tab opened any other way (WebDriver's) does not answer an inspector.
-const safari = /(\d+)\s+\S*MobileSafari\.app\/MobileSafari/.exec(devicectl("device", "info", "processes", "--device", device))?.[1];
-if (safari) devicectl("device", "process", "terminate", "--device", device, "--pid", safari);
-await sleep(1500);
+/*
+ * `--attach`: the tab already open on `url` is used as it is, Safari neither closed nor launched. For a tab
+ * the person has touched: Safari runs the canvas frame's animation frames at 30 Hz until a finger lands
+ * on it (a cross-origin frame nobody has interacted with), and a tab this script opens is never touched.
+ */
+const attach = process.argv.includes("--attach");
 const probeTo = arg("probe");
-const page = `${url}${url.includes("?") ? "&" : "?"}probe=${probeTo ? encodeURIComponent(probeTo) : "1"}`;
-devicectl("device", "process", "launch", "--device", device, "--payload-url", page, "com.apple.mobilesafari");
+if (!attach) {
+	const safari = /(\d+)\s+\S*MobileSafari\.app\/MobileSafari/.exec(devicectl("device", "info", "processes", "--device", device))?.[1];
+	if (safari) devicectl("device", "process", "terminate", "--device", device, "--pid", safari);
+	await sleep(1500);
+	const page = `${url}${url.includes("?") ? "&" : "?"}probe=${probeTo ? encodeURIComponent(probeTo) : "1"}`;
+	devicectl("device", "process", "launch", "--device", device, "--payload-url", page, "com.apple.mobilesafari");
+}
 
 // The proxy, and the tab.
 const proxy = spawn("ios_webkit_debug_proxy", ["-c", `${device}:9222`], { stdio: "ignore" });
@@ -51,7 +59,7 @@ let socketUrl;
 for (let i = 0; i < 40 && !socketUrl; i++) {
 	await sleep(500);
 	const tabs = await fetch("http://localhost:9222/json").then((r) => r.json()).catch(() => []);
-	socketUrl = tabs.find((tab) => tab.url?.includes("probe="))?.webSocketDebuggerUrl;
+	socketUrl = tabs.find((tab) => (attach ? tab.url?.startsWith(url) : tab.url?.includes("probe=")))?.webSocketDebuggerUrl;
 }
 if (!socketUrl) throw new Error("The iPad's Safari tab did not show up in the inspector: is Web Inspector on in Settings › Apps › Safari › Advanced?");
 
@@ -101,8 +109,12 @@ const zoomTo = async (want) => {
 	await settle(3000);
 };
 
+// `--flags '{"__decksRecycleTiles":false}'`: globals set in the canvas frame before anything is recorded, for experiments.
+if (arg("flags")) await run(`Object.assign(globalThis, ${arg("flags")}), "set"`);
 await send("Timeline.enable");
 await send("Memory.enable");
+// Garbage collections, with their pauses: a pause is a frame gap with nothing on the main thread's tasks to show for it.
+await send("Heap.enable");
 const record = async (name, action) => {
 	events.length = 0;
 	await send("ScriptProfiler.startTracking", { includeSamples: true });
@@ -139,6 +151,10 @@ if (manual) {
 	await zoomTo(0.55);
 	phases.push(await record("Above 50%: 55% to 200% and back, 3 s", "__pilot.pinch(3.6, 1500).then(() => __pilot.pinch(1 / 3.6, 1500))"));
 	phases.push(await record("Above 50%: 55% to 200% and back, 1 s", "__pilot.pinch(3.6, 500).then(() => __pilot.pinch(1 / 3.6, 500))"));
+} else if (arg("phases", "pan") === "churn") {
+	// Fast, wide pinches, as a hand makes them: 2% to 30% and back in 0.4 s each, ten times; what churns tiles and pictures.
+	await zoomTo(0.02);
+	phases.push(await record("Ten fast pinches, 2% to 30% and back", Array.from({ length: 10 }, () => "__pilot.pinch(15, 400).then(() => __pilot.pinch(1 / 15, 400))").reduce((chain, step) => `${chain}.then(() => ${step})`, "Promise.resolve()")));
 } else if (arg("phases", "pan") === "zoom") {
 	await zoomTo(0.02);
 	phases.push(await record("Zoom 2% to 200% in 3 s", "__pilot.pinch(100, 3000)"));
@@ -179,6 +195,8 @@ const summary = phases.map(({ name, wall, events, pageStart, pageEnd, sheet }) =
 	const main = cpu.map((reading) => reading.threads.find((thread) => thread.type === "main")?.usage ?? 0);
 	const memory = events.filter((e) => e.method === "Memory.trackingUpdate").at(-1)?.params.event.categories ?? [];
 	const records = events.filter((e) => e.method === "Timeline.eventRecorded").map((e) => e.params.record);
+	const gcs = events.filter((e) => e.method === "Heap.garbageCollected").map((e) => e.params.collection);
+	const gcPauses = gcs.map((c) => Math.round((c.endTime - c.startTime) * 1000)).sort((a, b) => a - b);
 	const count = (type) => {
 		let n = 0;
 		const walk = (record) => {
@@ -196,6 +214,9 @@ const summary = phases.map(({ name, wall, events, pageStart, pageEnd, sheet }) =
 		mainBusyWorst: Math.round(Math.max(0, ...main)),
 		scriptMsPerSecond: Math.round(samples.length / seconds),
 		boardScriptsStarted: count("EvaluateScript"),
+		gcs: gcs.length,
+		gcPauseMaxMs: gcPauses.at(-1) ?? 0,
+		gcPauseOver16: gcPauses.filter((p) => p > 16).length,
 		layoutsPerSecond: Math.round(count("Layout") / seconds),
 		paintsPerSecond: Math.round(count("Paint") / seconds),
 		...gapsIn(pageStart, pageEnd),
