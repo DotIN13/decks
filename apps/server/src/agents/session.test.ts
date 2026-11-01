@@ -97,7 +97,7 @@ function agentOn(
 	if (camera) cameras.report(agent.id, camera);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
-	const last = () => sent.filter((message) => message.type === "context.changed").at(-1);
+	const last = () => sent.filter((message) => message.type === "agent.context").at(-1);
 	return { agent, cameras, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
@@ -175,7 +175,7 @@ function agentOn(
 		assert.equal(row.lastLine, "Reading the file");
 		assert.equal(row.lastAt, 1_700);
 		assert.equal(row.dormant, true, "and that it has not been woken yet");
-		assert.equal(sent.some((message) => message.type === "agents"), false, "and it is not the chat list");
+		assert.equal(sent.some((message) => message.type === "agent.list"), false, "and it is not the chat list");
 		cleanup();
 	});
 
@@ -294,7 +294,7 @@ test("both sets travel together, and neither repeats itself", () => {
 	agent.setInPlay(["boards/a.html", "boards/a.html", "boards/b.html"]);
 
 	const message = last();
-	assert.ok(message && message.type === "context.changed");
+	assert.ok(message && message.type === "agent.context");
 	assert.deepEqual(message.inPlay, ["boards/a.html", "boards/b.html"], "deduplicated");
 	assert.deepEqual(message.boards, ["boards/a.html", "boards/b.html"]);
 	cleanup();
@@ -317,7 +317,7 @@ test("a deleted board leaves the context, and only the deleted one", () => {
 	assert.equal(context(), "boards/b.html");
 	assert.equal(inPlay(), "boards/b.html");
 	const message = last();
-	assert.ok(message && message.type === "context.changed");
+	assert.ok(message && message.type === "agent.context");
 	assert.deepEqual(message.boards, ["boards/b.html"], "the removal is published, not just recorded");
 	cleanup();
 });

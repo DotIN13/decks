@@ -333,19 +333,19 @@ export class CardService {
 	 */
 	deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
 		if (!this.deck.board(path)) {
-			reply({ type: "notice", level: "warn", text: `There is no board at ${path} to delete.` });
+			reply({ type: "harness.notice", level: "warn", text: `There is no board at ${path} to delete.` });
 			return;
 		}
 		const refused = this.viewOnly(path);
 		if (refused) {
-			reply({ type: "notice", level: "warn", text: refused });
+			reply({ type: "harness.notice", level: "warn", text: refused });
 			return;
 		}
 		this.recordRevision(path);
 		try {
 			this.deck.remove(path);
 		} catch (error) {
-			reply({ type: "notice", level: "error", text: `Could not delete ${path}: ${(error as Error).message}` });
+			reply({ type: "harness.notice", level: "error", text: `Could not delete ${path}: ${(error as Error).message}` });
 			return;
 		}
 		this.hooks.removed(path);

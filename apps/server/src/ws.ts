@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
-import type { ClientMessage, ServerMessage } from "@decks/protocol";
+import { OLD_EVENT_NAMES, type ClientMessage, type ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import { HELLO_MS } from "./line.ts";
 
@@ -15,6 +15,8 @@ import { HELLO_MS } from "./line.ts";
 export interface View {
 	/** The agent this browser's stage is on. `undefined` until it has said. */
 	focused?: string;
+	/** Said `v: 2` in its hello: reads the events by their names (`names.ts`). Without it, a page of the release before, or the iOS app: told the old names. */
+	names?: true;
 }
 
 /**
@@ -74,7 +76,7 @@ export class Hub {
 
 	private accept(socket: WebSocket, request: IncomingMessage, open: boolean): void {
 		const view: View = {};
-		const reply = (message: ServerMessage) => send(socket, message);
+		const reply = (message: ServerMessage) => send(socket, view.names ? message : asOld(message));
 		let opened = false;
 		// Nothing is heard before the token, and a socket that never says it is closed.
 		const deadline = open ? undefined : setTimeout(() => socket.close(4401, "Say hello with a token first."), HELLO_MS);
@@ -91,7 +93,7 @@ export class Hub {
 			try {
 				message = JSON.parse(String(data)) as ClientMessage;
 			} catch (error) {
-				reply({ type: "error", text: `Unreadable frame: ${(error as Error).message}` });
+				reply({ type: "harness.error", text: `Unreadable frame: ${(error as Error).message}` });
 				return;
 			}
 			if (message.type === "hello") {
@@ -100,6 +102,7 @@ export class Hub {
 					socket.close(4401, "That token does not open the socket.");
 					return;
 				}
+				if ((message as { v?: unknown }).v === 2) view.names = true;
 				if (!opened) begin();
 				return;
 			}
@@ -114,7 +117,7 @@ export class Hub {
 				// gets told, and the next frame is handled as normal.
 				const text = error instanceof Error ? error.message : String(error);
 				console.error("[decks] handling", message.type, error);
-				reply({ type: "error", text });
+				reply({ type: "harness.error", text });
 			}
 		});
 
@@ -128,12 +131,15 @@ export class Hub {
 	}
 
 	broadcast(message: ServerMessage): void {
-		for (const socket of this.sockets.keys()) send(socket, message);
+		for (const [socket, view] of this.sockets) send(socket, view.names ? message : asOld(message));
 	}
 
 	/** To every connected browser, each given the message as its own view should see it. */
 	each(render: (view: View) => ServerMessage): void {
-		for (const [socket, view] of this.sockets) send(socket, render(view));
+		for (const [socket, view] of this.sockets) {
+			const message = render(view);
+			send(socket, view.names ? message : asOld(message));
+		}
 	}
 
 	get connections(): number {
@@ -145,6 +151,12 @@ export class Hub {
 		this.sockets.clear();
 		this.server.close();
 	}
+}
+
+/** An event under its old name, for a socket of the release before (`OLD_EVENT_NAMES`); every other event as it is. */
+function asOld(message: ServerMessage): ServerMessage {
+	const old = OLD_EVENT_NAMES[message.type];
+	return old ? ({ ...message, type: old } as unknown as ServerMessage) : message;
 }
 
 function send(socket: WebSocket, message: ServerMessage): void {

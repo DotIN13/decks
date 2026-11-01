@@ -5,7 +5,7 @@ import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import { scheme, toggleScheme } from "../lib/theme.ts";
 import { act } from "../state/decks.ts";
-import { send } from "../state/socket.ts";
+import { call } from "../state/socket.ts";
 import { setOps, setSettings } from "../state/ui.ts";
 
 /**
@@ -33,7 +33,7 @@ export const moreItems = (stagePages: () => Page[]) => [
 		icon: SettingsIcon,
 		onPick: () => {
 			setSettings(true);
-			send({ type: "claude.accounts", limits: true });
+			void call("account.list", [{ limits: true }]);
 		},
 	},
 ];

@@ -15,11 +15,11 @@ import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory } from "./state/history.ts";
 import { mode, selected, setMode } from "./state/selection.ts";
-import { on, send, setOnScreen, start } from "./state/socket.ts";
+import { call, on, setFailureSink, setOnScreen, start, warnIfFailed } from "./state/socket.ts";
 import { can } from "./connections/backend.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
-import { pens } from "./state/pens.ts";
+import { pens, rewatch, watchCanvas } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
 import { panelOpen, pagesStarted, releasePages, draft, ops, openUsage, picking, readUsage, setPanelOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
 import { destination, destinationLabel } from "./app/send-from-bar.ts";
@@ -184,7 +184,7 @@ export function App() {
 	 */
 	onMount(() => watchInsets());
 	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
-	setOnScreen(() => stageOf(state.focused)?.name);
+	setOnScreen(() => stageOf(state.focused)?.name, () => state.focused);
 	// The same two for the person's clicks sent as verbs (`state/decks.ts`).
 	setPersonStage(() => stageOf(state.focused)?.name, () => state.focused);
 
@@ -197,18 +197,22 @@ export function App() {
 			/* A reconnect means whatever the old connection was asked is not coming. */
 			scratch.forgetAsked();
 			forgetAskedResults();
+			rewatch();
 		});
+		setFailureSink((text) => notice("warn", text));
 		// Whatever arrives or does not, the canvas is not held empty for longer than this.
 		setTimeout(releasePages, 2500);
 		// The chip knows the row; the conversation it is in is found here.
 		setToolResultSender((itemId) => {
 			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
 			if (!agentId) return false;
-			send({ type: "chat.tool", agentId, itemId });
+			void call("chat.tool", [agentId, itemId]);
 			return true;
 		});
 		const off = on((message) => handleFrame(message, frames));
 		onCleanup(off);
+		// The drawing of the canvas on screen, whole and then every change (`state/pens.ts`), and again after a reconnect.
+		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
 	});
 
 	/** How many deck frames have arrived: a landing with no canvas waits for one sent after it began (`landing`). */
@@ -245,8 +249,8 @@ export function App() {
 	 */
 	/** The drawing of the chat on screen, when it has one (`state/pens.ts`). */
 	const stagePen = createMemo(() => {
-		const id = state.focused;
-		const pen = id ? pens()[id] : undefined;
+		const name = stageOf(state.focused)?.name;
+		const pen = name ? pens()[name] : undefined;
 		// Its placeholder frames are marked with the agent that last wrote it, as the canvas knows it.
 		const by = pen?.by ? state.identities[pen.by] : undefined;
 		const writer = by ? { name: by.name, color: by.color } : undefined;
@@ -399,7 +403,7 @@ export function App() {
 		setUnread(id, 0);
 		ensureHistory(id);
 		setDraft(undefined);
-		send({ type: "agent.focus", id });
+		void call("agent.focus", [id]);
 	};
 
 	/*
@@ -413,7 +417,7 @@ export function App() {
 	 * row's × is disabled to avoid: `closing()` in `agent-order.ts` draws it from the same
 	 * rule `Registry.remove` enforces.
 	 */
-	const closeAgent = (id: string) => send({ type: "agent.remove", id });
+	const closeAgent = (id: string) => void call("agent.remove", [id]).then(warnIfFailed);
 
 	/* A board put on the canvas is flown to once the server has placed it (`app/links.ts`). */
 	const { frameWhenPlaced, playAndFrame } = createFraming(stagePages);
@@ -529,7 +533,7 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={focusAgent}
-					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) })}
+					onNew={(kind) => void call("agent.add", [{ ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed)}
 					onClose={closeAgent}
 					onMoreAgents={openAgentsPanel}
 					phone={phone()}
@@ -548,8 +552,8 @@ export function App() {
 				*/}
 				<StageManager
 					stages={stages()}
-					onRename={(name, to) => send({ type: "stage.rename", name, to })}
-					onDelete={(name) => send({ type: "stage.delete", name })}
+					onRename={(name, to) => void call("canvas.rename", [to, { canvas: name }]).then(warnIfFailed)}
+					onDelete={(name) => void call("canvas.remove", [name]).then(warnIfFailed)}
 					onCopy={copyShared}
 					here={stageOf(state.focused)?.name}
 					open={stagesOpen()}
@@ -653,7 +657,7 @@ export function App() {
 					desktop={!phone()}
 					onSettings={() => {
 						setSettings(true);
-						send({ type: "claude.accounts", limits: true });
+						void call("account.list", [{ limits: true }]);
 					}}
 					pens={state.deck?.pens ?? []}
 					onPlacePen={(pen) => {
@@ -683,16 +687,16 @@ export function App() {
 					identities={state.identities}
 					unread={unread}
 					onFocusAgent={focusAgent}
-					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}), ...(state.focused ? { near: state.focused } : {}) })}
+					onNewAgent={(workspace, kind) => void call("agent.add", [{ kind, ...(workspace ? { workspace } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed)}
 					onCloseAgent={closeAgent}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
-					onAgentTags={(id, tags) => send({ type: "agent.tags", id, tags })}
+					onAgentTags={(id, tags) => void call("agent.set", [id, { tags }]).then(warnIfFailed)}
 					/* The workspace, which is one field with two writers rather than two fields: the
 					   agent declares one and you can move it, and whoever wrote last is where it is. */
-					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
-					onAgentRename={(id, name) => send({ type: "agent.rename", id, name })}
-					onAbortAgent={(id) => send({ type: "agent.abort", id })}
+					onAgentWorkspace={(id, workspace) => void call("agent.set", [id, { workspace }]).then(warnIfFailed)}
+					onAgentRename={(id, name) => void call("agent.set", [id, { name }]).then(warnIfFailed)}
+					onAbortAgent={(id) => void call("chat.abort", [id])}
 					apps={apps()}
 					onAppsOpen={loadApps}
 					onApp={onApp}
@@ -757,11 +761,11 @@ export function App() {
 						onPrefs={setPrefs}
 						accounts={state.accounts}
 						active={state.activeAccount}
-						onAdd={() => send({ type: "claude.accounts.add" })}
-						onForget={(id) => send({ type: "claude.accounts.forget", id })}
+						onAdd={() => void call("account.add").then(warnIfFailed)}
+						onForget={(id) => void call("account.forget", [id]).then(warnIfFailed)}
 						web={state.web}
-						onWebRepair={() => send({ type: "web.repair" })}
-						onWebStop={() => send({ type: "web.stop" })}
+						onWebRepair={() => void call<{ code?: string }>("web.repair").then((answer) => answer.ok && setState("web", (web) => (web ? { ...web, code: answer.value?.code } : web)))}
+						onWebStop={() => void call("web.stop")}
 						phone={phone()}
 						onClose={() => setSettings(false)}
 					/>
@@ -809,10 +813,7 @@ export function App() {
 							<Dialog
 								prompt={prompt()}
 								onAnswer={(answer) => {
-									send({
-										type: "extension.ui.answer",
-										answer: { id: prompt().id, ...answer } as never,
-									});
+									void call("agent.answer", [{ id: prompt().id, ...answer }]);
 									clearDialog();
 								}}
 							/>
@@ -837,13 +838,13 @@ export function App() {
 						runtime={focusedChat()?.kind}
 						modes={runtimeFor(focusedChat()?.kind)?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
-						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
+						onMode={(mode) => void call("agent.set", [state.focused ?? "", { mode }]).then(warnIfFailed)}
 						onSend={(text, comments, draft) => sendFromBar(text, comments, false, draft)}
 						onQueue={(text, comments, draft) => sendFromBar(text, comments, true, draft)}
 						{...(queuedFor(state.focused) ? { queued: queuedFor(state.focused)! } : {})}
 						onQueueAction={(action, item) => {
 							const id = state.focused;
-							if (id) send({ type: "agent.queue", id, action, ...(item ? { item } : {}) });
+							if (id) void call("chat.queue", [id, { action, ...(item ? { item } : {}) }]);
 						}}
 						comments={waitingComments(state.focused, focusedCanvas())}
 						onCommentsGone={(ids) => {
@@ -859,12 +860,12 @@ export function App() {
 							dest: destination(barText(), barContext()),
 							label: destinationLabel(destination(barText(), barContext())),
 							onPick: focusAgent,
-							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }),
+							onNew: (kind) => void call("agent.add", [{ ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed),
 							onClose: closeAgent,
 							onMore: openAgentsPanel,
 						}}
 						mentionables={state.chats.map((chat) => ({ name: agentName(chat.id), chat }))}
-						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}
+						onAbort={() => void call("chat.abort", [state.focused ?? ""])}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does
 						 * not offer the level you were on keeps the nearest one it does, and that
@@ -872,16 +873,10 @@ export function App() {
 						 * the server would hear two messages and apply them in either order.
 						 */
 						onModel={(provider, model, thinking) =>
-							send({
-								type: "agent.setModel",
-								id: state.focused ?? "",
-								provider,
-								model,
-								...(thinking ? { thinking } : {}),
-							})
+							void call("agent.set", [state.focused ?? "", { model: { provider, model, ...(thinking ? { thinking } : {}) } }]).then(warnIfFailed)
 						}
 						onThinking={(thinking: ThinkingLevel) =>
-							send({ type: "agent.thinking", id: state.focused ?? "", thinking })
+							void call("agent.set", [state.focused ?? "", { thinking }]).then(warnIfFailed)
 						}
 						/*
 						 * Which subscription this conversation spends.
@@ -896,8 +891,8 @@ export function App() {
 						   the mapping is actually on — and a picker showing nothing selected reads
 						   as "no subscription" rather than as "the list has not arrived". */
 						account={(state.focused ? state.agents[state.focused]?.spending : undefined) ?? state.activeAccount}
-						onAccount={(id: string) => send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
-						onAccountsOpen={() => send({ type: "claude.accounts", limits: true })}
+						onAccount={(id: string) => void call("account.use", [id, state.focused ?? ""]).then(warnIfFailed)}
+						onAccountsOpen={() => void call("account.list", [{ limits: true }])}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
 						 * what it hands back is a deck path — so what it inserts is a file pill, which the agent reads as an `@` mention

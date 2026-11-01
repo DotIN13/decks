@@ -71,6 +71,8 @@ export interface Verb {
 	params: Param[];
 	/** What it answers with; absent when it answers with nothing. */
 	result?: Schema;
+	/** The person's (`person.ts`): called by the person's token or a paired site's, never by an agent, an app or a canvas frame. */
+	who?: "person";
 	/**
 	 * Where a card's call to it goes, from the canvas frame a card is drawn in (`@decks/canvas`,
 	 * `frame/inside/card-calls.ts`): `frame`, answered there, the person's view of that canvas; `canvas`,

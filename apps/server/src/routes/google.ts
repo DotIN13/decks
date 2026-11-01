@@ -1,5 +1,6 @@
 import { asyncRoute, type RouteDeps } from "./shared.ts";
-import { type Response, type Router } from "express";
+import { type Request, type Response, type Router } from "express";
+import { runVerb } from "../verbs/router.ts";
 
 /**
  * Google Docs (`google/`): signing in as the person, the pictures in a Doc's page, and the agents' Google Docs tools.
@@ -10,10 +11,14 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * agents' Google Docs tools. The sign-in is started by the page with its own origin, since
 	 * behind a proxy this server cannot tell what address the browser used to reach it.
 	 */
-	api.get("/google/status", (_req, res) => {
+	// Kept one release as aliases of account.google, account.googleCode and account.googleSignOut.
+	const run = async (req: Request, res: Response, verb: string, args: unknown[]) => {
+		const { status, answer } = await runVerb(app, req.principal, req.headers, verb, args, req.socket.remoteAddress);
 		res.setHeader("Cache-Control", "no-store");
-		res.json(app.google.state());
-	});
+		if (!answer.ok) res.status(status).json({ error: answer.error });
+		else res.json(answer.value ?? { ok: true });
+	};
+	api.get("/google/status", asyncRoute((req, res) => run(req, res, "account.google", [])));
 	api.get("/google/signin", (req, res) => {
 		const origin = typeof req.query.origin === "string" && /^https?:\/\/[^/\s]+$/.test(req.query.origin) ? req.query.origin : `${req.protocol}://${req.get("host")}`;
 		try {
@@ -38,17 +43,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			}
 		}),
 	);
-	api.post(
-		"/google/code",
-		asyncRoute(async (req, res) => {
-			try {
-				const email = await app.google.auth.finish({ url: String((req.body as { url?: unknown })?.url ?? "") });
-				res.json({ ok: true, email });
-			} catch (error) {
-				res.json({ ok: false, message: (error as Error).message });
-			}
-		}),
-	);
+	api.post("/google/code", asyncRoute((req, res) => run(req, res, "account.googleCode", [String((req.body as { url?: unknown })?.url ?? "")])));
 	/** The person's Google Docs for the file picker, the ones they looked at last first; `q` narrows them by name. */
 	api.get(
 		"/google/docs",
@@ -65,10 +60,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			}
 		}),
 	);
-	api.post("/google/signout", (_req, res) => {
-		app.google.auth.signOut();
-		res.json({ ok: true });
-	});
+	api.post("/google/signout", asyncRoute((req, res) => run(req, res, "account.googleSignOut", [])));
 	api.get(
 		"/google/image/:doc/:object",
 		asyncRoute(async (req, res) => {

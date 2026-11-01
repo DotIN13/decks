@@ -92,7 +92,7 @@ export type ClientMessage =
 	 * `decks_token` (still taken, for one release). Nothing else is heard before it, and a socket that
 	 * does not say it in five seconds is closed. Taken by the hub itself (`server/src/ws.ts`), never dispatched.
 	 */
-	| { type: "hello"; token: string }
+	| { type: "hello"; token: string; /** Reads the events by their names (`names.ts`); without it the socket says the old names, for one release. */ v?: 2 }
 	| { type: "deck.open"; path: string }
 	| { type: "card.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
 	/**
@@ -323,16 +323,16 @@ export type ChangeAuthor = { kind: "person" | "agent" | "file" | "studio"; id?: 
  * the changes from that revision are sent at once, as edits or the whole drawing.
  */
 export type LineClientMessage =
-	| { type: "hello"; token: string; watch?: Array<{ canvas: string; since?: number }>; /** Hear every broadcast, as the event stream does (the person's and a paired site's token only). */ all?: boolean }
+	| { type: "line.hello"; token: string; watch?: Array<{ canvas: string; since?: number; whole?: true }>; /** Hear every broadcast, as the event stream does (the person's and a paired site's token only). */ all?: boolean; /** A Decks page: greeted with the whole truth (the deck, the agents, the accounts, the canvases, the settings), and given a screen of its own, which agent it is on (`agent.focus`). The person's and a paired site's token only. */ greet?: true }
 	/** A renewed token, for every message from now on. */
-	| { type: "token"; token: string }
-	| { type: "canvas.watch"; canvas: string; since?: number }
+	| { type: "line.token"; token: string }
+	| { type: "canvas.watch"; canvas: string; since?: number; /** The drawing whole, now, as `canvas.changed` with `doc`: for a client holding none. */ whole?: true }
 	| { type: "canvas.unwatch"; canvas: string }
-	| { type: "call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Stage` and `X-Decks-Agent`. */ stage?: string; agent?: string }
+	| { type: "line.call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Stage` and `X-Decks-Agent`. */ stage?: string; agent?: string }
 	/** The answer to an agent's `stage.call` on a watched canvas. */
-	| { type: "stage.result"; id: string; value?: unknown; error?: string }
+	| { type: "view.answered"; id: string; value?: unknown; error?: string }
 	/** A document item's editor's message, for a file on a watched canvas; its answers come back on this line. */
-	| { type: "doc"; message: DocClientMessage }
+	| DocClientMessage
 	/** The person read this card (`card.seen`), or the frame measured it (`card.extent`). */
 	| { type: "card.seen"; path: string }
 	| { type: "card.extent"; path: string; rev: number; w: number; h: number; [key: string]: unknown }
@@ -340,7 +340,7 @@ export type LineClientMessage =
 	| { type: "presence.set"; canvas: string; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null };
 
 export type ServerMessage =
-	| { type: "deck.state"; deck: DeckState }
+	| { type: "deck.changed"; deck: DeckState }
 	/**
 	 * What this install can run, and what to call it — sent on connect, and whenever a
 	 * client asks.
@@ -352,19 +352,18 @@ export type ServerMessage =
 	 * they are sent once instead of once per chat. Sent again when a runtime that has just
 	 * started reports a different catalogue.
 	 */
-	| { type: "runtimes"; list: RuntimeInfo[] }
+	| { type: "harness.runtimes"; list: RuntimeInfo[] }
 	/** A card (or an old board a canvas still holds) was written or removed. */
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; /** Only the size in its own tag changed: a page showing it keeps its document. */ sized?: true }
 	/** An app's state changed (`apps/service.ts`): for the canvas frames showing it, instead of each asking again every few seconds. */
-	| { type: "app.state"; name: string; title?: string; status: string }
+	| { type: "app.changed"; name: string; title?: string; status: string }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the
 	 * page's time for one number.
 	 */
-	| { type: "board.sized"; path: string; h: number }
 	| {
-			type: "agents";
+			type: "agent.list";
 			chats: AgentChat[];
 			focused?: string;
 			/** What `+` hands a new agent, from `DECKS_BACKEND`. */
@@ -405,7 +404,7 @@ export type ServerMessage =
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
 	/** The messages you queued for an agent, oldest first, and whether Stop is holding them. */
 	| { type: "agent.queued"; agentId: string; items: Array<{ id: string; text: string }>; held: boolean }
-	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
+	| { type: "chat.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	/**
 	 * The conversation as the browser should open it: the tail, and whether there is more.
 	 *
@@ -427,7 +426,7 @@ export type ServerMessage =
 	/** Answering `chat.tool`: the whole output, or empty when the call is no longer anywhere. */
 	| { type: "chat.tool"; agentId: string; itemId: string; result: string }
 	/** Answering a `document.create` that carried a `request`: the new item's path on the stage (`item:<id>`). */
-	| { type: "document.created"; request: string; path: string }
+	| { type: "doc.created"; request: string; path: string }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**
@@ -437,8 +436,8 @@ export type ServerMessage =
 	 * the agent is working from, which the rail lists — and `inPlay` is the subset it has
 	 * put on the canvas for the user to look at now.
 	 */
-	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[] }
-	| { type: "stage.call"; call: StageCall }
+	| { type: "agent.context"; agentId: string; boards: string[]; inPlay: string[] }
+	| { type: "view.called"; call: StageCall }
 	/**
 	 * An agent's stage drawing, whole: its `.pen` document (`stage/pens.ts`). Sent when it changes,
 	 * by an edit or by hand, and to a browser opening that agent's chat. `error` says the file on
@@ -463,11 +462,11 @@ export type ServerMessage =
 	 */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; error?: string; base: string; made?: string[]; by?: string; author?: ChangeAuthor }
 	/** The line's answer to a `call`, under the call's `id` (`LineClientMessage`). */
-	| { type: "answer"; id: string; ok: boolean; value?: unknown; error?: string; notes?: string[] }
+	| { type: "call.answered"; id: string; ok: boolean; value?: unknown; error?: string; notes?: string[] }
 	/** Someone else on a canvas moved, selected or looked elsewhere, or left (`gone`): never logged, never a revision. */
 	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null }
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
-	| { type: "hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
+	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *
@@ -476,7 +475,7 @@ export type ServerMessage =
 	 * whenever the set or who is on it changes; `rev` is the drawing's revision, which is what
 	 * makes a stage's picture cacheable for a year and still current.
 	 */
-	| { type: "stages"; stages: StageRow[] }
+	| { type: "canvas.list"; stages: StageRow[] }
 	/**
 	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
 	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call
@@ -497,9 +496,9 @@ export type ServerMessage =
 	 * With the id, the question belongs to a conversation: it is drawn when you are in that
 	 * conversation and the agent list says "Wants you" when you are not.
 	 */
-	| { type: "extension.ui.prompt"; agentId: string; prompt: ExtensionUiPrompt }
-	| { type: "extension.ui.prompt.closed"; agentId: string; id: string }
-	| { type: "notice"; level: "info" | "warn" | "error"; text: string }
+	| { type: "agent.prompt"; agentId: string; prompt: ExtensionUiPrompt }
+	| { type: "agent.promptClosed"; agentId: string; id: string }
+	| { type: "harness.notice"; level: "info" | "warn" | "error"; text: string }
 	/**
 	 * Words for the input bar, put there by the deck rather than typed.
 	 *
@@ -509,7 +508,7 @@ export type ServerMessage =
 	 * existed) and where it never went, so it was announced in a notice instead and the
 	 * whole message sat in a toast.
 	 */
-	| { type: "composer.draft"; text: string }
+	| { type: "chat.draft"; text: string }
 	/**
 	 * The install's Claude subscriptions, which one a new agent starts on, and who is on what.
 	 *
@@ -518,18 +517,18 @@ export type ServerMessage =
 	 * id, because with three agents on three subscriptions one "active" row no longer answers
 	 * the question the panel exists to answer.
 	 */
-	| { type: "claude.accounts"; accounts: ClaudeAccount[]; active: string; spending?: Record<string, string> }
+	| { type: "account.list"; accounts: ClaudeAccount[]; active: string; spending?: Record<string, string> }
 	/** One agent moved to a different subscription — by hand, or because a limit moved it. */
 	| { type: "agent.account"; id: string; account: string }
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
-	| { type: "web.status"; status: WebStatus; code?: string }
+	| { type: "web.changed"; status: WebStatus; code?: string }
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
-	| { type: "settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
+	| { type: "harness.settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
 	/** The code being shown, if any, and every front end holding a token. */
-	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[]; studio?: StudioLinkRow }
+	| { type: "harness.paired"; code?: string; expires?: number; paired: PairedRow[]; studio?: StudioLinkRow }
 	/** Who is answering, and what it can do: the first frame of every greeting. */
-	| { type: "backend"; backend: BackendInfo }
+	| { type: "harness.hello"; backend: BackendInfo }
 	/** A document page's answers and news (`@decks/docs`); its `notice` is this union's own. */
-	| Exclude<DocServerMessage, { type: "notice" }>
-	| { type: "error"; text: string };
+	| Exclude<DocServerMessage, { type: "harness.notice" }>
+	| { type: "harness.error"; text: string };
 

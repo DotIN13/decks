@@ -27,5 +27,6 @@ export * from "./stage.ts";
 export * from "./extension-ui.ts";
 export * from "./web.ts";
 export * from "./wire.ts";
+export * from "./names.ts";
 export * from "./files.ts";
 export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/docs";

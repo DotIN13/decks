@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkArgs, commandOf, jsonSchemaOf, Placement, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
+import { checkArgs, commandOf, jsonSchemaOf, PERSON_VERB_BY_NAME, PERSON_VERBS, Placement, signature, tsOf, VERB_BY_NAME, VERBS } from "./index.ts";
+import { BARE_NAMES, isNounVerb } from "../../protocol/src/names.ts";
 
 test("the table has every call of the redesign, each named once", () => {
 	assert.equal(new Set(VERBS.map((verb) => verb.name)).size, VERBS.length, "no name twice");
@@ -115,4 +116,13 @@ test("canvas.screenshot says what scale is measured against and where to writes"
 	const shot = VERBS.find((verb) => verb.name === "canvas.screenshot")!;
 	assert.match(shot.summary, /long side is at most 1,600 px; `scale` multiplies/);
 	assert.match(shot.summary, /`to` a path in the deck/);
+});
+
+test("every verb is noun.verb but the three bare words, the person's table included, and no name is in both tables", () => {
+	for (const verb of [...VERBS, ...PERSON_VERBS]) assert.ok(isNounVerb(verb.name) || BARE_NAMES.includes(verb.name), `${verb.name} is noun.verb`);
+	for (const verb of PERSON_VERBS) {
+		assert.equal(verb.who, "person", `${verb.name} is the person's`);
+		assert.ok(!VERB_BY_NAME.has(verb.name), `${verb.name} is in one table`);
+	}
+	assert.equal(PERSON_VERB_BY_NAME.size, PERSON_VERBS.length);
 });

@@ -166,19 +166,19 @@ export class DocService {
 				case "doc.gstyle": {
 					// Styles for a Google Doc: the typing before them has landed, since this page waited for it.
 					const doc = this.find(message.path);
-					if (doc && this.context.style) void this.context.style(doc.file, message.requests, typeof message.text === "string" ? message.text : undefined).catch((error: Error) => reply({ type: "notice", level: "warn", text: error.message }));
+					if (doc && this.context.style) void this.context.style(doc.file, message.requests, typeof message.text === "string" ? message.text : undefined).catch((error: Error) => reply({ type: "harness.notice", level: "warn", text: error.message }));
 					return;
 				}
 				case "doc.gcomment": {
 					const doc = this.find(message.path);
-					if (doc && this.context.comment) void this.context.comment(doc.file, message).catch((error: Error) => reply({ type: "notice", level: "warn", text: error.message }));
+					if (doc && this.context.comment) void this.context.comment(doc.file, message).catch((error: Error) => reply({ type: "harness.notice", level: "warn", text: error.message }));
 					return;
 				}
 				case "doc.git":
 					return void this.git(message.path, message.action).then(reply, (error: Error) => reply({ type: "doc.repo", path: message.path, action: message.action, ok: false, message: error.message }));
 			}
 		} catch (error) {
-			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			reply({ type: "harness.notice", level: "warn", text: (error as Error).message });
 		}
 	}
 
@@ -273,7 +273,7 @@ export class DocService {
 		}
 		this.saveChanges(doc);
 		doc.versions.record(doc.vkey, doc.text);
-		if (refused > 0) this.context.send({ type: "notice", level: "warn", text: `Part of that was typed over since, so ${refused} of its pieces were left as they are.` });
+		if (refused > 0) this.context.send({ type: "harness.notice", level: "warn", text: `Part of that was typed over since, so ${refused} of its pieces were left as they are.` });
 	}
 
 	/** One kept version's text, for a page to show. */

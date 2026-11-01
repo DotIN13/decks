@@ -1,7 +1,7 @@
 import type { ComponentProps } from "solid-js";
 import { clearPreview, preview, state } from "../state/deck.ts";
 import { loadEarlier } from "../state/history.ts";
-import { send } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/socket.ts";
 import { Stream } from "../chat/Stream.tsx";
 
 type TranscriptItem = ComponentProps<typeof Stream>["items"][number];
@@ -34,22 +34,22 @@ export function FocusedStream(props: { shown: boolean; items: TranscriptItem[]; 
 					clearPreview();
 					return;
 				}
-				send({ type: "rewind.preview", id: state.focused, entryId });
+				void call("chat.preview", [state.focused, entryId]);
 			}}
 			onRewind={(entryId) => {
 				if (!state.focused) return;
 				clearPreview();
-				send({ type: "rewind.to", id: state.focused, entryId });
+				void call("chat.rewind", [state.focused, entryId]).then(warnIfFailed);
 			}}
 			onFork={(entryId) => {
 				if (!state.focused) return;
 				clearPreview();
-				send({ type: "fork.from", id: state.focused, entryId });
+				void call("chat.fork", [state.focused, entryId]).then(warnIfFailed);
 			}}
 			onRestore={(entryId) => {
 				if (!state.focused) return;
 				clearPreview();
-				send({ type: "boards.restore", id: state.focused, entryId });
+				void call("chat.restore", [state.focused, entryId]).then(warnIfFailed);
 			}}
 		/>
 	);

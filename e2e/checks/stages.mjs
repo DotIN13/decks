@@ -123,7 +123,7 @@ say("…and the server says so too", sent.find((one) => one.name === wanted)?.ag
 // Read in the canvas frame, made again for the canvas arrived at.
 const zoom = await zoomOf(page);
 say("…at the arriving zoom, the same for every stage", zoom === 30, `${zoom}%`);
-say("…and says nothing about it: a toast for a thing you just did is noise", (await page.evaluate(() => document.querySelectorAll(".notice").length)) === 0);
+say("…and says nothing about it: a toast for a thing you just did is noise", (await page.evaluate(() => document.querySelectorAll(".notice").length)) === 0, await page.evaluate(() => [...document.querySelectorAll(".notice")].map((one) => one.textContent).join(" | ")));
 
 // --- and Escape leaves everything as it was -----------------------------------------------------
 

@@ -186,15 +186,16 @@ export function newId(): string {
 }
 
 /** The socket's address: a server connection's own host, or this server's. The token goes in the socket's first message (`socketToken`), never in the address. */
-export function socketUrl(): string {
+/** The line (`/api/v1/socket`) on the backend this tab is on: this server's, or another server's by its own address. */
+export function lineUrl(): string {
 	const one = active();
 	if (one?.kind === "server") {
 		const base = new URL(one.base);
 		base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
-		base.pathname = `${base.pathname.replace(/\/+$/, "")}/ws`;
+		base.pathname = `${base.pathname.replace(/\/+$/, "")}/api/v1/socket`;
 		return base.toString();
 	}
-	return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+	return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${apiBase()}/v1/socket`;
 }
 
 /** The token the socket says hello with: the server connection's, or this tab's (`lib/session.ts`). */

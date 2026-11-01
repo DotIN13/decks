@@ -77,7 +77,7 @@ function open() {
 	const replyTo = (view: View) => (message: ServerMessage) => inbox.get(view)!.push(message);
 	const last = <T extends ServerMessage["type"]>(view: View, type: T) =>
 		inbox.get(view)!.filter((message): message is Extract<ServerMessage, { type: T }> => message.type === type).at(-1);
-	const plan = (message: Extract<ServerMessage, { type: "deck.state" }> | undefined) => {
+	const plan = (message: Extract<ServerMessage, { type: "deck.changed" }> | undefined) => {
 		const board = message?.deck.boards.find((one) => one.path === "boards/plan.html");
 		return board && [board.x, board.y];
 	};
@@ -102,13 +102,13 @@ test("opening a chat on one device leaves the other device where it was", () => 
 		app.handle({ type: "agent.focus", id: one }, replyTo(laptop), laptop);
 		app.handle({ type: "agent.focus", id: two }, replyTo(phone), phone);
 
-		assert.equal(last(phone, "agents")?.focused, two, "the phone is on the chat it opened");
-		assert.equal(last(laptop, "agents")?.focused, one, "and the laptop was not moved to it");
+		assert.equal(last(phone, "agent.list")?.focused, two, "the phone is on the chat it opened");
+		assert.equal(last(laptop, "agent.list")?.focused, one, "and the laptop was not moved to it");
 
 		// A republish nobody asked for — an agent finishing a turn — says the same thing to each.
 		app.agents.publish();
-		assert.equal(last(laptop, "agents")?.focused, one);
-		assert.equal(last(phone, "agents")?.focused, two);
+		assert.equal(last(laptop, "agent.list")?.focused, one);
+		assert.equal(last(phone, "agent.list")?.focused, two);
 	} finally {
 		cleanup();
 	}
@@ -118,14 +118,14 @@ test("each device's board list carries its own conversation's arrangement", () =
 	const { app, one, two, laptop, phone, replyTo, last, plan, cleanup } = open();
 	try {
 		app.handle({ type: "agent.focus", id: one }, replyTo(laptop), laptop);
-		assert.deepEqual(plan(last(laptop, "deck.state")), [10, 20]);
+		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
 		app.handle({ type: "agent.focus", id: two }, replyTo(phone), phone);
-		assert.deepEqual(plan(last(phone, "deck.state")), [900, 400]);
+		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
 		// Something changed the deck: each device hears it as its own stage sees it.
-		app.send({ type: "deck.state", deck: app.stageState() });
-		assert.deepEqual(plan(last(laptop, "deck.state")), [10, 20]);
-		assert.deepEqual(plan(last(phone, "deck.state")), [900, 400]);
+		app.send({ type: "deck.changed", deck: app.stageState() });
+		assert.deepEqual(plan(last(laptop, "deck.changed")), [10, 20]);
+		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
 		// And a board moved on the laptop lands on the laptop's conversation, not the phone's.
 		app.handle({ type: "card.move", path: "boards/plan.html", x: 64, y: 64 }, replyTo(laptop), laptop);

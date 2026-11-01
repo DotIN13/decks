@@ -73,7 +73,7 @@ served from it (docs/DESIGN.md, "Trust"), and "same origin" has to be true of th
 browser ──https──▶ private-network proxy ──http──▶ 127.0.0.1:4329
                                                     │
                                                     ├── /api/*        the API
-                                                    ├── /ws           the socket
+                                                    ├── /api/v1/socket  the line: the page's and the canvas frame's socket (`/ws` stays one release for older pages)
                                                     └── /*            apps/web/dist
 ```
 
@@ -373,17 +373,17 @@ sudo ss -tlnp | grep 4329
 curl -s -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' https://<name>/
 curl -s https://<name>/api/deck
 
-# the socket, which is the whole application
+# the line, which is the whole application
 curl -s -i --http1.1 \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-  https://<name>/ws
+  https://<name>/api/v1/socket
 ```
 
 **`--http1.1` on that last one is not optional.** Over HTTP/2 the `Upgrade` headers are
 ignored, the request falls through to the SPA catch-all, and you get `200` and a page of
 HTML — a false pass that looks like success. A working socket answers `101 Switching
-Protocols` and then immediately sends `deck.state`, the agent list and the model catalogue,
+Protocols` and, once the page says `line.hello` with its token and `greet: true`, sends `harness.hello`, `deck.changed`, the agent list and the model catalogue,
 which incidentally confirms §6 worked.
 
 Then the containment checks, which are the ones people skip:

@@ -5,7 +5,7 @@ import { guardDocumentDrops, naturalSize } from "./file-drop.ts";
 import { cardPicture, centredOp, fileCardOps, fileItem, liveFileOps, markdownText, mediaItem, pictureItem, rowOps, wordsCard, type DroppedItem, type FilePreview, type SizedItem } from "@decks/canvas/tools";
 import { state } from "../../state/deck.ts";
 import { notice, working } from "../../state/notices.ts";
-import { send } from "../../state/socket.ts";
+import { call, warnIfFailed } from "../../state/socket.ts";
 import { setDraft, setPicking } from "../../state/ui.ts";
 import { mayUpload, uploadAsset } from "./upload.ts";
 import { api } from "../../connections/connection.ts";
@@ -338,14 +338,13 @@ export function createFileDrops() {
 		if (google || DOCUMENTS.has(extension)) {
 			const size = { w: 1000, h: 1100 };
 			// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the item.
-			return askFor((request) =>
-				send({
-					type: "document.create",
-					...(google ? { google } : { document: picked }),
-					...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}),
-					request,
-				}),
-			);
+			return call<{ path?: string }>("doc.place", [{ ...(google ? { google } : { document: picked }), ...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}) }]).then((answer) => {
+				if (!answer.ok) {
+					warnIfFailed(answer);
+					return undefined;
+				}
+				return answer.value?.path || undefined;
+			});
 		}
 		const agentId = state.focused;
 		// In the deck, the stage file refers to it where it is, with nothing copied: the server says where that is, and what a film or a sound is.

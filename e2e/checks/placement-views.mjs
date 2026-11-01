@@ -58,7 +58,7 @@ say("a note drawn by hand sits in that slot", !!note, JSON.stringify(note && { x
 const other = await chromium.launch();
 const pageB = await (await other.newContext({ viewport: { width: 1378, height: 702 } })).newPage();
 const reportsB = [];
-pageB.on("websocket", (ws) => ws.on("framesent", (f) => { try { const m = JSON.parse(f.payload); if (m.type === "camera.set") reportsB.push(m.agentId); } catch {} }));
+pageB.on("websocket", (ws) => ws.on("framesent", (f) => { try { const m = JSON.parse(f.payload); if (m.type === "line.call" && m.verb === "view.remember") reportsB.push(m.args?.[1]?.agent); } catch {} }));
 await pageB.goto(WEB, { waitUntil: "load" });
 await ready(pageB);
 await settle(pageB, 1500);

@@ -1166,6 +1166,11 @@ export class StagePens {
 	 * nothing when it holds the current one; the edits since, with the browsers' names for theirs, when
 	 * the log reaches back to it; else the drawing whole.
 	 */
+	/** The drawing whole, as `canvas.changed` with `doc`, with the browsers' recent edit names: for a client holding nothing yet. */
+	whole(name: string): ServerMessage {
+		return this.changedWhole(name, this.get(name), [...(this.madeLately.get(name) ?? []), ...(this.made.get(name) ?? [])]);
+	}
+
 	caughtUp(name: string, since: number): ServerMessage | undefined {
 		const entry = this.get(name);
 		if (!entry.error && entry.rev === since) return undefined;

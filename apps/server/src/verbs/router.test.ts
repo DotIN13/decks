@@ -283,3 +283,40 @@ test("an agent's harness token calls as that agent while it runs, with no idle l
 		cleanup();
 	}
 });
+
+test("the person's verbs run for the person's token alone, and the side routes they replace answer as aliases of them", async () => {
+	const { app, base, agent, token, bearer, call, cleanup } = await open();
+	try {
+		const person = app.tokens.issue({ kind: "person" }, { label: "verbs test" }).token;
+		const mine = bearer(person);
+		// Listed to the person, not to an agent.
+		const toPerson = (await (await fetch(base, { headers: mine })).json()) as { verbs: Array<{ name: string; who?: string }> };
+		assert.ok(toPerson.verbs.some((verb) => verb.name === "agent.set" && verb.who === "person"), "the person sees agent.set");
+		const toAgent = (await (await fetch(base, { headers: bearer(token) })).json()) as { verbs: Array<{ name: string }> };
+		assert.ok(!toAgent.verbs.some((verb) => verb.name === "agent.set"), "an agent does not");
+		// Refused to an agent's token, run for the person's.
+		const refused = await call("agent.set", [agent.id, { name: "Nope" }]);
+		assert.equal(refused.status, 403);
+		assert.match(refused.body.error ?? "", /person's to call/);
+		const renamed = await call("agent.set", [agent.id, { name: "Iris" }], mine);
+		assert.equal(renamed.status, 200, renamed.body.error);
+		assert.equal(app.agents.get(agent.id)?.chat().name, "Iris");
+		// The side routes, as aliases: the shapes Studio reads.
+		const api = base.replace(/\/v1$/, "");
+		const harness = (await (await fetch(`${api}/harness`, { headers: mine })).json()) as { name: string; paired: unknown[]; runtimes: unknown[] };
+		assert.equal(harness.name, app.deck.name);
+		assert.ok(Array.isArray(harness.runtimes));
+		const history = (await (await fetch(`${api}/agents/${agent.id}/history`, { headers: mine })).json()) as { items: unknown[]; more: boolean };
+		assert.ok(Array.isArray(history.items));
+		assert.equal(typeof history.more, "boolean");
+		const again = await fetch(`${api}/agents/${agent.id}/rename`, { method: "POST", headers: { "content-type": "application/json", ...mine }, body: JSON.stringify({ name: "Iris the second" }) });
+		assert.equal(again.status, 200, await again.clone().text());
+		assert.deepEqual(await again.json(), { id: agent.id, name: "Iris the second" });
+		const gone = await fetch(`${api}/agents/nobody/history`, { headers: mine });
+		assert.equal(gone.status, 404);
+		const deck = (await (await fetch(`${api}/deck`, { headers: mine })).json()) as { deck: { name: string }; warnings: string[] };
+		assert.equal(deck.deck.name, app.deck.name);
+	} finally {
+		cleanup();
+	}
+});

@@ -1,7 +1,7 @@
 import { PAGE } from "../chat/history-page.ts";
 import { scratch } from "./agent.ts";
 import { state } from "./deck.ts";
-import { send, started } from "./socket.ts";
+import { call, started } from "./socket.ts";
 
 /**
  * The browser's window over a conversation, and the server's copy behind it.
@@ -37,7 +37,7 @@ export function ensureHistory(agentId: string | undefined): void {
 	const held = scratch.of(agentId);
 	if (held.historyHeld || held.historyAsked) return;
 	held.historyAsked = true;
-	send({ type: "chat.open", agentId });
+	void call("chat.open", [agentId]);
 }
 
 /**
@@ -56,7 +56,7 @@ export function loadEarlier(agentId: string): Promise<number> {
 	if (waiting.has(before)) return Promise.resolve(0);
 	return new Promise<number>((resolve) => {
 		waiting.set(before, resolve);
-		send({ type: "chat.earlier", agentId, before, limit: PAGE });
+		void call("chat.earlier", [agentId, { before, limit: PAGE }]);
 		/*
 		 * A dropped socket must not leave the column unable to ask again. Ten seconds is far
 		 * longer than a read of a log file and short enough that a reader who has given up

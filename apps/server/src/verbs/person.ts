@@ -31,10 +31,10 @@ export async function asPerson(
 	asked: { stage?: string; agent?: string },
 	verb: string,
 	args: unknown[],
-	reply: (message: { type: "notice"; level: "warn"; text: string }) => void,
+	reply: (message: { type: "harness.notice"; level: "warn"; text: string }) => void,
 ): Promise<boolean> {
 	const answer = await personAgent(context, asked).personTool().call(verb, args);
-	if (!answer.ok) reply({ type: "notice", level: "warn", text: answer.error ?? `${verb} failed` });
+	if (!answer.ok) reply({ type: "harness.notice", level: "warn", text: answer.error ?? `${verb} failed` });
 	return answer.ok;
 }
 
@@ -47,9 +47,9 @@ export async function personGesture<G extends keyof Gestures>(
 	asked: { stage?: string; agent?: string },
 	name: G,
 	args: Parameters<Gestures[G]>,
-	reply: (message: { type: "notice"; level: "warn"; text: string }) => void,
+	reply: (message: { type: "harness.notice"; level: "warn"; text: string }) => void,
 ): Promise<boolean> {
 	const answer = await personAgent(context, asked).personTool().gesture(name, args);
-	if (!answer.ok) reply({ type: "notice", level: "warn", text: answer.error ?? `${name} failed` });
+	if (!answer.ok) reply({ type: "harness.notice", level: "warn", text: answer.error ?? `${name} failed` });
 	return answer.ok;
 }

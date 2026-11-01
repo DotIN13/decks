@@ -49,6 +49,7 @@ const hub = new Hub(
 app.attach(hub);
 // The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`line.ts`).
 const line = new Line(app);
+app.lines = () => line.connections;
 
 // Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
 // Its app list goes to Studio too, so Studio can list the apps beside the canvases.

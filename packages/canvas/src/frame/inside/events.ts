@@ -182,7 +182,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			first.rev,
 		);
 	else backend.follow((message) => {
-		if (message.type === "stage.call") return stageCall(message.call);
+		if (message.type === "view.called") return stageCall(message.call);
 		if (message.type === "presence.changed") return void ctx.presence?.hear(message);
 		// An agent at work on a card: its cursor and outline, from the card's place on the drawing. What it
 		// draws on the canvas is marked from the drawing's own change instead (`edits` above).
@@ -200,7 +200,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		}
 		if (message.type.startsWith("doc.")) return ctx.hearDoc(message);
 		// An app's state changed: its windows hear it (`apps.watch`), and nothing asks the harness again.
-		if (message.type === "app.state") {
+		if (message.type === "app.changed") {
 			for (const listener of ctx.appWatchers.get(message.name) ?? []) listener({ ...(message.title ? { title: message.title } : {}), status: message.status });
 			return;
 		}

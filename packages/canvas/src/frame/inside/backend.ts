@@ -40,13 +40,13 @@ export type Heard =
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
-	| { type: "app.state"; name: string; title?: string; status: string }
+	| { type: "app.changed"; name: string; title?: string; status: string }
 	/** An agent at work on a card of this canvas (`server/src/agents/acts.ts`): its cursor follows the work (`presence.ts`). */
 	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: string; ids?: string[]; boxes?: Array<{ x1: number; y1: number; x2: number; y2: number }>; label: string; color: string; at: number }
 	/** Someone else on this canvas moved, selected, looked elsewhere or left (`presence.ts`). */
 	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
-	| { type: "stage.call"; call: StageCall }
+	| { type: "view.called"; call: StageCall }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
 	| { type: `doc.${string}`; path?: string; [key: string]: unknown }
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
@@ -102,7 +102,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 
 		async post(route, body) {
 			const data = (body ?? {}) as Record<string, unknown>;
-			if (route === "doc") line().send({ type: "doc", message: data.message as never });
+			if (route === "doc") line().send(data.message as never);
 			else if (route === "card-seen") line().send({ type: "card.seen", path: String(data.path) });
 			else if (route === "card-extent") line().send({ type: "card.extent", ...(data as { path: string; rev: number; w: number; h: number }) });
 			else return { ok: false, error: `The line has no ${route}.` };
@@ -111,7 +111,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 
 		answer(id, value) {
 			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
-			line().send(error ? { type: "stage.result", id, error } : { type: "stage.result", id, value });
+			line().send(error ? { type: "view.answered", id, error } : { type: "view.answered", id, value });
 		},
 
 		presence(presence) {

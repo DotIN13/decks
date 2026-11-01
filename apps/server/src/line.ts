@@ -3,11 +3,12 @@ import type { Duplex } from "node:stream";
 import type { LineClientMessage, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { App } from "./app.ts";
+import type { View } from "./ws.ts";
 import { verifyOn } from "./auth/guard.ts";
 import { isCanvasPass } from "./auth/passes.ts";
 import type { Principal } from "./auth/principal.ts";
 import { cardRefusedFor, DOC_CALLS, onCanvas, runVerb } from "./verbs/router.ts";
-import { settleStage } from "./wire/deck.ts";
+import { settleStage } from "./stage/pending.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */
 export const HELLO_MS = 5_000;
@@ -26,12 +27,16 @@ interface LineState {
 	/** Where this line said it is, per canvas (`presence.set`), for whoever starts watching later and for the leave. */
 	present: Map<string, Presence>;
 	token?: string;
+	/** The id of the token, when it is one of the store's (`TokenStore.verify`), for the person's verbs that name the caller back. */
+	tokenId?: string;
 	/** The canvases this line hears: their changes and their cards', apps' and documents' messages. */
 	watched: Set<string>;
 	/** Every broadcast, as the event stream gives it (the person's or a paired site's line that asked). */
 	all: boolean;
 	headers: IncomingMessage["headers"];
 	remote?: string;
+	/** The person's screen on this line: which agent it is on (`forView`), kept for a page that says so in hello. */
+	view?: View;
 	hello?: NodeJS.Timeout;
 	recheck?: NodeJS.Timeout;
 }
@@ -83,12 +88,12 @@ export class Line {
 			try {
 				message = JSON.parse(String(data)) as LineClientMessage;
 			} catch (error) {
-				send(socket, { type: "error", text: `Unreadable message: ${(error as Error).message}` });
+				send(socket, { type: "harness.error", text: `Unreadable message: ${(error as Error).message}` });
 				return;
 			}
 			void this.handle(socket, state, message).catch((error) => {
 				console.error("[decks] line", (message as { type?: string }).type, error);
-				send(socket, { type: "error", text: error instanceof Error ? error.message : String(error) });
+				send(socket, { type: "harness.error", text: error instanceof Error ? error.message : String(error) });
 			});
 		});
 		const gone = () => {
@@ -112,13 +117,14 @@ export class Line {
 		}
 		const seen = verifyOn(this.app, token, state.headers);
 		if (!seen.ok) return undefined;
+		state.tokenId = seen.id;
 		const kind = seen.principal.kind;
 		return kind === "canvas" || kind === "person" || kind === "site" || kind === "agent" ? seen.principal : undefined;
 	}
 
 	private async handle(socket: WebSocket, state: LineState, message: LineClientMessage): Promise<void> {
 		if (!state.principal) {
-			if (message.type !== "hello" || typeof message.token !== "string") {
+			if (message.type !== "line.hello" || typeof message.token !== "string") {
 				socket.close(4401, "Say hello with a token first.");
 				return;
 			}
@@ -137,14 +143,19 @@ export class Line {
 				if (!state.token || !this.verify(state, state.token)) socket.close(4401, "The token no longer opens the line.");
 			}, RECHECK_MS);
 			state.recheck.unref?.();
-			send(socket, { type: "hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
-			for (const one of message.watch ?? []) this.watch(socket, state, one.canvas, one.since);
+			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
+			// A page: greeted as the tab's socket greeted it, with a screen of its own that `forView` renders for.
+			if (message.greet === true && (principal.kind === "person" || principal.kind === "site")) {
+				state.view = {};
+				this.app.greet((said) => send(socket, said), state.view);
+			}
+			for (const one of message.watch ?? []) this.watch(socket, state, one.canvas, one.since, one.whole);
 			return;
 		}
 		const principal = state.principal;
 		switch (message.type) {
-			case "hello":
-			case "token": {
+			case "line.hello":
+			case "line.token": {
 				// A renewed token: it must open the line as the same one did.
 				const next = this.verify(state, message.token);
 				if (!next || next.kind !== principal.kind || (next.kind === "canvas" && principal.kind === "canvas" && next.canvas !== principal.canvas)) {
@@ -156,42 +167,43 @@ export class Line {
 				return;
 			}
 			case "canvas.watch":
-				this.watch(socket, state, message.canvas, message.since);
+				this.watch(socket, state, message.canvas, message.since, message.whole);
 				return;
 			case "canvas.unwatch":
 				state.watched.delete(message.canvas);
 				return;
-			case "call": {
+			case "line.call": {
 				const headers = { ...state.headers, ...(message.edit ? { "x-decks-edit": message.edit } : {}), ...(message.stage ? { "x-decks-stage": message.stage } : {}), ...(message.agent ? { "x-decks-agent": message.agent } : {}) };
-				const { answer } = await runVerb(this.app, principal, headers, String(message.verb ?? ""), message.args, state.remote);
-				send(socket, { type: "answer", id: String(message.id), ok: answer.ok, ...(answer.value !== undefined ? { value: answer.value } : {}), ...(answer.error ? { error: answer.error } : {}), ...(answer.notes?.length ? { notes: answer.notes } : {}) });
+				const { answer } = await runVerb(this.app, principal, headers, String(message.verb ?? ""), message.args, state.remote, { tell: (said) => send(socket, said), ...(state.view ? { view: state.view } : {}), ...(state.tokenId ? { tokenId: state.tokenId } : {}) });
+				send(socket, { type: "call.answered", id: String(message.id), ok: answer.ok, ...(answer.value !== undefined ? { value: answer.value } : {}), ...(answer.error ? { error: answer.error } : {}), ...(answer.notes?.length ? { notes: answer.notes } : {}) });
 				return;
 			}
-			case "stage.result": {
+			case "view.answered": {
 				if (typeof message.id !== "string") return;
 				settleStage(this.app.pendingStage, { id: message.id, value: message.value, ...(typeof message.error === "string" ? { error: message.error } : {}) });
 				return;
 			}
-			case "doc": {
-				const doc = message.message as { type?: unknown; path?: unknown } | undefined;
-				if (!doc || typeof doc.type !== "string" || !DOC_CALLS.has(doc.type) || typeof doc.path !== "string") {
-					send(socket, { type: "error", text: "Send { type: \"doc\", message }, a document message for a file on a watched canvas." });
+			default: {
+				if (!message.type.startsWith("doc.")) break;
+				const doc = message as { type: string; path?: unknown };
+				if (!DOC_CALLS.has(doc.type) || typeof doc.path !== "string") {
+					send(socket, { type: "harness.error", text: "A document message names its file: { type: \"doc.open\", path }, for a document on a watched canvas." });
 					return;
 				}
 				// A canvas frame opens only the files the document items on its canvas name; the person any watched canvas's.
 				const canvases = principal.kind === "canvas" ? [principal.canvas] : [...state.watched];
 				if (!canvases.some((canvas) => this.app.documentsOn(canvas).has(doc.path as string))) {
-					send(socket, { type: "error", text: `${doc.path} is not a document on this canvas.` });
+					send(socket, { type: "harness.error", text: `${doc.path} is not a document on this canvas.` });
 					return;
 				}
-				this.app.docs.handle(message.message as never, (answer) => send(socket, answer as ServerMessage));
+				this.app.docs.handle(message as never, (answer) => send(socket, answer as ServerMessage));
 				return;
 			}
 			case "card.seen":
 			case "card.extent": {
 				const refused = cardRefusedFor(this.app, principal, String(message.path ?? ""));
 				if (refused) {
-					send(socket, { type: "error", text: refused.error });
+					send(socket, { type: "harness.error", text: refused.error });
 					return;
 				}
 				if (message.type === "card.seen") {
@@ -203,7 +215,7 @@ export class Line {
 				const w = num("w");
 				const h = num("h");
 				if (rev === undefined || w === undefined || h === undefined) {
-					send(socket, { type: "error", text: "Send { path, rev, w, h }, and what else was measured." });
+					send(socket, { type: "harness.error", text: "Send { path, rev, w, h }, and what else was measured." });
 					return;
 				}
 				const extra: Record<string, number> = {};
@@ -222,27 +234,30 @@ export class Line {
 				this.said({ type: "presence.changed", canvas, by: this.by(state), ...presence }, socket);
 				return;
 			}
-			default:
-				send(socket, { type: "notice", level: "warn", text: `The line does not know ${String((message as { type?: unknown }).type)}.` });
 		}
+		send(socket, { type: "harness.notice", level: "warn", text: `The line does not know ${String((message as { type?: unknown }).type)}.` });
 	}
 
 	/** Hear a canvas from now on, and catch up from `since` when given: a canvas pass hears its own canvas alone. */
-	private watch(socket: WebSocket, state: LineState, canvas: unknown, since: unknown): void {
+	private watch(socket: WebSocket, state: LineState, canvas: unknown, since: unknown, whole?: unknown): void {
 		if (typeof canvas !== "string" || !canvas) return;
 		const principal = state.principal!;
 		if (principal.kind === "canvas" && principal.canvas !== canvas) {
-			send(socket, { type: "error", text: `This line is ${principal.canvas}'s: it hears no other canvas.` });
+			send(socket, { type: "harness.error", text: `This line is ${principal.canvas}'s: it hears no other canvas.` });
 			return;
 		}
 		if (!this.app.pens.has(canvas)) {
-			send(socket, { type: "error", text: `There is no canvas called ${canvas}.` });
+			send(socket, { type: "harness.error", text: `There is no canvas called ${canvas}.` });
 			return;
 		}
 		state.watched.add(canvas);
 		// Who is on the canvas already: said to the newcomer as they last said it.
 		for (const [other, otherState] of this.sockets) if (other !== socket && otherState.principal && otherState.present.has(canvas)) send(socket, { type: "presence.changed", canvas, by: this.by(otherState), ...otherState.present.get(canvas)! });
 		for (const one of this.elsewhere.get(canvas)?.values() ?? []) send(socket, one);
+		if (whole === true) {
+			send(socket, this.app.pens.whole(canvas));
+			return;
+		}
 		if (typeof since !== "number") return;
 		const caught = this.app.pens.caughtUp(canvas, since);
 		if (caught) send(socket, caught);
@@ -289,8 +304,10 @@ export class Line {
 			if (!state.principal) continue;
 			const wanted = state.all || (message.type === "canvas.changed" ? state.watched.has(message.canvas) : [...state.watched].some((canvas) => onCanvas(this.app, message, canvas)));
 			if (!wanted) continue;
-			text ??= JSON.stringify(message);
-			if (socket.readyState === socket.OPEN) socket.send(text);
+			if (socket.readyState !== socket.OPEN) continue;
+			// A page's line is told what its own screen should see (`forView`): the deck as its agent's canvas has it.
+			if (state.view) socket.send(JSON.stringify(this.app.forView(message, state.view)));
+			else socket.send((text ??= JSON.stringify(message)));
 		}
 	}
 

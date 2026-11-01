@@ -1,7 +1,7 @@
 import type { UsageReport } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { send } from "./socket.ts";
+import { call } from "./socket.ts";
 
 /**
  * What the browser is showing that the server has no opinion about.
@@ -141,7 +141,7 @@ function createUi() {
 	const readUsage = (id: string | undefined) => {
 		if (!id) return;
 		setUsageReport((was) => ({ ...was, loading: true }));
-		send({ type: "agent.report", id });
+		void call("agent.report", [id]);
 	};
 
 	/** Open the panel on an agent, on whatever was last read, and ask for its figures. */
@@ -150,7 +150,7 @@ function createUi() {
 		setUsagePanel(id);
 		const kept = seenReports.get(id);
 		setUsageReport({ loading: true, ...(kept ? { report: kept.report, at: kept.at } : {}) });
-		send({ type: "agent.report", id });
+		void call("agent.report", [id]);
 	};
 
 	/**
@@ -180,7 +180,7 @@ function createUi() {
 		seenReports.delete(id);
 		if (usagePanel() !== id) return;
 		setUsageReport({ loading: true });
-		send({ type: "agent.report", id });
+		void call("agent.report", [id]);
 	};
 
 	/**

@@ -48,7 +48,7 @@ async function open() {
 		const greeted = (ms = 3000) =>
 			new Promise<boolean>((done) => {
 				const started = Date.now();
-				const tick = () => (heard.some((m) => m.type === "backend") ? done(true) : Date.now() - started > ms ? done(false) : setTimeout(tick, 20));
+				const tick = () => (heard.some((m) => m.type === "harness.hello" || (m as { type: string }).type === "backend") ? done(true) : Date.now() - started > ms ? done(false) : setTimeout(tick, 20));
 				tick();
 			});
 		return { ws, heard, closed, opened, greeted };
@@ -74,7 +74,7 @@ test("the tab's socket takes its token in hello: greeted after a good one, close
 		await polite.opened;
 		await new Promise((done) => setTimeout(done, 100));
 		assert.equal(polite.heard.length, 0, "nothing is said before hello");
-		polite.ws.send(JSON.stringify({ type: "hello", token: person }));
+		polite.ws.send(JSON.stringify({ type: "hello", token: person, v: 2 }));
 		assert.ok(await polite.greeted(), "greeted with the deck once the token is heard");
 		polite.ws.close();
 
@@ -85,7 +85,7 @@ test("the tab's socket takes its token in hello: greeted after a good one, close
 
 		const rude = connect();
 		await rude.opened;
-		rude.ws.send(JSON.stringify({ type: "runtimes" }));
+		rude.ws.send(JSON.stringify({ type: "harness.runtimes" }));
 		assert.equal(await rude.closed, 4401, "a frame before hello closes the socket");
 
 		const older = connect(`?decks_token=${encodeURIComponent(person)}`);

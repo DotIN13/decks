@@ -98,7 +98,7 @@ const agents = [
 	chat("q3", "Rune", "pi", "idle", "Waiting for a board", 2_000_000),
 	chat("q4", "Kestrel", "claude", "idle", undefined, 7_200_000, { dormant: true }),
 ];
-await feed({ type: "agents", defaultKind: "pi", focused: "k1", chats: agents });
+await feed({ type: "agent.list", defaultKind: "pi", focused: "k1", chats: agents });
 const workspaceOf = (id) => (id.startsWith("w") ? "irb-84069" : id.startsWith("k") ? "political-llm" : undefined);
 for (const [id, name] of agents.map((one) => [one.id, one.name])) {
 	const workspace = workspaceOf(id);

@@ -13,8 +13,7 @@ import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
-import { dispatch } from "./wire/index.ts";
-import type { Reply } from "./wire/context.ts";
+import { legacy } from "./wire/legacy.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
@@ -148,6 +147,8 @@ export class App {
 	/** Stage calls waiting for the browser to carry them out. */
 	/** Canvas frames following their canvas's stream now (`verbs/router.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
+	/** How many lines are open (`line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
+	lines: () => number = () => 0;
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
@@ -228,7 +229,7 @@ export class App {
 			deleteBoard: (path) => {
 				let refused: string | undefined;
 				this.boards.deleteBoard(path, (message) => {
-					if (message.type === "notice") refused = message.text;
+					if (message.type === "harness.notice") refused = message.text;
 				});
 				return refused;
 			},
@@ -246,7 +247,7 @@ export class App {
 			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.callStageAll(call, timeoutMs),
 			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
-			connected: () => (this.hub?.connections ?? 0) > 0 || this.canvasFrames > 0,
+			connected: () => (this.hub?.connections ?? 0) > 0 || this.lines() > 0 || this.canvasFrames > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.boards.wrote(path, who),
@@ -268,7 +269,7 @@ export class App {
 		this.apps.decksPort = config.port;
 		this.apps.passes = this.passes;
 		// A canvas frame showing the app hears its state change (`verbs/router.ts`, `onCanvas`), instead of asking every ten seconds.
-		this.apps.onChange = (name, state) => this.tellStreams({ type: "app.state", name, ...(state.title ? { title: state.title } : {}), status: state.status });
+		this.apps.onChange = (name, state) => this.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
@@ -304,7 +305,7 @@ export class App {
 		 * property of this server, not of a deck. Every change is broadcast, so the settings'
 		 * Your Chrome and the extension's popup say the same thing at the same time.
 		 */
-		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
+		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.changed", status }));
 		this.stage.web = this.web;
 		/*
 		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
@@ -371,7 +372,7 @@ export class App {
 			this.send(this.pairingMessage());
 			return made;
 		};
-		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
+		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "harness.notice", level: "warn", text }));
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
 			identity: (agentId) => this.agents.get(agentId)?.who(),
@@ -402,8 +403,8 @@ export class App {
 				 * `context.changed` that says the board is on the canvas, which is the order the two
 				 * arrive in.
 				 */
-				arranged: () => this.send({ type: "deck.state", deck: this.stageState() }),
-				publishRuntimes: () => this.send({ type: "runtimes", list: this.runtimes() }),
+				arranged: () => this.send({ type: "deck.changed", deck: this.stageState() }),
+				publishRuntimes: () => this.send({ type: "harness.runtimes", list: this.runtimes() }),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),
@@ -580,7 +581,7 @@ export class App {
 			const on = agent.accountId();
 			if (on) spending[agent.id] = on;
 		}
-		const frame: ServerMessage = { type: "claude.accounts", accounts, active, ...(Object.keys(spending).length > 0 ? { spending } : {}) };
+		const frame: ServerMessage = { type: "account.list", accounts, active, ...(Object.keys(spending).length > 0 ? { spending } : {}) };
 		if (reply) reply(frame);
 		else this.send(frame);
 	}
@@ -601,7 +602,7 @@ export class App {
 				resolve({ skipped: "the canvas did not answer in time" });
 			}, timeoutMs);
 			this.pendingStage.set(id, { resolve, timer });
-			this.send({ type: "stage.call", call: { ...call, id } });
+			this.send({ type: "view.called", call: { ...call, id } });
 		});
 	}
 
@@ -620,7 +621,7 @@ export class App {
 				resolve(many.answers);
 			}, timeoutMs);
 			this.pendingStage.set(id, { resolve: (value) => resolve(value as unknown[]), timer, many });
-			this.send({ type: "stage.call", call: { ...call, id } });
+			this.send({ type: "view.called", call: { ...call, id } });
 		});
 	}
 
@@ -702,7 +703,7 @@ export class App {
 				 */
 				this.deck.reload();
 				this.boards.restamp();
-				this.send({ type: "deck.state", deck: this.stageState() });
+				this.send({ type: "deck.changed", deck: this.stageState() });
 				return;
 			}
 			if (change.kind === "board") {
@@ -733,7 +734,7 @@ export class App {
 			}
 			// An asset under the deck moved. A board may be showing it, and the frame
 			// has no way to know, so every board reloads — cheap, and rare.
-			this.send({ type: "deck.state", deck: this.stageState() });
+			this.send({ type: "deck.changed", deck: this.stageState() });
 		});
 
 		/*
@@ -784,9 +785,9 @@ export class App {
 	 * feature's. The cases moved to `wire/`, and what is left is the one line that says
 	 * where they went.
 	 */
-	handle(message: ClientMessage, reply: Reply, view?: View): void {
+	handle(message: ClientMessage, reply: (message: ServerMessage) => void, view?: View): void {
 		if (!view) {
-			dispatch(message, reply, this);
+			void legacy(this, message, reply);
 			return;
 		}
 		/*
@@ -799,20 +800,18 @@ export class App {
 		 */
 		this.agents.look(view.focused);
 		this.viewing = view;
-		try {
-			dispatch(message, reply, this);
-		} finally {
+		void legacy(this, message, reply, view).finally(() => {
 			this.viewing = undefined;
 			view.focused = this.agents.looking()?.id;
-		}
+		});
 	}
 
 	greet(reply: (message: ServerMessage) => void, view?: View): void {
 		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
 		if (view) view.focused = this.agents.looking()?.id;
 		// Who is answering, first: a front end that holds several connections draws its controls from it.
-		reply({ type: "backend", backend: { name: this.deck.name, can: { agents: true, write: true, share: true } } });
-		reply({ type: "deck.state", deck: this.stageState() });
+		reply({ type: "harness.hello", backend: { name: this.deck.name, can: { agents: true, write: true, share: true } } });
+		reply({ type: "deck.changed", deck: this.stageState() });
 		/*
 		 * And what this install can run.
 		 *
@@ -822,8 +821,8 @@ export class App {
 		 * this, the `+` menu offered all four everywhere, and the first prompt was where you
 		 * found out that the binary was not installed.
 		 */
-		reply({ type: "runtimes", list: this.runtimes() });
-		for (const warning of this.deck.warnings) reply({ type: "notice", level: "warn", text: warning });
+		reply({ type: "harness.runtimes", list: this.runtimes() });
+		for (const warning of this.deck.warnings) reply({ type: "harness.notice", level: "warn", text: warning });
 		// The whole truth on connect, so a reconnect is a refresh: the deck, the
 		// agents, and each one's transcript.
 		this.agents.greet(reply);
@@ -843,7 +842,7 @@ export class App {
 		// shows it when nothing is connected yet, and the browser is where the user reads it.
 		// Which stages exist: the manager's list, and the name the pill shows beside the agent.
 		reply(this.stagesMessage());
-		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
+		reply({ type: "web.changed", status: this.web.status(), code: this.web.code() });
 		reply(this.settingsMessage());
 		reply(this.pairingMessage());
 	}
@@ -852,11 +851,11 @@ export class App {
 	pairingMessage(): ServerMessage {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
 		const studio = studioLink(this.deck.path);
-		return { type: "pairing", paired: this.tokens.paired(), ...(studio ? { studio } : {}) };
+		return { type: "harness.paired", paired: this.tokens.paired(), ...(studio ? { studio } : {}) };
 	}
 
 	settingsMessage(): ServerMessage {
-		return { type: "settings", settings: this.settings.get(), machineZone: this.settings.machineZone(), sttKey: sttReady() };
+		return { type: "harness.settings", settings: this.settings.get(), machineZone: this.settings.machineZone(), sttKey: sttReady() };
 	}
 
 	/** Choose the server recogniser's model; every browser hears it. */
@@ -906,8 +905,8 @@ export class App {
 		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 		});
 		this.watch();
-		this.send({ type: "deck.state", deck: this.stageState() });
-		for (const warning of this.deck.warnings) this.send({ type: "notice", level: "warn", text: warning });
+		this.send({ type: "deck.changed", deck: this.stageState() });
+		for (const warning of this.deck.warnings) this.send({ type: "harness.notice", level: "warn", text: warning });
 	}
 
 	/**
@@ -1057,7 +1056,7 @@ export class App {
 	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */
-	private forView(message: ServerMessage, view: View): ServerMessage {
+	forView(message: ServerMessage, view: View): ServerMessage {
 		const shared = this.agents.looking();
 		if (view === this.viewing) return message;
 		const own = this.agents.get(view.focused);
@@ -1067,9 +1066,9 @@ export class App {
 		}
 		if (own === shared) return message;
 		switch (message.type) {
-			case "agents":
+			case "agent.list":
 				return { ...message, focused: own.id };
-			case "deck.state":
+			case "deck.changed":
 				return { ...message, deck: this.stageState(own) };
 			case "card.changed": {
 				if (!message.card) return message;
@@ -1133,7 +1132,7 @@ export class App {
 					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
 			};
 		});
-		return { type: "stages", stages };
+		return { type: "canvas.list", stages };
 	}
 
 	publishStages(): void {

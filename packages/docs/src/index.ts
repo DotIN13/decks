@@ -260,4 +260,4 @@ export type DocServerMessage =
 	/** To every page: how a remote document's link stands, sent when it changes. */
 	| { type: "doc.remote"; path: string; status: DocRemoteStatus }
 	/** Something a person should be told, in a sentence. */
-	| { type: "notice"; level: "info" | "warn" | "error"; text: string };
+	| { type: "harness.notice"; level: "info" | "warn" | "error"; text: string };

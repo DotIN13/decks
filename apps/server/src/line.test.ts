@@ -72,21 +72,21 @@ test("the line takes its token in hello, answers calls once each, and says a can
 		// A line that says anything but hello first, or hello with a bad token, is closed.
 		const stranger = connect();
 		await stranger.opened;
-		stranger.send({ type: "hello", token: "not-a-token" });
+		stranger.send({ type: "line.hello", token: "not-a-token" });
 		assert.equal((await stranger.closed).code, 4401);
 
 		const me = connect();
 		await me.opened;
-		me.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
-		const hello = (await me.next((m) => m.type === "hello")) as Extract<ServerMessage, { type: "hello" }>;
+		me.send({ type: "line.hello", token: person, watch: [{ canvas, since: rev }] });
+		const hello = (await me.next((m) => m.type === "line.hello")) as Extract<ServerMessage, { type: "line.hello" }>;
 		assert.equal(hello.who, "person");
 		// Holding the current revision: nothing to catch up on.
 		await new Promise((done) => setTimeout(done, 100));
 		assert.equal(me.heard.filter((m) => m.type === "canvas.changed").length, 0);
 
 		// A call: one answer under its id, and the change it made, once, with the edit's name on it.
-		me.send({ type: "call", id: "k1", verb: "canvas.batch", args: [[{ op: "update", id: "a", set: { content: "two" } }]], edit: "typed two", stage: canvas });
-		const answer = (await me.next((m) => m.type === "answer")) as Extract<ServerMessage, { type: "answer" }>;
+		me.send({ type: "line.call", id: "k1", verb: "canvas.batch", args: [[{ op: "update", id: "a", set: { content: "two" } }]], edit: "typed two", stage: canvas });
+		const answer = (await me.next((m) => m.type === "call.answered")) as Extract<ServerMessage, { type: "call.answered" }>;
 		assert.equal(answer.id, "k1");
 		assert.equal(answer.ok, true, answer.error);
 		const changed = (await me.next((m) => m.type === "canvas.changed")) as Extract<ServerMessage, { type: "canvas.changed" }>;
@@ -99,15 +99,15 @@ test("the line takes its token in hello, answers calls once each, and says a can
 		assert.equal(me.heard.filter((m) => m.type === "stage.pen.delta").length, 0, "the per-agent copies are the tab's socket's");
 
 		// An unknown verb is answered, not dropped.
-		me.send({ type: "call", id: "k2", verb: "no.such", args: [] });
-		const refused = (await me.next((m) => m.type === "answer" && m.id === "k2")) as Extract<ServerMessage, { type: "answer" }>;
+		me.send({ type: "line.call", id: "k2", verb: "no.such", args: [] });
+		const refused = (await me.next((m) => m.type === "call.answered" && m.id === "k2")) as Extract<ServerMessage, { type: "call.answered" }>;
 		assert.equal(refused.ok, false);
 		assert.match(refused.error ?? "", /no verb called no.such/);
 
 		// A line that comes back holding an older revision is caught up with the edits since, and their names.
 		const again = connect();
 		await again.opened;
-		again.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
+		again.send({ type: "line.hello", token: person, watch: [{ canvas, since: rev }] });
 		const caught = (await again.next((m) => m.type === "canvas.changed")) as Extract<ServerMessage, { type: "canvas.changed" }>;
 		assert.deepEqual([caught.from, caught.rev], [rev, rev + 1]);
 		assert.deepEqual(caught.edits?.map((e) => e.op), ["set"]);
@@ -135,10 +135,10 @@ test("a canvas pass on the line hears its own canvas alone and calls only what a
 		const pass = app.passes.canvas(mine, "edit", app.tokens.verify(person.token).ok ? (app.tokens.verify(person.token) as { id: string }).id : "").pass;
 		const frame = connect();
 		await frame.opened;
-		frame.send({ type: "hello", token: pass, watch: [{ canvas: mine, since: app.pens.get(mine).rev }, { canvas: other, since: 0 }] });
-		const hello = (await frame.next((m) => m.type === "hello")) as Extract<ServerMessage, { type: "hello" }>;
+		frame.send({ type: "line.hello", token: pass, watch: [{ canvas: mine, since: app.pens.get(mine).rev }, { canvas: other, since: 0 }] });
+		const hello = (await frame.next((m) => m.type === "line.hello")) as Extract<ServerMessage, { type: "line.hello" }>;
 		assert.deepEqual([hello.who, hello.canvas, hello.role], ["canvas", mine, "edit"]);
-		const noOther = (await frame.next((m) => m.type === "error")) as Extract<ServerMessage, { type: "error" }>;
+		const noOther = (await frame.next((m) => m.type === "harness.error")) as Extract<ServerMessage, { type: "harness.error" }>;
 		assert.match(noOther.text, /hears no other canvas/);
 		// An agent at work on a card of this canvas is heard; one on a card elsewhere is not.
 		mkdirSync(join(app.deck.path, "canvases", mine, "cards", "one"), { recursive: true });
@@ -158,12 +158,12 @@ test("a canvas pass on the line hears its own canvas alone and calls only what a
 		assert.equal(changed.canvas, mine);
 		assert.equal(frame.heard.filter((m) => m.type === "canvas.changed" && m.canvas === other).length, 0);
 		// A frame's call reaches past its canvas: refused with a sentence; one on its canvas goes through.
-		frame.send({ type: "call", id: "a1", verb: "agent.list", args: [] });
-		const refused = (await frame.next((m) => m.type === "answer" && m.id === "a1")) as Extract<ServerMessage, { type: "answer" }>;
+		frame.send({ type: "line.call", id: "a1", verb: "agent.list", args: [] });
+		const refused = (await frame.next((m) => m.type === "call.answered" && m.id === "a1")) as Extract<ServerMessage, { type: "call.answered" }>;
 		assert.equal(refused.ok, false);
 		assert.match(refused.error ?? "", /not the canvas frame's to call/);
-		frame.send({ type: "call", id: "a2", verb: "canvas.read", args: [] });
-		const read = (await frame.next((m) => m.type === "answer" && m.id === "a2")) as Extract<ServerMessage, { type: "answer" }>;
+		frame.send({ type: "line.call", id: "a2", verb: "canvas.read", args: [] });
+		const read = (await frame.next((m) => m.type === "call.answered" && m.id === "a2")) as Extract<ServerMessage, { type: "call.answered" }>;
 		assert.equal(read.ok, true, read.error);
 		frame.ws.close();
 	} finally {
@@ -181,9 +181,9 @@ test("presence: a line's pointer and selection reach the other lines on the canv
 		const a = connect();
 		const b = connect();
 		await Promise.all([a.opened, b.opened]);
-		a.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
-		b.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
-		await Promise.all([a.next((m) => m.type === "hello"), b.next((m) => m.type === "hello")]);
+		a.send({ type: "line.hello", token: person, watch: [{ canvas, since: rev }] });
+		b.send({ type: "line.hello", token: person, watch: [{ canvas, since: rev }] });
+		await Promise.all([a.next((m) => m.type === "line.hello"), b.next((m) => m.type === "line.hello")]);
 		a.send({ type: "presence.set", canvas, pointer: { x: 10, y: 20 } });
 		const seen = (await b.next((m) => m.type === "presence.changed")) as Extract<ServerMessage, { type: "presence.changed" }>;
 		assert.deepEqual(seen.pointer, { x: 10, y: 20 });
@@ -198,7 +198,7 @@ test("presence: a line's pointer and selection reach the other lines on the canv
 		// A third line that starts watching is told where a is, pointer and selection together.
 		const c = connect();
 		await c.opened;
-		c.send({ type: "hello", token: person, watch: [{ canvas, since: rev }] });
+		c.send({ type: "line.hello", token: person, watch: [{ canvas, since: rev }] });
 		const told = (await c.next((m) => m.type === "presence.changed")) as Extract<ServerMessage, { type: "presence.changed" }>;
 		assert.deepEqual([told.by.id, told.pointer, told.selection], [seen.by.id, { x: 10, y: 20 }, ["n"]]);
 		// a goes: the others hear it left.
@@ -207,6 +207,53 @@ test("presence: a line's pointer and selection reach the other lines on the canv
 		assert.equal(gone.by.id, seen.by.id);
 		b.ws.close();
 		c.ws.close();
+	} finally {
+		await stop();
+	}
+});
+
+test("a page's hello is greeted with the whole truth, hears a watched canvas whole, and is told the deck as its own screen has it", async () => {
+	const { app, connect, stop } = await open();
+	try {
+		const canvas = app.pens.claim("Greeted");
+		app.pens.edit(canvas, [{ op: "insert", node: { type: "note", id: "n", content: "hi" }, box: { x1: 0, y1: 0 } }]);
+		const person = app.tokens.issue({ kind: "person" }, { label: "line page" }).token;
+
+		const page = connect();
+		await page.opened;
+		page.send({ type: "line.hello", token: person, all: true, greet: true, watch: [{ canvas, whole: true }] });
+		await page.next((m) => m.type === "harness.paired");
+		const kinds = page.heard.map((m) => m.type);
+		for (const kind of ["line.hello", "harness.hello", "deck.changed", "harness.runtimes", "agent.list", "canvas.list", "web.changed", "harness.settings", "harness.paired"]) assert.ok(kinds.includes(kind as never), `greeted with ${kind}`);
+		const whole = (await page.next((m) => m.type === "canvas.changed")) as Extract<ServerMessage, { type: "canvas.changed" }>;
+		assert.equal(whole.canvas, canvas);
+		assert.ok(whole.doc, "the drawing whole, since the page held none");
+		assert.equal(whole.rev, app.pens.get(canvas).rev);
+
+		// A call for the person: answered once under its id, and its side messages said to this line alone.
+		page.send({ type: "line.call", id: "c1", verb: "agent.add", args: [{}] });
+		const added = (await page.next((m) => m.type === "call.answered" && m.id === "c1")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(added.ok, true, added.error);
+		const id = (added.value as { id: string }).id;
+		page.send({ type: "line.call", id: "c2", verb: "agent.focus", args: [id] });
+		const focused = (await page.next((m) => m.type === "call.answered" && m.id === "c2")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(focused.ok, true, focused.error);
+		const told = (await page.next((m) => m.type === "deck.changed" && page.heard.indexOf(m) > page.heard.indexOf(added))) as Extract<ServerMessage, { type: "deck.changed" }>;
+		assert.ok(told.deck, "the deck as this screen's agent has it, said to the page that focused");
+
+		// An agent's token may not call the person's verbs.
+		const agent = app.agents.get(id)!;
+		const theirs = app.tokens.issue({ kind: "agent", id: agent.id }, { label: "agent" }).token;
+		const other = connect();
+		await other.opened;
+		other.send({ type: "line.hello", token: theirs });
+		await other.next((m) => m.type === "line.hello");
+		other.send({ type: "line.call", id: "a1", verb: "agent.focus", args: [id] });
+		const refused = (await other.next((m) => m.type === "call.answered" && m.id === "a1")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(refused.ok, false);
+		assert.match(refused.error ?? "", /person's to call/);
+		page.ws.close();
+		other.ws.close();
 	} finally {
 		await stop();
 	}

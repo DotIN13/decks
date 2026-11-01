@@ -1,5 +1,6 @@
 import type { RouteDeps } from "./shared.ts";
 import type { Router } from "express";
+import { runVerb } from "../verbs/router.ts";
 
 /**
  * The deck: the relay's connections and the deck's state.
@@ -19,7 +20,10 @@ export function register(api: Router, { app, relay }: RouteDeps): void {
 		res.json({ ok: true });
 	});
 
-	api.get("/deck", (_req, res) => {
-		res.json({ deck: app.deck.state(), warnings: app.deck.warnings });
+	// Kept one release as an alias of deck.get.
+	api.get("/deck", async (req, res) => {
+		const { status, answer } = await runVerb(app, req.principal, req.headers, "deck.get", [], req.socket.remoteAddress);
+		if (!answer.ok) res.status(status).json({ error: answer.error });
+		else res.json(answer.value);
 	});
 }
