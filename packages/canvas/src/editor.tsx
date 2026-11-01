@@ -224,6 +224,10 @@ export function createEditor(
 			{...editing}
 			onPenStep={step}
 			drawing={inking()}
+			onPencil={() => {
+				setModeSignal("browse");
+				setDrawing(true);
+			}}
 			camera={camera()}
 			setCamera={setCamera}
 			selected={selected()}

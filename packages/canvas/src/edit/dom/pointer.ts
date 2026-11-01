@@ -74,6 +74,11 @@ export type PointerHost = {
 	editable: () => boolean;
 	/** The draw tool is out. */
 	drawing: () => boolean;
+	/**
+	 * A Pencil pressed on bare canvas while the select tool is in hand: the host turns the pen on
+	 * and hands the press to the ink sheet, and says whether it did (`touch-rules`, step 7).
+	 */
+	pencil?: (event: PointerEvent) => boolean;
 	mode: () => "browse" | "edit";
 	tool: () => PenTool;
 	spaceHeld: () => boolean;
@@ -742,6 +747,12 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	const onPointerDown = (event: PointerEvent) => {
 		const element = host.element();
 		const kind = event.pointerType;
+		/*
+		 * A Pencil on bare canvas is a stroke, whatever tool is in hand: the pen comes on by itself and
+		 * the press starts the stroke, as on an iPad's own apps. On an item it still selects and moves
+		 * as a pointer does, and a finger is never this.
+		 */
+		if (kind === "pen" && event.button === 0 && host.editable() && !host.drawing() && host.tool() === "select" && onCanvas(event.target) && !pickAtHere(worldAt(event)) && !pictureUnder(event) && host.pencil?.(event)) return;
 		const act = decidePress({
 			pointer: kind === "touch" || kind === "pen" ? kind : "mouse",
 			button: event.button,

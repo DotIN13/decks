@@ -96,6 +96,8 @@ export type StageProps = {
 	onPenStep?: (direction: "undo" | "redo") => void;
 	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
 	drawing?: boolean;
+	/** A Pencil pressed bare canvas with the select tool: turn the pen on (and leave edit mode), so the press can start a stroke. */
+	onPencil?: () => void;
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	/**
@@ -451,6 +453,35 @@ export function Stage(props: StageProps) {
 			onSelect: (path) => props.onSelect(path),
 			fingers: () => input.touches.count(),
 			holdMenu: (menu) => setHoldMenu(menu),
+			pencil: (event) => {
+				if (!props.onPencil) return false;
+				props.onPencil();
+				// The ink sheet is there now (the pen is on): the press is given to it, as a Pencil's own.
+				const sheet = element.querySelector("svg.stage-ink");
+				if (!sheet) return false;
+				sheet.dispatchEvent(
+					new PointerEvent("pointerdown", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						pointerId: event.pointerId,
+						pointerType: "pen",
+						isPrimary: event.isPrimary,
+						clientX: event.clientX,
+						clientY: event.clientY,
+						screenX: event.screenX,
+						screenY: event.screenY,
+						pressure: event.pressure,
+						tiltX: event.tiltX,
+						tiltY: event.tiltY,
+						width: event.width,
+						height: event.height,
+						button: 0,
+						buttons: 1,
+					}),
+				);
+				return true;
+			},
 			claim: (pointer) => input.claimed.add(pointer),
 			beginTouch: (event) => input.beginTouch(event),
 			keepTouch: (event) => input.keptTouches.add(event.pointerId),
