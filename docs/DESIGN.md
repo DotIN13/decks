@@ -124,7 +124,7 @@ Calls are stateless: every canvas call takes `{ canvas }`, and left out it means
 the caller's home canvas.
 
 `GET /api/v1/events` streams every change the harness broadcasts as Server-Sent Events, the same
-messages the page hears on its socket (`card.changed`, `stage.pen.delta`, `agent.state`, …).
+messages the line carries (`card.changed`, `canvas.changed`, `agent.state`, …), every one named `noun.verb` and listed once in `packages/protocol/src/names.ts`.
 
 ## 6. The canvas in the browser
 

@@ -13,7 +13,7 @@ const [stages, setStages] = createSignal<StageRow[]>([]);
 
 export { stages };
 
-export function receiveStages(message: Extract<ServerMessage, { type: "stages" }>): void {
+export function receiveStages(message: Extract<ServerMessage, { type: "canvas.list" }>): void {
 	setStages(message.stages);
 }
 

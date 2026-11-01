@@ -602,7 +602,7 @@ export class Registry {
 
 	publish(): void {
 		this.emit({
-			type: "agents",
+			type: "agent.list",
 			chats: this.chats(),
 			defaultKind: this.host.defaultKind,
 			...(this.focusedId ? { focused: this.focusedId } : {}),
@@ -611,7 +611,7 @@ export class Registry {
 
 	greet(reply: (message: ServerMessage) => void): void {
 		reply({
-			type: "agents",
+			type: "agent.list",
 			chats: this.chats(),
 			defaultKind: this.host.defaultKind,
 			...(this.focusedId ? { focused: this.focusedId } : {}),

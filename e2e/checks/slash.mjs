@@ -52,7 +52,7 @@ const commands = [
 ];
 
 await feed({
-	type: "agents",
+	type: "agent.list",
 	defaultKind: "claude",
 	focused: "s1",
 	chats: [

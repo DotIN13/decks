@@ -78,7 +78,7 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
  * is away, which is the only way that state exists — it is derived, not sent.
  */
 await feed({
-	type: "agents",
+	type: "agent.list",
 	defaultKind: "pi",
 	focused: "a1",
 	chats: [
@@ -615,7 +615,7 @@ say("…and each heading carries a + that makes an agent in that project, instea
  * says something, not when it opens a tool or changes state.
  */
 await feed({
-	type: "agents",
+	type: "agent.list",
 	defaultKind: "pi",
 	focused: "a1",
 	chats: [
@@ -765,7 +765,7 @@ await page.keyboard.press("Escape");
  * not a sentence: pressing it opens the panel on its Agents tab, which is where the rest are.
  */
 await feed({
-	type: "agents",
+	type: "agent.list",
 	chats: Array.from({ length: 16 }, (_, index) => chat(`m${index}`, `Many ${index}`, "claude", "idle", undefined, 60_000 * (index + 1))),
 });
 await settle(page, 500);

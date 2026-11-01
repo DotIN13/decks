@@ -55,7 +55,7 @@ export function openLine(options: LineOptions): LineClient {
 		socket = ws;
 		ws.onopen = () => {
 			wait = 500;
-			ws.send(JSON.stringify({ type: "hello", token: options.token(), watch: options.watch() } satisfies LineClientMessage));
+			ws.send(JSON.stringify({ type: "line.hello", token: options.token(), watch: options.watch() } satisfies LineClientMessage));
 			options.onState?.(true, everOpen);
 			everOpen = true;
 			while (queue.length) ws.send(JSON.stringify(queue.shift()));
@@ -67,7 +67,7 @@ export function openLine(options: LineOptions): LineClient {
 			} catch {
 				return;
 			}
-			if (message.type === "answer") {
+			if (message.type === "call.answered") {
 				const done = pending.get(message.id);
 				pending.delete(message.id);
 				done?.({ ok: message.ok, ...(message.value !== undefined ? { value: message.value } : {}), ...(message.error ? { error: message.error } : {}), ...(message.notes ? { notes: message.notes } : {}) });
@@ -108,11 +108,11 @@ export function openLine(options: LineOptions): LineClient {
 			const id = `c${(nextId += 1).toString(36)}`;
 			return new Promise<LineAnswer>((resolve) => {
 				pending.set(id, resolve);
-				send({ type: "call", id, verb, args: [...args], ...(edit ? { edit } : {}) });
+				send({ type: "line.call", id, verb, args: [...args], ...(edit ? { edit } : {}) });
 			});
 		},
 		setToken(token) {
-			if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "token", token } satisfies LineClientMessage));
+			if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "line.token", token } satisfies LineClientMessage));
 		},
 		stop() {
 			stopped = true;

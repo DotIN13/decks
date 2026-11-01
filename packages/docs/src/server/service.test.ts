@@ -178,7 +178,7 @@ test("a host with only a socket answers every message through handle", () => {
 	const state = replies[0] as Extract<ServerMessage, { type: "doc.state" }>;
 	docs.handle({ type: "doc.patch", path: "a.md", client: "p", rev: state.rev, batch: "b", splices: [{ at: 3, before: "", text: "!" }] }, (m) => replies.push(m));
 	docs.handle({ type: "doc.restore", path: "a.md", client: "p", sha: "zzz" }, (m) => replies.push(m));
-	assert.deepEqual(replies.map((m) => m.type), ["doc.state", "doc.patched", "notice"]);
+	assert.deepEqual(replies.map((m) => m.type), ["doc.state", "doc.patched", "harness.notice"]);
 	assert.equal(readFileSync(join(root, "a.md"), "utf8"), "one!\n");
 	assert.equal(changed(sent).length, 1);
 	done();

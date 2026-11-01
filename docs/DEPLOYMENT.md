@@ -383,7 +383,7 @@ curl -s -i --http1.1 \
 **`--http1.1` on that last one is not optional.** Over HTTP/2 the `Upgrade` headers are
 ignored, the request falls through to the SPA catch-all, and you get `200` and a page of
 HTML — a false pass that looks like success. A working socket answers `101 Switching
-Protocols` and then immediately sends `deck.state`, the agent list and the model catalogue,
+Protocols` and, once the page says hello with its token, sends `harness.hello`, `deck.changed`, the agent list and the model catalogue,
 which incidentally confirms §6 worked.
 
 Then the containment checks, which are the ones people skip:

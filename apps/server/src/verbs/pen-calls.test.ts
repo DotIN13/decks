@@ -199,7 +199,7 @@ test("a placeholder frame an agent draws names that agent as the canvas's writer
 		// A person's edit over the wire leaves the writer as it was.
 		app.pens.edit(stage, [{ op: "update", id: "hero", set: { x: 10 } }] as never);
 		assert.equal(app.pens.writerOf(stage), agent.id);
-		const [delta] = app.pens.changes([agent.id], stage);
+		const delta = app.pens.changes([agent.id], stage).find((one) => one.type === "stage.pen.delta");
 		assert.equal(delta?.type === "stage.pen.delta" && delta.by, agent.id);
 	} finally {
 		cleanup();

@@ -61,7 +61,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 			}
 			if (req.query.limits) void app.refreshLimits();
 			let accounts: { accounts?: unknown[]; active?: string } = {};
-			if (agent.kind === "claude") await app.publishAccounts((frame) => frame.type === "claude.accounts" && (accounts = frame));
+			if (agent.kind === "claude") await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
 			res.set("cache-control", "no-store").json({
 				id: agent.id,
 				kind: agent.kind,

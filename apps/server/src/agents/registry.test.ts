@@ -288,9 +288,9 @@ test("the newest restored chat is the focused one", () => {
 
 	const { registry, sent } = registryOn(deck);
 	registry.restore();
-	const last = sent.filter((message) => message.type === "agents").at(-1);
+	const last = sent.filter((message) => message.type === "agent.list").at(-1);
 
-	assert.equal(last?.type === "agents" && registry.get(last.focused ?? "")?.chat().name, "Newer");
+	assert.equal(last?.type === "agent.list" && registry.get(last.focused ?? "")?.chat().name, "Newer");
 	cleanup();
 });
 

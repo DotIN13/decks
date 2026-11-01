@@ -116,7 +116,7 @@ await settle(page, 300);
 const onScreen = async (selector) => (await page.locator(`${selector}:visible`).count()) > 0;
 
 const busy = async (kind) => {
-	await feed({ type: "agents", defaultKind: "pi", focused: "a1", chats: [chat("a1", "One", kind, "streaming")] });
+	await feed({ type: "agent.list", defaultKind: "pi", focused: "a1", chats: [chat("a1", "One", kind, "streaming")] });
 	await settle(page, 400);
 	return page.evaluate(() => {
 		const svg = document.querySelector("svg.mark[data-agent][data-busy]");

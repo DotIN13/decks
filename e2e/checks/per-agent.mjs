@@ -163,7 +163,7 @@ await page.locator(".dockfield").fill("meant for Ada");
 await selectCard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksCards?.() ?? [])[0]?.path));
 await (await canvasFrame(page)).waitForSelector('.card-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
-await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
+await feed({ type: "agent.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
 await settle(page, 500);
 
 const ada = await look();
@@ -258,7 +258,7 @@ say("…and its stage really is empty", empty.shown.length === 0, JSON.stringify
  * conversation on screen is drawn — the other is reported by the agent list, not by a
  * dialog over somebody else's transcript.
  */
-await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q2", method: "confirm", title: "Second question", message: "also Ada's" } });
+await feed({ type: "agent.prompt", agentId: A, prompt: { id: "q2", method: "confirm", title: "Second question", message: "also Ada's" } });
 await settle(page, 500);
 say("a background agent's question does not appear over your conversation", (await look()).dialog === null, JSON.stringify((await look()).dialog));
 

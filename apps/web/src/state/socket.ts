@@ -109,7 +109,7 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 			attempt = 0;
 			// The token first, as the socket's own message: nothing is heard before it (`server/src/ws.ts`).
 			const token = socketToken();
-			if (token && here?.kind !== "bundle") socket?.send(JSON.stringify({ type: "hello", token } satisfies ClientMessage));
+			if (token && here?.kind !== "bundle") socket?.send(JSON.stringify({ type: "hello", token, v: 2 } satisfies ClientMessage));
 			onStateChange(true);
 			while (queue.length > 0) socket?.send(JSON.stringify(queue.shift()));
 		};

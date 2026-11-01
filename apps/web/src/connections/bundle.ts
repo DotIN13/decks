@@ -113,14 +113,14 @@ export function greeting(id: string, manifest: BundleManifest): ServerMessage[] 
 		inPlay: paths,
 	} as unknown as AgentChat;
 	return [
-		{ type: "backend", backend: { name: manifest.stage.title, can: { agents: false, write: false, share: false } } },
-		{ type: "runtimes", list: [] },
-		{ type: "deck.state", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.boards, roots: [] } },
-		{ type: "agents", chats: [reader], focused: READER, defaultKind: "claude" },
+		{ type: "harness.hello", backend: { name: manifest.stage.title, can: { agents: false, write: false, share: false } } },
+		{ type: "harness.runtimes", list: [] },
+		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.boards, roots: [] } },
+		{ type: "agent.list", chats: [reader], focused: READER, defaultKind: "claude" },
 		{ type: "stage.pen", agentId: READER, stage: manifest.stage.name, rev: manifest.stage.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) },
-		{ type: "stages", stages: [{ name: manifest.stage.name, title: manifest.stage.title, boards: manifest.boards.length, rev: manifest.stage.rev, agents: [], words: "" }] },
-		{ type: "settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-		{ type: "pairing", paired: [] },
+		{ type: "canvas.list", stages: [{ name: manifest.stage.name, title: manifest.stage.title, boards: manifest.boards.length, rev: manifest.stage.rev, agents: [], words: "" }] },
+		{ type: "harness.settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+		{ type: "harness.paired", paired: [] },
 	];
 }
 
@@ -146,7 +146,7 @@ export class BundleBackend {
 			(error: Error) => {
 				this.readyState = 1;
 				this.onopen?.();
-				this.deliver({ type: "notice", level: "error", text: error.message } as ServerMessage);
+				this.deliver({ type: "harness.notice", level: "error", text: error.message } as ServerMessage);
 			},
 		);
 	}

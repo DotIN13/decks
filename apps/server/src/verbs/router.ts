@@ -1,5 +1,6 @@
-import { VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
+import { VERBS, PERSON_VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME, PERSON_VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
+import type { ServerMessage } from "@decks/protocol";
 import type { App } from "../app.ts";
 import { appActor, callerTool, canvasHolds, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
@@ -8,7 +9,8 @@ import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
 import { renamedVerb } from "./renamed.ts";
 import { penEditBy } from "../stage/pens.ts";
-import { settleStage } from "../wire/deck.ts";
+import { settleStage } from "../stage/pending.ts";
+import { personTable, type PersonCall } from "./person-table.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
 /**
@@ -37,9 +39,11 @@ export function verbRoutes(app: App): express.Router {
 	const router = express.Router();
 	const allowedOnce = app.appsAllowedOnce;
 
-	router.get("/", (_req, res) => {
+	router.get("/", (req, res) => {
+		// The person's own verbs are listed to the person: an agent's command does not have them.
+		const mine = req.principal?.kind === "person" || req.principal?.kind === "site" ? [...VERBS, ...PERSON_VERBS] : VERBS;
 		res.set("cache-control", "no-store").json({
-			verbs: VERBS.map((verb) => ({ name: verb.name, group: verb.group, touches: verb.touches, effect: verb.effect, summary: verb.summary, signature: signature(verb) })),
+			verbs: mine.map((verb) => ({ name: verb.name, group: verb.group, touches: verb.touches, effect: verb.effect, summary: verb.summary, signature: signature(verb), ...(verb.who ? { who: verb.who } : {}) })),
 		});
 	});
 
@@ -193,12 +197,31 @@ export function verbRoutes(app: App): express.Router {
  * tool found for the token, and the answer as the SDK reads it, with the status a request would get.
  * `headers` carry what the caller says it acts on (`X-Decks-Stage`, `X-Decks-Agent`, `X-Decks-Edit`).
  */
-export async function runVerb(app: App, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string): Promise<{ status: number; answer: VerbAnswer }> {
+export async function runVerb(app: App, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string, asked?: Partial<Pick<PersonCall, "tell" | "view">>): Promise<{ status: number; answer: VerbAnswer }> {
 	const refuse = (status: number, error: string) => ({ status, answer: { ok: false, error, notes: [] } satisfies VerbAnswer });
-	const verb = VERB_BY_NAME.get(name);
+	const verb = VERB_BY_NAME.get(name) ?? PERSON_VERB_BY_NAME.get(name);
 	if (!verb) return refuse(404, renamedVerb(name) ?? `There is no verb called ${name}. GET /api/v1 lists them.`);
 	const args = rawArgs === undefined ? [] : rawArgs;
 	if (!Array.isArray(args)) return refuse(400, `Send the arguments as a list: { "args": [...] }. ${signature(verb)}`);
+	if (verb.who === "person") {
+		// The person's own verbs (`person-table.ts`): the harness answers them itself, for the person or a paired site and nobody else.
+		if (principal?.kind !== "person" && principal?.kind !== "site") return refuse(403, `${name} is the person's to call, from a Decks page or a paired site.`);
+		const problem = checkArgs(verb, args);
+		if (problem) return refuse(400, problem);
+		const header = (key: string) => {
+			const value = headers[key];
+			return typeof value === "string" && value.trim() ? value.trim() : undefined;
+		};
+		const notes: string[] = [];
+		const tell = asked?.tell ?? ((message: ServerMessage) => notes.push(JSON.stringify(message)));
+		const on = { ...(header("x-decks-stage") ? { stage: header("x-decks-stage") } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent") } : {}), ...(header("x-decks-edit") ? { edit: header("x-decks-edit")!.slice(0, 80) } : {}) };
+		try {
+			const value = await personTable(app)[name]!(args, { tell, ...(asked?.view ? { view: asked.view } : {}), on });
+			return { status: 200, answer: { ok: true, ...(value !== undefined ? { value } : {}), notes } };
+		} catch (error) {
+			return { status: 422, answer: { ok: false, error: error instanceof Error ? error.message : String(error), notes } };
+		}
+	}
 	if (principal?.kind === "canvas") {
 		const refused = refusedForCanvas(app, name, args, principal.canvas, principal.role);
 		if (refused) return refuse(403, refused);
@@ -351,7 +374,7 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 		const path = (message as { path?: unknown }).path;
 		return typeof path === "string" && app.documentsOn(canvas).has(path);
 	}
-	if (message.type === "stage.call") {
+	if (message.type === "view.called") {
 		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
 		if (!call || !["show", "camera", "reload", "cursor", "shot"].includes(call.op ?? "")) return false;
 		// A cursor, a reload or a card's picture names a card: the frame showing the canvas it is on answers, whoever's home that is.
@@ -365,7 +388,7 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 	// An agent at work on a card: the frame showing the canvas it is on draws the agent's cursor there.
 	if (message.type === "agent.act") return typeof message.path === "string" && boardOnCanvas(app, message.path, canvas);
 	// An app's state, for a canvas holding an item of that app.
-	if (message.type === "app.state") return typeof message.name === "string" && canvasHolds(app.stage.pens, canvas, appActor(message.name));
+	if (message.type === "app.changed") return typeof message.name === "string" && canvasHolds(app.stage.pens, canvas, appActor(message.name));
 	if (message.type === "card.changed") {
 		const board = message.card as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;

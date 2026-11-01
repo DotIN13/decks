@@ -17,7 +17,7 @@ test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", (
 		let held = first.doc;
 		let rev = first.rev;
 		const take = () => {
-			const [delta] = pens.changes(["agent"], name) as unknown as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>;
+			const delta = (pens.changes(["agent"], name) as unknown as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>).find((one) => one.type === "stage.pen.delta");
 			assert.equal(delta!.type, "stage.pen.delta");
 			assert.equal(delta!.from, rev);
 			held = applyEdits(held, delta!.edits);
@@ -76,7 +76,7 @@ test("a drawing sent whole to one browser takes no names from the others' next d
 		penEditBy.run("tab.1", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 40 } }] as never));
 		const whole = pens.frame("agent", name) as { made?: string[] };
 		assert.deepEqual(whole.made, ["tab.1"], "the one asking hears it too");
-		const [delta] = pens.changes(["agent"], name) as Array<{ type: string; made?: string[] }>;
+		const delta = (pens.changes(["agent"], name) as Array<{ type: string; made?: string[] }>).find((one) => one.type === "stage.pen.delta");
 		assert.equal(delta!.type, "stage.pen.delta");
 		assert.deepEqual(delta!.made, ["tab.1"], "and so do the others");
 		penEditBy.run("tab.2", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 41 } }] as never));

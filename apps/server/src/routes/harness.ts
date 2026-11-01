@@ -17,7 +17,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/harness",
 		asyncRoute(async (req, res) => {
 			let accounts: { accounts?: unknown[]; active?: string } = {};
-			await app.publishAccounts((frame) => frame.type === "claude.accounts" && (accounts = frame));
+			await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
 			const settings = app.settings.get();
 			const you = req.tokenId;
 			res.set("cache-control", "no-store").json({

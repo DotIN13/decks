@@ -108,20 +108,20 @@ function heardState(id: string, state_: AgentState, hooks: FrameHooks): void {
  */
 export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 	switch (message.type) {
-				case "backend":
+				case "harness.hello":
 					setBackend(message.backend);
 					return;
-				case "pairing": {
+				case "harness.paired": {
 					const { type: _type, ...rest } = message;
 					setPairing(rest);
 					return;
 				}
-				case "runtimes":
+				case "harness.runtimes":
 					// A property of the machine rather than of the deck, so it travels beside
 					// the greeting instead of inside it.
 					setState("runtimes", message.list);
 					return;
-				case "deck.state":
+				case "deck.changed":
 					setState("deck", message.deck);
 					/*
 					 * Reconciled by path, not replaced.
@@ -136,12 +136,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("pages", reconcile(message.deck.boards, { key: "path", merge: false }));
 					hooks.landed();
 					return;
-				case "board.sized": {
-					// One number on one board; the rest of the deck, and this board's document, are as they were.
-					const index = state.pages.findIndex((existing) => existing.path === message.path);
-					if (index !== -1 && state.pages[index]!.h !== message.h) setState("pages", index, "h", message.h);
-					return;
-				}
 				case "card.changed": {
 					if (message.removed) {
 						setState("pages", (boards) => boards.filter((board) => board.path !== message.path));
@@ -175,7 +169,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					}
 					return;
 				}
-				case "agents": {
+				case "agent.list": {
 					const focused = message.focused ?? state.focused;
 					// A different conversation is a different history: the turn the chat was
 					// opened at belongs to the one you were reading.
@@ -380,7 +374,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 				}
 
-				case "timeline.preview":
+				case "chat.preview":
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
 					return;
@@ -399,17 +393,17 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 
 				// What stages there are, and who is on them: the manager's whole list.
-				case "stages":
+				case "canvas.list":
 					receiveStages(message);
 					return;
 
-				case "context.changed":
+				case "agent.context":
 					setState("contexts", message.agentId, message.boards);
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "inPlay", message.inPlay);
 					return;
 
-				case "stage.call": {
+				case "view.called": {
 					/*
 					 * The canvas in its frame answers an agent's view on the canvas it shows, from its own stream
 					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
@@ -484,7 +478,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 				}
 
-				case "extension.ui.prompt":
+				case "agent.prompt":
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "dialog", message.prompt);
 					// Drawn in the dock, above the input bar, so it needs nothing dragged
@@ -508,27 +502,27 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					});
 					return;
 
-				case "extension.ui.prompt.closed":
+				case "agent.promptClosed":
 					if (state.agents[message.agentId]) setState("agents", message.agentId, "dialog", (current) => (current?.id === message.id ? undefined : current));
 					return;
 
-				case "notice":
+				case "harness.notice":
 					notice(message.level, message.text);
 					// Only `error`. A warning is a thing worth reading when you get to it, and an
 					// app that makes a noise for every one of those is an app people mute.
 					if (message.level === "error") hooks.raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
 					return;
 
-				case "composer.draft":
+				case "chat.draft":
 					// A rewound message, for the conversation that was rewound — the one on screen.
 					setDraft({ text: message.text, at: Date.now(), ...(state.focused ? { agentId: state.focused } : {}) });
 					return;
 
-				case "document.created":
+				case "doc.created":
 					hooks.hearCreated(message.request, message.path);
 					return;
 
-				case "claude.accounts": {
+				case "account.list": {
 					setState({ accounts: message.accounts, activeAccount: message.active });
 					/*
 					 * Which subscription each agent spends arrives as one map and is scattered onto
@@ -545,14 +539,14 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * The shared Chrome. The code rides only on the greeting's copy, so a later
 				 * status keeps the code the greeting brought rather than dropping it.
 				 */
-				case "settings":
+				case "harness.settings":
 					// The zone first, so everything the store change redraws is drawn in it.
 					setTimeZone(message.settings.timezone);
 					setState("settings", reconcile(message.settings));
 					setState("machineZone", message.machineZone);
 					setState("sttKey", message.sttKey === true);
 					return;
-				case "web.status":
+				case "web.changed":
 					setState("web", { status: message.status, code: message.code ?? state.web?.code });
 					return;
 
@@ -568,7 +562,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.id, "spending", message.account);
 					accountChanged(message.id);
 					return;
-				case "error":
+				case "harness.error":
 					notice("error", message.text);
 					hooks.raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
 					return;

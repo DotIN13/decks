@@ -552,8 +552,8 @@ export class DeckAgent {
 		}
 
 		this.bridge = new ExtensionUiBridge({
-			prompt: (prompt) => this.emit({ type: "extension.ui.prompt", agentId: this.id, prompt }),
-			closePrompt: (id) => this.emit({ type: "extension.ui.prompt.closed", agentId: this.id, id }),
+			prompt: (prompt) => this.emit({ type: "agent.prompt", agentId: this.id, prompt }),
+			closePrompt: (id) => this.emit({ type: "agent.promptClosed", agentId: this.id, id }),
 			notify: (text, level) => this.translator.notice(level, text),
 			status: () => {},
 			working: () => {},
@@ -977,7 +977,7 @@ export class DeckAgent {
 	}
 
 	private publishContext(): void {
-		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
+		this.emit({ type: "agent.context", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		// The boards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.save();
@@ -2065,7 +2065,7 @@ export class DeckAgent {
 	 * question is never redrawn waits forever.
 	 */
 	greet(reply: (message: ServerMessage) => void): void {
-		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", agentId: this.id, prompt });
+		for (const prompt of this.bridge.outstanding()) reply({ type: "agent.prompt", agentId: this.id, prompt });
 		if (this.mine.length > 0) reply({ type: "agent.queued", agentId: this.id, items: this.mine.map((one) => ({ ...one })), held: this.mineHeld });
 	}
 
