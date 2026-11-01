@@ -30,6 +30,7 @@ import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { ENGINE, knownGpuClass, PICTURES, readGpuClass } from "./device.ts";
 import { upgrades } from "./picture-ladder.ts";
 import { noticeFor } from "./backends/notice.ts";
+import { RULES } from "../device/profile.ts";
 
 /** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
 export const pictureKey = (path: string) => `card:${path}`;
@@ -37,7 +38,7 @@ export const pictureKey = (path: string) => `card:${path}`;
 const fetchable = (card: SceneCard) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture);
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
-const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
+const BAND_PX = RULES.lineReach;
 /** How long the camera rests before the pictures are held to their budget (`fitPictures`). */
 const REST_MS = 250;
 

@@ -18,6 +18,7 @@ import type { PageBox, Pt, Rect } from "./model.ts";
 import { childrenOf, marqueeRect, parentOf } from "./pick.ts";
 import { HANDLES, radiusStart, type Handle, type RadiusStart } from "./resize.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** A move in progress, by how much. */
 export type Offset = { dx: number; dy: number };
@@ -191,7 +192,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 }
 
 /** Handles hide when the box they would sit on is under this many screen pixels both ways: they would cover it. */
-export const HANDLES_MIN_PX = 10;
+export const HANDLES_MIN_PX = SAME.handleMin;
 
 /** Whether a box is too small on the screen, both ways, at this zoom, to wear handles. */
 export const tooSmallForHandles = (box: { w: number; h: number }, zoom: number) => box.w * zoom < HANDLES_MIN_PX && box.h * zoom < HANDLES_MIN_PX;
@@ -497,7 +498,7 @@ export const gripHidden = (drag: Offset, resizing: boolean) => !!(drag.dx || dra
 export const pageHandleList = (): readonly Handle[] => HANDLES;
 
 /** A resize handle answers a press this many screen pixels across under a pointer, whatever size it is drawn; a finger gets 44 (`dom/touch-rules.ts`). */
-export const HANDLE_HIT_PX = 15;
+export const HANDLE_HIT_PX = SAME.handleReach;
 
 /** How far a handle's hit zone reaches past its drawn box on each side, in stage pixels: `size` is the drawn width, in stage pixels, `hit` how wide it answers on the screen. */
 export const hitReach = (size: number, zoom: number, hit = HANDLE_HIT_PX) => Math.max(0, (hit / zoom - size) / 2);

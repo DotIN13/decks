@@ -962,18 +962,17 @@
 	 * but as bands with nothing to see, and the size label and the arrow anchors are not shown, so
 	 * a selection is a box with four dots and nothing else round it.
 	 */
-	@media (pointer: coarse) {
-	.world > .pen-handle {
+	/* By the form (`device/profile.ts`, `data-touch` on the root), not the pointer media query: the rules table says it. */
+	:root[data-touch] .world > .pen-handle {
 		border-radius: 50%;
 	}
-	.world > .pen-handle:is([data-handle="n"], [data-handle="s"], [data-handle="e"], [data-handle="w"]) {
+	:root[data-touch] .world > .pen-handle:is([data-handle="n"], [data-handle="s"], [data-handle="e"], [data-handle="w"]) {
 		background: transparent;
 		box-shadow: none;
 	}
-	.world > :is(.pen-size, .pen-anchor) {
+	:root[data-touch] .world > :is(.pen-size, .pen-anchor) {
 		display: none;
 	}
-}
 	/*
 	 * The one film or sound playing, laid over the item it belongs to (`Stage.tsx`, `playingBox`).
 	 *

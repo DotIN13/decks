@@ -13,7 +13,8 @@ import { StageInk } from "../edit/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
-import { overlayJson, rgbOf } from "../edit/core/overlay-json.ts";
+import { overlayJson } from "../edit/core/overlay-json.ts";
+import { rgbOf } from "../edit/dom/rgb.ts";
 import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
 import { scheme } from "../lib/theme.ts";
@@ -587,6 +588,8 @@ export function Stage(props: StageProps) {
 			return { accent: read("--color-accent"), panel: rgbOf(getComputedStyle(element).getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] as [number, number, number] };
 		});
 		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
+		// For the rules checks: what the engine was last told to draw round the selection.
+		(globalThis as { __decksOverlay?: string }).__decksOverlay = json;
 		setEngineOverlays(penLayer.setOverlay(json));
 	});
 	penLayer.drawn = () => {

@@ -8,22 +8,23 @@
  * them before they were decided here.
  */
 import type { PenTool, PointerKind, Pt } from "./model.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** Before a press moves this far on the screen, it has not moved: `follow` holds its first step back. */
-export const DRAG_SLOP_PX = 3;
+export const DRAG_SLOP_PX = SAME.slop.mouse;
 /** A finger that has gone this far on the screen is a pan or a carry, not a tap. */
-export const TAP_SLOP_PX = 10;
+export const TAP_SLOP_PX = SAME.tapPx;
 /** A finger held longer than this before it lifts is not a tap. */
-export const TAP_MS = 600;
+export const TAP_MS = SAME.tapMs;
 /** A second tap on the same item within this long: a double tap, which opens its words. */
-export const SECOND_TAP_MS = 400;
-/** Two taps on bare canvas this close in time and on the screen: the canvas menu, as a double-click is. */
-export const BARE_TAP_MS = 350;
-export const BARE_TAP_PX = 30;
+export const SECOND_TAP_MS = SAME.secondTapMs;
+/** Two taps on bare canvas this close in time and on the screen: a note there, as a double-click is. */
+export const BARE_TAP_MS = SAME.bareSecondTapMs;
+export const BARE_TAP_PX = SAME.bareSecondTapPx;
 /** A double-click this soon after the camera was dragged is the end of a pan, not a double-click. */
-export const PANNED_MS = 400;
+export const PANNED_MS = SAME.clickAfterPanMs;
 /** A double-click this soon after a tool made an item is that click's second press. */
-export const MADE_MS = 500;
+export const MADE_MS = SAME.clickAfterMakeMs;
 
 /** Where a press landed: the bare stage, a drawn item's click shape over a board, or anything else (a board, a handle, chrome). */
 export type PressTarget = "stage" | "drawn" | "other";

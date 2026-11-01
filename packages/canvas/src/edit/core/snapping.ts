@@ -5,9 +5,10 @@
 import { isArrow } from "@decks/pen";
 import type { Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** Snapping reaches this many screen pixels, whatever the zoom. */
-export const SNAP_PX = 5;
+export const SNAP_PX = SAME.snapPx;
 
 /**
  * The items around a selection and the boards, as far as `view` (the window, in stage pixels)

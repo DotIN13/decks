@@ -4,6 +4,7 @@
 import { isShape, type PenNode } from "@decks/pen";
 import type { Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /**
  * The topmost frame under a point. Only frames that place their children where they say, unless
@@ -90,7 +91,7 @@ function slotLine(frame: LaidOut, before: Rect | undefined, after: Rect | undefi
 }
 
 /** Screen pixels round the pointer within which a drag shows the places it could drop into. */
-export const NEAR_PX = 200;
+export const NEAR_PX = SAME.nearPx;
 
 /** Every place a drag could land near the pointer: slot lines in frames that arrange their children, and frames that do not. */
 export type NearDrops = { slots: readonly Rect[]; frames: readonly Rect[] };

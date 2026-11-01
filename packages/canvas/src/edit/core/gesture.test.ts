@@ -109,6 +109,24 @@ test("a drag snaps the selection's edge to its neighbour, and ⌘ or Ctrl turns 
 	assert.deepEqual(ctrl.state.drag, { dx: 287, dy: 0 });
 });
 
+test("rules, snap.by-pointer: a finger's carry snaps to its neighbour's edge as a mouse's does, and the lift clears the guide", () => {
+	const start = withSelection(initialState("edit"), { items: ["a"] });
+	// 287 screen pixels right at 100%: a's right edge at 397, 3 short of b's left edge at 400.
+	const carried = run(
+		start,
+		[
+			{ type: "carry", from: { at: { x: 50, y: 40 }, client: { x: 50, y: 40 } }, ...at(337, 40, {}, 1000, "touch") },
+			{ type: "move", ...at(337, 40, {}, 1000, "touch") },
+		],
+		ctx(WIDE),
+	);
+	assert.deepEqual(carried.state.drag, { dx: 290, dy: 0 });
+	assert.ok(carried.state.guides.some((guide) => guide.kind === "line" && guide.x1 === 400 && guide.x2 === 400));
+	const lift = step(carried.state, { type: "release", ...at(337, 40, {}, 1000, "touch") }, scene, ctx(WIDE));
+	assert.deepEqual(lift.ops, [{ op: "update", id: "a", set: { x: 300, y: 20 } }]);
+	assert.deepEqual(lift.state.guides, []);
+});
+
 test("Shift keeps a drag to one axis, the one it has gone further along", () => {
 	const across = run(initialState("edit"), [{ type: "press-canvas", ...at(50, 40) }, { type: "move", ...at(91, 55, { shift: true }) }]).steps[1]!;
 	assert.deepEqual(across.state.drag, { dx: 41, dy: 0 });

@@ -7,6 +7,7 @@ import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
+import { RULES } from "../device/profile.ts";
 import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
@@ -146,6 +147,57 @@ export function createStageInput(deps: StageInputDeps) {
 		for (const kind of ["pointerup", "pointercancel"] as const) window.addEventListener(kind, letGo, true);
 		onCleanup(() => {
 			for (const kind of ["pointerup", "pointercancel"] as const) window.removeEventListener(kind, letGo, true);
+		});
+		/*
+		 * The coast after a flick, on touch (`coast.by` in the rules): ours, not the browser's. While one
+		 * finger pans, the browser scrolls and the camera follows; the scroll is sampled meanwhile. At the
+		 * lift the browser's momentum is stopped where it is (no overflow for a frame, the scroll pinned)
+		 * and the camera coasts on from the finger's own speed (`ctl.coast`). The browser's momentum
+		 * owned every finger that landed during it, so on an iPad a second finger could not start a pinch
+		 * until it ran down; ours is stopped by any finger (`touch`, `cancelCoast`), so a pinch mid-coast
+		 * is an ordinary pinch.
+		 */
+		let flick: { t: number; left: number; top: number }[] | undefined;
+		const sampleFlick = () => {
+			if (!flick) return;
+			flick.push({ t: performance.now(), left: element.scrollLeft, top: element.scrollTop });
+			if (flick.length > 12) flick.shift();
+		};
+		const flickStart = (event: TouchEvent) => {
+			// One finger on the glass, left to the browser to scroll: a flick in the making. Any other count is not.
+			flick = event.touches.length === 1 && keptTouches.size === 0 && RULES.coastBy === "ours" ? [{ t: performance.now(), left: element.scrollLeft, top: element.scrollTop }] : undefined;
+		};
+		const flickEnd = (event: TouchEvent) => {
+			const samples = flick;
+			flick = undefined;
+			if (!samples || event.touches.length > 0) return;
+			const now = performance.now();
+			const recent = samples.filter((sample) => now - sample.t <= 100);
+			if (recent.length < 2) return;
+			const first = recent[0]!;
+			const last = recent[recent.length - 1]!;
+			const dt = Math.max(1, last.t - first.t);
+			// The content moves against the scroll: a finger thrown right scrolled left.
+			const v = { vx: -(last.left - first.left) / dt, vy: -(last.top - first.top) / dt };
+			if (Math.hypot(v.vx, v.vy) < 0.15) return;
+			const left = element.scrollLeft;
+			const top = element.scrollTop;
+			element.style.overflow = "hidden";
+			element.scrollTo(left, top);
+			requestAnimationFrame(() => {
+				element.style.overflow = "";
+			});
+			ctl.coast(v);
+		};
+		element.addEventListener("scroll", sampleFlick, { passive: true });
+		element.addEventListener("touchstart", flickStart, { passive: true });
+		element.addEventListener("touchend", flickEnd, { passive: true });
+		element.addEventListener("touchcancel", flickEnd, { passive: true });
+		onCleanup(() => {
+			element.removeEventListener("scroll", sampleFlick);
+			element.removeEventListener("touchstart", flickStart);
+			element.removeEventListener("touchend", flickEnd);
+			element.removeEventListener("touchcancel", flickEnd);
 		});
 		/*
 		 * Two fingers on the canvas are one pinch, and the canvas's own (`touch`, `pinchCamera`): it zooms

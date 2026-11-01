@@ -49,6 +49,7 @@
  *   still has. It contributes no step of its own — there is no previous position to
  *   measure from — and drives the gesture from there.
  */
+import { SAME } from "../device/rules.ts";
 
 export interface Finger {
 	id: number;
@@ -176,7 +177,7 @@ export function createTouches(options: { now?: () => number } = {}): Touches {
  * long it takes to lose about two thirds of it, and the whole glide travels `v * tau`.
  * `step` is one frame of it: how far to pan over `dt` milliseconds, and the speed left.
  */
-export const COAST_TAU = 325;
+export const COAST_TAU = SAME.coastTauMs;
 export function coastStep(v: { vx: number; vy: number }, dt: number, tau = COAST_TAU): { dx: number; dy: number; v: { vx: number; vy: number } } {
 	const keep = Math.exp(-dt / tau);
 	const travel = tau * (1 - keep);

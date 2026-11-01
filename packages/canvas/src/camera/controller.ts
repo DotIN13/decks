@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, untrack, type Access
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";
 import { coastStep } from "./touch.ts";
 import { springCurve } from "./spring.ts";
+import { SAME } from "../device/rules.ts";
 
 /**
  * The camera of one stage: where it is, whether it is moving, and the one place that moves it.
@@ -382,8 +383,8 @@ export function createCameraController(host: CameraHost) {
 	 * Chrome reports as `ctrlKey` without ⌘, has its own; every other zoom (⌘ with a wheel, a mouse
 	 * that scrolls in small steps) keeps the one it had.
 	 */
-	const PINCH_TRAVEL = 64;
-	const WHEEL_TRAVEL = 80;
+	const PINCH_TRAVEL = SAME.pinchTravel;
+	const WHEEL_TRAVEL = SAME.wheelTravel;
 	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean; pinch?: boolean }) => {
 		const travel = gesture.pinch ? PINCH_TRAVEL : WHEEL_TRAVEL;
 		if (gesture.zooming) {

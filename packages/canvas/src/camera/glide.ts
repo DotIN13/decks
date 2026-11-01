@@ -6,9 +6,10 @@
  */
 import type { Offset, Rect } from "../edit/core/model.ts";
 import type { SceneQuery } from "../edit/core/scene.ts";
+import { SAME } from "../device/rules.ts";
 
 /** How long a landing glides for. */
-export const GLIDE_MS = 150;
+export const GLIDE_MS = SAME.glideMs;
 
 /** Ease-out, cubic: fast from where it was let go, slow into where it lands. */
 export const easeOut = (k: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);

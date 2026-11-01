@@ -24,6 +24,7 @@ import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
 import { pageResizeEnd, pageResizeStep, shownPageResize, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, sizeNarrowest, type Handle, type RadiusStart } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
 import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** How long a let-go gesture waits for the drawing that answers it before its preview goes anyway. */
 export const SETTLE_MS = 2000;
@@ -195,6 +196,9 @@ const landed = (state: EditorState): EditorState => ({ ...state, drag: ZERO, res
 const isFree = (mods: Mods) => mods.meta || mods.ctrl;
 const done = (state: EditorState, effects: Effect[] = [], ops: Op[] = []): Step => ({ state, ops, effects });
 
+/** Whether a drag by this pointer snaps (`device/rules.json`, `snap.by-pointer`). */
+const snaps = (pointer: PointerInput["pointer"]): boolean => SAME.snapBy[pointer];
+
 /** Start carrying `ids` and `boards` from a press. The ghost's picture is cut now, before anything leaves the sheet. */
 function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: PointerInput, ids: readonly string[], boards: readonly string[], tap?: Tap, touch?: { from: { at: Pt; client: Pt } }): { state: EditorState; effect: Effect } {
 	const gesture: Gesture = {
@@ -202,9 +206,9 @@ function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: Po
 		ids,
 		boards,
 		start: selectionBox(scene, ids, boards),
-		// A finger does not snap, so it never asks what is around.
-		targets: touch ? [] : snapTargets(scene, ids, boards, ctx.view),
-		reading: touch ? [] : readingTargets(scene, ids, boards, ctx.view),
+		// What it snaps to, for every pointer the rules let snap (`snap.by-pointer`: all of them, a finger too).
+		targets: snaps(touch ? "touch" : p.pointer) ? snapTargets(scene, ids, boards, ctx.view) : [],
+		reading: snaps(touch ? "touch" : p.pointer) ? readingTargets(scene, ids, boards, ctx.view) : [],
 		from: touch ? touch.from.at : p.at,
 		fromClient: touch ? touch.from.client : p.client,
 		...(touch ? { touch: true as const } : {}),
@@ -282,6 +286,12 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 			offset = { dx: now.x + gap - card.x, dy: now.y + gap - card.y };
 		}
 		over = !!card;
+		// A finger snaps as a mouse does (`snap.by-pointer`), to edges, centres and the reading gap; a finger has no ⌘ to turn it off.
+		if (!card && start && g.targets.length + g.reading.length > 0) {
+			const snapped = snapMove({ ...start, x: start.x + offset.dx, y: start.y + offset.dy }, g.targets, SNAP_PX / ctx.zoom, g.reading);
+			offset = { dx: offset.dx + snapped.dx, dy: offset.dy + snapped.dy };
+			lines = snapped.guides;
+		}
 		effects.push({ do: "ghost-show", over, client: p.client, gap: 28 });
 	} else {
 		let dx = now.x - g.from.x;
@@ -327,7 +337,7 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 	// A finger carries the boards picked up as they are now; a mouse the ones it picked up.
 	const carried = g.touch ? state.selection.boards : boards;
 	let next: EditorState = { ...state, gesture: { ...g, kind: "move", offset }, drop };
-	if (!g.touch) next = { ...next, guides: lines };
+	next = { ...next, guides: lines };
 	if (ids.length || g.touch) next = { ...next, drag: offset };
 	if (carried.length) next = { ...next, pageDrag: { paths: carried, ...offset } };
 	const preview = ids.length || g.touch ? new Map(ids.map((id) => [id, offset])) : undefined;
@@ -342,7 +352,7 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 	if (g.touch) {
 		const into = state.drop.into;
 		const slot = state.drop.slot?.index;
-		next = { ...next, drop: {} };
+		next = { ...next, drop: {}, guides: [] };
 		const ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
 		if (ids.length) next = settle(next, p.time, ctx, effects, landingBoxes(scene, ids, offset, into));
 		const moves = pageMoves(scene.boards(), state.selection.boards, offset.dx, offset.dy);

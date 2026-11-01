@@ -15,6 +15,7 @@ import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
 import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import { HOLD_MS, slopFor } from "./touch-rules.ts";
+import { RULES } from "../../device/profile.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
 import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
@@ -105,7 +106,7 @@ export type PointerHost = {
 	madeAt: () => number;
 	/** A note at a screen point, open for typing: what the Note tool and a click there make (`InsertMenu`'s `noteAt`). */
 	noteAt: (event: Client) => void;
-	/** A finger held still for `HOLD_MS` (`touch-rules.ts`): the item's menu at the finger, or the canvas's with no item (`ui/HoldMenu.tsx`). */
+	/** A finger held still for `HOLD_MS` (`touch-rules.ts`): the item's menu at the finger, or the canvas's with no item where the rules ask for one (`ui/HoldMenu.tsx`). */
 	holdMenu?: (menu: { ids: string[]; at: Pt; stage: Pt }) => void;
 	toggleMedia: (id: string, media: MediaItem) => void;
 	open: Openers;
@@ -517,9 +518,23 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		let pinched = false;
 		let travelled = false;
 		let held = false;
-		// A finger held still on bare canvas: the canvas's menu at the finger (`holdMenu`), and the lift does nothing more.
+		/*
+		 * A finger held still on bare canvas (`hold.on-bare` in the rules): on touch it starts selecting,
+		 * the finger taken from the camera and dragging a marquee from where it held, as a mouse's press
+		 * on bare canvas does; a second finger still makes a pinch and takes it back (`follow`). A form
+		 * whose rule is a menu opens the canvas's menu at the finger instead (`holdMenu`).
+		 */
 		const hold = setTimeout(() => {
-			if (pinched || travelled || !host.holdMenu || !host.editable() || host.drawing()) return;
+			if (pinched || travelled || !host.editable() || host.drawing()) return;
+			if (RULES.holdOnBare === "marquee") {
+				held = true;
+				done();
+				host.claim(pointer);
+				host.keepTouch?.(event);
+				if (editor.input({ type: "press-canvas", ...pointerInput(event, worldAt(event)) })) followEditor(event);
+				return;
+			}
+			if (!host.holdMenu) return;
 			held = true;
 			host.holdMenu({ ids: [], at: from, stage: worldAt(event) });
 		}, HOLD_MS);

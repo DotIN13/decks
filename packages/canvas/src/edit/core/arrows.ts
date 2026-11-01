@@ -10,13 +10,14 @@ import { ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMi
 import type { Pt, Rect } from "./model.ts";
 import { pickAt } from "./pick.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** An end let go within this many screen pixels of a side's middle keeps to that side (or a quarter of a small box). */
-export const SIDE_PX = 14;
+export const SIDE_PX = SAME.sidePx;
 /** Within this many screen pixels of the side it joins, an end's drag slides the join; further, it re-attaches. */
-export const SLIDE_PX = 18;
+export const SLIDE_PX = SAME.slidePx;
 /** A slid join clicks to a corner or the middle within this many screen pixels, unless Alt is held. */
-export const JOIN_SNAP_PX = 8;
+export const JOIN_SNAP_PX = SAME.joinPx;
 
 export type Which = "from" | "to";
 /** What an end would join at a point: an item or a board, its box to light up, and the side it is near. */

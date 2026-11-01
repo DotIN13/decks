@@ -6,10 +6,11 @@ import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
 import { APP_BAR } from "../render/types.ts";
 import { COARSE } from "../edit/dom/touch-rules.ts";
+import { RULES } from "../device/profile.ts";
 
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
-const EDGE_OUT_PX = COARSE ? 16 : 8;
-const EDGE_IN_PX = COARSE ? 6 : 4;
+const EDGE_OUT_PX = RULES.edgeOut;
+const EDGE_IN_PX = RULES.edgeIn;
 
 /**
  * What the stage hands the slot of one placed item (`Stage`'s `frame` prop): a card, a document, an

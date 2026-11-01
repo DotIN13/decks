@@ -3,6 +3,7 @@ import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } fro
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { COARSE } from "../edit/dom/touch-rules.ts";
+import { RULES } from "../device/profile.ts";
 import { setPropsOpen } from "../edit/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import { canvasHost, openInTab } from "../host.ts";
@@ -112,7 +113,7 @@ export function PageCallout(props: {
 		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
 		if (!slots.length) return { below: false, sure: false };
 		// Under a finger the pill goes below whenever below is on screen: never over what the hand holds, and the same place every time.
-		if (COARSE) return { below: slots.some((slot) => slot.below), sure: true };
+		if (RULES.pillPlace === "below") return { below: slots.some((slot) => slot.below), sure: true };
 		const others = props.obstacles?.() ?? [];
 		const covered = (slot: { from: number; to: number }) => {
 			let area = 0;
@@ -144,7 +145,7 @@ export function PageCallout(props: {
 			// The first time, at once: the pill has nowhere to be yet.
 			if (was === undefined || !untrack(side).sure) return setSide(untrack(choose));
 			// Placed once on touch: a change of the item's size does not send it to the other edge, so it never hops.
-			if (COARSE) return;
+			if (RULES.pillPlace === "below") return;
 			chooseSoon = setTimeout(() => setSide(untrack(choose)), 80);
 		}),
 	);

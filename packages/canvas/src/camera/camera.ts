@@ -1,4 +1,5 @@
 import type { Page, Camera } from "@decks/protocol";
+import { SAME } from "../device/rules.ts";
 
 /**
  * The camera, and the two conversions everything else is built on.
@@ -16,7 +17,7 @@ export const MAX_ZOOM = 4;
  * document as its picture (`items/awake.ts`). Under 40% an item's words are too small to read or press,
  * and an awake item is a surface the page lays out and paints at every step of a pinch.
  */
-export const LIVE_ZOOM = 0.4;
+export const LIVE_ZOOM = SAME.liveZoom;
 
 export interface Viewport {
 	width: number;

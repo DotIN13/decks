@@ -6,6 +6,7 @@
  * Pure arithmetic on stage boxes, so it can be tested without a canvas. `threshold` is in stage
  * units, which the caller works out from a number of screen pixels and the zoom.
  */
+import { SAME } from "../device/rules.ts";
 
 export interface Box {
 	x: number;
@@ -30,7 +31,7 @@ export interface Guide {
 }
 
 /** The gap a board keeps from the next one, beside it or above or below it, for reading them in order. */
-export const READING_GAP = 160;
+export const READING_GAP = SAME.readingGap;
 
 const lines = (b: Box, axis: "x" | "y") => (axis === "x" ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h]);
 const start = (b: Box, axis: "x" | "y") => (axis === "x" ? b.x : b.y);

@@ -18,6 +18,7 @@ import { isLiveFile } from "../model/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { StageEditor } from "../edit/index.ts";
 import type { StageProps } from "./Stage.tsx";
+import { SAME } from "../device/rules.ts";
 
 /** What the items layer needs of the stage around it. */
 export type ItemsLayerDeps = {
@@ -283,7 +284,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
 	type LiveFile = { id: string; file: string; name: string };
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
-	const LIVE_FILES = 12;
+	const LIVE_FILES = SAME.filesLive;
 	/**
 	 * For the browser checks: every card (and old board) on the canvas and where it is on screen, node or
 	 * picture (`rendered`).

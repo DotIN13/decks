@@ -10,6 +10,7 @@
 import { ARROW, arrowEndItem, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
 import type { PageBox, MakingTool, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** Where a new id comes from: each call one not used before. */
 export type NextId = () => string;
@@ -165,7 +166,7 @@ export function copyOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 }
 
 /** How far down and right a duplicate (⌘D, the pill's Duplicate) is put from what it copies. */
-export const DUPLICATE_OFFSET = 24;
+export const DUPLICATE_OFFSET = SAME.duplicateOffset;
 
 /** A copy of each item, `DUPLICATE_OFFSET` down and right of it. */
 export function duplicateOps(scene: SceneQuery, ids: readonly string[], nextId: NextId): { ops: Op[]; made: string[] } {

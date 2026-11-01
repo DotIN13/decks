@@ -113,6 +113,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => ctx.news();
 	(globalThis as { __decksFrameSelect?: (ids: string[]) => void }).__decksFrameSelect = (ids) => handle.select(ids);
 	(globalThis as { __decksFrameCamera?: () => unknown }).__decksFrameCamera = () => handle.camera();
+	// For the rules checks (`e2e/rules-kit.mjs`): the editor's handle, to set the camera and the mode and read the selection.
+	(globalThis as { __decksFrameHandle?: unknown }).__decksFrameHandle = handle;
 	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
 
 	reread = wireFrame(ctx).reread;

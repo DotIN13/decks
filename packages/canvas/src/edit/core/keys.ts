@@ -13,6 +13,7 @@ import { PEN_TOOL_KEYS, type PenTool } from "./model.ts";
 import { childrenOf, parentOf } from "./pick.ts";
 import { pageMoves, deleteOps, duplicateOps, moveOps, type PageMove, type NextId } from "./ops.ts";
 import type { SceneQuery } from "./scene.ts";
+import { SAME } from "../../device/rules.ts";
 
 /** A key as it was pressed: `KeyboardEvent.key` and the modifiers held. */
 export type KeyPress = { key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean };
@@ -53,7 +54,7 @@ export type KeyAct =
 
 const NUDGES: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 /** How far Shift and an arrow move what is selected; the arrow alone moves it 1. */
-export const NUDGE_SHIFT = 10;
+export const NUDGE_SHIFT = SAME.nudgeShift;
 
 export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	const { selection, boards, tool } = context;

@@ -8,18 +8,29 @@
  * and the user agent alone an iPad as a Mac, which is what iPadOS calls itself: a real Mac has no
  * touch screen, so a "Mac" with one is an iPad.
  */
+import { ROWS, type AwakeBudget } from "../device/rules.ts";
+import { PROFILE } from "../device/profile.ts";
+
+/** A row of the rules table that differs by browser engine, as a record (`device/rules.json`). */
+function byEngine<T>(name: string): Record<"webkit" | "chromium" | "other", T> {
+	const row = ROWS[name]!;
+	return { webkit: row.webkit as T, chromium: row.chromium as T, other: row.other as T };
+}
+
 export type DeviceKind = "computer" | "mobile";
 
 export interface DeviceFacts {
 	platform: string;
 	userAgent: string;
 	maxTouchPoints: number;
-	/** `?device=computer` or `?device=mobile` in the page's address, for testing one on the other. */
+	/** `?device=computer` or `mobile` in the page's address, or a form (`desk`, `tablet`, `phone`, `device/profile.ts`), for testing one on the other. */
 	forced?: string | null | undefined;
 }
 
 export function deviceKind(facts: DeviceFacts): DeviceKind {
 	if (facts.forced === "computer" || facts.forced === "mobile") return facts.forced;
+	if (facts.forced === "desk") return "computer";
+	if (facts.forced === "tablet" || facts.forced === "phone") return "mobile";
 	const apple = /iPhone|iPad|iPod/.test(facts.platform) || /iPhone|iPad|iPod/.test(facts.userAgent) || (facts.platform === "MacIntel" && facts.maxTouchPoints > 1);
 	const android = /Android/i.test(facts.userAgent);
 	return apple || android ? "mobile" : "computer";
@@ -81,11 +92,7 @@ export const ENGINE: BrowserEngine =
  * cards showed 164 of 288 frames on an M4, against 276 with a layer per card. Another engine (Firefox)
  * is unmeasured and keeps what Chromium does.
  */
-export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean }> = {
-	webkit: { scaling: false, sliding: false },
-	chromium: { scaling: true, sliding: true },
-	other: { scaling: true, sliding: true },
-};
+export const LAYERS = byEngine<{ scaling: boolean; sliding: boolean }>("layers");
 
 /**
  * What an awake item is while the camera moves, by its kind and the engine: `live`, its surface kept
@@ -102,11 +109,7 @@ export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean 
  * every step of a zoom. Covering is kept in the table for a measure on a slow device.
  */
 export type Moving = "live" | "cover";
-export const MOVING: Record<BrowserEngine, { card: Moving; app: Moving; document: Moving }> = {
-	webkit: { card: "live", app: "live", document: "live" },
-	chromium: { card: "live", app: "live", document: "live" },
-	other: { card: "live", app: "live", document: "live" },
-};
+export const MOVING = byEngine<{ card: Moving; app: Moving; document: Moving }>("moving");
 
 /**
  * How much a device's GPU can hold, as far as a page can tell: no browser says how much memory its
@@ -151,12 +154,7 @@ export function gpuClass(facts: GpuFacts): GpuClass {
  * pictures four times that. A computer's 256 MB holds about 450 cards at 800 compressed, or 115 plain;
  * a small device's 64 MB about 300 at 480 compressed. Past it, far cards drop to a lower rung.
  */
-export const PICTURES: Record<GpuClass, { ladder: readonly number[]; budgetMB: number }> = {
-	big: { ladder: [192, 480, 800], budgetMB: 256 },
-	small: { ladder: [192, 480], budgetMB: 64 },
-	// A phone's screen is narrow and its memory the least: every card at 192, whatever its zoom (about 1,000 cards compressed).
-	phone: { ladder: [192], budgetMB: 32 },
-};
+export const PICTURES: Record<GpuClass, { ladder: readonly number[]; budgetMB: number }> = { big: ROWS.pictures!.big as never, small: ROWS.pictures!.small as never, phone: ROWS.pictures!.phone as never };
 
 /**
  * This device's class as far as is known at once, before its WebGPU adapter answers (`readGpuClass`):
@@ -167,7 +165,7 @@ export function knownGpuClass(): GpuClass {
 	const nav = typeof navigator === "undefined" ? undefined : navigator;
 	return gpuClass({
 		kind: DEVICE,
-		phone: isPhone({ platform: nav?.platform ?? "", userAgent: nav?.userAgent ?? "" }),
+		phone: PROFILE.form === "phone",
 		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),
 	});
 }
@@ -178,7 +176,7 @@ export async function readGpuClass(): Promise<GpuClass> {
 	const adapter = await nav?.gpu?.requestAdapter().catch(() => null);
 	return gpuClass({
 		kind: DEVICE,
-		phone: isPhone({ platform: nav?.platform ?? "", userAgent: nav?.userAgent ?? "" }),
+		phone: PROFILE.form === "phone",
 		deviceMemory: nav?.deviceMemory,
 		maxBufferSize: adapter?.limits.maxBufferSize,
 		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),
@@ -198,7 +196,4 @@ export async function readGpuClass(): Promise<GpuClass> {
  * paints; an app a whole page of its own in a sandboxed frame, a document an editor; an iPad or a
  * phone has one thread and a hard memory ceiling for all of it.
  */
-export const AWAKE: Record<DeviceKind, { live: { card: number; app: number; document: number }; kept: number }> = {
-	computer: { live: { card: 12, app: 2, document: 2 }, kept: 4 },
-	mobile: { live: { card: 3, app: 1, document: 1 }, kept: 2 },
-};
+export const AWAKE: Record<DeviceKind, { live: { card: number; app: number; document: number }; kept: number }> = { computer: ROWS.awake!.computer as AwakeBudget, mobile: ROWS.awake!.mobile as AwakeBudget };
