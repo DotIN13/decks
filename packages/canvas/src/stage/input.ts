@@ -433,6 +433,9 @@ export function createStageInput(deps: StageInputDeps) {
 
 	/** One finger's worth of a gesture. A one-finger pan is the browser's scroll, so only a pinch moves the camera here. */
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
+		// For the checks: every step of the pool, when asked for (`__decksTouchLog`).
+		const log = (globalThis as { __decksTouchLog?: unknown[] }).__decksTouchLog;
+		if (log) log.push({ phase, id: finger.id, x: Math.round(finger.x), y: Math.round(finger.y), count: touches.count(), claimed: claimed.size, kept: keptTouches.size, t: Math.round(performance.now()) });
 		if (phase === "down") {
 			// A finger on the glass stops a coast, the way a hand stops a spinning list.
 			cancelCoast();
@@ -453,6 +456,7 @@ export function createStageInput(deps: StageInputDeps) {
 		}
 
 		const step = touches.move(finger);
+		if (log) log.push({ phase: "step", id: finger.id, kind: step.kind, t: Math.round(performance.now()) });
 		if (step.kind === "pinch") {
 			pinched = true;
 			claimed.clear();

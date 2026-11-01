@@ -1173,6 +1173,29 @@ export class StageEngine {
 	 * two-event pinch, 1.2 for a wheel zoom).
 	 */
 	private dirty = false;
+	/**
+	 * A card's picture replacing one the engine held fades in over it (`Page::fade_pictures`, 180 ms),
+	 * so a rung swap at rest never pops: a frame is drawn for each step of the fade until none is left.
+	 */
+	private fadeFrame = 0;
+	private fadeLast = 0;
+	private fadeSoon(): void {
+		this.draw();
+		if (this.fadeFrame || this.disposed) return;
+		this.fadeLast = performance.now();
+		const step = () => {
+			this.fadeFrame = 0;
+			if (this.disposed || !this.page) return;
+			const now = performance.now();
+			const more = this.page.fadePictures(Math.min(100, now - this.fadeLast));
+			this.fadeLast = now;
+			this.draw();
+			// For the checks: how many fade frames have run (`touch-step5` probe).
+			(globalThis as { __decksPictureFades?: number }).__decksPictureFades = ((globalThis as { __decksPictureFades?: number }).__decksPictureFades ?? 0) + 1;
+			if (more) this.fadeFrame = requestAnimationFrame(step);
+		};
+		this.fadeFrame = requestAnimationFrame(step);
+	}
 	/** The pictures the cards near the window want, asked for at the next frame (`setCamera`). */
 	private picturesSoon = false;
 	private tickFrame = 0;
@@ -1777,7 +1800,7 @@ export class StageEngine {
 						this.picturesPut++;
 						this.compressedPut++;
 						this.compressedSize.set(key, [packed.width, packed.height]);
-						this.draw();
+						this.fadeSoon();
 					});
 					return;
 				}
@@ -1804,7 +1827,8 @@ export class StageEngine {
 						return this.recover(error, `the picture ${key}`);
 					}
 					this.picturesPut++;
-					this.draw();
+					if (card) this.fadeSoon();
+					else this.draw();
 				};
 				// A card's picture waits its turn to the GPU (`putPaced`); an image fill is needed by the worker's tiles now.
 				if (card) {
@@ -2361,6 +2385,7 @@ export class StageEngine {
 
 	dispose(): void {
 		this.disposed = true;
+		cancelAnimationFrame(this.fadeFrame);
 		cancelAnimationFrame(this.tickFrame);
 		// Pictures still waiting for the GPU let go of their bitmaps (each sees the engine is gone).
 		cancelAnimationFrame(this.putFrame);

@@ -181,7 +181,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * The camera can move while the press is held (a wheel, a glide), and then the last step runs
 	 * again: a `move` that reads the pointer in world space (`worldAt`) follows the cursor.
 	 */
-	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void, on: HTMLElement = host.element()) => {
+	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void, on: HTMLElement = host.element(), abandon?: () => void) => {
 		try {
 			on.setPointerCapture(event.pointerId);
 		} catch {
@@ -211,6 +211,26 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		const watch = (e: PointerEvent) => {
 			if (e.pointerId === event.pointerId) released(e);
 		};
+		/*
+		 * A second finger landing while one follows a press is a pinch, which the stage's pool takes
+		 * from here (`input.ts`): the press is abandoned, not released where it was, so a resize or a
+		 * carry that had begun is put back rather than landed half done.
+		 */
+		const other = (e: PointerEvent) => {
+			if (!abandon || e.pointerType !== "touch" || e.pointerId === event.pointerId || over) return;
+			over = true;
+			cameraWatchers.delete(replay);
+			on.removeEventListener("pointermove", onMove);
+			on.removeEventListener("pointerup", finish);
+			on.removeEventListener("pointercancel", finish);
+			on.removeEventListener("lostpointercapture", finish);
+			window.removeEventListener("pointermove", watch, true);
+			window.removeEventListener("pointerup", finish, true);
+			window.removeEventListener("pointercancel", finish, true);
+			window.removeEventListener("pointerdown", other, true);
+			abandon();
+		};
+		if (abandon && event.pointerType === "touch") window.addEventListener("pointerdown", other, true);
 		cameraWatchers.add(replay);
 		/*
 		 * Ended once, by whichever of these comes first: the release or a cancel at the element that
@@ -230,6 +250,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			window.removeEventListener("pointermove", watch, true);
 			window.removeEventListener("pointerup", finish, true);
 			window.removeEventListener("pointercancel", finish, true);
+			window.removeEventListener("pointerdown", other, true);
 			done(moved, e);
 		};
 		on.addEventListener("pointermove", onMove);
@@ -251,7 +272,20 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			(e) => editor.input({ type: "move", ...pointerInput(e, worldAt(e)) }),
 			(_moved, e) => editor.input({ type: "release", ...pointerInput(e, worldAt(e)) }),
 			on,
+			() => editor.input({ type: "cancel" }),
 		);
+
+	/*
+	 * A finger pressing a handle, an arrow's end or a block's grip is the editor's, and these presses
+	 * stop at their element: the stage never hears them, so the finger was not in its pool, and a
+	 * pinch begun on a handle could not happen. Put in the pool here, and kept from the browser's
+	 * scroll (`keepTouch`); a second finger then makes the pinch and abandons the press (`follow`).
+	 */
+	const fingerIn = (event: PointerEvent) => {
+		if (event.pointerType !== "touch") return;
+		host.keepTouch?.(event);
+		host.beginTouch(event);
+	};
 
 	/**
 	 * A press on the drawing; true when it was the drawing's to handle. A tool makes its item; with
@@ -300,6 +334,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		if (editor.input({ type: "press-handle", handle, box, ...pointerInput(event, worldAt(event)) })) followEditor(event);
 	};
 
@@ -316,6 +351,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (event.button !== 0 || !start) return;
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		if (editor.input({ type: "press-radius", handle: start, ...pointerInput(event, worldAt(event)) })) followEditor(event);
 	};
 
@@ -330,6 +366,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		if (editor.input({ type: "press-board-handle", handle, box, ...pointerInput(event, worldAt(event)) })) followEditor(event);
 	};
 
@@ -344,6 +381,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (event.button !== 0 || !ends) return;
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		if (editor.input({ type: "press-arrow-end", which, ends, ...pointerInput(event, worldAt(event)) })) followEditor(event);
 	};
 
@@ -357,6 +395,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (event.button !== 0 || !ends?.middle) return;
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		if (editor.input({ type: "press-arrow-bend", ends, ...pointerInput(event, worldAt(event)) })) followEditor(event);
 	};
 
@@ -364,6 +403,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	const dragBlock = (event: PointerEvent, id: string) => {
 		event.preventDefault();
 		event.stopPropagation();
+		fingerIn(event);
 		const on = event.currentTarget as HTMLElement;
 		if (editor.input({ type: "press-block", id, ...pointerInput(event, worldAt(event)) })) followEditor(event, on);
 	};

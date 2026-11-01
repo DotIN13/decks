@@ -27,6 +27,11 @@ pub struct Camera {
 pub struct Pictures {
 	pub held: HashMap<String, (u32, u32, u32)>,
 	pub wanted: RefCell<Vec<String>>,
+	/// A card's picture a sharper or newer one has replaced, kept drawn under it while the new one
+	/// fades in (`Page::fade_pictures`): texture, width, height, and how far the new one has come, 0 to 1.
+	pub fading: HashMap<String, (u32, u32, u32, f32)>,
+	/// Textures let go of here (an old picture whose fade is done, or one replaced mid-fade), for the caller to free on the GPU.
+	pub dropped: Vec<u32>,
 }
 
 impl Pictures {
@@ -45,6 +50,8 @@ impl Pictures {
 /// screen in the same frame as the board pages.
 /// The fewest tiles the page keeps, whatever the screen.
 const MIN_TILES: usize = 160;
+/// How long a card's new picture takes to fade in over the one it replaced (`Page::fade_pictures`).
+const PICTURE_FADE_MS: f32 = 180.0;
 
 pub struct Page {
 	/// Draw the lifted items and nothing else over the pages, for one frame: a drag's ghost.
@@ -674,15 +681,25 @@ impl Page {
 				 * on below its content: never stretched, and never bare paper under it.
 				 */
 				let r = 12.0 * s as f32;
-				let tall = (ph as f32 / pw.max(1) as f32 * w).round();
-				let image = |uv: [f32; 4]| stage_paint::list::Paint::Image { texture, opacity: 1.0, uv };
-				if tall >= h {
-					over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, h / tall]), stroke: None });
-				} else {
-					let last = (ph as f32 - 0.5) / ph.max(1) as f32;
-					let part = |h: f32, radii: [f32; 4]| stage_paint::list::Shape { w, h, radii, ellipse: false };
-					over.push(Op::Shape { shape: part(tall, [r, r, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
-					over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, r, r]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+				let paint_picture = |over: &mut DrawList, texture: u32, pw: u32, ph: u32, opacity: f32| {
+					let tall = (ph as f32 / pw.max(1) as f32 * w).round();
+					let image = |uv: [f32; 4]| stage_paint::list::Paint::Image { texture, opacity, uv };
+					if tall >= h {
+						over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, h / tall]), stroke: None });
+					} else {
+						let last = (ph as f32 - 0.5) / ph.max(1) as f32;
+						let part = |h: f32, radii: [f32; 4]| stage_paint::list::Shape { w, h, radii, ellipse: false };
+						over.push(Op::Shape { shape: part(tall, [r, r, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+						over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, r, r]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+					}
+				};
+				// The picture this one replaced stays under it while it fades in (`picture_unlaid`, `fade_pictures`).
+				match self.pictures.fading.get(&board.picture) {
+					Some(&(old, ow, oh, alpha)) => {
+						paint_picture(&mut over, old, ow, oh, 1.0);
+						paint_picture(&mut over, texture, pw, ph, alpha);
+					}
+					None => paint_picture(&mut over, texture, pw, ph, 1.0),
 				}
 			} else if !board.title.is_empty() {
 				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
@@ -950,13 +967,52 @@ impl Page {
 	}
 
 	/// As `picture`, but the drawing is laid out for it by `lay_out_pictures`: a batch of pictures
-	/// lays it out once.
+	/// lays it out once. A card's picture replacing one held in another texture (a higher rung at rest,
+	/// a new revision) keeps the old one drawn under it while the new fades in over `PICTURE_FADE_MS`
+	/// (`fade_pictures`), so a zoom's rung swap never pops.
 	pub fn picture_unlaid(&mut self, url: &str, texture: u32, width: u32, height: u32) {
-		self.pictures.held.insert(url.to_owned(), (texture, width, height));
+		if let Some((was, w, h)) = self.pictures.held.insert(url.to_owned(), (texture, width, height)) {
+			if was != texture && url.starts_with("card:") {
+				if let Some((older, _, _, _)) = self.pictures.fading.insert(url.to_owned(), (was, w, h, 0.0)) {
+					self.pictures.dropped.push(older);
+				}
+			}
+		}
 		// Only a card that shows it is laid out differently for it (`Text::picture`).
 		if !url.starts_with("card:") && self.text.picture(url, width as f32, height as f32) {
 			self.pictures_unlaid = true;
 		}
+	}
+
+	/// Carry every picture fade on by `dt` milliseconds (`picture_unlaid`): the old pictures whose new
+	/// one has fully come are let go of (`Pictures::dropped`). True while any fade is still going.
+	pub fn fade_pictures(&mut self, dt: f32) -> bool {
+		let step = (dt / PICTURE_FADE_MS).clamp(0.0, 1.0);
+		let mut done = Vec::new();
+		for (url, one) in self.pictures.fading.iter_mut() {
+			one.3 = (one.3 + step).min(1.0);
+			if one.3 >= 1.0 {
+				done.push(url.clone());
+			}
+		}
+		for url in done {
+			if let Some((old, _, _, _)) = self.pictures.fading.remove(&url) {
+				self.pictures.dropped.push(old);
+			}
+		}
+		!self.pictures.fading.is_empty()
+	}
+
+	/// A picture forgotten by its address: its texture, and any old one still fading under it, to free.
+	pub fn forget_picture(&mut self, url: &str) -> Vec<u32> {
+		let mut out = Vec::new();
+		if let Some((texture, _, _)) = self.pictures.held.remove(url) {
+			out.push(texture);
+		}
+		if let Some((old, _, _, _)) = self.pictures.fading.remove(url) {
+			out.push(old);
+		}
+		out
 	}
 
 	/// Lay the drawing out for the pictures put since it last was that cards show; false if none.

@@ -369,7 +369,8 @@ impl PageEngine {
 	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>, later: Option<bool>) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
-		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
+		// A card's goes into a texture of its own, so the one it replaces can stay drawn under it while it fades in (`Page::picture_unlaid`).
+		let id = self.page.pictures.get(url).map(|p| p.0).filter(|_| !url.starts_with("card:")).unwrap_or_else(|| self.page.new_texture());
 		if copy_in_as(gpu, id, &bitmap, None, false, false, true) {
 			if later.unwrap_or(false) {
 				self.page.picture_unlaid(url, id, w, h);
@@ -377,6 +378,25 @@ impl PageEngine {
 				self.page.picture(url, id, w, h);
 			}
 		}
+		self.free_dropped();
+	}
+
+	/// Free on the GPU the old pictures the page has let go of (`Pictures::dropped`).
+	fn free_dropped(&mut self) {
+		let dropped = std::mem::take(&mut self.page.pictures.dropped);
+		if let Some(gpu) = &mut self.gpu {
+			for texture in dropped {
+				gpu.forget(texture);
+			}
+		}
+	}
+
+	/// Carry every card picture's fade-in on by `dt` milliseconds (`Page::fade_pictures`): true while any goes on, so the caller draws another frame.
+	#[wasm_bindgen(js_name = fadePictures)]
+	pub fn fade_pictures(&mut self, dt: f32) -> bool {
+		let more = self.page.fade_pictures(dt);
+		self.free_dropped();
+		more
 	}
 
 	/// Whether this device takes compressed pictures (`putCompressedPicture`): ASTC, on Apple's GPUs and most phones.
@@ -395,7 +415,7 @@ impl PageEngine {
 			return false;
 		}
 		let levels = (spans.len() / 2) as u32;
-		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
+		let id = self.page.pictures.get(url).map(|p| p.0).filter(|_| !url.starts_with("card:")).unwrap_or_else(|| self.page.new_texture());
 		gpu.compressed_picture(id, width, height, levels);
 		for (level, span) in spans.chunks(2).enumerate() {
 			gpu.write_level_js(id, level as u32, &data.subarray(span[0], span[0] + span[1]));
@@ -405,6 +425,7 @@ impl PageEngine {
 		} else {
 			self.page.picture(url, id, width, height);
 		}
+		self.free_dropped();
 		true
 	}
 
@@ -535,8 +556,9 @@ impl PageEngine {
 	/// Forget a card's picture (it changed): asked for again when next drawn.
 	#[wasm_bindgen(js_name = forgetPicture)]
 	pub fn forget_picture(&mut self, url: &str) {
-		if let Some((texture, _, _)) = self.page.pictures.held.remove(url) {
-			if let Some(gpu) = &mut self.gpu {
+		let textures = self.page.forget_picture(url);
+		if let Some(gpu) = &mut self.gpu {
+			for texture in textures {
 				gpu.forget(texture);
 			}
 		}
