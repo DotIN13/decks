@@ -76,6 +76,8 @@ export type Rules = {
 	arrowAnchors: boolean;
 	anchorSize: number;
 	anchorOut: number;
+	arrowEnd: number;
+	arrowBend: number;
 	lineReach: number;
 	edgeOut: number;
 	edgeIn: number;
@@ -138,6 +140,8 @@ export const NAMES: Record<keyof Rules, string> = {
 	arrowAnchors: "arrow.anchors",
 	anchorSize: "arrow.anchor-px",
 	anchorOut: "arrow.anchor-out-px",
+	arrowEnd: "arrow.end-px",
+	arrowBend: "arrow.bend-px",
 	lineReach: "line.reach-px",
 	edgeOut: "edge.out-px",
 	edgeIn: "edge.in-px",

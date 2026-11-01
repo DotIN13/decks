@@ -303,7 +303,7 @@ export function OverlayLayer(
 					<For each={["from", "to"] as const}>
 						{(which) => {
 							// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
-							const px = COARSE ? 18 : 11;
+							const px = RULES.arrowEnd;
 							// A joined end is a diamond, which slides along the side it joins; a free end is a dot.
 							const joined = () => !!(which === "from" ? ends().fromJoin : ends().toJoin);
 							return (
@@ -322,7 +322,7 @@ export function OverlayLayer(
 			</Show>
 			<Show when={o().arrow?.middle}>
 				{(middle) => {
-					const px = COARSE ? 18 : 12;
+					const px = RULES.arrowBend;
 					return (
 						<div
 							class="pen-handle"

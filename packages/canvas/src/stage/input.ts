@@ -142,6 +142,21 @@ export function createStageInput(deps: StageInputDeps) {
 		};
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
+		const holdKeptMove = (event: TouchEvent) => {
+			if (keptTouches.size > 0 && event.cancelable) event.preventDefault();
+		};
+		let holdingKept = false;
+		keptChanged = () => {
+			const want = keptTouches.size > 0;
+			if (want === holdingKept) return;
+			holdingKept = want;
+			if (want) element.addEventListener("touchmove", holdKeptMove, { passive: false });
+			else element.removeEventListener("touchmove", holdKeptMove);
+		};
+		onCleanup(() => {
+			keptChanged = () => {};
+			element.removeEventListener("touchmove", holdKeptMove);
+		});
 		// A kept finger lets go when it lifts, wherever it was kept: one left behind would hold every later touch from scrolling.
 		const letGo = (event: PointerEvent) => keptTouches.delete(event.pointerId);
 		for (const kind of ["pointerup", "pointercancel"] as const) window.addEventListener(kind, letGo, true);
@@ -464,8 +479,31 @@ export function createStageInput(deps: StageInputDeps) {
 	 * mind, not an ambiguity.
 	 */
 	const touches = createTouches();
-	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
-	const keptTouches = new Set<number>();
+	/**
+	 * Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage.
+	 * Kept at its start, cancelling the touch's start is enough (`holdTouch`); kept later (a hold that
+	 * became a marquee, 450 ms in), the browser would still scroll once it moved, so while any finger
+	 * is kept its moves are held too. That listener is there only then: a scroll never waits for the
+	 * page otherwise (`keptChanged`).
+	 */
+	let keptChanged = () => {};
+	class Kept extends Set<number> {
+		override add(id: number) {
+			super.add(id);
+			keptChanged();
+			return this;
+		}
+		override delete(id: number) {
+			const had = super.delete(id);
+			keptChanged();
+			return had;
+		}
+		override clear() {
+			super.clear();
+			keptChanged();
+		}
+	}
+	const keptTouches: Set<number> = new Kept();
 	const claimed = new Set<number>();
 	/** Fingers this document is carrying. */
 	const carried = new Set<number>();

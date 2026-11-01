@@ -10,6 +10,7 @@
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",
 		"./host": "./src/public/host.ts",
+		"./device": "./src/device/index.ts",
 		"./card-reading": "./src/items/card-reading.ts",
 		"./card": "./src/items/card.ts",
 		"./styles.css": "./styles/standalone.css",

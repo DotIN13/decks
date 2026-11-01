@@ -1,5 +1,6 @@
 import type { FrameChrome } from "@decks/canvas";
 import { insets } from "@decks/canvas/camera";
+import { RULES } from "@decks/canvas/device";
 import { PenBar } from "@decks/canvas/host";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { makeFloat } from "@decks/ui/float";
@@ -112,7 +113,10 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
 				</div>
 			</Show>
-			<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
+			{/* The zoom bar where the rules have one (`zoom-bar`): a desk and a tablet, not a phone, which pinches. */}
+			<Show when={RULES.zoomBar}>
+				<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
+			</Show>
 			<Show when={chrome.offer()} keyed>
 				{(offer) => (
 					<div class="v3-bar float pill frame-offer" role="status">

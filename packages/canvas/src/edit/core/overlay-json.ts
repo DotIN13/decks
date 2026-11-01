@@ -19,6 +19,9 @@ export type OverlayStyle = {
 	handlePx: number;
 	anchorPx: number;
 	anchorOut: number;
+	/** An arrow's end and middle handles as drawn (`arrow.end-px`, `arrow.bend-px`). */
+	endPx: number;
+	bendPx: number;
 };
 
 type Box = { x: number; y: number; w: number; h: number; r?: number; kind: string };
@@ -76,10 +79,10 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 		for (const l of o.distances.lines) lines.push({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, kind: l.dashed ? "measure-dashed" : "measure" });
 	}
 	if (o.arrow) {
-		const px = style.coarse ? 18 : 11;
+		const px = style.endPx;
 		dots.push({ x: o.arrow.from.x, y: o.arrow.from.y, px, kind: o.arrow.fromJoin ? "diamond" : "end" });
 		dots.push({ x: o.arrow.to.x, y: o.arrow.to.y, px, kind: o.arrow.toJoin ? "diamond" : "end" });
-		if (o.arrow.middle) dots.push({ x: o.arrow.middle.x, y: o.arrow.middle.y, px: style.coarse ? 18 : 12, kind: o.arrow.bent ? "bend-bent" : "bend" });
+		if (o.arrow.middle) dots.push({ x: o.arrow.middle.x, y: o.arrow.middle.y, px: style.bendPx, kind: o.arrow.bent ? "bend-bent" : "bend" });
 	}
 	if (o.route) paths.push({ x: o.route.x, y: o.route.y, d: o.route.d, kind: "route" });
 	if (o.endDraft) lines.push({ x1: o.endDraft.x1, y1: o.endDraft.y1, x2: o.endDraft.x2, y2: o.endDraft.y2, kind: "draft" });

@@ -132,6 +132,12 @@ const CHECKS = [
 	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.
 	 */
 	{ file: "stage-gestures.mjs", needsAgent: false },
+	/* The rules table (`packages/canvas/src/device/rules.json`), followed on a desk, an iPad Mini and an iPhone 13: one check per table of the rules board. */
+	{ file: "rules-press.mjs", needsAgent: false },
+	{ file: "rules-drag.mjs", needsAgent: false },
+	{ file: "rules-camera.mjs", needsAgent: false },
+	{ file: "rules-chrome.mjs", needsAgent: false },
+	{ file: "rules-pages.mjs", needsAgent: false },
 	/*
 	 * The canvas editor: a shape from the library, the properties panel that swaps, words and sizes
 	 * it without ever scrolling sideways, and an arrow that keeps to the side it was drawn from.

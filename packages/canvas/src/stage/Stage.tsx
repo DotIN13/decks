@@ -60,6 +60,7 @@ import { createSelection } from "./selection.tsx";
  */
 export type { InkRequest, StageComment, StageShots } from "../types.ts";
 import type { InkRequest, StageComment, StageShots } from "../types.ts";
+import { RULES } from "../device/profile.ts";
 
 
 /** What the stage is given by its host. */
@@ -587,7 +588,7 @@ export function Stage(props: StageProps) {
 			const read = (name: string) => rgbOf(getComputedStyle(element).getPropertyValue(name).trim() || "#2563eb", element);
 			return { accent: read("--color-accent"), panel: rgbOf(getComputedStyle(element).getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] as [number, number, number] };
 		});
-		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
+		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT, endPx: RULES.arrowEnd, bendPx: RULES.arrowBend });
 		// For the rules checks: what the engine was last told to draw round the selection.
 		(globalThis as { __decksOverlay?: string }).__decksOverlay = json;
 		setEngineOverlays(penLayer.setOverlay(json));
