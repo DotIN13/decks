@@ -178,6 +178,8 @@ if (PICTURES) {
 	await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 112, undefined, { timeout: 30000 }).catch(() => {});
 }
 
+/** `AWAKE_BENCH_FLAGS='{"__decksFreezeWorld":true}'`: globals set in the canvas frame before measuring, for experiments. */
+if (process.env.AWAKE_BENCH_FLAGS) await canvas.evaluate((flags) => Object.assign(globalThis, flags), JSON.parse(process.env.AWAKE_BENCH_FLAGS));
 if (PANEL === "closed") {
 	await page.locator('button[aria-label="Hide the side panel"]').first().click({ timeout: 10000 });
 	await page.waitForTimeout(500);
@@ -379,7 +381,7 @@ for (const kind of ONLY) {
 		}
 		if (TRACE && i === 0 && !profiling) {
 			profiling = true;
-			await cdp.send("Tracing.start", { traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink.user_timing", "v8.execute", "disabled-by-default-v8.gc"], recordMode: "recordContinuously" }, transferMode: "ReportEvents" });
+			await cdp.send("Tracing.start", { traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.stack", "disabled-by-default-devtools.timeline.invalidationTracking", "blink.user_timing", "v8.execute", "disabled-by-default-v8.gc"], recordMode: "recordContinuously" }, transferMode: "ReportEvents" });
 		}
 		const row = await run(kind);
 		await quiet();
