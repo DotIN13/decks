@@ -846,6 +846,7 @@ export class StageEngine {
 		if (changes.all || changes.roots.length || changes.removed.length || changes.bases.length) {
 			this.cardList = undefined;
 			this.placedList = undefined;
+		this.pageIds = undefined;
 			this.placedIndex = undefined;
 		}
 		this.drawnDoc = doc;
@@ -884,6 +885,7 @@ export class StageEngine {
 		this.bounds = boundsOf(placed);
 		this.cardList = undefined;
 		this.placedList = undefined;
+		this.pageIds = undefined;
 		this.placedIndex = undefined;
 		this.drawnDoc = this.doc;
 		if (quiet) return;
@@ -2036,6 +2038,22 @@ export class StageEngine {
 		this.writeHits();
 	}
 
+	/** Each page's item on the drawing by the page's path, made when first asked for after a change: what a glide's offset is kept under. */
+	private pageIds: Map<string, string> | undefined;
+	/** The id of the item that is this page (a card, a board, a document, an app), by its path as the item names it or by its end. */
+	pageIdOf(path: string): string | undefined {
+		if (!this.pageIds) {
+			this.pageIds = new Map();
+			for (const one of this.placed.values()) {
+				const own = (one.node.metadata as { path?: unknown } | undefined)?.path;
+				if (typeof own === "string") this.pageIds.set(own, one.node.id);
+			}
+		}
+		const exact = this.pageIds.get(path);
+		if (exact) return exact;
+		for (const [own, id] of this.pageIds) if (path.endsWith(own) || own.endsWith(path)) return id;
+		return undefined;
+	}
 	/** `placed` as a list, and an index of what each covers, made when first asked for after a change. */
 	private placedList: Placed[] | undefined;
 	private placedIndex: BoxIndex | undefined;

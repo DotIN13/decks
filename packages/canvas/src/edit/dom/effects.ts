@@ -55,9 +55,18 @@ export function createEffects(host: EffectHost) {
 	 * target a hand has to aim at, so a board parked at the bottom of the canvas is parked *beside*
 	 * it rather than on it; and a board is the thing most worth saying "this one" about.
 	 */
+	/** Where the composer was last seen on the screen, read again every 200 ms: a point far from it needs no hit test. */
+	let composerSeen: { rect: DOMRect | undefined; at: number } | undefined;
+	const nearComposer = (at: Pt): boolean => {
+		const now = performance.now();
+		if (!composerSeen || now - composerSeen.at > 200) composerSeen = { rect: document.querySelector<HTMLElement>(".composer-box")?.getBoundingClientRect(), at: now };
+		const r = composerSeen.rect;
+		return !!r && at.x >= r.left - 24 && at.x <= r.right + 24 && at.y >= r.top - 24 && at.y <= r.bottom + 24;
+	};
 	const composerUnder = (at: Pt, ids: readonly string[], boards: readonly string[]): ReferTarget | undefined => {
 		if (!host.onRefer || ids.length + boards.length === 0) return undefined;
-		const element = document.elementFromPoint(at.x, at.y) as HTMLElement | null;
+		// A hit test (elementFromPoint) at every step of a drag cost more than the drawing; it is asked only near the composer's last place.
+		const element = nearComposer(at) ? (document.elementFromPoint(at.x, at.y) as HTMLElement | null) : null;
 		const own = element?.closest<HTMLElement>(".composer-box");
 		if (own) return own;
 		// In the canvas frame the composer is the page's: the host knows where it is.

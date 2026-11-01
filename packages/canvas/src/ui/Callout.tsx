@@ -124,8 +124,22 @@ export function PageCallout(props: {
 		return { below: best.slot.below, sure: true };
 	};
 	const [side, setSide] = createSignal<{ below: boolean; sure: boolean }>({ below: false, sure: false });
+	/*
+	 * Chosen once the box has stopped changing, not at every step it moves: choosing reads the page's
+	 * layout (the stage's rect, elementFromPoint for each slot), which at every step of a drag or a
+	 * glide cost more than the drawing did. The edge it had rides with the box meanwhile; out of
+	 * sight (hidden while something moves) it is chosen when it shows again.
+	 */
+	let chooseSoon: ReturnType<typeof setTimeout> | undefined;
+	onCleanup(() => clearTimeout(chooseSoon));
 	createEffect(
-		on([() => props.box.x, () => props.box.y, () => props.box.w, () => props.box.h, width, tall], () => setSide(untrack(choose))),
+		on([() => props.box.x, () => props.box.y, () => props.box.w, () => props.box.h, width, tall], (_now, was) => {
+			clearTimeout(chooseSoon);
+			if (untrack(() => props.hidden)) return setSide((one) => ({ ...one, sure: false }));
+			// The first time, at once: the pill has nowhere to be yet.
+			if (was === undefined || !untrack(side).sure) return setSide(untrack(choose));
+			chooseSoon = setTimeout(() => setSide(untrack(choose)), 80);
+		}),
 	);
 	createEffect(
 		on(

@@ -25,6 +25,8 @@ export interface SceneQuery {
 	parent(id: string): PenNode | undefined;
 	/** The boards on the stage, as placed, in file order. */
 	boards(): readonly PageBox[];
+	/** The item on the drawing that is this page, by its path, when the scene can say. */
+	pageItem?(path: string): string | undefined;
 	/**
 	 * Every item under a stage point, topmost first, unfiltered: raw geometry, with a press's
 	 * reach round each so a thin line can be hit. Which of them a press means is `pick.ts`'s.

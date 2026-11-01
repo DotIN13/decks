@@ -711,6 +711,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	/** What a board's frame reads of the editor and says back to it (`PageView`). */
 	/** The item on the drawing that is this page, by its path as the item names it or by its end. */
 	const pageItemId = (path: string): string | undefined => {
+		if (host.scene.pageItem) return host.scene.pageItem(path);
 		let ends: string | undefined;
 		for (const one of host.scene.items()) {
 			const own = (one.node.metadata as { path?: unknown } | undefined)?.path;

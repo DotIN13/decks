@@ -8,7 +8,7 @@ import type { StageEngine } from "../render/engine.ts";
 import type { PageBox } from "./core/model.ts";
 import type { EngineSeam, SceneQuery } from "./core/scene.ts";
 
-export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
+export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll" | "onLine" | "pageIdOf">, doc: () => PenDocument | undefined, boards: () => readonly PageBox[]): SceneQuery {
 	const found = (id: string) => {
 		const current = doc();
 		return current ? docIndex(current).get(id) : undefined;
@@ -21,6 +21,7 @@ export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll
 		node: (id) => found(id)?.node,
 		parent: (id) => found(id)?.parent,
 		boards,
+		pageItem: (path) => engine.pageIdOf(path),
 		under: (point) => engine.pickAll(point),
 		onLine: (id, point) => engine.onLine(id, point),
 	};
