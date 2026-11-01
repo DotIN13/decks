@@ -33,6 +33,8 @@ import { noticeFor } from "./backends/notice.ts";
 
 /** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
 export const pictureKey = (path: string) => `card:${path}`;
+/** A card whose picture can be fetched: it names one by address, and is not a live page still loading. */
+const fetchable = (card: SceneCard) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture);
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
@@ -453,6 +455,7 @@ export class StageEngine {
 		this.page?.free();
 		this.page = undefined;
 		this.picturesAsked.clear();
+		for (const key of this.cardByKey.keys()) this.unpictured.add(key);
 		// What the GPU held went with the context: the cards' pictures are fetched again from the bottom rung.
 		this.pictureBytes.clear();
 		this.heldWidth.clear();
@@ -1441,6 +1444,7 @@ export class StageEngine {
 		 * address: the one fetched carries a rung (`&w=480`). The old picture stays drawn until the new
 		 * one replaces it.
 		 */
+		this.cardByKey = new Map(cards.map((card) => [pictureKey(card.path), card]));
 		for (const card of cards) {
 			const key = pictureKey(card.path);
 			const asked = this.picturesAsked.get(key);
@@ -1448,6 +1452,7 @@ export class StageEngine {
 				this.picturesAsked.delete(key);
 				this.heldWidth.delete(key);
 			}
+			if (!(this.picturesAsked.get(key)?.size ?? 0) && !this.heldWidth.get(key)) this.unpictured.add(key);
 		}
 		// A card taken off the canvas lets go of its picture on the GPU: nothing else ever did.
 		if (this.pictureBytes.size > 0) {
@@ -1540,16 +1545,18 @@ export class StageEngine {
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w;
 		const top = this.camera.y - h;
+		// What a camera step wants is found from `unpictured` alone (`unpicturedNear`): the index is asked only at rest.
+		if (this.moving && this.unpictured.size === 0) return;
 		// The cards near the window, from the index `setCards` keeps (built from these cards, in their order).
-		const near = (this.indexed !== this.placedCards ? this.placedCards : this.cardIndex.search({ x: left, y: top, w: w * 2, h: h * 2 }).map((at) => this.placedCards[at]!)).filter(
-			(card) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture) && !(card.x + card.w < left || card.x > left + w * 2 || card.y + card.h < top || card.y > top + h * 2),
-		);
+		const near = this.moving
+			? []
+			: (this.indexed !== this.placedCards ? this.placedCards : this.cardIndex.search({ x: left, y: top, w: w * 2, h: h * 2 }).map((at) => this.placedCards[at]!)).filter((card) => fetchable(card) && !(card.x + card.w < left || card.x > left + w * 2 || card.y + card.h < top || card.y > top + h * 2));
 		const ladder = this.pictures.ladder;
-		const byKey = new Map(near.map((card) => [pictureKey(card.path), card]));
+		const byKey = this.moving ? this.cardByKey : new Map(near.map((card) => [pictureKey(card.path), card]));
 		// What a card holds or is fetching: the rung asked, or the width on the GPU, whichever is more.
 		const holds = (key: string) => Math.max(this.picturesAsked.get(key)?.size ?? 0, this.heldWidth.get(key) ?? 0);
 		const wanted = this.moving
-			? near.filter((card) => holds(pictureKey(card.path)) === 0).map((card) => ({ key: pictureKey(card.path), width: ladder[0]! }))
+			? this.unpicturedNear(left, top, w * 2, h * 2, holds).map((card) => ({ key: pictureKey(card.path), width: ladder[0]! }))
 			: upgrades(
 					near.map((card) => ({ key: pictureKey(card.path), x: card.x, y: card.y, w: card.w, h: card.h })),
 					holds,
@@ -1574,6 +1581,25 @@ export class StageEngine {
 		}
 	}
 
+	/**
+	 * Of the cards that may hold nothing (`unpictured`), those near the window and fetchable; a key found
+	 * holding something, or whose card is gone, leaves the set here, so the set empties as pictures come.
+	 */
+	private unpicturedNear(left: number, top: number, w: number, h: number, holds: (key: string) => number): SceneCard[] {
+		const out: SceneCard[] = [];
+		for (const key of this.unpictured) {
+			const card = this.cardByKey.get(key);
+			if (!card || holds(key) > 0) {
+				this.unpictured.delete(key);
+				continue;
+			}
+			if (!fetchable(card)) continue;
+			if (card.x + card.w < left || card.x > left + w || card.y + card.h < top || card.y > top + h) continue;
+			out.push(card);
+		}
+		return out;
+	}
+
 	/** About what a card's picture at a rung holds on the GPU, its smaller sizes included: a byte a pixel compressed, four plain. */
 	private rungBytes(width: number, card: { w: number; h: number }): number {
 		const pixels = width * width * (card.h / Math.max(card.w, 1));
@@ -1584,6 +1610,17 @@ export class StageEngine {
 	private pictureBytes = new Map<string, number>();
 	/** Each card picture's width on the GPU, after any shrinking: the rung it holds (`wantCardPictures`). */
 	private heldWidth = new Map<string, number>();
+	/**
+	 * Card picture keys that may hold nothing and have nothing asked (`holds` of 0): what a camera step
+	 * has to look at. Added to whenever a card's picture state may have fallen to nothing (the cards sent
+	 * again, a new revision, a fetch let go, the engine started again), and cleared of a key once a step
+	 * finds it holding something: so a step with nothing in it costs nothing, where it searched the index
+	 * and sorted the hundred cards near the window at every frame of a zoom (a quarter of the script time
+	 * on an iPad), for a list that is empty once every card has a picture.
+	 */
+	private unpictured = new Set<string>();
+	/** Each placed card by its picture key, for `unpictured`. */
+	private cardByKey = new Map<string, SceneCard>();
 	private heldBytes(): number {
 		let total = 0;
 		for (const bytes of this.pictureBytes.values()) total += bytes;
@@ -1698,6 +1735,7 @@ export class StageEngine {
 			setTimeout(() => {
 				if (this.picturesAsked.get(key) !== asked) return;
 				this.picturesAsked.delete(key);
+				if (card) this.unpictured.add(key);
 				// A card's is asked for again with the cards in view; an image fill's by its address
 				// (the worker's asking again for it may have come while this one waited, and been let go).
 				if (card) this.wantCardPictures();
