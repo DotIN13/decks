@@ -149,11 +149,11 @@ impl Page {
 	/// shown fields are taken back first: the saved drawing is what is drawn from now on.
 	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
 		self.unpreview_fields();
-		let before = self.rects();
+		let before = self.boxes();
 		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
 		self.scene.update(&self.doc, Some(&applied), &self.text);
 		// Arrows follow what the edit moved, routed here as the server will route them.
-		let routed = self.reroute_after(&before, edits);
+		let routed = self.reroute_after(&before, applied.reshaped, edits);
 		if !routed.is_empty() {
 			let applied = self.doc.apply(&routed).map_err(|e| e.0)?;
 			self.scene.update(&self.doc, Some(&applied), &self.text);
@@ -161,19 +161,11 @@ impl Page {
 		Ok(())
 	}
 
-	/// Every item's box on the stage by its id, and each page's (a card, a board, an app, a document)
-	/// by its path too: where an arrow's ends are, by the names its metadata gives them.
-	fn rects(&self) -> HashMap<String, Rect> {
-		let mut out = HashMap::new();
-		for root in &self.scene.roots {
-			for (item, place) in root.tree.items.iter().zip(&root.placed) {
-				out.insert(item.id.clone(), place.rect);
-				if let Some(path) = item.get("metadata").and_then(|m| m.get("path")).and_then(Value::as_str) {
-					out.entry(path.to_owned()).or_insert(place.rect);
-				}
-			}
-		}
-		out
+	/// Each root's items' boxes as laid out, with the root's handle and version: what an edit's
+	/// layout is compared with to find what it moved. A list, not a map: 2,000 items are copied in
+	/// microseconds, where hashing every id cost more than the routing.
+	fn boxes(&self) -> Vec<(stage_doc::Handle, u64, Vec<Rect>)> {
+		self.scene.roots.iter().map(|root| (root.handle, root.version, root.placed.iter().map(|p| p.rect).collect())).collect()
 	}
 
 	/// The arrows an edit touched, routed again from where their ends are now, as the Decks server
@@ -182,9 +174,11 @@ impl Page {
 	/// The others keep the server's route: routed again here, one that differed from the server's by
 	/// a pixel would move for the round trip and back. An arrow a gesture still holds lifted is routed
 	/// too: the gesture's own edit (its drop) arrives with the lift still on, and the drop lands it
-	/// where the edit put its ends. `before` is `rects` from before the edit; the answer is the field
-	/// changes to apply, none when every touched arrow already lies where its ends are.
-	fn reroute_after(&self, before: &HashMap<String, Rect>, edits: &[stage_doc::edits::Edit]) -> Vec<Change> {
+	/// where the edit put its ends. `before` is `boxes` from before the edit; `reshaped` says the edit
+	/// added, removed or moved items, so a re-laid root's items are compared whole rather than one by
+	/// one. The answer is the field changes to apply, none when every touched arrow already lies where
+	/// its ends are.
+	fn reroute_after(&self, before: &[(stage_doc::Handle, u64, Vec<Rect>)], reshaped: bool, edits: &[stage_doc::edits::Edit]) -> Vec<Change> {
 		use stage_doc::edits::Edit;
 		let mut written: HashSet<&str> = HashSet::new();
 		for edit in edits {
@@ -198,8 +192,41 @@ impl Page {
 				_ => {}
 			}
 		}
-		let now = self.rects();
-		let moved = |name: &str| before.get(name) != now.get(name);
+		// What moved: the items of each root laid out again whose box differs, or all of a root's when its items changed.
+		let was: HashMap<stage_doc::Handle, usize> = before.iter().enumerate().map(|(i, (h, _, _))| (*h, i)).collect();
+		let mut moved: HashSet<&str> = HashSet::new();
+		for root in &self.scene.roots {
+			let Some(&(_, version, ref rects)) = was.get(&root.handle).map(|&i| &before[i]) else {
+				moved.extend(root.tree.items.iter().map(|it| it.id.as_str()));
+				continue;
+			};
+			if version == root.version {
+				continue;
+			}
+			let same_shape = !reshaped && rects.len() == root.placed.len();
+			for (i, item) in root.tree.items.iter().enumerate() {
+				if !same_shape || rects[i] != root.placed[i].rect {
+					moved.insert(item.id.as_str());
+				}
+			}
+		}
+		if moved.is_empty() && written.is_empty() {
+			return Vec::new();
+		}
+		// Where a name is: an item by id, or a page (a card, a board, an app, a document) by its path.
+		let find = |name: &str| -> Option<Rect> {
+			if let Some((r, i)) = self.scene.find(name) {
+				return Some(self.scene.roots[r].placed[i as usize].rect);
+			}
+			for root in &self.scene.roots {
+				for (item, place) in root.tree.items.iter().zip(&root.placed) {
+					if item.get("metadata").and_then(|m| m.get("path")).and_then(Value::as_str) == Some(name) {
+						return Some(place.rect);
+					}
+				}
+			}
+			None
+		};
 		let line = if self.doc.meta.get("variables").and_then(|v| v.get("decks-line")).is_some() { "$decks-line" } else { "#8a8f98" };
 		let mut changes = Vec::new();
 		for root in &self.scene.roots {
@@ -212,16 +239,15 @@ impl Page {
 				let Some(meta) = item.get("metadata") else { continue };
 				let parent = item.parent.map(|p| &items[p as usize]);
 				let parent_id = parent.map(|p| p.id.as_str());
-				let touched = written.contains(item.id.as_str()) || !before.contains_key(&item.id) || arrows::end_items(meta).iter().flatten().copied().chain(parent_id).any(|name| moved(name));
+				let touched = written.contains(item.id.as_str()) || arrows::end_items(meta).iter().flatten().copied().chain(parent_id).any(|name| moved.contains(name));
 				if !touched {
 					continue;
 				}
-				let find = |id: &str| now.get(id).copied();
 				let Some(points) = arrows::points(meta, &find) else { continue };
 				let (route, heads) = arrows::style(meta);
 				let stroke = item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0);
 				let shape = arrows::shape(&points, stroke, route, heads);
-				let origin = parent_id.and_then(|p| now.get(p)).map_or((0.0, 0.0), |r| (r.x, r.y));
+				let origin = parent_id.and_then(find).map_or((0.0, 0.0), |r| (r.x, r.y));
 				let (x, y) = (arrows::round(shape.x - origin.0), arrows::round(shape.y - origin.1));
 				let num = |key: &str| item.get(key).and_then(Value::as_f64);
 				if num("x") == Some(x) && num("y") == Some(y) && item.get("geometry").and_then(Value::as_str) == Some(shape.geometry.as_str()) {

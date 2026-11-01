@@ -19,15 +19,44 @@ export interface PlacedItem {
 	path?: string;
 }
 
+type TopNode = { id?: string; type?: string; x?: unknown; y?: unknown; width?: unknown; height?: unknown; rotation?: unknown };
+
+const sized = (n: TopNode) => typeof n.x === "number" && typeof n.y === "number" && typeof n.width === "number" && n.width > 0 && typeof n.height === "number" && n.height > 0 && !n.rotation;
+
 /**
- * The drawing's top-level items, each with the box it is drawn in (`placements`, laid out in `look`).
+ * Each top-level item's box, by id. A top-level item with a number for its place and size sits in
+ * that box: nothing lays it out, since the top level has no layout of its own. Only the items sized
+ * by their content (a text that grows, a frame that fits) are laid out, and those alone: laying the
+ * whole drawing out for every change cost 10 to 20 ms of a drag on 2,000 items, for boxes already
+ * written on the items.
+ */
+export function topBoxMap(doc: PenDocument, look: "light" | "dark" = "light"): Map<string, Box> {
+	const out = new Map<string, Box>();
+	const needy: TopNode[] = [];
+	for (const node of (doc.children ?? []) as unknown as TopNode[]) {
+		if (!node.id) continue;
+		if (sized(node)) out.set(node.id, { x: node.x as number, y: node.y as number, w: node.width as number, h: node.height as number });
+		else needy.push(node);
+	}
+	if (needy.length) {
+		const placed = placements({ ...doc, children: needy as PenDocument["children"] }, { theme: baseTheme(doc, look) });
+		for (const node of needy) {
+			const box = placed.get(node.id!)?.box;
+			if (box) out.set(node.id!, { x: box.x, y: box.y, w: box.w, h: box.h });
+		}
+	}
+	return out;
+}
+
+/**
+ * The drawing's top-level items, each with the box it is drawn in (`topBoxMap`).
  * One reading of the boxes for everything that frames, fits or lists what is on a canvas.
  */
 export function placedItems(doc: PenDocument, look: "light" | "dark" = "light"): PlacedItem[] {
-	const placed = placements(doc, { theme: baseTheme(doc, look) });
+	const placed = topBoxMap(doc, look);
 	const out: PlacedItem[] = [];
 	for (const node of (doc.children ?? []) as unknown as Array<{ id?: string; name?: string; metadata?: { path?: unknown; type?: unknown } }>) {
-		const box = node.id ? placed.get(node.id)?.box : undefined;
+		const box = node.id ? placed.get(node.id) : undefined;
 		if (!node.id || !box || box.w <= 0 || box.h <= 0) continue;
 		out.push({
 			id: node.id,

@@ -1,4 +1,5 @@
-import { baseTheme, placements, type PenDocument } from "@decks/pen";
+import type { PenDocument } from "@decks/pen";
+import { topBoxMap } from "./boxes.ts";
 
 /**
  * The layers list (the Decks page's Canvas tab): the drawing's top-level items, as Studio's editor lists its layers, each with
@@ -18,11 +19,11 @@ export function canvasItems(doc: PenDocument | undefined, query = ""): { items: 
 	const arrows: string[] = [];
 	if (!doc) return { items, arrows };
 	const q = query.trim().toLowerCase();
-	const placed = placements(doc, { theme: baseTheme(doc, "light") });
+	const placed = topBoxMap(doc);
 	for (const n of (doc.children ?? []) as unknown as Record<string, unknown>[]) {
 		const id = String(n.id);
 		const meta = (n.metadata ?? {}) as { type?: string; path?: string };
-		const frame = placed.get(id)?.box;
+		const frame = placed.get(id);
 		const box = frame ? { x: frame.x, y: frame.y, w: frame.w, h: frame.h } : { x: Number(n.x ?? 0), y: Number(n.y ?? 0), w: 0, h: 0 };
 		const named = typeof n.name === "string" && n.name.trim() ? n.name.trim() : undefined;
 		let item: CanvasItem;

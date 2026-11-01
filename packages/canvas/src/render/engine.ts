@@ -857,7 +857,8 @@ export class StageEngine {
 		if (changes.all || changes.roots.length || changes.removed.length || changes.bases.length) {
 			this.cardList = undefined;
 			this.placedList = undefined;
-		this.pageIds = undefined;
+			// A gesture's or a glide's step re-lays only the arrows it bends: no page's item changes, so the page ids stand.
+			if (!quiet) this.pageIds = undefined;
 			this.placedIndex = undefined;
 		}
 		this.drawnDoc = doc;
