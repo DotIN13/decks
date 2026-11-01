@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "2d76e53d6792e00f95494f46ddec16e27d9b256446f24008bb86e5c9b1af7531",
+	"hash": "1af2478ed1d92bbee535f0e389e65564d226a8ad2831fd12feb5aeb61d14d201",
 	"rules": 1870,
 	"sheets": 21,
 	"ties": 23,
@@ -1181,7 +1181,7 @@
 		["styles/marks.css","@layer components ▸ .agent-cursor .ring{position:absolute;left:0;top:0;width:8px;height:8px;margin:-4px 0 0 -4px;border:2px solid var(--cursor-color);border-radius:var(--radius-pill);opacity:0;animation:cursor-ping 520ms cubic-bezier(0.2, 0.7, 0.2, 1)}"],
 		["styles/marks.css","@layer components ▸ .agent-cursor .label{position:absolute;top:22px;left:20px;padding:2px 8px;border-radius:4px;background:var(--cursor-soft);box-shadow:0 1px 3px rgb(0 0 0 / 18%);color:#11131a;font-size:13px;font-weight:500;line-height:18px;white-space:nowrap;transition:transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms}"],
 		["styles/marks.css","@layer components ▸ .agent-cursor[data-moving=\"true\"] .label{transform:translate(-6px, -4px)}"],
-		["styles/marks.css","@layer components ▸ @keyframes cursor-float{{0%, 100% { transform: translate(0, 0); } 22% { transform: translate(2px, -3px); } 50% { transform: translate(-2px, -1.5px); } 76% { transform: translate(1px, 2px); }}}"],
+		["styles/marks.css","@layer components ▸ @keyframes cursor-float{{0%, 100% { transform: translate(0, 0); } 35% { transform: translate(0.5px, -2px); } 65% { transform: translate(-0.5px, -1.2px); }}}"],
 		["styles/marks.css","@layer components ▸ @keyframes cursor-ping{{from { width: 8px; height: 8px; margin: -4px 0 0 -4px; opacity: 0.85; } to { width: 64px; height: 64px; margin: -32px 0 0 -32px; opacity: 0; }}}"],
 		["styles/marks.css","@layer components ▸ @keyframes cursor-in{{from { opacity: 0; }}}"],
 		["styles/marks.css","@layer components ▸ @media (prefers-reduced-motion: reduce) ▸ .agent-cursor,.agent-cursor .label{transition:none}"],

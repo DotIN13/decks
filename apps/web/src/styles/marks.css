@@ -270,20 +270,20 @@
 .agent-cursor[data-moving="true"] .label {
 	transform: translate(-6px, -4px);
 }
-	/* At rest the arrow drifts a few pixels round its point, up and across, so a still agent is still seen to be there. */
+	/*
+	 * At rest the arrow breathes: a 2 px rise and fall with a hair of sideways drift, as the first
+	 * cursor's dot did (2.5 px, up and down). A 3 px wander on both axes read as fidgeting.
+	 */
 	@keyframes cursor-float {
 	0%,
 	100% {
 		transform: translate(0, 0);
 	}
-	22% {
-		transform: translate(2px, -3px);
+	35% {
+		transform: translate(0.5px, -2px);
 	}
-	50% {
-		transform: translate(-2px, -1.5px);
-	}
-	76% {
-		transform: translate(1px, 2px);
+	65% {
+		transform: translate(-0.5px, -1.2px);
 	}
 }
 	@keyframes cursor-ping {
