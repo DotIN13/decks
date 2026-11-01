@@ -986,9 +986,23 @@ export class StageEngine {
 	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
 	 * undone, so it covers exactly the window.
 	 */
+	/**
+	 * Hold the canvas where it is while the scale moves (`Stage`, `holdStill`): the stage leaves the world
+	 * where it is too, so the canvas keeps covering the window, and every frame draws the window at the
+	 * camera into it as before. Setting its transform at each step, even on a promised layer, made
+	 * Chromium rebuild its paint property tree and assign every layer on the page again, a frame's
+	 * worth of style and layer work per zoom step (a quarter of a zoom's main thread over 100 cards).
+	 */
+	holdStill(on: boolean): void {
+		if (on === this.still) return;
+		this.still = on;
+		if (!on) this.draw();
+	}
+	private still = false;
+
 	private place(): boolean {
 		const at = this.drawnAt;
-		if (!this.over || !at) return false;
+		if (!this.over || !at || this.still) return false;
 		const transform = `translate(${at.x}px, ${at.y}px) scale(${1 / at.zoom})`;
 		// Compared with the one set, not the style's, which the browser writes back rounded.
 		if (transform === this.placedAs) return false;

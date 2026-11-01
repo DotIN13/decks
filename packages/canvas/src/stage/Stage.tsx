@@ -206,6 +206,8 @@ export function Stage(props: StageProps) {
 	 * whole area: a third of a pinch's script time on an iPad mini, and 8 to 27% of a zoom's on a Mac.
 	 */
 	let zoomScroll: { left: number; top: number } | undefined;
+	/** Whether this zoom moves nothing in the DOM (`place` above): no card node is in the world. */
+	let zoomStill = false;
 	/** The zoom the world was last placed at, to tell a zoom step from a pan. */
 	let placedZoom: number | undefined;
 	const ctl = createCameraController({
@@ -213,10 +215,23 @@ export function Stage(props: StageProps) {
 		place: (cam) => {
 			const zooming = placedZoom !== undefined && cam.zoom !== placedZoom;
 			placedZoom = cam.zoom;
-			if (zooming && !zoomScroll && element) zoomScroll = { left: element.scrollLeft, top: element.scrollTop };
+			if (zooming && !zoomScroll && element) {
+				zoomScroll = { left: element.scrollLeft, top: element.scrollTop };
+				/*
+				 * A zoom with no card node in the world moves nothing in the DOM: the world and the sheet's
+				 * canvas stay where they are, the canvas covering the window as it did, and the engine draws
+				 * the window at each step's camera into it (`holdStill`). Each step set two inline transforms,
+				 * and in Chromium each set rebuilt the paint property tree and assigned every layer on the
+				 * page again, even with the transform promised: a quarter of a zoom's main thread over 100
+				 * cards as pictures. With a card's page in the world the world has to move, as its page is
+				 * stretched on its own layer (`data-scaling`); nothing wakes mid-gesture, so this is decided once.
+				 */
+				zoomStill = !worldEl.querySelector(".card-node");
+				penLayer.holdStill(zoomStill);
+			}
 			if (zoomScroll) {
 				origin = originFor(cam, zoomScroll, view());
-				placeWorld(cam.zoom, true);
+				if (!zoomStill) placeWorld(cam.zoom, true);
 				penLayer.setCamera(cam);
 				return;
 			}
@@ -262,7 +277,14 @@ export function Stage(props: StageProps) {
 	// The zoom has rested: from here the scroll and the camera agree again, and a pan sets the scroll as before.
 	createEffect(
 		on(scaling, (now) => {
-			if (!now) zoomScroll = undefined;
+			if (now) return;
+			zoomScroll = undefined;
+			// A zoom that moved nothing: the world and the canvas are placed for where it rested.
+			if (zoomStill) {
+				zoomStill = false;
+				placeWorld(ctl.now().zoom, true);
+				penLayer.holdStill(false);
+			}
 		}, { defer: true }),
 	);
 	/*
