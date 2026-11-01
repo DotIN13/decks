@@ -1,0 +1,11 @@
+[package]
+name = "stage-editor"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+stage-scene = { path = "../scene" }
+stage-paint = { path = "../paint" }
+serde.workspace = true
+serde_json.workspace = true

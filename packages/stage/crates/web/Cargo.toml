@@ -14,6 +14,7 @@ stage-paint = { path = "../paint" }
 stage-gpu = { path = "../gpu" }
 stage-render = { path = "../render" }
 stage-text = { path = "../text" }
+stage-editor = { path = "../editor" }
 serde_json.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

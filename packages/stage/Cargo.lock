@@ -1204,6 +1204,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stage-editor"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "stage-paint",
+ "stage-scene",
+]
+
+[[package]]
 name = "stage-gpu"
 version = "0.1.0"
 dependencies = [
@@ -1287,6 +1297,7 @@ dependencies = [
  "js-sys",
  "serde_json",
  "stage-doc",
+ "stage-editor",
  "stage-gpu",
  "stage-paint",
  "stage-render",
