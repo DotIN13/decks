@@ -1,4 +1,4 @@
-import type { PointerKind } from "../core/model.ts";
+import type { PointerKind } from "../model.ts";
 import { RULES, TOUCH } from "../../device/profile.ts";
 
 /**

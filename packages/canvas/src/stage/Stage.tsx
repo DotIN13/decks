@@ -22,11 +22,7 @@ import { StageEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
 import {
 	createStageEditor,
-	dropSlot as dropSlotIn,
-	frameUnder as frameUnderIn,
-	idMaker,
 	InsertMenu,
-	moveOps,
 	OverlayLayer,
 	TextEditor,
 	tsScene,
@@ -339,7 +335,15 @@ export function Stage(props: StageProps) {
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
-	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
+	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
+	const freshIds = (...also: string[]) => {
+		const used = new Set([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
+		return () => {
+			const id = newId(used);
+			used.add(id);
+			return id;
+		};
+	};
 	/** An item as the file has it, not as a preview has drawn it. */
 	const penNode = (id: string) => (props.pen ? docIndex(props.pen.doc).get(id)?.node : undefined);
 
@@ -714,15 +718,15 @@ export function Stage(props: StageProps) {
 	};
 
 	/** Move items by `dx dy`, into a frame or out of one when `into` says (`editor/core/ops.ts`). */
-	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => penEdit(moveOps(scene, idsToMove, dx, dy, into, slot));
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => penEdit(editor.call<unknown[]>("move-ops", { ids: idsToMove, dx, dy, ...(into !== undefined ? { into } : {}), ...(slot !== undefined ? { slot } : {}) }) ?? []);
 
 	/**
 	 * The frame a drop at a point would go into, or `null` for the stage itself (`editor/core/drop.ts`):
 	 * what a live drag is aiming at is the editor's (`editor.dropInto`); this answers the page's checks.
 	 */
-	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => frameUnderIn(scene, point, carrying);
+	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => editor.call<string | null>("frame-under", { ...point, carrying }) ?? null;
 	/** Where in a frame that arranges its children a drop would land (`editor/core/drop.ts`, `dropSlot`). */
-	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => dropSlotIn(scene, frameId, point, carrying);
+	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => editor.call<{ index: number; line: { x: number; y: number; w: number; h: number } } | null>("drop-slot", { frame: frameId, ...point, carrying }) ?? undefined;
 
 	/** A link is under the pointer: the cursor says so. */
 	const overLink = editor.overLink;

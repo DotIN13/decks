@@ -7,8 +7,8 @@
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
 import { canvasHost, openInTab, type CanvasHost } from "../../host.ts";
 import { shortLabel } from "@decks/ui";
-import type { Effect } from "../core/gesture.ts";
-import type { Pt, Rect } from "../core/model.ts";
+import type { Effect } from "../wire.ts";
+import type { Pt, Rect } from "../model.ts";
 
 /** The composer a drag is over: its element, or the host's word for one outside this document. */
 type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;

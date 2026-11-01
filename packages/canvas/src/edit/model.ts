@@ -3,8 +3,8 @@
  * from the page: no Solid, no DOM, no engine (`core/imports.test.ts` holds that).
  */
 import type { Frame } from "@decks/pen";
-import type { Guide } from "../snap.ts";
-import type { Gesture } from "./gesture.ts";
+import type { Guide } from "./snap.ts";
+import type { GestureSummary } from "./wire.ts";
 import type { TextSession } from "./text.ts";
 
 export type Pt = { x: number; y: number };
@@ -66,8 +66,8 @@ export type EditorState = {
 	selection: { items: readonly string[]; boards: readonly string[]; awaited: readonly string[] };
 	/** The item under the pointer, the board, a board's picture with no node, a card's block, a link; and whether Alt is held, for the distances. */
 	hover: { item?: string | undefined; board?: string | undefined; picture?: string | undefined; block?: string | undefined; link: boolean; alt?: boolean | undefined };
-	/** The press in hand (`core/gesture.ts`). */
-	gesture?: Gesture | undefined;
+	/** The press in hand, as the engine's editor says it (`wire.ts`, `GestureSummary`). */
+	gesture?: GestureSummary | undefined;
 	/** The selection's move, held after the lift until the drawing that answers it is drawn. */
 	drag: Offset;
 	/**
@@ -110,3 +110,18 @@ export type EditorState = {
 	/** The words open for typing, in the editor laid over their item (`dom/TextEditing.tsx`). */
 	text?: TextSession | undefined;
 };
+
+const ZERO: Offset = { dx: 0, dy: 0 };
+
+/** The editor's state before anything is selected or pressed. */
+export function initialState(mode: EditorState["mode"] = "browse", tool: PenTool = "select"): EditorState {
+	return { mode, tool, selection: { items: [], boards: [], awaited: [] }, hover: { link: false }, drag: ZERO, guides: [], drop: {}, joins: [], sides: [], carryPending: false, settling: [] };
+}
+
+/** The selection with its items, its boards, or both replaced. */
+export function withSelection(state: EditorState, next: { items?: readonly string[]; boards?: readonly string[] }): EditorState {
+	return { ...state, selection: { ...state.selection, ...(next.items ? { items: next.items } : {}), ...(next.boards ? { boards: next.boards } : {}) } };
+}
+
+/** The selection's drag as the canvas shows it: nothing while the carried picture is on its way. */
+export const shownDrag = (state: EditorState): Offset => (state.carryPending ? ZERO : state.drag);

@@ -8,7 +8,9 @@ import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
 import { handTool } from "../edit/pen-tools.ts";
 import { RULES } from "../device/profile.ts";
-import { handPans } from "../edit/core/dispatch.ts";
+
+/** Whether a press is the hand's: the hand tool or Space, the main button, not a finger, not on a control. */
+const handPans = (facts: { hand: boolean; pointer: string; button: number; control: boolean }) => facts.hand && facts.pointer !== "touch" && facts.button === 0 && !facts.control;
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";

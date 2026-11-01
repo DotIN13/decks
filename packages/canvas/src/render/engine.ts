@@ -1075,8 +1075,6 @@ export class StageEngine {
 		if (this.placed.size && this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8)) this.writeHits();
 	}
 
-	/** The editor's overlay as the engine paints it (`edit/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
-	private overlayJson: string | undefined;
 	/**
 	 * The canvas editor, which lives in the engine (`crates/editor`, `crates/web/src/editing.rs`): one
 	 * input in the editor's `Input` shape, with the page's frame, answered with the ops, the preview, the
@@ -1113,15 +1111,6 @@ export class StageEngine {
 
 	/** What the editor's overlay last painted, to draw again only when it changes. */
 	private paintedOverlay = "";
-
-	setOverlay(json: string): boolean {
-		if (!this.page) return false;
-		if (json === this.overlayJson) return true;
-		this.overlayJson = json;
-		this.page.setOverlay(json);
-		this.draw();
-		return true;
-	}
 
 	setMoving(moving: boolean): void {
 		if (moving === this.moving) return;

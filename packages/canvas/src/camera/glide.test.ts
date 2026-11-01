@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene } from "../edit/core/fake-scene.ts";
+import { fakeScene } from "../edit/fake-scene.ts";
 import { easeOut, GLIDE_MS, glideAt, glideShifts, landingBoxes } from "./glide.ts";
 
 /** A column holding a b c, and a loose item x, inside an outer frame that holds the column and a note. */

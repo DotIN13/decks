@@ -17,12 +17,10 @@ import { setPenTyping } from "../pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../model/card-frame.ts";
 import { CardEditor } from "../CardEditor.tsx";
 import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../render/look.ts";
-import { dropSlot } from "../core/drop.ts";
-import type { Pt, Rect } from "../core/model.ts";
-import type { NextId } from "../core/ops.ts";
-import type { Picked } from "../core/pick.ts";
-import type { EngineSeam, SceneQuery } from "../core/scene.ts";
-import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
+import type { Pt, Rect } from "../model.ts";
+import type { NextId, Picked } from "../wire.ts";
+import type { EngineSeam, SceneQuery } from "../scene.ts";
+import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../text.ts";
 import type { Editor } from "./controller.ts";
 import { openInTab, pictureAddress } from "../../host.ts";
 
@@ -125,7 +123,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		const pen = host.pen();
 		const current = (pen ? indexOf(pen.doc).get(card.id)?.node : undefined) ?? card;
 		const box = host.scene.item(card.id)?.box ?? hit.box;
-		if (hit.node.id === card.id) openCard(current, box, false, { insertAt: dropSlot(host.scene, card.id, at, [])?.index ?? (current.children ?? []).length });
+		if (hit.node.id === card.id) openCard(current, box, false, { insertAt: editor.call<{ index: number } | null>("drop-slot", { frame: card.id, x: at.x, y: at.y, carrying: [] })?.index ?? (current.children ?? []).length });
 		else openCard(current, box, false, { caretAt: client });
 		return true;
 	};

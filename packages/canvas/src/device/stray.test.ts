@@ -23,7 +23,6 @@ const STILL_ASKING = new Set([
 	"apps/web/src/styles/shell.css",
 	"apps/web/src/styles/stages.css",
 	"apps/web/src/styles/v3.css",
-	"packages/canvas/src/edit/core/overlay-json.ts",
 	"packages/canvas/src/edit/dom/OverlayLayer.tsx",
 	"packages/canvas/src/edit/dom/touch-rules.ts",
 	"packages/canvas/src/items/item-slot.tsx",

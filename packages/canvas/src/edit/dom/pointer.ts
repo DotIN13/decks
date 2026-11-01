@@ -13,17 +13,23 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import { HOLD_MS, slopFor } from "./touch-rules.ts";
 import { RULES } from "../../device/profile.ts";
-import type { ArrowHandles } from "../core/arrows.ts";
-import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
-import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
-import { glideShift } from "../core/overlay.ts";
-import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
-import type { Handle } from "../core/resize.ts";
-import type { SceneQuery } from "../core/scene.ts";
+import type { PageBox, Offset, PenTool, Pt, Rect } from "../model.ts";
+import type { ArrowHandles, BareTap, Handle, HoverAction, LastTap, Outline, PageHandles, Picked, PickOptions, PressAction, PressTarget, RadiusHandle } from "../wire.ts";
+import { glideShift } from "./places.ts";
+import type { SceneQuery } from "../scene.ts";
 import { pointerInput, type Editor } from "./controller.ts";
+
+/** The press and tap timings, from the rules table (`device/rules.json`). */
+const TAP_MS = RULES.tapMs;
+const TAP_SLOP_PX = RULES.tapPx;
+const PANNED_MS = RULES.clickAfterPanMs;
+const MADE_MS = RULES.clickAfterMakeMs;
+/** Whether a tap on `id` at `now` is the second of a double tap on it (`tap.second-ms`). */
+const isSecondTap = (last: LastTap | undefined, id: string, now: number) => !!last && last.id === id && now - last.at < RULES.secondTapMs;
+/** Whether a tap on bare canvas is the second of two close together (`tap.bare-second-ms`, `tap.bare-second-px`). */
+const isBareSecondTap = (last: BareTap | undefined, point: Pt, now: number) => !!last && now - last.at < RULES.bareSecondTapMs && Math.hypot(point.x - last.x, point.y - last.y) < RULES.bareSecondTapPx;
 
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
@@ -159,15 +165,23 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	let lastTap: LastTap | undefined;
 
 	const worldAt = host.worldAt;
-	const pickAtHere = (at: Pt, options?: PickOptions) => pickAt(host.scene, at, options);
+	/** What a press at a stage point picks, decided by the engine's editor (`crates/editor/src/pick.rs`), with its node from the drawing. */
+	const pickAtHere = (at: Pt, options?: PickOptions): Picked | undefined => {
+		const hit = editor.call<{ id: string; box: Rect } | null>("pick", { x: at.x, y: at.y, ...options });
+		const node = hit ? host.scene.node(hit.id) : undefined;
+		return hit && node ? { id: hit.id, node, box: hit.box } : undefined;
+	};
 	/**
 	 * The board whose picture is under a point and that has no node of its own to take the press
 	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
 	 */
 	const pictureUnder = (event: Client): string | undefined => {
 		const at = worldAt(event);
-		// The spatial index finds the few boards near the point; core decides among them, in paint order.
-		return pictureAt(host.pagesNear(at), at, host.rendered());
+		// The spatial index finds the few boards near the point; the last in file order is on top.
+		const rendered = host.rendered();
+		let top: string | undefined;
+		for (const board of host.pagesNear(at)) if (!rendered.has(board.path) && at.x >= board.x && at.x <= board.x + board.w && at.y >= board.y && at.y <= board.y + board.h) top = board.path;
+		return top;
 	};
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
@@ -418,7 +432,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
 	 * level with it. Not while the card is open for typing, which has its own way of moving things.
 	 */
-	const blockUnder = (at: Pt): string | undefined => blockAt(host.scene, at, host.typing());
+	const blockUnder = (at: Pt): string | undefined => editor.call<string | null>("block-at", { x: at.x, y: at.y, typing: host.typing() }) ?? undefined;
 
 	/**
 	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
@@ -442,7 +456,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		 * the node would go as the pointer reached the bar it is there for.
 		 */
 		hoverNode = (event.target as Element | null)?.closest?.(".card-node[data-state='picture']")?.getAttribute("data-path") ?? undefined;
-		const decided = decideHover({
+		const decided = editor.call<HoverAction>("decide-hover", {
 			pointer: event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse",
 			editable: host.editable(),
 			editing: host.mode() === "edit",
@@ -453,7 +467,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			tool: host.tool(),
 			target: pressTarget(host.element(), event.target),
 			hand: host.spaceHeld(),
-		});
+		}) ?? { do: "none" };
 		if (decided.do === "none") return;
 		if (decided.do === "clear") {
 			hoverAt = undefined;
@@ -768,7 +782,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		 * as a pointer does, and a finger is never this.
 		 */
 		if (kind === "pen" && event.button === 0 && host.editable() && !host.drawing() && host.tool() === "select" && onCanvas(event.target) && !pickAtHere(worldAt(event)) && !pictureUnder(event) && host.pencil?.(event)) return;
-		const act = decidePress({
+		const act = editor.call<PressAction>("decide-press", {
 			pointer: kind === "touch" || kind === "pen" ? kind : "mouse",
 			button: event.button,
 			target: pressTarget(element, event.target),
@@ -777,9 +791,9 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			tool: host.tool(),
 			space: host.spaceHeld(),
 			fingers: host.fingers(),
-			onItem: () => !!pickAtHere(worldAt(event)),
-			picture: () => pictureUnder(event),
-		});
+			onItem: !!pickAtHere(worldAt(event)),
+			picture: pictureUnder(event) ?? null,
+		}) ?? { do: "nothing" };
 		// A finger that presses something rather than the canvas is the editor's, not the browser's to scroll with.
 		if (kind === "touch" && act.do !== "touch" && act.do !== "pan") host.keepTouch?.(event);
 		switch (act.do) {

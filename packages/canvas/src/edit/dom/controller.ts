@@ -16,15 +16,14 @@
 import { arrowEndItem, ids as penIds, isArrow, mediaOf, type MediaItem, type Op, type PenDocument } from "@decks/pen";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { feedSelection, keptSelection } from "../pen-tools.ts";
-import { glideShift } from "../core/overlay.ts";
-import { initialState, shownDrag, withSelection, type Input, type PointerInput } from "../core/gesture.ts";
-import type { PageBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
-import type { NextId } from "../core/ops.ts";
-import type { TextSession } from "../core/text.ts";
-import type { EngineSeam, SceneQuery } from "../core/scene.ts";
+import { glideShift } from "./places.ts";
+import { initialState, shownDrag, withSelection } from "../model.ts";
+import type { Effect, Input, NextId, PointerInput } from "../wire.ts";
+import type { PageBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../model.ts";
+import type { TextSession } from "../text.ts";
+import type { EngineSeam, SceneQuery } from "../scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 import { PROFILE } from "../../device/profile.ts";
-import type { Effect } from "../core/gesture.ts";
 
 /** A board as the editor needs it from the app: where it is and its revision. */
 export type HostPage = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
@@ -316,6 +315,14 @@ export function createEditor(host: EditorHost) {
 		},
 
 		/** Step one input; true when it left a gesture in hand, for the page to follow the pointer. */
+		/**
+		 * One of the engine's editor's other answers, by name (`crates/web/src/editing_wire.rs`, `call`): a pick,
+		 * a drop slot, the ops for a move, a make or a delete, a key. At the camera's zoom, which a press's reach is on.
+		 */
+		call: <T = unknown>(name: string, args: Record<string, unknown> = {}): T | undefined => {
+			sync();
+			return host.engine.editorCall<T>(name, { zoom: host.zoom(), ...args });
+		},
 		input: (input: Input): boolean => {
 			dispatch(input);
 			return !!read().gesture;

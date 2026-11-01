@@ -9,8 +9,8 @@
 import { ARROW_SIDES, sidePoint, type ArrowSide } from "@decks/pen";
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
-import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
-import { HANDLES, type Handle } from "../core/resize.ts";
+import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown } from "./places.ts";
+import { HANDLES, type Handle, type Outline, type Overlay } from "../wire.ts";
 import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "./touch-rules.ts";
 import { RULES } from "../../device/profile.ts";
 

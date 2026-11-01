@@ -1,5 +1,5 @@
 import { createSignal, untrack, type Accessor } from "solid-js";
-import type { PenTool } from "./core/model.ts";
+import type { PenTool } from "./model.ts";
 
 /**
  * What a press on the stage's drawing does, and what is selected in it (`canvas/pen/`).
@@ -12,7 +12,7 @@ import type { PenTool } from "./core/model.ts";
 export type { PenTool };
 
 /** The key that arms each tool (`canvas/editor/core/model.ts`). */
-export { PEN_TOOL_KEYS } from "./core/model.ts";
+export { PEN_TOOL_KEYS } from "./model.ts";
 
 const [penTool, setPenTool] = createSignal<PenTool>("select");
 /**

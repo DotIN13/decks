@@ -15,13 +15,10 @@ import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTo
 import { newCard } from "../model/card-frame.ts";
 import { Insert } from "./Insert.tsx";
 import type { Box } from "../edit/snap.ts";
-import { joinAt as joinAtIn, newArrowEnds, type Join } from "../edit/core/arrows.ts";
-import { frameAt as frameAtIn } from "../edit/core/drop.ts";
-import { drawHints, insertPick, opensWords } from "../edit/core/insert.ts";
-import type { PenTool, Pt } from "../edit/core/model.ts";
-import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../edit/core/ops.ts";
-import type { Outline } from "../edit/core/overlay.ts";
-import type { SceneQuery } from "../edit/core/scene.ts";
+import type { PenTool, Pt } from "../edit/model.ts";
+import type { Join, NextId, Outline } from "../edit/wire.ts";
+import type { PenNode } from "@decks/pen";
+import type { SceneQuery } from "../edit/scene.ts";
 import type { Editor } from "../edit/dom/controller.ts";
 import type { TextEditing } from "../edit/dom/TextEditing.tsx";
 
@@ -43,23 +40,43 @@ export type InsertHost = {
 	follow: (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => void;
 };
 
+/** Whether a tool opens its words for typing as soon as it makes its item. */
+const opensWords = (tool: PenTool): tool is "text" | "note" | "card" => tool === "text" || tool === "note" || tool === "card";
+
+/** What an arrow being drawn lights up: what its start joins, and what its end would join with the sides it can keep to. */
+function drawHints(start: Join | undefined, end: Join | undefined): { joins: Box[]; sides: { box: Box; side?: ArrowSide }[] } {
+	const other = end && end.name !== start?.name ? end : undefined;
+	return { joins: [...(start ? [start.box] : []), ...(other ? [other.box] : [])], sides: other ? [{ box: other.box, ...(other.side ? { side: other.side } : {}) }] : [] };
+}
+
+/** A pick in the insert panel: another icon for one already drawn, an item where the panel was opened for, or the tool armed. */
+function insertPick(open: { at?: Pt | undefined; replace?: string | undefined } | undefined, tool: "shape" | "icon", icon: { library: string; name: string }): { do: "update"; ops: Op[] } | { do: "make"; at: Pt } | { do: "arm" } {
+	if (open?.replace && tool === "icon") return { do: "update", ops: [{ op: "update", id: open.replace, set: { library: icon.library, icon: icon.name, name: icon.name } }] };
+	if (open?.at) return { do: "make", at: open.at };
+	return { do: "arm" };
+}
+
 export function createInsertMenu(editor: Editor, text: TextEditing, host: InsertHost) {
 	const worldAt = host.worldAt;
 	/** When a tool last made an item, so the second press of a double-click does not make a note as well. */
 	let penMadeAt = 0;
 
-	/** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
-	const makeOptions = (id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: host.idsBut(id), card: newCard });
+	/**
+	 * What a tool makes, besides the tool (`crates/editor/src/ops.rs`): the shape and icon picked, and for a
+	 * card the card itself with a first block whose id is none taken (`newCard`), built here and sent as it is.
+	 */
+	const makeOptions = (id: string, tool: string) => ({ shape: penShape(), icon: penIcon(), ...(tool === "card" ? { card: newCard(id, host.idsBut(id)()) } : {}) });
+	type Made = { op: Op; node: PenNode; box: { x: number; y: number; w: number; h: number } };
 
-	/** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
-	const joinAt = (point: Pt, not?: string): Join | undefined => joinAtIn(host.scene, point, { zoom: host.zoom(), not });
+	/** What an arrow's end joins at a point (`crates/editor/src/arrows.rs`), at the camera's zoom. */
+	const joinAt = (point: Pt, not?: string): Join | undefined => editor.call<Join | null>("join-at", { x: point.x, y: point.y, ...(not ? { not } : {}) }) ?? undefined;
 
 	/**
 	 * The innermost frame under a point. An item drawn inside a free-standing frame belongs to it,
 	 * which is the plain call; `stacking` also takes the frames that arrange their children, which
 	 * is what a drop asks for. A library shape is a frame with a layout too, and never either.
 	 */
-	const frameAt = (point: Pt, stacking = false) => frameAtIn(host.scene, point, stacking);
+	const frameAt = (point: Pt, stacking = false) => editor.call<string | null>("frame-at", { x: point.x, y: point.y, stacking }) ?? undefined;
 
 	/*
 	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
@@ -100,10 +117,11 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 					 * Each end joins what it was let go on, and follows it from then on; an end on bare
 					 * canvas is a point there. A click with no drag makes an arrow only between two things.
 					 */
-					const made = newArrowEnds(startJoin, joinAt(end), at, end, moved);
+					const made = editor.call<{ from: unknown; to: unknown } | null>("new-arrow-ends", { fromJoin: startJoin ?? null, toJoin: joinAt(end) ?? null, x: at.x, y: at.y, end, moved });
 					if (!made) return void editor.setDraft(undefined);
 					const { from, to } = made;
-					host.edit([arrowInsertOp(id, from, to, penArrowStyle())]);
+					const op = editor.call<Op>("arrow-insert-op", { id, from, to, ...penArrowStyle() });
+					if (op) host.edit([op]);
 					keepDraftFor(id);
 					editor.selectMade([id]);
 					return;
@@ -113,8 +131,10 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 					return penMakeAt(tool, at);
 				}
 				const parent = frameAt(at);
-				// The box dragged out, at least 8 each way (`editor/core/ops.ts` `drawnOp`).
-				const { op, node, box } = drawnOp(tool, id, at, end, { ...makeOptions(id), ...(parent ? { parent } : {}) });
+				// The box dragged out, at least 8 each way (`crates/editor/src/ops.rs`, `drawn_op`).
+				const made = editor.call<Made>("drawn-op", { tool, id, x: at.x, y: at.y, end, ...makeOptions(id, tool), ...(parent ? { parent } : {}) });
+				if (!made) return void editor.setDraft(undefined);
+				const { op, node, box } = made;
 				host.edit([op]);
 				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
 				if (opensWords(tool)) editor.setDraft(undefined);
@@ -132,9 +152,11 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: Pt, centred = false) => {
 		penMadeAt = performance.now();
 		const id = host.freshId();
-		// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`editor/core/ops.ts`).
+		// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`crates/editor/src/ops.rs`).
 		const parent = frameAt(at);
-		const { op, node, box } = makeAtOp(tool, id, at, { ...makeOptions(id), centred, ...(parent ? { parent } : {}) });
+		const made = editor.call<Made>("make-at-op", { tool, id, x: at.x, y: at.y, ...makeOptions(id, tool), centred, ...(parent ? { parent } : {}) });
+		if (!made) return;
+		const { op, node, box } = made;
 		host.edit([op]);
 		editor.selectMade([id]);
 		if (opensWords(tool)) text.openPenText({ id, node, box }, true);

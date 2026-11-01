@@ -6,10 +6,9 @@
  * board being edited); a key that was one of the drawing's goes no further.
  */
 import type { Op } from "@decks/pen";
-import { penKey as penKeyOf, type KeyAct } from "../core/keys.ts";
-import type { PenTool } from "../core/model.ts";
-import type { NextId } from "../core/ops.ts";
-import type { SceneQuery } from "../core/scene.ts";
+import type { KeyAct, NextId } from "../wire.ts";
+import type { PenTool } from "../model.ts";
+import type { SceneQuery } from "../scene.ts";
 import type { Editor } from "./controller.ts";
 
 export type KeysHost = {
@@ -50,12 +49,16 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				return true;
 			}
 		}
-		// The document's ids are gathered only for a key that makes something (⌘D).
-		let ids: (() => string) | undefined;
-		const act: KeyAct = penKeyOf(
-			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
-			{ selection: selected, boards: editor.pagePicks(), tool: host.tool(), pageSelected: host.pageSelected(), selectedPage: host.selectedPage?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
-		);
+		// What the key does, decided by the engine's editor (`crates/editor/src/keys.rs`), its steps the rules table's.
+		const act: KeyAct = editor.call<KeyAct>("pen-key", {
+			press: { key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
+			selection: selected,
+			boards: editor.pagePicks(),
+			tool: host.tool(),
+			pageSelected: host.pageSelected(),
+			selectedPage: host.selectedPage?.(),
+			canStep: host.canStep(),
+		}) ?? { handled: false };
 		if (!act.handled) return false;
 		switch (act.do) {
 			case "step":

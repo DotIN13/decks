@@ -7,7 +7,7 @@
  * the same file. Which profile this page is is `profile.ts`'s to say.
  */
 import table from "./rules.json" with { type: "json" };
-import type { PointerKind } from "../edit/core/model.ts";
+import type { PointerKind } from "../edit/model.ts";
 
 /** A desk is a fine pointer; a tablet and a phone are touch screens, a phone under 600 px on its short side. */
 export type Form = "desk" | "tablet" | "phone";

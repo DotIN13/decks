@@ -226,7 +226,7 @@
 	.bar-layer .chrome[data-sizing="true"],
 	/*
 	 * The engine paints the outlines, handles, guides, slots and drafts with the drawing
-	 * (`stage_paint::overlay`, `edit/core/overlay-json.ts`): the elements stay for the checks and as
+	 * (`stage_paint::overlay`, from the engine's own editor): the elements stay for the checks and as
 	 * hit areas (a handle still answers its 44 pt), but show nothing of their own. Opacity, not
 	 * visibility, so a check that asks whether a selection shows still gets yes.
 	 */

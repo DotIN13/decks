@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CARD, MARKDOWN, SHAPE, type PenDocument, type PenNode } from "@decks/pen";
-import { FILE } from "../../model/file-kinds.ts";
+import { FILE } from "../model/file-kinds.ts";
 import { cancelOps, cardInner, escapeKeeps, cardLook, cardOf, commitOf, emptyVanishes, enclosing, fileOf, labelBox, legacyCard, pictureUrls, shapeOf, textLook, type TextSession } from "./text.ts";
 
 const font = (family: string, weight: number, italic: boolean) => `${family}/${weight}/${italic}`;
