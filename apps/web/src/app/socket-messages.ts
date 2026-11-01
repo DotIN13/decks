@@ -20,7 +20,7 @@ import { historyShown } from "../state/edge.ts";
 import { accountChanged, releasePages, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
-import { forgetPen, receivePen, receivePenDelta } from "../state/pens.ts";
+import { receiveCanvasChanged } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
 
 /**
@@ -231,7 +231,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.id, undefined);
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
-					forgetPen(message.id);
 					setUnread(message.id, 0);
 					return;
 				}
@@ -379,16 +378,14 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
 					return;
 
+				case "canvas.changed":
+					receiveCanvasChanged(message);
+					if (message.doc && message.error) notice("warn", message.error);
+					return;
+
+				// The tab socket's per-agent copies of a change, for one release: the line says canvas.changed.
 				case "stage.pen":
-					receivePen(message);
-					if (message.error) notice("warn", message.error);
-					return;
-
 				case "stage.pen.delta":
-					receivePenDelta(message);
-					return;
-
-				// The canvas frame makes the person's edits to the canvas on screen itself, and hears its own refusals.
 				case "stage.pen.refused":
 					return;
 
@@ -428,7 +425,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					if (message.call.op === "shot") {
 						// A moment later: the first answer is the one taken, and another tab's frame may have the card.
 						const id = message.call.id;
-						setTimeout(() => send({ type: "stage.result", result: { id, value: { how: "none", why: "it is not on the canvas on the person's screen" } } }), 1500);
+						setTimeout(() => send({ type: "view.answered", id, value: { how: "none", why: "it is not on the canvas on the person's screen" } }), 1500);
 						return;
 					}
 					/*
@@ -474,7 +471,8 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };
 					}
-					send({ type: "stage.result", result: { id: message.call.id, value } });
+					const failed = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
+					send(failed ? { type: "view.answered", id: message.call.id, error: failed } : { type: "view.answered", id: message.call.id, value });
 					return;
 				}
 

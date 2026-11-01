@@ -211,3 +211,50 @@ test("presence: a line's pointer and selection reach the other lines on the canv
 		await stop();
 	}
 });
+
+test("a page's hello is greeted with the whole truth, hears a watched canvas whole, and is told the deck as its own screen has it", async () => {
+	const { app, connect, stop } = await open();
+	try {
+		const canvas = app.pens.claim("Greeted");
+		app.pens.edit(canvas, [{ op: "insert", node: { type: "note", id: "n", content: "hi" }, box: { x1: 0, y1: 0 } }]);
+		const person = app.tokens.issue({ kind: "person" }, { label: "line page" }).token;
+
+		const page = connect();
+		await page.opened;
+		page.send({ type: "line.hello", token: person, all: true, greet: true, watch: [{ canvas, whole: true }] });
+		await page.next((m) => m.type === "harness.paired");
+		const kinds = page.heard.map((m) => m.type);
+		for (const kind of ["line.hello", "harness.hello", "deck.changed", "harness.runtimes", "agent.list", "canvas.list", "web.changed", "harness.settings", "harness.paired"]) assert.ok(kinds.includes(kind as never), `greeted with ${kind}`);
+		const whole = (await page.next((m) => m.type === "canvas.changed")) as Extract<ServerMessage, { type: "canvas.changed" }>;
+		assert.equal(whole.canvas, canvas);
+		assert.ok(whole.doc, "the drawing whole, since the page held none");
+		assert.equal(whole.rev, app.pens.get(canvas).rev);
+
+		// A call for the person: answered once under its id, and its side messages said to this line alone.
+		page.send({ type: "line.call", id: "c1", verb: "agent.add", args: [{}] });
+		const added = (await page.next((m) => m.type === "call.answered" && m.id === "c1")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(added.ok, true, added.error);
+		const id = (added.value as { id: string }).id;
+		page.send({ type: "line.call", id: "c2", verb: "agent.focus", args: [id] });
+		const focused = (await page.next((m) => m.type === "call.answered" && m.id === "c2")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(focused.ok, true, focused.error);
+		const told = (await page.next((m) => m.type === "deck.changed" && page.heard.indexOf(m) > page.heard.indexOf(added))) as Extract<ServerMessage, { type: "deck.changed" }>;
+		assert.ok(told.deck, "the deck as this screen's agent has it, said to the page that focused");
+
+		// An agent's token may not call the person's verbs.
+		const agent = app.agents.get(id)!;
+		const theirs = app.tokens.issue({ kind: "agent", id: agent.id }, { label: "agent" }).token;
+		const other = connect();
+		await other.opened;
+		other.send({ type: "line.hello", token: theirs });
+		await other.next((m) => m.type === "line.hello");
+		other.send({ type: "line.call", id: "a1", verb: "agent.focus", args: [id] });
+		const refused = (await other.next((m) => m.type === "call.answered" && m.id === "a1")) as Extract<ServerMessage, { type: "call.answered" }>;
+		assert.equal(refused.ok, false);
+		assert.match(refused.error ?? "", /person's to call/);
+		page.ws.close();
+		other.ws.close();
+	} finally {
+		await stop();
+	}
+});

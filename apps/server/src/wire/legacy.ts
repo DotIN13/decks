@@ -13,7 +13,7 @@ import { renameCanvas, unpairStudioHere } from "../verbs/person-table.ts";
  * send these.
  */
 
-type Alias = { verb: string; args: unknown[]; on?: { stage?: string; agent?: string; edit?: string }; after?: (answer: { ok: boolean; value?: unknown; error?: string }, tell: (message: ServerMessage) => void, app: App) => void } | { direct: (app: App, tell: (message: ServerMessage) => void, view?: View) => void };
+type Alias = { verb: string; args: unknown[]; on?: { stage?: string; agent?: string; edit?: string }; /** Says its own refusals (the pen edits): no notice from here. */ quiet?: true; after?: (answer: { ok: boolean; value?: unknown; error?: string }, tell: (message: ServerMessage) => void, app: App) => void } | { direct: (app: App, tell: (message: ServerMessage) => void, view?: View) => void };
 
 function alias(message: ClientMessage): Alias | undefined {
 	const stage = (message as { stage?: string }).stage;
@@ -51,6 +51,7 @@ function alias(message: ClientMessage): Alias | undefined {
 			return { verb: "card.delete", args: [message.path] };
 		case "stage.pen.edit":
 			return {
+				quiet: true,
 				verb: "canvas.edit",
 				args: [message.ops, { ...on, agent: message.agentId }],
 				on: { stage, agent: message.agentId, ...(message.edit ? { edit: message.edit.slice(0, 80) } : {}) },
@@ -98,6 +99,7 @@ function alias(message: ClientMessage): Alias | undefined {
 			return { verb: "canvas.remove", args: [message.name], after: (answer, tell, app) => answer.ok && tell({ type: "deck.changed", deck: app.stageState() }) };
 		case "stage.pen.step":
 			return {
+				quiet: true,
 				verb: "canvas.step",
 				args: [message.direction, on],
 				on: { stage, agent: message.agentId, ...(message.edit ? { edit: message.edit.slice(0, 80) } : {}) },
@@ -114,8 +116,8 @@ function alias(message: ClientMessage): Alias | undefined {
 		case "agent.focus":
 			return {
 				direct: (app, tell, view) => {
-					app.agents.focus(message.id);
 					if (view) view.focused = message.id;
+					app.agents.focus(message.id);
 					tell({ type: "deck.changed", deck: app.stageState() });
 				},
 			};
@@ -206,6 +208,6 @@ export async function legacy(app: App, message: ClientMessage, tell: (message: S
 	}
 	const headers: Record<string, string> = { ...(found.on?.stage ? { "x-decks-stage": found.on.stage } : {}), ...(found.on?.agent ? { "x-decks-agent": found.on.agent } : {}), ...(found.on?.edit ? { "x-decks-edit": found.on.edit } : {}) };
 	const { answer } = await runVerb(app, { kind: "person" }, headers, found.verb, found.args, undefined, { tell, view });
-	if (!answer.ok && !found.after) tell({ type: "harness.notice", level: "warn", text: answer.error ?? `${message.type} failed` });
+	if (!answer.ok && !found.quiet) tell({ type: "harness.notice", level: "warn", text: answer.error ?? `${message.type} failed` });
 	found.after?.(answer, tell, app);
 }

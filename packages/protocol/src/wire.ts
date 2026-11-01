@@ -323,10 +323,10 @@ export type ChangeAuthor = { kind: "person" | "agent" | "file" | "studio"; id?: 
  * the changes from that revision are sent at once, as edits or the whole drawing.
  */
 export type LineClientMessage =
-	| { type: "line.hello"; token: string; watch?: Array<{ canvas: string; since?: number }>; /** Hear every broadcast, as the event stream does (the person's and a paired site's token only). */ all?: boolean }
+	| { type: "line.hello"; token: string; watch?: Array<{ canvas: string; since?: number; whole?: true }>; /** Hear every broadcast, as the event stream does (the person's and a paired site's token only). */ all?: boolean; /** A Decks page: greeted with the whole truth (the deck, the agents, the accounts, the canvases, the settings), and given a screen of its own, which agent it is on (`agent.focus`). The person's and a paired site's token only. */ greet?: true }
 	/** A renewed token, for every message from now on. */
 	| { type: "line.token"; token: string }
-	| { type: "canvas.watch"; canvas: string; since?: number }
+	| { type: "canvas.watch"; canvas: string; since?: number; /** The drawing whole, now, as `canvas.changed` with `doc`: for a client holding none. */ whole?: true }
 	| { type: "canvas.unwatch"; canvas: string }
 	| { type: "line.call"; id: string; verb: string; args: unknown[]; /** The caller's name for the edit this call makes, as `X-Decks-Edit`. */ edit?: string; /** For the person: the canvas on screen and the agent they are talking to, as `X-Decks-Stage` and `X-Decks-Agent`. */ stage?: string; agent?: string }
 	/** The answer to an agent's `stage.call` on a watched canvas. */

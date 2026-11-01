@@ -6,7 +6,7 @@ import { setState, state } from "../state/deck.ts";
 import { act } from "../state/decks.ts";
 import { notice } from "../state/notices.ts";
 import { setSelected } from "../state/selection.ts";
-import { send } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/socket.ts";
 
 /*
  * Frame these boards, whatever they are: the camera moves to hold them all.
@@ -59,7 +59,7 @@ export function createFraming(stagePages: () => Page[]) {
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
-		send({ type: "card.play", path });
+		void call("card.play", [path]).then(warnIfFailed);
 		frameWhenPlaced(path);
 	};
 	createEffect(() => {
@@ -126,7 +126,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 		land(there);
 		return true;
 	}
-	send({ type: "card.play", path });
+	void call("card.play", [path]).then(warnIfFailed);
 	// The server copies the board into the canvas; it is landed when the copy arrives.
 	const started = performance.now();
 	const wait = () => {

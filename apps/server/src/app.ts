@@ -147,6 +147,8 @@ export class App {
 	/** Stage calls waiting for the browser to carry them out. */
 	/** Canvas frames following their canvas's stream now (`verbs/router.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
+	/** How many lines are open (`line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
+	lines: () => number = () => 0;
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
@@ -245,7 +247,7 @@ export class App {
 			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.callStageAll(call, timeoutMs),
 			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
-			connected: () => (this.hub?.connections ?? 0) > 0 || this.canvasFrames > 0,
+			connected: () => (this.hub?.connections ?? 0) > 0 || this.lines() > 0 || this.canvasFrames > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.boards.wrote(path, who),
@@ -1054,7 +1056,7 @@ export class App {
 	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */
-	private forView(message: ServerMessage, view: View): ServerMessage {
+	forView(message: ServerMessage, view: View): ServerMessage {
 		const shared = this.agents.looking();
 		if (view === this.viewing) return message;
 		const own = this.agents.get(view.focused);

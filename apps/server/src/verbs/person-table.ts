@@ -70,11 +70,10 @@ export function personTable(app: App): Record<string, Impl> {
 		},
 
 		"agent.focus": async ([id], call) => {
+			// This screen first, then everyone: the agent.list the focus publishes is rendered for each line by its view (`forView`), and this one must already say the new agent.
+			if (call.view) call.view.focused = String(id);
 			agents().focus(String(id));
-			if (call.view) {
-				call.view.focused = String(id);
-				call.tell({ type: "deck.changed", deck: app.stageState(agents().get(String(id))) });
-			}
+			if (call.view) call.tell({ type: "deck.changed", deck: app.stageState(agents().get(String(id))) });
 		},
 		"agent.remove": async ([id]) => {
 			const outcome = agents().remove(String(id));
@@ -344,6 +343,9 @@ export function personTable(app: App): Record<string, Impl> {
 		"harness.revoke": async ([id]) => {
 			if (app.tokens.paired().some((one) => one.id === String(id))) app.tokens.revoke(String(id));
 			app.send(app.pairingMessage());
+		},
+		"harness.unpair": async () => {
+			unpairStudioHere(app);
 		},
 		"web.answer": async ([id, ok], call) => {
 			if (!app.web.answer(String(id), ok === true)) notice(call, "info", "That question has already been answered.");

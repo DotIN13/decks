@@ -2,7 +2,9 @@ import { connect, DecksError, type Decks } from "@decks/sdk";
 import { apiBase } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
 import { notice } from "./notices.ts";
-import { send } from "./socket.ts";
+import { call } from "./socket.ts";
+import { rewatch } from "./pens.ts";
+import { stageOf } from "./stages.ts";
 
 /**
  * The person's clicks on the canvas, as verbs: the same `POST /api/v1/<verb>` an agent's `decks`
@@ -71,7 +73,7 @@ export async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: st
 		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));
 		done = undefined;
 	}
-	if (done === undefined) send({ type: "stage.pen.get", agentId });
+	if (done === undefined) rewatch(stageOf(agentId)?.name);
 	return done !== undefined;
 }
 

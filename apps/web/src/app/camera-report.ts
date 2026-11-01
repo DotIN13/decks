@@ -2,7 +2,7 @@ import type { Camera } from "@decks/protocol";
 import { canvasBox } from "@decks/canvas/camera";
 import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
-import { send } from "../state/socket.ts";
+import { call } from "../state/socket.ts";
 import { deviceId } from "../state/device.ts";
 import { stageOf } from "../state/stages.ts";
 
@@ -41,7 +41,7 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
 	const stage = stageOf(agentId)?.name;
-	send({ type: "camera.set", camera: sized, agentId, ...(stage ? { stage } : {}), device: deviceId });
+	void call("view.remember", [sized, { agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId }]);
 }
 
 /**

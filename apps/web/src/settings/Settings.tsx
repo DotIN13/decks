@@ -17,7 +17,7 @@ import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
 import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
-import { send } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/socket.ts";
 import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
 import type { AlertPrefs } from "../alerts/policy.ts";
@@ -248,7 +248,7 @@ function TimeSettings() {
 	});
 	const known = (zone: string) => zone === "UTC" || zones().includes(zone);
 	const set = (timezone: string | null) => {
-		send({ type: "settings.set", timezone });
+		void call("harness.configure", [{ timezone }]).then(warnIfFailed);
 		setDraft("");
 	};
 	const inForce = () => chosen() ?? state.machineZone;
@@ -387,7 +387,7 @@ function VoiceSettings() {
 				</SetRow>
 				<Show when={recogniser() !== "browser"}>
 					<SetRow title="The server's model" sub={state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key yet: set OPENAI_API_KEY on the server."}>
-						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => send({ type: "settings.set", sttModel: id === STT_MODELS[0]!.id ? null : id })} />
+						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => void call("harness.configure", [{ sttModel: id === STT_MODELS[0]!.id ? null : id }]).then(warnIfFailed)} />
 					</SetRow>
 				</Show>
 				<Show when={recogniser() !== "server"}>
@@ -460,7 +460,7 @@ function Connections() {
 							sub={<span class="truncate">{`${studio().url} · its browsers are given an hour's token at a time through its key`}</span>}
 						>
 							<Show when={!studio().env}>
-								<Btn tone="danger" title="Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => send({ type: "studio.unpair" })}>
+								<Btn tone="danger" title="Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
 									Unpair
 								</Btn>
 							</Show>
@@ -482,7 +482,7 @@ function Connections() {
 								}
 								sub={<span class="truncate">{`${row.origin || "unknown site"} · used ${ago(row.last)}`}</span>}
 							>
-								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => send({ type: "pair.revoke", id }))}>
+								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
 									{row.ids.length > 1 ? "Revoke all" : "Revoke"}
 								</Btn>
 							</SetRow>

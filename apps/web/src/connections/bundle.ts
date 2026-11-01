@@ -1,4 +1,4 @@
-import type { AgentChat, Page, ClientMessage, ServerMessage } from "@decks/protocol";
+import type { AgentChat, Page, LineClientMessage, ServerMessage } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import { api, connections, newId, saveConnections, type Connection } from "./connection.ts";
 import { readZip } from "./zip.ts";
@@ -117,7 +117,6 @@ export function greeting(id: string, manifest: BundleManifest): ServerMessage[] 
 		{ type: "harness.runtimes", list: [] },
 		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.boards, roots: [] } },
 		{ type: "agent.list", chats: [reader], focused: READER, defaultKind: "claude" },
-		{ type: "stage.pen", agentId: READER, stage: manifest.stage.name, rev: manifest.stage.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) },
 		{ type: "canvas.list", stages: [{ name: manifest.stage.name, title: manifest.stage.title, boards: manifest.boards.length, rev: manifest.stage.rev, agents: [], words: "" }] },
 		{ type: "harness.settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
 		{ type: "harness.paired", paired: [] },
@@ -136,12 +135,14 @@ export class BundleBackend {
 	onerror: (() => void) | undefined;
 	readyState = 0;
 
+	private manifest: BundleManifest | undefined;
+
 	constructor(private readonly id: string) {
 		void manifestOf(id).then(
 			(manifest) => {
+				this.manifest = manifest;
 				this.readyState = 1;
 				this.onopen?.();
-				for (const frame of greeting(id, manifest)) this.deliver(frame);
 			},
 			(error: Error) => {
 				this.readyState = 1;
@@ -155,9 +156,28 @@ export class BundleBackend {
 		queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(frame) }));
 	}
 
+	/** The line's envelope, answered from the file: the greeting on hello, the drawing whole on a watch, the reader's empty history, and a refusal of any change. */
 	send(text: string): void {
-		const message = JSON.parse(text) as ClientMessage;
-		if (message.type === "chat.open") this.deliver({ type: "chat.history", agentId: message.agentId, items: [] });
+		const message = JSON.parse(text) as LineClientMessage;
+		const manifest = this.manifest;
+		if (!manifest) return;
+		if (message.type === "line.hello") {
+			this.deliver({ type: "line.hello", who: "person" });
+			for (const frame of greeting(this.id, manifest)) this.deliver(frame);
+			return;
+		}
+		if (message.type === "canvas.watch") {
+			this.deliver({ type: "canvas.changed", canvas: manifest.stage.name, rev: manifest.stage.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) });
+			return;
+		}
+		if (message.type === "line.call") {
+			if (message.verb === "chat.open") {
+				this.deliver({ type: "chat.history", agentId: String(message.args[0] ?? READER), items: [] });
+				this.deliver({ type: "call.answered", id: message.id, ok: true });
+				return;
+			}
+			this.deliver({ type: "call.answered", id: message.id, ok: false, error: "This canvas is a file opened in this browser: it cannot be changed from here." });
+		}
 	}
 
 	close(): void {

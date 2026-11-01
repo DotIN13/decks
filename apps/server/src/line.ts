@@ -141,7 +141,12 @@ export class Line {
 			}, RECHECK_MS);
 			state.recheck.unref?.();
 			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
-			for (const one of message.watch ?? []) this.watch(socket, state, one.canvas, one.since);
+			// A page: greeted as the tab's socket greeted it, with a screen of its own that `forView` renders for.
+			if (message.greet === true && (principal.kind === "person" || principal.kind === "site")) {
+				state.view = {};
+				this.app.greet((said) => send(socket, said), state.view);
+			}
+			for (const one of message.watch ?? []) this.watch(socket, state, one.canvas, one.since, one.whole);
 			return;
 		}
 		const principal = state.principal;
@@ -159,7 +164,7 @@ export class Line {
 				return;
 			}
 			case "canvas.watch":
-				this.watch(socket, state, message.canvas, message.since);
+				this.watch(socket, state, message.canvas, message.since, message.whole);
 				return;
 			case "canvas.unwatch":
 				state.watched.delete(message.canvas);
@@ -231,7 +236,7 @@ export class Line {
 	}
 
 	/** Hear a canvas from now on, and catch up from `since` when given: a canvas pass hears its own canvas alone. */
-	private watch(socket: WebSocket, state: LineState, canvas: unknown, since: unknown): void {
+	private watch(socket: WebSocket, state: LineState, canvas: unknown, since: unknown, whole?: unknown): void {
 		if (typeof canvas !== "string" || !canvas) return;
 		const principal = state.principal!;
 		if (principal.kind === "canvas" && principal.canvas !== canvas) {
@@ -246,6 +251,10 @@ export class Line {
 		// Who is on the canvas already: said to the newcomer as they last said it.
 		for (const [other, otherState] of this.sockets) if (other !== socket && otherState.principal && otherState.present.has(canvas)) send(socket, { type: "presence.changed", canvas, by: this.by(otherState), ...otherState.present.get(canvas)! });
 		for (const one of this.elsewhere.get(canvas)?.values() ?? []) send(socket, one);
+		if (whole === true) {
+			send(socket, this.app.pens.whole(canvas));
+			return;
+		}
 		if (typeof since !== "number") return;
 		const caught = this.app.pens.caughtUp(canvas, since);
 		if (caught) send(socket, caught);
@@ -292,8 +301,10 @@ export class Line {
 			if (!state.principal) continue;
 			const wanted = state.all || (message.type === "canvas.changed" ? state.watched.has(message.canvas) : [...state.watched].some((canvas) => onCanvas(this.app, message, canvas)));
 			if (!wanted) continue;
-			text ??= JSON.stringify(message);
-			if (socket.readyState === socket.OPEN) socket.send(text);
+			if (socket.readyState !== socket.OPEN) continue;
+			// A page's line is told what its own screen should see (`forView`): the deck as its agent's canvas has it.
+			if (state.view) socket.send(JSON.stringify(this.app.forView(message, state.view)));
+			else socket.send((text ??= JSON.stringify(message)));
 		}
 	}
 

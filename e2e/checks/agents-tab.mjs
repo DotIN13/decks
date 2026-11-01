@@ -495,7 +495,7 @@ await page.keyboard.press("Enter");
 await settle(page, 300);
 const refused = await page.evaluate(() => ({
 	line: document.querySelector('[role="dialog"] .agent-edit-err')?.textContent?.trim(),
-	sent: window.__sent.filter((frame) => frame.includes("agent.rename")).length,
+	sent: window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("\"name\"")).length,
 }));
 say("a taken name says so under the field and is not sent", refused.line === "Another agent is already called Ada." && refused.sent === 0, JSON.stringify(refused));
 
@@ -503,7 +503,7 @@ say("a taken name says so under the field and is not sent", refused.line === "An
 await page.locator('[role="dialog"] input[aria-label="Agent name"]').fill("Iris the second");
 await page.keyboard.press("Enter");
 await settle(page, 400);
-const renamed = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.rename")).map((frame) => JSON.parse(frame)).at(-1));
+const renamed = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("\"name\"")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })).at(-1));
 say("renaming sends the new name, for the agent whose row it is", renamed?.name === "Iris the second" && renamed?.id === "a3", JSON.stringify(renamed));
 
 // The workspace: picked from the list, never typed.
@@ -519,7 +519,7 @@ await page.locator(".popover.agent-edit-list input").fill("political-llm");
 await page.keyboard.press("Enter");
 await settle(page, 300);
 const picked = await page.evaluate(() => ({
-	...window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1),
+	...window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("workspace")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })).at(-1),
 	listOpen: Boolean(document.querySelector(".popover.agent-edit-list")),
 }));
 say("naming a new one sends the workspace, for the agent whose row it is, and the list closes", picked.workspace === "political-llm" && picked.id === "a3" && !picked.listOpen, JSON.stringify(picked));
@@ -528,7 +528,7 @@ say("naming a new one sends the workspace, for the agent whose row it is, and th
 await page.locator('[role="dialog"] input[aria-label="Add a tag"]').fill("Panel CSS, later");
 await page.keyboard.press("Enter");
 await settle(page, 400);
-const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.tags")).map((frame) => JSON.parse(frame)));
+const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("tags")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })));
 /*
  * Commas only, not whitespace: a tag may contain spaces, which the server turns into
  * hyphens — so `Panel CSS` is one tag called `panel-css`, and splitting on whitespace made
@@ -540,7 +540,7 @@ say("…and the window stays open, so a second tag is one keystroke away", await
 
 await page.locator('[role="dialog"] .tag-x').first().click();
 await settle(page, 400);
-const after = await page.evaluate(() => JSON.parse(window.__sent.filter((frame) => frame.includes("agent.tags")).at(-1)));
+const after = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("tags")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })).at(-1));
 /* The field keeps the tags as they are being edited (`AgentEdit.tsx`, `mine`), so the rest is the two just added:
    this fed agent's identity never comes back from the server to put it back to ["mine"]. */
 say("removing one sends the rest", JSON.stringify(after.tags) === JSON.stringify(["Panel CSS", "later"]), JSON.stringify(after.tags));
@@ -680,7 +680,7 @@ const dragRowTo = async (name, label, { drop = true } = {}) => {
 
 const dragged = await dragRowTo("Iris", "irb-84069");
 say("the heading a row is over says it would land there, and the row says it is in flight", JSON.stringify(dragged.over) === JSON.stringify(["irb-84069"]) && JSON.stringify(dragged.lifted) === JSON.stringify(["Iris"]), JSON.stringify(dragged));
-const dropped = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1));
+const dropped = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("workspace")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })).at(-1));
 say("…and letting go moves that agent into that project", dropped?.id === "a3" && dropped?.workspace === "irb-84069", JSON.stringify(dropped));
 
 /*
@@ -691,7 +691,7 @@ say("…and letting go moves that agent into that project", dropped?.id === "a3"
 await declare("a3", "Iris", { workspace: "irb-84069" });
 await settle(page, 300);
 await dragRowTo("Iris", "No workspace");
-const cleared = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1));
+const cleared = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.set") && frame.includes("workspace")).map((frame) => JSON.parse(frame)).map((call) => ({ id: call.args[0], ...call.args[1] })).at(-1));
 say("dropping a row under No workspace takes it out of its project", cleared?.id === "a3" && cleared?.workspace === null, JSON.stringify(cleared));
 await declare("a3", "Iris", { workspace: undefined });
 await settle(page, 300);
