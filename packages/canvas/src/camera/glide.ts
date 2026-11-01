@@ -79,12 +79,14 @@ export function glideAt(shifts: ReadonlyMap<string, Offset>, elapsed: number): M
  * An item that appeared starts a little low and transparent and rises in (`RISE`, `FADE_RATE`).
  * There is no end time: a new drawing mid-glide re-targets from where things are drawn.
  */
-/** How fast a shift decays, per second: half of what is left goes every 35 ms. */
-export const RATE = 20;
-/** How fast an appeared item's transparency goes, per second: faded in within about 600 ms. */
-export const FADE_RATE = 5;
+/** How fast a moved item's shift decays, per second: half of what is left goes every 50 ms, 95% of a move done in 215 ms. */
+export const RATE = 14;
+/** How fast an appeared item's rise decays, per second: slower than a move, so it is seen rising through its fade. */
+export const RISE_RATE = 7;
+/** How fast an appeared item's transparency goes, per second: faded in within about 500 ms. */
+export const FADE_RATE = 6;
 /** How far below its place an appeared item starts, in stage pixels. */
-export const RISE = 24;
+export const RISE = 40;
 /** Under this many pixels a shift is done. */
 export const SETTLED_PX = 0.5;
 /** Under this much transparency left a fade is done. */
@@ -106,10 +108,21 @@ export const decay = (value: number, k: number, dt: number): number => value * M
  * starts `RISE` below and transparent. Items inside a moved one move with it. Nothing when more than
  * `MOST_GLIDING` moved, which is a whole canvas changing rather than an edit.
  */
-export function shiftsFrom(before: ReadonlyMap<string, Rect>, after: (id: string) => Rect | undefined, parent: (id: string) => string | undefined, appeared: readonly string[]): Map<string, Shift> {
+export function shiftsFrom(before: ReadonlyMap<string, Rect>, after: (id: string) => Rect | undefined, parent: (id: string) => string | undefined, appeared: readonly string[], fading?: ReadonlyMap<string, number>): Map<string, Shift> {
 	const shifts: Map<string, Shift> = glideShifts(before, after, parent);
 	for (const id of appeared) {
 		if (!before.has(id) && !shifts.has(id)) shifts.set(id, { dx: 0, dy: RISE, fade: 1 });
+	}
+	/*
+	 * An item still fading in from the last drawing keeps what is left of its fade: the new drawing
+	 * re-targets its place from where it is drawn, and without this it jumped to opaque the moment
+	 * the next edit landed, which an agent sends a few times a second.
+	 */
+	for (const [id, fade] of fading ?? []) {
+		if (!after(id)) continue;
+		const held = shifts.get(id);
+		if (held) held.fade = fade;
+		else shifts.set(id, { dx: 0, dy: 0, fade });
 	}
 	return shifts.size > MOST_GLIDING ? new Map() : shifts;
 }
@@ -121,8 +134,10 @@ export function shiftsFrom(before: ReadonlyMap<string, Rect>, after: (id: string
 export function glideStep(shifts: ReadonlyMap<string, Shift>, dt: number): Map<string, Shift> {
 	const out = new Map<string, Shift>();
 	for (const [id, one] of shifts) {
-		const dx = decay(one.dx, RATE, dt);
-		const dy = decay(one.dy, RATE, dt);
+		// An appeared item rises at the slower rate, through its fade; a moved one goes at the move's.
+		const rate = one.fade === undefined ? RATE : RISE_RATE;
+		const dx = decay(one.dx, rate, dt);
+		const dy = decay(one.dy, rate, dt);
 		const fade = one.fade === undefined ? undefined : decay(one.fade, FADE_RATE, dt);
 		const moving = Math.abs(dx) >= SETTLED_PX || Math.abs(dy) >= SETTLED_PX;
 		const fading = fade !== undefined && fade >= SETTLED_FADE;

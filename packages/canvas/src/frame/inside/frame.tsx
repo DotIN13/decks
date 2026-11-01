@@ -41,23 +41,12 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const { camera, pages, cursor } = ctx;
 	installHost(ctx);
 
-	let reread = () => {};
-	const editor: Editor = createEditor(editorOptions(ctx, () => reread()));
-	const { handle } = editor;
-	ctx.setMade(editor);
-	ctx.changed();
-	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
-	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
-	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => ctx.news();
-	(globalThis as { __decksFrameSelect?: (ids: string[]) => void }).__decksFrameSelect = (ids) => handle.select(ids);
-	(globalThis as { __decksFrameCamera?: () => unknown }).__decksFrameCamera = () => handle.camera();
-	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
-
-	reread = wireFrame(ctx).reread;
-
 	/*
-	 * The agent's cursor, over the canvas on a layer that follows the camera: the card's place plus the
-	 * point on it, drifting from one place to the next and one size on the screen at any zoom.
+	 * The agent's cursor, in the stage's world (`CanvasOptions.world`): the card's place plus the point on
+	 * it, drifting from one place to the next and one size on the screen at any zoom. In the world rather
+	 * than over the canvas on a layer of its own, which placed it from the window's middle while the stage
+	 * places the drawing from the column beside the side panel: the cursor stood 180 px from what it pointed
+	 * at, and jittered against the drawing at every step of a pan, a frame behind the scroll.
 	 */
 	const cursorAt = () => {
 		const at = cursor();
@@ -85,14 +74,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		return list;
 	};
-	/*
-	 * Only while a cursor or an outline is out: its layer follows the camera, and drawn always it was written
-	 * at every step of every pan, a repaint and a new layer tree each time with nothing on it to see.
-	 */
+	/* Only while a cursor or an outline is out: nothing to see, nothing in the world. Placed in canvas units; the world's own transform scrolls and scales it. */
 	const cursors = () => (
 		<Show when={cursorAt() || pointers().length || outlines().length}>
-			<div class="frame-cursors" style={{ position: "absolute", inset: "0", overflow: "hidden", "pointer-events": "none", "z-index": "5" }}>
-				<div style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", "will-change": "transform", transform: `translate(${innerWidth / 2}px, ${innerHeight / 2}px) scale(${camera().zoom}) translate(${-camera().x}px, ${-camera().y}px)` }}>
+			<div class="frame-cursors" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none", "z-index": "5" }}>
 					<For each={outlines()}>
 						{(box) => (
 							<div class="frame-presence-outline" style={{ position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, border: `${1.5 / camera().zoom}px solid ${box.color}`, "border-radius": `${4 / camera().zoom}px`, "box-sizing": "border-box" }}>
@@ -104,10 +89,23 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 						<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
 					</Show>
 					<For each={pointers()}>{(one) => <AgentCursor cursor={one.cursor} zoom={camera().zoom} />}</For>
-				</div>
 			</div>
 		</Show>
 	);
+	let reread = () => {};
+	const editor: Editor = createEditor(editorOptions(ctx, () => reread(), cursors));
+	const { handle } = editor;
+	ctx.setMade(editor);
+	ctx.changed();
+	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
+	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
+	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => ctx.news();
+	(globalThis as { __decksFrameSelect?: (ids: string[]) => void }).__decksFrameSelect = (ids) => handle.select(ids);
+	(globalThis as { __decksFrameCamera?: () => unknown }).__decksFrameCamera = () => handle.camera();
+	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
+
+	reread = wireFrame(ctx).reread;
+
 
 	if (chrome) {
 		const { canWrite, setMode } = ctx;
@@ -139,7 +137,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		render(() => (
 			<>
 				{editor.surface()}
-				{cursors()}
 				{view()}
 			</>
 		), root);
@@ -153,7 +150,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	render(() => (
 		<>
 			{start.look.toolbar ? editor.root() : editor.surface()}
-			{cursors()}
 		</>
 	), root);
 }

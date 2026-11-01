@@ -145,6 +145,13 @@ export interface CanvasOptions {
 	inkAgent?: () => string | undefined;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
 	onSelection?: (ids: readonly string[]) => void;
+	/**
+	 * What the host draws over the drawing in canvas units (others' cursors and outlines): rendered
+	 * inside the stage's world, so a pan scrolls it with the drawing and a zoom scales it, and a point
+	 * on it is placed as the stage places the drawing, side panel and all. Counter-scale what should
+	 * stay one size on the screen by the zoom.
+	 */
+	world?: () => JSX.Element;
 }
 
 /** The editor's handle, inside the canvas frame (and to an app's chrome there, `frame/chrome.ts`). */

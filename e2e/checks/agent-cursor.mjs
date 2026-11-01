@@ -40,18 +40,17 @@ try {
 	say("the cursor shows in the frame", !!appeared, JSON.stringify(diag));
 	if (appeared) {
 		await settle(page, 700);
-		// The layer cannot be hit-tested (it takes no pointer), so what is checked is that it is drawn: on screen, opaque, and stacked after the editor's surface.
+		// The layer cannot be hit-tested (it takes no pointer), so what is checked is that it is drawn: on screen, opaque, and in the stage's world, where a pan carries it with the drawing (`CanvasOptions.world`).
 		const where = await frame.evaluate(() => {
 			const c = document.querySelector(".frame-cursors .agent-cursor");
 			const layer = document.querySelector(".frame-cursors");
 			const arrow = c?.querySelector(".arrow")?.getBoundingClientRect();
 			if (!arrow || !layer) return { arrow: null };
-			const surface = document.querySelector(".stage") ?? document.querySelector(".decks-canvas");
-			const after = surface ? Boolean(surface.compareDocumentPosition(layer) & Node.DOCUMENT_POSITION_FOLLOWING) && !surface.contains(layer) : false;
+			const inWorld = Boolean(layer.closest(".world"));
 			const style = getComputedStyle(c);
-			return { arrow: { x: arrow.x, y: arrow.y, w: arrow.width, h: arrow.height }, opacity: style.opacity, visibility: style.visibility, after, z: getComputedStyle(layer).zIndex };
+			return { arrow: { x: arrow.x, y: arrow.y, w: arrow.width, h: arrow.height }, opacity: style.opacity, visibility: style.visibility, inWorld, z: getComputedStyle(layer).zIndex };
 		});
-		say("…the arrow is on screen, opaque, and stacked over the editor's surface", !!where.arrow && where.arrow.x > 0 && where.arrow.y > 0 && where.arrow.x < 1400 && where.arrow.y < 900 && where.opacity !== "0" && where.visibility === "visible" && where.after, JSON.stringify(where));
+		say("…the arrow is on screen, opaque, and in the stage's world", !!where.arrow && where.arrow.x > 0 && where.arrow.y > 0 && where.arrow.x < 1400 && where.arrow.y < 900 && where.opacity !== "0" && where.visibility === "visible" && where.inWorld, JSON.stringify(where));
 		const clip = where.arrow ? { x: Math.max(0, where.arrow.x - 60), y: Math.max(0, where.arrow.y - 60), width: 260, height: 160 } : undefined;
 		await page.screenshot({ path: process.env.AGENT_CURSOR_SHOT ?? "/tmp/agent-cursor.png", ...(clip ? { clip } : {}) });
 		say("…named for the agent", ((await cursor.first().locator(".label").textContent()) ?? "").length > 0, await cursor.first().locator(".label").textContent());

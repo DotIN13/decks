@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import type { Page, Camera } from "@decks/protocol";
 import { Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
@@ -127,6 +128,8 @@ export type StageProps = {
 	 */
 	onInk?: (request: InkRequest) => void;
 	inkAgent?: string;
+	/** The host's own layer in the world, in canvas units (`CanvasOptions.world`). */
+	world?: () => JSX.Element;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
@@ -183,6 +186,10 @@ export function Stage(props: StageProps) {
 	 * drag) sets the scroll and, when the zoom or the origin changed, the world's transform.
 	 */
 	let origin: Origin = { x: props.camera.x, y: props.camera.y };
+	/** The origin as a signal, for the host's world layer (`props.world`), which is placed from it. */
+	const [worldOrigin, setWorldOrigin] = createSignal<Origin>(origin);
+	/** The origin and zoom the world's transform was last written for (`placeWorld`): what a child of the world is placed in. */
+	const [worldPlaced, setWorldPlaced] = createSignal<{ x: number; y: number; zoom: number }>({ x: origin.x, y: origin.y, zoom: props.camera.zoom });
 	/** The origin and zoom the world's transform was last written for. */
 	let worldFor: { x: number; y: number; zoom: number } | undefined;
 	/** The scroll this file last set, so the scroll event that answers it is not taken for the person's. */
@@ -190,6 +197,7 @@ export function Stage(props: StageProps) {
 	const placeWorld = (zoom: number, force = false) => {
 		if (!force && worldFor && worldFor.x === origin.x && worldFor.y === origin.y && worldFor.zoom === zoom) return;
 		worldFor = { x: origin.x, y: origin.y, zoom };
+		setWorldPlaced(worldFor);
 		worldEl.style.transform = worldTransform(origin, zoom);
 	};
 	const placeScroll = (cam: Camera) => {
@@ -231,6 +239,7 @@ export function Stage(props: StageProps) {
 			}
 			if (zoomScroll) {
 				origin = originFor(cam, zoomScroll, view());
+				setWorldOrigin(origin);
 				if (!zoomStill) placeWorld(cam.zoom, true);
 				penLayer.setCamera(cam);
 				return;
@@ -266,6 +275,7 @@ export function Stage(props: StageProps) {
 			if (!nearEdge({ left: element.scrollLeft, top: element.scrollTop }, view())) return;
 			const cam = ctl.now();
 			origin = { x: cam.x, y: cam.y };
+			setWorldOrigin(origin);
 			placeWorld(cam.zoom, true);
 			placeScroll(cam);
 			// A zoom not yet rested keeps the scroll it now has.
@@ -765,6 +775,31 @@ export function Stage(props: StageProps) {
 					{items.player()}
 				</OverlayLayer>
 				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
+				{/*
+				 * The host's layer (others' cursors, outlines), in canvas units: in the world, so a pan carries it,
+				 * placed as the world's children are, from the origin at the world's own origin and at the zoom.
+				 */}
+				<Show when={props.world}>
+					{(world) => {
+						/*
+						 * In canvas units whatever the world's transform says: the world is written for an origin
+						 * and a zoom (`placeWorld`), and while a zoom is held still it keeps an older pair, so a
+						 * child in canvas units goes through the difference. Nothing when they agree.
+						 */
+						const transform = () => {
+							const z = ctl.zoom();
+							const o = worldOrigin();
+							const w = worldPlaced();
+							const s = z / w.zoom;
+							return `translate(${w.x - o.x * s}px, ${w.y - o.y * s}px) scale(${s})`;
+						};
+						return (
+							<div class="world-host" style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: transform() }}>
+								{world()()}
+							</div>
+						);
+					}}
+				</Show>
 			</div>
 			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
 			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}

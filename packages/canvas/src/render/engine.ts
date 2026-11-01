@@ -706,11 +706,19 @@ export class StageEngine {
 	 * of more than `MOST_GLIDING` items, which is a canvas changing whole.
 	 */
 	private glideFrom(before: Map<string, Frame> | undefined): boolean {
-		// Not with a drag of cards in hand either: the server's answers to its steps land where the hand has them.
-		if (!before || !this.page || this.moving || this.shown !== undefined || this.carriedCount > 0 || this.cardsOnly || !glidesWanted()) return false;
+		/*
+		 * Not while a gesture is showing its own preview, nor with a drag of cards in hand: the server's
+		 * answers to its steps land where the hand has them. A pan is no reason not to: the shifts are in
+		 * canvas units and ride the scroll, and an agent's edit that lands while the person pans to follow
+		 * it (or while a flick still coasts) used to jump in.
+		 */
+		if (!before || !this.page || this.shown !== undefined || this.carriedCount > 0 || this.cardsOnly || !glidesWanted()) return false;
 		const appeared: string[] = [];
 		for (const [id, one] of this.placed) if (!one.parent && !before.has(id)) appeared.push(id);
-		const shifts = shiftsFrom(before, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent, appeared);
+		// What is still fading in from the last drawing keeps its fade (`shiftsFrom`).
+		const fading = new Map<string, number>();
+		for (const [id, one] of this.glide?.shifts ?? []) if (one.fade !== undefined) fading.set(id, one.fade);
+		const shifts = shiftsFrom(before, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent, appeared, fading);
 		return this.beginGlide(shifts);
 	}
 

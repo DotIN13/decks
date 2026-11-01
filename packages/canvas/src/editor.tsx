@@ -236,6 +236,7 @@ export function createEditor(
 			{...(options.onComment ? { onComment: options.onComment } : {})}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}
+			{...(options.world ? { world: options.world } : {})}
 		/>
 	);
 	const surface = () => stageView();

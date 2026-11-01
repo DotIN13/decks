@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol";
@@ -174,13 +175,14 @@ export function installHost(ctx: FrameContext): void {
  * the cards' pages and pictures on the ticket, and what the editor says, sent to the page.
  * `reread` reads the drawing whole again (`events.ts`), once it is wired.
  */
-export function editorOptions(ctx: FrameContext, reread: () => void): Parameters<typeof createEditor>[0] {
+export function editorOptions(ctx: FrameContext, reread: () => void, world?: () => JSX.Element): Parameters<typeof createEditor>[0] {
 	const { start, end, chrome, studio, backend, first, mode, setMode, pages, address, trust, cardItem, takeOff, changed } = ctx;
 	let restUntil: ReturnType<typeof setTimeout> | undefined;
 	return {
 		text: serialize(first.doc),
 		base: first.base,
 		dark: start.look.dark,
+		...(world ? { world } : {}),
 		mode: start.look.mode,
 		// With chrome of its own, the frame's mode and pen are the editor's state, set by its toolbars.
 		...(chrome ? { state: { mode: [mode, setMode], inking: () => drawing() && mode() === "browse" } } : {}),

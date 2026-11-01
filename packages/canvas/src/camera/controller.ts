@@ -345,6 +345,19 @@ export function createCameraController(host: CameraHost) {
 		}
 		if (moved) {
 			cancelGlide();
+			/*
+			 * A move the app made (the opening camera, a fit, an agent's focus) is a step like a finger's:
+			 * the scale and the motion settle as after a gesture. Without this a zoom that came this way
+			 * never counted as scaling, so the stage never heard it rest: a zoom it had held still (the
+			 * world and the drawing's canvas left where they were, the drawing drawn at the camera into
+			 * them) stayed held for good. Every pan after that moved the canvas with the scroll and the
+			 * drawing was drawn again at the new camera into the moved canvas, so it drifted from the
+			 * camera by each pan: an agent's cursor and a fit landed a pan's width from what they aimed
+			 * at, the canvas's margin ran out at one edge and pans showed bare strips, until a pinch or a
+			 * wheel zoom placed everything again.
+			 */
+			if (target.zoom !== localCamera.zoom) nowScaling();
+			nowMoving();
 			localCamera = target;
 		}
 		/*

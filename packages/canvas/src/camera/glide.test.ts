@@ -64,11 +64,12 @@ test("a glide eases out over 150 ms: all of the shift at the start, a little at 
 });
 
 test("every change glides: shifts come from where things were drawn, an appeared item rises in, and each frame decays them until under half a pixel", async () => {
-	const { decay, glideStep, shiftsFrom, RATE, FADE_RATE, RISE, MOST_GLIDING } = await import("./glide.ts");
+	const { decay, glideStep, shiftsFrom, RATE, RISE_RATE, FADE_RATE, RISE, MOST_GLIDING } = await import("./glide.ts");
 	// Half of what is left goes every ln2/k seconds.
 	assert.ok(Math.abs(decay(100, RATE, Math.LN2 / RATE) - 50) < 1e-9);
-	assert.ok(decay(100, RATE, 0.15) < 5, "a 100 px move is 95% there in 150 ms");
-	assert.ok(decay(1, FADE_RATE, 0.6) < 0.05, "a fade is done in about 600 ms");
+	assert.ok(decay(100, RATE, 0.25) < 5, "a 100 px move is 95% there in 250 ms");
+	assert.ok(decay(1, FADE_RATE, 0.55) < 0.05, "a fade is done in about 550 ms");
+	assert.ok(decay(RISE, RISE_RATE, 0.55) < 1 && decay(RISE, RISE_RATE, 0.2) > 8, "an appeared item is still visibly rising at 200 ms and in place with its fade");
 	const before = new Map([["a", { x: 0, y: 0, w: 10, h: 10 }], ["b", { x: 100, y: 0, w: 10, h: 10 }]]);
 	const after = new Map([["a", { x: 40, y: 0, w: 10, h: 10 }], ["b", { x: 100, y: 0, w: 10, h: 10 }], ["c", { x: 200, y: 0, w: 10, h: 10 }]]);
 	const shifts = shiftsFrom(before, (id) => after.get(id), () => undefined, ["c"]);
@@ -86,6 +87,11 @@ test("every change glides: shifts come from where things were drawn, an appeared
 	const one = glideStep(shifts, 1 / 60);
 	assert.ok(one.get("a")!.dx > -40 && one.get("a")!.dx < -25, "a frame in, a has moved some of the way");
 	assert.ok(one.get("c")!.fade! < 1 && one.get("c")!.dy < RISE, "c is rising and fading in");
+	// The next drawing lands mid-fade: c keeps what is left of its fade instead of jumping to opaque.
+	const later = new Map([["a", { x: 40, y: 0, w: 10, h: 10 }], ["c", { x: 200, y: 0, w: 10, h: 10 }], ["d", { x: 300, y: 0, w: 10, h: 10 }]]);
+	const carried = shiftsFrom(after, (id) => later.get(id), () => undefined, ["d"], new Map([["c", 0.4]]));
+	assert.deepEqual(carried.get("c"), { dx: 0, dy: 0, fade: 0.4 }, "c's fade carries over");
+	assert.deepEqual(carried.get("d"), { dx: 0, dy: RISE, fade: 1 }, "d appeared");
 	// A whole canvas changing is not an edit: nothing glides.
 	const many = new Map([...Array(MOST_GLIDING + 1)].map((_, i) => [`i${i}`, { x: 0, y: 0, w: 1, h: 1 }]));
 	assert.equal(shiftsFrom(many, (id) => ({ x: 10, y: 0, w: 1, h: 1 }), () => undefined, []).size, 0);
