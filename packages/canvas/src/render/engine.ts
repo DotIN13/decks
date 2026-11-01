@@ -112,6 +112,10 @@ type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array 
 export function pixelsFirst(): boolean {
 	const forced = (globalThis as { __decksTilePixels?: boolean }).__decksTilePixels;
 	if (typeof forced === "boolean") return forced;
+	// `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `host.tsx`), for measuring one way on a device that takes the other.
+	const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("tiles");
+	if (asked === "bitmaps") return false;
+	if (asked === "pixels") return true;
 	return webKit();
 }
 

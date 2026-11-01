@@ -55,6 +55,34 @@ if (!attach) {
 // The proxy, and the tab.
 const proxy = spawn("ios_webkit_debug_proxy", ["-c", `${device}:9222`], { stdio: "ignore" });
 process.on("exit", () => proxy.kill());
+/*
+ * Every tab this script opened before is closed first (`window.close()` through its own inspector socket, which
+ * Safari allows for a tab another app opened), so the device does not carry a dozen pages behind the one measured.
+ */
+const closeOthers = async () => {
+	const tabs = await fetch("http://localhost:9222/json").then((r) => r.json()).catch(() => []);
+	const old = tabs.filter((tab) => tab.url?.startsWith(url) && !(attach ? false : tab.url.includes("probe=") && tab.url.includes(probeTo ? encodeURIComponent(probeTo) : "probe=1")) && tab.webSocketDebuggerUrl);
+	for (const tab of old) {
+		await new Promise((done) => {
+			const w = new WebSocket(tab.webSocketDebuggerUrl);
+			let targetId;
+			let n = 0;
+			const timer = setTimeout(() => (w.close(), done()), 3000);
+			w.onmessage = (m) => {
+				const msg = JSON.parse(m.data);
+				if (msg.method === "Target.targetCreated") {
+					targetId = msg.params.targetInfo.targetId;
+					w.send(JSON.stringify({ id: ++n, method: "Target.sendMessageToTarget", params: { targetId, message: JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: "window.close()" } }) } }));
+					setTimeout(() => (clearTimeout(timer), w.close(), done()), 500);
+				}
+			};
+			w.onerror = () => (clearTimeout(timer), done());
+		});
+	}
+	if (old.length) console.error(`closed ${old.length} earlier tab(s)`);
+};
+await sleep(1500);
+await closeOthers();
 let socketUrl;
 for (let i = 0; i < 40 && !socketUrl; i++) {
 	await sleep(500);

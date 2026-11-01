@@ -12,7 +12,7 @@ import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type C
  * the app's `perf/probe.ts`) and its companions, and the device, engine, picture and card-picture overrides (`render/device.ts`,
  * `stage/items-layer.tsx`), run in the frame, where the stage is.
  */
-const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "picture-mb", "skip-levels", "device", "pictures", "card-pictures", "engine"];
+const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "picture-mb", "skip-levels", "device", "pictures", "card-pictures", "engine", "tiles"];
 const frameAddress = (): string => {
 	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
 	const passed = new URLSearchParams();
