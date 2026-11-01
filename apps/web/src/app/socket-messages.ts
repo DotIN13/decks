@@ -475,7 +475,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							select: () => {},
 							// A card or a cursor on a canvas that is not on screen: nothing here shows it.
 							reload: () => {},
-							cursor: () => {},
+							cursor: () => true,
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };
