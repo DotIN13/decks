@@ -24,8 +24,8 @@ export interface Mark {
 	color: string;
 }
 
-/** How long a mark is shown: the sweep and the glow are done by then (`styles/marks.css`). */
-export const MARK_MS = 1400;
+/** How long a mark is kept: past its animation (820 ms at most, `styles/marks.css`), so it has ended, not been cut. */
+export const MARK_MS = 900;
 /** Marks past this many in one change are a canvas changing whole, not an edit: none are drawn. */
 export const MOST_MARKED = 40;
 

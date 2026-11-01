@@ -80,13 +80,14 @@
 	pointer-events: none;
 	--line-w: calc(1.5px / var(--zoom, 1));
 	--mark-r: calc(8px / var(--zoom, 1));
-	--glow: calc(20px / var(--zoom, 1));
-	--spread: calc(5px / var(--zoom, 1));
+	--glow: calc(18px / var(--zoom, 1));
+	--spread: calc(4px / var(--zoom, 1));
 	border-radius: var(--mark-r);
 	outline: var(--line-w) solid var(--act);
 	outline-offset: calc(var(--line-w) * 2);
 	overflow: hidden;
-	animation: mark-print 1400ms ease-out both;
+	/* Done before the element goes (`MARK_MS`), so nothing is cut off mid-fade. */
+	animation: mark-print 820ms ease-in-out both;
 }
 	.edit-mark::before {
 	content: "";
@@ -95,7 +96,7 @@
 	background: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--act) 42%, transparent) 55%, transparent 100%);
 	background-size: 55% 100%;
 	background-repeat: no-repeat;
-	animation: mark-sweep 560ms ease-out both;
+	animation: mark-sweep 480ms ease-out both;
 }
 	/* The print head: a bright line at the front of the band. */
 	.edit-mark::after {
@@ -105,14 +106,14 @@
 	bottom: 0;
 	width: calc(14px / var(--zoom, 1));
 	background: linear-gradient(90deg, transparent, rgb(255 255 255 / 92%) 50%, transparent);
-	animation: mark-head 560ms ease-out both;
+	animation: mark-head 480ms ease-out both;
 }
 	.edit-mark[data-kind="move"] {
-	animation: mark-outline 900ms ease-out both;
+	animation: mark-outline 700ms ease-in-out both;
 }
 	.edit-mark[data-kind="delete"] {
 	transform-origin: center;
-	animation: mark-dissolve 700ms ease-in both;
+	animation: mark-dissolve 600ms ease-in both;
 }
 	.edit-mark[data-kind="move"]::before,
 	.edit-mark[data-kind="move"]::after,
@@ -120,14 +121,20 @@
 	.edit-mark[data-kind="delete"]::after {
 	display: none;
 }
+	/*
+	 * The glow comes up in the first third and is gone by the end, with the fill and the outline: the
+	 * last part of the fade is as quick as the first, so the mark ends rather than lingers.
+	 */
 	@keyframes mark-print {
 	0% {
-		background: color-mix(in srgb, var(--act) 24%, transparent);
-		box-shadow: 0 0 0 0 color-mix(in srgb, var(--act) 65%, transparent);
+		background: color-mix(in srgb, var(--act) 22%, transparent);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--act) 60%, transparent);
 		outline-color: var(--act);
 	}
-	45% {
-		box-shadow: 0 0 var(--glow) var(--spread) color-mix(in srgb, var(--act) 40%, transparent);
+	35% {
+		background: color-mix(in srgb, var(--act) 16%, transparent);
+		box-shadow: 0 0 var(--glow) var(--spread) color-mix(in srgb, var(--act) 45%, transparent);
+		outline-color: var(--act);
 	}
 	100% {
 		background: transparent;
@@ -158,6 +165,9 @@
 		outline-color: var(--act);
 		box-shadow: 0 0 0 0 color-mix(in srgb, var(--act) 55%, transparent);
 	}
+	40% {
+		box-shadow: 0 0 var(--glow) var(--spread) color-mix(in srgb, var(--act) 40%, transparent);
+	}
 	100% {
 		outline-color: transparent;
 		box-shadow: 0 0 var(--glow) var(--spread) transparent;
@@ -167,7 +177,7 @@
 	0% {
 		opacity: 1;
 		transform: scale(1);
-		background: color-mix(in srgb, var(--act) 28%, transparent);
+		background: color-mix(in srgb, var(--act) 26%, transparent);
 	}
 	100% {
 		opacity: 0;
@@ -195,6 +205,13 @@
 	transform: scale(calc(1 / var(--zoom, 1)));
 	transform-origin: 0 0;
 	pointer-events: none;
+	/*
+	 * Its own layer. The cursor sits in the stage's world, which is scaled by the zoom, with this
+	 * counter-scale on top; drawn into the world's layer the name was rasterised at the world's scale
+	 * and enlarged, and read blurred at any zoom under 100%. On a layer of its own it is rasterised at
+	 * the scale it is seen at.
+	 */
+	will-change: transform;
 	transition:
 		left 380ms cubic-bezier(0.2, 0.7, 0.2, 1),
 		top 380ms cubic-bezier(0.2, 0.7, 0.2, 1),
@@ -214,7 +231,7 @@
 	left: -3px;
 	overflow: visible;
 	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 28%));
-	animation: cursor-bob 3.2s ease-in-out infinite;
+	animation: cursor-float 4.6s ease-in-out infinite;
 }
 	.agent-cursor .arrow path {
 	fill: var(--cursor-soft);
@@ -253,13 +270,20 @@
 .agent-cursor[data-moving="true"] .label {
 	transform: translate(-6px, -4px);
 }
-	@keyframes cursor-bob {
+	/* At rest the arrow drifts a few pixels round its point, up and across, so a still agent is still seen to be there. */
+	@keyframes cursor-float {
 	0%,
 	100% {
-		transform: translateY(0);
+		transform: translate(0, 0);
+	}
+	22% {
+		transform: translate(2px, -3px);
 	}
 	50% {
-		transform: translateY(-1.5px);
+		transform: translate(-2px, -1.5px);
+	}
+	76% {
+		transform: translate(1px, 2px);
 	}
 }
 	@keyframes cursor-ping {
