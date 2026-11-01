@@ -184,7 +184,7 @@ export function verbRoutes(app: App): express.Router {
 		res.json({ ok: true });
 	});
 	router.post("/:verb", async (req: Request, res: Response) => {
-		const { status, answer } = await runVerb(app, req.principal, req.headers, String(req.params.verb ?? ""), (req.body as { args?: unknown } | undefined)?.args, req.socket.remoteAddress);
+		const { status, answer } = await runVerb(app, req.principal, req.headers, String(req.params.verb ?? ""), (req.body as { args?: unknown } | undefined)?.args, req.socket.remoteAddress, req.tokenId ? { tokenId: req.tokenId } : undefined);
 		res.status(status).json(answer);
 	});
 
@@ -197,7 +197,7 @@ export function verbRoutes(app: App): express.Router {
  * tool found for the token, and the answer as the SDK reads it, with the status a request would get.
  * `headers` carry what the caller says it acts on (`X-Decks-Stage`, `X-Decks-Agent`, `X-Decks-Edit`).
  */
-export async function runVerb(app: App, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string, asked?: Partial<Pick<PersonCall, "tell" | "view">>): Promise<{ status: number; answer: VerbAnswer }> {
+export async function runVerb(app: App, principal: Principal | undefined, headers: Record<string, string | string[] | undefined>, name: string, rawArgs: unknown, remoteAddress?: string, asked?: Partial<Pick<PersonCall, "tell" | "view" | "tokenId">>): Promise<{ status: number; answer: VerbAnswer }> {
 	const refuse = (status: number, error: string) => ({ status, answer: { ok: false, error, notes: [] } satisfies VerbAnswer });
 	const verb = VERB_BY_NAME.get(name) ?? PERSON_VERB_BY_NAME.get(name);
 	if (!verb) return refuse(404, renamedVerb(name) ?? `There is no verb called ${name}. GET /api/v1 lists them.`);
@@ -216,7 +216,7 @@ export async function runVerb(app: App, principal: Principal | undefined, header
 		const tell = asked?.tell ?? ((message: ServerMessage) => notes.push(JSON.stringify(message)));
 		const on = { ...(header("x-decks-stage") ? { stage: header("x-decks-stage") } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent") } : {}), ...(header("x-decks-edit") ? { edit: header("x-decks-edit")!.slice(0, 80) } : {}) };
 		try {
-			const value = await personTable(app)[name]!(args, { tell, ...(asked?.view ? { view: asked.view } : {}), on });
+			const value = await personTable(app)[name]!(args, { tell, ...(asked?.view ? { view: asked.view } : {}), ...(asked?.tokenId ? { tokenId: asked.tokenId } : {}), on });
 			return { status: 200, answer: { ok: true, ...(value !== undefined ? { value } : {}), notes } };
 		} catch (error) {
 			return { status: 422, answer: { ok: false, error: error instanceof Error ? error.message : String(error), notes } };

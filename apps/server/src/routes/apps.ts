@@ -2,6 +2,7 @@ import { SDK_FILE } from "../apps/service.ts";
 import { appActor, canvasHolds } from "../stage/caller-run.ts";
 import { type RouteDeps } from "./shared.ts";
 import { type Request, type Response, type Router } from "express";
+import { runVerb } from "../verbs/router.ts";
 
 /**
  * The deck's apps (`apps/service.ts`) and the SDK an app's page imports.
@@ -33,12 +34,13 @@ export function register(api: Router, { app }: RouteDeps): void {
 	 * a board's page has no token (`auth/guard.ts` lets this read in), and a heartbeat is no more than the
 	 * request from its frame that would wake the app anyway.
 	 */
-	const seen = (req: Request, res: Response) => {
-		const name = appOf(req, res);
-		if (!name) return;
-		app.apps.seen(name);
-		res.set("cache-control", "no-store").json({ ok: true });
+	// Kept one release as aliases of apps.seen and apps.restart.
+	const run = async (req: Request, res: Response, verb: string, args: unknown[], shape: (value: unknown) => unknown = (value) => value) => {
+		const { status, answer } = await runVerb(app, req.principal, req.headers, verb, args, req.socket.remoteAddress);
+		if (!answer.ok) res.status(status).json({ error: answer.error });
+		else res.set("cache-control", "no-store").json(shape(answer.value));
 	};
+	const seen = (req: Request, res: Response) => void run(req, res, "apps.seen", [String(req.params.name ?? "")], () => ({ ok: true }));
 	api.get("/apps/:name/seen", seen);
 	api.post("/apps/:name/seen", seen);
 
@@ -90,10 +92,5 @@ export function register(api: Router, { app }: RouteDeps): void {
 		res.set("cache-control", "no-store").json({ url: `/app/t/${pass}/${name}/` });
 	});
 
-	api.post("/apps/:name/restart", async (req, res) => {
-		const name = appOf(req, res);
-		if (!name) return;
-		app.apps.stop(name);
-		res.json(await app.apps.run(name, 30_000));
-	});
+	api.post("/apps/:name/restart", (req, res) => void run(req, res, "apps.restart", [String(req.params.name ?? "")]));
 }

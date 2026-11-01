@@ -27,6 +27,8 @@ interface LineState {
 	/** Where this line said it is, per canvas (`presence.set`), for whoever starts watching later and for the leave. */
 	present: Map<string, Presence>;
 	token?: string;
+	/** The id of the token, when it is one of the store's (`TokenStore.verify`), for the person's verbs that name the caller back. */
+	tokenId?: string;
 	/** The canvases this line hears: their changes and their cards', apps' and documents' messages. */
 	watched: Set<string>;
 	/** Every broadcast, as the event stream gives it (the person's or a paired site's line that asked). */
@@ -115,6 +117,7 @@ export class Line {
 		}
 		const seen = verifyOn(this.app, token, state.headers);
 		if (!seen.ok) return undefined;
+		state.tokenId = seen.id;
 		const kind = seen.principal.kind;
 		return kind === "canvas" || kind === "person" || kind === "site" || kind === "agent" ? seen.principal : undefined;
 	}
@@ -171,7 +174,7 @@ export class Line {
 				return;
 			case "line.call": {
 				const headers = { ...state.headers, ...(message.edit ? { "x-decks-edit": message.edit } : {}), ...(message.stage ? { "x-decks-stage": message.stage } : {}), ...(message.agent ? { "x-decks-agent": message.agent } : {}) };
-				const { answer } = await runVerb(this.app, principal, headers, String(message.verb ?? ""), message.args, state.remote, { tell: (said) => send(socket, said), ...(state.view ? { view: state.view } : {}) });
+				const { answer } = await runVerb(this.app, principal, headers, String(message.verb ?? ""), message.args, state.remote, { tell: (said) => send(socket, said), ...(state.view ? { view: state.view } : {}), ...(state.tokenId ? { tokenId: state.tokenId } : {}) });
 				send(socket, { type: "call.answered", id: String(message.id), ok: answer.ok, ...(answer.value !== undefined ? { value: answer.value } : {}), ...(answer.error ? { error: answer.error } : {}), ...(answer.notes?.length ? { notes: answer.notes } : {}) });
 				return;
 			}

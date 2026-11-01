@@ -1,7 +1,9 @@
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
 import type { Op } from "@decks/pen";
-import type { ServerMessage } from "@decks/protocol";
+import { STT_MODELS, type ServerMessage } from "@decks/protocol";
+import { harnessVersion } from "../routes/shared.ts";
+import { sttReady } from "../stt.ts";
 import type { App } from "../app.ts";
 import { cleanParts } from "../agents/message-parts.ts";
 import type { DeckAgent } from "../agents/session.ts";
@@ -25,6 +27,8 @@ import { personAgent } from "./person.ts";
 export interface PersonCall {
 	tell: (message: ServerMessage) => void;
 	view?: View;
+	/** The id of the token the call came with, for what names the caller back (the paired front end that is you). */
+	tokenId?: string;
 	/** What the caller says it acts on: the canvas on screen and the agent it is talking to, from `X-Decks-Stage` and `X-Decks-Agent` or the line's `stage` and `agent`. */
 	on: { stage?: string; agent?: string; edit?: string };
 }
@@ -165,11 +169,12 @@ export function personTable(app: App): Record<string, Impl> {
 			agent.sayRow();
 		},
 		"chat.open": async ([id], call) => {
-			const agent = agents().get(String(id));
-			if (!agent) return;
-			call.tell(agent.historyMessage());
+			const agent = need(id);
+			const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+			call.tell(history);
 			const pen = app.penMessage(agent.id);
 			if (pen) call.tell(pen);
+			return { items: history.items, more: history.more ?? false };
 		},
 		"chat.earlier": async ([id, page], call) => {
 			const asked = (page ?? {}) as { before?: string; limit?: number };
@@ -181,10 +186,13 @@ export function personTable(app: App): Record<string, Impl> {
 			}
 			const got = agent.earlier(before, Math.min(Math.max(asked.limit ?? 60, 1), 200));
 			call.tell({ type: "chat.earlier", agentId: agent.id, before, items: got.items, more: got.more });
+			return { items: got.items, more: got.more };
 		},
 		"chat.tool": async ([id, item], call) => {
 			const agent = agents().get(String(id));
-			call.tell({ type: "chat.tool", agentId: String(id), itemId: String(item), result: agent?.toolResult(String(item)) ?? "" });
+			const result = agent?.toolResult(String(item)) ?? "";
+			call.tell({ type: "chat.tool", agentId: String(id), itemId: String(item), result });
+			return { result };
 		},
 		"chat.preview": async ([id, entry], call) => {
 			const agent = need(id);
@@ -336,12 +344,79 @@ export function personTable(app: App): Record<string, Impl> {
 		},
 
 		"harness.configure": async ([settings]) => {
-			const asked = (settings ?? {}) as { timezone?: string | null; sttModel?: string | null };
+			const asked = (settings ?? {}) as { timezone?: string | null; sttModel?: string | null; requireCode?: boolean };
 			const problems = [asked.timezone !== undefined ? app.setTimezone(asked.timezone) : undefined, asked.sttModel !== undefined ? app.setSttModel(asked.sttModel) : undefined].filter((one): one is { error: string } => !!one);
+			if (typeof asked.requireCode === "boolean") {
+				if (app.codes.forced && !asked.requireCode) problems.push({ error: "This harness was started with DECKS_REQUIRE_PAIR_CODE, so a code is always asked for." });
+				else app.codes.setRequired(asked.requireCode);
+			}
 			if (problems.length) throw new Error(problems.map((one) => one.error).join(" "));
 		},
+		"agent.dialogs": async ([id]) => ({ dialogs: need(id).dialogs() }),
+		"agent.settings": async ([id, options]) => {
+			const agent = need(id);
+			if ((options as { limits?: unknown } | undefined)?.limits) void app.refreshLimits();
+			let accounts: { accounts?: unknown[]; active?: string } = {};
+			if (agent.kind === "claude") await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
+			const runtime = app.runtimes().find((one) => one.kind === agent.kind);
+			return {
+				id: agent.id,
+				kind: agent.kind,
+				model: agent.model ?? null,
+				models: runtime?.models ?? [],
+				commands: agent.chat().commands ?? runtime?.commands ?? [],
+				mode: agent.mode ?? null,
+				usage: agent.usage ?? null,
+				modes: runtime?.capabilities.modes ?? [],
+				accounts: accounts.accounts ?? [],
+				account: agent.accountId() ?? accounts.active ?? null,
+				queued: agent.queuedMine(),
+			};
+		},
+		"agent.reset": async ([id]) => {
+			await need(id).reset();
+			agents().publish();
+		},
+		"apps.seen": async ([name]) => {
+			if (!app.apps.exists(String(name))) throw new Error(`There is no app called ${String(name)}.`);
+			app.apps.seen(String(name));
+		},
+		"deck.get": async () => ({ deck: app.deck.state(), warnings: app.deck.warnings }),
+		"harness.get": async ([], call) => {
+			let accounts: { accounts?: unknown[]; active?: string } = {};
+			await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
+			const settings = app.settings.get();
+			return {
+				name: app.deck.name,
+				deck: app.deck.path,
+				version: harnessVersion(),
+				timezone: settings.timezone ?? null,
+				machineZone: app.settings.machineZone(),
+				sttModel: settings.sttModel ?? STT_MODELS[0]!.id,
+				sttModels: STT_MODELS.map((one) => ({ id: one.id, label: one.label ?? one.id })),
+				sttKey: sttReady(),
+				runtimes: app.runtimes().map((one) => ({ kind: one.kind, label: one.label, available: one.available, ...(one.reason ? { reason: one.reason } : {}), models: one.models, modes: one.capabilities.modes })),
+				accounts: accounts.accounts ?? [],
+				paired: app.tokens.paired().map((one) => ({ ...one, ...(one.id === call.tokenId ? { you: true } : {}) })),
+				requireCode: app.codes.required,
+				requireCodeForced: app.codes.forced,
+				extension: { status: app.web.status() },
+			};
+		},
+				"account.google": async () => app.google.state(),
+		"account.googleCode": async ([url]) => {
+			try {
+				return { ok: true, email: await app.google.auth.finish({ url: String(url ?? "") }) };
+			} catch (error) {
+				return { ok: false, message: (error as Error).message };
+			}
+		},
+		"account.googleSignOut": async () => {
+			app.google.auth.signOut();
+		},
+
 		"harness.revoke": async ([id]) => {
-			if (app.tokens.paired().some((one) => one.id === String(id))) app.tokens.revoke(String(id));
+			if (!app.tokens.paired().some((one) => one.id === String(id)) || !app.tokens.revoke(String(id))) throw new Error("No front end with that id is paired here.");
 			app.send(app.pairingMessage());
 		},
 		"harness.unpair": async () => {

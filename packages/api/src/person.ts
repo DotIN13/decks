@@ -103,10 +103,20 @@ export const PERSON_VERBS: readonly Verb[] = [
 	{ name: "view.remember", group: "view", ...screen, summary: "Where the person's screen is on an agent's canvas, so the agent's view calls and the next page know.", params: [{ name: "camera", schema: obj({ x: num(), y: num(), zoom: num() }, true) }, { name: "options", schema: obj({ agent: str(), canvas: opt(str()), device: opt(str()) }) }] },
 
 	// --- the harness and the outside --------------------------------------------------------
-	{ name: "harness.configure", group: "misc", ...outside, summary: "The harness's settings: the person's timezone, the speech-to-text model (null for the default).", params: [{ name: "settings", schema: obj({ timezone: opt(union(str(), nul)), sttModel: opt(union(str(), nul)) }) }] },
+	{ name: "harness.configure", group: "misc", ...outside, summary: "The harness's settings: the person's timezone, the speech-to-text model (null for the default), whether another front end needs a pairing code.", params: [{ name: "settings", schema: obj({ timezone: opt(union(str(), nul)), sttModel: opt(union(str(), nul)), requireCode: opt(bool()) }) }] },
 	{ name: "harness.revoke", group: "misc", ...outside, summary: "Take back a paired front end's token.", params: [{ name: "id", schema: str() }] },
 	{ name: "harness.unpair", group: "misc", ...outside, summary: "Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here.", params: [] },
 	{ name: "web.answer", group: "web", ...outside, summary: "Answer the shared browser's question: yes or no.", params: [{ name: "id", schema: str() }, { name: "ok", schema: bool() }] },
+	// --- added with the side routes (step 4): what Studio and a terminal asked of /api/agents, /api/harness, /api/deck, /api/google ---
+	{ name: "agent.dialogs", group: "agent", ...agentsRead, summary: "The questions an agent's runtime has up, waiting for an answer.", params: [{ name: "id", schema: str() }], result: obj({ dialogs: arr(any()) }) },
+	{ name: "agent.settings", group: "agent", ...agentsRead, summary: "An agent's settings as a settings page shows them: its model and the models its runtime offers, its mode and the modes, its usage, the accounts and the one it spends from, its queue.", params: [{ name: "id", schema: str() }, { name: "options", schema: obj({ limits: opt(bool()) }), optional: true }], result: obj({}, true) },
+	{ name: "agent.reset", group: "agent", ...agents, summary: "Start the agent's conversation over.", params: [{ name: "id", schema: str() }] },
+	{ name: "apps.seen", group: "apps", ...deck, summary: "The person looked at an app's state: clears its mark.", params: [{ name: "name", schema: str() }] },
+	{ name: "deck.get", group: "misc", ...agentsRead, summary: "The deck as the harness sees it, with any warnings from opening it.", params: [], result: obj({ deck: any(), warnings: arr(str()) }) },
+	{ name: "harness.get", group: "misc", ...agentsRead, summary: "The harness's own settings page: its name, version, timezone, speech model, runtimes, accounts, paired front ends and the pairing-code rule.", params: [], result: obj({}, true) },
+	{ name: "account.google", group: "misc", ...agentsRead, summary: "Whether this harness is signed in to Google, and as whom.", params: [], result: obj({}, true) },
+	{ name: "account.googleCode", group: "misc", ...outside, summary: "Finish a Google sign-in from the address the browser landed on.", params: [{ name: "url", schema: str() }], result: obj({ ok: bool(), email: opt(str()), message: opt(str()) }) },
+	{ name: "account.googleSignOut", group: "misc", ...outside, summary: "Sign out of Google.", params: [] },
 ];
 
 export const PERSON_VERB_BY_NAME: ReadonlyMap<string, Verb> = new Map(PERSON_VERBS.map((verb) => [verb.name, verb]));

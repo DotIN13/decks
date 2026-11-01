@@ -274,12 +274,12 @@ test("an agent's view of its canvas reaches the frame on its stream, and the fra
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
 		assert.equal((await post("/api/v1/canvas.insert", person, { args: [{ type: "note", id: "n", content: "x" }, { canvas: one, at: { x1: 0, y1: 0 } }] })).status, 200);
 		const frame = { ...bearer(passFor(one, "edit")), ...sandboxed };
-		const response = await fetch(`${origin}/api/v1/events?types=stage.call`, { headers: frame, signal: controller.signal });
+		const response = await fetch(`${origin}/api/v1/events?types=view.called`, { headers: frame, signal: controller.signal });
 		const reader = response.body!.getReader();
 		const decoder = new TextDecoder();
 		let text = "";
 		const asked = (async () => {
-			while (!text.includes('"stage.call"')) {
+			while (!text.includes('"view.called"')) {
 				const { value, done } = await reader.read();
 				if (done) break;
 				text += decoder.decode(value);
@@ -287,7 +287,7 @@ test("an agent's view of its canvas reaches the frame on its stream, and the fra
 		})();
 		const answered = post("/api/v1/view.focus", bearer(app.bridge.issue(agent.id)), { args: ["n", { canvas: one }] });
 		await asked;
-		const line = text.split("\n").find((one) => one.startsWith("data:") && one.includes('"stage.call"'));
+		const line = text.split("\n").find((one) => one.startsWith("data:") && one.includes('"view.called"'));
 		const id = line ? (JSON.parse(line.slice(5)) as { call: { id: string } }).call.id : undefined;
 		assert.ok(id, text);
 		assert.equal((await post("/api/v1/stage-result", bearer(app.bridge.issue(agent.id)), { id, value: { no: 1 } })).status, 403, "an agent does not answer the canvas's calls");
