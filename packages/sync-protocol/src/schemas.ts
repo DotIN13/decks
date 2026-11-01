@@ -94,6 +94,19 @@ export const Hello = z.object({
 });
 export type Hello = z.infer<typeof Hello>;
 
+/** Where someone is on a canvas: the pointer in canvas units, the items selected, the camera; each part only when it changed, `null` gone. */
+export const Presence = z.object({
+	canvas: z.string(),
+	pointer: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+	selection: z.array(z.string().max(200)).max(200).optional(),
+	camera: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).nullable().optional(),
+	gone: z.literal(true).optional(),
+});
+export type Presence = z.infer<typeof Presence>;
+/** Who is present: a person or an agent, by an id stable while they are there, with a name and a colour; `harness` names the harness they are on. */
+export const PresenceBy = z.object({ kind: z.enum(["person", "agent"]), id: z.string().max(200), name: z.string().max(200).optional(), color: z.string().max(40), harness: z.string().max(200).optional() });
+export type PresenceBy = z.infer<typeof PresenceBy>;
+
 /** What the live sockets send, to browsers and harnesses alike. */
 export const LiveEvent = z.discriminatedUnion("type", [
 	/** Connected; on a reconnect, what was said while away is not known. */
@@ -114,6 +127,12 @@ export const LiveEvent = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("cursor"), canvas: z.string(), user: z.string(), name: z.string(), x: z.number(), y: z.number() }),
 	z.object({ type: z.literal("cursor.gone"), canvas: z.string(), user: z.string() }),
 	/**
+	 * Someone on a canvas moved, selected or looked elsewhere, or left (`gone`): a person on a Studio page,
+	 * or a person or an agent on a harness (`by.harness`), each part said when it changes and left out when
+	 * it did not. Never kept, never a revision.
+	 */
+	Presence.extend({ type: z.literal("presence"), by: PresenceBy }),
+	/**
 	 * To a harness alone, over the socket its key opened: Studio asks it for a harness token for one
 	 * signed-in Studio person's browser, at Studio's `origin`, under ask `id`. Studio asks only for a person
 	 * who may use this harness there; the harness trusts the ask because it came on its key's own socket,
@@ -130,10 +149,10 @@ export type LiveEvent = z.infer<typeof LiveEvent>;
 export const TokenGiven = z.object({ type: z.literal("token"), id: z.string().max(100), token: z.string().max(200).optional(), expires: z.number().optional(), error: z.string().max(500).optional() });
 export type TokenGiven = z.infer<typeof TokenGiven>;
 
-/** What a harness may send on its live socket: only answers to Studio's asks. */
-export const HarnessSend = TokenGiven;
+/** What a harness may send on its live socket: answers to Studio's asks, and where the people and agents on it are (`presence`, naming each). */
+export const HarnessSend = z.union([TokenGiven, Presence.extend({ type: z.literal("presence"), by: PresenceBy.omit({ harness: true }) })]);
 export type HarnessSend = z.infer<typeof HarnessSend>;
 
-/** What a browser may send on its live socket: where its pointer is on a canvas, in canvas units. */
-export const LiveSend = z.object({ type: z.literal("cursor"), canvas: z.string(), x: z.number(), y: z.number() });
+/** What a browser may send on its live socket: where its pointer is on a canvas (`cursor`, the older form), or where it is (`presence`). */
+export const LiveSend = z.union([z.object({ type: z.literal("cursor"), canvas: z.string(), x: z.number(), y: z.number() }), Presence.extend({ type: z.literal("presence") })]);
 export type LiveSend = z.infer<typeof LiveSend>;

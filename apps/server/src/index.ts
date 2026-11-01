@@ -70,7 +70,17 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
 			return true;
 		},
 	},
+	// Someone on Studio, or on another harness through it, is on a canvas kept here: every line watching it hears (`line.ts`).
+	presence: (name, event) => {
+		const { type: _type, canvas: _canvas, ...rest } = event;
+		line.present({ type: "presence.changed", canvas: name, ...rest });
+	},
 });
+// Where the people and agents on this harness are, for everyone else on the canvas through Studio.
+line.onPresence = (message) => {
+	const { type: _type, canvas, by, ...rest } = message;
+	studio.presence(canvas, { by: { kind: by.kind, id: by.id, ...(by.name ? { name: by.name } : {}), color: by.color }, ...rest });
+};
 // Every write of a canvas, as logged: a canvas on Studio has its edits sent up at once (`HarnessSync.edited`).
 app.pens.wrote = (name, change) => studio.edited(name, change);
 

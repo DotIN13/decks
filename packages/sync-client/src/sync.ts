@@ -75,6 +75,11 @@ export interface SyncOptions {
 	 * (`edited`). Answers false to have the file written here instead. Absent: the file is written.
 	 */
 	remote?: { write(name: string, text: string, by: string): boolean };
+	/**
+	 * Someone elsewhere is on a canvas kept here: a person on a Studio page, or a person or an agent on
+	 * another harness (`by.harness`). Said as Studio says it, by the canvas's name here.
+	 */
+	presence?: (name: string, event: Extract<LiveEvent, { type: "presence" }>) => void;
 }
 
 interface CanvasState {
@@ -1075,6 +1080,18 @@ export class HarnessSync {
 		this.save();
 	}
 
+	/**
+	 * Where someone on this harness is on a canvas kept on Studio: said up the live socket, naming them
+	 * (`by`), for Studio to say to everyone else on the canvas. Nothing when the canvas is not on Studio
+	 * or the socket is down: where a pointer was is not news later.
+	 */
+	presence(name: string, message: { by: { kind: "person" | "agent"; id: string; name?: string; color: string }; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: { x: number; y: number; zoom: number } | null; gone?: true }): void {
+		const s = this.state.canvases[name];
+		if (!s || !this.ws || this.ws.readyState !== this.ws.OPEN) return;
+		const { by, ...rest } = message;
+		this.ws.send(JSON.stringify({ type: "presence", canvas: s.id, by, ...rest }));
+	}
+
 	// ---- staying in step ----
 
 	/** What a live message asks for: one canvas, its files, or (the list changed) a full pass. */
@@ -1083,6 +1100,11 @@ export class HarnessSync {
 			// Connected again: what was said while away is not known, so everything is looked at.
 			this.fullDue = true;
 			return this.soon(50);
+		}
+		if (e.type === "presence") {
+			const name = Object.entries(this.state.canvases).find(([, s]) => s.id === e.canvas)?.[0];
+			if (name) this.o.presence?.(name, e);
+			return;
 		}
 		if ("by" in e && e.by && e.by === this.me) return;
 		switch (e.type) {

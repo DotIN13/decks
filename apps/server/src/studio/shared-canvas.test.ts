@@ -48,12 +48,14 @@ function harness(url: string, key: string) {
 	const deck = mkdtempSync(join(tmpdir(), "decks-shared-"));
 	mkdirSync(join(deck, "canvases"), { recursive: true });
 	const heard: string[] = [];
+	const present: Array<{ name: string; by: { kind: string; id: string; name?: string; harness?: string }; pointer?: { x: number; y: number } | null; gone?: true }> = [];
 	const pens = new StagePens(deck, () => {});
 	const sync = new HarnessSync({
 		deck,
 		studio: url,
 		key,
 		log: (line) => heard.push(line),
+		presence: (name, event) => present.push({ name, by: event.by, ...(event.pointer !== undefined ? { pointer: event.pointer } : {}), ...(event.gone ? { gone: true } : {}) }),
 		remote: {
 			write: (name, text, by) => {
 				pens.writeFrom(name, text, { kind: "studio", id: by });
@@ -62,7 +64,7 @@ function harness(url: string, key: string) {
 		},
 	});
 	pens.wrote = (name, change) => sync.edited(name, change);
-	return { deck, pens, sync, heard, async stop() {
+	return { deck, pens, sync, heard, present, async stop() {
 		await sync.stop();
 		pens.close();
 		rmSync(deck, { recursive: true, force: true });
@@ -110,6 +112,14 @@ test("two harnesses on one canvas: an edit on either reaches the other through S
 		a.pens.edit(name, [{ op: "update", id: "n", set: { content: "from a" } }]);
 		b.pens.edit(name, [{ op: "update", id: "n", set: { content: "from b" } }]);
 		assert.ok(await until(() => content(a.pens, name, "n") === content(b.pens, name, "n") && content(a.pens, name, "n") === (s.store.canvas(id)!.pen.children[0] as { content?: string }).content && ["from a", "from b"].includes(content(a.pens, name, "n") ?? "")), `tie settled: A ${content(a.pens, name, "n")}, B ${content(b.pens, name, "n")}, Studio ${(s.store.canvas(id)!.pen.children[0] as { content?: string }).content}`);
+
+		// Presence: where someone on A is goes up A's socket and comes down B's, naming A's harness; A hears nothing of its own.
+		a.sync.presence(name, { by: { kind: "person", id: "l1", color: "#2563eb" }, pointer: { x: 5, y: 6 } });
+		assert.ok(await until(() => b.present.length > 0), "B hears A's presence through Studio");
+		assert.deepEqual(b.present[0], { name, by: { kind: "person", id: "l1", color: "#2563eb", harness: "harness-a" }, pointer: { x: 5, y: 6 } });
+		assert.equal(a.present.length, 0, "never back to the harness that said it");
+		a.sync.presence(name, { by: { kind: "person", id: "l1", color: "#2563eb" }, gone: true });
+		assert.ok(await until(() => b.present.some((one) => one.gone)), "and the leave");
 	} finally {
 		await a.stop();
 		await b.stop();

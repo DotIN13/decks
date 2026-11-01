@@ -19,6 +19,8 @@ export interface StudioLink {
 	status(): { connected: boolean; url?: string };
 	/** An edit made here, as the canvas store logged it: sent up at once for a canvas on Studio (`HarnessSync.edited`). */
 	edited(name: string, change: { edits: readonly PenEdit[]; by: { kind: string; id?: string } }): void;
+	/** Where someone on this harness is on a canvas, for everyone else on it through Studio (`HarnessSync.presence`). */
+	presence(name: string, message: Parameters<HarnessSync["presence"]>[1]): void;
 }
 
 const DEFAULT_URL = "https://studio.decks.app";
@@ -123,7 +125,7 @@ export function startStudio(
 	harness?: string,
 	inventory?: SyncOptions["inventory"],
 	harnessToken?: SyncOptions["harnessToken"],
-	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote"> = {},
+	link: Pick<SyncOptions, "issueToken" | "unlinked" | "remote" | "presence"> = {},
 ): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
@@ -175,5 +177,6 @@ export function startStudio(
 		},
 		status: () => ({ connected: Boolean(sync), url: current ? current.split(" ")[0] : undefined }),
 		edited: (name, change) => sync?.edited(name, change),
+		presence: (name, message) => sync?.presence(name, message),
 	};
 }
