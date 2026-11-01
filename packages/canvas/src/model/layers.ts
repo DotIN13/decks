@@ -14,12 +14,16 @@ const clip = (text: unknown, fallback: string) => {
 	return line.trim().slice(0, 60) || fallback;
 };
 
-export function canvasItems(doc: PenDocument | undefined, query = ""): { items: CanvasItem[]; arrows: string[] } {
+/**
+ * `boxes: false` lists without laying anything out: an item sized by its content comes with its place
+ * and no size, which is enough to list it; ask again with boxes for the one picked, to fly to it.
+ */
+export function canvasItems(doc: PenDocument | undefined, query = "", options?: { boxes?: boolean }): { items: CanvasItem[]; arrows: string[] } {
 	const items: CanvasItem[] = [];
 	const arrows: string[] = [];
 	if (!doc) return { items, arrows };
 	const q = query.trim().toLowerCase();
-	const placed = topBoxMap(doc);
+	const placed = topBoxMap(doc, "light", { layout: options?.boxes !== false });
 	for (const n of (doc.children ?? []) as unknown as Record<string, unknown>[]) {
 		const id = String(n.id);
 		const meta = (n.metadata ?? {}) as { type?: string; path?: string };

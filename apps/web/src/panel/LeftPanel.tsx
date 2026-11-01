@@ -432,7 +432,8 @@ export function LeftPanel(props: {
 	const [recentList, setRecentList] = createStore<AgentListRow[]>(recentAgents(agentInput()));
 	createEffect(() => setRecentList(reconcile(recentAgents(agentInput()), { key: "id" })));
 	/* The Canvas tab's rows: the drawing on screen, as Studio's editor lists its layers. */
-	const items = createMemo(() => canvasItems(props.canvasDoc, query()));
+	// Listed without laying the drawing out (it ran on every change, whichever tab showed); the one picked is read again with its box, to fly to it.
+	const items = createMemo(() => canvasItems(props.canvasDoc, query(), { boxes: false }));
 	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
 	const cardItems = () => items().items.filter((item) => item.board !== undefined);
 	const drawnItems = () => items().items.filter((item) => item.board === undefined);
@@ -444,7 +445,7 @@ export function LeftPanel(props: {
 			data-kind={item.kind}
 			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
 			title={item.label}
-			onClick={() => props.onPickItem?.(item)}
+			onClick={() => props.onPickItem?.(canvasItems(props.canvasDoc, query()).items.find((one) => one.id === item.id) ?? item)}
 		>
 			<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
 			<span class="v3-item-name truncate">{item.label}</span>
