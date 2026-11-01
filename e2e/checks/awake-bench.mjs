@@ -18,6 +18,11 @@
  * - picturesFetched: picture requests during the run; live: awake items of each kind at rest, as the stage says.
  *
  * `AWAKE_BENCH_ONLY=pan` or `zoom`; `AWAKE_BENCH_RUNS`, `AWAKE_BENCH_SECONDS`; `AWAKE_BENCH_OUT=<file>` writes the JSON.
+ * `AWAKE_BENCH_PROFILE=<file>` writes a CPU profile of the canvas frame's main thread over the measured runs
+ * (a `.cpuprofile`, 100 µs samples), summed by `scripts/profile-shares.mjs`. `AWAKE_BENCH_TRACE=<file>` writes a
+ * Chrome trace of the same runs instead (the renderer's timeline events: input, script, style, paint, commit),
+ * summed by `scripts/trace-shares.mjs`; one or the other, not both.
+ * - cardLists: how often the stage rebuilt the list of cards it hands the engine during the run (`items-layer.tsx`; should be about 0).
  */
 import { writeFileSync } from "node:fs";
 import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
@@ -27,6 +32,8 @@ const RUNS = Math.max(1, Number(process.env.AWAKE_BENCH_RUNS ?? 3));
 const SECONDS = Number(process.env.AWAKE_BENCH_SECONDS ?? 1.2);
 const OUT = process.env.AWAKE_BENCH_OUT;
 const ONLY = (process.env.AWAKE_BENCH_ONLY ?? "pan,zoom").split(",");
+const PROFILE = process.env.AWAKE_BENCH_PROFILE;
+const TRACE = process.env.AWAKE_BENCH_TRACE;
 const W = 1500;
 const H = 950;
 const DPR = 2;
@@ -214,6 +221,16 @@ const quiet = (ms = 1200, cap = 15000) =>
 		{ ms, cap },
 	);
 
+/** The page's session profiles the canvas frame too: in headless Chromium the sandboxed frame shares the page's process and main thread. */
+const frameCdp = PROFILE ? cdp : undefined;
+if (frameCdp) {
+	await frameCdp.send("Profiler.enable");
+	await frameCdp.send("Profiler.setSamplingInterval", { interval: 100 });
+}
+let profiling = false;
+/** The trace's events, gathered as they stream. */
+const traced = [];
+if (TRACE) cdp.on("Tracing.dataCollected", (event) => traced.push(...event.value));
 const frameBox = await page.locator("iframe.canvas-frame").boundingBox();
 const point = { x: frameBox.x + frameBox.width / 2, y: frameBox.y + frameBox.height / 2 };
 
@@ -221,6 +238,7 @@ const point = { x: frameBox.x + frameBox.width / 2, y: frameBox.y + frameBox.hei
 const run = async (kind) => {
 	const before = await metrics();
 	const engineBefore = await canvas.evaluate(() => globalThis.__bench.engine());
+	const listsBefore = await canvas.evaluate(() => globalThis.__decksCardLists ?? 0);
 	const nodes = await canvas.evaluate(() => globalThis.__bench.nodes());
 	counts.status = 0;
 	counts.pictures = 0;
@@ -244,6 +262,7 @@ const run = async (kind) => {
 	counting = false;
 	const after = await metrics();
 	const engineAfter = await canvas.evaluate(() => globalThis.__bench.engine());
+	const listsAfter = await canvas.evaluate(() => globalThis.__decksCardLists ?? 0);
 	const gaps = got.frames.slice(1).map((t, i) => t - got.frames[i]);
 	const per = (k) => ((after[k] - before[k]) * 1000) / Math.max(1, gaps.length);
 	return {
@@ -263,6 +282,7 @@ const run = async (kind) => {
 		picturesFetched: counts.pictures,
 		engineCalls: engineAfter.calls - engineBefore.calls,
 		engineKB: Math.round((engineAfter.bytes - engineBefore.bytes) / 1024),
+		cardLists: listsAfter - listsBefore,
 	};
 };
 
@@ -277,6 +297,15 @@ for (const kind of ONLY) {
 	const rows = [];
 	for (let i = -1; i < RUNS; i++) {
 		at(`${kind}: run ${i}`);
+		// The profile covers the measured runs alone, every scenario in one: started after the warm-up, stopped at the end.
+		if (frameCdp && i === 0 && !profiling) {
+			profiling = true;
+			await frameCdp.send("Profiler.start");
+		}
+		if (TRACE && i === 0 && !profiling) {
+			profiling = true;
+			await cdp.send("Tracing.start", { traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink.user_timing", "v8.execute", "disabled-by-default-v8.gc"], recordMode: "recordContinuously" }, transferMode: "ReportEvents" });
+		}
 		const row = await run(kind);
 		await quiet();
 		if (i >= 0) rows.push(row);
@@ -287,6 +316,18 @@ for (const kind of ONLY) {
 	say(`${kind} measured over ${RUNS} runs`, rows.length === RUNS, JSON.stringify(result.scenarios[kind]));
 }
 at("done");
+if (TRACE && profiling) {
+	const ended = new Promise((done) => cdp.once("Tracing.tracingComplete", done));
+	await cdp.send("Tracing.end");
+	await ended;
+	writeFileSync(TRACE, JSON.stringify({ traceEvents: traced }));
+	console.error(`[awake-bench] trace written to ${TRACE}, ${traced.length} events`);
+}
+if (frameCdp && profiling) {
+	const { profile } = await frameCdp.send("Profiler.stop");
+	writeFileSync(PROFILE, JSON.stringify(profile));
+	console.error(`[awake-bench] profile written to ${PROFILE}`);
+}
 if (OUT) writeFileSync(OUT, JSON.stringify(result, null, "\t"));
 await page.close().catch(() => {});
 // The harness's socket would keep the process alive.
