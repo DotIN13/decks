@@ -1,3 +1,4 @@
+import { probes } from "../debug.ts";
 import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
 import { ownInput } from "./input.ts";
@@ -53,7 +54,7 @@ export function CardSurface(props: {
 }) {
 	let host!: HTMLDivElement;
 	// For the checks: how many surfaces were made for each card, and how many times each mounted its file.
-	const made = ((globalThis as { __decksMade?: Record<string, { surfaces: number; mounts: number }> }).__decksMade ??= {});
+	const made = probes.made;
 	(made[props.path] ??= { surfaces: 0, mounts: 0 }).surfaces++;
 	/*
 	 * The card's address with its folder stamped with its revision (`cards/sales@<rev>/index.html`,

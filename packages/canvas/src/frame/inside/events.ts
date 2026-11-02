@@ -1,3 +1,4 @@
+import { probes } from "../../debug.ts";
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
@@ -263,7 +264,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		event.preventDefault();
 		const at = { x: event.clientX, y: event.clientY };
 		// Over a card they go into it, between its blocks where they land: only the stage here knows what is under the point.
-		const card = (globalThis as { __decksCardAt?: (x: number, y: number) => CardSlot | undefined }).__decksCardAt?.(at.x, at.y);
+		const card = probes.cardAt?.(at.x, at.y) as CardSlot | undefined;
 		const files = Array.from(event.dataTransfer?.files ?? []);
 		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
 			end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),

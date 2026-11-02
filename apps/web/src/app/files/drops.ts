@@ -1,3 +1,4 @@
+import { probes } from "@decks/canvas/host";
 import { onCleanup, onMount } from "solid-js";
 import { toWorld } from "@decks/canvas/camera";
 import { camera } from "../../state/camera.ts";
@@ -174,7 +175,7 @@ export function createFileDrops() {
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
 		if (files.length === 0) return;
 		// Over a card, every file goes into it, between the blocks where it lands: the canvas frame says which.
-		const card = over ?? (globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt?.(at.x, at.y);
+		const card = over ?? probes.cardAt?.(at.x, at.y);
 		if (card) return intoCard(files, card);
 		const direct = files.filter(onStage);
 		const rest = files.filter((file) => !onStage(file));

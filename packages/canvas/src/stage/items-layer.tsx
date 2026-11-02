@@ -1,3 +1,4 @@
+import { probes } from "../debug.ts";
 import type { Page, Camera } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
@@ -213,7 +214,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		 */
 		const resize = editor.sheetResize((path) => live.has(path));
 		// How often this list is rebuilt, for `awake-bench.mjs` (`cardLists`): a camera step should not rebuild it.
-		(globalThis as { __decksCardLists?: number }).__decksCardLists = ((globalThis as { __decksCardLists?: number }).__decksCardLists ?? 0) + 1;
+		probes.cardLists++;
 		const sendCards = (cards: SceneCard[]) => {
 			/*
 			 * The engine draws the cards' pictures, and hears of every card: an arrow follows the card it
@@ -269,7 +270,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const [picturedNow, setPicturedNow] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.pictured = setPicturedNow;
 	/** For the browser checks: the items the sheet is drawing as their pictures now. */
-	(globalThis as { __decksPictured?: () => string[] }).__decksPictured = () => [...untrack(picturedNow)];
+	probes.pictured = () => [...untrack(picturedNow)];
 	/*
 	 * An item a drag carries while the sheet draws it as its picture (not awake): its picture goes with the drag, so its slot waits unseen too, or its
 	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).
@@ -300,7 +301,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 				return { path: board.path, node: nodes.has(board.path), rev: board.rev, sized: board.sized, rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
-	(globalThis as { __decksCards?: typeof cardsOnScreen }).__decksCards = cardsOnScreen;
+	probes.cards = cardsOnScreen;
 
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
@@ -384,8 +385,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return sameAwake(was, next) ? was : next;
 	}, NO_AWAKE);
 	/** For the browser checks: the items chosen awake and kept asleep, of every kind. */
-	(globalThis as { __decksLiveCards?: () => Awake; __decksAwake?: () => Awake }).__decksLiveCards = () => untrack(cardChoice);
-	(globalThis as { __decksAwake?: () => Awake & { selected?: string | undefined; hover?: string | undefined; held: string[] } }).__decksAwake = () => ({ ...untrack(cardChoice), selected: props.selected, hover: untrack(editor.hoverPicture), held: [...untrack(editor.heldPages)], shown: [...untrack(liveCards).entries()].map(([path, n]) => `${path}:${n}`), leaving: [...untrack(leaving).keys()] });
+	probes.liveCards = () => untrack(cardChoice);
+	probes.awake = () => ({ ...untrack(cardChoice), selected: props.selected, hover: untrack(editor.hoverPicture), held: [...untrack(editor.heldPages)], shown: [...untrack(liveCards).entries()].map(([path, n]) => `${path}:${n}`), leaving: [...untrack(leaving).keys()] });
 	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
 		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
 	});

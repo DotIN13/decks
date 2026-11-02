@@ -1,3 +1,4 @@
+import { probes } from "../../debug.ts";
 import { Show, For, createMemo } from "solid-js";
 import { render } from "solid-js/web";
 import { createEditor } from "../../editor.tsx";
@@ -109,11 +110,11 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	ctx.setMade(editor);
 	ctx.changed();
 	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
-	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
-	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => ctx.news();
-	(globalThis as { __decksFrameSelect?: (ids: string[]) => void }).__decksFrameSelect = (ids) => handle.select(ids);
-	(globalThis as { __decksFrameCamera?: () => unknown }).__decksFrameCamera = () => handle.camera();
-	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
+	probes.frameDrawn = () => handle.drawn();
+	probes.frameNews = () => ctx.news();
+	probes.frameSelect = (ids) => handle.select(ids);
+	probes.frameCamera = () => handle.camera();
+	probes.frameState = () => ({ dock: ctx.dock(), agents: Object.keys(ctx.agents()).length, agent: ctx.agent(), cursor: cursor(), pages: pages().length, cardsReads: ctx.cardsReads(), cards: pages().map((page) => ({ path: page.path.split("/").at(-2) ?? page.path, rev: page.rev, sized: page.sized })) });
 
 	reread = wireFrame(ctx).reread;
 

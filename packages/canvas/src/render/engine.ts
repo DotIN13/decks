@@ -1,3 +1,4 @@
+import { knobs, probes, type SheetStats } from "../debug.ts";
 import renderWorkerUrl from "./render.worker.ts?worker&url";
 /**
  * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
@@ -87,8 +88,6 @@ const PICTURES_BATCH_MS = 16;
  * or at another scale than the one it has at rest, moving or not, and no font still being fetched:
  * the frame a pan has filled in (`fillAfterPanMs`).
  */
-type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; pixelTiles?: number; sharpAt?: number; settledAt?: number };
-const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
 /** Card pictures copied to the GPU in one frame (`putPaced`). */
@@ -107,10 +106,10 @@ type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array 
  * way), but a fast pan was filled in 17 to 48 ms instead of 7 to 8, every tile waiting for its read
  * back from the worker's device. WebKit is told by its user agent: AppleWebKit without Chrome's,
  * Chromium's or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is
- * WebKit). `globalThis.__decksTilePixels` (true or false), set before the stage opens, says it instead.
+ * WebKit). `knobs.tilePixels` (`debug.ts`; true or false), set before the stage opens, says it instead.
  */
 export function pixelsFirst(): boolean {
-	const forced = (globalThis as { __decksTilePixels?: boolean }).__decksTilePixels;
+	const forced = knobs.tilePixels;
 	if (typeof forced === "boolean") return forced;
 	// `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `host.tsx`), for measuring one way on a device that takes the other.
 	const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("tiles");
@@ -131,14 +130,14 @@ function webKit(): boolean {
  * either; what is left waits for the next frame, the window's tiles first. A pinch's tiles taken in
  * all at once held frames on an iPad mini for 40 to 100 ms. Three tiles of bytes a frame, tried
  * first, made a pinch's tiles take 300 ms to come in where all at once took 65 (WebKit as an iPad
- * mini on a Mac). `globalThis.__decksTileBudget` changes it, for measuring.
+ * mini on a Mac). `knobs.tileBudget` changes it, for measuring.
  */
 const TILE_BUDGET = { ms: 4, bytes: 12, pictures: 2 };
 /** A zoom faster than this many doublings a second paints no new level (`zoomRate`), over this window of time; and is painted after this long still. */
 const FAST_ZOOM = 1;
 const ZOOM_RATE_MS = 100;
 const FAST_HOLD_MS = 250;
-const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...(globalThis as { __decksTileBudget?: Partial<typeof TILE_BUDGET> }).__decksTileBudget });
+const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...knobs.tileBudget });
 /** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
 const tileScale = new DataView(new ArrayBuffer(4));
 function tileArea(t: { scale: number; x: number; y: number }): [number, number, number] {
@@ -176,10 +175,10 @@ const SHEET_MARGIN = 0.25;
 
 /**
  * Whether changes glide at all: not when the person asked their system for less motion, and not when
- * a check or a page turned it off (`__decksGlide = false`). A drop still lands where it is dropped.
+ * a check or a page turned it off (`knobs.noGlide`). A drop still lands where it is dropped.
  */
 function glidesWanted(): boolean {
-	if ((globalThis as { __decksNoGlide?: boolean }).__decksNoGlide) return false;
+	if (knobs.noGlide) return false;
 	return typeof matchMedia !== "function" || !matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
@@ -406,9 +405,9 @@ export class StageEngine {
 		this.pictures = PICTURES[await readGpuClass()];
 		if (this.disposed) return gpu.free();
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
-		(globalThis as { __decksRust?: unknown }).__decksRust = this;
+		probes.rust = this;
 		const self = this;
-		(globalThis as { __decksEngine?: unknown }).__decksEngine = {
+		probes.engine = {
 			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture, restarts: this.restarts, pictures: this.picturesPut, paused: this.paused, cardsSent: { ...this.cardsSent } }),
 			/** The boards a drag carries as their picture, and by how far. */
 			get carried() {
@@ -522,7 +521,7 @@ export class StageEngine {
 					this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
 					if (this.settledNext && !this.dirty) {
 						this.settledNext = false;
-						sheetStats().settledAt = performance.now();
+						probes.sheet.settledAt = performance.now();
 					}
 					break;
 				}
@@ -736,7 +735,7 @@ export class StageEngine {
 		if (!shifts.size || !this.page) return false;
 		if (this.glide) cancelAnimationFrame(this.glide.frame);
 		// What glides now, for the checks (`smooth-edits.mjs`).
-		(globalThis as { __decksGlide?: () => Array<[string, Shift]> }).__decksGlide = () => (this.glide ? [...this.glide.shifts] : []);
+		probes.glide = () => (this.glide ? [...this.glide.shifts] : []);
 		this.settling = false;
 		const show = (now: Map<string, Shift>) => {
 			const preview = new Map<string, PenPreview>();
@@ -767,7 +766,7 @@ export class StageEngine {
 			// What a frame of the glide costs the main thread (the preview, the lift, the arrows, the draw): for the checks.
 			const began = performance.now();
 			show(next);
-			const cost = (globalThis as { __decksGlideCost?: number[] }).__decksGlideCost;
+			const cost = knobs.glideCost;
 			if (cost) cost.push(performance.now() - began);
 			glide.frame = requestAnimationFrame(step);
 		};
@@ -1046,7 +1045,7 @@ export class StageEngine {
 		// Zooming once the zoom changes while the camera moves, until it rests (`setMoving`): a pan at one zoom keeps the exact scale.
 		if (this.moving && camera.zoom !== this.camera.zoom) this.zooming = true;
 		this.camera = camera;
-		this.fastZoom = this.moving && this.zooming && this.zoomRate(performance.now(), camera.zoom) > FAST_ZOOM && (globalThis as { __decksSkipLevels?: boolean }).__decksSkipLevels !== false;
+		this.fastZoom = this.moving && this.zooming && this.zoomRate(performance.now(), camera.zoom) > FAST_ZOOM && knobs.skipLevels;
 		clearTimeout(this.fastTimer);
 		// Fingers that stop moving but stay down: painted once the zoom has been still a while.
 		if (this.fastZoom)
@@ -1110,7 +1109,7 @@ export class StageEngine {
 	 * the zoom would leave before the level covered the window (its first frames painted 15 to
 	 * 20 tiles of a level a frame): the page shows the levels it holds stretched or shrunk, the
 	 * overview under any edge they leave bare, and the current level is painted once the zoom
-	 * slows or rests. `__decksSkipLevels = false` paints every level, for measuring.
+	 * slows or rests. `knobs.skipLevels = false` paints every level, for measuring.
 	 */
 	private zoomRate(now: number, zoom: number): number {
 		const trail = this.zoomTrail;
@@ -1139,9 +1138,9 @@ export class StageEngine {
 		 * half the screen's density: a quarter of the pixels a tile, and the sharp ones once the zoom
 		 * rests. A pinch on an iPad mini asked for 35 to 135 tiles, each about 2 ms of the worker's time
 		 * and a copy into the page's texture; text is soft only while the zoom moves. A pan at one zoom
-		 * keeps the exact scale. `__decksHalfZoom = false` paints them sharp, for measuring.
+		 * keeps the exact scale. `knobs.halfZoom = false` paints them sharp, for measuring.
 		 */
-		const half = this.zooming && (globalThis as { __decksHalfZoom?: boolean }).__decksHalfZoom !== false;
+		const half = this.zooming && knobs.halfZoom;
 		const sent = { zoom, dpr: half ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
 		this.post({ type: "camera", x, y, width, height, ...sent });
 		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
@@ -1202,7 +1201,7 @@ export class StageEngine {
 			this.fadeLast = now;
 			this.draw();
 			// For the checks: how many fade frames have run (`touch-step5` probe).
-			(globalThis as { __decksPictureFades?: number }).__decksPictureFades = ((globalThis as { __decksPictureFades?: number }).__decksPictureFades ?? 0) + 1;
+			probes.pictureFades++;
 			if (more) this.fadeFrame = requestAnimationFrame(step);
 		};
 		this.fadeFrame = requestAnimationFrame(step);
@@ -1320,13 +1319,13 @@ export class StageEngine {
 				pictures++;
 			} else {
 				page.putTilePixels(next.scale, next.x, next.y, new Uint8Array(next.pixels), next.stride);
-				sheetStats().pixelTiles = (sheetStats().pixelTiles ?? 0) + 1;
+				probes.sheet.pixelTiles = (probes.sheet.pixelTiles ?? 0) + 1;
 				bytes++;
 			}
 			taken++;
 		}
 		this.frameTaken = { ms: spent.ms + performance.now() - start, bytes, pictures };
-		sheetStats().tiles = (sheetStats().tiles ?? 0) + taken;
+		probes.sheet.tiles = (probes.sheet.tiles ?? 0) + taken;
 		const batch = this.tileBatch;
 		if (!this.tileQueue.length && batch) {
 			this.tileBatch = undefined;
@@ -1344,10 +1343,10 @@ export class StageEngine {
 	 * first zoom or drag would otherwise make in its first frames (`PageEngine::warm`,
 	 * `WorkerEngine::warm`): every pipeline they draw with, the glyph textures, spare tile textures
 	 * (not on a device short of memory).
-	 * Again after the engines start again (a lost device). `__decksWarm = false` leaves it out, for measuring.
+	 * Again after the engines start again (a lost device). `knobs.warm = false` leaves it out, for measuring.
 	 */
 	private warmSoon(): void {
-		if (this.warmed || (globalThis as { __decksWarm?: boolean }).__decksWarm === false) return;
+		if (this.warmed || !knobs.warm) return;
 		this.warmed = true;
 		const idle = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
 		const warm = () => {
@@ -1414,15 +1413,15 @@ export class StageEngine {
 		 */
 		if (this.place() && (this.webKit ??= webKit())) this.draw();
 		this.lastOps = ops;
-		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
+		probes.sheet.shown = (probes.sheet.shown ?? 0) + 1;
 		if (this.sharpNext && !this.moving) {
 			this.sharpNext = false;
-			sheetStats().sharpAt ??= performance.now();
+			probes.sheet.sharpAt ??= performance.now();
 			this.warmSoon();
 		}
 		if (this.settledNext) {
 			this.settledNext = false;
-			sheetStats().settledAt = performance.now();
+			probes.sheet.settledAt = performance.now();
 		}
 		// Asked for in JSON only when the engine says they changed: most frames, nothing did.
 		const marks = this.page.cardMarks();
@@ -1555,7 +1554,7 @@ export class StageEngine {
 	/** The preview a gesture on drawn items is showing, as sent to the engine; undefined when none. */
 	private shown: string | undefined;
 	private carriedCount = 0;
-	/** The boards the last `carry` names (`__decksEngine.carried`). */
+	/** The boards the last `carry` names (`probes.engine.carried`). */
 	private carriedPaths: string[] = [];
 	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
 	private cardsOnly = false;
@@ -1678,9 +1677,9 @@ export class StageEngine {
 		for (const bytes of this.pictureBytes.values()) total += bytes;
 		return total;
 	}
-	/** `__decksPictureMB` changes it, for measuring. */
+	/** `knobs.pictureMB` changes it, for measuring. */
 	private budgetBytes(): number {
-		return ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? this.pictures.budgetMB) * 2 ** 20;
+		return (knobs.pictureMB ?? this.pictures.budgetMB) * 2 ** 20;
 	}
 	/** Card pictures put compressed (`putCompressedPicture`), for checks. */
 	private compressedPut = 0;
@@ -1768,8 +1767,8 @@ export class StageEngine {
 	}
 	private putSome = (): void => {
 		this.putFrame = 0;
-		// `__decksPicturesPerFrame` changes it, for measuring.
-		const most = (globalThis as { __decksPicturesPerFrame?: number }).__decksPicturesPerFrame ?? PICTURES_PER_FRAME;
+		// `knobs.picturesPerFrame` changes it, for measuring.
+		const most = knobs.picturesPerFrame ?? PICTURES_PER_FRAME;
 		for (let i = 0; i < most && this.putQueue.length > 0; i++) this.putQueue.shift()!();
 		if (this.putQueue.length > 0 && !this.disposed) this.putFrame = requestAnimationFrame(this.putSome);
 	};
@@ -2089,7 +2088,7 @@ export class StageEngine {
 
 	/** Strokes to draw over everything until they are in the drawing, at the next frame however often they change. */
 	ink(strokes: readonly LiveInk[], _warm?: boolean): void {
-		sheetStats().ink = strokes.length;
+		probes.sheet.ink = strokes.length;
 		this.page?.setInk(JSON.stringify(strokes));
 		this.drawSoon();
 	}

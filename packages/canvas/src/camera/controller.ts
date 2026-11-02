@@ -1,3 +1,4 @@
+import { knobs } from "../debug.ts";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";
@@ -148,7 +149,7 @@ export function createCameraController(host: CameraHost) {
 	 * after their tails. When the last finger lifts from a pinch there is no next step to wait for,
 	 * and the tails (160 and 300 ms) were that much more of tiles painted at the moving scale before
 	 * the sharp ones were asked for (on an iPad mini, sharp about 620 ms after the lift). A wheel or
-	 * a trackpad's pinch has no lift, so it keeps the tails. `__decksPinchTail = true` keeps them after
+	 * a trackpad's pinch has no lift, so it keeps the tails. `knobs.pinchTail` (`debug.ts`) keeps them after
 	 * a pinch too, for measuring.
 	 */
 	const stopped = () => {
@@ -422,7 +423,7 @@ export function createCameraController(host: CameraHost) {
 	 * the screen, which may load a page, where a pill goes) looks a whole window past the screen or
 	 * waits for a rest anyway: so each pan step reaches none of it. A zoom reaches it at once.
 	 *
-	 * `__decksExactCamera = true` hands every camera through, for measuring.
+	 * `knobs.exactCamera` hands every camera through, for measuring.
 	 */
 	const settled = createMemo<Camera>(
 		() => {
@@ -438,8 +439,7 @@ export function createCameraController(host: CameraHost) {
 				if (was === next) return true;
 				if (was.zoom !== next.zoom) return false;
 				const still = !untrack(moving) && !untrack(gliding) && !untrack(panning);
-				const exact = globalThis as { __decksExactCamera?: boolean };
-				if (still || exact.__decksExactCamera) return was.x === next.x && was.y === next.y;
+				if (still || knobs.exactCamera) return was.x === next.x && was.y === next.y;
 				const v = untrack(host.view);
 				return Math.abs(was.x - next.x) * was.zoom < v.width / 8 && Math.abs(was.y - next.y) * was.zoom < v.height / 8;
 			},
