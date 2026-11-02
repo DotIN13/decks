@@ -4,7 +4,7 @@ import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol";
 import type { createEditor } from "../../editor.tsx";
 import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
-import { drawing } from "../../edit/ink.ts";
+import { drawing } from "../../ink/ink.ts";
 import { canvasBox } from "../../camera/insets.ts";
 import { fitInto } from "../../camera/camera.ts";
 import { placedItems } from "../../model/boxes.ts";

@@ -9,9 +9,9 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import Undo2 from "lucide-solid/icons/undo-2";
 import X from "lucide-solid/icons/x";
 import { For, onCleanup, onMount, Show } from "solid-js";
-import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../edit/ink.ts";
+import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../ink/ink.ts";
 import { Icon } from "@decks/ui";
-import { inkKey } from "../edit/ink-keys.ts";
+import { inkKey } from "../ink/ink-keys.ts";
 
 /**
  * The drawing tools: what is in your hand, its colour and width, and undo, redo and delete.

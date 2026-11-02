@@ -10,7 +10,7 @@ import { stagePoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
-import { StageInk } from "../edit/StageInk.tsx";
+import { StageInk } from "../ink/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";

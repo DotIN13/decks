@@ -4,7 +4,7 @@ import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
 import { dismissMenus } from "@decks/ui";
 import type { Page, Camera, StageCall } from "@decks/protocol";
-import { setDrawing } from "../../edit/ink.ts";
+import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { runStageCall } from "../../camera/stage-ops.ts";
 import { cardShot } from "../../items/card-surface.tsx";

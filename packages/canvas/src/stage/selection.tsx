@@ -4,7 +4,7 @@ import { boxOf, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { PageCallout } from "../ui/Callout.tsx";
 import { isInk } from "../model/ink.ts";
-import { inkSelection, setInkSelection } from "../edit/ink.ts";
+import { inkSelection, setInkSelection } from "../ink/ink.ts";
 import { setPenBoxes } from "../edit/pen-tools.ts";
 import { firstLine } from "../look/look.ts";
 import { parseMarkdown } from "../model/markdown.ts";

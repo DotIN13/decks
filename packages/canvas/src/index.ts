@@ -4,7 +4,7 @@
  * as the frame does.
  */
 export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor.tsx";
-export type { InkTool } from "./edit/ink.ts";
+export type { InkTool } from "./ink/ink.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
 export type { InkRequest, StageComment } from "./types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";

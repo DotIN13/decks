@@ -16,7 +16,7 @@ import { setCanvasScheme } from "./theme.ts";
 import { PenBar } from "./ui/PenBar.tsx";
 import { ItemSlot } from "./items/item-slot.tsx";
 import { Stage, type InkRequest, type StageComment } from "./stage/Stage.tsx";
-import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./edit/ink.ts";
+import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./ink/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./edit/pen-tools.ts";
 
 export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "./types.ts";

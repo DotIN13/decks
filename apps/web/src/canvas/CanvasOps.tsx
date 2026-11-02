@@ -25,7 +25,7 @@ import { tokens } from "@decks/canvas/host";
  * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
  * and `PEN_TOOL_KEYS` for the camera and the tools, `edit/` for selection and editing,
  * `model/file-drop.ts` for the drop, `items/card-surface.tsx` for a card's own chrome,
- * `edit/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
+ * `ink/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
  * that lies is worse than none, so where the two disagree this file is the one that is
  * wrong.
  */
