@@ -197,7 +197,12 @@ export function Stage(props: StageProps) {
 	/** The origin and zoom the world's transform was last written for. */
 	let worldFor: { x: number; y: number; zoom: number } | undefined;
 	/** The scroll this file last set, so the scroll event that answers it is not taken for the person's. */
-	let ownScroll: { left: number; top: number } | undefined;
+	/*
+	 * The scrolls this file set in the last quarter second (`placeScroll`). Safari tells a scroll a frame
+	 * or two late, so the event can name one written before the last: taken for the person's, it moved
+	 * the camera back there and stopped a coast.
+	 */
+	const ownScrolls: { left: number; top: number; at: number }[] = [];
 	const placeWorld = (zoom: number, force = false) => {
 		if (!force && worldFor && worldFor.x === origin.x && worldFor.y === origin.y && worldFor.zoom === zoom) return;
 		worldFor = { x: origin.x, y: origin.y, zoom };
@@ -207,7 +212,9 @@ export function Stage(props: StageProps) {
 	const placeScroll = (cam: Camera) => {
 		if (!element || view().width === 0) return;
 		const to = scrollFor(cam, origin, view());
-		ownScroll = to;
+		const now = performance.now();
+		while (ownScrolls.length && now - ownScrolls[0]!.at > 250) ownScrolls.shift();
+		ownScrolls.push({ ...to, at: now });
 		element.scrollTo(to.left, to.top);
 	};
 	/**
@@ -307,9 +314,9 @@ export function Stage(props: StageProps) {
 	 */
 	const scrolled = () => {
 		const at = { left: element.scrollLeft, top: element.scrollTop };
-		const own = ownScroll;
-		if (own && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1) return;
-		ownScroll = undefined;
+		const now = performance.now();
+		if (ownScrolls.some((own) => now - own.at <= 250 && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1)) return;
+		ownScrolls.length = 0;
 		// A scroll in the middle of a zoom (fingers, a wheel): its later steps keep the view at the scroll it moved to.
 		if (zoomScroll) zoomScroll = at;
 		ctl.scrolled(cameraFor(at, origin, ctl.now().zoom, view()));

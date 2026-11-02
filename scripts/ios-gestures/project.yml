@@ -1,0 +1,35 @@
+name: IOSGestures
+options:
+  bundleIdPrefix: dev.decks.gestures
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  GestureHost:
+    type: application
+    platform: iOS
+    sources: [Host]
+    info:
+      path: Host/Info.plist
+      properties:
+        UILaunchScreen: {}
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      CODE_SIGNING_ALLOWED: NO
+  GestureDriver:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Driver]
+    dependencies:
+      - target: GestureHost
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      CODE_SIGNING_ALLOWED: NO
+      TEST_TARGET_NAME: GestureHost
+schemes:
+  GestureDriver:
+    build:
+      targets:
+        GestureHost: all
+        GestureDriver: [test]
+    test:
+      targets: [GestureDriver]

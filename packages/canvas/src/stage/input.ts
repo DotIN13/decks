@@ -166,13 +166,13 @@ export function createStageInput(deps: StageInputDeps) {
 			for (const kind of ["pointerup", "pointercancel"] as const) window.removeEventListener(kind, letGo, true);
 		});
 		/*
-		 * The coast after a flick, on touch (`coast.by` in the rules): ours, not the browser's. While one
-		 * finger pans, the browser scrolls and the camera follows; the scroll is sampled meanwhile. At the
-		 * lift the browser's momentum is stopped where it is (no overflow for a frame, the scroll pinned)
-		 * and the camera coasts on from the finger's own speed (`ctl.coast`). The browser's momentum
-		 * owned every finger that landed during it, so on an iPad a second finger could not start a pinch
-		 * until it ran down; ours is stopped by any finger (`touch`, `cancelCoast`), so a pinch mid-coast
-		 * is an ordinary pinch.
+		 * The coast after a flick, on touch (`coast.by` in the rules): ours, not the browser's. While
+		 * Safari's momentum runs it keeps every finger that lands for its own scroll, so the page never
+		 * hears them and a pinch cannot start until it has run down (in the iOS simulator, a flick and a
+		 * pinch on its momentum: no touch reached the page). So at the lift the momentum is stopped where
+		 * Safari shows it, by a frame with no overflow and no scroll set: `scrollLeft` lags behind what
+		 * Safari shows, and pinning the scroll to it sprang the canvas back. The scroll event the stop
+		 * raises moves the camera there, and the coast starts from it a frame later, from the finger's speed.
 		 */
 		let flick: { t: number; left: number; top: number }[] | undefined;
 		const sampleFlick = () => {
@@ -197,14 +197,11 @@ export function createStageInput(deps: StageInputDeps) {
 			// The content moves against the scroll: a finger thrown right scrolled left.
 			const v = { vx: -(last.left - first.left) / dt, vy: -(last.top - first.top) / dt };
 			if (Math.hypot(v.vx, v.vy) < 0.15) return;
-			const left = element.scrollLeft;
-			const top = element.scrollTop;
 			element.style.overflow = "hidden";
-			element.scrollTo(left, top);
 			requestAnimationFrame(() => {
 				element.style.overflow = "";
+				requestAnimationFrame(() => ctl.coast(v));
 			});
-			ctl.coast(v);
 		};
 		element.addEventListener("scroll", sampleFlick, { passive: true });
 		element.addEventListener("touchstart", flickStart, { passive: true });
@@ -523,6 +520,16 @@ export function createStageInput(deps: StageInputDeps) {
 		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 
+	/** The steps of a pan the canvas owns, for the speed it is thrown at (`coastFrom`). */
+	const panSamples: { t: number; dx: number; dy: number }[] = [];
+	const coastFrom = (samples: readonly { t: number; dx: number; dy: number }[]) => {
+		const now = performance.now();
+		const recent = samples.filter((sample) => now - sample.t <= 100);
+		if (recent.length < 2) return;
+		const dt = Math.max(1, now - recent[0]!.t);
+		const v = { vx: recent.reduce((sum, s) => sum + s.dx, 0) / dt, vy: recent.reduce((sum, s) => sum + s.dy, 0) / dt };
+		if (Math.hypot(v.vx, v.vy) >= 0.15) ctl.coast(v);
+	};
 	/** One finger's worth of a gesture. A one-finger pan is the browser's scroll, so only a pinch moves the camera here. */
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		// For the checks: every step of the pool, when asked for (`__decksTouchLog`).
@@ -540,6 +547,9 @@ export function createStageInput(deps: StageInputDeps) {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
+				// A pan the canvas owned (it began on a moving canvas) coasts on with ours, from the finger's last 100 ms.
+				if (caught && !pinched && RULES.coastBy === "ours") coastFrom(panSamples);
+				panSamples.length = 0;
 				caught = false;
 				setPanning(false);
 				if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
@@ -554,6 +564,8 @@ export function createStageInput(deps: StageInputDeps) {
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
 		} else if (step.kind === "pan" && caught && !claimed.has(finger.id)) {
+			panSamples.push({ t: performance.now(), dx: step.dx, dy: step.dy });
+			if (panSamples.length > 12) panSamples.shift();
 			pushCamera(pan(ctl.now(), step.dx, step.dy));
 			deps.editor().panned();
 		}
