@@ -146,7 +146,15 @@ function alias(message: ClientMessage): Alias | undefined {
 		case "chat.earlier":
 			return { verb: "chat.earlier", args: [message.agentId, { before: message.before, ...(message.limit !== undefined ? { limit: message.limit } : {}) }] };
 		case "chat.open":
-			return { verb: "chat.open", args: [message.agentId] };
+			// The old socket also took the agent's drawing with its history; the line watches the canvas instead.
+			return {
+				verb: "chat.open",
+				args: [message.agentId],
+				after: (answer, tell, app) => {
+					const pen = answer.ok ? app.penMessage(message.agentId) : undefined;
+					if (pen) tell(pen);
+				},
+			};
 		case "chat.tool":
 			return { verb: "chat.tool", args: [message.agentId, message.itemId] };
 		case "stage.result":

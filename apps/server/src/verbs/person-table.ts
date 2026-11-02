@@ -172,8 +172,6 @@ export function personTable(app: App): Record<string, Impl> {
 			const agent = need(id);
 			const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 			call.tell(history);
-			const pen = app.penMessage(agent.id);
-			if (pen) call.tell(pen);
 			return { items: history.items, more: history.more ?? false };
 		},
 		"chat.earlier": async ([id, page], call) => {
