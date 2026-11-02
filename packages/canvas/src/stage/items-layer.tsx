@@ -21,7 +21,7 @@ import type { StageEditor } from "../edit/index.ts";
 import type { StageProps } from "./Stage.tsx";
 
 /** What the items layer needs of the stage around it. */
-export type ItemsLayerDeps = {
+type ItemsLayerDeps = {
 	props: StageProps;
 	/** The host's slot for one placed item (`props.frame`, read once). */
 	Frame: Component<ItemSlotProps>;

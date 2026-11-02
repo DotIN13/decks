@@ -18,7 +18,7 @@ import { springCurve } from "./spring.ts";
  * Moved out of `Stage.tsx` whole, its comments with it, so the stage keeps the drawing and the
  * boards and asks this for the camera.
  */
-export interface CameraHost {
+interface CameraHost {
 	/** The stage's size on screen. */
 	view: Accessor<Viewport>;
 	/** Put the world and the drawing at this camera: the one write to the page a camera step makes (for the stage, its scroll). */

@@ -11,7 +11,7 @@ import type { PenDocument, PenEdit } from "@decks/pen";
  * page's edits shown at once and sent in order, Studio's revisions applied as they are said, the
  * whole drawing only when its log no longer reaches back.
  */
-export interface StudioLine {
+interface StudioLine {
 	drawing(): Promise<{ doc: PenDocument; rev: number }>;
 	/** Follow the canvas: each newer drawing as it comes. Answers what stops it. */
 	follow(show: (doc: PenDocument) => void, now: () => PenDocument, rev: number): () => void;

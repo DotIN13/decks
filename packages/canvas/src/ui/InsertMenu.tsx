@@ -186,7 +186,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 		},
 	};
 }
-export type InsertMenuApi = ReturnType<typeof createInsertMenu>;
+type InsertMenuApi = ReturnType<typeof createInsertMenu>;
 
 /** The insert panel a shape or an icon is picked in, while it is open. */
 export function InsertMenu(props: { menu: InsertMenuApi }) {

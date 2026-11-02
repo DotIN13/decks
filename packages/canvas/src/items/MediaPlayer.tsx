@@ -13,7 +13,7 @@ import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../look/m
  * or on a sound's name is still a press on a drawn item: a click plays or pauses it (the stage
  * asks `toggle`), and a drag moves it, as any item moves. Only the controls take presses.
  */
-export interface MediaPlayerProps {
+interface MediaPlayerProps {
 	kind: "video" | "audio";
 	src: string;
 	name: string;

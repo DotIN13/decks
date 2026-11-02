@@ -24,11 +24,11 @@ import { Marked, type TokenizerExtension, type Tokens } from "marked";
 export const COLOURS = ["red", "orange", "yellow", "green", "blue", "purple"] as const;
 export type Colour = (typeof COLOURS)[number];
 /** Obsidian's highlight colours, by the emoji that opens one. */
-export const HIGHLIGHT_EMOJI: Record<string, Colour> = { "🔴": "red", "🟠": "orange", "🟡": "yellow", "🟢": "green", "🔵": "blue", "🟣": "purple" };
+const HIGHLIGHT_EMOJI: Record<string, Colour> = { "🔴": "red", "🟠": "orange", "🟡": "yellow", "🟢": "green", "🔵": "blue", "🟣": "purple" };
 export const EMOJI_OF: Record<Colour, string> = Object.fromEntries(Object.entries(HIGHLIGHT_EMOJI).map(([emoji, colour]) => [colour, emoji])) as Record<Colour, string>;
 
 export interface HighlightToken extends Tokens.Generic { type: "highlight"; colour?: Colour; tokens: Tokens.Generic[] }
-export const SIZES = ["small", "large", "huge"] as const;
+const SIZES = ["small", "large", "huge"] as const;
 export type Size = (typeof SIZES)[number];
 /** `.serif` and `.mono`, short for the two faces a card reaches for most. */
 export const FACE_ALIAS: Record<string, string> = { serif: "Source Serif 4", mono: "JetBrains Mono" };
@@ -49,7 +49,7 @@ export interface ColourToken extends Tokens.Generic { type: "colour"; colour?: C
  * A span's attributes, Pandoc's way: `{.red .large font="Lora"}`. Undefined when any of them is not
  * one a card knows, so `[words]{anything}` stays the words it was typed as.
  */
-export function spanAttributes(text: string): { colour?: Colour; size?: Size; face?: string } | undefined {
+function spanAttributes(text: string): { colour?: Colour; size?: Size; face?: string } | undefined {
 	const out: { colour?: Colour; size?: Size; face?: string } = {};
 	const parts = text.match(/\.[\w-]+|font=(?:"[^"]*"|[\w-]+)|\S+/g) ?? [];
 	if (!parts.length) return undefined;
@@ -71,7 +71,7 @@ export function spanAttributes(text: string): { colour?: Colour; size?: Size; fa
 const SPAN = `\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]\\{([^{}\\n]+)\\}`;
 export interface WikiToken extends Tokens.Generic { type: "wiki"; target: string; alias?: string; embed: boolean; width?: number }
 export interface CriticToken extends Tokens.Generic { type: "critic"; op: "replace" | "add" | "remove" | "comment" | "highlight"; old: string; new: string }
-export interface HiddenToken extends Tokens.Generic { type: "hidden"; text: string }
+interface HiddenToken extends Tokens.Generic { type: "hidden"; text: string }
 
 const highlight: TokenizerExtension = {
 	name: "highlight",

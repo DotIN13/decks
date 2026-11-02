@@ -17,7 +17,7 @@
  * Sizes are read from layout (`offsetWidth`), never from `getBoundingClientRect`: the card sits under the
  * camera's zoom, and a box read on screen is the zoomed one.
  */
-export interface CardShotOptions {
+interface CardShotOptions {
 	/** The card's width, in its own pixels. */
 	w: number;
 	/** At least this tall: the card's box on the canvas. */

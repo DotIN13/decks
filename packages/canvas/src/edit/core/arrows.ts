@@ -12,17 +12,17 @@ import { pickAt } from "./pick.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /** An end let go within this many screen pixels of a side's middle keeps to that side (or a quarter of a small box). */
-export const SIDE_PX = 14;
+const SIDE_PX = 14;
 /** Within this many screen pixels of the side it joins, an end's drag slides the join; further, it re-attaches. */
-export const SLIDE_PX = 18;
+const SLIDE_PX = 18;
 /** A slid join clicks to a corner or the middle within this many screen pixels, unless Alt is held. */
-export const JOIN_SNAP_PX = 8;
+const JOIN_SNAP_PX = 8;
 
 export type Which = "from" | "to";
 /** What an end would join at a point: an item or a board, its box to light up, and the side it is near. */
 export type Join = { name: string; box: Rect; side?: ArrowSide };
 /** An end as the arrow's metadata writes it: an item, an item and a side (and where along it), or a point. */
-export type ArrowEnd = string | { item: string; side: ArrowSide; at?: number } | [number, number];
+type ArrowEnd = string | { item: string; side: ArrowSide; at?: number } | [number, number];
 /** What a joined end of the selected arrow joins, for its drag to slide along (`slideJoin`). */
 export type JoinedEnd = { item: string; box: Rect; side: ArrowSide; at?: number };
 /** The handles of a selected arrow: its two ends, what they join, and its middle when it has one to pull. */
@@ -40,7 +40,7 @@ export function pageAt(scene: SceneQuery, point: Pt): string | undefined {
 }
 
 /** Where an end's item or board is placed: an item's box first, then a board's. */
-export function endBox(scene: SceneQuery, name: string): Rect | undefined {
+function endBox(scene: SceneQuery, name: string): Rect | undefined {
 	const box = scene.item(name)?.box;
 	if (box) return box;
 	const board = scene.boards().find((one) => one.path === name);
@@ -142,7 +142,7 @@ export function arrowHandles(scene: SceneQuery, id: string, drag: { dx: number; 
  * start, two controls and end; a line's corners), through its box and `viewBox`. Undefined when it has
  * no geometry or the subpath is neither.
  */
-export function drawnLine(node: PenNode, box: Rect): Array<[number, number]> | undefined {
+function drawnLine(node: PenNode, box: Rect): Array<[number, number]> | undefined {
 	if (typeof node.geometry !== "string") return undefined;
 	const line = node.geometry.trim().split(/(?=M)/i)[0] ?? "";
 	if (!/^M/i.test(line) || /[^MLC\d\s.,eE+-]/i.test(line)) return undefined;

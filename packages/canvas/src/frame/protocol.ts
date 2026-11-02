@@ -27,7 +27,7 @@ export type Message =
 	| { t: "reply"; id: number; ok: false; error: string; code?: ReplyCode };
 
 /** Why a call was refused, for a caller that decides by it. */
-export type ReplyCode = "refused" | "not-for-cards" | "asked-no" | "offline" | "gone";
+type ReplyCode = "refused" | "not-for-cards" | "asked-no" | "offline" | "gone";
 
 /** The frame's first word to its parent, the only window message it sends. */
 export interface Hello {
@@ -96,7 +96,7 @@ export interface PageToFrame {
 }
 
 /** The calls the page makes of the frame, and what each answers. */
-export type PageCalls = {
+type PageCalls = {
 	edit: { data: { ops: unknown[] }; value: true };
 };
 
@@ -114,7 +114,7 @@ export interface ComposerPart {
 }
 
 /** What the frame sends the page. */
-export interface FrameToPage {
+interface FrameToPage {
 	composer: ComposerPart;
 	/** Open an app in a tab of its own: the page's, outside the canvas's sandbox (`decks.app`). */
 	"open-app": { name: string };
@@ -168,7 +168,7 @@ type Handler = (data: unknown) => unknown;
  * One end of the port: send events, make calls and wait for their replies, and answer the other
  * side's. Typed by what this end sends (`Out`, `OutCalls`) and hears (`In`, `InCalls`).
  */
-export interface Peer<Out, OutCalls extends Record<string, { data: unknown; value: unknown }>, In, InCalls extends Record<string, { data: unknown; value: unknown }>> {
+interface Peer<Out, OutCalls extends Record<string, { data: unknown; value: unknown }>, In, InCalls extends Record<string, { data: unknown; value: unknown }>> {
 	emit<K extends keyof Out & string>(name: K, data: Out[K]): void;
 	call<K extends keyof OutCalls & string>(name: K, data: OutCalls[K]["data"], transfer?: Transferable[]): Promise<OutCalls[K]["value"]>;
 	on<K extends keyof In & string>(name: K, handler: (data: In[K]) => void): void;

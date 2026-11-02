@@ -67,7 +67,7 @@ export interface ItemSlotProps {
 }
 
 /** What a host adds to the slot: where a card's file is, and whether its scripts may run here. */
-export interface ItemSlotExtras {
+interface ItemSlotExtras {
 	/** A card's address (its `index.html`), or anything for a document or an app item. */
 	page?: string | undefined;
 	/** Raised by the host when the card's file changed where it comes from: it loads again. */

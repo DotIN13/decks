@@ -87,7 +87,7 @@ function kindOf(node: PenNode): Kind {
 const KIND_ICON: Record<Kind, LucideIcon> = { shape: Shapes, arrow: ArrowUpRight, text: Type, note: StickyNote, icon: SmilePlus, frame: FrameIcon, rectangle: Square, ellipse: Square, polygon: Shapes, path: Spline, group: Layers, other: Square };
 
 /** The colour a value names, for the colour input: a hex colour, or undefined for a variable or a gradient. */
-export const hexOf = (value: unknown): string | undefined => {
+const hexOf = (value: unknown): string | undefined => {
 	const first = Array.isArray(value) ? value[0] : value;
 	const type = first && typeof first === "object" ? (first as { type?: string }).type : undefined;
 	const text = typeof first === "string" ? first : type === "color" || type === "solid" ? (first as { color?: unknown }).color : undefined;
@@ -95,7 +95,7 @@ export const hexOf = (value: unknown): string | undefined => {
 	return typeof text === "string" ? toHex(parseColor(text)) : undefined;
 };
 /** The colour a value names, for the panel: a variable as it is written (`"$decks-text"`), anything else as hex (`hexOf`). */
-export const colorOf = (value: unknown): string | undefined => {
+const colorOf = (value: unknown): string | undefined => {
 	const first = Array.isArray(value) ? value[0] : value;
 	const type = first && typeof first === "object" ? (first as { type?: string }).type : undefined;
 	const text = typeof first === "string" ? first : type === "color" || type === "solid" ? (first as { color?: unknown }).color : undefined;

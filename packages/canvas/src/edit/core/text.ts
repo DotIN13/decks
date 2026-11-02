@@ -54,7 +54,7 @@ export type TextSession = {
 /** The colours of the app's own words and paper, in the scheme now (`pen/look.ts`, `CARD_PALETTE`). */
 export type Palette = { paper: string; fg: string };
 /** The font the page sets a family in, at a weight and a style (`pen/look.ts`, `pageFont`). */
-export type FontOf = (family: string, weight: number, italic: boolean) => string;
+type FontOf = (family: string, weight: number, italic: boolean) => string;
 export type Scheme = "light" | "dark";
 
 const EMPTY: PenDocument = { version: "", children: [] };

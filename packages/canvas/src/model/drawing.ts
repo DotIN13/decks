@@ -47,7 +47,7 @@ export interface Drawing {
 	removePage(path: string): void;
 }
 
-export interface DrawingOptions {
+interface DrawingOptions {
 	onEdits?: (edits: PenEdit[], doc: PenDocument) => void;
 	/** The scheme the drawing's theme variables are read in. */
 	look?: () => "light" | "dark";
@@ -92,8 +92,8 @@ export const itemKind = (node: PenNode): "document" | "app" | undefined => {
 	return type === "decks.document" ? "document" : type === "decks.app" ? "app" : undefined;
 };
 export const isPage = (node: PenNode) => node.type === "browser" && PAGE_TAGS.has(String((node.metadata as { type?: string } | undefined)?.type));
-export const isCardItem = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.card";
-export const pagePath = (node: PenNode) => {
+const isCardItem = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.card";
+const pagePath = (node: PenNode) => {
 	const kind = itemKind(node);
 	// An item is its own: its path is its id, so two of one file or app are two places.
 	if (kind) return `item:${String(node.id)}`;
@@ -536,7 +536,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 }
 
 /** What a document or an app item adds to its board record: its kind, and its file or its app. */
-export function itemFields(node: PenNode): { item?: "document" | "app"; file?: string; app?: string } {
+function itemFields(node: PenNode): { item?: "document" | "app"; file?: string; app?: string } {
 	const kind = itemKind(node);
 	const meta = (node.metadata ?? {}) as { path?: unknown; name?: unknown };
 	if (kind === "document") return { item: "document", file: String(meta.path ?? "") };

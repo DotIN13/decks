@@ -17,13 +17,13 @@ import { CallRefused } from "../protocol.ts";
  * - **Nowhere**: everything that reaches past the canvas (apps, the shared Chrome tab, pairing, ports,
  *   changing who an agent is, other canvases).
  */
-export const IN_FRAME = cardCallsTo("frame");
-export const ON_CANVAS = cardCallsTo("canvas");
+const IN_FRAME = cardCallsTo("frame");
+const ON_CANVAS = cardCallsTo("canvas");
 /** The page's, with your token: the agents, and moving your screen to another canvas. */
-export const BY_THE_PAGE = cardCallsTo("page");
+const BY_THE_PAGE = cardCallsTo("page");
 
 /** What the frame lends its card calls. */
-export interface CardCallDeps {
+interface CardCallDeps {
 	canvas: string;
 	camera(): Camera;
 	move(camera: Camera, glide?: number): void;

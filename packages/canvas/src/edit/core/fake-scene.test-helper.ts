@@ -6,7 +6,7 @@ import type { SceneQuery } from "./scene.ts";
 export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown>; line?: boolean; undrawn?: boolean };
 
 /** How far round its box a fake item is found under a point, as a press's reach is in the engine. */
-export const FAKE_REACH = 4;
+const FAKE_REACH = 4;
 
 export function fakeScene(list: FakeItem[], boards: PageBox[] = []): SceneQuery {
 	const nodes = new Map<string, PenNode>();

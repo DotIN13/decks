@@ -15,7 +15,7 @@ type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;
 
 /** A mention of something dropped on the composer. */
 /** `label` is what the pill shows; `name` what it is called in full, for its card and the sent message. */
-export type ReferPill = { kind: "card" | "item"; id: string; label: string; name?: string };
+type ReferPill = { kind: "card" | "item"; id: string; label: string; name?: string };
 
 export type EffectHost = {
 	/** The stage's element: what the ghost's attribute goes on. */

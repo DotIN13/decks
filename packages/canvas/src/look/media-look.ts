@@ -8,7 +8,7 @@
  * places from here, in the item's own stage pixels.
  */
 
-export interface MediaBox {
+interface MediaBox {
 	x: number;
 	y: number;
 	w: number;
@@ -22,9 +22,9 @@ export const SOUND_INK = {
 } as const;
 
 /** A sound's card, the size it is dropped at; the layout scales with its height from here. */
-export const SOUND_SIZE = { w: 420, h: 72 } as const;
+const SOUND_SIZE = { w: 420, h: 72 } as const;
 
-export interface SoundLayout {
+interface SoundLayout {
 	/** The scale against a card of `SOUND_SIZE`'s height. */
 	k: number;
 	disc: { cx: number; cy: number; r: number };
@@ -76,7 +76,7 @@ export function waveBars(wave: SoundLayout["wave"], peaks: readonly number[] | u
 	});
 }
 
-export interface FilmLayout {
+interface FilmLayout {
 	disc: { cx: number; cy: number; r: number };
 	/** The running time's pill, in the bottom-right corner. */
 	pill: { right: number; bottom: number; size: number; padX: number; padY: number };

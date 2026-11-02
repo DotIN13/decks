@@ -4,7 +4,7 @@
  */
 import { NoBackend } from "./detect.ts";
 
-export const NOTICE = "This browser can't draw the stage: it needs WebGPU or WebGL 2.";
+const NOTICE = "This browser can't draw the stage: it needs WebGPU or WebGL 2.";
 
 /** The words for a stage engine that did not start: the notice when no backend is to be had, else why. */
 export function noticeFor(error: unknown): string {

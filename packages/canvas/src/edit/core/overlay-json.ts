@@ -9,7 +9,7 @@ import { anchorAt, draftBox, draftCurve, handleAt, pageHandleList, radiusInset, 
  * changes, and handed to the engine as one JSON string (`StageEngine.setOverlay`); the DOM keeps
  * only the hit areas (`dom/OverlayLayer.tsx`, invisible under `[data-engine-overlays]`).
  */
-export type OverlayStyle = {
+type OverlayStyle = {
 	/** The main pointer is a finger: round corner handles, bigger arrow ends, no edge handles or anchors. */
 	coarse: boolean;
 	/** Colours as red, green, blue from 0 to 1. */

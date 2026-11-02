@@ -8,9 +8,9 @@
  * and the user agent alone an iPad as a Mac, which is what iPadOS calls itself: a real Mac has no
  * touch screen, so a "Mac" with one is an iPad.
  */
-export type DeviceKind = "computer" | "mobile";
+type DeviceKind = "computer" | "mobile";
 
-export interface DeviceFacts {
+interface DeviceFacts {
 	platform: string;
 	userAgent: string;
 	maxTouchPoints: number;
@@ -43,9 +43,9 @@ export const DEVICE: DeviceKind =
  * Told by the user agent: AppleWebKit without Chrome's, Chromium's or Edge's name is WebKit. Chrome on
  * iOS says CriOS, not Chrome/, and is WebKit, as it should be.
  */
-export type BrowserEngine = "webkit" | "chromium" | "other";
+type BrowserEngine = "webkit" | "chromium" | "other";
 
-export interface EngineFacts {
+interface EngineFacts {
 	userAgent: string;
 	/** `?engine=webkit`, `chromium` or `other` in the page's address, for testing one on another. */
 	forced?: string | null | undefined;
@@ -115,14 +115,14 @@ export const MOVING: Record<BrowserEngine, { card: Moving; app: Moving; document
  * Each card's picture is fetched at the rung of the class's ladder (`PICTURES`) its drawn width needs
  * (`picture-ladder.ts`); the GPU makes its smaller sizes and draws it at any zoom from the nearest.
  */
-export type GpuClass = "big" | "small" | "phone";
+type GpuClass = "big" | "small" | "phone";
 
 /** A phone, not a tablet: an iPhone or iPod, or an Android device that calls itself Mobile (Android tablets do not). */
 export function isPhone(facts: { platform: string; userAgent: string }): boolean {
 	return /iPhone|iPod/.test(facts.platform) || /iPhone|iPod/.test(facts.userAgent) || /Android.*Mobile/i.test(facts.userAgent);
 }
 
-export interface GpuFacts {
+interface GpuFacts {
 	kind: DeviceKind;
 	/** `navigator.deviceMemory`, in GB, where the browser gives it (Chrome). */
 	deviceMemory?: number | undefined;

@@ -18,9 +18,9 @@ export { COARSE };
 export const ANCHOR_OUT = 14;
 export const ANCHOR_PX = COARSE ? 16 : 10;
 /** A resize handle's width as drawn, in screen pixels (`touch-rules.ts`): a 10 px dot under a finger, answering 44. */
-export const HANDLE_PX = HANDLE_DOT_PX;
+const HANDLE_PX = HANDLE_DOT_PX;
 
-export type OverlayHandlers = {
+type OverlayHandlers = {
 	/** A press on a card block's grip. */
 	onGrip: (event: PointerEvent, id: string) => void;
 	/** A press on an arrow anchor: draws an arrow from that side of the item. */

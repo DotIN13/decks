@@ -18,7 +18,7 @@ import type { SceneQuery } from "./scene.ts";
  * `"outermost"`: as `"exact"`, and on to the outermost group round it, the way some design tools
  * select a group whole. A group's empty space is nothing. What an arrow's end joins still asks this.
  */
-export type PickPolicy = "exact" | "outermost";
+type PickPolicy = "exact" | "outermost";
 
 export type PickOptions = {
 	/** `"exact"` unless said. */

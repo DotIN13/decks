@@ -35,7 +35,7 @@ import {
 import type { StageProps } from "./Stage.tsx";
 
 /** What the selection's drawing needs of the stage around it. */
-export type SelectionDeps = {
+type SelectionDeps = {
 	props: StageProps;
 	ctl: CameraController;
 	view: () => Viewport;

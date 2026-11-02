@@ -4,7 +4,7 @@
  * leaves the card as it was, its picture still shown, and is asked for once more a moment later: a card
  * mounted empty was blank paper where its picture had been.
  */
-export interface CardLoad {
+interface CardLoad {
 	/** Read the file now, as asked anew: its address may have changed. */
 	load(): void;
 	/** Stop: what is still on its way is dropped, and no retry is made. */

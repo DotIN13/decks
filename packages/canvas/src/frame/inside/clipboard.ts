@@ -17,7 +17,7 @@ import type { CanvasHandle } from "../../types.ts";
  * Files from the computer go to the page, which uploads them where the pointer is (`upload`); words
  * from elsewhere become a note.
  */
-export interface ClipboardDeps {
+interface ClipboardDeps {
 	handle: CanvasHandle;
 	canvas: string;
 	/** Who keeps the canvas: the harness's id, or `studio:<address>`. */

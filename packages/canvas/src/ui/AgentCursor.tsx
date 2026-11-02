@@ -20,7 +20,7 @@ import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
  * title bars (`--zoom`), so it is one size on the screen at any zoom. Reduced motion keeps the
  * position and the name and drops everything that moves.
  */
-export interface CursorAt {
+interface CursorAt {
 	x: number;
 	y: number;
 	label: string;

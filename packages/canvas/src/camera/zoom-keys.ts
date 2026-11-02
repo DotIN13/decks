@@ -20,7 +20,7 @@
  * `Minus` is somewhere else — so it is the fallback for the numpad rather than the primary
  * test, and what somebody's keyboard actually produces (`key`) is tried first.
  */
-export type ZoomKey = "in" | "out" | "fit";
+type ZoomKey = "in" | "out" | "fit";
 
 /** Physical keys, for the numpad — where `key` alone is ambiguous across layouts. */
 const CODES: Record<string, ZoomKey> = {

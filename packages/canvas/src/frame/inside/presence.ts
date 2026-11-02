@@ -11,15 +11,15 @@ export interface Present extends Presence {
 }
 
 /** How often at most this frame says where its pointer is. */
-export const POINTER_MS = 50;
+const POINTER_MS = 50;
 /** How long an agent's cursor stays on a card after its work there is done. */
-export const ACT_LINGER_MS = 2500;
+const ACT_LINGER_MS = 2500;
 /** How long an agent's cursor stays on the last thing it drew, waiting for its next edit. */
-export const TOUR_LINGER_MS = 3200;
+const TOUR_LINGER_MS = 3200;
 /** How long the cursor rests on each thing an edit touched before moving to the next: its drift is 380 ms. */
-export const TOUR_STEP_MS = 340;
+const TOUR_STEP_MS = 340;
 /** More stops waiting than this and the older ones are skipped: the cursor keeps up with the agent rather than replaying. */
-export const TOUR_MOST = 6;
+const TOUR_MOST = 6;
 /** How long a cursor is kept, pointer gone, for its fade out (`AgentCursor`, 600 ms). */
 export const LEAVE_MS = 650;
 

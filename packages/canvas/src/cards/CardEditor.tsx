@@ -39,7 +39,7 @@ import { pictureAddress } from "../host.ts";
  * (`data-raw`) until something in it changes, so an edit to one line never rewrites the rest.
  */
 
-export interface CardEditorProps {
+interface CardEditorProps {
 	value: string;
 	/** Where the deck's files are, for the card's pictures. */
 	base: string;

@@ -93,7 +93,7 @@ function slotLine(frame: LaidOut, before: Rect | undefined, after: Rect | undefi
 export const NEAR_PX = 200;
 
 /** Every place a drag could land near the pointer: slot lines in frames that arrange their children, and frames that do not. */
-export type NearDrops = { slots: readonly Rect[]; frames: readonly Rect[] };
+type NearDrops = { slots: readonly Rect[]; frames: readonly Rect[] };
 
 /**
  * What a drag could drop into, within `reach` stage pixels of the pointer (`NEAR_PX` over the

@@ -88,9 +88,9 @@ export const FADE_RATE = 6;
 /** How far below its place an appeared item starts, in stage pixels. */
 export const RISE = 40;
 /** Under this many pixels a shift is done. */
-export const SETTLED_PX = 0.5;
+const SETTLED_PX = 0.5;
 /** Under this much transparency left a fade is done. */
-export const SETTLED_FADE = 0.05;
+const SETTLED_FADE = 0.05;
 /** More moved items than this (a canvas opened, a reset) jump: a glide of everything says nothing. */
 export const MOST_GLIDING = 60;
 

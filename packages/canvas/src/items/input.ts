@@ -16,7 +16,7 @@ import { INTERACTIVE, scrollsInside } from "./card.ts";
  * card's button from one on its background; an element otherwise), `host` the element whose own
  * scrolling counts as inside.
  */
-export interface OwnInput {
+interface OwnInput {
 	selected: () => boolean;
 	onSelect: () => void;
 	/** A Shift or ⌘ press offered to the editor: true when it took it. */
@@ -24,7 +24,7 @@ export interface OwnInput {
 }
 
 /** Whether the event's target is one of the item's own controls. */
-export const onControl = (event: Event) => event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
+const onControl = (event: Event) => event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
 
 /** Whether the event's target takes typing. */
 export const inField = (event: Event) => {

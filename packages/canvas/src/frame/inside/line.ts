@@ -3,7 +3,7 @@ import type { LineClientMessage, ServerMessage } from "@decks/protocol";
 /** The answer to one `call` on the line, as the SDK reads it. */
 export type LineAnswer = { ok: boolean; value?: unknown; error?: string; notes?: string[] };
 
-export interface LineOptions {
+interface LineOptions {
 	/** The harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 	api: string;
 	/** The token now: read at every `hello`, so a renewed one is what the next connection says. */

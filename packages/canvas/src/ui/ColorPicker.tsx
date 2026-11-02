@@ -26,7 +26,7 @@ import { scheme } from "../theme.ts";
  */
 type Hsv = { h: number; s: number; v: number };
 
-export function hexToHsv(hex: string): Hsv {
+function hexToHsv(hex: string): Hsv {
 	const m = /^#?([0-9a-f]{6})/i.exec(hex);
 	const n = m ? parseInt(m[1]!, 16) : 0xffffff;
 	const r = ((n >> 16) & 255) / 255;
@@ -46,7 +46,7 @@ export function hexToHsv(hex: string): Hsv {
 	return { h, s: max === 0 ? 0 : d / max, v: max };
 }
 
-export function hsvToHex({ h, s, v }: Hsv): string {
+function hsvToHex({ h, s, v }: Hsv): string {
 	const c = v * s;
 	const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
 	const m = v - c;

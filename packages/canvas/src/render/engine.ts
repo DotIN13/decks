@@ -33,7 +33,7 @@ import { upgrades } from "./picture-ladder.ts";
 import { noticeFor } from "./backends/notice.ts";
 
 /** What a card's picture is held under in both engines: `card:<path>` (`CardPlace` in the Rust engine). */
-export const pictureKey = (path: string) => `card:${path}`;
+const pictureKey = (path: string) => `card:${path}`;
 /** A card whose picture can be fetched: it names one by address, and is not a live page still loading. */
 const fetchable = (card: SceneCard) => !!card.picture && !(card.live && !card.ready) && /^(https?:|\/)/.test(card.picture);
 
@@ -47,7 +47,7 @@ const REST_MS = 250;
  * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
  * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
  */
-export function readCompressed(data: Uint8Array): { data: Uint8Array; width: number; height: number; spans: Uint32Array; bytes: number } | undefined {
+function readCompressed(data: Uint8Array): { data: Uint8Array; width: number; height: number; spans: Uint32Array; bytes: number } | undefined {
 	if (data.length < 16 || String.fromCharCode(...data.subarray(0, 4)) !== "DKA1") return undefined;
 	const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
 	const width = view.getUint32(4, true);

@@ -42,14 +42,14 @@ export interface Awake {
 
 export const NO_AWAKE: Awake = { live: [], kept: [] };
 
-export interface AwakeBudget {
+interface AwakeBudget {
 	/** How many of each kind are awake at once besides the selected one. */
 	live: Record<Kind, number>;
 	/** How many let go are kept, of any kind. */
 	kept: number;
 }
 
-export interface AwakeChoice {
+interface AwakeChoice {
 	/** What the R-tree answers: indices into `items` touching a rectangle (`render/spatial.ts`, `BoxIndex`). */
 	index: { search(rect: Rect): number[] };
 	/** The placed items the index was built over. */
@@ -125,7 +125,7 @@ export function sameAwake(a: Awake, b: Awake): boolean {
  * - `kept`: let go lately, its surface kept hidden under its picture.
  * - `leaving`: let go, waiting for the sheet to draw its picture over it before its surface goes.
  */
-export type SurfaceState = "picture" | "waking" | "live" | "kept" | "leaving";
+type SurfaceState = "picture" | "waking" | "live" | "kept" | "leaving";
 
 export function surfaceState(of: { live: boolean; kept: boolean; leaving: boolean; shown: boolean }): SurfaceState {
 	if (of.live) return of.shown ? "live" : "waking";

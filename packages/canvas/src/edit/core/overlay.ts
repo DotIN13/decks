@@ -37,27 +37,27 @@ export type Outline = Rect & {
 /** The selected board's eight handles. */
 export type PageHandles = Outline & { path: string };
 /** The outline round what the pointer is over: an item (`id`) or a board (`board`). */
-export type HoverBox = Rect & { id?: string; board?: true; round?: true };
+type HoverBox = Rect & { id?: string; board?: true; round?: true };
 /** Where a card block's grip goes: level with the middle of the block's first line, at its left edge. */
-export type GripBox = { id: string; x: number; y: number };
+type GripBox = { id: string; x: number; y: number };
 /** The frame a drag would drop into. */
-export type DropBox = Rect & { id: string };
+type DropBox = Rect & { id: string };
 /**
  * What the selection, or the item under the pointer, sits in and holds: a light solid outline
  * round each parent, a light dashed one round each child.
  */
-export type KinBox = Rect & { id: string; kin: "parent" | "child"; of: "selection" | "hover"; round?: true };
+type KinBox = Rect & { id: string; kin: "parent" | "child"; of: "selection" | "hover"; round?: true };
 /**
  * One box round everything selected and its size under it, in stage pixels rounded (`"120 × 36"`).
  * `many` when more than one thing is selected: each is outlined thin, and this box is the strong one.
  */
-export type SelectionFrame = Rect & { many: boolean; label: string };
+type SelectionFrame = Rect & { many: boolean; label: string };
 /** One red line of the distances Alt shows, and the pixels it measures at its middle; `dashed` carries an edge out to meet it. */
-export type MeasureLine = { x1: number; y1: number; x2: number; y2: number; label?: string; dashed?: true };
+type MeasureLine = { x1: number; y1: number; x2: number; y2: number; label?: string; dashed?: true };
 /** What Alt shows between the selection and the item under the pointer: both boxes, and the lines between. */
-export type Distances = { from: Rect; to: Rect; lines: MeasureLine[] };
+type Distances = { from: Rect; to: Rect; lines: MeasureLine[] };
 /** A side an arrow end can keep to on what it would join, and the one it is near. */
-export type SideHint = { box: Box; side?: ArrowSide };
+type SideHint = { box: Box; side?: ArrowSide };
 /** A shape being drawn with a tool, corner to corner. */
 export type Draft = Corners & { tool: string };
 /** The corner radius handle: the box, the radius now, the most it can be. */
@@ -191,10 +191,10 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 }
 
 /** Handles hide when the box they would sit on is under this many screen pixels both ways: they would cover it. */
-export const HANDLES_MIN_PX = 10;
+const HANDLES_MIN_PX = 10;
 
 /** Whether a box is too small on the screen, both ways, at this zoom, to wear handles. */
-export const tooSmallForHandles = (box: { w: number; h: number }, zoom: number) => box.w * zoom < HANDLES_MIN_PX && box.h * zoom < HANDLES_MIN_PX;
+const tooSmallForHandles = (box: { w: number; h: number }, zoom: number) => box.w * zoom < HANDLES_MIN_PX && box.h * zoom < HANDLES_MIN_PX;
 
 /**
  * One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles.
@@ -210,7 +210,7 @@ export function itemHandles(outlines: readonly Outline[], scene: SceneQuery, zoo
 }
 
 /** What the arrow anchors and the radius handle wait for: an edit allowed, and nothing being drawn, sized or carried. */
-export type HandleInput = { editable: boolean; drafting: boolean; resizing: boolean; drag: Offset };
+type HandleInput = { editable: boolean; drafting: boolean; resizing: boolean; drag: Offset };
 
 /** One drawn item selected, not a line or words, and nothing being drawn or sized: where an arrow can leave it. */
 export function arrowAnchors(handles: Outline | undefined, input: Omit<HandleInput, "drag">, scene: SceneQuery): Outline | undefined {
@@ -246,7 +246,7 @@ export function arrowEnds(input: { selection: readonly string[]; pagePicks: read
 	return arrowHandles(scene, input.selection[0]!, input.drag);
 }
 
-export type HoverInput = {
+type HoverInput = {
 	/** Hover outlines are edit mode's. */
 	editing: boolean;
 	/** The item under the pointer. */
@@ -278,7 +278,7 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
 }
 
-export type KinInput = {
+type KinInput = {
 	selection: readonly string[];
 	/** The selection's drag as the canvas shows it: children are not outlined while it moves. */
 	drag: Offset;

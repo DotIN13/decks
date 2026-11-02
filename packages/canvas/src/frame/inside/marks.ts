@@ -11,7 +11,7 @@ export interface ItemBox {
 }
 
 /** What an agent did to an item, for the mark drawn over it. */
-export type MarkKind = "insert" | "update" | "move" | "delete";
+type MarkKind = "insert" | "update" | "move" | "delete";
 
 /** A mark on the canvas: the box an agent's edit touched, in its colour, drawn for a moment. */
 export interface Mark {
@@ -27,7 +27,7 @@ export interface Mark {
 /** How long a mark is kept: past its animation (820 ms at most, `styles/marks.css`), so it has ended, not been cut. */
 export const MARK_MS = 900;
 /** Marks past this many in one change are a canvas changing whole, not an edit: none are drawn. */
-export const MOST_MARKED = 40;
+const MOST_MARKED = 40;
 
 /** The kind an edit's ops make of an item; a later, stronger op wins. */
 const RANK: Record<MarkKind, number> = { move: 0, update: 1, delete: 2, insert: 3 };

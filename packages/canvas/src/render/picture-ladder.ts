@@ -7,7 +7,7 @@
  */
 
 /** How far a rung may be stretched before the next one up is wanted: a picture drawn at most a quarter larger than it is still reads sharp. */
-export const STRETCH = 1.25;
+const STRETCH = 1.25;
 
 /** The smallest rung at least `1 / STRETCH` of the drawn width, in device pixels; the top rung when none is. */
 export function rungFor(drawnPx: number, ladder: readonly number[]): number {
@@ -21,7 +21,7 @@ export function drawnWidth(cardWidth: number, zoom: number, pixelRatio: number):
 }
 
 /** A card near the screen, for `upgrades`. */
-export interface LadderCard {
+interface LadderCard {
 	key: string;
 	x: number;
 	y: number;

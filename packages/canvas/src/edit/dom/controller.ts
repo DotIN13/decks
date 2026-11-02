@@ -23,7 +23,7 @@ import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 
 /** A board as the editor needs it from the app: where it is and its revision. */
-export type HostPage = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
+type HostPage = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
 
 export type EditorHost = {
 	scene: SceneQuery;

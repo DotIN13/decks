@@ -8,7 +8,7 @@ import type { LiveInk, PenPreview } from "../render/types.ts";
 import { scheme } from "../theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
-export const STAGE_INK = "stage";
+const STAGE_INK = "stage";
 
 /** A touch this soon after the pencil leaves the glass is the hand that held it. */
 const PALM_AFTER_MS = 500;

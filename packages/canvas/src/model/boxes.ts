@@ -9,7 +9,7 @@ export interface Box {
 }
 
 /** A top-level item of a drawing as placed: its box, and, for a card, document, app or board, what it names. */
-export interface PlacedItem {
+interface PlacedItem {
 	id: string;
 	box: Box;
 	name?: string;

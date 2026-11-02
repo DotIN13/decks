@@ -32,7 +32,7 @@ export const RADIUS_HOLD_MS = 3000;
 /** How long a let-go board size is held for the board to be at it. */
 export const PAGE_HOLD_MS = 4000;
 /** Two presses on one handle within this long, with no drag: the handle's double-click. */
-export const HANDLE_TAP_MS = 400;
+const HANDLE_TAP_MS = 400;
 
 /** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };

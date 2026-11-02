@@ -18,7 +18,7 @@ import { FONT_COVERAGE } from "./font-coverage.ts";
  */
 
 /** The face a card's `code` is set in. */
-export const MONO_FAMILY = "JetBrains Mono";
+const MONO_FAMILY = "JetBrains Mono";
 export const FONT_CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
 export const FALLBACK_FAMILY = "Inter";
 /**
@@ -114,7 +114,7 @@ export function isFallbackFamily(name: string): boolean {
 	return fallbackList().some((f) => f.name === name);
 }
 
-export function fontChain(family: string): string[] {
+function fontChain(family: string): string[] {
 	return [...new Set([family, `${family}${EXT}`, FALLBACK_FAMILY, `${FALLBACK_FAMILY}${EXT}`, ...fallbackList().map((f) => f.name)])];
 }
 

@@ -22,7 +22,7 @@ import type { StageProps } from "./Stage.tsx";
 const TOOL_KEYS: Record<string, "select"> = { v: "select" };
 
 /** What the stage's input needs of the stage around it. */
-export type StageInputDeps = {
+type StageInputDeps = {
 	props: StageProps;
 	/** The stage element, set once it is mounted. */
 	element: () => HTMLDivElement;

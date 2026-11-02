@@ -23,12 +23,12 @@ export function drawHints(start: Join | undefined, end: Join | undefined): { joi
 }
 
 /** The insert panel as it was opened (`state/pen-tools.ts`, `InsertPanel`): at a stage point, or for an icon to change. */
-export type InsertOpen = { at?: Pt | undefined; replace?: string | undefined };
+type InsertOpen = { at?: Pt | undefined; replace?: string | undefined };
 /**
  * A pick in the insert panel: another icon for one already drawn (the same place, size and colour, a
  * new name); else put where it was opened for, centred there; else armed for the next press.
  */
-export type InsertPick = { do: "update"; ops: Op[] } | { do: "make"; at: Pt } | { do: "arm" };
+type InsertPick = { do: "update"; ops: Op[] } | { do: "make"; at: Pt } | { do: "arm" };
 export function insertPick(open: InsertOpen | undefined, tool: "shape" | "icon", icon: { library: string; name: string }): InsertPick {
 	if (open?.replace && tool === "icon") return { do: "update", ops: [{ op: "update", id: open.replace, set: { library: icon.library, icon: icon.name, name: icon.name } }] };
 	if (open?.at) return { do: "make", at: open.at };

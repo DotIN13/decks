@@ -4,7 +4,7 @@
  * Pure, so the table is tested rather than pressed: ⌘Z and Ctrl+Z undo, the shifted pair and
  * Ctrl+Y redo, Delete and Backspace remove what the lasso holds, Escape lets go.
  */
-export type InkKey = "undo" | "redo" | "delete" | "escape";
+type InkKey = "undo" | "redo" | "delete" | "escape";
 
 export function inkKey(event: { key: string; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }): InkKey | undefined {
 	const command = event.metaKey || event.ctrlKey;

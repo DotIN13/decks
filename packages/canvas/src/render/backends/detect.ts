@@ -15,13 +15,13 @@ import * as webgpu from "./webgpu.ts";
 import * as webgl from "./webgl.ts";
 
 /** The graphics API the stage draws with, by the name the engine gives it. */
-export type BackendName = "webgpu" | "webgl2";
+type BackendName = "webgpu" | "webgl2";
 
 /** The engine's module, either build: they have the same calls. */
 export type StageModule = typeof import("@decks/stage");
 
 /** Starts the engine again when its device goes, and stops watching when the stage goes. */
-export type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void; isLost: () => boolean }) => () => void;
+type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void; isLost: () => boolean }) => () => void;
 
 /** A backend this browser has: the build to load, and how its device is lost and comes back. */
 export interface Backend {
@@ -98,7 +98,7 @@ export function lowMemory(): boolean | undefined {
  * worker, and gets the notice rather than a stage with no drawing (decision D2).
  */
 /** The renderer this browser asked for in a settings page (Studio's), kept in `decks.backend`; else the best there is. */
-export const PREFERRED_BACKEND_KEY = "decks.backend";
+const PREFERRED_BACKEND_KEY = "decks.backend";
 function preferred(): BackendName | undefined {
 	try {
 		const want = globalThis.localStorage?.getItem(PREFERRED_BACKEND_KEY);

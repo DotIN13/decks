@@ -7,13 +7,13 @@
  * from the same CDN the icons come from, and kept for the page's life. Without a network nothing
  * new can be found, and icons already drawn stay drawn.
  */
-export interface IconEntry {
+interface IconEntry {
 	name: string;
 	/** Search words the library gives it, beside its name. */
 	tags: string[];
 }
 
-export interface IconLibrary {
+interface IconLibrary {
 	/** The `library` a pen `icon` item names (`icons.ts`, `iconUrl`). */
 	id: string;
 	label: string;

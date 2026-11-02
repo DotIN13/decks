@@ -35,13 +35,13 @@ import { freshAddress, passless } from "../host.ts";
  * The SDK as a card has it: every call by its group and name, `card.decks.canvas.read()`, answering a
  * promise of its value. A call the canvas does not let a card make rejects with why.
  */
-export type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
+type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
 	here(): Promise<unknown>;
 	now(): Promise<unknown>;
 };
 
 /** `card.decks`, its calls made by `call` with the dotted name: `decks.canvas.insert(…)` is `call("canvas.insert", […])`. */
-export function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
+function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
 	const at = (path: readonly string[]): unknown =>
 		new Proxy(function () {}, {
 			// `then` is no call: awaiting `card.decks` or a group must not look like a promise.
@@ -86,10 +86,10 @@ export interface CardContext {
 	path: string;
 }
 
-export type CardCleanup = void | (() => void);
+type CardCleanup = void | (() => void);
 
 /** What a card runs with: its file's text and address, and whether its scripts may run. */
-export interface CardSource {
+interface CardSource {
 	html: string;
 	url: string;
 	path: string;

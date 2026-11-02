@@ -47,7 +47,7 @@ const numbers = new Map<string, number>();
 const formulas = new Map<number, Formula>();
 
 /** The character a formula travels as, typesetting it the first time it is asked for. */
-export function formulaChar(tex: string, display: boolean): string {
+function formulaChar(tex: string, display: boolean): string {
 	const key = `${display ? "D" : "I"}${tex}`;
 	let number = numbers.get(key);
 	if (number === undefined) {
