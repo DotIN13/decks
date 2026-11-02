@@ -16,10 +16,10 @@ export const TAP_SLOP_PX = 10;
 /** A finger held longer than this before it lifts is not a tap. */
 export const TAP_MS = 600;
 /** A second tap on the same item within this long: a double tap, which opens its words. */
-export const SECOND_TAP_MS = 400;
+const SECOND_TAP_MS = 400;
 /** Two taps on bare canvas this close in time and on the screen: the canvas menu, as a double-click is. */
-export const BARE_TAP_MS = 350;
-export const BARE_TAP_PX = 30;
+const BARE_TAP_MS = 350;
+const BARE_TAP_PX = 30;
 /** A double-click this soon after the camera was dragged is the end of a pan, not a double-click. */
 export const PANNED_MS = 400;
 /** A double-click this soon after a tool made an item is that click's second press. */

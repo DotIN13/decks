@@ -53,7 +53,7 @@ export type KeyAct =
 
 const NUDGES: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 /** How far Shift and an arrow move what is selected; the arrow alone moves it 1. */
-export const NUDGE_SHIFT = 10;
+const NUDGE_SHIFT = 10;
 
 export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	const { selection, boards, tool } = context;

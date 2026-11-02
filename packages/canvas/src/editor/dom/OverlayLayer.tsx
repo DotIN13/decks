@@ -18,9 +18,9 @@ export const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: 
 export const ANCHOR_OUT = 14;
 export const ANCHOR_PX = COARSE ? 16 : 10;
 /** A resize handle's width, in screen pixels. */
-export const HANDLE_PX = COARSE ? 16 : 9;
+const HANDLE_PX = COARSE ? 16 : 9;
 
-export type OverlayHandlers = {
+type OverlayHandlers = {
 	/** A press on a card block's grip. */
 	onGrip: (event: PointerEvent, id: string) => void;
 	/** A press on an arrow anchor: draws an arrow from that side of the item. */

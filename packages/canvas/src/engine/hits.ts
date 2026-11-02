@@ -8,7 +8,7 @@ import type { BoxIndex } from "./spatial.ts";
 const NS = "http://www.w3.org/2000/svg";
 
 /** What the shapes are made from: every item as laid out, what each covers, and where the boards are. */
-export interface HitScene {
+interface HitScene {
 	placed: ReadonlyMap<string, Placed>;
 	bounds: ReadonlyMap<string, Frame>;
 	boards: BoxIndex;

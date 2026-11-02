@@ -15,10 +15,10 @@ export type Edge = "x1" | "x2" | "y1" | "y2";
 type Edges = { x1: number; y1: number; x2: number; y2: number };
 
 /** What the keys held say about a resize: Shift keeps the shape, ⌘ or Ctrl (`free`) turns snapping off. */
-export type ResizeMods = { shift?: boolean; free?: boolean };
+type ResizeMods = { shift?: boolean; free?: boolean };
 
 /** What a resize snaps to: the boxes around it, and how near is near, in stage units. */
-export type SnapOptions = { targets: readonly Rect[]; threshold: number };
+type SnapOptions = { targets: readonly Rect[]; threshold: number };
 
 /** Never smaller than a board can be. */
 export const BOARD_MIN = { w: 320, h: 200 };

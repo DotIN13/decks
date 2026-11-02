@@ -124,7 +124,7 @@ const DARK: Record<string, string> = {
 	operator: "#ff7b72",
 };
 
-export interface CodeRun {
+interface CodeRun {
 	text: string;
 	/** A colour from GitHub's theme; none is the code's own colour. */
 	colour?: string;

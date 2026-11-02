@@ -63,7 +63,7 @@ function joinsSomething(scene: SceneQuery, end: string): boolean {
  * Where an arrow's two ends are drawn now, on the stage: the first and last point of its line,
  * the first subpath of its geometry, through its box. Undefined for an arrow with no geometry yet.
  */
-export function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [number, number] } | undefined {
+function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [number, number] } | undefined {
 	if (typeof node.geometry !== "string") return undefined;
 	const line = node.geometry.split(/(?=M)/i)[0] ?? "";
 	const n = (line.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []).map(Number);
@@ -84,7 +84,7 @@ export function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [nu
  * to the point it is drawn at now, so the arrow stays where it was, joined to nothing, and can be
  * moved. Undefined when no end changes.
  */
-export function freedEnds(node: PenNode, scene: SceneQuery, gone: ReadonlySet<string> = new Set()): Record<string, unknown> | undefined {
+function freedEnds(node: PenNode, scene: SceneQuery, gone: ReadonlySet<string> = new Set()): Record<string, unknown> | undefined {
 	if (!isArrow(node) || !node.metadata) return undefined;
 	const meta = node.metadata as Record<string, unknown>;
 	const loose = (end: unknown) => {
@@ -165,7 +165,7 @@ export function copyOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 }
 
 /** How far down and right a duplicate (⌘D, the pill's Duplicate) is put from what it copies. */
-export const DUPLICATE_OFFSET = 24;
+const DUPLICATE_OFFSET = 24;
 
 /** A copy of each item, `DUPLICATE_OFFSET` down and right of it. */
 export function duplicateOps(scene: SceneQuery, ids: readonly string[], nextId: NextId): { ops: Op[]; made: string[] } {
@@ -217,7 +217,7 @@ export const NOTE_CORNER = 12;
 export const FRAME_RADIUS = NOTE_CORNER + FRAME_PAD;
 
 /** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
-export const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
+const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
 	rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
 	ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 	/*
@@ -238,7 +238,7 @@ export const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial
 };
 
 /** Shapes that are as tall as they are wide when made with a click: a circle, a star, a ring. */
-export const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pentagon", "Hexagon", "Plus", "Heart", "Triangle"]);
+const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pentagon", "Hexagon", "Plus", "Heart", "Triangle"]);
 
 /**
  * What a tool makes depends on more than the tool: the shape and the icon picked in the insert
@@ -270,7 +270,7 @@ export function madeNode(tool: MakingTool, id: string, size: { w: number; h: num
 }
 
 /** A made item: the insert op, its node, and the box it is drawn at (a card's opens 80 tall for typing). */
-export type InsertOp = Extract<Op, { op: "insert" }>;
+type InsertOp = Extract<Op, { op: "insert" }>;
 export type Made = { op: InsertOp; node: PenNode; box: Rect };
 
 const insertOp = (node: PenNode, box: Partial<Box>, parent: string | undefined): InsertOp => ({ op: "insert", ...(parent ? { parent } : {}), node, box });

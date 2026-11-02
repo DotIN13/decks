@@ -8,9 +8,9 @@
  * and the user agent alone an iPad as a Mac, which is what iPadOS calls itself: a real Mac has no
  * touch screen, so a "Mac" with one is an iPad.
  */
-export type DeviceKind = "computer" | "mobile";
+type DeviceKind = "computer" | "mobile";
 
-export interface DeviceFacts {
+interface DeviceFacts {
 	platform: string;
 	userAgent: string;
 	maxTouchPoints: number;
@@ -40,7 +40,7 @@ export const DEVICE: DeviceKind =
  * How many board pages show at once, and how many let go are kept loaded and hidden for going back
  * (`live-set.ts`). One rule on every device; only these numbers differ.
  */
-export interface LiveBudget {
+interface LiveBudget {
 	live: number;
 	kept: number;
 }
@@ -59,9 +59,9 @@ export const BUDGET: LiveBudget = BUDGETS[DEVICE];
  * Each board's picture is fetched at one width for the class (`PICTURES`) and copied to the GPU once;
  * the GPU makes its smaller sizes and draws it at any zoom from the nearest (`engine/engine.ts`).
  */
-export type GpuClass = "big" | "small";
+type GpuClass = "big" | "small";
 
-export interface GpuFacts {
+interface GpuFacts {
 	kind: DeviceKind;
 	/** `navigator.deviceMemory`, in GB, where the browser gives it (Chrome). */
 	deviceMemory?: number | undefined;

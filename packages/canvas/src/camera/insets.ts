@@ -32,7 +32,7 @@ import { createSignal, onCleanup } from "solid-js";
  * canvas rather than standing beside it, and subtracting it fitted a 1600px board into the
  * strip above the sheet at 3.7%.
  */
-export interface Insets {
+interface Insets {
 	left: number;
 	right: number;
 	top: number;

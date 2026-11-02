@@ -9,7 +9,7 @@ import type { Frame, Placed } from "@decks/pen";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { probes } from "../debug.ts";
 
-export interface ProbeHost {
+interface ProbeHost {
 	element: () => HTMLElement | undefined;
 	camera: () => Camera;
 	view: () => Viewport;

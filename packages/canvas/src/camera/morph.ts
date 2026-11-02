@@ -74,4 +74,4 @@ export function cameraOntoPage(
 }
 
 /** The focus view's header row, in screen pixels (`.focus-bar` in `styles/canvas.css`). */
-export const FOCUS_HEADER = 52;
+const FOCUS_HEADER = 52;

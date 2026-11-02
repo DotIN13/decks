@@ -41,8 +41,8 @@ export type Corners = { x1: number; y1: number; x2: number; y2: number };
 export type ResizeBox = Rect & { id: string; given?: Pt };
 /** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
 /** A board drag let go: where each board was asked to go, and when it is let go of anyway. */
-export type BoardDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
-export type BoardResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
+type BoardDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
+type BoardResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
 /** A shape being drawn with a tool, corner to corner. */
 export type DraftBox = Corners & { tool: PenTool };
 /** A side an arrow end can keep to on what it would join, and the one it is near. */

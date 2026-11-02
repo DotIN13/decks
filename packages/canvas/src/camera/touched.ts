@@ -13,7 +13,7 @@
 let last = Number.NEGATIVE_INFINITY;
 
 /** How long the canvas must go untouched before an agent may move the view. */
-export const HANDS_OFF_MS = 5000;
+const HANDS_OFF_MS = 5000;
 
 export function touchedCanvas(): void {
 	last = performance.now();

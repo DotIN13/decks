@@ -178,7 +178,7 @@ export function createTouches(options: { now?: () => number } = {}): Touches {
  */
 export const COAST_TAU = 325;
 /** Slower than this (px/ms) at release is a finger that stopped, not one that threw. */
-export const COAST_MIN = 0.15;
+const COAST_MIN = 0.15;
 /** A throw faster than this (px/ms) coasts as if it were this fast, so a flick cannot fling the canvas away. */
 export const COAST_MAX = 5;
 

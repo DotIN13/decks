@@ -12,7 +12,7 @@ import { coastStart, createTouches, type Finger, type TouchStep } from "../input
 import { onCleanup } from "solid-js";
 
 /** What the fingers need of the stage: where they are, the camera they move, and what a lift does. */
-export interface FingersHost {
+interface FingersHost {
 	/** The stage element, for pointer capture. */
 	element: () => HTMLElement;
 	camera: () => Camera;

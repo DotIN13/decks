@@ -25,7 +25,7 @@ import type { Viewport } from "./camera.ts";
 export const SIZE = 200_000;
 export const MIDDLE = SIZE / 2;
 /** How many windows from an edge the scroll may come to rest before the area is recentred. */
-export const RECENTRE_WINDOWS = 3;
+const RECENTRE_WINDOWS = 3;
 
 export interface Origin {
 	x: number;

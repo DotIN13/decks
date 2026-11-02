@@ -9,7 +9,7 @@ import type { Board } from "@decks/protocol";
  */
 
 /** The kinds of board drawn this way, by their `data-live`. */
-export const PLACEHOLDER_KINDS: ReadonlySet<string> = new Set(["doc", "app"]);
+const PLACEHOLDER_KINDS: ReadonlySet<string> = new Set(["doc", "app"]);
 
 /** Whether a board is drawn as a placeholder rather than its picture. */
 export const hasPlaceholder = (board: Pick<Board, "live">): boolean => !!board.live && PLACEHOLDER_KINDS.has(board.live);

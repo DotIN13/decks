@@ -27,7 +27,7 @@
 /** The most pixels a board's picture may have along either side. */
 export const MAX_SIDE = 4096;
 
-export interface PictureSize {
+interface PictureSize {
 	/** Backing-store pixels. */
 	w: number;
 	h: number;
@@ -96,7 +96,7 @@ export function drawScale(target: { w: number; h: number }, element: { width: nu
  * DOM library does not know them yet. `elementContext` is the feature test in action: it
  * hands back a context only when the method is there to call.
  */
-export interface ElementDrawingContext extends CanvasRenderingContext2D {
+interface ElementDrawingContext extends CanvasRenderingContext2D {
 	drawElementImage(element: Element, dx: number, dy: number, options?: { preserveElementGeometry?: boolean }): void;
 }
 

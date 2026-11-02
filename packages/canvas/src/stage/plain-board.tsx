@@ -70,7 +70,7 @@ function withStorage(address: string | undefined, key: string): string | undefin
 }
 
 /** What a host adds to a plain board: where its page is, its token and its sandbox. */
-export interface PlainBoardExtras {
+interface PlainBoardExtras {
 	page?: string | undefined;
 	boardHost?: BoardHost | undefined;
 	/** The host's own wiring for this board's frame, when it is not sandboxed; returns its undo. */

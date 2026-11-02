@@ -25,17 +25,17 @@
 import { onFrameMessage } from "../stage/frame-messages.ts";
 
 /** What a board's page posts up when it can take its token. */
-export interface BoardReady {
+interface BoardReady {
 	decks: "board.ready";
 }
 
 /** What this page posts down: the token, or why there is none. */
-export type BoardTokenMessage = { decks: "board.token"; token: string; renew?: boolean } | { decks: "board.token"; error: string };
+type BoardTokenMessage = { decks: "board.token"; token: string; renew?: boolean } | { decks: "board.token"; error: string };
 
 /** How a host asks the harness for a board's token: undefined (or a throw) when this board can have none here. */
 export type MintBoardToken = (path: string, stage?: string) => Promise<string | undefined>;
 
-export interface BoardHostOptions {
+interface BoardHostOptions {
 	mint: MintBoardToken;
 	/**
 	 * How long a token is used before a new one is made and sent. The harness forgets a board's token
@@ -50,7 +50,7 @@ export interface BoardHostOptions {
 }
 
 /** One frame, as the host is told about it. */
-export interface BoardFrameSpec {
+interface BoardFrameSpec {
 	/** The board's deck path, read each time a token is made. */
 	path: () => string;
 	/** The canvas it is on, if the host knows; a parameter of its calls, not who it is. */

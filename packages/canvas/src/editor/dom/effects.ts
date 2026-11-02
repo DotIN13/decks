@@ -11,7 +11,7 @@ import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
 
 /** A mention of something dropped on the composer. */
-export type ReferPill = { kind: "board" | "item"; id: string; label: string };
+type ReferPill = { kind: "board" | "item"; id: string; label: string };
 
 export type EffectHost = {
 	/** The stage's element: what the ghost's attribute goes on. */

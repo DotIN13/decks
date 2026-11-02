@@ -10,7 +10,7 @@
  * lucide's and feather's strokes; the icon is drawn in the item's first colour fill.
  */
 
-export interface IconPart {
+interface IconPart {
 	d: string;
 	fill: boolean;
 	stroke: boolean;
@@ -20,7 +20,7 @@ export interface IconPart {
 	evenOdd: boolean;
 }
 
-export interface IconShape {
+interface IconShape {
 	viewBox: [number, number, number, number];
 	parts: IconPart[];
 }

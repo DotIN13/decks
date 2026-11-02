@@ -111,7 +111,7 @@ export type PointerHost = {
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 
 /** Where an event landed, in `core/dispatch.ts`'s words. */
-export function pressTarget(element: HTMLElement, target: EventTarget | null): PressTarget {
+function pressTarget(element: HTMLElement, target: EventTarget | null): PressTarget {
 	if (target === element) return "stage";
 	return (target as Element | null)?.closest?.(".pen-hits") ? "drawn" : "other";
 }

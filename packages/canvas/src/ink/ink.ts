@@ -18,7 +18,7 @@ import type { PenDocument, PenNode, Placed } from "@decks/pen";
 
 export const INK = "decks.ink";
 /** The pen variable the `ink` colour is written as: dark on a light stage, light on a dark one. */
-export const INK_VARIABLE = "decks-ink";
+const INK_VARIABLE = "decks-ink";
 
 const PAINT: Record<InkColor, string> = {
 	ink: `$${INK_VARIABLE}`,

@@ -49,13 +49,13 @@ function postToFrame(frame: HTMLIFrameElement | undefined, message: unknown): bo
 export type BoardItems = Record<string, string>;
 
 /** Where the items of each board are kept, by a key the page around makes from the canvas and the board. */
-export interface BoardStorageKeeper {
+interface BoardStorageKeeper {
 	read(key: string): BoardItems;
 	write(key: string, items: BoardItems): void;
 }
 
 /** The most a board keeps, in characters of its keys and values: the shim's limit too. */
-export const BOARD_STORAGE_MAX = 1_000_000;
+const BOARD_STORAGE_MAX = 1_000_000;
 
 /** The key of a board's storage: the page's scope (a harness, a connection), the canvas and the board's path. */
 export function boardStorageKey(scope: string, canvas: string | undefined, path: string): string {
