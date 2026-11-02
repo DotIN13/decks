@@ -42,6 +42,11 @@ which the canvas package's typecheck cannot see and the entry-point test does no
 become an entry point of `@decks/canvas` or the server stops needing them; until then a move inside
 the canvas package is checked with the server's typecheck too.
 
+And a second: dropping `export` from a type nothing imports can still break the packages' declaration
+build, when an exported function's inferred return type holds that type (`StudioLine` in
+`frame/inside/studio-line.ts`, through `openFrame`; TS4058). `tsc --noEmit` does not see it;
+`npm run build:packages` does, and is the check for any pass over exports in the published packages.
+
 ## 1. Where the branch stands
 
 | | |
