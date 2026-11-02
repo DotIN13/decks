@@ -18,7 +18,7 @@ const HISTORY = new Set([
 	"e2e/README.md", "e2e/run.mjs", "e2e/harness.mjs", "e2e/checks/context.mjs",
 	"apps/web/src/lib/media.ts", "runtime/paths.ts", "apps/server/src/browser/bridge.test.ts", "packages/canvas/styles/canvas.css",
 	"scripts/css-order.test.mjs", "packages/agent-ui/src/alerts/policy.ts", "packages/agent-ui/styles/stream.css",
-	"docs/REORGANIZATION.md", "docs/COMPAT.md",
+	"docs/REORGANIZATION.md", "docs/COMPAT.md", "docs/STUDIO-MIGRATION.md",
 ]);
 const files = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter(Boolean)
 	.filter((f) => !/(^|\/)(node_modules|dist|dist-packages|pkg|pkg-gl)\//.test(f) && !/\.bundle\./.test(f) && !/^docs\/archive\//.test(f));
