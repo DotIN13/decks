@@ -21,6 +21,8 @@ export interface Knobs {
 	exactCamera: boolean;
 	/** No glide: an edited item lands where it is rather than sliding there. */
 	noGlide: boolean;
+	/** No hold-to-straighten: a stroke whose pen rests stays as drawn (a check that pauses mid-stroke to measure). */
+	noHold: boolean;
 	/** During a fast zoom, skip the levels between (the default); false paints every level. */
 	skipLevels: boolean;
 	/** Warm the engines' pipelines once they start (the default); false leaves it out. */
@@ -80,7 +82,7 @@ export interface Probes {
 	frameState?: (() => unknown) | undefined;
 }
 
-const DEFAULTS: Knobs = { halfZoom: true, pinchTail: false, exactCamera: false, noGlide: false, skipLevels: true, warm: true };
+const DEFAULTS: Knobs = { halfZoom: true, pinchTail: false, exactCamera: false, noGlide: false, noHold: false, skipLevels: true, warm: true };
 
 type Globals = { __decksKnobs?: Partial<Knobs>; __decksProbes?: Probes };
 const g = globalThis as Globals;

@@ -5,6 +5,7 @@ import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, set
 import { inkHex, inkItem } from "../model/ink.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { LiveInk, PenPreview } from "../render/types.ts";
+import { knobs } from "../debug.ts";
 import { scheme } from "../theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
@@ -282,6 +283,7 @@ export function StageInk(props: {
 	const rest = (drawn: Extract<Gesture, { kind: "draw" }>, x: number, y: number) => {
 		clearTimeout(drawn.timer);
 		drawn.still = { x, y };
+		if (knobs.noHold) return;
 		drawn.timer = setTimeout(() => {
 			if (gesture !== drawn || drawn.straight) return;
 			const [x0 = 0, y0 = 0] = drawn.points;

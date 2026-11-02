@@ -41,10 +41,17 @@ const r2 = (n) => Math.round(n * 100) / 100;
 
 await resetStage();
 const { browser, page, context, errors } = await open({ width: 1400, height: 900 });
-await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 const canvas = await canvasFrame(page);
+/*
+ * The page opens at the origin and lands on its cards a moment later; on a loaded machine that
+ * landing came in the middle of the first stroke and started it again ("end: 15729 vs 24
+ * characters"). Wait for it to land, then for the camera to rest, before drawing.
+ */
+await canvas.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+await canvas.waitForFunction(() => !/scale\(1\) translate\(-?0px, -?0px\)/.test(globalThis.__decksProbes?.cameraTransform?.() ?? "scale(1) translate(0px, 0px)"), null, { timeout: 8000, polling: 50 }).catch(() => {});
+await rest(page, { start: 0 });
 // The frame's own session when it is out of the page's process, else the page's, which then holds it.
 const cdp = await context.newCDPSession(canvas).catch(() => context.newCDPSession(page));
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
@@ -60,6 +67,12 @@ await canvas.evaluate(() => {
 	 * text, which is what is compared here.
 	 */
 	globalThis.__inkOnSvg = true;
+	/*
+	 * The check stops between a stroke's stretches to read the thread's time; on a loaded machine a
+	 * stop passed the half second a resting pen takes to straighten the stroke ("half: 25 vs 7887
+	 * characters"). The pen here never means to rest.
+	 */
+	globalThis.__decksKnobs.noHold = true;
 	const sheet = () => document.querySelector(".stage-ink");
 	let state;
 	const send = (type, x, y, pressure) =>

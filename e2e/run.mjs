@@ -213,8 +213,8 @@ const CHECKS = [
 	{ file: "presence.mjs", needsAgent: false },
 	/* An agent's view.cursor on a card puts a named arrow in the frame, and null takes it away. */
 	{ file: "agent-cursor.mjs", needsAgent: false },
-	/* Every change of place glides, whoever made it: an agent's move is drawn from where the item was, an insert rises in, a moved card's slot follows. */
-	{ file: "smooth-edits.mjs", needsAgent: false },
+	/* Every change of place glides, whoever made it: an agent's move is drawn from where the item was, an insert rises in, a moved card's slot follows. Alone: it times frames on the main thread. */
+	{ file: "smooth-edits.mjs", needsAgent: false, alone: true },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },
@@ -573,9 +573,14 @@ try {
 		}
 	};
 
-	const worker = async (i) => {
-		while (queue.length > 0 && !stopping) {
-			const check = queue.shift();
+	/*
+	 * A check marked `alone` measures time on the page's main thread, which other browsers on the
+	 * machine take from it: it runs after the others, one at a time, with nothing else running.
+	 */
+	const alone = queue.filter((check) => check.alone);
+	for (const check of alone) queue.splice(queue.indexOf(check), 1);
+	const runOne = async (i, check) => {
+		{
 			const index = selected.indexOf(check);
 			const data = freshDeck();
 			let server;
@@ -602,7 +607,11 @@ try {
 			report();
 		}
 	};
+	const worker = async (i) => {
+		while (queue.length > 0 && !stopping) await runOne(i, queue.shift());
+	};
 	await Promise.all(Array.from({ length: JOBS }, (_, i) => worker(i)));
+	for (const check of alone) if (!stopping) await runOne(0, check);
 	writeTimings(timings);
 
 	/*
