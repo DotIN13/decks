@@ -1,0 +1,1466 @@
+/*
+ * The redesign's restyling of the panel, the composer, the phone, the menus and the dialogs, as drawn on the
+ * Decks Studio canvas, in the steps it was built in. Last of the shell's sheets.
+ */
+
+/* ---- step 3: the side panel ---------------------------------------------------------------- */
+@layer components {
+	/* A workspace folds by its height and turns its chevron, rather than its rows vanishing. */
+	.v3-folder-body {
+		display: grid;
+		grid-template-rows: 1fr;
+		transition: grid-template-rows 240ms var(--v3-ease);
+	}
+	.v3-folder-body[data-open="false"] {
+		grid-template-rows: 0fr;
+	}
+	.v3-folder-body > * {
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	/* A tab's list rises in when the tab changes; rows that are already there stay put. */
+	.v3-panel .panel-list > :is(.panel-section, .v3-apps, .v3-new-agent) {
+		animation: v3-arrive 220ms var(--v3-ease);
+	}
+
+	/*
+	 * The conversation folds by its share of the panel: open it takes the room the list leaves,
+	 * folded it gives that room back and comes to rest at the panel's foot. Its body stays
+	 * mounted, clipped, so nothing in it is redrawn by a fold, and its history is held at the
+	 * bottom while it moves (`App.tsx`, `holdHistory`).
+	 */
+	.v3-chat,
+	.v3-chat[data-folded="true"] {
+		flex: 1 1 44px;
+		margin-top: auto;
+		overflow: hidden;
+		transition: flex-grow 260ms var(--v3-ease);
+	}
+	.v3-chat[data-folded="true"] {
+		flex-grow: 0.00001;
+	}
+	/*
+	 * Folded, the head alone: never squeezed under it by a long list above, and the body, held at the
+	 * bottom, hidden once the fold has run, so its latest message never shows under the head when the
+	 * section comes to rest a little taller than it.
+	 */
+	.v3-chat[data-folded="true"] {
+		min-height: 44px;
+	}
+	.v3-chat[data-folded="true"] .v3-chat-body {
+		display: flex;
+		visibility: hidden;
+		transition: visibility 0s linear 260ms;
+	}
+	.v3-chat-head .v3-icon svg {
+		transition: transform 220ms var(--v3-ease);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-folder-body,
+		.v3-chat {
+			transition: none;
+		}
+		.v3-panel .panel-list > * {
+			animation: none;
+		}
+	}
+}
+
+/* ---- step 4: the composer ------------------------------------------------------------------ */
+@layer components {
+	/* The context dial in the controls row: a ring and its percentage, on a desk and an iPad; a phone keeps it in ⋯. */
+	.dock .composer-ctx {
+		display: inline-flex;
+		align-items: center;
+	}
+	.dock .composer-ctx .dial {
+		height: 32px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--v3-fg2);
+		font: 11.5px var(--font-mono);
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease);
+	}
+	.dock .composer-ctx .dial:hover,
+	.dock .composer-ctx .dial[aria-expanded="true"] {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+		transition-duration: 120ms;
+	}
+	.dock .composer-ctx .ctx-ring .fill {
+		transition: stroke-dasharray 600ms var(--v3-ease);
+	}
+	.app[data-phone="true"] .dock .composer-ctx {
+		display: none;
+	}
+}
+
+/* ---- step 6: iPad and iPhone ---------------------------------------------------------------- */
+@layer components {
+	/* The phone's sheet leaves quicker than it came, down into the composer. */
+	/* Put away, the sheet slides all the way down off the screen, from wherever a drag left it. */
+	.v3-chat[data-sheet="true"][data-leaving="true"] {
+		animation: v3-sheet-out 260ms var(--v3-ease-in) forwards;
+		pointer-events: none;
+	}
+	@keyframes v3-sheet-out {
+		to {
+			transform: translateY(calc(100% + 120px));
+		}
+	}
+	/* The phone's properties rise as a sheet. */
+	.app[data-phone="true"] .props-panel.panel-float {
+		animation: v3-sheet-in 300ms var(--v3-ease);
+	}
+	@keyframes v3-sheet-in {
+		from {
+			transform: translateY(100%);
+		}
+	}
+	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.v3-zoom`),
+	   and gives the composer its whole width less 12px a side (`data-narrow-dock`, `fitChrome` in App.tsx). */
+	.app[data-narrow-dock]:not([data-phone="true"]) .dock {
+		width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 24px);
+	}
+	/* The phone's tool row carries the same marker as the column. */
+	.v3-tools[data-row="true"] .v3-tool-mark {
+		border-radius: 12px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-chat[data-sheet="true"][data-leaving="true"],
+		.app[data-phone="true"] .props-panel.panel-float {
+			animation: none;
+		}
+	}
+}
+
+@layer components {
+	/* The phone's row sits in the composer's stack: none of the column's place applies to it. */
+	.pen-tools.v3-tools[data-row="true"] {
+		position: relative;
+		top: auto;
+		left: auto;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* ---- step 7: the mark, and Present -------------------------------------------------------- */
+@layer components {
+	/* Present: the chrome steps out to its edges instead of vanishing. */
+	/* Only opacity and translate: a float's position is the float's own, and never eased while it is held or flung. */
+	.app :is(.v3-topright, .v3-zoom) {
+		transition:
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app .v3-topbar {
+		transition:
+			left 260ms var(--v3-ease),
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app :is(.pen-tools.v3-tools, .dock):not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition:
+			left 260ms var(--v3-ease),
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app[data-presenting="true"] :is(.v3-topbar, .pen-tools.v3-tools, .v3-tray-wrap) {
+		opacity: 0;
+		translate: -16px 0;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] :is(.v3-topright, .v3-zoom, .props-panel) {
+		opacity: 0;
+		translate: 16px 0;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] .dock {
+		opacity: 0;
+		translate: 0 16px;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] .panel-shell {
+		display: none !important;
+	}
+}
+
+@layer components {
+	/*
+	 * A float's glide after a flick or a drop is the float system's own transition (`[data-snapping]`,
+	 * `shell.css`): nothing in this sheet may override it, and nothing eases a float's position while
+	 * it is held. The tray glides as the tools and the composer do.
+	 */
+	.v3-tray-wrap[data-snapping="true"],
+	.pen-tools.v3-tools[data-snapping="true"],
+	.dock[data-snapping="true"] {
+		transition:
+			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			bottom var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+	.pen-tools.v3-tools[data-dragging="true"],
+	.v3-tray-wrap[data-dragging="true"],
+	.dock[data-dragging="true"] {
+		transition: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-tray-wrap[data-snapping="true"],
+		.pen-tools.v3-tools[data-snapping="true"],
+		.dock[data-snapping="true"] {
+			transition-duration: 0s;
+		}
+	}
+}
+
+@layer components {
+	.pen-tools.v3-tools[data-landing="true"],
+	.v3-tray-wrap[data-landing="true"] {
+		transition: none;
+	}
+}
+
+@layer components {
+	/*
+	 * Tucked behind an edge, a float is only its tab: the column's own surface goes with its tools,
+	 * so what is left showing is the tab and not a strip of the column cut to the tab's width.
+	 */
+	.pen-tools.v3-tools[data-stowed] {
+		overflow: visible;
+		background: transparent;
+		box-shadow: none;
+	}
+	.pen-tools.v3-tools[data-stowed] > .v3-tool-mark {
+		opacity: 0;
+	}
+}
+
+/* ---- the composer's mode and model chips, as Studio draws them ------------------------------ */
+@layer components {
+	/*
+	 * Plain words on one line: the mode capitalised at the ordinary weight ("Auto"), the model in the
+	 * text colour and its thinking after a dot in grey ("Opus 5.5 · medium"), both on the same
+	 * baseline, with a small grey chevron. No tint or bold for a standing mode: the word says it.
+	 */
+	.dock .dock-row .chip-button,
+	.dock .dock-row .chip-button[data-on="true"],
+	.dock .composer-box .chip-button[data-on="true"] {
+		display: inline-flex;
+		height: 32px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg2);
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1;
+	}
+	.dock .dock-row .chip-button:hover,
+	.dock .dock-row .chip-button[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-row .chip-button > span:not(.chip-sub) {
+		color: var(--v3-fg);
+		line-height: 1;
+	}
+	.dock .dock-row [data-mode-chip] > span:not(.chip-sub)::first-letter {
+		text-transform: uppercase;
+	}
+	.dock .dock-row .chip-button > .chip-sub {
+		color: color-mix(in srgb, var(--v3-fg2) 55%, var(--v3-fg3));
+		font-size: 13px;
+		line-height: 1;
+	}
+	.dock .dock-row .chip-button > .chevron {
+		width: 12px;
+		height: 12px;
+		color: var(--v3-fg2);
+		opacity: 1;
+	}
+}
+
+/* ---- the conversation's height is the person's ------------------------------------------- */
+@layer components {
+	.v3-chat {
+		position: relative;
+	}
+	/* The line between the list and the conversation, as something to take hold of. */
+	.v3-chat-resize {
+		position: absolute;
+		/* Over the list's last rows (their tags) and the conversation's scroller. */
+		z-index: 20;
+		top: -4px;
+		right: 0;
+		left: 0;
+		height: 9px;
+		cursor: row-resize;
+		touch-action: none;
+	}
+	/* A full-width line in the accent on approach, as the sidebar's own edge is. */
+	.v3-chat-resize::after {
+		position: absolute;
+		top: 3px;
+		right: 0;
+		left: 0;
+		height: 2px;
+		background: var(--v3-accent);
+		content: "";
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+	.v3-chat-resize:hover::after,
+	.v3-chat-resize:focus-visible::after,
+	.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+		opacity: 1;
+	}
+	.v3-chat-resize:focus-visible {
+		outline: none;
+	}
+	/* Sized by hand: the conversation keeps that height, folds from it, and the list takes the rest. */
+	.panel-shell[data-chat-sized] .v3-chat {
+		flex: 0 0 var(--v3-chat-h);
+		transition: flex-basis 260ms var(--v3-ease);
+	}
+	.panel-shell[data-chat-sized] .v3-chat[data-folded="true"] {
+		flex-basis: 44px;
+	}
+	.panel-shell[data-chat-sized] .panel-list,
+	.v3-panel[data-chat-sized]:has(.v3-chat:not([data-folded="true"])) .panel-list {
+		flex: 1 1 auto;
+		max-height: none;
+	}
+	.panel-shell[data-chat-resizing] .v3-chat {
+		transition: none;
+	}
+	.panel-shell[data-chat-resizing] {
+		cursor: row-resize;
+		user-select: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.panel-shell[data-chat-sized] .v3-chat {
+			transition: none;
+		}
+	}
+}
+
+/* ---- a narrow panel: the strip and the search fit whatever width the panel is dragged to ---- */
+@layer components {
+	.panel-shell.v3-panel {
+		container: v3-panel / inline-size;
+	}
+	.v3-nav {
+		min-width: 0;
+		overflow: hidden;
+	}
+	.v3-nav-tab {
+		min-width: 0;
+		flex: 0 1 auto;
+	}
+	/* Narrower than four tabs with icons: the icons go and every tab keeps its word (270px in all). */
+	@container v3-panel (max-width: 351px) {
+		.v3-nav-tab > svg {
+			display: none;
+		}
+	}
+	@container v3-panel (max-width: 299px) {
+		.v3-search .v3-kbd {
+			display: none;
+		}
+		.v3-lp-head {
+			gap: 8px;
+			padding-left: 12px;
+		}
+		.v3-lp-mark {
+			width: 28px;
+			height: 28px;
+		}
+		.v3-panel[data-desktop="true"] .v3-nav-tab {
+			padding: 0 8px;
+		}
+	}
+	@container v3-panel (max-width: 220px) {
+		.v3-nav {
+			padding-right: 8px;
+			padding-left: 8px;
+		}
+		.v3-nav-tab {
+			padding: 0 8px;
+		}
+	}
+}
+
+@layer components {
+	/* A ⋯ row that is a setting carries its tick at the end, in the accent. */
+	.v3-more-check {
+		display: grid;
+		flex: none;
+		place-items: center;
+		color: var(--v3-accent);
+	}
+	.popover [data-row][disabled] {
+		opacity: 0.45;
+		pointer-events: none;
+	}
+}
+
+@layer components {
+	/* v3's agent face: 24px, in a 24px slot. */
+	.v3-panel .agent-list .agent-row .row-icon {
+		width: 24px;
+		min-width: 24px;
+	}
+}
+
+
+
+/* ---- the Recent and Canvas tabs ------------------------------------------------------------ */
+@layer components {
+	/* Recent is one list with no folders above it, so its rows start at the panel's edge. */
+	.v3-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
+		padding-left: 10px;
+	}
+	/* The Canvas tab: the drawing's items, one row each, as Studio's editor lists its layers. */
+	.v3-item {
+		display: flex;
+		width: 100%;
+		height: 28px;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+		text-align: left;
+	}
+	.v3-item:hover,
+	.v3-item:focus-visible {
+		background: var(--v3-bg2);
+		outline: none;
+	}
+	.v3-item[data-on="true"] {
+		background: var(--v3-row-on);
+	}
+	.v3-item-icon {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+	.v3-item[data-on="true"] .v3-item-icon {
+		color: var(--v3-row-on-icon);
+	}
+	.v3-item-name {
+		min-width: 0;
+		flex: 1;
+	}
+	.v3-item-n {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+}
+
+/* ---- the panel beside the rail, as Studio's editor draws it --------------------------------- */
+@layer components {
+	/*
+	 * The head (the mock-up "The sidebar top, polished"): Decks' mark as a tile, beside it the canvas
+	 * and under that the deck and what the tab holds, then Settings and Hide; its line under it.
+	 */
+	.v3-lp-head {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 10px;
+		padding: 14px 10px 12px 14px;
+		border-bottom: 1px solid var(--v3-line);
+	}
+	.v3-lp-text {
+		display: grid;
+		min-width: 0;
+		flex: 1;
+		gap: 2px;
+		/* One column no wider than the head allows, so a long title shortens instead of pushing the buttons. */
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.v3-lp-title > .truncate {
+		min-width: 0;
+	}
+	.v3-lp-buttons {
+		display: flex;
+		flex: none;
+		gap: 2px;
+	}
+	.v3-lp-title {
+		display: inline-flex;
+		max-width: 100%;
+		align-items: center;
+		gap: 4px;
+		margin: -2px -4px;
+		padding: 2px 4px;
+		border: 0;
+		border-radius: 5px;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13.5px;
+		font-weight: 600;
+		justify-self: start;
+	}
+	.v3-lp-title:hover:not(:disabled) {
+		background: var(--v3-bg2);
+	}
+	.v3-lp-title > svg {
+		color: var(--v3-fg2);
+	}
+	.v3-lp-status {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 8px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+	}
+	/* The deck's switcher, said in the status line's own size: its name and a small chevron. */
+	.v3-lp-deck {
+		flex: none;
+	}
+	.v3-lp-deck .switcher {
+		width: auto;
+		height: 18px;
+		gap: 3px;
+		margin: 0 -4px;
+		padding: 0 4px;
+		border-radius: 4px;
+		font-size: 11.5px;
+	}
+	.v3-lp-deck .switcher .panel-mark-glyph {
+		display: none;
+	}
+	.v3-lp-deck .switcher-name {
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 400;
+	}
+	/* The live tab strip, 10px under the head's line (a margin: its sliding mark is placed from the top). */
+	.v3-panel[data-desktop="true"] .v3-nav {
+		margin-top: 10px;
+		padding: 0 10px;
+	}
+	.v3-panel[data-desktop="true"] .v3-search-wrap {
+		padding: 10px 12px 8px;
+	}
+	.v3-panel[data-desktop="true"] .panel-list > .panel-section:first-child > .v3-sec:first-child {
+		padding-top: 6px;
+	}
+	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
+	.v3-panel[data-desktop="true"] .v3-search {
+		height: 32px;
+		gap: 8px;
+		padding: 0 6px 0 10px;
+		border-radius: 8px;
+		box-shadow: inset 0 0 0 1px transparent;
+		transition:
+			background 150ms var(--v3-ease),
+			box-shadow 150ms var(--v3-ease);
+	}
+	.v3-panel[data-desktop="true"] .v3-search:focus-within {
+		background: var(--v3-panel);
+		box-shadow:
+			inset 0 0 0 1px var(--v3-accent),
+			0 0 0 3px var(--v3-accent-soft);
+	}
+	.v3-panel[data-desktop="true"] .v3-search input {
+		font-size: 12.5px;
+	}
+	.v3-panel[data-desktop="true"] .v3-search .v3-kbd {
+		height: auto;
+		padding: 1px 5px;
+		border-color: var(--v3-line);
+		font-size: 10.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		line-height: 1.3;
+	}
+
+	/* A section's heading in a list, with its count at the right. */
+	.v3-sec {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 8px 4px;
+		color: var(--v3-fg);
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.v3-sec-n {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		font-weight: 400;
+	}
+
+	/*
+	 * The apps (`panel/AppRow.tsx`), as the "Apps tab redesigned" mockup has them: 52px rows with air
+	 * between them, a bright 34px tile, the name over its state and folder, and ⋯ at the right on
+	 * hover, on the picked row and while its menu is open. A click picks (the grey of a chosen row),
+	 * a double-click runs and shows.
+	 */
+	.v3-apps {
+		display: grid;
+		align-content: start;
+		gap: 2px;
+		padding-inline: 4px;
+	}
+	.v3-app-row {
+		position: relative;
+		display: flex;
+		height: 52px;
+		align-items: center;
+		gap: 12px;
+		padding: 0 8px;
+		border-radius: 9px;
+		cursor: default;
+		transition: background 120ms var(--v3-ease);
+		user-select: none;
+	}
+	.v3-app-row:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-app-row[data-on] {
+		background: var(--v3-row-on);
+	}
+	.v3-app-tile {
+		display: grid;
+		width: 34px;
+		height: 34px;
+		flex: none;
+		place-items: center;
+		border-radius: 9px;
+		color: #fff;
+	}
+	.v3-app-text {
+		display: grid;
+		min-width: 0;
+		flex: 1;
+		gap: 3px;
+	}
+	.v3-app-name {
+		color: var(--v3-fg);
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.v3-app-state {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 6px;
+		color: var(--v3-fg2);
+		font-size: 12px;
+	}
+	.v3-app-word {
+		flex: none;
+	}
+	.v3-app-path {
+		min-width: 0;
+		color: var(--v3-fg3);
+	}
+	.v3-app-state > i {
+		width: 6px;
+		height: 6px;
+		flex: none;
+		border-radius: 50%;
+		background: var(--v3-fg3);
+	}
+	.v3-app-state[data-state="on"] > i {
+		background: #14ae5c;
+	}
+	.v3-app-state[data-state="busy"] > i {
+		background: #e5a000;
+		animation: v3-app-busy 1.4s ease-in-out infinite;
+	}
+	.v3-app-state[data-state="broken"] > i {
+		background: var(--v3-danger);
+	}
+	.v3-app-state[data-state="broken"] > .v3-app-word {
+		color: var(--v3-danger);
+	}
+	@keyframes v3-app-busy {
+		50% {
+			opacity: 0.3;
+		}
+	}
+	.v3-app-more {
+		display: grid;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		place-items: center;
+		border: 0;
+		border-radius: 7px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity 120ms var(--v3-ease);
+	}
+	.v3-app-row:is(:hover, :focus-within, [data-on]) .v3-app-more,
+	.v3-app-more[data-on] {
+		opacity: 1;
+	}
+	.v3-app-more:hover,
+	.v3-app-more[data-on] {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+	}
+	@media (hover: none) {
+		.v3-app-more {
+			opacity: 1;
+		}
+	}
+
+	/* An app's logs: a small panel over the canvas's lower right. */
+	.v3-app-logs {
+		position: fixed;
+		z-index: var(--z-menu);
+		right: 14px;
+		bottom: 66px;
+		width: min(460px, calc(100vw - 28px));
+		overflow: hidden;
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		color: var(--v3-fg);
+		font-size: 13px;
+		animation: v3-arrive 180ms var(--v3-ease);
+	}
+	.v3-app-logs-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 8px 8px 14px;
+		border-bottom: 1px solid var(--v3-line);
+		font-weight: 500;
+	}
+	.v3-app-logs-head > svg {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+	.v3-app-logs-x {
+		display: grid;
+		width: 26px;
+		height: 26px;
+		place-items: center;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+	}
+	.v3-app-logs-x:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-app-logs pre {
+		max-height: 220px;
+		margin: 0;
+		padding: 10px 14px 12px;
+		overflow: auto;
+		color: var(--v3-fg2);
+		font: 11.5px/1.55 var(--font-mono);
+		white-space: pre-wrap;
+		user-select: text;
+	}
+
+	/*
+	 * The Agents tab's rows: the same two lines, packed, and indented so the face sits under its
+	 * folder's icon. The indent is the row's margin, so the wash starts at the face, not at the
+	 * folder's edge. Recent keeps its roomier rows at the panel's edge.
+	 */
+	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row {
+		margin-left: 14.5px;
+	}
+	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row > button[data-row] {
+		gap: 8px;
+		padding: 4px 10px 4px 6px;
+	}
+	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-body {
+		gap: 1px;
+		line-height: 1.25;
+	}
+	.v3-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
+		gap: 10px;
+		padding: 7px 10px;
+	}
+	/* The working ring clear of the face by a hair more, so it reads as a ring breathing round it. */
+	.v3-panel .agent-list .agent-face[data-status]:not([data-status="idle"]) {
+		outline-offset: 2.5px;
+	}
+}
+
+/* ---- a folded conversation has no "latest messages" to jump to ------------------------------ */
+@layer components {
+	/*
+	 * Folded, the stream is a box with no height, so it never reads as scrolled to the end and its
+	 * jump button stayed up over the fold. Nothing of the stream shows while it is folded.
+	 */
+	.v3-chat[data-folded="true"] .stream-jump {
+		display: none;
+	}
+}
+
+/* ---- the sidebar without a rail: the mark in the head, the tabs over the search ------------- */
+@layer components {
+	.v3-lp-mark {
+		display: grid;
+		width: 32px;
+		height: 32px;
+		flex: none;
+		place-items: center;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-lp-icon {
+		display: grid;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		place-items: center;
+		border: 0;
+		border-radius: 7px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+	}
+	.v3-lp-icon:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-lp-icon:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: -1px;
+	}
+
+}
+
+/* ---- menus, as the redesign draws them ("Menus and dialogs redesign" on the Decks Studio canvas) ----
+   White, a hairline and a soft shadow, 10px corners, 30px rows, labels in sentence case, and the
+   current choice a grey wash with no tick. Every `.popover` in the app takes it. */
+@layer components {
+	body .popover {
+		padding: 6px;
+		border: 1px solid var(--v3-line);
+		border-radius: 10px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	[data-color-scheme="dark"] body .popover {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .popover [data-row]:hover,
+	body .popover [data-row]:focus-visible {
+		background: var(--v3-bg2);
+	}
+	body .popover [data-row][data-current="true"],
+	body .popover .row-act:has(> [data-row][data-current="true"]) {
+		background: var(--v3-row-on);
+	}
+	body .popover [data-row][data-flat="true"] {
+		min-height: 30px;
+		gap: 9px;
+		border-radius: 6px;
+	}
+	body .popover [data-row] > .row-icon {
+		color: var(--v3-fg2);
+	}
+	/* On a one-line row the icon sits on the words' middle: the 1px nudge is for two-line rows only. */
+	body .popover [data-row][data-flat="true"] > .row-icon,
+	body .popover [data-row]:not(:has(> .row-note)) > .row-icon {
+		align-self: center;
+		padding-top: 0;
+	}
+	body .popover [data-row]:not(:has(> .row-note)) {
+		align-items: center;
+	}
+	body .popover [data-row] > svg:first-child {
+		align-self: center;
+	}
+	body .popover [data-row][data-flat="true"] > .row-label {
+		min-width: 0;
+		line-height: 18px;
+		white-space: nowrap;
+	}
+	/* A menu never scrolls sideways: a long word truncates in its row instead. */
+	body .popover {
+		overflow-x: hidden;
+	}
+	body .popover [data-row][data-current="true"] > .row-icon {
+		color: var(--v3-row-on-icon);
+	}
+	/* A section's label in a menu: sentence case, quiet, a line inside the list's rhythm. */
+	.menu-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+	}
+	body .popover .group {
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+	body .popover .rule {
+		height: 1px;
+		margin: 5px 2px;
+		background: var(--v3-line);
+	}
+	/* The find field at a menu's top: the panel search's field, a step smaller, not focused on open. */
+	.menu-find {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		margin: 2px 2px 4px;
+		padding: 0 8px 0 9px;
+		border-radius: 6px;
+	}
+	.menu-find input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 12.5px;
+		outline: none;
+	}
+	/* The thinking scale as drawn: a grey track and a raised white thumb on the level, not a blue fill. */
+	body .popover .segmented[data-scale="true"] {
+		padding: 2px;
+		gap: 1px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+		box-shadow: none;
+	}
+	body .popover .segmented[data-scale="true"] > button {
+		height: 24px;
+		border-radius: 5px;
+		font-size: 11.5px;
+	}
+	body .popover .segmented[data-scale="true"] > button:hover {
+		background: transparent;
+		color: var(--v3-fg);
+	}
+	body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: var(--v3-panel);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+		color: var(--v3-fg);
+		font-weight: 500;
+	}
+	[data-color-scheme="dark"] body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: #4a4a4a;
+	}
+	/* The deck switcher's own deck: a card at the top, the others listed under it. */
+	body .popover .row-act[data-here="true"] {
+		margin-bottom: 2px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+	}
+	body .popover .row-act[data-here="true"] .row-label {
+		font-weight: 600;
+	}
+	/* A row that removes something: red, its hover a red wash. */
+	body .popover [data-row].menu-danger:not([disabled]) {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]) > .row-icon {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]):hover {
+		background: color-mix(in srgb, var(--v3-danger, #dc2626) 10%, transparent);
+	}
+	/* A runtime's mark in a small tile, as the New agent menu draws it. */
+	.menu-tile {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		place-items: center;
+		border-radius: 5px;
+		background: var(--v3-bg3);
+	}
+	[disabled] > .menu-tile {
+		background: var(--v3-bg2);
+	}
+	.menu-note {
+		margin-left: auto;
+		padding-left: 10px;
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		white-space: nowrap;
+	}
+}
+
+/* ---- the confirm dialog, as drawn ----------------------------------------------------------- */
+@layer components {
+	.confirm-dlg {
+		width: min(380px, calc(100vw - 32px));
+		overflow: hidden;
+		border-radius: 14px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 24px 60px rgb(0 0 0 / 25%),
+			0 0 0 1px var(--v3-line);
+		color: var(--v3-fg);
+	}
+	.confirm-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 16px 14px 10px 18px;
+	}
+	.confirm-icon {
+		display: grid;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		place-items: center;
+		border-radius: 7px;
+		background: color-mix(in srgb, var(--v3-danger) 12%, transparent);
+		color: var(--v3-danger);
+	}
+	.confirm-title {
+		font-size: 15px;
+		font-weight: 600;
+	}
+	.confirm-x {
+		display: grid;
+		width: 26px;
+		height: 26px;
+		place-items: center;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+	}
+	.confirm-x:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.confirm-body {
+		padding: 0 18px 16px;
+		color: var(--v3-fg2);
+		font-size: 13px;
+		line-height: 1.45;
+		white-space: pre-wrap;
+	}
+	.confirm-foot {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 12px 18px;
+		border-top: 1px solid var(--v3-line);
+	}
+	.confirm-foot .btn[data-danger="true"] {
+		border-color: transparent;
+		background: var(--v3-danger);
+		color: #fff;
+	}
+}
+
+/* ---- the canvas manager, as drawn: a plain head, find and order in one row, one blue button ---- */
+@layer components {
+	body .stage-box {
+		width: min(94vw, 900px);
+		border-radius: 14px;
+		background: var(--v3-panel);
+	}
+	body .stage-head {
+		gap: 12px;
+		padding: 16px 20px 14px;
+		border-bottom: 0;
+	}
+	body .stage-title {
+		font-size: 15px;
+		font-weight: 600;
+		letter-spacing: 0;
+	}
+	body .stage-new {
+		height: 30px;
+		border-radius: 7px;
+		background: var(--v3-accent);
+		color: #fff;
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.stage-tools {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	body .stage-search {
+		height: 30px;
+		flex: 1;
+		gap: 7px;
+		padding: 0 9px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--v3-bg2);
+	}
+	body .stage-search:focus-within {
+		background: var(--v3-panel);
+		box-shadow:
+			inset 0 0 0 1px var(--v3-accent),
+			0 0 0 3px color-mix(in srgb, var(--v3-accent) 18%, transparent);
+	}
+	body .stage-search > input {
+		font-size: 12.5px;
+	}
+	body .stage-sort {
+		padding: 2px;
+		gap: 1px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+		box-shadow: none;
+	}
+	body .stage-sort > button {
+		height: 26px;
+		padding: 0 10px;
+		border-radius: 5px;
+		font-size: 12px;
+	}
+	body .stage-sort > button:hover {
+		background: transparent;
+	}
+	body .stage-sort > button[data-on="true"] {
+		background: var(--v3-panel);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+		font-weight: 500;
+	}
+	[data-color-scheme="dark"] body .stage-sort > button[data-on="true"] {
+		background: #4a4a4a;
+	}
+	body .stage-card[data-here] .stage-open {
+		border-color: var(--v3-accent);
+		box-shadow: 0 0 0 1px var(--v3-accent);
+	}
+}
+
+/* ---- the canvas switcher: a small picture, the name, its faces and its age ------------------- */
+@layer components {
+	body .popover [data-row].switcher-canvas {
+		min-height: 38px;
+		gap: 10px;
+	}
+	.switcher-thumb {
+		display: block;
+		width: 34px;
+		height: 24px;
+		flex: none;
+		overflow: hidden;
+		border-radius: 4px;
+		background: var(--v3-bg2);
+		box-shadow: inset 0 0 0 1px var(--v3-line);
+	}
+	.switcher-thumb > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.switcher-faces {
+		display: flex;
+		flex: none;
+	}
+	.switcher-face {
+		display: grid;
+		width: 18px;
+		height: 18px;
+		margin-left: -4px;
+		place-items: center;
+		border-radius: 50%;
+		box-shadow: 0 0 0 2px var(--v3-panel);
+		color: #fff;
+		font-size: 9px;
+		font-weight: 600;
+	}
+	body .popover [data-row].switcher-canvas .menu-note {
+		min-width: 24px;
+		padding-left: 4px;
+		text-align: right;
+	}
+}
+
+/* ---- the agent's details, as drawn: each label over its field, the tags inside theirs, Done at the foot ---- */
+@layer components {
+	body .agent-edit {
+		gap: 12px;
+		padding: 2px 18px 16px;
+	}
+	body .agent-edit-row,
+	body .agent-edit-row.agent-edit-tags {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+		min-height: 0;
+		padding: 0;
+	}
+	body .agent-edit-k,
+	body .agent-edit-row.agent-edit-tags > .agent-edit-k {
+		width: auto;
+		color: var(--v3-fg2);
+		font-size: 12px;
+		font-weight: 500;
+		line-height: 1.3;
+	}
+	body .agent-edit-v > .field,
+	body .agent-edit-pick {
+		height: 32px;
+		border-radius: 6px;
+	}
+	.agent-edit-chips {
+		display: flex;
+		min-height: 34px;
+		height: auto !important;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 5px;
+		box-sizing: border-box;
+		padding: 5px 6px;
+		border-radius: 6px;
+		cursor: text;
+	}
+	.agent-edit-chips .tag {
+		height: 22px;
+		padding: 0 3px 0 8px;
+		border-radius: 5px;
+		font-size: 12px;
+	}
+	.agent-edit-foot {
+		display: flex;
+		justify-content: flex-end;
+		padding: 12px 18px;
+		border-top: 1px solid var(--v3-line);
+	}
+	.agent-edit-foot .btn[data-primary="true"] {
+		border-color: transparent;
+		background: var(--v3-accent);
+		color: #fff;
+	}
+}
+
+/* ---- a dialog covers the floating tools ------------------------------------------------------
+   The tools, the zoom and the other floats sit at --z-float (30), over the canvas; a dialog's
+   backdrop sat at --z-backdrop (20), under them, so the tool column stayed lit over Settings and the
+   agent's details. Over every float now, and still under a menu (40), which a dialog's own pickers open. */
+@layer components {
+	body .picker-backdrop {
+		z-index: 35;
+	}
+}
+
+/* ---- the two splitters under a finger -----------------------------------------------------
+   An 8px strip shown only on hover is a mouse's handle: a finger cannot see it and seldom lands on
+   it. On a touchscreen the side panel's edge takes 30px (mostly inside the panel, so the canvas's
+   tools beside it keep theirs), unmarked, and the conversation's top a 22px band across its middle
+   with a small grip. */
+@layer components {
+	@media (pointer: coarse) {
+		.panel-resize {
+			right: -10px;
+			width: 30px;
+		}
+		/* No grip on the panel's edge: the edge is the handle; its line shows only while it is dragged. */
+		.panel-resize::after {
+			left: 18px;
+		}
+		/* A tap leaves :hover behind on a touchscreen; the line is for the drag alone. */
+		.panel-resize:hover::after {
+			opacity: 0;
+		}
+		.panel-shell[data-resizing="true"] .panel-resize::after {
+			opacity: 1;
+		}
+		/* Inside the conversation's top (its box clips what stands above it), across the middle, clear of
+		   its name on the left and its fold on the right. */
+		.v3-chat-resize {
+			top: 0;
+			right: 30%;
+			left: 30%;
+			height: 22px;
+		}
+		.v3-chat-resize::after {
+			top: 6px;
+			right: auto;
+			left: 50%;
+			width: 40px;
+			height: 4px;
+			border-radius: 2px;
+			background: var(--v3-line2, #d9d9d9);
+			opacity: 1;
+			transform: translateX(-50%);
+		}
+		.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+			background: var(--v3-accent);
+		}
+	}
+}
+
+/* ---- the comment popup (`markup/CommentPopup.tsx`), in the menus' look ----
+   The same card as a menu: a hairline, the soft shadow and 12px corners; the field a grey well
+   with no border of its own, and buttons with the menus' 7px corners. */
+@layer components {
+	body .comment-popup {
+		border: 1px solid var(--v3-line);
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+		animation: v3-arrive 160ms var(--v3-ease);
+	}
+	[data-color-scheme="dark"] body .comment-popup {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .comment-popup[data-open="true"] {
+		gap: 10px;
+		padding: 12px;
+	}
+	body .comment-popup .comment-start,
+	body .comment-popup .comment-act {
+		height: 28px;
+		padding: 0 10px;
+		border-radius: 7px;
+		font-size: 13px;
+	}
+	body .comment-popup .comment-start:hover,
+	body .comment-popup .comment-act:hover:not(:disabled) {
+		background: var(--v3-bg2);
+	}
+	body .comment-popup .comment-act {
+		border-color: var(--v3-line2);
+	}
+	body .comment-popup .comment-act[data-primary="true"] {
+		border-color: var(--v3-fg);
+		background: var(--v3-fg);
+		color: var(--v3-panel);
+	}
+	body .comment-popup .comment-quote {
+		padding: 1px 0 1px 10px;
+		border-left-width: 3px;
+		border-radius: 1px;
+		color: var(--v3-fg2);
+	}
+	body .comment-popup .comment-field {
+		min-height: 72px;
+		padding: 9px 11px;
+		border: 1px solid transparent;
+		border-radius: 9px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font-size: 14px;
+		resize: none;
+	}
+	body .comment-popup .comment-field::placeholder {
+		color: var(--v3-fg3);
+	}
+	body .comment-popup .comment-field:focus {
+		border-color: var(--v3-accent);
+		background: var(--v3-panel);
+	}
+	body .comment-popup .comment-acts .icon-button {
+		border-radius: 7px;
+	}
+}
+
+/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
+@layer components {
+	.fps-meter {
+		position: fixed;
+		z-index: var(--z-float);
+		/* The top-right bar is 12px from the top and right and 44px tall (`.v3-topright`): 8px under it, its right edge in line. */
+		top: calc(env(safe-area-inset-top, 0px) + 64px);
+		right: calc(var(--inset-right, 0px) + 12px);
+		width: 260px;
+		padding: 8px 10px 8px;
+		border: 1px solid var(--v3-line);
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		color: var(--v3-fg);
+		font-size: 12px;
+		font-variant-numeric: tabular-nums;
+		pointer-events: none;
+	}
+	.fps-head {
+		display: flex;
+		align-items: baseline;
+		gap: 4px;
+	}
+	.fps-n {
+		font-size: 20px;
+		font-weight: 650;
+	}
+	.fps-meter[data-level="good"] .fps-n { color: #2ea043; }
+	.fps-meter[data-level="meh"] .fps-n { color: #d29922; }
+	.fps-meter[data-level="bad"] .fps-n { color: var(--v3-danger); }
+	.fps-u {
+		color: var(--v3-fg2);
+	}
+	.fps-plot {
+		display: block;
+		width: 100%;
+		height: 56px;
+		margin: 4px 0 4px;
+		border-radius: 6px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.fps-d {
+		color: var(--v3-fg2);
+	}
+	.fps-key {
+		display: flex;
+		gap: 10px;
+		margin-top: 2px;
+		color: var(--v3-fg3);
+		font-size: 11px;
+	}
+	.fps-key span::before {
+		content: "";
+		display: inline-block;
+		width: 10px;
+		margin-right: 4px;
+		vertical-align: middle;
+		border-top: 1px dashed currentColor;
+	}
+	.fps-key .k120::before { border-color: #2ea043; }
+	.fps-key .k60::before { border-color: #d29922; }
+}

@@ -1,0 +1,406 @@
+/*
+ * Motion, one system for every shell control (theme.css carries the colours, surfaces.css the shapes).
+ */
+
+/* ===========================================================================================
+ * Motion, rebuilt from the mockup (assets/harness-v3-mock): one system for every v3 control.
+ *
+ *   Hover is a wash: 120 ms in, 200 ms out, nothing moves. Press is a 0.96 squeeze for 90 ms.
+ *   The tool in hand and the panel's tab are one marker each that slides on a spring.
+ *   Menus grow out of the edge they hang from in 160 ms and shrink back in 90 ms.
+ *   Working breathes: a halo swells from the face and fades, every 1.6 s.
+ *   The floats (tools, composer, pen tray) keep their drag, fling and tuck; nothing here
+ *   transitions their position while they are held or flung.
+ * ======================================================================================== */
+body {
+	--v3-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--v3-ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--v3-spring: cubic-bezier(0.3, 1.32, 0.55, 1);
+}
+
+@layer components {
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row, .v3-folder-toggle, .composer-queue-release, .v3-new-agent.new-agent),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button),
+	.v3-panel .agent-list .agent-row {
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease),
+			box-shadow 200ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip),
+	.v3-panel .agent-list .agent-row {
+		&:hover {
+			transition-duration: 120ms, 120ms, 120ms, 90ms;
+		}
+	}
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-zoom-value),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button) {
+		&:active {
+			transform: scale(0.96);
+		}
+	}
+
+	/* ---- the tool in hand: one marker that slides ---------------------------------------- */
+	.v3-tools {
+		position: absolute;
+	}
+	.v3-tools[data-row="true"] {
+		position: relative;
+	}
+	.v3-tool-mark {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 36px;
+		height: 36px;
+		border-radius: 8px;
+		background: var(--v3-accent);
+		box-shadow: 0 2px 8px color-mix(in srgb, var(--v3-accent) 30%, transparent);
+		pointer-events: none;
+		transition:
+			transform 300ms var(--v3-spring),
+			width 300ms var(--v3-spring),
+			height 300ms var(--v3-spring),
+			opacity 160ms var(--v3-ease);
+	}
+	.v3-tool-mark[data-shown="false"],
+	.v3-tool-mark:not([data-shown]) {
+		opacity: 0;
+	}
+	.v3-tools .v3-tool {
+		position: relative;
+		z-index: 1;
+	}
+	.v3-tools .v3-tool[data-on="true"],
+	.v3-tools .v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+		background: transparent;
+		color: #ffffff;
+	}
+	.v3-tools .v3-tool[data-on="true"]:hover {
+		background: transparent;
+	}
+	.v3-tools .v3-tool[data-open="true"]:not([data-on="true"]) {
+		background: var(--v3-bg3);
+	}
+	.v3-tool[data-family]::after {
+		transition: transform 200ms var(--v3-ease);
+	}
+	.v3-tool[data-open="true"]::after {
+		transform: translate(1px, 1px);
+	}
+	@media (pointer: coarse) {
+		.v3-tool-mark {
+			border-radius: 10px;
+		}
+	}
+
+	/* ---- the panel's tab: the same, along the strip --------------------------------------- */
+	.v3-nav {
+		position: relative;
+	}
+	.v3-nav-mark {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 30px;
+		border-radius: 8px;
+		background: var(--v3-tab-on);
+		pointer-events: none;
+		transition:
+			transform 280ms var(--v3-spring),
+			width 280ms var(--v3-spring);
+	}
+	.v3-nav-tab {
+		position: relative;
+		z-index: 1;
+	}
+	.v3-nav-tab[data-on="true"],
+	.v3-nav-tab:hover {
+		background: transparent;
+	}
+	.v3-nav-tab:not([data-on="true"]):hover {
+		color: var(--v3-fg);
+	}
+
+	/* ---- menus grow out of their edge ------------------------------------------------------ */
+	.v3-menu {
+		opacity: 0;
+		transform: scale(0.96);
+		transform-origin: left top;
+		transition:
+			opacity 90ms var(--v3-ease-in),
+			transform 90ms var(--v3-ease-in);
+		pointer-events: none;
+	}
+	.v3-menu[data-above="true"] {
+		transform-origin: left bottom;
+	}
+	.v3-menu[data-open="true"] {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+		transition:
+			opacity 140ms var(--v3-ease),
+			transform 180ms var(--v3-ease);
+	}
+	.v3-menu-row {
+		transition: none;
+	}
+	.popover[data-placed] {
+		animation: v3-pop 170ms var(--v3-ease);
+		transform-origin: top center;
+	}
+	.popover[data-placed][data-side="above"] {
+		transform-origin: bottom center;
+	}
+	.popover[data-placed][data-side="beside"] {
+		transform-origin: left top;
+	}
+	@keyframes v3-pop {
+		from {
+			opacity: 0;
+			transform: scale(0.96);
+		}
+	}
+
+	/* ---- tooltips ---------------------------------------------------------------------------- */
+	.v3-tip {
+		position: fixed;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 5px 8px;
+		border-radius: 6px;
+		background: var(--v3-ink);
+		color: var(--v3-ink-fg);
+		font: 12px/1.3 var(--font-sans);
+		white-space: nowrap;
+		pointer-events: none;
+		opacity: 0;
+		transform: translateY(-2px);
+		transition:
+			opacity 120ms var(--v3-ease),
+			transform 160ms var(--v3-ease);
+	}
+	.v3-tip[data-side="right"] {
+		transform: translateX(-3px);
+	}
+	.v3-tip[data-shown="true"] {
+		opacity: 1;
+		transform: none;
+	}
+	.v3-tip[data-warm="true"] {
+		transition:
+			opacity 60ms,
+			left 120ms var(--v3-ease),
+			top 120ms var(--v3-ease);
+	}
+	.v3-tip-key {
+		color: var(--v3-ink-key);
+		font: 11px var(--font-mono);
+	}
+
+	/* ---- agent rows: the time gives way to the row's actions on approach -------------------- */
+	.v3-panel .agent-list .agent-row :is(.agent-tagbtn, .close) {
+		transition:
+			opacity 160ms var(--v3-ease),
+			transform 200ms var(--v3-ease);
+	}
+	.v3-panel .agent-list .agent-row:not(:hover, :focus-within) :is(.agent-tagbtn, .close) {
+		transform: translateX(4px);
+	}
+
+	/* ---- folders fold by their height ------------------------------------------------------- */
+	.v3-folder-chev {
+		transition: transform 220ms var(--v3-ease);
+	}
+
+	/* ---- the floats: transitions only while they stand at home, never while held or flung --- */
+	.pen-tools.v3-tools:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--v3-ease);
+	}
+	.v3-tray-wrap:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--v3-ease);
+	}
+	.v3-tray-wrap {
+		--stowtab-w: 20px;
+		--stowtab-h: 48px;
+	}
+	.v3-tray-wrap[data-stowed] > :not(.stowtab) {
+		opacity: 0;
+		pointer-events: none;
+	}
+	.v3-tray-grip {
+		cursor: grab;
+		touch-action: none;
+	}
+	[data-dragging="true"] .v3-tray-grip {
+		cursor: grabbing;
+	}
+
+	/* ---- the pen tray: instruments rise on a spring ----------------------------------------- */
+	.v3-instrument {
+		margin-top: 22px;
+		transition: transform 320ms var(--v3-spring);
+	}
+	.v3-instrument:hover {
+		transform: translateY(-5px);
+	}
+	.v3-instrument[data-on="true"] {
+		transform: translateY(-14px);
+	}
+	.v3-swatch::before {
+		transition: transform 200ms var(--v3-spring);
+	}
+	.v3-swatch:hover::before {
+		transform: scale(1.12);
+	}
+	.v3-swatch {
+		position: relative;
+	}
+	.v3-swatch[data-on="true"] {
+		box-shadow: none;
+	}
+	.v3-swatch::after {
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		box-shadow: 0 0 0 1.5px var(--v3-fg);
+		content: "";
+		opacity: 0;
+		transform: scale(0.7);
+		transition:
+			opacity 160ms var(--v3-ease),
+			transform 260ms var(--v3-spring);
+	}
+	.v3-swatch[data-on="true"]::after {
+		opacity: 1;
+		transform: none;
+	}
+	.v3-wheel {
+		transition: transform 300ms var(--v3-spring);
+	}
+	.v3-tray-wrap {
+		animation: v3-grow 220ms var(--v3-ease);
+		transform-origin: left top;
+	}
+	.v3-widths.float {
+		animation: v3-grow 200ms var(--v3-ease);
+	}
+	@keyframes v3-grow {
+		from {
+			opacity: 0;
+			transform: translateX(-8px) scale(0.97);
+		}
+	}
+
+	/* ---- the properties panel slides in once, for a new selection -------------------------- */
+	.props-panel.panel-float {
+		animation: v3-slide 220ms var(--v3-ease);
+	}
+	@keyframes v3-slide {
+		from {
+			opacity: 0;
+			transform: translateX(12px);
+		}
+	}
+
+	/* ---- the status pill pops from the composer --------------------------------------------- */
+	.v3-status.float {
+		transform-origin: left bottom;
+		animation: v3-pill 300ms var(--v3-spring);
+		transition:
+			box-shadow 200ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	.v3-status.float:hover {
+		box-shadow: 0 8px 28px rgb(0 0 0 / 16%), 0 0 0 0.5px rgb(0 0 0 / 12%);
+	}
+	.v3-status.float:active {
+		transform: scale(0.97);
+	}
+	@keyframes v3-pill {
+		from {
+			opacity: 0;
+			transform: translateY(8px) scale(0.9);
+		}
+	}
+
+	/* ---- the queue: rows hand over their actions on approach ------------------------------- */
+	.dock .composer-queue-row .icon-button {
+		transition:
+			opacity 160ms var(--v3-ease),
+			background-color 200ms var(--v3-ease);
+	}
+	.dock .composer-queue {
+		animation: v3-arrive 240ms var(--v3-ease);
+	}
+	.dock .composer-queue-body {
+		display: grid;
+		grid-template-rows: 1fr;
+		transition: grid-template-rows 240ms var(--v3-ease);
+	}
+	.dock .composer-queue[data-folded="true"] .composer-queue-body {
+		grid-template-rows: 0fr;
+	}
+	.dock .composer-queue-body > div {
+		min-height: 0;
+		overflow: hidden;
+	}
+	.composer-queue-fold svg {
+		transition: transform 220ms var(--v3-ease);
+	}
+	.dock .composer-queue[data-folded="true"] .composer-queue-fold svg {
+		transform: rotate(-90deg);
+	}
+	@keyframes v3-arrive {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+	}
+
+	/* ---- the composer: the send button turns into stop and back ---------------------------- */
+	.dock .send-button {
+		transition:
+			background-color 220ms var(--v3-ease),
+			color 220ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	.dock .composer-box {
+		transition: box-shadow 200ms var(--v3-ease);
+	}
+	.dock .composer-box:focus-within {
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 16%),
+			0 0 0 0.5px rgb(0 0 0 / 12%),
+			0 0 0 1px color-mix(in srgb, var(--v3-accent) 22%, transparent);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.v3-tool-mark,
+		.v3-nav-mark,
+		.v3-menu,
+		.v3-tip,
+		.v3-instrument,
+		.dock .composer-queue-body {
+			transition: none;
+		}
+		.popover[data-placed],
+		.v3-tray-wrap,
+		.props-panel.panel-float,
+		.v3-status.float,
+		.dock .composer-queue {
+			animation: none;
+		}
+	}
+}
+
+@layer components {
+	.v3-instrument[data-on="true"] {
+		margin-top: 22px;
+	}
+}
