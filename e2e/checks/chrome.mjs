@@ -83,11 +83,14 @@ say("…in mono, uppercase, with the chevron at the end", sameShape?.kid.mono &&
 const chips = await page.evaluate(() => {
 	const panel = document.querySelector(".stream");
 	const stream = panel.querySelector(".stream-roll");
-	panel.style.height = "190px";
-	panel.style.bottom = "auto";
+	// The scroller itself is held short: the conversation docks in the side panel now, which sizes the column,
+	// so a height on the panel no longer reaches the roll.
+	stream.style.flex = "0 0 auto";
+	stream.style.height = "190px";
 	const measure = () => [...stream.querySelectorAll(".tool")].map((t) => Math.round(t.getBoundingClientRect().height));
 
 	const overflowing = stream.scrollHeight > stream.clientHeight + 1;
+	const sizes = { panel: Math.round(panel.getBoundingClientRect().height), roll: stream.clientHeight, content: stream.scrollHeight, kids: stream.children.length, chat: !!panel.closest(".v3-chat") };
 	const fixed = measure();
 
 	// The guard removed for a moment: every row in the scroller free to shrink.
@@ -98,11 +101,11 @@ const chips = await page.evaluate(() => {
 	undo.remove();
 
 	const restored = measure();
-	panel.style.height = "";
-	panel.style.bottom = "";
-	return { overflowing, fixed, squeezed, restored, count: fixed.length };
+	stream.style.flex = "";
+	stream.style.height = "";
+	return { overflowing, sizes, fixed, squeezed, restored, count: fixed.length };
 });
-say("the history is overflowing (the condition that squeezed them)", chips.overflowing);
+say("the history is overflowing (the condition that squeezed them)", chips.overflowing, JSON.stringify(chips.sizes));
 say("every tool chip keeps its height", chips.count > 0 && chips.fixed.every((h) => h >= 24), `${chips.count} chips: ${chips.fixed.join(", ")}px`);
 /*
  * And keeps it even with nothing stopping it — which it did not always.

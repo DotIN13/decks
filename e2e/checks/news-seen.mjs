@@ -4,7 +4,7 @@
  * A card is news when something changed it that the person has not read since (`items/news.ts`):
  * here, the person's own resize names them its writer, and the file changing after that, as an agent
  * or a script writing it would, makes it news. Selecting it in the canvas frame says it was read
- * (`Stage`'s `onRead`, the frame's `card-seen`); the harness stamps it read and the frame's dot for it
+ * (`Stage`'s `onRead`, the frame's `card.seen` on its line); the harness stamps it read and the frame's dot for it
  * goes. Said once: a second selection of the same unchanged card sends nothing more.
  */
 import { API, asPerson, canvasFrame, deckState, open, read, resetStage, say, selectCard, settle, socket, write } from "../harness.mjs";
@@ -22,11 +22,17 @@ const person = await asPerson();
 const me = (await call("agent.me", [], person)).value;
 const agent = { ...person, "x-decks-agent": me.id };
 
-// The frame's posts of `card-seen`, counted.
-const seenPosts = [];
-page.on("request", (request) => {
-	if (request.method() === "POST" && /\/api\/v1\/card-seen$/.test(request.url())) seenPosts.push(request.postData() ?? "");
+// The frame's `card.seen` messages, counted: it says them on its line (`frame/inside/backend.ts`), not as a POST
+// any more. Read inside the frame, where its socket lives; Playwright's websocket events do not reach it.
+await canvas.evaluate(() => {
+	window.__seenSent = [];
+	const send = WebSocket.prototype.send;
+	WebSocket.prototype.send = function (data) {
+		if (typeof data === "string" && /"type":"card\.seen"/.test(data)) window.__seenSent.push(data);
+		return send.call(this, data);
+	};
 });
+const sent = () => canvas.evaluate(() => window.__seenSent ?? []);
 
 // A card on the canvas on screen (the fixture's plan).
 const onStage = await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path));
@@ -58,21 +64,23 @@ if (card) {
 	const became = await waitFor(async () => card.path in (await newsNow()));
 	say("the card changed after that is news in the frame", became, JSON.stringify(await newsNow()));
 
-	const before = seenPosts.length;
+	const before = (await sent()).length;
 	await selectCard(page, card.path);
 	const cleared = await waitFor(async () => !(card.path in (await newsNow())));
 	say("selecting it clears its dot", cleared, JSON.stringify(await newsNow()));
-	say("…by one card-seen from the frame", seenPosts.length - before === 1, `${seenPosts.length - before} posts: ${seenPosts.slice(before).join(" | ")}`);
+	const seen = await sent();
+	say("…by one card.seen from the frame", seen.length - before === 1, `${seen.length - before} sent: ${seen.slice(before).join(" | ")}`);
 	const stamped = (await deckState()).boards.find((board) => board.path === card.path);
 	say("…which the harness keeps as read", (stamped?.seenAt ?? 0) >= Math.max(stamped?.modifiedAt ?? 0, stamped?.namedAt ?? 0), JSON.stringify({ seenAt: stamped?.seenAt, modifiedAt: stamped?.modifiedAt, namedAt: stamped?.namedAt }));
 
 	// Pressed off and on again, unchanged: nothing more is said.
 	await page.keyboard.press("Escape");
 	await page.waitForTimeout(300);
-	const again = seenPosts.length;
+	const again = (await sent()).length;
 	await selectCard(page, card.path);
 	await page.waitForTimeout(800);
-	say("selecting it again, unchanged, says nothing more", seenPosts.length === again, `${seenPosts.length - again} more posts`);
+	const after = (await sent()).length;
+	say("selecting it again, unchanged, says nothing more", after === again, `${after - again} more sent`);
 }
 
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));

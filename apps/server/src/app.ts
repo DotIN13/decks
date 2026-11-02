@@ -612,7 +612,9 @@ export class App {
 	 */
 	private callStageAll(call: Omit<StageCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
 		const id = randomUUID();
-		const expected = this.hub?.connections ?? 0;
+		// Every front end may answer: pages and canvas frames on the line as well as the old socket's. A line that
+		// answers nothing (a script's, or a page leaving the call to its frame) only makes the wait run to its end.
+		const expected = (this.hub?.connections ?? 0) + this.lines();
 		if (expected === 0) return Promise.resolve([]);
 		return new Promise((resolve) => {
 			const many = { answers: [] as unknown[], expected };
