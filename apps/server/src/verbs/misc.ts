@@ -55,7 +55,7 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "ports" | "now" | "stud
 		 */
 		/**
 		 * A pairing code for another Decks front end, such as Studio, to connect with
-		 * (`share/pairing.ts`): the same code Settings, Other Decks makes, for a harness with no
+		 * (`auth/issue.ts`): the same code Settings, Other Decks makes, for a harness with no
 		 * screen. Not a board's: its page could make one and hand it to anyone.
 		 */
 		pair: {

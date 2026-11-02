@@ -137,7 +137,7 @@ export class OpencodeBackend implements AgentBackend {
 		// The shared server, brought up by whoever was first and counted for this agent.
 		// The briefing file is written first so the server's config can name it: the
 		// instructions are a *path*, and opencode re-reads the file it points at on every
-		// turn (`session/instruction.ts`), so one deck's briefing staying current as the
+		// turn, so one deck's briefing staying current as the
 		// words change is the server's own doing.
 		const handle = await opencodeManager.acquire({
 			cwd: deck.path,

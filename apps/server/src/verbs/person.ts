@@ -22,7 +22,7 @@ export function personAgent(context: { agents: Registry; pens?: StagePens | unde
 
 /**
  * One verb, called as the person: what the browser's older socket messages do now, so a drag sent
- * over the socket and one sent through the SDK are one code path (`wire/boards.ts`, `wire/pen.ts`).
+ * over the socket and one sent through the SDK are one code path (`verbs/person-table.ts`).
  * A refusal comes back as the notice the person sees.
  */
 export async function asPerson(

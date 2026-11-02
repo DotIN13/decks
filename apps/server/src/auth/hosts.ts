@@ -5,7 +5,7 @@ import { isIP } from "node:net";
  *
  * A page on any site can point a name it owns at 127.0.0.1 after the page has loaded, and the
  * browser then calls this server as if it were that site's own: same-origin, no `Origin` to
- * check, no pairing token asked (`pairing.ts`). What it cannot change is the `Host` it sends,
+ * check, no pairing token asked (`auth/issue.ts`). What it cannot change is the `Host` it sends,
  * which is still the attacker's name. So a request is answered only when it was addressed to a
  * name that can only mean this server: an IP address, `localhost`, a tailnet name (`*.ts.net`),
  * the name the server was told to listen on, or a name the owner lists in `DECKS_HOSTS`.

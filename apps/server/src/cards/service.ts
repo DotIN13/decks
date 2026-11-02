@@ -304,7 +304,7 @@ export class CardService {
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
 		if (!board) throw new Error(`No such board: ${path}`);
-		// Only the size in its tag: the pages showing it keep their document (`frames.ts`).
+		// Only the size in its tag: the surfaces showing it keep their document (`items/card-surface.tsx`, `sized`).
 		const sized = before !== undefined && onlySizeChanged(path, before, html);
 		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;

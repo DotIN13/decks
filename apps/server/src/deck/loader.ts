@@ -433,7 +433,7 @@ export class Deck {
 			// the way it was does not churn every open frame.
 			rev,
 			// The *other* reading of the same file, published because the canvas's
-			// "changed" mark needs a time (`board-news.ts`). A reading and not a promise:
+			// "changed" mark needs a time (`agents/canvas-news.ts`). A reading and not a promise:
 			// a board touched without being edited has a new time and the same revision.
 			// `signatureOf` has already stat-ed the file by now; this is the stat whose
 			// number it kept private.

@@ -141,7 +141,7 @@ export class StageService {
 	forwards: Forwards | undefined;
 	/** The deck's apps (`apps/service.ts`). `undefined` in tests without one. */
 	apps: Apps | undefined;
-	/** A fresh pairing code for another Decks front end (`share/pairing.ts`), for `decks pair code`. */
+	/** A fresh pairing code for another Decks front end (`auth/issue.ts`), for `decks pair code`. */
 	pairCode: (() => { code: string; expires: number }) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
@@ -420,7 +420,7 @@ export class StageService {
 	 *
 	 * The result is the browser's: which boards it moved to, and the sentence it left on the
 	 * canvas when this agent's view was remembered rather than moved (the camera is per
-	 * conversation — §7). Typed rather than `unknown` because `stage.d.ts` promises the
+	 * conversation — §7). Typed rather than `unknown` because the SDK's `index.d.ts` promises the
 	 * shape to the agent, and the agent writes code against what that file says.
 	 */
 	async show(

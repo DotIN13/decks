@@ -2,7 +2,7 @@
  * Boards on a stage, read from and written to its file (`stage/pens.ts`), by anyone who names it.
  *
  * The stage file is the one record of which boards are on a stage, where, and how big. An agent
- * works on its own stage (`agents/session.ts`), a person on the stage on screen (`wire/boards.ts`);
+ * works on its own stage (`agents/session.ts`), a person on the stage on screen (`verbs/person-table.ts`);
  * both come here with the stage's name, and neither keeps a copy of what the file says.
  */
 import type { Deck } from "../deck/loader.ts";
