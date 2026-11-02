@@ -99,7 +99,7 @@
 	will-change: auto;
 }
 /*
- * A card let go lately and kept asleep with its root (`items/live-cards.ts`, `kept`): not laid out, painted
+ * A card let go lately and kept asleep with its root (`items/awake.ts`, `kept`): not laid out, painted
  * or pressed, while the sheet draws its picture over it; shown again at once when it wakes.
  */
 .card-node[data-asleep] :is(.card-surface, .document-surface, .app-surface) {
@@ -162,9 +162,9 @@
  * screen for the whole session rather than for the moment that mattered.
  *
  * What carries the sign now is the pencil's own pressed state and the palette's five tools —
- * both in the chrome, neither over the work. `e2e/checks/modes.mjs` asserts that *neither*
- * mode draws a ring, so this cannot come back by accident, and it asserts the tools are the
- * difference in the one place they are drawn.
+ * both in the chrome, neither over the work. A browser check (`modes.mjs`, since cut from the
+ * suite) asserted that *neither* mode draws a ring and that the tools are the difference in the
+ * one place they are drawn.
  */
 
 .world {
@@ -174,7 +174,7 @@
 	transform-origin: 0 0;
 }
 	/*
-	 * The engine's canvas (`engine-stage.ts`): the size of the window, under the world, drawn with the
+	 * The engine's canvas (`render/engine.ts`): the size of the window, under the world, drawn with the
 	 * camera rather than moved by it. A page asleep over a picture there has no paper of its own, or
 	 * it would cover the picture it is asleep over.
 	 */
@@ -289,7 +289,7 @@
 	pointer-events: none;
 }
 	/*
- * A board that is news (`board/glow.ts`): an agent named it and the person has not read it.
+ * A card that is news (`items/news.ts`): an agent named it and the person has not read it.
  *
  * A soft shadow in the writer's colour all round the board — even, not thrown down, so it
  * reads as the board glowing rather than floating — over a quiet dark one for depth,
@@ -387,7 +387,7 @@
 .card-node[data-carried] > :is(.shade, .surface) {
 	visibility: hidden;
 }
-	/* The board's outline, taken by the canvas so a scroll landing on it pans (`BoardFrame.tsx`). */
+	/* The card's outline, taken by the canvas so a scroll landing on it pans (`items/item-slot.tsx`). */
 	.card-node > .surface > .edge {
 	position: absolute;
 	inset: 0;
@@ -544,7 +544,7 @@
 	content: "";
 }
 	/*
-	 * The pill over a selected board (`canvas/BoardCallout.tsx`): the comment popup's card
+	 * The pill over a selected card (`ui/Callout.tsx`): the comment popup's card
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
 	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
 	 */
@@ -717,7 +717,7 @@
 	user-select: none;
 }
 	/*
-	 * The stage's one sheet (`canvas/pen/layer.ts`): the drawing, and each board as its picture or as
+	 * The stage's one sheet (`render/engine.ts`): the drawing, and each board as its picture or as
 	 * a hole over its document, painted in a worker and placed by the camera it was drawn for. Over
 	 * the boards' surfaces, and never in the way of a gesture.
 	 */
@@ -1276,7 +1276,7 @@
 }
 	/*
 	 * A card typed into as it reads (`pen/CardEditor.tsx`): the canvas's markdown look
-	 * (`pen/markdown-layout.ts`) in CSS, so the words barely move when it opens. Sizes are in ems of the
+	 * (`packages/stage/crates/text/src/card.rs`) in CSS, so the words barely move when it opens. Sizes are in ems of the
 	 * card's font size, as there. Its style bar and the ghost of a dragged piece stand outside its box.
 	 */
 	.world > .pen-card-editor {
@@ -1413,7 +1413,7 @@
 	.pen-card-editor mark[data-c="green"] { background: #4ade8059; }
 	.pen-card-editor mark[data-c="blue"] { background: #38bdf859; }
 	.pen-card-editor mark[data-c="purple"] { background: #c084fc59; }
-	/* A span's size and face, `[words]{.large .serif}`, as the canvas draws them (`markdown-layout.ts`). */
+	/* A span's size and face, `[words]{.large .serif}`, as the engine draws them (`packages/stage/crates/text/src/card.rs`). */
 	.pen-card-editor [data-size="small"] { font-size: 0.85em; }
 	.pen-card-editor [data-size="large"] { font-size: 1.25em; }
 	.pen-card-editor [data-size="huge"] { font-size: 1.6em; }
@@ -1423,7 +1423,7 @@
 	.pen-card-editor [data-fg="green"] { color: #15803d; }
 	.pen-card-editor [data-fg="blue"] { color: #2563eb; }
 	.pen-card-editor [data-fg="purple"] { color: #7c3aed; }
-	/* The same colours as the canvas draws them in the dark (`pen/markdown-layout.ts`). */
+	/* The same colours as the engine draws them in the dark (`packages/stage/crates/text/src/card.rs`). */
 	[data-color-scheme="dark"] .pen-card-editor mark { background: #facc1547; }
 	[data-color-scheme="dark"] .pen-card-editor mark[data-c="red"] { background: #f871714d; }
 	[data-color-scheme="dark"] .pen-card-editor mark[data-c="orange"] { background: #fb923c4d; }

@@ -168,7 +168,7 @@ type RootCard = Omit<CardGeometry, "order"> & { i: number };
 type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[] };
 
 /**
- * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet had (`canvas/pen/layer.ts`)
+ * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet it replaced had
  * so the stage chooses between the two by one setting while this one is proved.
  */
 /** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */

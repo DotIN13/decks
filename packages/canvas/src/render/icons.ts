@@ -64,7 +64,7 @@ function cdnIconUrl(library: string, name: string, weight: number): string | und
  * An SVG element as the parser below reads it: its name, its attributes and its children.
  *
  * Read with a few regular expressions rather than `DOMParser`, because the drawing is laid out and
- * painted in a worker (`scene.worker.ts`) and a worker has no DOM. An icon file is a handful of
+ * painted in a worker (`render.worker.ts`) and a worker has no DOM. An icon file is a handful of
  * shapes with plain attributes, which is all this has to understand.
  */
 interface SvgElement {

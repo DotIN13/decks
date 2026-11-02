@@ -82,7 +82,7 @@ export type StageProps = {
 	boards: Page[];
 	/**
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
-	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera. `edits`, when the
+	 * against (`render/engine.ts`). Drawn under the boards, with the same camera. `edits`, when the
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
 	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
 	 */
@@ -143,7 +143,7 @@ export type StageProps = {
 	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
 	stageName?: string | undefined;
-	/** The boards that are news, by path, each with the colour its glow is drawn in (`board/glow.ts`). */
+	/** The boards that are news, by path, each with the colour its glow is drawn in (`items/news.ts`). */
 	news?: Record<string, string>;
 	/** A card that was news was looked at (selected): said once for each change of it. */
 	onRead?: (path: string) => void;
@@ -617,7 +617,7 @@ export function Stage(props: StageProps) {
 	});
 	/*
 	 * The drag as far as the canvas shows it: nothing yet while the carried picture of what was picked
-	 * up is on its way (`layer.ts`, `onCarryPending`), so outlines and handles stay on the items, which
+	 * up is on its way (`render/engine.ts`, `onCarryPending`), so outlines and handles stay on the items, which
 	 * the sheet still draws where they were, and both go with the pointer from the same frame.
 	 */
 	penLayer.onCarryPending = editor.carryPending;
@@ -807,7 +807,7 @@ export function Stage(props: StageProps) {
 				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
 				 * document — and the invisible shapes that catch clicks on the drawing: after the boards,
 				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
-				 * `pen/layer.ts` and `pen/scene.ts`.
+				 * `render/engine.ts`.
 				 */}
 				{items.fileNodes()}
 				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}

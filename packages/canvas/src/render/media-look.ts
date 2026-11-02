@@ -1,7 +1,7 @@
 /**
  * Where everything on a film or a sound goes, for the two that draw it.
  *
- * A media item is drawn twice: by the sheet's worker as a still (`paint.ts` `paintMedia`), and,
+ * A media item is drawn twice: by the engine's worker as a still (`packages/stage/crates/paint`), and,
  * once it is pressed, by the one live player laid over it (`MediaPlayer.tsx`). The press must not
  * move anything — the play button under the pointer is the pause button a frame later, and the
  * waveform the sound was drawn with is the one its progress runs along — so both read their

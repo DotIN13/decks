@@ -7,7 +7,7 @@ export const SERIF_FAMILY = FACE_ALIAS.serif!;
 import { FONT_COVERAGE } from "./font-coverage.ts";
 
 /**
- * Which font files a drawing's words need, and where they come from: the page's fonts (`fonts.ts`)
+ * Which font files a drawing's words need, and where they come from: the page's engine (`engine.ts`)
  * and the server's measure (`apps/server/src/stage/text.ts`) both fetch by this list, so the two
  * hold the same files and measure the same words alike. Nothing here touches a browser.
  *

@@ -449,7 +449,7 @@ export function createCameraController(host: CameraHost) {
 	/**
 	 * The camera at rest: it changes only once moving, scaling, gliding and panning are all off (and no
 	 * glide is waiting to start), and then to exactly where the camera is. What is chosen from it, which
-	 * cards are live (`items/live-cards.ts`), is chosen once a gesture ends and never during one, so a
+	 * cards are live (`items/awake.ts`), is chosen once a gesture ends and never during one, so a
 	 * pinch mounts and unmounts nothing. `settled` changes at every step of a zoom; this does not.
 	 */
 	const rest = createMemo<Camera>(

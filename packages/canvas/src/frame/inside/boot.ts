@@ -125,7 +125,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
 	/** Each agent's name and colour, from the page: what is new glows in its writer's colour. */
 	const [agents, setAgents] = createSignal<Record<string, { name: string; color: string }>>(start.look.agents ?? {});
-	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`board-news.ts`). */
+	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`items/news.ts`). */
 	const news = () => {
 		const out: Record<string, string> = {};
 		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--color-accent)";

@@ -494,7 +494,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 
 	/*
 	 * SVGs shown live on the canvas (`liveFileItem`), each as an image. Each is an element in the boards' layer, under the sheet, which draws a hole
-	 * where it is (`paint.ts`, `holes`): so it moves with the boards in the same frame, and what is drawn
+	 * where it is (`render/engine.ts`, `holes`): so it moves with the boards in the same frame, and what is drawn
 	 * over it stays over it. As a board's page: only from the live zoom, only near the screen as of the
 	 * camera's last rest, the nearest few; while a zoom moves, or the item is being moved or sized, the
 	 * sheet draws its still over it instead, and the element waits underneath, still loaded.

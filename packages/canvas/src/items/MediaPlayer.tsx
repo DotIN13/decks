@@ -4,7 +4,7 @@ import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../render
 /**
  * The one live player, laid over the film or sound it plays (`Stage.tsx` `playing`).
  *
- * It draws exactly what the still drew (`paint.ts` `paintMedia`), from the same layout, and adds
+ * It draws exactly what the still drew (the engine's painter, `packages/stage/crates/paint`), from the same layout, and adds
  * only what playing needs: the play button turns to pause, a sound's waveform fills as it plays
  * and can be pressed or dragged to seek, and a film gets a bar along its foot while the pointer is
  * on it or it is paused.

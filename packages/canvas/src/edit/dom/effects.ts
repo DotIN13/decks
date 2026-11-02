@@ -163,7 +163,7 @@ export function createEffects(host: EffectHost) {
 
 	/**
 	 * A card's link. A link to a board of this deck opens that board on the canvas, exactly as
-	 * the same link on a board does (`board/board-links.ts`); anything else is a new tab. A
+	 * the host opens one (`onOpenLink`, `types.ts`); anything else is a new tab. A
 	 * relative link is read against the stage's own folder.
 	 */
 	const openLink = (href: string) => {

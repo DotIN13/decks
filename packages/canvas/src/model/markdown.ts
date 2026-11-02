@@ -11,7 +11,7 @@ import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Siz
  *
  * `marked`'s lexer does the reading — CommonMark and GFM: tables, task lists, strikethrough,
  * autolinks, reference links, nested blocks — and this file turns its tokens into the handful of
- * blocks and styled runs the canvas lays out (`markdown-layout.ts`). Obsidian's own inline syntax
+ * blocks and styled runs the engine lays out (`packages/stage/crates/text/src/card.rs`). Obsidian's own inline syntax
  * and ours are `marked` extensions (`card-syntax.ts`); footnotes, callouts, embeds on a line of their
  * own and `:emoji:` shortcodes are done here. Raw HTML is shown as the words inside it, with `<br>`
  * as a break.

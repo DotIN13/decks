@@ -2,7 +2,7 @@
  * Which picture a card gets: the rung of this device's ladder (`PICTURES` in `device.ts`) its drawn
  * width needs. A card drawn 880 device pixels wide (1,100 px at 40% on a 2× screen, where cards go
  * live) wants the top rung; one drawn 220 wide (10%) the bottom. The server keeps exactly these widths
- * (`SMALL_WIDTHS` in `apps/server/src/boards/thumbs.ts`), and the GPU makes every smaller size of the
+ * (`SMALL_WIDTHS` in `apps/server/src/pictures/ladder.ts`), and the GPU makes every smaller size of the
  * one fetched, so a zoom out never fetches.
  */
 

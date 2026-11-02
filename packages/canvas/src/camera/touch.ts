@@ -1,16 +1,16 @@
 /**
  * What a set of fingers on the canvas means, and nothing about where they are.
  *
- * The camera's touch gestures happen in two documents — on the stage, and inside a
- * board frame (`frame-gestures.ts`, DESIGN §7) — and the mistake to avoid is writing
+ * The camera's touch gestures have two sources — the stage's own finger pool (`stage/input.ts`)
+ * and the controller's (`camera/controller.ts`) — and the mistake to avoid is writing
  * them twice. What both places need is the same reduction: fingers arrive and leave,
  * one of them moves, and the answer is either "pan by this much" or "here is one step
  * of a pinch". So that reduction is here, as arithmetic over plain numbers, and the
  * two callers keep only the part that is theirs: converting their own coordinates and
  * moving the camera.
  *
- * **Positions are screen pixels, whoever is asking.** A board frame's own pixels are
- * board pixels, so `frame-gestures.ts` converts before it reports — and it must,
+ * **Positions are screen pixels, whoever is asking.** A source with pixels of its own
+ * converts before it reports — and it must,
  * because a finger that does not move is over a *different* part of the board once the
  * camera pans under it. Screen space is the one frame of reference in which a still
  * finger is still, which is what stops a two-finger gesture feeding itself.
@@ -35,7 +35,7 @@
  * and keeps the grabbing cursor, and a board can no longer be dragged because the drag
  * gives way to what it takes for a second finger.
  *
- * So the sources release what they hold (`frame-gestures.ts` on teardown, `Stage` when
+ * So the sources release what they hold (`stage/input.ts` on teardown, `Stage` when
  * the window loses focus), and this file is the net under them, because a source that
  * has died cannot release anything:
  *

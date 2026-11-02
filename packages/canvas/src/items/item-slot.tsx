@@ -28,7 +28,7 @@ export interface ItemSlotProps {
 	visible: boolean;
 	/**
 	 * Mounted but asleep: a card let go lately, kept with its root so waking it again is instant
-	 * (`items/live-cards.ts`, `kept`). Hidden, and drawn by the sheet as its picture; it takes a press as
+	 * (`items/awake.ts`, `kept`). Hidden, and drawn by the sheet as its picture; it takes a press as
 	 * a sleeping card's slot does. Its scripts go on running: a card has no way to be paused.
 	 */
 	asleep?: boolean | undefined;

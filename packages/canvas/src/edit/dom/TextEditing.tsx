@@ -201,7 +201,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	 * the editor's, drew them only once the server's answer had been laid out.
 	 */
 	let editorGhost: HTMLElement | undefined;
-	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`layer.ts`, `mark`). */
+	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`render/engine.ts`, `mark`). */
 	let ghostUntil: number | undefined;
 	const leaveGhost = () => {
 		dropGhost();

@@ -186,7 +186,7 @@ export async function readGpuClass(): Promise<GpuClass> {
 }
 
 /**
- * A device's cards (`items/live-cards.ts`): how many are live at once besides the selected one, the
+ * A device's cards (`items/awake.ts`): how many are live at once besides the selected one, the
  * nearest the middle of the screen, and how many let go keep their roots, asleep, so that coming back
  * to one is instant. A live card is a root of elements this one page lays out, paints and runs the
  * scripts of; an iPad or a phone has one thread and a hard memory ceiling for all of it.

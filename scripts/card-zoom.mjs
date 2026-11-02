@@ -229,7 +229,7 @@ const heap = async () => {
 const live = () =>
 	canvas.evaluate(() => {
 		const all = [...document.querySelectorAll(".card-host")];
-		// A card kept asleep with its root (`items/live-cards.ts`, `kept`) is not live.
+		// A card kept asleep with its root (`items/awake.ts`, `kept`) is not live.
 		const hosts = all.filter((host) => !host.closest("[data-asleep]"));
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		const shown = hosts.filter((host) => {

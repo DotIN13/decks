@@ -63,7 +63,7 @@ const cssOf = (rgba: ReturnType<typeof color>) => (rgba ? `rgba(${Math.round(rgb
 const firstColourOf = (node: PenNode) => fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
 
 /**
- * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
+ * How the engine sets an item's words (`packages/stage/crates/text`), for the editor that types
  * over them: the same font, size, weight, spacing, line height, padding and colour, so the words do
  * not move when the editor opens or closes. The canvas keeps drawing the item — its paper, its
  * shadow, its card — and leaves out only the words while they are the editor's (`muteText`).

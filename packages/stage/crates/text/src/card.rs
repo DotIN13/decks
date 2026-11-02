@@ -1,4 +1,4 @@
-//! A card's markdown set in the app's own hand, as `markdown-layout.ts` sets it: the app's greys,
+//! A card's markdown set in the app's own hand, as the canvas's own sheet (`packages/canvas/styles/canvas.css`) sets it: the app's greys,
 //! hairlines and accent, light or dark; headings in semibold with no rule under them; a quote behind
 //! a hairline bar; code on the app's tint in its monospace face; tables across the whole card with a
 //! line under the header and between rows; sizes in units of the card's font size, paragraphs at a

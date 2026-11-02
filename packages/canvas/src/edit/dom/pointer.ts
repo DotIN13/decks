@@ -171,7 +171,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		return pictureAt(host.pagesNear(at), at, host.rendered());
 	};
 	/**
-	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
+	 * A press on a drawn item's click shape (`render/engine.ts`, `attachHits`). Only items over a board have one, to take
 	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
 	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
