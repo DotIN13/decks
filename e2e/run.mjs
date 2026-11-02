@@ -217,6 +217,8 @@ const CHECKS = [
 	{ file: "running.mjs", needsAgent: true },
 	{ file: "time-machine.mjs", needsAgent: true },
 	{ file: "chrome.mjs", needsAgent: true },
+	/* One sitting through the main journeys, open to time machine; the fake model is enough (`e2e/fake-model.mjs`). */
+	{ file: "walkthrough.mjs", needsAgent: true },
 ];
 
 const wanted = process.argv.slice(2).filter((argument) => !argument.startsWith("-"));

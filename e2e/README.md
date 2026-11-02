@@ -22,7 +22,7 @@ names it as the default model. Pi itself is real; only the model is fake.
 
 ```sh
 node e2e/fake-model.mjs &
-PI_CODING_AGENT_DIR=e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e
+PI_CODING_AGENT_DIR=$PWD/e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e   # absolute: the server runs from apps/server
 ```
 
 The checks are written against the UI and the protocol, not against a runtime, so the same

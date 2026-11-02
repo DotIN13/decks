@@ -6,7 +6,7 @@
  * its words, and otherwise answers briefly. Pi is the real agent; only the model is fake.
  *
  *     node e2e/fake-model.mjs &                                   # on 127.0.0.1:4700
- *     PI_CODING_AGENT_DIR=e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e
+ *     PI_CODING_AGENT_DIR=$PWD/e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e   # absolute: the server runs from apps/server
  *
  * `e2e/fake-agent/` is a pi agent directory whose models.json names this endpoint and whose
  * settings.json makes it the default model; pi writes its sessions beside them, which git ignores.
