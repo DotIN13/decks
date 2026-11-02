@@ -1,7 +1,7 @@
 import Images from "lucide-solid/icons/images";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { api } from "../connections/connection.ts";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 /** What `GET /api/pictures` answers (`PictureProgress` in the server's `boards/thumbs.ts`). */
 interface Progress {

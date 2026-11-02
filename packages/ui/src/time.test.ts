@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { clockTime, dayKey, formatDate, setTimeZone, timeZone, yearOf } from "./time.ts";
+import { clockTime, dayKey, formatDate, setTimeZone, timeZone, yearOf } from "@decks/ui";
 
 afterEach(() => setTimeZone(undefined));
 

@@ -2,7 +2,7 @@ import type { Board } from "@decks/protocol";
 import Trash2 from "lucide-solid/icons/trash-2";
 import EyeOff from "lucide-solid/icons/eye-off";
 import { createSignal, onCleanup, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import { basename } from "./panel-groups.ts";
 
 /** How long an armed delete waits for the second press before forgetting it was asked. */

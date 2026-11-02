@@ -19,7 +19,7 @@ import Search from "lucide-solid/icons/search";
 import Upload from "lucide-solid/icons/upload";
 import X from "lucide-solid/icons/x";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 interface BrowseEntry {
 	name: string;

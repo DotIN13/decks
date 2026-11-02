@@ -1,4 +1,4 @@
-import { PAGE } from "../chat/history-page.ts";
+import { PAGE } from "@decks/agent-ui/chat";
 import { scratch } from "./agent.ts";
 import { state } from "./deck.ts";
 import { send, started } from "./socket.ts";

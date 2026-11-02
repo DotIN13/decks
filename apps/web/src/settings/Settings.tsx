@@ -14,14 +14,13 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
-import { Icon } from "../ui/icons.tsx";
-import { browserZone, clockTime } from "../lib/time.ts";
+import { Icon, browserZone, clockTime } from "@decks/ui";
 import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
 import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
-import type { AlertPrefs } from "../alerts/policy.ts";
+import type { AlertPrefs } from "@decks/agent-ui/alerts";
 
 /** The six sections, in the order the left of the window lists them. */
 const SECTIONS = [

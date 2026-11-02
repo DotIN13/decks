@@ -1,6 +1,6 @@
 import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
-import { trackZoneWith } from "../lib/time.ts";
+import { trackZoneWith } from "@decks/ui";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { DecksMark } from "../ui/icons.tsx";
+import { DecksMark } from "@decks/ui";
 import { Switcher } from "./Switcher.tsx";
 
 /**

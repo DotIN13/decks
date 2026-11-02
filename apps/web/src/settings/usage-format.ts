@@ -1,4 +1,4 @@
-import { dayKey, formatDateTime } from "../lib/time.ts";
+import { dayKey, formatDateTime } from "@decks/ui";
 /**
  * Numbers in the usage panel, said the way a person would say them.
  *

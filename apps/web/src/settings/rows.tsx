@@ -1,7 +1,6 @@
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { For, Show, type JSX } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
+import { Icon, Popover } from "@decks/ui";
 
 /*
  * The rows Settings is made of (`settings/Settings.tsx`, `alerts/AlertSettings.tsx`): a group's

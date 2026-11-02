@@ -4,7 +4,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import { createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/tools";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 /**
  * The pen tray: the instruments in a row, the one in hand raised, its colour and its width.

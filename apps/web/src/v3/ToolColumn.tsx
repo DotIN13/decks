@@ -40,7 +40,7 @@ import {
 	type ArrowStyle,
 	type PenTool,
 } from "@decks/canvas/tools";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 /**
  * The tool column of the v3 harness: select and hand, then what you can put on the canvas

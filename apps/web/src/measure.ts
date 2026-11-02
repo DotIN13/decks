@@ -1,4 +1,4 @@
-import { measureFrame } from "./board/extent.ts";
+import { measureFrame } from "@decks/canvas/host";
 
 /**
  * One board, measured for `decks.canvas.fit` when no canvas has measured it (`server/stage/shots.ts`).

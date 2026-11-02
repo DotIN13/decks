@@ -2,7 +2,7 @@ import { onCleanup, onMount, Show } from "solid-js";
 import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { question, type Question } from "../state/confirm.ts";
-import { Icon } from "./icons.tsx";
+import { Icon } from "@decks/ui";
 
 /** Whether the answer removes something. */
 const danger = (q: Question) => q.danger ?? /^(delete|remove|forget)\b/i.test(q.yes);

@@ -5,7 +5,7 @@ import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
 import { isWorking, workingWords } from "@decks/agent-ui/chat";
 import { onMount, Show, type JSX } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 /** What an agent is doing, said after its name: "running tools…", "waiting for you", or nothing. */
 export function stateWords(state: AgentState, name: string): string | undefined {

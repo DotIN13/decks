@@ -8,8 +8,7 @@ import { AgentFace } from "../agents/AgentPill.tsx";
 import { ContextRing } from "../chrome/ContextRing.tsx";
 import { PictureProgress } from "../chrome/PictureProgress.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
-import { Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
+import { Icon, Popover } from "@decks/ui";
 
 export type MoreItem = { label: string; icon: LucideIcon; note?: string; onPick: () => void; rule?: boolean; checked?: boolean; disabled?: boolean };
 

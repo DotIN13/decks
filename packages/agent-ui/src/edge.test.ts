@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeHistory, edgeOwner, historyButton, setInspectable, toggleHistory } from "./edge.ts";
+import { closeHistory, edgeOwner, historyButton, setInspectable, toggleHistory } from "@decks/agent-ui/edge";
 
 /** Back to nothing wanted, nothing selected, and the inspector holding the claim — through the public calls. */
 function resetEdge(): void {
