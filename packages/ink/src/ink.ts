@@ -21,19 +21,6 @@ export interface InkStroke {
 	points: number[];
 }
 
-const PAINT: Record<InkColor, string> = {
-	ink: "var(--b-fg, currentColor)",
-	red: "#e5484d",
-	blue: "#3b82f6",
-	green: "#2f9e62",
-	yellow: "#f2b200",
-};
-
-/** The CSS colour a stroke is drawn in. */
-export function inkPaint(color: InkColor): string {
-	return PAINT[color];
-}
-
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // --- geometry ------------------------------------------------------------------------
