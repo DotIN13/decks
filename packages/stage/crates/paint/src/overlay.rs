@@ -91,7 +91,10 @@ impl Overlay {
 }
 
 /// Paint the overlay for a camera at `(x, y)` and `s` target pixels per canvas unit, after everything else.
-pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, ops: &mut Vec<Op>) {
+/// `s` is the camera's scale in device pixels (zoom × `dpr`); every screen size here (a handle's width, a
+/// line's, a dash's) is in CSS pixels and is multiplied by `dpr`, so it is the same size on every screen.
+pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, dpr: f64, ops: &mut Vec<Op>) {
+	let k = dpr as f32;
 	let tx = |x: f64| ((x - cam_x) * s) as f32;
 	let ty = |y: f64| ((y - cam_y) * s) as f32;
 	let rgba = |c: [f32; 3], a: f32| Color::straight([c[0], c[1], c[2], a], 1.0);
@@ -105,27 +108,27 @@ pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, ops: &mut Vec<
 		let shape = |ellipse: bool| Shape { w, h, radii: [r; 4], ellipse };
 		let at = Affine::translate(x, y);
 		match b.kind.as_str() {
-			"kin" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(0.45)), stroke: Some((1.0, Align::Outside)) }),
-			"kin-child" => dashed_box(ops, w, h, r, at, 1.0, &[4.0, 3.0], accent(0.55)),
-			"selection" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Outside)) }),
-			"selection-thin" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.0, Align::Outside)) }),
-			"selection-box" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Outside)) }),
-			"hover" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.0, Align::Outside)) }),
+			"kin" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(0.45)), stroke: Some((1.0 * k, Align::Outside)) }),
+			"kin-child" => dashed_box(ops, w, h, r, at, 1.0 * k, &[4.0 * dpr, 3.0 * dpr], accent(0.55)),
+			"selection" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Outside)) }),
+			"selection-thin" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.0 * k, Align::Outside)) }),
+			"selection-box" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Outside)) }),
+			"hover" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.0 * k, Align::Outside)) }),
 			"join" => {
 				ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(0.1)), stroke: None });
-				ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.0, Align::Outside)) });
+				ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.0 * k, Align::Outside)) });
 			}
-			"slot-frame" => dashed_box(ops, w, h, r, at, 1.5, &[4.0, 3.0], accent(0.6)),
+			"slot-frame" => dashed_box(ops, w, h, r, at, 1.5 * k, &[4.0 * dpr, 3.0 * dpr], accent(0.6)),
 			"draft" | "draft-ellipse" => {
 				let ellipse = b.kind == "draft-ellipse";
 				ops.push(Op::Shape { shape: shape(ellipse), transform: at, paint: Paint::Solid(accent(0.08)), stroke: None });
 				if ellipse {
-					dashed_path(ops, &mesh::ellipse_path(w as f64, h as f64), at, 1.5, &[4.0, 3.0], accent(1.0));
+					dashed_path(ops, &mesh::ellipse_path(w as f64, h as f64), at, 1.5 * k, &[4.0 * dpr, 3.0 * dpr], accent(1.0));
 				} else {
-					dashed_box(ops, w, h, r, at, 1.5, &[4.0, 3.0], accent(1.0));
+					dashed_box(ops, w, h, r, at, 1.5 * k, &[4.0 * dpr, 3.0 * dpr], accent(1.0));
 				}
 			}
-			"measure" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(guide(1.0)), stroke: Some((1.0, Align::Center)) }),
+			"measure" => ops.push(Op::Shape { shape: shape(false), transform: at, paint: Paint::Solid(guide(1.0)), stroke: Some((1.0 * k, Align::Center)) }),
 			_ => {}
 		}
 	}
@@ -134,12 +137,12 @@ pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, ops: &mut Vec<
 		path.move_to((tx(l.x1) as f64, ty(l.y1) as f64));
 		path.line_to((tx(l.x2) as f64, ty(l.y2) as f64));
 		match l.kind.as_str() {
-			"slot" => line(ops, &path, 1.5, LineCap::Round, Some(&[4.0, 3.0]), accent(0.7)),
-			"insert" => line(ops, &path, 3.0, LineCap::Round, None, accent(1.0)),
-			"guide" => line(ops, &path, 1.0, LineCap::Butt, None, guide(1.0)),
-			"measure" => line(ops, &path, 1.0, LineCap::Butt, None, guide(1.0)),
-			"measure-dashed" => line(ops, &path, 1.0, LineCap::Butt, Some(&[3.0, 3.0]), guide(1.0)),
-			"draft" => line(ops, &path, 2.0, LineCap::Butt, Some(&[6.0, 6.0]), accent(1.0)),
+			"slot" => line(ops, &path, 1.5 * k, LineCap::Round, Some(&[4.0 * dpr, 3.0 * dpr]), accent(0.7)),
+			"insert" => line(ops, &path, 3.0 * k, LineCap::Round, None, accent(1.0)),
+			"guide" => line(ops, &path, 1.0 * k, LineCap::Butt, None, guide(1.0)),
+			"measure" => line(ops, &path, 1.0 * k, LineCap::Butt, None, guide(1.0)),
+			"measure-dashed" => line(ops, &path, 1.0 * k, LineCap::Butt, Some(&[3.0 * dpr, 3.0 * dpr]), guide(1.0)),
+			"draft" => line(ops, &path, 2.0 * k, LineCap::Butt, Some(&[6.0 * dpr, 6.0 * dpr]), accent(1.0)),
 			_ => {}
 		}
 	}
@@ -147,38 +150,38 @@ pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, ops: &mut Vec<
 		let Ok(mut path) = BezPath::from_svg(&p.d) else { continue };
 		path.apply_affine(kurbo::Affine::new([s, 0.0, 0.0, s, tx(p.x) as f64, ty(p.y) as f64]));
 		if p.kind == "route" {
-			line(ops, &path, 2.0, LineCap::Butt, Some(&[6.0, 6.0]), accent(1.0));
+			line(ops, &path, 2.0 * k, LineCap::Butt, Some(&[6.0 * dpr, 6.0 * dpr]), accent(1.0));
 		}
 	}
 	for d in &o.dots {
 		let (cx, cy) = (tx(d.x), ty(d.y));
-		let px = d.px;
+		let px = d.px * k;
 		let square = |radii: f32, ellipse: bool| Shape { w: px, h: px, radii: [radii; 4], ellipse };
 		let at = Affine::translate(cx - px / 2.0, cy - px / 2.0);
 		match d.kind.as_str() {
 			"handle" => {
-				ops.push(Op::Shape { shape: square(2.0, false), transform: at, paint: Paint::Solid(panel), stroke: None });
-				ops.push(Op::Shape { shape: square(2.0, false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Inside)) });
+				ops.push(Op::Shape { shape: square(2.0 * k, false), transform: at, paint: Paint::Solid(panel), stroke: None });
+				ops.push(Op::Shape { shape: square(2.0 * k, false), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Inside)) });
 			}
 			"handle-round" | "radius" | "end" | "bend" => {
 				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(panel), stroke: None });
-				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Inside)) });
+				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Inside)) });
 			}
 			"bend-bent" => {
 				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(panel), stroke: None });
-				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.5, Align::Inside)) });
+				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((2.5 * k, Align::Inside)) });
 			}
 			"diamond" => {
 				// A square turned 45° about its centre: the joined end, which slides along the side it joins.
 				let (c, sn) = (std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2);
 				let half = px / 2.0;
 				let turned = Affine([c, sn, -sn, c, cx - c * half + sn * half, cy - sn * half - c * half]);
-				ops.push(Op::Shape { shape: square(2.0, false), transform: turned, paint: Paint::Solid(panel), stroke: None });
-				ops.push(Op::Shape { shape: square(2.0, false), transform: turned, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Inside)) });
+				ops.push(Op::Shape { shape: square(2.0 * k, false), transform: turned, paint: Paint::Solid(panel), stroke: None });
+				ops.push(Op::Shape { shape: square(2.0 * k, false), transform: turned, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Inside)) });
 			}
 			"anchor" => {
 				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(panel), stroke: None });
-				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5, Align::Inside)) });
+				ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: Some((1.5 * k, Align::Inside)) });
 			}
 			"side" => ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(0.55)), stroke: None }),
 			"side-on" => ops.push(Op::Shape { shape: square(0.0, true), transform: at, paint: Paint::Solid(accent(1.0)), stroke: None }),
@@ -211,7 +214,7 @@ mod overlay_tests {
 	fn a_selection_and_its_handles_are_painted_at_the_camera() {
 		let o = Overlay::parse(r#"{"boxes":[{"x":10,"y":10,"w":100,"h":50,"r":4,"kind":"selection"}],"dots":[{"x":10,"y":10,"px":10,"kind":"handle-round"}],"lines":[{"x1":0,"y1":0,"x2":10,"y2":0,"kind":"guide"}],"paths":[{"x":0,"y":0,"d":"M0 0L10 10","kind":"route"}]}"#).unwrap();
 		let mut ops = Vec::new();
-		paint_overlay(&o, 0.0, 0.0, 2.0, &mut ops);
+		paint_overlay(&o, 0.0, 0.0, 2.0, 1.0, &mut ops);
 		// The box, two ops for the dot, a mesh for the line and one for the path.
 		assert_eq!(ops.len(), 5);
 		match &ops[0] {
@@ -225,10 +228,26 @@ mod overlay_tests {
 	}
 
 	#[test]
+	fn screen_sizes_are_css_pixels_on_any_screen() {
+		let o = Overlay::parse(r#"{"boxes":[{"x":0,"y":0,"w":10,"h":10,"kind":"selection"}],"dots":[{"x":0,"y":0,"px":9,"kind":"handle"}]}"#).unwrap();
+		let mut ops = Vec::new();
+		// A 2× screen at zoom 1: the scale is 2, and a 9 px handle and a 1.5 px line are twice that in device pixels.
+		paint_overlay(&o, 0.0, 0.0, 2.0, 2.0, &mut ops);
+		match (&ops[0], &ops[1]) {
+			(Op::Shape { stroke, .. }, Op::Shape { shape, .. }) => {
+				assert_eq!(*stroke, Some((3.0, Align::Outside)));
+				assert_eq!((shape.w, shape.h), (18.0, 18.0));
+				assert_eq!(shape.radii, [4.0; 4]);
+			}
+			other => panic!("{other:?}"),
+		}
+	}
+
+	#[test]
 	fn an_unknown_kind_paints_nothing_and_a_bad_json_is_none() {
 		let o = Overlay::parse(r#"{"boxes":[{"x":0,"y":0,"w":1,"h":1,"kind":"nope"}]}"#).unwrap();
 		let mut ops = Vec::new();
-		paint_overlay(&o, 0.0, 0.0, 1.0, &mut ops);
+		paint_overlay(&o, 0.0, 0.0, 1.0, 1.0, &mut ops);
 		assert!(ops.is_empty());
 		assert!(Overlay::parse("{").is_none());
 	}

@@ -826,7 +826,7 @@ impl Page {
 		// The editor's outlines, handles and guides, over everything and in the same frame (not on a ghost's frame).
 		if !self.only_lifted {
 			if let Some(overlay) = &self.overlay {
-				stage_paint::overlay::paint_overlay(overlay, camera.x, camera.y, s, &mut over.ops);
+				stage_paint::overlay::paint_overlay(overlay, camera.x, camera.y, s, dpr, &mut over.ops);
 			}
 		}
 		over
