@@ -468,7 +468,7 @@ export type ServerMessage =
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
 	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**
-	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
+	 * Every stage in the deck, for the canvas manager (`canvases/CanvasManager.tsx`).
 	 *
 	 * A stage is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
 	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and

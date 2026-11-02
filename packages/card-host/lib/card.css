@@ -83,7 +83,7 @@ body.board[data-bg="dots"] {
 
 /*
  * A board that is one thing edge to edge: a live document, a file, an app, the shared
- * browser's card (the server writes these, `boards/templates.ts`). The thing is the board, so it
+ * browser's card (the server writes these, `cards/size.ts`). The thing is the board, so it
  * fills the frame the canvas gives it — `100vh` inside a frame is that rectangle — and its own
  * content scrolls inside it.
  */
@@ -781,7 +781,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
  * list inside it scrolls, and nothing here comes from the file — the app posts its state in.
  *
  * The one property that matters to the canvas is on `.live-list`: `overflow-y: auto` is
- * what makes `frame-gestures.ts` give it the wheel while it has room and hand the scroll
+ * what makes the canvas (`stage/input.ts`) give it the wheel while it has room and hand the scroll
  * back to the stage at the ends. Everything else is appearance.
  *
  * `--live-panel` is `#fff` in the light scheme and `#242424` in the dark one, this ramp's
