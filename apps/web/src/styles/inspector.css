@@ -96,20 +96,6 @@
 	}
 
 	/*
-	 * The label of a scrubbable field, while it is being pulled.
-	 *
-	 * `chrome.css` gives the handle its `ew-resize` cursor and its `user-select: none` at
-	 * rest, which is the affordance; this is the feedback. Four of them sit 4px apart in one
-	 * 24px row, and once the pointer has left the panel — which it does immediately, because
-	 * the gesture is horizontal and the panel is 320px wide — the accent is the only thing
-	 * saying *which* number is moving. `data-scrubbing` is set by `scrub.ts` on the element
-	 * it captured the pointer with, so it cannot disagree with the drag.
-	 */
-	.field > .kv-key[data-scrubbing="true"] {
-		color: var(--color-accent);
-	}
-
-	/*
 	 * A field whose value is not a number: `height` on a box that sizes from its own
 	 * content, which is most of them.
 	 *
