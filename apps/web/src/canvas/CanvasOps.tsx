@@ -22,10 +22,10 @@ import { tokens } from "@decks/canvas/host";
  * has a goal ("how do I move a thing?") and not a keystroke, so the headings are the goals
  * and the gestures sit under them.
  *
- * Every row is checked against the code that implements it: `Stage.shortcut` and
- * `TOOL_KEYS` for the camera and the tools, `Editor.ts` for selection and editing,
- * `file-drop.ts` for the drop, `PageFrame.tsx` for the board's own chrome, `InkLayer.tsx`
- * and `comment-select.ts` for reading a board. A cheat sheet
+ * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
+ * and `PEN_TOOL_KEYS` for the camera and the tools, `edit/` for selection and editing,
+ * `model/file-drop.ts` for the drop, `items/card-surface.tsx` for a card's own chrome,
+ * `edit/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
  * that lies is worse than none, so where the two disagree this file is the one that is
  * wrong.
  */

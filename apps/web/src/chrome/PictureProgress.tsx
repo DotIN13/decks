@@ -3,7 +3,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon } from "@decks/ui";
 
-/** What `GET /api/pictures` answers (`PictureProgress` in the server's `boards/thumbs.ts`). */
+/** What `GET /api/pictures` answers (`PictureProgress` in the server's `pictures/service.ts`). */
 interface Progress {
 	total: number;
 	ready: number;

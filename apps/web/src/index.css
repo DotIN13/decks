@@ -72,7 +72,7 @@
  * beat `@media (pointer: coarse) { .notices { top: 74px } }` and the rule silently did
  * nothing. Anything responsive about a utility-styled element has to be a variant in the
  * markup (`pointer-coarse:`), which is why those read oddly long in
- * `App.tsx` and `Inspector.tsx`. The alternative — leaving the base declaration here too —
+ * `App.tsx`. The alternative — leaving the base declaration here too —
  * is fine, and is what the surfaces above with `env()` corners actually do; what does not
  * work is one property stated in both places.
  */
@@ -104,7 +104,7 @@ body {
 	-webkit-font-smoothing: antialiased;
 	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
 	   chrome — where a double-tap means nothing and the delay is felt on every button.
-	   The stage sets `none` for itself; the frames do it in `frame-gestures.ts`. */
+	   The stage sets `none` for itself (`stage/input.ts`). */
 	touch-action: manipulation;
 }
 

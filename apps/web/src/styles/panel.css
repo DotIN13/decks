@@ -888,7 +888,7 @@
  * vertically, 18px of daylight between their right edges reads as a misalignment rather
  * than as clearance.
  *
- * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
+ * Only the shell is here. Everything inside the panel is utilities in `panel/LeftPanel.tsx`;
  * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
  * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
  */
