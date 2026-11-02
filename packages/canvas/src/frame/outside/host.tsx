@@ -30,6 +30,12 @@ export interface FrameHostOptions {
 	 * its canvas on it.
 	 */
 	pass(canvas: string): Promise<CanvasPass>;
+	/**
+	 * Whether the frame showing `from` may move to `to` in place, keeping its loaded code rather than
+	 * being made again: both must be yours alone (not a friend's, and nobody else may edit them), since
+	 * a card's script can leave code running in the frame after its card is gone. Left out: never.
+	 */
+	inPlace?(from: string, to: string): boolean;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
@@ -233,40 +239,58 @@ export function createFramedEditor(options: Options): FramedEditor {
 		});
 	}
 
-	/** Start the frame on the canvas on screen: the pass first, then everything it begins with. */
-	const startFrame = async (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean) => {
-		const pass = await options.frame.pass(canvas);
-		if (cancelled()) return;
-		const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
-		const pen = untrack(() => state?.pen?.());
-		const stored: Record<string, string> = {};
-		if (storage) {
-			const prefix = storeKey(canvas);
-			for (let i = 0; i < (storage as Storage).length; i++) {
-				const key = (storage as Storage).key(i);
-				if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = storage.getItem(key) ?? "";
-			}
-			// A harness's frame keeps no view of its own any more (the page keeps one per agent and canvas): what one kept is dropped.
-			if (backend.kind !== "studio" && FRAME_VIEWS in stored) {
-				delete stored[FRAME_VIEWS];
-				storage.removeItem(prefix + FRAME_VIEWS);
-			}
-		}
-		const start: Start = {
-			protocol: PROTOCOL,
-			canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
-			backend,
-			files: { base: pass.files, expires: pass.expires },
-			pictures: pass.pictures,
-			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
-			camera: localCamera,
-			...(pen?.writer ? { writer: pen.writer } : {}),
-			stored,
-			appStored: appStoredNow(),
-		};
+	/**
+	 * Start the frame on a canvas: its hello is listened for at once (a frame moved in place says it
+	 * again soon after its `reset`), and the pass is asked for beside it; once both are here, the frame
+	 * gets everything it begins with. Answers how to stop waiting, for a canvas left before it started.
+	 */
+	const startFrame = (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean): (() => void) => {
+		let said = false;
+		let pass: CanvasPass | undefined;
 		const onHello = (event: MessageEvent) => {
 			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
 			removeEventListener("message", onHello);
+			said = true;
+			if (pass) begin(pass);
+		};
+		addEventListener("message", onHello);
+		void options.frame.pass(canvas).then(
+			(got) => {
+				if (cancelled()) return;
+				pass = got;
+				if (said) begin(got);
+			},
+			(error: unknown) => console.error(error),
+		);
+		const begin = (pass: CanvasPass) => {
+			if (cancelled()) return;
+			const backend = { api: pass.api, token: pass.token, expires: pass.expires, ...(pass.kind ? { kind: pass.kind } : {}) };
+			const pen = untrack(() => state?.pen?.());
+			const stored: Record<string, string> = {};
+			if (storage) {
+				const prefix = storeKey(canvas);
+				for (let i = 0; i < (storage as Storage).length; i++) {
+					const key = (storage as Storage).key(i);
+					if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = storage.getItem(key) ?? "";
+				}
+				// A harness's frame keeps no view of its own any more (the page keeps one per agent and canvas): what one kept is dropped.
+				if (backend.kind !== "studio" && FRAME_VIEWS in stored) {
+					delete stored[FRAME_VIEWS];
+					storage.removeItem(prefix + FRAME_VIEWS);
+				}
+			}
+			const start: Start = {
+				protocol: PROTOCOL,
+				canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
+				backend,
+				files: { base: pass.files, expires: pass.expires },
+				pictures: pass.pictures,
+				look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
+				camera: localCamera,
+				...(pen?.writer ? { writer: pen.writer } : {}),
+				stored,
+				appStored: appStoredNow(),
+			};
 			const channel = new MessageChannel();
 			const page = peer(channel.port1) as PageEnd;
 			// A new frame has said nothing yet, and starts with the page's selection (`start.selected`), so it is not sent again.
@@ -280,8 +304,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 			// The camera as it is now: the page may have landed while the frame was loading.
 			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: localCamera, ...(selected ? { selected } : {}) })) as Start }, "*", [channel.port2]);
 		};
-		addEventListener("message", onHello);
-		onCleanup(() => removeEventListener("message", onHello));
+		return () => removeEventListener("message", onHello);
 	};
 
 	/**
@@ -525,24 +548,59 @@ export function createFramedEditor(options: Options): FramedEditor {
 		});
 	};
 
-	/** The frame for the canvas on screen, made again when the host moves to another canvas. */
+	/**
+	 * The frame for the canvas on screen. Moving to another canvas ends the one it showed (its port, its
+	 * pass's renewals) and either moves the same frame in place (`reset`, both canvases yours alone,
+	 * `inPlace`), which keeps the code and the engine's module it loaded, or makes a new frame.
+	 */
 	const surface = (): JSX.Element => {
 		keepInStep();
+		/** Which frame is made: a new one each time this changes. */
+		const [made, setMade] = createSignal<{ n: number } | undefined>();
+		/** The canvas the frame shows, or is being started on. */
+		let holds: string | undefined;
+		/** Stops the canvas the frame shows now: its start, its port, its renewals. */
+		let leave: (() => void) | undefined;
+		const show = (frame: HTMLIFrameElement, canvas: string) => {
+			leave?.();
+			let cancelled = false;
+			const stopWaiting = startFrame(frame, canvas, () => cancelled);
+			leave = () => {
+				cancelled = true;
+				stopWaiting();
+				end()?.close();
+				setEnd(undefined);
+			};
+		};
+		createEffect(
+			on(
+				() => options.canvasName?.(),
+				(canvas) => {
+					if (canvas === holds) return;
+					const was = holds;
+					holds = canvas;
+					const frame = untrack(frameAt);
+					if (canvas && was && frame && untrack(end) && options.frame.inPlace?.(was, canvas)) {
+						show(frame, canvas);
+						frame.contentWindow?.postMessage({ t: "reset" }, "*");
+						return;
+					}
+					leave?.();
+					leave = undefined;
+					setMade(canvas ? { n: (untrack(made)?.n ?? 0) + 1 } : undefined);
+				},
+			),
+		);
+		onCleanup(() => leave?.());
 		return (
-			<Show when={options.canvasName?.()} keyed>
-				{(canvas) => {
-					let cancelled = false;
-					onCleanup(() => {
-						cancelled = true;
-						end()?.close();
-						setEnd(undefined);
-						setFrameAt(undefined);
-					});
+			<Show when={made()} keyed>
+				{(_made) => {
+					onCleanup(() => setFrameAt(undefined));
 					return (
 						<iframe
 							ref={(frame) => {
 								setFrameAt(frame);
-								void startFrame(frame, canvas, () => cancelled);
+								if (holds) show(frame, holds);
 							}}
 							class="canvas-frame"
 							title="Canvas"

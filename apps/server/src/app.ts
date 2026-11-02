@@ -1123,7 +1123,7 @@ export class App {
 			return {
 				name,
 				title: pens.titleOf(name),
-				...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : {}),
+				...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : !pens.yoursAlone(name) ? { othersEdit: true as const } : {}),
 				...(changedAt ? { changedAt } : {}),
 				boards,
 				rev,

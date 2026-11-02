@@ -77,6 +77,11 @@ export interface StageRow {
 	 */
 	shared?: { owner: string; role: "edit" | "view" };
 	/**
+	 * One of yours that someone else may edit (Studio says so, `othersEdit` in its `canvas.json`): what is on
+	 * it may not be yours, so it is not "yours alone", and the canvas frame opens it in a frame of its own.
+	 */
+	othersEdit?: true;
+	/**
 	 * The folders it had before, since this server started: the first name chosen for a canvas names
 	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
 	 */

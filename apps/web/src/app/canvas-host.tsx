@@ -6,7 +6,7 @@ import { canvasPass, cardAgentCall } from "../canvases/pass.ts";
 import { scheme } from "../lib/theme.ts";
 import { camera, glide } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
-import { stageOf } from "../state/canvases.ts";
+import { stageOf, stages } from "../state/canvases.ts";
 import { setDrawingEditor } from "../state/decks.ts";
 import { mode, selected, setMode, setSelected } from "../state/selection.ts";
 import { reportCameraSoon } from "./camera-report.ts";
@@ -75,6 +75,11 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		onRefer: frameRefer,
 		frame: {
 			pass: canvasPass,
+			// Between canvases that are yours alone the frame moves in place; a friend's, or one someone else may edit, gets a frame of its own.
+			inPlace: (from, to) => [from, to].every((name) => {
+				const row = stages().find((one) => one.name === name);
+				return !!row && !row.shared && !row.othersEdit;
+			}),
 			comment: frameComment,
 			ink: frameInk,
 			panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),

@@ -1,3 +1,4 @@
+import { life } from "./life.ts";
 import { probes } from "../../debug.ts";
 import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
@@ -43,7 +44,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		say,
 	});
 	// A sheet open over the foot of the frame (a phone's properties drawer): the page's dock makes way for it.
-	document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }));
+	document.addEventListener("decks-sheet", (event) => end.emit("sheet", { open: !!(event as CustomEvent<{ open?: boolean }>).detail?.open }), { signal: life() });
 	end.on("paste", (data) => clipboard.paste(data));
 
 	/*
@@ -258,7 +259,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		if (!carries(event)) return;
 		event.preventDefault();
 		if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-	});
+	}, { signal: life() });
 	addEventListener("drop", (event) => {
 		if (!carries(event)) return;
 		event.preventDefault();
@@ -269,7 +270,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
 			end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
 		);
-	});
+	}, { signal: life() });
 
 	/*
 	 * A shortcut the canvas did not take goes to the page, so the app's own keys work wherever the focus
@@ -278,14 +279,14 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	addEventListener("keydown", (event) => {
 		if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
 		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
-	});
+	}, { signal: life() });
 
 	/*
 	 * A press or Escape here puts away the page's menus, which hear nothing from this document; and one
 	 * there puts away this frame's (`@decks/ui` dismiss).
 	 */
-	addEventListener("pointerdown", () => end.emit("away", {}), true);
-	addEventListener("keydown", (event) => event.key === "Escape" && end.emit("away", {}), true);
+	addEventListener("pointerdown", () => end.emit("away", {}), { capture: true, signal: life() });
+	addEventListener("keydown", (event) => event.key === "Escape" && end.emit("away", {}), { capture: true, signal: life() });
 	end.on("away", () => dismissMenus());
 	return { reread };
 }

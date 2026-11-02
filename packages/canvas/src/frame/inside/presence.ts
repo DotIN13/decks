@@ -1,3 +1,4 @@
+import { life } from "./life.ts";
 import { createSignal, type Accessor } from "solid-js";
 import type { Camera, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { toWorld } from "../../camera/camera.ts";
@@ -70,10 +71,10 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 		pointerOut = true;
 		options.send({ pointer: null });
 	};
-	addEventListener("pointermove", pointer, { capture: true, passive: true });
-	addEventListener("pointerleave", leave, true);
-	addEventListener("blur", leave);
-	document.addEventListener("mouseleave", leave);
+	addEventListener("pointermove", pointer, { capture: true, passive: true, signal: life() });
+	addEventListener("pointerleave", leave, { capture: true, signal: life() });
+	addEventListener("blur", leave, { signal: life() });
+	document.addEventListener("mouseleave", leave, { signal: life() });
 	return {
 		present,
 		/** The selection changed: said as it is. */

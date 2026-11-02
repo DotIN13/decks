@@ -177,6 +177,8 @@ const CHECKS = [
 	{ file: "arrows-steady.mjs", needsAgent: false, named: true },
 	/* A canvas of drawing only is framed on its drawing when switched to and by Fit, not only on boards. */
 	{ file: "canvas-frame.mjs", needsAgent: false },
+	/* Between two of your canvases the frame moves in place; to and from a friend's it is made anew. */
+	{ file: "canvas-switch.mjs", needsAgent: false },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
 	{ file: "same-drawing.mjs", needsAgent: false },
 	/* A long stroke drawn as it grows is the stroke shaped whole, and its last frames cost less than shaping it whole each frame. */

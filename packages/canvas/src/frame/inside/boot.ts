@@ -1,3 +1,4 @@
+import { life } from "./life.ts";
 import { createSignal, untrack } from "solid-js";
 import type { Page, Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
@@ -70,7 +71,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	addEventListener("resize", () => {
 		setNarrow(innerWidth < 600);
 		reflect();
-	});
+	}, { signal: life() });
 	reflect();
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);

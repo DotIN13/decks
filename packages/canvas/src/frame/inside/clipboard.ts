@@ -1,3 +1,4 @@
+import { life } from "./life.ts";
 import { baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
 import { toWorld } from "../../camera/camera.ts";
 import type { CanvasHandle } from "../../types.ts";
@@ -74,8 +75,8 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 	const { handle } = deps;
 	/** Where the pointer is over the canvas, on this frame's screen; undefined once it has left. */
 	let pointer: { x: number; y: number } | undefined;
-	addEventListener("pointermove", (event) => (pointer = { x: event.clientX, y: event.clientY }), true);
-	document.documentElement.addEventListener("pointerleave", () => (pointer = undefined));
+	addEventListener("pointermove", (event) => (pointer = { x: event.clientX, y: event.clientY }), { capture: true, signal: life() });
+	document.documentElement.addEventListener("pointerleave", () => (pointer = undefined), { signal: life() });
 	const view = () => ({ width: innerWidth, height: innerHeight });
 	const screenAt = () => pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
 	const worldAt = () => {
@@ -109,8 +110,8 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 			deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
 		});
 	};
-	addEventListener("copy", (event) => copy(event, false));
-	addEventListener("cut", (event) => copy(event, true));
+	addEventListener("copy", (event) => copy(event, false), { signal: life() });
+	addEventListener("cut", (event) => copy(event, true), { signal: life() });
 
 	/** Select what a paste put in, once the drawing has it (it comes down the canvas's stream). */
 	const selectWhenDrawn = (made: string[], tries = 40) => {
@@ -161,7 +162,7 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		if (!clip && !text.trim()) return;
 		event.preventDefault();
 		paste({ clip, text });
-	});
+	}, { signal: life() });
 
 	// A paste the page heard while it had the focus, handed over (`PageToFrame.paste`).
 	return { paste: (data) => paste({ clip: parseClip(data.clip) ?? clipFromHtml(data.clip), text: data.text }) };

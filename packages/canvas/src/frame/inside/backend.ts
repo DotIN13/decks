@@ -1,3 +1,4 @@
+import { life } from "./life.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
 import type { Page, Presence, PresenceBy, StageCall, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../items/card-snapshot.ts";
@@ -77,6 +78,9 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 				if (open && again && !sinceOf) for (const one of hearers) one({ type: "reconnected" });
 			},
 		}));
+
+	// The line is this canvas's: it stops when the frame moves to another canvas in place (`life.ts`).
+	life().addEventListener("abort", () => opened?.stop(), { once: true });
 
 	return {
 		async drawing() {

@@ -108,7 +108,15 @@ function preferred(): BackendName | undefined {
 	}
 }
 
-export async function detect(): Promise<Detected> {
+export function detect(): Promise<Detected> {
+	// Once a frame: the next canvas it moves to in place (`frame/inside/frame.tsx`) finds the answer here. One that failed is asked again.
+	const asked = (detected ??= detectNow());
+	asked.catch(() => detected === asked && (detected = undefined));
+	return asked;
+}
+let detected: Promise<Detected> | undefined;
+
+async function detectNow(): Promise<Detected> {
 	const memory = lowMemory();
 	// WebGL asked for: tried first, so a machine whose WebGPU misbehaves can be steered off it.
 	if (preferred() === "webgl2" && hasWebGl2(typeof document === "undefined" ? undefined : document.createElement("canvas")) && typeof OffscreenCanvas === "function" && hasWebGl2(new OffscreenCanvas(1, 1))) return { backend: BACKENDS.webgl2, lowMemory: memory };
