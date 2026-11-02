@@ -9,7 +9,6 @@
  */
 import type { PenTool, PointerKind, Pt } from "./model.ts";
 
-/** Before a press moves this far on the screen, it has not moved: `follow` holds its first step back. */
 export const DRAG_SLOP_PX = 3;
 /** A finger that has gone this far on the screen is a pan or a carry, not a tap. */
 export const TAP_SLOP_PX = 10;

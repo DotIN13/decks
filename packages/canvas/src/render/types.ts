@@ -83,13 +83,6 @@ export interface CardGeometry {
 	scrollers: Array<{ x: number; y: number; w: number; h: number; content: number }>;
 }
 
-/** What a press found: the item, its node, and the box it covers. */
-export interface PenHit {
-	id: string;
-	node: import("@decks/pen").PenNode;
-	box: Frame;
-}
-
 /** Messages to the render worker (`render.worker.ts`). */
 export type ToWorker =
 	/**

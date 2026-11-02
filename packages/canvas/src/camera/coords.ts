@@ -69,20 +69,3 @@ export function checkStageOrigin(stage: Element): void {
 	);
 }
 
-/**
- * Where a board's frame is on the stage, and how large it is drawn.
- *
- * From the camera, never from `getBoundingClientRect`: a rect read on a frame is a forced
- * layout of the parent document, and during a pinch every title bar has just had its width
- * rewritten, so each finger's event paid for laying all of them out again. The camera is
- * written synchronously in the same handler that dispatched the event, so asking it gives the
- * same answer the layout would have.
- */
-export interface FrameAt {
-	/** The frame's left edge, in stage pixels. */
-	left: number;
-	/** Its top edge, in stage pixels. */
-	top: number;
-	/** The camera's zoom: one board pixel is this many stage pixels. */
-	scale: number;
-}
