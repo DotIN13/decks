@@ -99,13 +99,6 @@
 		letter-spacing: -0.01em;
 	}
 
-	.stage-count {
-		color: var(--faint);
-		font-size: var(--type-body);
-		font-weight: 500;
-		letter-spacing: 0;
-	}
-
 	/* The one filled button here: making a canvas is the panel's only action that is not a choice. */
 	.stage-new {
 		display: inline-flex;
@@ -284,19 +277,6 @@
 		box-shadow: 0 0 0 1px var(--color-accent);
 	}
 
-	.stage-current {
-		position: absolute;
-		top: 8px;
-		left: 8px;
-		padding: 2px 8px;
-		border-radius: 999px;
-		background: var(--color-accent);
-		color: #fff;
-		font-size: var(--type-note);
-		font-weight: 600;
-		letter-spacing: 0.01em;
-	}
-
 	/* The whole canvas, letterboxed on its own ground, with a margin so work at an edge is not a crop. */
 	.stage-shot {
 		display: block;
@@ -472,31 +452,6 @@
 	.stage-faces > .agent-face {
 		margin-left: -5px;
 		box-shadow: 0 0 0 2px var(--raise);
-	}
-
-	/* --- the keys ------------------------------------------------------------------------------ */
-
-	.stage-keys {
-		display: flex;
-		flex: none;
-		gap: 18px;
-		padding: 10px 22px;
-		border-top: 1px solid var(--line);
-		background: color-mix(in srgb, var(--stage) 55%, var(--raise));
-		color: var(--faint);
-		font-size: var(--type-label);
-	}
-
-	.stage-keys > span {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	@media (hover: none) {
-		.stage-keys {
-			display: none;
-		}
 	}
 
 	/* The pill's stage segment: the app's mark, the name, and the chevron that opens all this.
