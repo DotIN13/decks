@@ -28,7 +28,7 @@ for (const f of files) {
 	if (!/\.(ts|tsx|mjs|mts|md|css|rs|yml|html)$/.test(f) || HISTORY.has(f) || /cascade-order\.json$/.test(f)) continue;
 	const lines = readFileSync(f, "utf8").split("\n");
 	lines.forEach((line, i) => {
-		for (const m of line.matchAll(/`([\w./-]+\.(?:ts|tsx|mjs|mts|css|rs))`/g)) if (!basenames.has(m[1].split("/").pop())) stale.push(`${f}:${i + 1}: ${m[1]}`);
+		for (const m of line.matchAll(/`((?:[\w./-]*[\w-])\.(?:ts|tsx|mjs|mts|css|rs))`/g)) if (!basenames.has(m[1].split("/").pop())) stale.push(`${f}:${i + 1}: ${m[1]}`);
 	});
 }
 if (stale.length) {
