@@ -8,6 +8,36 @@ The numbers here come from scans of the tree (see §7). Every "dead" claim was c
 against every tracked `.ts`, `.tsx`, `.mjs`, `.html`, `.json` and `.md` file outside `_scratch/`.
 Where a scan can be fooled, the entry says so and what to check before deleting.
 
+## 0. Status: built on `studio-canvas-reorg`
+
+Done on 2026-11-02, as the 19 commits after this document on the branch `studio-canvas-reorg`,
+one step each, every one green on `npm run typecheck`, `npm test`, `npm run css:order` and the two
+new gates. Where the work differed from the plan below, this is why:
+
+- **`App.tsx` was not split (§4.2, step 19).** The 754-line menu closure the plan describes was a
+  mis-measurement: the closure is 21 lines; the 2,100 lines are mostly the component's JSX. The two
+  float helpers capture 18 of the component's names, so extracting them would mean a host object
+  the size of the code. Left as it is.
+- **The engine's picture store and tile queue stayed in the engine (§4.1, steps 13 and 14).** They
+  share the engine's `page`, `camera`, `draw()` and `picturesAsked` with everything else; what came
+  out cleanly is `tiles.ts` (the helpers), `compressed.ts`, `fonts.ts` (`FontLoader`) and
+  `hits.ts`. Likewise the Stage: `fingers.ts`, `media.ts` and `probes.ts` came out; the camera
+  wiring and the live set did not, since both are effects over the component's signals.
+- **`v3.css` was split, not folded (§4.2, step 20).** Its 253 overrides of other sheets' classes
+  each decide a cascade tie, and folding them is design work rule by rule. It is four sheets now,
+  named for what they hold and imported in the same order, so the cascade is byte for byte the
+  same (the gate's hash did not change), and nothing moved into the canvas package, which is what
+  Studio needs (§4.6). The `v3` prefix is gone from tokens (`--ui-*`), classes (`shell-*`) and prose.
+- **The browser checks ran on WebGL 2 here.** This container's Chromium crashes with WebGPU on, so
+  the harness gained `DECKS_E2E_GPU_ARGS` and the suite ran with SwiftShader: 32 of 58 checks pass
+  on the branch's base in that setting, and the same 32 after each step, with two timing-bound
+  exceptions worth a look on a real machine: `shapes.mjs` and `glide.mjs` land their opening zoom
+  on a knife-edge of the harness's 350 ms wait and flipped either way between runs here (the
+  camera, the live flag and the engine were measured identical before and after). The checks that
+  need a model were not run.
+- **One check went rather than being revived:** `e2e/checks/apps.mjs` was never in the runner's list
+  and was out of date twice over; it is in git if an apps check is wanted again.
+
 ## 1. Where the branch stands
 
 | | |
