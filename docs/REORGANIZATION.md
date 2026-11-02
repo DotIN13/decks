@@ -352,6 +352,46 @@ its `?probe=` gate and reads from the same object.
   owner's machine; the crates declare no `#[allow(dead_code)]`, so warnings are the truth.
 - `e2e/` and `scripts/` are clean apart from §3.6. `KNOWN-FAILURES.md` is current.
 
+### 4.6 Decks Studio, the other host
+
+`DotIN13/decks-studio` vendors this repository as a git submodule (`vendor/decks`, tracking
+`studio-canvas`, pinned at `c4f12da` of 2026-10-21, 213 commits behind the tip at the time of
+writing) and lists thirteen of its packages as workspaces. It never builds or imports `apps/web`.
+What it reaches:
+
+- **Styles:** one import, `@decks/canvas/canvas.css`, the `dist/canvas.css` that
+  `scripts/build-css.mjs` compiles from `styles/standalone.css` (chrome, stream, canvas, ink,
+  markdown, properties, tokens, host) and scopes under `:where(.decks-canvas, .decks-layer)` in a
+  `decks` layer. `v3.css` is not in that list, so Studio has always seen the package sheets
+  **without** the app's 55 overrides of their classes (24 in `chrome.css`, 9 in `stream.css`, 8 in
+  `properties.css`, 7 in `ink.css`, 6 in `canvas.css`, 1 in `host.css`). Studio restyles 23 of those
+  classes itself, from its own `packages/ui/src/styles.css`.
+- **Code:** the package entry points only: `@decks/canvas`, `/comments`, `/tools`,
+  `@decks/agent-ui/chat`, `/composer`, `/alerts`, `/vite`, `@decks/ui/float`, and `@decks/pen`,
+  `/protocol`, `/hub`, `/sdk`, `/sync-*`, `/board-host`. No deep import into any `src/`, no path
+  alias, no `__decks*` global.
+
+So the plan's effect on Studio comes down to two rules, both already in §4.2 and §3.5 and worth
+stating as constraints:
+
+1. **Fold `v3.css` into the app's sheets, never into the package's.** An override of `.pill` or
+   `.btn` belongs in `apps/web/src/styles/shell.css` (or whichever app sheet owns that surface), not
+   in `packages/canvas/styles/chrome.css`. Moved into the package, those 55 rules would ship to
+   Studio in its next `dist/canvas.css` and change its look. Moved into the app, Studio sees exactly
+   what it sees today. The scoping in `build-css.mjs` makes this easy to check: anything that lands
+   in `dist/canvas.css` is Studio's; anything that does not is the app's alone.
+2. **The 53 dead classes are safe to delete.** None of them appears in Studio's markup or styles
+   (checked against every `.ts`, `.tsx`, `.html` and `.css` outside `vendor/` and `node_modules/`).
+   The 41 package-sheet class names Studio's markup does use (`pill`, `float`, `stream`, `row`,
+   `title`, …) are all live in this repository too and are not touched.
+
+The canvas layout moves in §4.1 (`pen/` to `cards/`, `stage/` to `engine/`, the `Stage.tsx` and
+`engine.ts` splits) change nothing Studio imports, because the package's `exports` map is kept as
+it is. The one Studio-side chore is the ordinary one: bump the submodule, run `npm install` (its
+`postinstall` rebuilds `dist/canvas.css`), and look at the canvas once. Doing that bump before
+Phase 4 rather than after would separate "213 commits of feature work" from "the reorganization" in
+what Studio sees.
+
 ## 5. Guardrails, so it stays clean
 
 1. **A dead-export gate in CI.** The scan behind §3.3 (§7 says how it works) is forty lines; write
@@ -406,7 +446,8 @@ Each line is a commit or a short run of them. Each leaves `npm run typecheck`, `
     dissolved; `pages/`. Pure moves; typecheck proves them.
 19. `App.tsx`: extract `app/menu.tsx` and `app/floats.ts`. Checks: `chrome`, `shell`, `panel`.
 20. Fold `v3.css` into its targets, one target sheet per commit, starting with `panel.css`;
-    `theme.css` and `motion.css` are what remains. Checks: `chrome`, `panel`, `panel-steady`,
+    `theme.css` and `motion.css` are what remains. Overrides of package classes go into app
+    sheets, never into `packages/canvas/styles/` (§4.6). Checks: `chrome`, `panel`, `panel-steady`,
     `shell`, `stages`, `card-phone`. (§4.2)
 21. Rename `--v3-*` tokens to `--ui-*` and `v3-*` classes to `shell-*`, as a pure rename.
 22. Drop the over-exports in the app and the server. (§3.4)
