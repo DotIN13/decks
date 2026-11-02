@@ -15,6 +15,16 @@ DECKS_E2E_JOBS=1 npm run test:e2e       # one at a time — still a fresh deck e
 DECKS_BACKEND=claude npm run test:e2e   # the same checks, on the Claude runtime
 ```
 
+The checks that need a model can run against a **fake model** instead, with no account and no
+tokens: `e2e/fake-model.mjs` is an OpenAI-compatible endpoint that follows the few instructions
+the checks give by calling pi's real tools, and `e2e/fake-agent/` is a pi agent directory that
+names it as the default model. Pi itself is real; only the model is fake.
+
+```sh
+node e2e/fake-model.mjs &
+PI_CODING_AGENT_DIR=$PWD/e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e   # absolute: the server runs from apps/server
+```
+
 The checks are written against the UI and the protocol, not against a runtime, so the same
 suite is the parity test for both: `DECKS_BACKEND=claude DECKS_E2E_AGENT=1 npm run test:e2e`
 should pass exactly as `DECKS_E2E_AGENT=1 npm run test:e2e` does. Where one fails, it is
