@@ -186,6 +186,11 @@ export class Live {
 		for (const s of this.sockets) if (s.who.harness?.id === id) s.ws.close(4001, "revoked");
 	}
 
+	/** Close every socket of a person's, their harnesses' too: the account is gone. */
+	dropUser(id: string): void {
+		for (const s of this.sockets) if (s.who.user.id === id) s.ws.close(4001, "account deleted");
+	}
+
 	get size(): number {
 		return this.sockets.size;
 	}
