@@ -1488,13 +1488,6 @@ svg.lucide {
 	border-color: var(--color-accent);
 	box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 22%, transparent);
 }
-	.picker-google-hint {
-	max-width: 440px;
-	margin: 4px 0 0;
-	color: var(--faint);
-	font-size: var(--type-note);
-	line-height: 1.5;
-}
 	/* Google's own sign-in button: white, a hairline, the four-colour G. */
 .picker-google-signin {
 	display: inline-flex;
@@ -1519,12 +1512,7 @@ svg.lucide {
 
 	/* The same rules, under the same query. */
 	@media (prefers-reduced-motion: reduce) {
-	/* The outline stays; what moves goes. The glow stays too, still. */
-	.act-hold,
-	.act-land,
-	.act-land::before,
-	.act-draw,
-	.act-draw::before,
+	/* The glow stays still. */
 	.card-node > .news-glow::after {
 		animation: none;
 	}
