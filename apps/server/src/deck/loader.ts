@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { pageFolders } from "./stage-boards.ts";
-import { isCardPath, pageName } from "./layout.ts";
+import { isCardPath, pageName } from "@decks/hub/layout";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Page, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";

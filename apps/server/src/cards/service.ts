@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
+import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "@decks/hub/layout";
 import { dirname, join } from "node:path";
 import type { Page, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "../deck/snapshots.ts";

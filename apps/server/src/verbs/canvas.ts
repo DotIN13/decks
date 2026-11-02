@@ -3,7 +3,7 @@ import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
-import { canvasFolder, isCardPath, pageName } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";

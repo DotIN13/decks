@@ -1,4 +1,4 @@
-import { canvasFolder, canvasOfPath, isCardPath } from "../deck/layout.ts";
+import { canvasFolder, canvasOfPath, isCardPath } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cardShell } from "../cards/cards.ts";

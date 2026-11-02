@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { constants, copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { emptyDocument, parse, serialize, type PenDocument } from "@decks/pen";
-import { canvasFolder, isSharedCanvas } from "../deck/layout.ts";
+import { canvasFolder, isSharedCanvas } from "@decks/hub/layout";
 import { rewriteLinks } from "../migrations/2026-10-20-standalone-canvases.ts";
 import { CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
 import type { StagePens } from "./pens.ts";

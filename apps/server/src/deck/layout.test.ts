@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { canvasFolder, canvasOfPath, isPagePath, isHidden, referenceFor, resolveReference, servedAs, sharedName, urlFor } from "./layout.ts";
+import { canvasFolder, canvasOfPath, isPagePath, isHidden, referenceFor, resolveReference, servedAs, sharedName, urlFor } from "@decks/hub/layout";
 import { PathRefused, realPathOf, resolveFileRequest, resolveRoots, resolveServed } from "./roots.ts";
 
 const path = (r: ReturnType<typeof resolveReference>) => ("path" in r ? r.path : `refused: ${r.refused}`);

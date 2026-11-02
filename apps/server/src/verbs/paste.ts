@@ -3,7 +3,7 @@ import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync,
 import { dirname, join, posix } from "node:path";
 import { clipItems, clone, isArrow, pastedItems, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { copyBoardInto } from "../stage/copy-in.ts";
-import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas } from "../deck/layout.ts";
+import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas } from "@decks/hub/layout";
 
 /**
  * Copy and paste of items between the canvases of one harness (`canvas.clip`, `canvas.paste`).

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, sep } from "node:path";
-import { canvasFolder, isHidden, plainSegment, urlFor } from "../deck/layout.ts";
+import { canvasFolder, isHidden, plainSegment, urlFor } from "@decks/hub/layout";
 
 /**
  * 2026-10-20: every canvas becomes a folder that stands alone (`deck/layout.ts`).

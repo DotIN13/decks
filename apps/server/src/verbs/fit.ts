@@ -1,4 +1,4 @@
-import { isCardPath } from "../deck/layout.ts";
+import { isCardPath } from "@decks/hub/layout";
 import type { VerbContext } from "./context.ts";
 
 /**

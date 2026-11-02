@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import type { NextFunction, Request, Response } from "express";
-import { isPagePath, SHARED_SANDBOX } from "../deck/layout.ts";
+import { isPagePath, SHARED_SANDBOX } from "@decks/hub/layout";
 import type { App } from "../app.ts";
 import type { Relay } from "../share/relay.ts";
 

@@ -1,6 +1,6 @@
 import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
-import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas, servedAs } from "../deck/layout.ts";
+import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas, servedAs } from "@decks/hub/layout";
 import { rewriteLinks } from "../migrations/2026-10-20-standalone-canvases.ts";
 import { boardToCard, notACard } from "../migrations/2026-10-29-boards-to-cards.ts";
 

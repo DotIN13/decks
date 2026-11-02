@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { Response } from "express";
 import type { Page } from "@decks/protocol";
 import { cardModules, cardPage, readDeckImports } from "../cards/cards.ts";
-import { canvasOfPath, isCardPath, isSharedCanvas } from "../deck/layout.ts";
+import { canvasOfPath, isCardPath, isSharedCanvas } from "@decks/hub/layout";
 import { libVersion, versionLibRefs } from "../deck/lib-version.ts";
 import { NotFound, PathRefused, resolveServed } from "../deck/roots.ts";
 import { boardHeaders } from "../files/serve.ts";

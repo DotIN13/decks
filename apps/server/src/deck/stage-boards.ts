@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { canvasFolder } from "./layout.ts";
+import { canvasFolder } from "@decks/hub/layout";
 
 /**
  * Boards a canvas keeps for itself: `canvases/<name>/boards/`.

@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Root } from "@decks/protocol";
 import { expandUser } from "../config.ts";
-import { isHidden } from "./layout.ts";
+import { isHidden } from "@decks/hub/layout";
 
 /**
  * Which paths may be served — and the one that may be written — decided here and

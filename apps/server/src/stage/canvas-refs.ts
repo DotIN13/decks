@@ -1,6 +1,6 @@
 import { PenError, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { posix } from "node:path";
-import { canvasFolder, isCardPath, referenceFor, resolveReference, urlFor } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, referenceFor, resolveReference, urlFor } from "@decks/hub/layout";
 
 /**
  * A canvas's drawing as it is on disk, and as the harness holds it.

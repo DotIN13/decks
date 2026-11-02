@@ -4,7 +4,7 @@ import { unstampCard } from "@decks/card-host";
 import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts";
 import { normalizeBoardPath } from "../deck/schema.ts";
 import { NotFound, PathRefused, resolveServed } from "../deck/roots.ts";
-import { canvasOfPath, isCardPath, isSharedCanvas, servedAs } from "../deck/layout.ts";
+import { canvasOfPath, isCardPath, isSharedCanvas, servedAs } from "@decks/hub/layout";
 import { assetHeaders, boardHeaders } from "../files/serve.ts";
 import { assetAnswer } from "./assets.ts";
 import { cardModuleAnswer, cardPageAnswer } from "./cards.ts";

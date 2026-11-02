@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { libName, servedAs } from "../deck/layout.ts";
+import { libName, servedAs } from "@decks/hub/layout";
 import { deckVersion, DryRun, LATEST, MIGRATIONS, runAtOpen } from "./index.ts";
 import { readRecord } from "./version.ts";
 

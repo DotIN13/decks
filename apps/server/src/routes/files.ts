@@ -4,7 +4,7 @@ import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts
 import { basename, join, relative, resolve, sep } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } from "../deck/roots.ts";
-import { canvasFolder, canvasNameOk, libName } from "../deck/layout.ts";
+import { canvasFolder, canvasNameOk, libName } from "@decks/hub/layout";
 import { browse } from "../files/browse.ts";
 import { filePreview, previewKind } from "../files/preview.ts";
 import { boardHeaders, quarantine } from "../files/serve.ts";

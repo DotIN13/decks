@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import { pageFolders, inPageFolder } from "./stage-boards.ts";
-import { cardOf } from "./layout.ts";
+import { cardOf } from "@decks/hub/layout";
 import { isBoardFile } from "./kinds.ts";
 import { basename, join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";

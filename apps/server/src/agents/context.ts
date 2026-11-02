@@ -2,7 +2,7 @@ import { processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { agentsTemplate, decksCommands } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
-import { isCardPath } from "../deck/layout.ts";
+import { isCardPath } from "@decks/hub/layout";
 
 /**
  * What the agent is told about the deck, once, as a context file.
