@@ -206,8 +206,9 @@ export function personTable(app: App): Record<string, Impl> {
 				return { cancelled: true };
 			}
 			notice(call, "info", "Rewound.");
+			// The words taken back go to the caller's composer as a draft; a caller with no line (Studio, over HTTP) gets them in the answer.
 			if (result.editorText) call.tell({ type: "chat.draft", text: result.editorText });
-			return { cancelled: false };
+			return { cancelled: false, ...(result.editorText ? { editorText: result.editorText } : {}) };
 		},
 		"chat.fork": async ([id, entry], call) => {
 			const agent = need(id);
@@ -224,7 +225,7 @@ export function personTable(app: App): Record<string, Impl> {
 			});
 			if (call.view) call.view.focused = child.id;
 			agents().focus(child.id);
-			return { id: child.id };
+			return { id: child.id, name: child.chat().name };
 		},
 		"chat.restore": async ([id, entry], call) => {
 			const agent = need(id);
