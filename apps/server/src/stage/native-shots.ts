@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Box } from "@decks/pen";
-import { fontFiles, type FontNeed } from "../../../../packages/canvas/src/render/font-files.ts";
-import { iconUrl, parseIcon } from "../../../../packages/canvas/src/render/icons.ts";
+import { fontFiles, type FontNeed } from "../../../../packages/canvas/src/look/font-files.ts";
+import { iconUrl, parseIcon } from "../../../../packages/canvas/src/look/icons.ts";
 import { cardReader } from "../../../../packages/canvas/src/render/reader.ts";
 import { serverText } from "./text.ts";
 
@@ -26,7 +26,7 @@ import { serverText } from "./text.ts";
  * of its current revision, no binary built, no graphics card.
  */
 
-export interface NativeBoard {
+interface NativeBoard {
 	path: string;
 	x: number;
 	y: number;
@@ -53,9 +53,9 @@ export interface NativeRequest {
 	writer?: { name?: string; color: string };
 }
 
-export type NativeOutcome = { ok: true; width: number; height: number; ms: Record<string, number> } | { ok: false; why: string };
+type NativeOutcome = { ok: true; width: number; height: number; ms: Record<string, number> } | { ok: false; why: string };
 
-export interface NativeHost {
+interface NativeHost {
 	/**
 	 * A card's picture of its current revision, at least `px` wide when there is one that size, or
 	 * why there is none (and it is asked for, so a later shot has it).

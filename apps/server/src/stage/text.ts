@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText } from "@decks/pen";
 import { fileURLToPath } from "node:url";
 import { initSync, TextMeasure } from "@decks/stage";
-import { fontFiles, isFallbackFamily, textNeeds, type FontFile } from "../../../../packages/canvas/src/render/font-files.ts";
+import { fontFiles, isFallbackFamily, textNeeds, type FontFile } from "../../../../packages/canvas/src/look/font-files.ts";
 import { cardReader, mathTypesetter } from "../../../../packages/canvas/src/render/reader.ts";
 
 /**

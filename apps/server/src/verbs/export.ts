@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { iconsIn, toHtml, type HtmlIcon, type MeasureText, type PenDocument, type PenNode } from "@decks/pen";
-import { iconUrl, parseIcon } from "../../../../packages/canvas/src/render/icons.ts";
+import { iconUrl, parseIcon } from "../../../../packages/canvas/src/look/icons.ts";
 
 /**
  * Frames written out as one HTML page in the deck (`decks.canvas.export`): `@decks/pen`'s `toHtml`,
@@ -47,7 +47,7 @@ const fromPage = (page: string, file: string) =>
 		.map((part) => encodeURIComponent(part))
 		.join("/");
 
-export interface ExportRequest {
+interface ExportRequest {
 	/** The document, with its imports in place, laid out as the canvas lays it out. */
 	doc: PenDocument;
 	ids: string[];
