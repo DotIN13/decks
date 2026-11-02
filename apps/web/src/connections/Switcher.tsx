@@ -8,7 +8,7 @@ import { createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DecksMark, Icon, Popover } from "@decks/ui";
 import { state } from "../state/deck.ts";
-import { stageOf } from "../state/stages.ts";
+import { stageOf } from "../state/canvases.ts";
 import { backend, can } from "./backend.ts";
 import { forget, openBundle } from "./bundle.ts";
 import { active, api, connections, nameOf, newId, rename, saveConnections, switchTo, type Connection } from "./connection.ts";

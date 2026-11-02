@@ -7,7 +7,7 @@ import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { selected, setSelected } from "../state/selection.ts";
-import { stageOf, stages } from "../state/stages.ts";
+import { stageOf, stages } from "../state/canvases.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */

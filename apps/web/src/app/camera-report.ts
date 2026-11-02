@@ -4,7 +4,7 @@ import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { call } from "../state/socket.ts";
 import { deviceId } from "../state/device.ts";
-import { stageOf } from "../state/stages.ts";
+import { stageOf } from "../state/canvases.ts";
 
 /**
  * Telling the server where the user is looking — which is not every frame.

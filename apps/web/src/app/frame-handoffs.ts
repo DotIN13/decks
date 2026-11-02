@@ -5,7 +5,7 @@ import { commentBlock } from "../markup/comments.ts";
 import { addComment, cleanFrameComment, cleanFrameInk, cleanFramePills } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
-import { stageOf } from "../state/stages.ts";
+import { stageOf } from "../state/canvases.ts";
 import { setDraft } from "../state/ui.ts";
 import { inkAsked } from "./ink-prompts.ts";
 

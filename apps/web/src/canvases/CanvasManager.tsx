@@ -9,7 +9,7 @@ import LayoutDashboard from "lucide-solid/icons/layout-dashboard";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import type { StageRow } from "@decks/protocol";
 import { Icon } from "@decks/ui";
-import { searchStages } from "../state/stages.ts";
+import { searchStages } from "../state/canvases.ts";
 import { AgentFace } from "../agents/AgentPill.tsx";
 import { AuthedImg } from "../lib/authed.tsx";
 
@@ -47,11 +47,11 @@ import { AuthedImg } from "../lib/authed.tsx";
  * cards is a wall of pictures rather than of pencils and bins. The canvas you are on wears the
  * accent and says "Current".
  */
-/** The panel's fade, in and out: `stages.css` says the same 120ms. */
+/** The panel's fade, in and out: `canvases.css` says the same 120ms. */
 const FADE_MS = 120;
 
 
-export function StageManager(props: {
+export function CanvasManager(props: {
 	stages: StageRow[];
 	/** The stage the conversation on screen is on, so its card is marked. */
 	here: string | undefined;
@@ -108,7 +108,7 @@ export function StageManager(props: {
 		}
 	});
 
-	/* The canvas dims behind the panel by a mark on the body (`stages.css`). A `body:has()` rule
+	/* The canvas dims behind the panel by a mark on the body (`canvases.css`). A `body:has()` rule
 	   did the same, and made the browser restyle the whole app on every step of a zoom: 2,300
 	   elements a step on a 400-board canvas, for a panel that was closed. */
 	createEffect(() => {

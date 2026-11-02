@@ -1,6 +1,6 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
-import { stageOf } from "../state/stages.ts";
+import { stageOf } from "../state/canvases.ts";
 import type { AgentState, Camera, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend, receiveToolResult } from "@decks/agent-ui/chat";
@@ -20,7 +20,7 @@ import { accountChanged, releasePages, setDraft, setUnread, setUsagePanel, tookR
 import { watchedBeingNamed } from "./watching.ts";
 
 import { receiveCanvasChanged } from "../state/pens.ts";
-import { receiveStages } from "../state/stages.ts";
+import { receiveStages } from "../state/canvases.ts";
 
 /**
  * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the

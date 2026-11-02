@@ -15,7 +15,7 @@ import { can } from "../../connections/backend.ts";
 import { switchTo } from "../../connections/connection.ts";
 import { ensureWorker } from "../../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../../state/decks.ts";
-import { viewOnly } from "../../state/stages.ts";
+import { viewOnly } from "../../state/canvases.ts";
 import { authedSrc } from "../../lib/authed.tsx";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */

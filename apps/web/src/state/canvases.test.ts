@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { StageRow } from "@decks/protocol";
-import { searchStages } from "./stages.ts";
+import { searchStages } from "./canvases.ts";
 
 /**
  * What the manager's field matches, and the rule that it never shortens the list: a stage that

@@ -719,7 +719,7 @@ export function AgentPill(props: {
 				It had never been on screen at all, so two stages looked like one canvas that had
 				changed. The name goes where it is read with the agent — this pill is already the
 				answer to "whose work am I looking at" — and pressing it is the answer to "what else
-				is there" (`canvas/StageManager.tsx`).
+				is there" (`canvases/CanvasManager.tsx`).
 			*/}
 			<Show when={props.onStages}>
 				{(_on) => (

@@ -1,6 +1,6 @@
 @layer components {
 	/*
-	 * The canvas switcher (`canvas/StageManager.tsx`): every canvas in the deck, as pictures, in a
+	 * The canvas switcher (`canvases/CanvasManager.tsx`): every canvas in the deck, as pictures, in a
 	 * panel over a blurred canvas.
 	 *
 	 * Built like the app's other summoned surfaces — the `--raise` ground, a hairline, the menu's

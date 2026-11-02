@@ -34,7 +34,7 @@
 @import "./styles/dock.css";
 @import "./styles/usage.css";
 @import "../../../packages/canvas/styles/canvas.css";
-@import "./styles/stages.css";
+@import "./styles/canvases.css";
 @import "./styles/shell.css";
 @import "../../../packages/canvas/styles/ink.css";
 @import "./styles/settings.css";

@@ -89,7 +89,7 @@ const wall = await cards();
 say("pressing it opens a panel with a card per stage", wall.length === (listed ?? []).length && wall.length >= 2, JSON.stringify(wall.map((one) => one.name)));
 say("…and the card of the stage you are on is the marked one", wall.filter((one) => one.here).length === 1 && wall.find((one) => one.here)?.title === mine, JSON.stringify(wall.map((one) => [one.name, one.title, one.here])));
 /* The picture is the server's, taken once per revision — the `v` is what makes that cacheable. */
-// An empty canvas has nothing for the server to draw: its card says "Empty canvas" instead (`StageManager`, `.stage-empty`).
+// An empty canvas has nothing for the server to draw: its card says "Empty canvas" instead (`CanvasManager`, `.stage-empty`).
 say("…each card with boards asks for the stage's own picture, by revision, and an empty one says it is empty", wall.every((one) => /^\/api\/stage-thumb\/.+[?&]v=\d+/.test(one.shot ?? "") || one.empty) && wall.some((one) => (one.shot ?? "").startsWith("/api/stage-thumb/")), JSON.stringify(wall.map((one) => one.shot?.slice(0, 60) ?? (one.empty ? "empty" : null))));
 
 // --- the field filters the wall to what matches -------------------------------------------------

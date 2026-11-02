@@ -4,7 +4,7 @@ import { authHeaders } from "../lib/session.ts";
 import { notice } from "./notices.ts";
 import { call } from "./socket.ts";
 import { rewatch } from "./pens.ts";
-import { stageOf } from "./stages.ts";
+import { stageOf } from "./canvases.ts";
 
 /**
  * The person's clicks on the canvas, as verbs: the same `POST /api/v1/<verb>` an agent's `decks`

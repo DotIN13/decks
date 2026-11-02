@@ -5,7 +5,7 @@ import Search from "lucide-solid/icons/search";
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon, Popover } from "@decks/ui";
-import { searchStages } from "../state/stages.ts";
+import { searchStages } from "../state/canvases.ts";
 import { AuthedImg } from "../lib/authed.tsx";
 
 /** How many canvases the switcher lists before a search: the recent few. All canvases has the rest. */

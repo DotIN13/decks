@@ -6,7 +6,7 @@ import { takeComments } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
-import { stageOf } from "../state/stages.ts";
+import { stageOf } from "../state/canvases.ts";
 import { destination, stripMention, withoutName } from "./send-from-bar.ts";
 
 /** What the bar names its pills by, read when a line is sent. */

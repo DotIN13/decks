@@ -27,12 +27,12 @@ import { FilePicker } from "./app/files/FilePicker.tsx";
 import { pageKey } from "./composer/parked.ts";
 import { adoptFormerComments, removeComment, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
-import { CanvasOps } from "./canvas/CanvasOps.tsx";
+import { CanvasOps } from "./canvases/CanvasOps.tsx";
 import type { FramedHandle } from "@decks/canvas";
 import { Dialog } from "./agents/Dialog.tsx";
 import { Composer } from "./composer/Composer.tsx";
-import { StageManager } from "./canvas/StageManager.tsx";
-import { stageOf, stages, viewOnly } from "./state/stages.ts";
+import { CanvasManager } from "./canvases/CanvasManager.tsx";
+import { stageOf, stages, viewOnly } from "./state/canvases.ts";
 import { TopBar } from "./shell/TopBar.tsx";
 import { TopRight } from "./shell/TopRight.tsx";
 import { ChatSection, StatusPill } from "./shell/ChatSection.tsx";
@@ -40,7 +40,7 @@ import { installTooltips } from "./shell/tooltip.ts";
 import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./shell/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
-import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
+import { CanvasSwitcher } from "./canvases/CanvasSwitcher.tsx";
 import { agentViews } from "./state/views.ts";
 import { closeHistory } from "@decks/agent-ui/edge";
 import { watchInsets } from "@decks/canvas/camera";
@@ -146,7 +146,7 @@ export function App() {
 	const { barText, setBarText, agentName, barContext, sendFromBar } = createBar({ titleOf: (path) => titleOf(path), itemName: (id) => itemName(id) });
 
 
-	/** The canvas on screen, when it is a friend's shared with you to view (`state/stages.ts`). */
+	/** The canvas on screen, when it is a friend's shared with you to view (`state/canvases.ts`). */
 	const viewOnlyStage = () => viewOnly(stageOf(state.focused)?.name);
 	/* A backend that cannot write is read, and so is a friend's canvas shared with you to view: no edit mode and no pen, whichever key asked for them. */
 	createEffect(() => {
@@ -443,7 +443,7 @@ export function App() {
 			trigger={trigger}
 		/>
 	);
-	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
+	/** Whether the stage manager is up. One state, because there is one of it (`CanvasManager`). */
 	const [stagesOpen, setStagesOpen] = createSignal(false);
 	/**
 	 * Your own copy of a friend's canvas (`canvas.copyShared`), and this conversation moved onto it:
@@ -550,7 +550,7 @@ export function App() {
 					Here rather than inside the pill, because it covers the canvas and the pill is a
 					cluster of controls 40px tall. The pill owns the button; this owns the surface.
 				*/}
-				<StageManager
+				<CanvasManager
 					stages={stages()}
 					onRename={(name, to) => void call("canvas.rename", [to, { canvas: name }]).then(warnIfFailed)}
 					onDelete={(name) => void call("canvas.remove", [name]).then(warnIfFailed)}
