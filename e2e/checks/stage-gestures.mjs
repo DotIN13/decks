@@ -443,11 +443,22 @@ let ITEM_WASH = "";
 	say("a finger's tap selects an item", !!(await until(() => count(".pen-selection").then((n) => n === 1), 2000)));
 	const was = item("g-a").x;
 	m = await matrix();
+	// One finger pans, on what is selected too: a plain drag leaves the item where it is.
 	await touch("pointerdown", 31, a.x, a.y);
 	for (let i = 1; i <= 6; i += 1) await touch("pointermove", 31, a.x + i * 10, a.y);
 	await touch("pointerup", 31, a.x + 60, a.y);
+	await settle(page, 400);
+	say("…a finger dragging it straight away does not move it, even selected", item("g-a").x === was, JSON.stringify({ was, now: item("g-a").x }));
+	// Held still first, then dragged: it is picked up and carried. Its menu opens at the hold and goes as the finger moves.
+	await touch("pointerdown", 31, a.x, a.y);
+	await settle(page, 600);
+	const menuAtHold = await count(".hold-menu");
+	for (let i = 1; i <= 6; i += 1) await touch("pointermove", 31, a.x + i * 10, a.y);
+	const menuAfterMove = await count(".hold-menu");
+	await touch("pointerup", 31, a.x + 60, a.y);
 	const dragged = await until(() => Math.abs(item("g-a").x - was - Math.round(60 / m.a)) <= 2);
-	say("…and once it is selected, a finger drags it", !!dragged, JSON.stringify({ was, now: item("g-a").x }));
+	say("…held still, then dragged, a finger carries it", !!dragged, JSON.stringify({ was, now: item("g-a").x }));
+	say("…its menu opens at the hold and goes once the finger moves", menuAtHold === 1 && menuAfterMove === 0, JSON.stringify({ menuAtHold, menuAfterMove }));
 	// Bare canvas: a finger that pans keeps the selection, and a tap there lets it go, as a click does.
 	const bareSpots = () =>
 		canvas.evaluate(() => {
@@ -471,6 +482,19 @@ let ITEM_WASH = "";
 		await touch("pointerup", 31, back.x, back.y, target);
 		const gone = await until(() => count(".pen-selection").then((n) => n === 0), 2000);
 		say("a finger's pan over bare canvas keeps the item selected, and a tap there lets it go", kept === 1 && !!gone, JSON.stringify({ kept, bare, back }));
+		// Held still on bare canvas, then dragged: a marquee from where it was held, which selects what it closes round.
+		const r = await canvas.evaluate(() => window.__decksProbes?.penBox?.("g-a"));
+		const corner = (await firstOnCanvas([{ x: r.x - 24, y: r.y - 24 }, { x: r.x - 40, y: r.y - 40 }, { x: r.x - 16, y: r.y - 16 }])) ?? null;
+		if (corner) {
+			await touch("pointerdown", 31, corner.x, corner.y);
+			await settle(page, 600);
+			const steps = 8;
+			for (let i = 1; i <= steps; i += 1) await touch("pointermove", 31, corner.x + ((r.x + r.width + 16 - corner.x) * i) / steps, corner.y + ((r.y + r.height + 16 - corner.y) * i) / steps, target);
+			await touch("pointerup", 31, r.x + r.width + 16, r.y + r.height + 16, target);
+			const boxed = await until(() => count(".pen-selection").then((n) => n >= 1), 2000);
+			say("held still on bare canvas, then dragged, a finger draws a marquee and selects what it closes round", !!boxed, JSON.stringify({ corner, box: r }));
+			await page.keyboard.press("Escape");
+		} else say("held still on bare canvas, then dragged, a finger draws a marquee", false, "no bare canvas beside the item");
 	} else say("a finger's tap on bare canvas lets the item go", false, "no bare canvas on screen");
 	await page.keyboard.press("Escape");
 }
@@ -680,6 +704,9 @@ await canvas.waitForSelector(".stage-ink");
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	}), 3000);
 	say("the lasso's box has corners to resize by", !!corner);
+	// What the lasso holds gets the selection's pill, leading with what the agent on screen can make of it.
+	const inkPill = await until(() => canvas.evaluate(() => { const pill = document.querySelector(".stage-fixed > .card-callout"); return pill && /Make a drawing/.test(pill.textContent ?? "") ? pill.textContent.replace(/\s+/g, " ").trim().slice(0, 120) : undefined; }), 3000);
+	say("…and its pill offers Make a drawing, Make a card and Send to the agent on screen", !!inkPill, String(inkPill));
 	if (corner && stroke) {
 		await page.mouse.move(corner.x, corner.y);
 		await page.mouse.down();

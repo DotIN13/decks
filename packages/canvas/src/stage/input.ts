@@ -142,6 +142,26 @@ export function createStageInput(deps: StageInputDeps) {
 		};
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
+		/*
+		 * A finger kept after it landed (a hold, `pointer.ts`): its touch began as the browser's, so its moves
+		 * are held back too, by a listener there only while a finger is kept, so a plain pan never waits for
+		 * the page. The browser has not begun to scroll a finger that stayed within its slop.
+		 */
+		const holdMove = (event: TouchEvent) => {
+			if (keptTouches.size > 0 && event.cancelable) event.preventDefault();
+		};
+		let holdingMoves = false;
+		keptTouches.changed = () => {
+			const want = keptTouches.size > 0;
+			if (want === holdingMoves) return;
+			holdingMoves = want;
+			if (want) element.addEventListener("touchmove", holdMove, { passive: false });
+			else element.removeEventListener("touchmove", holdMove);
+		};
+		onCleanup(() => {
+			keptTouches.changed = undefined;
+			element.removeEventListener("touchmove", holdMove);
+		});
 		// A kept finger lets go when it lifts, wherever it was kept: one left behind would hold every later touch from scrolling.
 		const letGo = (event: PointerEvent) => keptTouches.delete(event.pointerId);
 		for (const kind of ["pointerup", "pointercancel"] as const) window.addEventListener(kind, letGo, true);
@@ -414,7 +434,7 @@ export function createStageInput(deps: StageInputDeps) {
 	 */
 	const touches = createTouches();
 	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
-	const keptTouches = new Set<number>();
+	const keptTouches = new KeptTouches();
 	const claimed = new Set<number>();
 	/** Fingers this document is carrying. */
 	const carried = new Set<number>();
@@ -644,4 +664,23 @@ export function createStageInput(deps: StageInputDeps) {
 	};
 
 	return { grabbing, pressHeld, onWheel, touches, claimed, keptTouches, beginTouch, panFrom, gestures, caught: () => caught };
+}
+
+/** The fingers whose touch is kept from the browser's scroll, saying when that changes (`holdMove`). */
+class KeptTouches extends Set<number> {
+	changed: (() => void) | undefined;
+	override add(id: number): this {
+		super.add(id);
+		this.changed?.();
+		return this;
+	}
+	override delete(id: number): boolean {
+		const was = super.delete(id);
+		this.changed?.();
+		return was;
+	}
+	override clear(): void {
+		super.clear();
+		this.changed?.();
+	}
 }

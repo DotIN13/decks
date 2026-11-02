@@ -155,7 +155,7 @@ const saved = await until(() => cardNode()?.children?.find((n) => n.id === "p-a"
 say("words typed by the phone's keyboard go in, and a tap on the canvas saves them", !!saved, JSON.stringify(cardNode()?.children?.map((n) => n.content)));
 say("…as one edit to that block: the others keep their ids", JSON.stringify(cardNode()?.children?.map((n) => n.id)) === JSON.stringify(["p-h", "p-a", "p-l"]), JSON.stringify(cardNode()?.children?.map((n) => n.id)));
 
-// A finger picks a picture with a tap and carries it into the card.
+// A finger picks a picture with a tap, and held then dragged, carries it into the card.
 await settle(page, 600);
 const drawn = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
 /* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (v3). */
@@ -179,6 +179,8 @@ const point = (x, y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
 const from = { x: picture.x + picture.width / 2, y: picture.y + picture.height / 2 };
 const to = { x: first.x + 80, y: first.y + first.height + 6 };
 await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
+// Held still first: one finger alone pans, and a hold is what picks an item up to carry (`touch-rules.ts`, HOLD_MS).
+await page.waitForTimeout(600);
 let ghost;
 for (let i = 1; i <= 16; i++) {
 	await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 16, from.y + ((to.y - from.y) * i) / 16) });
