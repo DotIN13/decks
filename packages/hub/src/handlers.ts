@@ -121,7 +121,7 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 	route("PUT", "/sync/v1/canvases/:id/files", async (req, { who, params, url }) => {
 		editable(who, params.id!);
 		const path = pathParam(url);
-		const put = store.putCanvasFile(params.id!, path, await bytesOf(req), baseParam(url), who.harness?.id ?? who.user.id);
+		const put = await store.putCanvasFile(params.id!, path, await bytesOf(req), baseParam(url), who.harness?.id ?? who.user.id);
 		if (put.current) live?.toCanvas(params.id!, { type: "file", canvas: params.id!, path, version: put.version, hash: put.hash, by: who.harness?.id ?? who.user.id });
 		return json(200, { path, ...put });
 	});
@@ -133,8 +133,8 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 		return json(200, { path, deleted: true });
 	});
 	/** Bytes by their hash, for a file this account (or someone sharing a canvas with it) has or had. */
-	route("GET", "/sync/v1/blobs/:hash", (_req, { who, params }) => {
-		const bytes = store.mayReadBlob(who.user.id, params.hash!) ? store.blob(params.hash!) : undefined;
+	route("GET", "/sync/v1/blobs/:hash", async (_req, { who, params }) => {
+		const bytes = store.mayReadBlob(who.user.id, params.hash!) ? await store.blob(params.hash!) : undefined;
 		if (!bytes) throw new HubError(404, "No such blob.");
 		return new Response(bytes as unknown as ArrayBuffer, { status: 200, headers: { "Content-Type": "application/octet-stream" } });
 	});

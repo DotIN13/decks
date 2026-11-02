@@ -19,9 +19,11 @@ export interface Stored {
 
 /**
  * Where a sharing service keeps canvases, their history and their files. Decks Studio keeps them in
- * SQLite and a blob folder; `MemoryStore` keeps them in memory; anything else fits by implementing
- * these calls. Every call is synchronous: a store that talks to a database over the network keeps a
- * cache in front of it, as Studio keeps open drawings in memory.
+ * SQLite and a blob store; `MemoryStore` keeps them in memory; anything else fits by implementing
+ * these calls. Every call about rows is synchronous: a store that talks to a database over the network
+ * keeps a cache in front of it, as Studio keeps open drawings in memory. The two about a file's bytes
+ * (`putCanvasFile`, `blob`) may answer a promise instead, since bytes live in object storage as
+ * naturally as on a disk; the hub awaits them either way.
  *
  * Who may do what is the store's too, through `role`: the hub asks before every read and write.
  */
@@ -44,12 +46,12 @@ export interface HubStore {
 	canvasFiles(id: string): SyncFile[];
 	canvasFile(id: string, path: string): SyncFile | undefined;
 	/** Keep a file's bytes; `base` is the version the writer replaced, and a stale one is kept as a version only. */
-	putCanvasFile(id: string, path: string, bytes: Uint8Array, base: number | undefined, by: string): Stored;
+	putCanvasFile(id: string, path: string, bytes: Uint8Array, base: number | undefined, by: string): Stored | Promise<Stored>;
 	/** Remove a file, unless it changed since `base`. */
 	removeCanvasFile(id: string, path: string, base?: number): boolean;
 	/** Whether this person may read these bytes: a file of a canvas they may see has, or had, them. */
 	mayReadBlob(user: string, hash: string): boolean;
-	blob(hash: string): Uint8Array | undefined;
+	blob(hash: string): Uint8Array | undefined | Promise<Uint8Array | undefined>;
 	/** What a harness says it serves. Optional: a service with no apps leaves it out, and the route answers 404. */
 	setInventory?(harness: string, apps: HarnessApp[]): void;
 }
