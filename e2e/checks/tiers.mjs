@@ -102,7 +102,7 @@ await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksCard
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not
- * detach it (`wire/boards.ts`, `card.play`'s note), so it stays in the agent's context and out
+ * detach it (`verbs/person-table.ts`, `card.play`'s note), so it stays in the agent's context and out
  * of its in-play list. The server says so in `context.changed`.
  */
 const told = async () => {

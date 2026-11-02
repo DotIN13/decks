@@ -897,7 +897,7 @@ export function differ(before, after) {
 /**
  * Select a board the way a person does now that boards have no title bars: click it. The point is
  * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
- * then the board's pill (`canvas/BoardCallout.tsx`) is waited for.
+ * then the card's pill (`ui/Callout.tsx`) is waited for.
  */
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
@@ -962,7 +962,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 		throw new Error(`no uncovered point on ${path} to click: ${why}`);
 	}
 	await page.mouse.click(at.x, at.y);
-	// The selected item's pill (`canvas/BoardCallout.tsx`).
+	// The selected item's pill (`ui/Callout.tsx`).
 	await canvas.waitForSelector(".card-callout:not([data-hidden])", { timeout });
 	await page.waitForTimeout(150);
 }

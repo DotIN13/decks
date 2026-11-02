@@ -241,7 +241,7 @@ const agent = {
  * Its own context, and no synthetic agent in it: `resetStage` plays the deck onto the agent the
  * server has focused, so a fed agent in place would put the boards on a canvas the browser is not
  * looking at. A touchscreen draws no title bars; a tap selects a board, and its actions are a
- * menu over it (`canvas/BoardCallout.tsx`). A board is only its picture now, with no edge band of
+ * menu over it (`ui/Callout.tsx`). A board is only its picture now, with no edge band of
  * its own to carry it by (a card's is `stage-gestures.mjs`'s and `card-phone.mjs`'s to check).
  */
 {
@@ -280,7 +280,7 @@ const agent = {
 			heights: [...new Set(items.map((el) => Math.round(box(el).height)))],
 			inside: box(callout).left >= 0 && box(callout).right <= innerWidth,
 			span: [Math.round(box(callout).left), Math.round(box(callout).right), innerWidth],
-			// The pill is centred on the board's middle wherever that is, off the screen included (`BoardCallout.tsx`, `place`).
+			// The pill is centred on the board's middle wherever that is, off the screen included (`ui/Callout.tsx`, `place`).
 			centre: Math.round((box(callout).left + box(callout).right) / 2),
 			boardMid: (() => {
 				const r = (window.__decksCards?.() ?? []).find((one) => one.path === path)?.rect;

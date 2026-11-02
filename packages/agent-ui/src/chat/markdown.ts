@@ -9,7 +9,7 @@
  * asterisks is a reply you have to decode.
  *
  * So there is no HTML anywhere in this path. The text becomes a **tree of tokens**, and
- * `Markdown.tsx` builds real elements from it — no `innerHTML`, no `dangerouslySetInnerHTML`,
+ * `MarkdownView.tsx` builds real elements from it — no `innerHTML`, no `dangerouslySetInnerHTML`,
  * nothing for a sanitiser to get wrong, because a string of markup is never constructed in
  * the first place. The one place a document *can* still be attacked through structured
  * output is a link target, and `safeHref` is the whole of that surface: `http:`, `https:`

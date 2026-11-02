@@ -2,7 +2,7 @@
  * The mark in the tab strip, and the three things that happen when an agent wants you.
  *
  * Almost everything here is invisible until it is broken, which is the whole reason it is
- * checked in a browser rather than left to the unit tests. `alerts.test.ts` already asserts
+ * checked in a browser rather than left to the unit tests. `alerts/policy.test.ts` (`@decks/agent-ui`) already asserts
  * the *policy* — that arriving at idle is an event and being idle is not, that a banner is
  * suppressed while the page is in view — with no DOM anywhere near it. What that cannot
  * reach is whether the policy is wired to anything: whether a frame off the socket actually

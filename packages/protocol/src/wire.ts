@@ -32,7 +32,7 @@ export interface StudioLinkRow {
 	env?: true;
 }
 
-/** Another Decks front end this server has given a token to (`server/src/share/pairing.ts`). */
+/** Another Decks front end this server has given a token to (`server/src/auth/issue.ts`). */
 export interface PairedRow {
 	id: string;
 	/** What the other front end called itself when it paired. */

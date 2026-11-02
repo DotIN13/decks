@@ -124,7 +124,7 @@ export interface Page {
 	/**
 	 * The file's last modification, as `mtimeMs`.
 	 *
-	 * Half of what the canvas's "changed" mark reads (`board-news.ts`). Optional because
+	 * Half of what the canvas's "changed" mark reads (`items/news.ts` in the canvas, `agents/canvas-news.ts` in the server). Optional because
 	 * every fixture and every older record predates it — the server always sends it, and a
 	 * reader treats its absence as "unknown" (`?? 0`).
 	 */
