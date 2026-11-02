@@ -9,6 +9,39 @@ Every number here comes from scans of the tracked tree (§7 says how). Every "de
 by name against every tracked `.ts`, `.tsx`, `.mjs`, `.html`, `.json`, `.css` and `.md` file. Where a
 scan can be fooled, the entry says so and what to check before deleting.
 
+## 0. Where this stands
+
+Written against `34ee017`; the work began the same day, on this branch, one idea per commit. As of
+`a96cb01`:
+
+**Done.** Phase 0 (the pen schema regenerated, the unused dependencies dropped, `scripts/README.md`,
+the stylesheet counts, `docs/COMPAT.md`). Phase 1 (the 25 shims, 19 dead exports including
+`SyncRoutes` found after, `cssEscape` in `@decks/ui`, `fake-scene.test-helper.ts`, 31 dead CSS rules
+over 10 sheets each re-stamped with zero moves, the stale-pointer sweep). The Studio contract test
+(§5.0). Phase 2 (`debug.ts`, writers and checks moved, aliases gone). Phase 3's moves (`theme.ts`,
+`look/`, `cards/`, `ink/`), the `host.ts` named export (§3.3) and the canvas over-exports. Phase 4's
+moves (`pages/`, `shell/`, `composer/`, `agents/Dialog.tsx`, `settings/AlertSettings.tsx`,
+`state/views.ts`, `canvases/` with `CanvasManager`, `canvases.css`) and the web and server
+over-exports. Phase 5 (the three gates, `npm run gates` in CI, `CONTRIBUTING.md`).
+
+**Not done, and why.** The browser checks cannot run where this was written: headless Chromium's
+renderer crashes there without a GPU, on the commit before the work as on the last one. So the steps
+only those checks can prove are left for a machine that runs them: the engine's collaborators
+(steps 14 to 16), the `CardEditor`, `Properties`, `LeftPanel` and `AgentPill` splits (17, 18, 22),
+and the `v3.css` fold and renames (23, 24), which the cascade gate guards but which want eyes on
+the page as well. Step 8 (the tests-only whole features: the ink undo history, the docs' git
+helpers, `edge.ts`'s inspector remnants) is a product decision and is not taken here. Phase 6 waits
+on the clients, as planned. `e2e/README.md`'s table of cut checks (§3.5) is left as it is: it is
+headed "Gone" and says what went is in git, which is the one line the plan asked for.
+
+**Found on the way.** The server reaches into the canvas package by relative path
+(`apps/server/src/stage/native-shots.ts`, `stage/text.ts`, `verbs/export.ts` import
+`packages/canvas/src/look/font-files.ts`, `look/icons.ts` and `render/reader.ts` by `../../../../`),
+which the canvas package's typecheck cannot see and the entry-point test does not cover; the
+`render/` to `look/` move broke the server's typecheck for two commits. Either those three modules
+become an entry point of `@decks/canvas` or the server stops needing them; until then a move inside
+the canvas package is checked with the server's typecheck too.
+
 ## 1. Where the branch stands
 
 | | |
