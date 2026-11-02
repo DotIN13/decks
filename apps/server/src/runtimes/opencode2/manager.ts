@@ -20,7 +20,7 @@ import { decksServerEnv } from "../decks-env.ts";
  */
 
 /** What the shared server is told about at spawn. Built by the first agent to acquire. */
-export interface Opencode2ServerSpec {
+interface Opencode2ServerSpec {
 	/** The server's working directory: the deck. */
 	cwd: string;
 	/** Where Decks' tools call back: Decks' own `/api/stage/eval`. */
@@ -45,7 +45,7 @@ export interface Opencode2ServerHandle {
 }
 
 /** How the server process is started, overridable for tests. */
-export interface Opencode2ManagerOptions {
+interface Opencode2ManagerOptions {
 	spawn?: (argv: string[], env: NodeJS.ProcessEnv, cwd: string) => Opencode2Child;
 	/** The environment the server is started from; the process's own by default. */
 	env?: NodeJS.ProcessEnv;
@@ -61,7 +61,7 @@ export interface Opencode2Child {
 }
 
 /** What OpenCode 2 prints when it is listening: `server listening on http://127.0.0.1:41713`. */
-export const LISTENING = /server listening on\s+(https?:\/\/\S+)/;
+const LISTENING = /server listening on\s+(https?:\/\/\S+)/;
 
 export class Opencode2Manager {
 	private readonly spawnImpl: (argv: string[], env: NodeJS.ProcessEnv, cwd: string) => Opencode2Child;

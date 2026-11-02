@@ -30,20 +30,20 @@ import { join } from "node:path";
  * back the token it was made with, or by the canvas's sharing.
  */
 
-export const CANVAS_PASS = "dk_cp_";
-export const APP_PASS = "dk_ap_";
+const CANVAS_PASS = "dk_cp_";
+const APP_PASS = "dk_ap_";
 
 /** How long an app pass for a tab lives: a day. An app's server's lives as long as that run of it. */
-export const APP_TAB_MS = 24 * 3_600_000;
+const APP_TAB_MS = 24 * 3_600_000;
 
 /** How long a canvas pass lives: an hour. A card's script beside the frame can read it, so it is short. */
-export const CANVAS_PASS_MS = 3_600_000;
+const CANVAS_PASS_MS = 3_600_000;
 
 /** The id a pass the harness makes for its own pages is bound to: its own Chromium, which needs no one's token. */
 export const HARNESS_ID = "harness";
 
 /** A canvas pass as it is read, with the role it has now. */
-export interface CanvasPassOf {
+interface CanvasPassOf {
 	canvas: string;
 	/** The role on the canvas now: the pass's, or less if the canvas's sharing has changed since. */
 	role: "edit" | "view";
@@ -60,7 +60,7 @@ interface CanvasPayload {
 }
 
 /** What a pass needs to know of the harness when it is used. */
-export interface PassChecks {
+interface PassChecks {
 	/** Whether the harness token with this id still works (`TokenStore.live`). */
 	live(id: string): boolean;
 	/** The person's role on a canvas now, or undefined when there is no such canvas (any more). */
@@ -83,7 +83,7 @@ interface AppPayload {
 }
 
 /** An app pass as it is read: which app, and whether it is its server's or a tab's. */
-export interface AppPassOf {
+interface AppPassOf {
 	app: string;
 	/** `server`: the app's own server, while that run of it goes; `tab`: one page opening it; `canvas`: the app placed on a canvas. */
 	holder: "server" | "tab" | "canvas";

@@ -22,7 +22,7 @@ export const MIGRATION = "2026-10-21-isolation-removed";
 
 const MARKS = ["isolated.json", "from-isolation.json"];
 
-export interface IsolationPlan {
+interface IsolationPlan {
 	/** Deck-relative marker files to remove. */
 	marks: string[];
 	/** Deck-relative agent records with an isolation field to drop. */
@@ -43,7 +43,7 @@ export function migrated(deck: string): boolean {
 }
 
 /** What isolated mode left in this deck. */
-export function planIsolation(deck: string): IsolationPlan {
+function planIsolation(deck: string): IsolationPlan {
 	const marks: string[] = [];
 	const canvases = join(deck, "canvases");
 	if (existsSync(canvases)) {
@@ -65,7 +65,7 @@ export function planIsolation(deck: string): IsolationPlan {
 }
 
 /** The lines a dry run prints. */
-export function describeIsolation(plan: IsolationPlan): string[] {
+function describeIsolation(plan: IsolationPlan): string[] {
 	return [
 		...plan.marks.map((path) => `remove   ${path}`),
 		...plan.agents.map((path) => `ordinary ${path} (isolated mode dropped)`),

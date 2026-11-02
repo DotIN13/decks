@@ -65,7 +65,7 @@ type Target = { canvas: string; frame?: undefined } | { frame: string; canvas?: 
 /** The options every item call takes to say what it acts on. */
 type On = { canvas?: string; frame?: string };
 type ItemIn = { type: string; [key: string]: unknown };
-export type CanvasOpIn =
+type CanvasOpIn =
 	| { op: "insert"; item: ItemIn; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }
 	| { op: "update"; id: string; set?: Record<string, unknown>; at?: Corner; size?: { w?: number; h?: number } }
 	| { op: "replace"; id: string; item: ItemIn }

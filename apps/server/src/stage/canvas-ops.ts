@@ -28,7 +28,7 @@ export function boardsOn(pens: StagePens, deck: Deck, name: string): OnStage[] {
 }
 
 /** What is drawn on a stage besides its boards, which a joining board keeps clear of. */
-export function drawnOn(pens: StagePens, name: string): Box[] {
+function drawnOn(pens: StagePens, name: string): Box[] {
 	try {
 		return pens.drawn(name);
 	} catch {

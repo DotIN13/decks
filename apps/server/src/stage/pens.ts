@@ -109,7 +109,7 @@ export const penWriter = new AsyncLocalStorage<string>();
  * another harness's or browser's change down (`writeFrom`). Read when the drawing is written and kept
  * on the log, so the sync does not send the change back up.
  */
-export const penOrigin = new AsyncLocalStorage<Author>();
+const penOrigin = new AsyncLocalStorage<Author>();
 
 /** Words measured as the page measures them (`text.ts`). */
 const measure = serverText.measure;

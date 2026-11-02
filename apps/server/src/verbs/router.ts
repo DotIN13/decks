@@ -33,7 +33,7 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  */
 
 /** The answer to one call, as the SDK reads it. */
-export interface VerbAnswer extends StageCallResult {}
+interface VerbAnswer extends StageCallResult {}
 
 export function verbRoutes(app: App): express.Router {
 	const router = express.Router();

@@ -13,7 +13,7 @@ import type { PictureService } from "./service.ts";
  * the board's own address, so its stylesheets, fonts and pictures resolve exactly as the board's
  * do, puts the scroll positions back, and takes the picture.
  */
-export interface SnapshotAsk {
+interface SnapshotAsk {
 	path: string;
 	html: string;
 	w: number;

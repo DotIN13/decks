@@ -118,7 +118,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame" | "fi
  * Write a blank card, `cards/<title>/index.html` in a canvas's own folder (`card.create`): the shell from its title, at a width held inside the screen when none is asked for.
  * Placing it is the caller's job. The viewport goes in the call's notes.
  */
-export function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: number }, stageName: string): { path: string; title: string; width: number; canvas: string } {
+function makeCard(ctx: VerbContext, options: { title: string; w?: number; h?: number }, stageName: string): { path: string; title: string; width: number; canvas: string } {
 	const { service, agent, notes, viewport } = ctx;
 	const title = options?.title?.trim();
 	if (!title) throw new Error("A card needs a title: the finding it states, as a sentence.");

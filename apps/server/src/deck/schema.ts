@@ -23,7 +23,7 @@ export interface DeckFile {
 	[key: string]: unknown;
 }
 
-export interface ParsedDeckFile {
+interface ParsedDeckFile {
 	file: DeckFile;
 	/**
 	 * The arrangement an older `boards` map held, kept as a **seed** rather than as state.

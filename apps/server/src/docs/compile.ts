@@ -17,7 +17,7 @@ import type { CompileError, CompileResult } from "@decks/docs";
 const TIMEOUT_MS = 180_000;
 
 /** The engine: `DECKS_TECTONIC`, else the first install found, else whatever `tectonic` is on the path. */
-export function tectonicPath(): string {
+function tectonicPath(): string {
 	const named = process.env.DECKS_TECTONIC;
 	if (named) return named;
 	for (const candidate of [join(homedir(), ".local", "bin", "tectonic"), join(homedir(), "tools", "tectonic", "tectonic"), "/usr/local/bin/tectonic", "/usr/bin/tectonic"]) {

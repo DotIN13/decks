@@ -15,7 +15,7 @@ import { createStageTool, type StageTool } from "./tool.ts";
  * fault, and an agent reading the chat later needs to know a press or an app did something. Their
  * code runs in their own page or process; the server only answers the verbs.
  */
-export interface CallerRun {
+interface CallerRun {
 	agents: Registry;
 	cameras: Cameras;
 	boards: CardService;
@@ -23,7 +23,7 @@ export interface CallerRun {
 	port: number;
 }
 
-export interface CallerSpec {
+interface CallerSpec {
 	/** The board the actor is: a board's own path, or an app's name as `app:<name>` (`appActor`). */
 	board: string;
 	/** What cursors and notices call it, as in `board plan.html` or `app polls`. */

@@ -34,7 +34,7 @@ interface AskedQuestion {
 	options?: unknown;
 }
 
-export type ToolDecision =
+type ToolDecision =
 	| { behavior: "allow"; updatedInput: Record<string, unknown> }
 	| { behavior: "deny"; message: string };
 

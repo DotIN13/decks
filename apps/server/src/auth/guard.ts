@@ -156,7 +156,7 @@ function decodedSegment(segment: string): string | undefined {
 }
 
 /** What a canvas pass is told when it asks for anything else. */
-export const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing else.";
+const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing else.";
 
 /** What the gate needs of the harness. */
 export interface Gate {
@@ -167,7 +167,7 @@ export interface Gate {
 }
 
 /** What a request with a canvas pass that does not check out is told. */
-export const PASS_REFUSED = "This canvas pass has run out, was signed out, or no longer reaches this canvas. The page asks for a new one; reload the canvas if it does not.";
+const PASS_REFUSED = "This canvas pass has run out, was signed out, or no longer reaches this canvas. The page asks for a new one; reload the canvas if it does not.";
 
 /**
  * Who a token is, from the request it came on: refused when another site sends a token that is not

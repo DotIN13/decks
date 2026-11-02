@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
  * the command runs (`runtime/opencode/plugin`, `POST /api/tokens/session`).
  */
 /** The folder holding the `decks` command. */
-export const SDK_BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/bin");
+const SDK_BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/bin");
 /** The SDK itself, for a node script: `const { decks } = await import(process.env.DECKS_SDK)`. */
 export const SDK_FILE = resolve(SDK_BIN, "../src/index.js");
 

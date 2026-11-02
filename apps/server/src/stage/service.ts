@@ -98,7 +98,7 @@ export interface StageHost {
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
 
 /** What the stage tool needs of the shared browser. `WebBridge` is the one implementation. */
-export interface WebHost {
+interface WebHost {
 	code(): string;
 	repair(): string;
 	status(): WebStatus;

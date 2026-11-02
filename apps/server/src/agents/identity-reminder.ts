@@ -15,7 +15,7 @@ import type { Identity } from "@decks/protocol";
 /** The name an agent wears until it picks one: `Agent`, or `Agent 3` (`agents/names.ts`). */
 const UNNAMED = /^agent(?: \d+)?$/i;
 
-export type Gap = "name" | "avatar" | "workspace" | "tags";
+type Gap = "name" | "avatar" | "workspace" | "tags";
 
 export function identityGaps(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">): Gap[] {
 	const gaps: Gap[] = [];

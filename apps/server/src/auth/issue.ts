@@ -120,7 +120,7 @@ export function fromThisMachine(remote: string | undefined, headers: Record<stri
  * through only from this machine itself. Any other site asks for a code: otherwise any page the
  * person opened could link the harness to a Studio of its own and be sent the deck.
  */
-export function studioWithoutCode(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
+function studioWithoutCode(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
 	const origin = headers.origin;
 	if (typeof origin !== "string" || origin === "") return fromThisMachine(remote, headers);
 	let from: URL;

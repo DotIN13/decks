@@ -49,7 +49,7 @@ export function isZone(zone: unknown): zone is string {
 	}
 }
 
-export interface ZonedParts {
+interface ZonedParts {
 	year: number;
 	/** 1 to 12. */
 	month: number;

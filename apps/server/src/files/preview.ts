@@ -36,7 +36,7 @@ const PREVIEW_WIDTH = 960;
  */
 const PAGE = { width: 800, height: 500 };
 
-export const previewPath = (path: string) => `${path}.preview.png`;
+const previewPath = (path: string) => `${path}.preview.png`;
 
 export function previewKind(path: string): "pdf" | "svg" | "page" | undefined {
 	const extension = (path.split(".").pop() ?? "").toLowerCase();

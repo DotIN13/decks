@@ -32,7 +32,7 @@ export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../
 export type AppKind = "static" | "build" | "server";
 export type AppStatus = "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken";
 
-export interface AppManifest {
+interface AppManifest {
 	title?: string;
 	kind: AppKind;
 	/** What is served, for `static` and `build`: the folder itself, or the build's output (`dist`). */

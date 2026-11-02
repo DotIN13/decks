@@ -200,7 +200,7 @@ const SHOTS = /^\.decks\/shots\/[^/]+$/;
  * own pictures of canvases. The deck's records and keys live in `.decks/`, and a board that could
  * read them could act as the person.
  */
-export function refuseHidden(place: string, below: string, requested: string): void {
+function refuseHidden(place: string, below: string, requested: string): void {
 	const rel = relative(place, below).split(sep).join("/");
 	if (isHidden(rel) && !SHOTS.test(rel)) throw new PathRefused(requested, "it is in a hidden folder");
 }
@@ -223,7 +223,7 @@ function visible(place: string, candidate: string, real: string, requested: stri
  * folder and a name, so a bare file name never matches some other file that shares it; and what
  * is found must exist and pass the same containment test as any other path.
  */
-export function movedTo(resolved: ResolvedRoots, gone: string): string | undefined {
+function movedTo(resolved: ResolvedRoots, gone: string): string | undefined {
 	const parts = gone.split("/").filter(Boolean);
 	const places = [resolved.deck, ...resolved.roots.filter((root) => root.exists).map((root) => root.path)];
 	for (let from = 1; from <= parts.length - 2; from++) {

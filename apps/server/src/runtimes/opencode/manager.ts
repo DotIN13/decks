@@ -79,7 +79,7 @@ export interface OpencodeServerHandle {
  * listening line itself, and so exercises the counting and the death handling without
  * owning a Bun process.
  */
-export interface OpencodeManagerOptions {
+interface OpencodeManagerOptions {
 	spawn?: (argv: string[], env: NodeJS.ProcessEnv, cwd: string) => OpencodeChild;
 }
 

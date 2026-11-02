@@ -38,7 +38,7 @@ export function tokenDays(env: NodeJS.ProcessEnv = process.env): number {
 export const TOKEN_IDLE_MS = 24 * 3_600_000;
 
 /** The prefix of every harness token, whoever its subject. */
-export const HARNESS_PREFIX = "dk_h_";
+const HARNESS_PREFIX = "dk_h_";
 // Tokens issued under the older prefixes (dk_p_, dk_s_, dk_a_) are still read, by their hash.
 
 /** The subjects a harness token is issued for: the person, a site the person paired, an agent. */

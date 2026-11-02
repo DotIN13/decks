@@ -20,9 +20,9 @@ export const BOARD_ITEM = "decks.board";
 /** A card: a board drawn in a shadow root of the stage's own page (`deck/layout.ts`, `isCardPath`). */
 export const CARD_ITEM = "decks.card";
 /** Whether a tag is a board's or a card's: both name a page in the canvas's folder by `path`. */
-export const isPageTag = (type: unknown): type is string => type === BOARD_ITEM || type === CARD_ITEM;
+const isPageTag = (type: unknown): type is string => type === BOARD_ITEM || type === CARD_ITEM;
 /** What a refused board item is held as, in memory only. */
-export const REFUSED_ITEM = "decks.board.refused";
+const REFUSED_ITEM = "decks.board.refused";
 
 interface Meta {
 	type?: unknown;
@@ -123,7 +123,7 @@ function adoptFills(name: string, doc: PenDocument, file: NonNullable<Adopt["fil
 }
 
 /** The saved frames a drawing places by ref, `frames/<name>`, overrides and all. */
-export function frameRefsOf(doc: PenDocument): string[] {
+function frameRefsOf(doc: PenDocument): string[] {
 	const found = new Set<string>();
 	const scan = (value: unknown): void => {
 		if (Array.isArray(value)) value.forEach(scan);

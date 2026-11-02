@@ -30,7 +30,7 @@ import { join, relative } from "node:path";
  * your own belongs in `assets/`.
  */
 
-export interface LibSync {
+interface LibSync {
 	/** Deck-relative paths under `lib/` whose bytes changed, or that were missing. */
 	written: string[];
 	/** Paths that this build no longer ships, and which have been deleted. */

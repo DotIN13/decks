@@ -86,7 +86,7 @@ export async function mediaFacts(file: string): Promise<MediaFacts | undefined> 
 }
 
 /** How wide a poster is written. Wide enough for a film at reading distance, small enough to be a still. */
-export const POSTER_WIDTH = 960;
+const POSTER_WIDTH = 960;
 
 /** The deck-relative path a file's poster is kept at, beside the file itself. */
 export function posterPath(asset: string): string {
@@ -122,7 +122,7 @@ export async function writePoster(deck: string, asset: string, facts?: MediaFact
 }
 
 /** How many bars a sound's waveform is drawn with: enough to read its shape, few enough to keep in the item. */
-export const PEAK_BARS = 56;
+const PEAK_BARS = 56;
 
 /**
  * How loud a sound is along its length, as `PEAK_BARS` numbers from 0 to 1: the waveform a sound's

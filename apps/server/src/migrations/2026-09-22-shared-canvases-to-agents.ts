@@ -13,7 +13,7 @@ import type { AgentRecord } from "../agents/store.ts";
  * owns its stage again, so a record like that is given the canvas's boards and places once, on
  * restore, and writes them as its own from then on. The files are only ever read here.
  */
-export function readCanvasStage(deckPath: string, id: string): { boards: string[]; places: Record<string, { x: number; y: number }> } | undefined {
+function readCanvasStage(deckPath: string, id: string): { boards: string[]; places: Record<string, { x: number; y: number }> } | undefined {
 	const dir = join(deckPath, ".decks", "canvases");
 	if (!existsSync(dir)) return undefined;
 	let names: string[];

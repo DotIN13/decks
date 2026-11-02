@@ -19,7 +19,7 @@
 /** An avatar is a few hundred bytes of paths. This is room for a detailed one and not for a map. */
 export const AVATAR_LIMIT = 64 * 1024;
 
-export interface CheckedAvatar {
+interface CheckedAvatar {
 	/** What to store: the agent's own markup, repaired if it needed it. */
 	svg: string;
 	/**

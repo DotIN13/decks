@@ -27,7 +27,7 @@ interface Node {
 	[key: string]: unknown;
 }
 
-export interface MarkdownCardsPlan {
+interface MarkdownCardsPlan {
 	/** Deck-relative drawings with old-tagged frames, and how many each holds. */
 	files: Array<{ path: string; frames: number }>;
 }
@@ -86,7 +86,7 @@ function drawings(deck: string): string[] {
 }
 
 /** What would change. */
-export function planMarkdownCards(deck: string): MarkdownCardsPlan {
+function planMarkdownCards(deck: string): MarkdownCardsPlan {
 	const files: MarkdownCardsPlan["files"] = [];
 	for (const file of drawings(deck)) {
 		const doc = readJson<{ children?: unknown }>(file);
@@ -97,7 +97,7 @@ export function planMarkdownCards(deck: string): MarkdownCardsPlan {
 }
 
 /** The lines a dry run prints. */
-export function describeMarkdownCards(plan: MarkdownCardsPlan): string[] {
+function describeMarkdownCards(plan: MarkdownCardsPlan): string[] {
 	const total = plan.files.reduce((sum, file) => sum + file.frames, 0);
 	return [...plan.files.map((file) => `retag    ${file.path} (${file.frames} markdown card${file.frames === 1 ? "" : "s"})`), `markdown cards: ${total} in ${plan.files.length} drawing${plan.files.length === 1 ? "" : "s"} become ${NEW}`];
 }

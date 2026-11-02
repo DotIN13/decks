@@ -42,7 +42,7 @@ type Browser = import("playwright").Browser;
 export type ShotFormat = "png" | "jpeg" | "pdf";
 export type ShotOf = string | string[] | Partial<Box> | undefined;
 
-export interface ShotRequest {
+interface ShotRequest {
 	stage: string;
 	/** A .pen file to picture instead of the stage, whole: a saved frame, or any other (`StagePens.penFile`). */
 	file?: string;
@@ -68,7 +68,7 @@ export interface Shot {
 	how: "native" | `chromium: ${string}`;
 }
 
-export interface ShotHost {
+interface ShotHost {
 	deck: string;
 	pens: StagePens;
 	/** Where the web app is served, as the server can reach it: `shot.html` is part of it. */

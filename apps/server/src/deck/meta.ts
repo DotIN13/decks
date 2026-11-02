@@ -9,7 +9,7 @@ import { BOARD_W } from "../cards/size.ts";
  * missing title costs a heading in the rail.
  */
 
-export interface BoardMeta {
+interface BoardMeta {
 	title?: string;
 	w?: number;
 	h?: number;

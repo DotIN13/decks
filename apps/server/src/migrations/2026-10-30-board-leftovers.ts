@@ -60,7 +60,7 @@ type Becomes =
 	| { kind: "picture"; card: string; picture?: string; why: string }
 	| { kind: "kept"; why: string };
 
-export interface BoardLeftoversPlan {
+interface BoardLeftoversPlan {
 	canvases: Array<{
 		canvas: string;
 		/** Each board item left, by id: its board (canvas-relative) and what it becomes. */
@@ -127,7 +127,7 @@ function boardFiles(folder: string, under = "boards"): string[] {
 }
 
 /** A board's last picture on disk: of this revision if there is one, else the newest of any, light before dark. */
-export function lastPicture(deck: string, path: string, html: string): string | undefined {
+function lastPicture(deck: string, path: string, html: string): string | undefined {
 	const thumbs = join(deck, ".decks", "thumbs");
 	if (!existsSync(thumbs)) return undefined;
 	const rev = revisionOf(html);
@@ -147,7 +147,7 @@ export function lastPicture(deck: string, path: string, html: string): string | 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** A card that shows a board's picture, with a link to its old page: for a board no converter reads. */
-export function pictureCard(title: string, board: string, picture: string | undefined, size: { w?: number; h?: number }): string {
+function pictureCard(title: string, board: string, picture: string | undefined, size: { w?: number; h?: number }): string {
 	const meta = { ...(size.w ? { w: size.w } : {}), ...(size.h ? { h: size.h } : {}) };
 	const link = `../../${board}`;
 	return `<title>${escape(title)}</title>
@@ -334,7 +334,7 @@ function linkedBoards(folder: string): Set<string> {
 	return out;
 }
 
-export function planBoardLeftovers(deck: string, options: { draw?: boolean } = {}): BoardLeftoversPlan {
+function planBoardLeftovers(deck: string, options: { draw?: boolean } = {}): BoardLeftoversPlan {
 	const canvases: BoardLeftoversPlan["canvases"] = [];
 	for (const { canvas, file } of drawings(deck)) {
 		const doc = readJson<{ children?: unknown }>(file);
@@ -353,7 +353,7 @@ export function countsOf(plan: BoardLeftoversPlan) {
 	return { fileCards: by("file"), removed: by("removed"), documents: by("document"), apps: by("app"), cards: by("card"), pictureCards: by("picture"), kept: by("kept"), deleted: files.filter((one) => one.deleted).length, keptFiles: files.filter((one) => !one.deleted).length };
 }
 
-export function describeBoardLeftovers(plan: BoardLeftoversPlan): string[] {
+function describeBoardLeftovers(plan: BoardLeftoversPlan): string[] {
 	const lines: string[] = [];
 	for (const one of plan.canvases) {
 		for (const item of one.items) {

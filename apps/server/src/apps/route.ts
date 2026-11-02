@@ -30,13 +30,13 @@ import { readFile } from "node:fs/promises";
  * Whether a token is one this server gave out, and, given the page it came from (`Origin`), good
  * from that page (`TokenStore.verify`).
  */
-export type PairedCheck = (token: string | undefined, origin?: string) => boolean;
+type PairedCheck = (token: string | undefined, origin?: string) => boolean;
 
 /** Whether what a GET carries in its address opens this app: an app pass for a tab, for this app (`decks_pass`, `auth/passes.ts`). */
-export type TicketCheck = (pass: string | undefined, name: string) => boolean;
+type TicketCheck = (pass: string | undefined, name: string) => boolean;
 
 /** Whether the pass in an address's path opens this app: an app pass held by a canvas the app is placed on (`/app/t/<pass>/<name>/…`). */
-export type CarriedCheck = (pass: string, name: string) => boolean;
+type CarriedCheck = (pass: string, name: string) => boolean;
 
 /**
  * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`routes/apps.ts`, `open`). The frame is

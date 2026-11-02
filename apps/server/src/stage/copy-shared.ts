@@ -111,7 +111,7 @@ const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&${{ "&": 
  * An app's board, as the copy keeps it: the app's last picture where the harness has one, and where
  * the app comes from; nothing of it runs. `picture` is its path from the board, when there is one.
  */
-export function appPictureBoard(html: string, owner: string, picture: string | undefined, lib = "../lib"): string {
+function appPictureBoard(html: string, owner: string, picture: string | undefined, lib = "../lib"): string {
 	const name = /data-app="([^"]*)"/.exec(html)?.[1] ?? "app";
 	const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? name;
 	const repo = /data-repo="([^"]*)"/.exec(html)?.[1];

@@ -93,7 +93,7 @@ function filesIn(dir: string, at = ""): string[] {
 	return out;
 }
 
-export interface PasteDeps {
+interface PasteDeps {
 	deck: string;
 	/** Write a card's or a board's page, recorded and announced as any write of one is. */
 	writePage(path: string, html: string): void;

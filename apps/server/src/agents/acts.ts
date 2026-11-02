@@ -44,7 +44,7 @@ export interface ToolEvent {
  */
 export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string } | { kind: "draw"; stage: string; ids: string[]; boxes: ActBox[] };
 
-export interface ActsHost {
+interface ActsHost {
 	emit(message: ServerMessage): void;
 	/** The agent's name and colour for the label; absent for an agent that is gone. */
 	identity(agentId: string): { name: string; color: string } | undefined;

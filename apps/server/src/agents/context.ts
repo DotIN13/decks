@@ -31,7 +31,7 @@ import { isCardPath } from "@decks/hub/layout";
  * (a handed-over brief carries "now") and to `decks now`. The zone is the process
  * clock's, which is the deck's Time setting once one is chosen (`settings.ts`).
  */
-export function timeLine(): string {
+function timeLine(): string {
 	const zone = processZone();
 	return `**The person's timezone is ${zone}.** Times and dates they mention ("this afternoon", "by Friday", "every weekday at nine") are in it. \`date\` in your shell prints it, and \`decks now\` returns the time there. Timestamps from Decks are epoch milliseconds.`;
 }

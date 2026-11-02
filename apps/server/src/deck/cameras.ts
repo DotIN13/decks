@@ -17,7 +17,7 @@ import type { Camera } from "@decks/protocol";
  * With no reading of its own, an agent is told the origin, sized like the last screen measured.
  */
 
-export interface CameraReading {
+interface CameraReading {
 	at: Camera;
 	/** The agent whose stage this view is of. */
 	agentId: string;

@@ -51,9 +51,9 @@ export function breakingPart(version: Semver): Semver {
 /** The version of a deck no migration has run on. */
 export const NONE: Semver = "0.0.0";
 
-export const RECORD_FILE = join(".decks", "migrations.json");
+const RECORD_FILE = join(".decks", "migrations.json");
 
-export type MigrationRecord = { version?: unknown; [migration: string]: unknown };
+type MigrationRecord = { version?: unknown; [migration: string]: unknown };
 
 export function readRecord(deck: string): MigrationRecord {
 	try {

@@ -137,7 +137,7 @@ const EMPTY: Index = { accounts: [] };
  * at `~/.claude` would move `.claude.json` to `~/.claude/.claude.json` and leave the CLI's
  * own identity, project trust and MCP config behind.
  */
-export interface ClaudeHome {
+interface ClaudeHome {
 	configDir: string;
 	configFile: string;
 	/** macOS keeps tokens in the keychain rather than in a file — see `hasCredentials`. */

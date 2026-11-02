@@ -21,7 +21,7 @@ import type { Translator } from "../../agents/translator.ts";
  *   `session.idle`. But not every execution is a turn: moving a session to another folder runs
  *   as an execution of its own, with no model step in it, and that one ends nothing.
  */
-export interface Opencode2StreamHooks {
+interface Opencode2StreamHooks {
 	/** The turn ended, however it ended. */
 	ended(outcome: "succeeded" | "failed" | "interrupted"): void;
 	/**

@@ -16,7 +16,7 @@ import { lookOf } from "./ladder.ts";
  * A file written in the last ten minutes is left, since it may be one being made. Names that are not
  * pictures (a folder, a stage's shots) are left too.
  */
-export interface CleanResult {
+interface CleanResult {
 	removed: number;
 	bytes: number;
 	orphans: number;

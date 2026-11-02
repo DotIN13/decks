@@ -43,7 +43,7 @@ interface Linked {
 	url: string;
 }
 
-export interface GoogleDocsHost {
+interface GoogleDocsHost {
 	dataDir: string;
 	library: () => DocLibrary;
 	docs: DocService;

@@ -100,7 +100,7 @@ const AHEAD_READY_MS = 3_000;
 /** How long a board has to stop changing before its picture is retaken. */
 const SETTLE_MS = 1_500;
 
-export interface ThumbHost {
+interface ThumbHost {
 	/** Where this server can be reached from its own machine: `http://127.0.0.1:4329`. */
 	origin: () => string;
 	/** `<deck>/.decks/thumbs`. */

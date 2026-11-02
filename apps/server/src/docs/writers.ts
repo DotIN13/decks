@@ -30,7 +30,7 @@ interface Call {
 	end?: number;
 }
 
-export interface WritersHost {
+interface WritersHost {
 	/** The agent's name, or undefined for one that is gone. */
 	name(agentId: string): string | undefined;
 	/** Where a relative path in a tool call is read from: the agent's working directory. */

@@ -353,7 +353,7 @@ export function describe(plan: Plan): string[] {
 	return lines;
 }
 
-export interface MigrateOptions {
+interface MigrateOptions {
 	dryRun?: boolean;
 	/** The install's data folder, where `board-eval.json` (the Allow decisions) is kept. */
 	dataDir?: string;
@@ -386,7 +386,7 @@ export function migrateStandalone(deck: string, options: MigrateOptions = {}): {
  * The system's `zip`, which streams and knows zip64, so a deck of any size fits; refused loudly when
  * it is missing, since nothing moves without a backup.
  */
-export function backUp(deck: string, to: string): string {
+function backUp(deck: string, to: string): string {
 	const full = join(deck, to);
 	mkdirSync(dirname(full), { recursive: true });
 	execFileSync("zip", ["-q", "-r", "-y", full, ".", "-x", "apps/*/node_modules/*", "-x", ".decks/backups/*", "-x", "*/node_modules/*"], { cwd: deck, stdio: ["ignore", "ignore", "pipe"], maxBuffer: 64 * 1024 * 1024 });

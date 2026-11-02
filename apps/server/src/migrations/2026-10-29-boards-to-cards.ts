@@ -44,7 +44,7 @@ interface Node {
 	[key: string]: unknown;
 }
 
-export interface BoardsToCardsPlan {
+interface BoardsToCardsPlan {
 	/** Per canvas: its boards that become cards (canvas-relative board path → card folder name), and those kept, with why. */
 	canvases: Array<{ canvas: string; cards: Array<{ board: string; card: string }>; kept: Array<{ board: string; why: string }> }>;
 }
@@ -302,7 +302,7 @@ function planCanvas(deck: string, canvas: string, doc: { children?: unknown }): 
 	return { canvas, cards, kept };
 }
 
-export function planBoardsToCards(deck: string): BoardsToCardsPlan {
+function planBoardsToCards(deck: string): BoardsToCardsPlan {
 	const canvases: BoardsToCardsPlan["canvases"] = [];
 	for (const { canvas, file } of drawings(deck)) {
 		const doc = readJson<{ children?: unknown }>(file);
@@ -313,7 +313,7 @@ export function planBoardsToCards(deck: string): BoardsToCardsPlan {
 	return { canvases };
 }
 
-export function describeBoardsToCards(plan: BoardsToCardsPlan): string[] {
+function describeBoardsToCards(plan: BoardsToCardsPlan): string[] {
 	const cards = plan.canvases.reduce((sum, one) => sum + one.cards.length, 0);
 	const kept = plan.canvases.flatMap((one) => one.kept.map((k) => `kept     canvases/${one.canvas}/${k.board}: ${k.why}`));
 	return [...kept, `boards to cards: ${cards} board(s) in ${plan.canvases.filter((one) => one.cards.length).length} canvas(es) become cards, ${kept.length} kept as they are`];

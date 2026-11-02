@@ -15,7 +15,7 @@ import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
  * `agents/backend.ts` narrows its account switcher: the boards layer should not know what
  * an agent is, only that something wants telling.
  */
-export interface BoardHooks {
+interface BoardHooks {
 	/** To every browser. `card.changed` is the message this service exists to send. */
 	send(message: ServerMessage): void;
 	/**

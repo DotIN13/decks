@@ -29,7 +29,7 @@ interface Node {
 	[key: string]: unknown;
 }
 
-export interface DocumentsAndAppsPlan {
+interface DocumentsAndAppsPlan {
 	/** Deck-relative drawings, and the items in each that change. */
 	files: Array<{ path: string; items: Array<{ id: string; board: string; becomes: "document" | "app"; names: string }> }>;
 }
@@ -98,7 +98,7 @@ function drawings(deck: string): Array<{ canvas: string; file: string }> {
 		.sort((a, b) => a.canvas.localeCompare(b.canvas));
 }
 
-export function planDocumentsAndApps(deck: string): DocumentsAndAppsPlan {
+function planDocumentsAndApps(deck: string): DocumentsAndAppsPlan {
 	const files: DocumentsAndAppsPlan["files"] = [];
 	for (const { canvas, file } of drawings(deck)) {
 		const doc = readJson<{ children?: unknown }>(file);
@@ -108,7 +108,7 @@ export function planDocumentsAndApps(deck: string): DocumentsAndAppsPlan {
 	return { files };
 }
 
-export function describeDocumentsAndApps(plan: DocumentsAndAppsPlan): string[] {
+function describeDocumentsAndApps(plan: DocumentsAndAppsPlan): string[] {
 	const items = plan.files.flatMap((file) => file.items);
 	return [
 		...items.map((item) => `${item.becomes.padEnd(9)}${item.board} -> ${item.names}`),

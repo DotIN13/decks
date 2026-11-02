@@ -41,7 +41,7 @@ interface DialogOptions {
 	signal?: AbortSignal;
 }
 
-export interface ExtensionUiHooks {
+interface ExtensionUiHooks {
 	prompt(prompt: ExtensionUiPrompt): void;
 	closePrompt(id: string): void;
 	notify(message: string, level: "info" | "warn" | "error"): void;

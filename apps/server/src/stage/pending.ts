@@ -1,4 +1,4 @@
-export interface PendingStage {
+interface PendingStage {
 	resolve: (value: unknown) => void;
 	timer: NodeJS.Timeout;
 	many?: { answers: unknown[]; expected: number };

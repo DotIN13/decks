@@ -44,7 +44,7 @@ type Page = import("playwright").Page;
 type Locator = import("playwright").Locator;
 
 /** How Playwright is reached — injectable so a test can hand in a stub. */
-export type Connector = (endpoint: string) => Promise<Browser>;
+type Connector = (endpoint: string) => Promise<Browser>;
 
 export class WebBridge {
 	private readonly wss = new WebSocketServer({ noServer: true });

@@ -20,7 +20,7 @@ import { zip, type ZipEntry } from "./zip.ts";
  * Nothing from the agents is in it: no transcript, no settings, no other stage. The manifest is
  * the greeting a server would have sent (`App.greet`), cut to the frames a reader needs.
  */
-export const BUNDLE_VERSION = 1;
+const BUNDLE_VERSION = 1;
 
 export interface BundleManifest {
 	decks: typeof BUNDLE_VERSION;
@@ -36,7 +36,7 @@ export interface BundleManifest {
 	pictures: Record<string, Partial<Record<ThumbScheme, string>>>;
 }
 
-export interface BundleSource {
+interface BundleSource {
 	deckPath: string;
 	deckName: string;
 	board(path: string): Page | undefined;

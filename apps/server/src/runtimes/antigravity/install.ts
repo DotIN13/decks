@@ -58,7 +58,7 @@ export function antigravityHomeDir(): string {
 	return join(loadConfig().dataDir, "antigravity-home");
 }
 
-export interface PreparedHome {
+interface PreparedHome {
 	homeDir: string;
 	/** The user's own `.gemini`, whose auth the sandbox reaches through symlinks. */
 	realGemini: string;

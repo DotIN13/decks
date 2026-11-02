@@ -20,7 +20,7 @@ import { titleFor, type Translator } from "../../agents/translator.ts";
  * a turn that produced no stream events at all.
  */
 
-export interface ClaudeStreamState {
+interface ClaudeStreamState {
 	/** Whether the current assistant message has had any streamed text. */
 	streamed: boolean;
 	/** Tool calls seen this turn, so a result can be matched to its name. */
