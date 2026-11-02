@@ -198,9 +198,22 @@ export function createStageInput(deps: StageInputDeps) {
 			const v = { vx: -(last.left - first.left) / dt, vy: -(last.top - first.top) / dt };
 			if (Math.hypot(v.vx, v.vy) < 0.15) return;
 			element.style.overflow = "hidden";
+			const stopped = { left: element.scrollLeft, top: element.scrollTop };
 			requestAnimationFrame(() => {
 				element.style.overflow = "";
-				requestAnimationFrame(() => ctl.coast(v));
+				const held = { left: element.scrollLeft, top: element.scrollTop };
+				requestAnimationFrame(() => {
+					/*
+					 * Whether the stop held: Safari's momentum can outlive a frame with no overflow (a short
+					 * flick in the simulator went on scrolling after it). Then the coast is Safari's, and ours
+					 * does not start beside it: two coasts writing the scroll in turn sprang the canvas back
+					 * and forth.
+					 */
+					const still = Math.abs(element.scrollLeft - held.left) < 1 && Math.abs(element.scrollTop - held.top) < 1;
+					const probe = (globalThis as { __decksFlicks?: unknown[] }).__decksFlicks;
+					if (probe) probe.push({ t: Math.round(performance.now()), v, stopped, held, now: { left: element.scrollLeft, top: element.scrollTop }, ours: still });
+					if (still) ctl.coast(v);
+				});
 			});
 		};
 		element.addEventListener("scroll", sampleFlick, { passive: true });
