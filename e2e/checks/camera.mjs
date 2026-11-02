@@ -364,7 +364,7 @@ const bars = await barsNow();
  * brings them back: unloading on the way in and parsing again on the way out was 37ms per
  * step of `Document::shutdown` in the middle of the gesture, and every document rebuilt in
  * the middle of the next. So the boards that just left are still documents here. On a stage of
- * this size (up to `KEEP_ALL` in `board-admission.ts`) they stay documents: letting them go after a
+ * this size (the budget in `live-set.ts`) they stay documents: letting them go after a
  * few seconds made every pan back to one a white box that filled in. A large stage still lets go.
  */
 say("…while the boards that just left the screen keep their documents for now", bars.documents === bars.nodes, `${bars.documents} of ${bars.nodes}`);

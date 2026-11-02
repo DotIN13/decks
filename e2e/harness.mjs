@@ -181,7 +181,9 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * it and has been cut, so neither canvas renderer is exercised now.
 	 */
 	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
-	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
+	// `DECKS_E2E_GPU_ARGS` replaces these flags on a machine whose Chromium crashes with WebGPU on
+	// (a container with no GPU): `--use-gl=angle --use-angle=swiftshader` runs the checks on WebGL 2.
+	const gpu = process.env.DECKS_E2E_GPU_ARGS !== undefined ? process.env.DECKS_E2E_GPU_ARGS.split(" ").filter(Boolean) : ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
 	/*
 	 * `engine: "webkit"` is Safari's engine, for what only a phone's browser does (no WebGPU, WebGL 2
 	 * in a worker): `backends.mjs`. It takes none of Chromium's flags.

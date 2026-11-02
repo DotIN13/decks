@@ -1,7 +1,7 @@
 /**
  * What the backend checks share (`checks/backends.mjs`, `checks/context-loss.mjs`,
- * `checks/sharper-pictures.mjs`): the two browsers they run in, the APIs they take away, and how
- * they tell the stage's canvas drew something.
+ * `checks/one-picture.mjs` and the others that import it): the two browsers they run in, the APIs
+ * they take away, and how they tell the stage's canvas drew something.
  */
 import { join } from "node:path";
 import { settle } from "./harness.mjs";
