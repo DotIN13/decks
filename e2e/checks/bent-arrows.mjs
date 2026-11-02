@@ -65,18 +65,37 @@ say("the first step lifts the box and the arrow joined to it", lifted.includes("
 
 await canvas.evaluate(() => (globalThis.__tilesPainted = 0));
 const boxes = [];
-const started = Date.now();
 for (let dy = 20; dy <= 300; dy += 10) {
 	await step(dy);
 	boxes.push(await placed("bend-ab"));
 }
-const ms = (Date.now() - started) / 29;
 await settle(page, 600);
 const painted = await canvas.evaluate(() => globalThis.__tilesPainted);
 say("29 more steps paint no tile at all", painted === 0, `${painted} tiles`);
 const grew = boxes.every((box, i) => i === 0 || box.h >= boxes[i - 1].h) && boxes.at(-1).h > boxes[0].h + 250;
 say("the arrow follows the box at every step: its elbow grows as the box goes down", grew, JSON.stringify([boxes[0], boxes.at(-1)]));
-say("a step takes under a frame", ms < 16, `${ms.toFixed(1)} ms a step, with a frame between`);
+/*
+ * Timed in the page, a step a frame: what the step costs the main thread, and the frames between steps.
+ * Timed from here it was the wait for the next frame and two round trips to the browser, about 16 ms
+ * however cheap the step, and it failed or passed by a fraction of a millisecond.
+ */
+const timed = await canvas.evaluate(async () => {
+	const stage = globalThis.__decksProbes.rust;
+	const costs = [];
+	const gaps = [];
+	let last = performance.now();
+	for (let dy = 310; dy <= 600; dy += 10) {
+		const t0 = performance.now();
+		stage.preview(new Map([["bend-a", { dx: 0, dy }]]));
+		costs.push(performance.now() - t0);
+		await new Promise((done) => requestAnimationFrame(() => done()));
+		const now = performance.now();
+		gaps.push(now - last);
+		last = now;
+	}
+	return { cost: costs.reduce((a, b) => a + b, 0) / costs.length, worst: Math.max(...costs), gap: Math.max(...gaps.slice(1)) };
+});
+say("a step takes well under a frame of the main thread, and no frame while it moves runs past two", timed.cost < 4 && timed.gap < 34, `${timed.cost.toFixed(2)} ms a step (worst ${timed.worst.toFixed(1)}), longest frame ${timed.gap.toFixed(1)} ms`);
 
 // Let go without saving: the drawing's own arrow comes back.
 await canvas.evaluate(() => globalThis.__decksProbes.rust.preview(undefined));

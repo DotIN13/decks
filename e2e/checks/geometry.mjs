@@ -228,19 +228,25 @@ await settle(page, 200);
 const letGo = await drawnAt(componentPath);
 await canvas.evaluate((wanted) => {
 	const seen = (window.__heights = []);
+	window.__heightsDone = false;
+	// Until the check reads what it saw (`__heightsDone`): a sampler left running into the steps after this one read a card they had changed. A frame with no node is -1.
 	const sample = () => {
+		if (window.__heightsDone) return;
 		const node = document.querySelector(`.card-node[data-path="${wanted}"]`);
-		seen.push(Math.round(Number.parseFloat(node.style.height)));
+		seen.push(node ? Math.round(Number.parseFloat(node.style.height)) : -1);
 		if (seen.length < 120) requestAnimationFrame(sample);
 	};
 	requestAnimationFrame(sample);
 }, componentPath);
 await page.mouse.up();
 await page.waitForTimeout(2200);
-const heights = await canvas.evaluate(() => window.__heights);
+const heights = await canvas.evaluate(() => {
+	window.__heightsDone = true;
+	return window.__heights;
+});
 say(
-	"a board made shorter never draws taller than where it was let go",
-	letGo.h < before.h - 40 && Math.max(...heights) <= letGo.h + 1 && Math.abs(heights.at(-1) - letGo.h) <= 1,
+	"a board made shorter never draws taller than where it was let go, nor goes missing",
+	letGo.h < before.h - 40 && !heights.includes(-1) && Math.max(...heights) <= letGo.h + 1 && Math.abs(heights.at(-1) - letGo.h) <= 1,
 	`${before.h} → ${letGo.h}, frames after letting go reach ${Math.max(...heights)}, end at ${heights.at(-1)}; ${[...new Set(heights)].join(" ")}`,
 );
 
