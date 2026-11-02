@@ -29,12 +29,12 @@ if (!agentName) throw new Error("the fixture deck has no agent to address");
 
 const hash = () => page.evaluate(() => location.hash);
 say("the app opens on the stage, at the plain root, and writes nothing into the address", (await hash()) === "" && (await page.getAttribute(".surface", "data-surface")) === "stage", `${JSON.stringify(await hash())} ${await page.getAttribute(".surface", "data-surface")}`);
-/* The v3 top-left bar: whose canvas this is and which canvas, and a new one. With the side panel open its head has the deck's mark and the fold, so the bar has no unfold button. */
+/* The top-left bar: whose canvas this is and which canvas, and a new one. With the side panel open its head has the deck's mark and the fold, so the bar has no unfold button. */
 const pill = await page.evaluate(() => ({
-	agent: document.querySelectorAll(".v3-topbar .v3-agent-chip").length,
-	canvas: document.querySelectorAll(".v3-topbar .v3-canvas-chip").length,
-	tabs: document.querySelectorAll('.v3-topbar [role="tab"]').length,
-	unfold: document.querySelectorAll('.v3-topbar button[aria-label="Show the side panel"]').length,
+	agent: document.querySelectorAll(".shell-topbar .shell-agent-chip").length,
+	canvas: document.querySelectorAll(".shell-topbar .shell-canvas-chip").length,
+	tabs: document.querySelectorAll('.shell-topbar [role="tab"]').length,
+	unfold: document.querySelectorAll('.shell-topbar button[aria-label="Show the side panel"]').length,
 	fold: document.querySelectorAll('.panel-shell button[aria-label="Hide the side panel"]').length,
 }));
 say("the top-left bar has the agent and the canvas, no tabs, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 0 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
@@ -54,11 +54,11 @@ say("the top-left bar has the agent and the canvas, no tabs, and the panel folds
 	await canvasTab.click();
 	await settle(page, 400);
 	const rows = await page.evaluate(() => {
-		const all = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
+		const all = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-item[data-kind="board"]')];
 		return {
 			rows: all.length,
-			named: all.every((row) => (row.querySelector(".v3-item-name")?.textContent ?? "").length > 0),
-			icons: all.filter((row) => row.querySelector("svg.v3-item-icon, .v3-item-icon svg, svg")).length,
+			named: all.every((row) => (row.querySelector(".shell-item-name")?.textContent ?? "").length > 0),
+			icons: all.filter((row) => row.querySelector("svg.shell-item-icon, .shell-item-icon svg, svg")).length,
 			pictures: document.querySelectorAll(".panel-shell img").length,
 			frames: document.querySelectorAll(".panel-shell iframe").length,
 			grid: document.querySelectorAll('.panel-view[aria-label*="grid" i]').length,
@@ -139,7 +139,7 @@ await page.waitForSelector(".surface");
 await settle(page, 1500);
 const after = await page.evaluate(() => document.querySelector(".dock")?.getBoundingClientRect().left);
 say("a reload puts the composer back where it was dropped", (await page.getAttribute(".dock", "data-floating")) === "true" && Math.abs((after ?? 0) - (dropped ?? -1)) < 2, `${dropped} -> ${after}`);
-// At the grip, which is drawn under the box's drag strip (`.composer-box::before`, `styles/v3.css`): the press lands on the box, the float's handle.
+// At the grip, which is drawn under the box's drag strip (`.composer-box::before`, the shell's sheets): the press lands on the box, the float's handle.
 await page.locator(".dock-grip").dblclick({ force: true });
 await settle(page, 700);
 say("a double-click on the grip sends it home", (await page.getAttribute(".dock", "data-floating")) === null);

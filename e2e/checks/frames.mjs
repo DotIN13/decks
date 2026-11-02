@@ -199,8 +199,8 @@ if (spot) {
 	 * frame is a column, so a drop into it is a place in an order rather than a pixel, and the line
 	 * between two children is what says which place.
 	 */
-	await page.click('.v3-tool[data-tool="shape"]');
-	await page.click('.v3-menu-row:has-text("Frame")');
+	await page.click('.shell-tool[data-tool="shape"]');
+	await page.click('.shell-menu-row:has-text("Frame")');
 	const room = await page.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());

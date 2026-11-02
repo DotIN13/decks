@@ -480,7 +480,7 @@ export function App() {
 		 * drops the agent's kind so its name and the canvas's keep theirs.
 		 */
 		const fitChrome = () => {
-			const right = document.querySelector<HTMLElement>(".v3-topright")?.offsetWidth ?? 0;
+			const right = document.querySelector<HTMLElement>(".shell-topright")?.offsetWidth ?? 0;
 			document.documentElement.style.setProperty("--topright-w", `${right}px`);
 			const column = workBox().w;
 			document.querySelector(".app")?.toggleAttribute("data-tight-top", column - 32 - right < 340);
@@ -497,7 +497,7 @@ export function App() {
 		if (typeof ResizeObserver !== "undefined") {
 			const right = new ResizeObserver(() => fitChrome());
 			queueMicrotask(() => {
-				const bar = document.querySelector(".v3-topright");
+				const bar = document.querySelector(".shell-topright");
 				if (bar) right.observe(bar);
 			});
 			onCleanup(() => right.disconnect());
@@ -806,7 +806,7 @@ export function App() {
 	};
 
 	/*
-	 * The v3 layout's own state.
+	 * The shell's own state.
 	 *
 	 * A phone is under 600px wide: its tools are a row above the composer, the top bars are one,
 	 * and the conversation is a sheet that grows out of the status pill. Everywhere else the
@@ -843,13 +843,13 @@ export function App() {
 			return void setPhoneChatRaw(false);
 		}
 		if (open) {
-			setSheetFrom(from ?? document.querySelector(".v3-status")?.getBoundingClientRect());
+			setSheetFrom(from ?? document.querySelector(".shell-status")?.getBoundingClientRect());
 			setSheetLeaving(false);
 			return void setPhoneChatRaw(true);
 		}
 		if (!phoneChat() || sheetLeaving()) return;
 		setSheetLeaving(true);
-		// As long as its slide off the screen (`v3-sheet-out`).
+		// As long as its slide off the screen (`shell-sheet-out`).
 		setTimeout(() => {
 			setPhoneChatRaw(false);
 			setSheetLeaving(false);
@@ -870,7 +870,7 @@ export function App() {
 	const holdHistory = (ms = 320) => {
 		const until = performance.now() + ms;
 		const pin = () => {
-			for (const roll of document.querySelectorAll<HTMLElement>(".v3-chat .stream-roll")) roll.scrollTop = roll.scrollHeight;
+			for (const roll of document.querySelectorAll<HTMLElement>(".shell-chat .stream-roll")) roll.scrollTop = roll.scrollHeight;
 			if (performance.now() < until) requestAnimationFrame(pin);
 		};
 		pin();
@@ -1541,7 +1541,7 @@ export function App() {
 				<Show
 					when={!phone()}
 					fallback={
-						<span class="v3-phone-more">
+						<span class="shell-phone-more">
 							<TopRight
 								menuOnly
 								here={[]}

@@ -204,14 +204,14 @@ const opened = await page.evaluate(() => ({
 	offer: document.querySelector(".panel-view")?.getAttribute("aria-label"),
 	lines: document.querySelector(".row-list.agent-list")?.getAttribute("data-lines"),
 	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.dataset.kind}:${one.querySelectorAll(".agent-row").length}`),
-	label: document.querySelector(".v3-folder-name")?.textContent,
+	label: document.querySelector(".shell-folder-name")?.textContent,
 }));
 say(
 	"the agents list opens cut by workspace, which is one heading here, since none of these five has a project",
 	JSON.stringify(opened.sections) === JSON.stringify(["unfiled:5"]) && opened.label === "No workspace",
 	JSON.stringify([opened.sections, opened.label]),
 );
-// v3 draws every agent on two lines (name, kind and state; then the tags), with no toggle.
+// The redesign draws every agent on two lines (name, kind and state; then the tags), with no toggle.
 say("…with two lines per agent", opened.lines === "2", JSON.stringify(opened));
 
 const rowsNow = () =>
@@ -264,7 +264,7 @@ const panel = {
 	rows: await rowsNow(),
 	...(await page.evaluate(() => ({
 		foot: document.querySelector(".panel-foot")?.textContent?.trim(),
-		placeholder: document.querySelector(".panel-shell .v3-search input")?.placeholder,
+		placeholder: document.querySelector(".panel-shell .shell-search input")?.placeholder,
 	}))),
 };
 const rowOf = (name) => panel.rows.find((agent) => agent.name === name);
@@ -284,7 +284,7 @@ say("a finished turn keeps its place, and says it is not read yet", panel.rows[3
 say("every row is two lines", panel.rows.every((agent) => agent.lines === "2" && agent.shape[0] === "agent-line" && agent.shape.length <= 2), JSON.stringify(panel.rows.map((r) => r.shape)));
 say("the avatar is beside the name, not above it", panel.rows.every((agent) => agent.sideBySide), JSON.stringify(panel.rows.map((r) => r.sideBySide)));
 say("…at 24px", panel.rows.every((agent) => agent.avatar === 24), JSON.stringify(panel.rows.map((r) => r.avatar)));
-// The Agents tab packs its rows: 4px above and below the two lines, 46px (4c556096, `styles/v3.css`); Recent keeps the roomier ones.
+// The Agents tab packs its rows: 4px above and below the two lines, 46px (4c556096, the shell's sheets); Recent keeps the roomier ones.
 say("…on a 46px row, the face centred on the two lines", panel.rows.every((agent) => agent.h === 46 && agent.offCentre <= 1), JSON.stringify(panel.rows.map((r) => [r.h, r.offCentre])));
 /*
  * **What it is doing is where the time was**, at the right-hand end of the name line, in the
@@ -321,7 +321,7 @@ say(
 );
 /* The name is the strong word on the row; a dormant one steps down a weight and stays legible. */
 say(
-	"every name is full-strength, the current one at 500 and the rest at 400, as v3 sets them",
+	"every name is full-strength, the current one at 500 and the rest at 400, as the redesign sets them",
 	panel.rows.every((agent) => agent.weight === (agent.current ? "500" : "400")) && panel.rows.every((agent) => agent.nameColour === panel.rows[0]?.nameColour),
 	JSON.stringify(panel.rows.map((r) => `${r.name}:${r.weight}:${r.nameColour}`)),
 );
@@ -427,14 +427,14 @@ await settle(page, 300);
 
 // --- searching by tag, and the query clearing on a switch --------------------------
 
-await page.locator(".panel-shell .v3-search input").fill("panel-css");
+await page.locator(".panel-shell .shell-search input").fill("panel-css");
 await settle(page, 400);
 const found = await page.evaluate(() => ({
 	rows: [...document.querySelectorAll(".agent-row .row-label")].map((el) => el.textContent),
 }));
 say("searching a tag finds the agent on it", JSON.stringify(found.rows) === JSON.stringify(["Ada"]), JSON.stringify(found.rows));
 
-await page.locator(".panel-shell .v3-search input").fill("mine");
+await page.locator(".panel-shell .shell-search input").fill("mine");
 await settle(page, 400);
 say("…including by a tag you put on yourself", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".agent-row .row-label")].map((el) => el.textContent))) === JSON.stringify(["Iris"]));
 
@@ -446,8 +446,8 @@ say("…including by a tag you put on yourself", JSON.stringify(await page.evalu
 // Boards is the Canvas tab now, and its field searches the canvas by name (`panel/LeftPanel.tsx`).
 await page.getByRole("tab", { name: "Canvas" }).click();
 await settle(page, 400);
-say("switching tabs clears the query", (await page.locator(".panel-shell .v3-search input").inputValue()) === "", await page.locator(".panel-shell .v3-search input").inputValue());
-const canvasPlaceholder = (await page.locator(".panel-shell .v3-search input").getAttribute("placeholder")) ?? "";
+say("switching tabs clears the query", (await page.locator(".panel-shell .shell-search input").inputValue()) === "", await page.locator(".panel-shell .shell-search input").inputValue());
+const canvasPlaceholder = (await page.locator(".panel-shell .shell-search input").getAttribute("placeholder")) ?? "";
 say("…and the placeholder follows the tab", /^Search /.test(canvasPlaceholder) && !/agents/i.test(canvasPlaceholder), canvasPlaceholder);
 
 // --- the edit window ------------------------------------------------------------------
@@ -483,7 +483,7 @@ const pop = await page.evaluate(() => ({
 say("the window takes the cursor, in the name", pop.focused === "Agent name", String(pop.focused));
 say("…and holds the three things about an agent you can change, as rows", JSON.stringify(pop.rows) === JSON.stringify(["Name", "Workspace", "Tags"]), JSON.stringify(pop.rows));
 say("…with nothing written under them", pop.notes === 0, `${pop.notes} notes`);
-// The tags are chips inside their own field, which is 34px at least so a 22px chip sits in it (8182a2f2, `styles/v3.css`).
+// The tags are chips inside their own field, which is 34px at least so a 22px chip sits in it (8182a2f2, the shell's sheets).
 say("…with fields that did not collapse", pop.fields.length === 3 && pop.fields[0] === 32 && pop.fields[1] === 32 && pop.fields[2] >= 34, JSON.stringify(pop.fields));
 say("…the workspace as a picker, saying it is on none", pop.picker === "No workspace", String(pop.picker));
 /* Yours alone: the agent's own tags stay on its row, and only yours carry a way to remove them. */
@@ -578,9 +578,9 @@ say("a workspace is not drawn on the row: its heading says it", chipped.ws === 0
 const filed = await page.evaluate(() => {
 	return [...document.querySelectorAll(".panel-section")].map((section) => ({
 		kind: section.dataset.kind,
-		label: section.querySelector(".v3-folder-name")?.textContent,
-		note: section.querySelector(".v3-folder-head .note")?.textContent ?? null,
-		plus: section.querySelector(".v3-folder-head button.new-agent")?.getAttribute("aria-label") ?? null,
+		label: section.querySelector(".shell-folder-name")?.textContent,
+		note: section.querySelector(".shell-folder-head .note")?.textContent ?? null,
+		plus: section.querySelector(".shell-folder-head button.new-agent")?.getAttribute("aria-label") ?? null,
 		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent),
 	}));
 });
@@ -630,8 +630,8 @@ await settle(page, 500);
 
 const moved = await page.evaluate(() =>
 	[...document.querySelectorAll(".panel-section")].map((section) => ({
-		label: section.querySelector(".v3-folder-name")?.textContent,
-		note: section.querySelector(".v3-folder-head .note")?.textContent ?? null,
+		label: section.querySelector(".shell-folder-name")?.textContent,
+		note: section.querySelector(".shell-folder-head .note")?.textContent ?? null,
 		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent),
 	})),
 );
@@ -654,11 +654,11 @@ say("an agent with nothing going on shows the last thing it said instead of a st
  * heading says where the row would land while it is in flight, and that the drop sends the
  * move for the agent whose row it is.
  */
-const heading = (label) => page.locator(".panel-section").filter({ has: page.locator(".v3-folder-name", { hasText: new RegExp(`^${label}$`) }) }).first();
+const heading = (label) => page.locator(".panel-section").filter({ has: page.locator(".shell-folder-name", { hasText: new RegExp(`^${label}$`) }) }).first();
 const dragRowTo = async (name, label, { drop = true } = {}) => {
 	const row = page.locator(".agent-row").filter({ hasText: name }).first();
 	const from = await row.boundingBox();
-	const to = await heading(label).locator(".v3-folder-head").first().boundingBox();
+	const to = await heading(label).locator(".shell-folder-head").first().boundingBox();
 	await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
 	await page.mouse.down();
 	await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
@@ -669,7 +669,7 @@ const dragRowTo = async (name, label, { drop = true } = {}) => {
 	await page.mouse.move(to.x + to.width / 2 + 2, to.y + to.height / 2, { steps: 3 });
 	await settle(page, 200);
 	const marks = await page.evaluate(() => ({
-		over: [...document.querySelectorAll(".panel-section[data-drop]")].map((one) => one.querySelector(".v3-folder-name")?.textContent),
+		over: [...document.querySelectorAll(".panel-section[data-drop]")].map((one) => one.querySelector(".shell-folder-name")?.textContent),
 		lifted: [...document.querySelectorAll(".agent-row[data-dragging]")].map((one) => one.querySelector(".row-label")?.textContent),
 	}));
 	if (drop) await page.mouse.up();
@@ -718,7 +718,7 @@ say("in the two-line view pointing at a row opens no card", cardInTwo === 0, `${
 await page.mouse.move(700, 500);
 await settle(page, 200);
 
-/* v3 has no one-line view: every agent is two lines, and the hover card is the one-line view's, so it is not drawn here. */
+/* The redesign has no one-line view: every agent is two lines, and the hover card is the one-line view's, so it is not drawn here. */
 
 // --- the square beside the search is the agents' alone ----------------------------------
 

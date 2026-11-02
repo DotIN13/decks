@@ -6,22 +6,22 @@
 /* ---- step 3: the side panel ---------------------------------------------------------------- */
 @layer components {
 	/* A workspace folds by its height and turns its chevron, rather than its rows vanishing. */
-	.v3-folder-body {
+	.shell-folder-body {
 		display: grid;
 		grid-template-rows: 1fr;
-		transition: grid-template-rows 240ms var(--v3-ease);
+		transition: grid-template-rows 240ms var(--ui-ease);
 	}
-	.v3-folder-body[data-open="false"] {
+	.shell-folder-body[data-open="false"] {
 		grid-template-rows: 0fr;
 	}
-	.v3-folder-body > * {
+	.shell-folder-body > * {
 		min-height: 0;
 		overflow: hidden;
 	}
 
 	/* A tab's list rises in when the tab changes; rows that are already there stay put. */
-	.v3-panel .panel-list > :is(.panel-section, .v3-apps, .v3-new-agent) {
-		animation: v3-arrive 220ms var(--v3-ease);
+	.shell-panel .panel-list > :is(.panel-section, .shell-apps, .shell-new-agent) {
+		animation: shell-arrive 220ms var(--ui-ease);
 	}
 
 	/*
@@ -30,14 +30,14 @@
 	 * mounted, clipped, so nothing in it is redrawn by a fold, and its history is held at the
 	 * bottom while it moves (`App.tsx`, `holdHistory`).
 	 */
-	.v3-chat,
-	.v3-chat[data-folded="true"] {
+	.shell-chat,
+	.shell-chat[data-folded="true"] {
 		flex: 1 1 44px;
 		margin-top: auto;
 		overflow: hidden;
-		transition: flex-grow 260ms var(--v3-ease);
+		transition: flex-grow 260ms var(--ui-ease);
 	}
-	.v3-chat[data-folded="true"] {
+	.shell-chat[data-folded="true"] {
 		flex-grow: 0.00001;
 	}
 	/*
@@ -45,23 +45,23 @@
 	 * bottom, hidden once the fold has run, so its latest message never shows under the head when the
 	 * section comes to rest a little taller than it.
 	 */
-	.v3-chat[data-folded="true"] {
+	.shell-chat[data-folded="true"] {
 		min-height: 44px;
 	}
-	.v3-chat[data-folded="true"] .v3-chat-body {
+	.shell-chat[data-folded="true"] .shell-chat-body {
 		display: flex;
 		visibility: hidden;
 		transition: visibility 0s linear 260ms;
 	}
-	.v3-chat-head .v3-icon svg {
-		transition: transform 220ms var(--v3-ease);
+	.shell-chat-head .shell-icon svg {
+		transition: transform 220ms var(--ui-ease);
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.v3-folder-body,
-		.v3-chat {
+		.shell-folder-body,
+		.shell-chat {
 			transition: none;
 		}
-		.v3-panel .panel-list > * {
+		.shell-panel .panel-list > * {
 			animation: none;
 		}
 	}
@@ -80,20 +80,20 @@
 		border: 0;
 		border-radius: 8px;
 		background: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font: 11.5px var(--font-mono);
 		transition:
-			background-color 200ms var(--v3-ease),
-			color 200ms var(--v3-ease);
+			background-color 200ms var(--ui-ease),
+			color 200ms var(--ui-ease);
 	}
 	.dock .composer-ctx .dial:hover,
 	.dock .composer-ctx .dial[aria-expanded="true"] {
-		background: var(--v3-bg3);
-		color: var(--v3-fg);
+		background: var(--ui-bg3);
+		color: var(--ui-fg);
 		transition-duration: 120ms;
 	}
 	.dock .composer-ctx .ctx-ring .fill {
-		transition: stroke-dasharray 600ms var(--v3-ease);
+		transition: stroke-dasharray 600ms var(--ui-ease);
 	}
 	.app[data-phone="true"] .dock .composer-ctx {
 		display: none;
@@ -104,35 +104,35 @@
 @layer components {
 	/* The phone's sheet leaves quicker than it came, down into the composer. */
 	/* Put away, the sheet slides all the way down off the screen, from wherever a drag left it. */
-	.v3-chat[data-sheet="true"][data-leaving="true"] {
-		animation: v3-sheet-out 260ms var(--v3-ease-in) forwards;
+	.shell-chat[data-sheet="true"][data-leaving="true"] {
+		animation: shell-sheet-out 260ms var(--ui-ease-in) forwards;
 		pointer-events: none;
 	}
-	@keyframes v3-sheet-out {
+	@keyframes shell-sheet-out {
 		to {
 			transform: translateY(calc(100% + 120px));
 		}
 	}
 	/* The phone's properties rise as a sheet. */
 	.app[data-phone="true"] .props-panel.panel-float {
-		animation: v3-sheet-in 300ms var(--v3-ease);
+		animation: shell-sheet-in 300ms var(--ui-ease);
 	}
-	@keyframes v3-sheet-in {
+	@keyframes shell-sheet-in {
 		from {
 			transform: translateY(100%);
 		}
 	}
-	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.v3-zoom`),
+	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.shell-zoom`),
 	   and gives the composer its whole width less 12px a side (`data-narrow-dock`, `fitChrome` in App.tsx). */
 	.app[data-narrow-dock]:not([data-phone="true"]) .dock {
 		width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 24px);
 	}
 	/* The phone's tool row carries the same marker as the column. */
-	.v3-tools[data-row="true"] .v3-tool-mark {
+	.shell-tools[data-row="true"] .shell-tool-mark {
 		border-radius: 12px;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.v3-chat[data-sheet="true"][data-leaving="true"],
+		.shell-chat[data-sheet="true"][data-leaving="true"],
 		.app[data-phone="true"] .props-panel.panel-float {
 			animation: none;
 		}
@@ -141,7 +141,7 @@
 
 @layer components {
 	/* The phone's row sits in the composer's stack: none of the column's place applies to it. */
-	.pen-tools.v3-tools[data-row="true"] {
+	.pen-tools.shell-tools[data-row="true"] {
 		position: relative;
 		top: auto;
 		left: auto;
@@ -154,29 +154,29 @@
 @layer components {
 	/* Present: the chrome steps out to its edges instead of vanishing. */
 	/* Only opacity and translate: a float's position is the float's own, and never eased while it is held or flung. */
-	.app :is(.v3-topright, .v3-zoom) {
+	.app :is(.shell-topright, .shell-zoom) {
 		transition:
-			opacity 200ms var(--v3-ease),
-			translate 260ms var(--v3-ease);
+			opacity 200ms var(--ui-ease),
+			translate 260ms var(--ui-ease);
 	}
-	.app .v3-topbar {
+	.app .shell-topbar {
 		transition:
-			left 260ms var(--v3-ease),
-			opacity 200ms var(--v3-ease),
-			translate 260ms var(--v3-ease);
+			left 260ms var(--ui-ease),
+			opacity 200ms var(--ui-ease),
+			translate 260ms var(--ui-ease);
 	}
-	.app :is(.pen-tools.v3-tools, .dock):not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+	.app :is(.pen-tools.shell-tools, .dock):not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
 		transition:
-			left 260ms var(--v3-ease),
-			opacity 200ms var(--v3-ease),
-			translate 260ms var(--v3-ease);
+			left 260ms var(--ui-ease),
+			opacity 200ms var(--ui-ease),
+			translate 260ms var(--ui-ease);
 	}
-	.app[data-presenting="true"] :is(.v3-topbar, .pen-tools.v3-tools, .v3-tray-wrap) {
+	.app[data-presenting="true"] :is(.shell-topbar, .pen-tools.shell-tools, .shell-tray-wrap) {
 		opacity: 0;
 		translate: -16px 0;
 		pointer-events: none;
 	}
-	.app[data-presenting="true"] :is(.v3-topright, .v3-zoom, .props-panel) {
+	.app[data-presenting="true"] :is(.shell-topright, .shell-zoom, .props-panel) {
 		opacity: 0;
 		translate: 16px 0;
 		pointer-events: none;
@@ -197,22 +197,22 @@
 	 * `shell.css`): nothing in this sheet may override it, and nothing eases a float's position while
 	 * it is held. The tray glides as the tools and the composer do.
 	 */
-	.v3-tray-wrap[data-snapping="true"],
-	.pen-tools.v3-tools[data-snapping="true"],
+	.shell-tray-wrap[data-snapping="true"],
+	.pen-tools.shell-tools[data-snapping="true"],
 	.dock[data-snapping="true"] {
 		transition:
 			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
 			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
 			bottom var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
 	}
-	.pen-tools.v3-tools[data-dragging="true"],
-	.v3-tray-wrap[data-dragging="true"],
+	.pen-tools.shell-tools[data-dragging="true"],
+	.shell-tray-wrap[data-dragging="true"],
 	.dock[data-dragging="true"] {
 		transition: none;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.v3-tray-wrap[data-snapping="true"],
-		.pen-tools.v3-tools[data-snapping="true"],
+		.shell-tray-wrap[data-snapping="true"],
+		.pen-tools.shell-tools[data-snapping="true"],
 		.dock[data-snapping="true"] {
 			transition-duration: 0s;
 		}
@@ -220,8 +220,8 @@
 }
 
 @layer components {
-	.pen-tools.v3-tools[data-landing="true"],
-	.v3-tray-wrap[data-landing="true"] {
+	.pen-tools.shell-tools[data-landing="true"],
+	.shell-tray-wrap[data-landing="true"] {
 		transition: none;
 	}
 }
@@ -231,12 +231,12 @@
 	 * Tucked behind an edge, a float is only its tab: the column's own surface goes with its tools,
 	 * so what is left showing is the tab and not a strip of the column cut to the tab's width.
 	 */
-	.pen-tools.v3-tools[data-stowed] {
+	.pen-tools.shell-tools[data-stowed] {
 		overflow: visible;
 		background: transparent;
 		box-shadow: none;
 	}
-	.pen-tools.v3-tools[data-stowed] > .v3-tool-mark {
+	.pen-tools.shell-tools[data-stowed] > .shell-tool-mark {
 		opacity: 0;
 	}
 }
@@ -259,42 +259,42 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 14px;
 		font-weight: 400;
 		line-height: 1;
 	}
 	.dock .dock-row .chip-button:hover,
 	.dock .dock-row .chip-button[aria-expanded="true"] {
-		background: var(--v3-bg3);
+		background: var(--ui-bg3);
 	}
 	.dock .dock-row .chip-button > span:not(.chip-sub) {
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		line-height: 1;
 	}
 	.dock .dock-row [data-mode-chip] > span:not(.chip-sub)::first-letter {
 		text-transform: uppercase;
 	}
 	.dock .dock-row .chip-button > .chip-sub {
-		color: color-mix(in srgb, var(--v3-fg2) 55%, var(--v3-fg3));
+		color: color-mix(in srgb, var(--ui-fg2) 55%, var(--ui-fg3));
 		font-size: 13px;
 		line-height: 1;
 	}
 	.dock .dock-row .chip-button > .chevron {
 		width: 12px;
 		height: 12px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		opacity: 1;
 	}
 }
 
 /* ---- the conversation's height is the person's ------------------------------------------- */
 @layer components {
-	.v3-chat {
+	.shell-chat {
 		position: relative;
 	}
 	/* The line between the list and the conversation, as something to take hold of. */
-	.v3-chat-resize {
+	.shell-chat-resize {
 		position: absolute;
 		/* Over the list's last rows (their tags) and the conversation's scroller. */
 		z-index: 20;
@@ -306,39 +306,39 @@
 		touch-action: none;
 	}
 	/* A full-width line in the accent on approach, as the sidebar's own edge is. */
-	.v3-chat-resize::after {
+	.shell-chat-resize::after {
 		position: absolute;
 		top: 3px;
 		right: 0;
 		left: 0;
 		height: 2px;
-		background: var(--v3-accent);
+		background: var(--ui-accent);
 		content: "";
 		opacity: 0;
 		transition: opacity 120ms ease;
 	}
-	.v3-chat-resize:hover::after,
-	.v3-chat-resize:focus-visible::after,
-	.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+	.shell-chat-resize:hover::after,
+	.shell-chat-resize:focus-visible::after,
+	.panel-shell[data-chat-resizing] .shell-chat-resize::after {
 		opacity: 1;
 	}
-	.v3-chat-resize:focus-visible {
+	.shell-chat-resize:focus-visible {
 		outline: none;
 	}
 	/* Sized by hand: the conversation keeps that height, folds from it, and the list takes the rest. */
-	.panel-shell[data-chat-sized] .v3-chat {
-		flex: 0 0 var(--v3-chat-h);
-		transition: flex-basis 260ms var(--v3-ease);
+	.panel-shell[data-chat-sized] .shell-chat {
+		flex: 0 0 var(--ui-chat-h);
+		transition: flex-basis 260ms var(--ui-ease);
 	}
-	.panel-shell[data-chat-sized] .v3-chat[data-folded="true"] {
+	.panel-shell[data-chat-sized] .shell-chat[data-folded="true"] {
 		flex-basis: 44px;
 	}
 	.panel-shell[data-chat-sized] .panel-list,
-	.v3-panel[data-chat-sized]:has(.v3-chat:not([data-folded="true"])) .panel-list {
+	.shell-panel[data-chat-sized]:has(.shell-chat:not([data-folded="true"])) .panel-list {
 		flex: 1 1 auto;
 		max-height: none;
 	}
-	.panel-shell[data-chat-resizing] .v3-chat {
+	.panel-shell[data-chat-resizing] .shell-chat {
 		transition: none;
 	}
 	.panel-shell[data-chat-resizing] {
@@ -346,7 +346,7 @@
 		user-select: none;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.panel-shell[data-chat-sized] .v3-chat {
+		.panel-shell[data-chat-sized] .shell-chat {
 			transition: none;
 		}
 	}
@@ -354,45 +354,45 @@
 
 /* ---- a narrow panel: the strip and the search fit whatever width the panel is dragged to ---- */
 @layer components {
-	.panel-shell.v3-panel {
-		container: v3-panel / inline-size;
+	.panel-shell.shell-panel {
+		container: shell-panel / inline-size;
 	}
-	.v3-nav {
+	.shell-nav {
 		min-width: 0;
 		overflow: hidden;
 	}
-	.v3-nav-tab {
+	.shell-nav-tab {
 		min-width: 0;
 		flex: 0 1 auto;
 	}
 	/* Narrower than four tabs with icons: the icons go and every tab keeps its word (270px in all). */
-	@container v3-panel (max-width: 351px) {
-		.v3-nav-tab > svg {
+	@container shell-panel (max-width: 351px) {
+		.shell-nav-tab > svg {
 			display: none;
 		}
 	}
-	@container v3-panel (max-width: 299px) {
-		.v3-search .v3-kbd {
+	@container shell-panel (max-width: 299px) {
+		.shell-search .shell-kbd {
 			display: none;
 		}
-		.v3-lp-head {
+		.shell-lp-head {
 			gap: 8px;
 			padding-left: 12px;
 		}
-		.v3-lp-mark {
+		.shell-lp-mark {
 			width: 28px;
 			height: 28px;
 		}
-		.v3-panel[data-desktop="true"] .v3-nav-tab {
+		.shell-panel[data-desktop="true"] .shell-nav-tab {
 			padding: 0 8px;
 		}
 	}
-	@container v3-panel (max-width: 220px) {
-		.v3-nav {
+	@container shell-panel (max-width: 220px) {
+		.shell-nav {
 			padding-right: 8px;
 			padding-left: 8px;
 		}
-		.v3-nav-tab {
+		.shell-nav-tab {
 			padding: 0 8px;
 		}
 	}
@@ -400,11 +400,11 @@
 
 @layer components {
 	/* A ⋯ row that is a setting carries its tick at the end, in the accent. */
-	.v3-more-check {
+	.shell-more-check {
 		display: grid;
 		flex: none;
 		place-items: center;
-		color: var(--v3-accent);
+		color: var(--ui-accent);
 	}
 	.popover [data-row][disabled] {
 		opacity: 0.45;
@@ -413,8 +413,8 @@
 }
 
 @layer components {
-	/* v3's agent face: 24px, in a 24px slot. */
-	.v3-panel .agent-list .agent-row .row-icon {
+	/* the redesign's agent face: 24px, in a 24px slot. */
+	.shell-panel .agent-list .agent-row .row-icon {
 		width: 24px;
 		min-width: 24px;
 	}
@@ -425,11 +425,11 @@
 /* ---- the Recent and Canvas tabs ------------------------------------------------------------ */
 @layer components {
 	/* Recent is one list with no folders above it, so its rows start at the panel's edge. */
-	.v3-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
+	.shell-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
 		padding-left: 10px;
 	}
 	/* The Canvas tab: the drawing's items, one row each, as Studio's editor lists its layers. */
-	.v3-item {
+	.shell-item {
 		display: flex;
 		width: 100%;
 		height: 28px;
@@ -439,33 +439,33 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 		font-size: 13px;
 		text-align: left;
 	}
-	.v3-item:hover,
-	.v3-item:focus-visible {
-		background: var(--v3-bg2);
+	.shell-item:hover,
+	.shell-item:focus-visible {
+		background: var(--ui-bg2);
 		outline: none;
 	}
-	.v3-item[data-on="true"] {
-		background: var(--v3-row-on);
+	.shell-item[data-on="true"] {
+		background: var(--ui-row-on);
 	}
-	.v3-item-icon {
+	.shell-item-icon {
 		flex: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
-	.v3-item[data-on="true"] .v3-item-icon {
-		color: var(--v3-row-on-icon);
+	.shell-item[data-on="true"] .shell-item-icon {
+		color: var(--ui-row-on-icon);
 	}
-	.v3-item-name {
+	.shell-item-name {
 		min-width: 0;
 		flex: 1;
 	}
-	.v3-item-n {
-		color: var(--v3-fg3);
+	.shell-item-n {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 	}
 }
@@ -476,15 +476,15 @@
 	 * The head (the mock-up "The sidebar top, polished"): Decks' mark as a tile, beside it the canvas
 	 * and under that the deck and what the tab holds, then Settings and Hide; its line under it.
 	 */
-	.v3-lp-head {
+	.shell-lp-head {
 		display: flex;
 		flex: none;
 		align-items: center;
 		gap: 10px;
 		padding: 14px 10px 12px 14px;
-		border-bottom: 1px solid var(--v3-line);
+		border-bottom: 1px solid var(--ui-line);
 	}
-	.v3-lp-text {
+	.shell-lp-text {
 		display: grid;
 		min-width: 0;
 		flex: 1;
@@ -492,15 +492,15 @@
 		/* One column no wider than the head allows, so a long title shortens instead of pushing the buttons. */
 		grid-template-columns: minmax(0, 1fr);
 	}
-	.v3-lp-title > .truncate {
+	.shell-lp-title > .truncate {
 		min-width: 0;
 	}
-	.v3-lp-buttons {
+	.shell-lp-buttons {
 		display: flex;
 		flex: none;
 		gap: 2px;
 	}
-	.v3-lp-title {
+	.shell-lp-title {
 		display: inline-flex;
 		max-width: 100%;
 		align-items: center;
@@ -510,32 +510,32 @@
 		border: 0;
 		border-radius: 5px;
 		background: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 		font-size: 13.5px;
 		font-weight: 600;
 		justify-self: start;
 	}
-	.v3-lp-title:hover:not(:disabled) {
-		background: var(--v3-bg2);
+	.shell-lp-title:hover:not(:disabled) {
+		background: var(--ui-bg2);
 	}
-	.v3-lp-title > svg {
-		color: var(--v3-fg2);
+	.shell-lp-title > svg {
+		color: var(--ui-fg2);
 	}
-	.v3-lp-status {
+	.shell-lp-status {
 		display: flex;
 		min-width: 0;
 		align-items: center;
 		gap: 8px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 	}
 	/* The deck's switcher, said in the status line's own size: its name and a small chevron. */
-	.v3-lp-deck {
+	.shell-lp-deck {
 		flex: none;
 	}
-	.v3-lp-deck .switcher {
+	.shell-lp-deck .switcher {
 		width: auto;
 		height: 18px;
 		gap: 3px;
@@ -544,49 +544,49 @@
 		border-radius: 4px;
 		font-size: 11.5px;
 	}
-	.v3-lp-deck .switcher .panel-mark-glyph {
+	.shell-lp-deck .switcher .panel-mark-glyph {
 		display: none;
 	}
-	.v3-lp-deck .switcher-name {
-		color: var(--v3-fg2);
+	.shell-lp-deck .switcher-name {
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 		font-weight: 400;
 	}
 	/* The live tab strip, 10px under the head's line (a margin: its sliding mark is placed from the top). */
-	.v3-panel[data-desktop="true"] .v3-nav {
+	.shell-panel[data-desktop="true"] .shell-nav {
 		margin-top: 10px;
 		padding: 0 10px;
 	}
-	.v3-panel[data-desktop="true"] .v3-search-wrap {
+	.shell-panel[data-desktop="true"] .shell-search-wrap {
 		padding: 10px 12px 8px;
 	}
-	.v3-panel[data-desktop="true"] .panel-list > .panel-section:first-child > .v3-sec:first-child {
+	.shell-panel[data-desktop="true"] .panel-list > .panel-section:first-child > .shell-sec:first-child {
 		padding-top: 6px;
 	}
 	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
-	.v3-panel[data-desktop="true"] .v3-search {
+	.shell-panel[data-desktop="true"] .shell-search {
 		height: 32px;
 		gap: 8px;
 		padding: 0 6px 0 10px;
 		border-radius: 8px;
 		box-shadow: inset 0 0 0 1px transparent;
 		transition:
-			background 150ms var(--v3-ease),
-			box-shadow 150ms var(--v3-ease);
+			background 150ms var(--ui-ease),
+			box-shadow 150ms var(--ui-ease);
 	}
-	.v3-panel[data-desktop="true"] .v3-search:focus-within {
-		background: var(--v3-panel);
+	.shell-panel[data-desktop="true"] .shell-search:focus-within {
+		background: var(--ui-panel);
 		box-shadow:
-			inset 0 0 0 1px var(--v3-accent),
-			0 0 0 3px var(--v3-accent-soft);
+			inset 0 0 0 1px var(--ui-accent),
+			0 0 0 3px var(--ui-accent-soft);
 	}
-	.v3-panel[data-desktop="true"] .v3-search input {
+	.shell-panel[data-desktop="true"] .shell-search input {
 		font-size: 12.5px;
 	}
-	.v3-panel[data-desktop="true"] .v3-search .v3-kbd {
+	.shell-panel[data-desktop="true"] .shell-search .shell-kbd {
 		height: auto;
 		padding: 1px 5px;
-		border-color: var(--v3-line);
+		border-color: var(--ui-line);
 		font-size: 10.5px;
 		font-weight: 500;
 		letter-spacing: 0;
@@ -594,17 +594,17 @@
 	}
 
 	/* A section's heading in a list, with its count at the right. */
-	.v3-sec {
+	.shell-sec {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		padding: 8px 8px 4px;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 12px;
 		font-weight: 500;
 	}
-	.v3-sec-n {
-		color: var(--v3-fg3);
+	.shell-sec-n {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 		font-weight: 400;
 	}
@@ -615,13 +615,13 @@
 	 * hover, on the picked row and while its menu is open. A click picks (the grey of a chosen row),
 	 * a double-click runs and shows.
 	 */
-	.v3-apps {
+	.shell-apps {
 		display: grid;
 		align-content: start;
 		gap: 2px;
 		padding-inline: 4px;
 	}
-	.v3-app-row {
+	.shell-app-row {
 		position: relative;
 		display: flex;
 		height: 52px;
@@ -630,16 +630,16 @@
 		padding: 0 8px;
 		border-radius: 9px;
 		cursor: default;
-		transition: background 120ms var(--v3-ease);
+		transition: background 120ms var(--ui-ease);
 		user-select: none;
 	}
-	.v3-app-row:hover {
-		background: var(--v3-bg2);
+	.shell-app-row:hover {
+		background: var(--ui-bg2);
 	}
-	.v3-app-row[data-on] {
-		background: var(--v3-row-on);
+	.shell-app-row[data-on] {
+		background: var(--ui-row-on);
 	}
-	.v3-app-tile {
+	.shell-app-tile {
 		display: grid;
 		width: 34px;
 		height: 34px;
@@ -648,58 +648,58 @@
 		border-radius: 9px;
 		color: #fff;
 	}
-	.v3-app-text {
+	.shell-app-text {
 		display: grid;
 		min-width: 0;
 		flex: 1;
 		gap: 3px;
 	}
-	.v3-app-name {
-		color: var(--v3-fg);
+	.shell-app-name {
+		color: var(--ui-fg);
 		font-size: 13px;
 		font-weight: 500;
 	}
-	.v3-app-state {
+	.shell-app-state {
 		display: flex;
 		min-width: 0;
 		align-items: center;
 		gap: 6px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 12px;
 	}
-	.v3-app-word {
+	.shell-app-word {
 		flex: none;
 	}
-	.v3-app-path {
+	.shell-app-path {
 		min-width: 0;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 	}
-	.v3-app-state > i {
+	.shell-app-state > i {
 		width: 6px;
 		height: 6px;
 		flex: none;
 		border-radius: 50%;
-		background: var(--v3-fg3);
+		background: var(--ui-fg3);
 	}
-	.v3-app-state[data-state="on"] > i {
+	.shell-app-state[data-state="on"] > i {
 		background: #14ae5c;
 	}
-	.v3-app-state[data-state="busy"] > i {
+	.shell-app-state[data-state="busy"] > i {
 		background: #e5a000;
-		animation: v3-app-busy 1.4s ease-in-out infinite;
+		animation: shell-app-busy 1.4s ease-in-out infinite;
 	}
-	.v3-app-state[data-state="broken"] > i {
-		background: var(--v3-danger);
+	.shell-app-state[data-state="broken"] > i {
+		background: var(--ui-danger);
 	}
-	.v3-app-state[data-state="broken"] > .v3-app-word {
-		color: var(--v3-danger);
+	.shell-app-state[data-state="broken"] > .shell-app-word {
+		color: var(--ui-danger);
 	}
-	@keyframes v3-app-busy {
+	@keyframes shell-app-busy {
 		50% {
 			opacity: 0.3;
 		}
 	}
-	.v3-app-more {
+	.shell-app-more {
 		display: grid;
 		width: 28px;
 		height: 28px;
@@ -708,28 +708,28 @@
 		border: 0;
 		border-radius: 7px;
 		background: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		cursor: pointer;
 		opacity: 0;
-		transition: opacity 120ms var(--v3-ease);
+		transition: opacity 120ms var(--ui-ease);
 	}
-	.v3-app-row:is(:hover, :focus-within, [data-on]) .v3-app-more,
-	.v3-app-more[data-on] {
+	.shell-app-row:is(:hover, :focus-within, [data-on]) .shell-app-more,
+	.shell-app-more[data-on] {
 		opacity: 1;
 	}
-	.v3-app-more:hover,
-	.v3-app-more[data-on] {
-		background: var(--v3-bg3);
-		color: var(--v3-fg);
+	.shell-app-more:hover,
+	.shell-app-more[data-on] {
+		background: var(--ui-bg3);
+		color: var(--ui-fg);
 	}
 	@media (hover: none) {
-		.v3-app-more {
+		.shell-app-more {
 			opacity: 1;
 		}
 	}
 
 	/* An app's logs: a small panel over the canvas's lower right. */
-	.v3-app-logs {
+	.shell-app-logs {
 		position: fixed;
 		z-index: var(--z-menu);
 		right: 14px;
@@ -737,25 +737,25 @@
 		width: min(460px, calc(100vw - 28px));
 		overflow: hidden;
 		border-radius: 12px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
-		color: var(--v3-fg);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
+		color: var(--ui-fg);
 		font-size: 13px;
-		animation: v3-arrive 180ms var(--v3-ease);
+		animation: shell-arrive 180ms var(--ui-ease);
 	}
-	.v3-app-logs-head {
+	.shell-app-logs-head {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding: 8px 8px 8px 14px;
-		border-bottom: 1px solid var(--v3-line);
+		border-bottom: 1px solid var(--ui-line);
 		font-weight: 500;
 	}
-	.v3-app-logs-head > svg {
+	.shell-app-logs-head > svg {
 		flex: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
-	.v3-app-logs-x {
+	.shell-app-logs-x {
 		display: grid;
 		width: 26px;
 		height: 26px;
@@ -763,19 +763,19 @@
 		border: 0;
 		border-radius: 6px;
 		background: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		cursor: pointer;
 	}
-	.v3-app-logs-x:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+	.shell-app-logs-x:hover {
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
-	.v3-app-logs pre {
+	.shell-app-logs pre {
 		max-height: 220px;
 		margin: 0;
 		padding: 10px 14px 12px;
 		overflow: auto;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font: 11.5px/1.55 var(--font-mono);
 		white-space: pre-wrap;
 		user-select: text;
@@ -786,23 +786,23 @@
 	 * folder's icon. The indent is the row's margin, so the wash starts at the face, not at the
 	 * folder's edge. Recent keeps its roomier rows at the panel's edge.
 	 */
-	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row {
+	.shell-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row {
 		margin-left: 14.5px;
 	}
-	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row > button[data-row] {
+	.shell-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-row > button[data-row] {
 		gap: 8px;
 		padding: 4px 10px 4px 6px;
 	}
-	.v3-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-body {
+	.shell-panel .panel-section:not([data-kind="recent"]) .agent-list .agent-body {
 		gap: 1px;
 		line-height: 1.25;
 	}
-	.v3-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
+	.shell-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
 		gap: 10px;
 		padding: 7px 10px;
 	}
 	/* The working ring clear of the face by a hair more, so it reads as a ring breathing round it. */
-	.v3-panel .agent-list .agent-face[data-status]:not([data-status="idle"]) {
+	.shell-panel .agent-list .agent-face[data-status]:not([data-status="idle"]) {
 		outline-offset: 2.5px;
 	}
 }
@@ -813,24 +813,24 @@
 	 * Folded, the stream is a box with no height, so it never reads as scrolled to the end and its
 	 * jump button stayed up over the fold. Nothing of the stream shows while it is folded.
 	 */
-	.v3-chat[data-folded="true"] .stream-jump {
+	.shell-chat[data-folded="true"] .stream-jump {
 		display: none;
 	}
 }
 
 /* ---- the sidebar without a rail: the mark in the head, the tabs over the search ------------- */
 @layer components {
-	.v3-lp-mark {
+	.shell-lp-mark {
 		display: grid;
 		width: 32px;
 		height: 32px;
 		flex: none;
 		place-items: center;
 		border-radius: 8px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
-	.v3-lp-icon {
+	.shell-lp-icon {
 		display: grid;
 		width: 28px;
 		height: 28px;
@@ -839,15 +839,15 @@
 		border: 0;
 		border-radius: 7px;
 		background: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		cursor: pointer;
 	}
-	.v3-lp-icon:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+	.shell-lp-icon:hover {
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
-	.v3-lp-icon:focus-visible {
-		outline: 2px solid var(--v3-accent);
+	.shell-lp-icon:focus-visible {
+		outline: 2px solid var(--ui-accent);
 		outline-offset: -1px;
 	}
 
@@ -859,13 +859,13 @@
 @layer components {
 	body .popover {
 		padding: 6px;
-		border: 1px solid var(--v3-line);
+		border: 1px solid var(--ui-line);
 		border-radius: 10px;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow:
 			0 8px 28px rgb(0 0 0 / 12%),
 			0 0 0 0.5px rgb(0 0 0 / 6%);
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 13px;
 	}
 	[data-color-scheme="dark"] body .popover {
@@ -875,11 +875,11 @@
 	}
 	body .popover [data-row]:hover,
 	body .popover [data-row]:focus-visible {
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	body .popover [data-row][data-current="true"],
 	body .popover .row-act:has(> [data-row][data-current="true"]) {
-		background: var(--v3-row-on);
+		background: var(--ui-row-on);
 	}
 	body .popover [data-row][data-flat="true"] {
 		min-height: 30px;
@@ -887,7 +887,7 @@
 		border-radius: 6px;
 	}
 	body .popover [data-row] > .row-icon {
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	/* On a one-line row the icon sits on the words' middle: the 1px nudge is for two-line rows only. */
 	body .popover [data-row][data-flat="true"] > .row-icon,
@@ -911,7 +911,7 @@
 		overflow-x: hidden;
 	}
 	body .popover [data-row][data-current="true"] > .row-icon {
-		color: var(--v3-row-on-icon);
+		color: var(--ui-row-on-icon);
 	}
 	/* A section's label in a menu: sentence case, quiet, a line inside the list's rhythm. */
 	.menu-label {
@@ -919,13 +919,13 @@
 		align-items: center;
 		gap: 6px;
 		padding: 8px 8px 4px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 		font-weight: 500;
 	}
 	body .popover .group {
 		padding: 8px 8px 4px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 		font-weight: 500;
 		letter-spacing: 0;
@@ -934,7 +934,7 @@
 	body .popover .rule {
 		height: 1px;
 		margin: 5px 2px;
-		background: var(--v3-line);
+		background: var(--ui-line);
 	}
 	/* The find field at a menu's top: the panel search's field, a step smaller, not focused on open. */
 	.menu-find {
@@ -951,7 +951,7 @@
 		flex: 1;
 		border: 0;
 		background: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font: inherit;
 		font-size: 12.5px;
 		outline: none;
@@ -961,7 +961,7 @@
 		padding: 2px;
 		gap: 1px;
 		border-radius: 7px;
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 		box-shadow: none;
 	}
 	body .popover .segmented[data-scale="true"] > button {
@@ -971,12 +971,12 @@
 	}
 	body .popover .segmented[data-scale="true"] > button:hover {
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 	}
 	body .popover .segmented[data-scale="true"] > button[data-on="true"] {
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-weight: 500;
 	}
 	[data-color-scheme="dark"] body .popover .segmented[data-scale="true"] > button[data-on="true"] {
@@ -986,20 +986,20 @@
 	body .popover .row-act[data-here="true"] {
 		margin-bottom: 2px;
 		border-radius: 7px;
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	body .popover .row-act[data-here="true"] .row-label {
 		font-weight: 600;
 	}
 	/* A row that removes something: red, its hover a red wash. */
 	body .popover [data-row].menu-danger:not([disabled]) {
-		color: var(--v3-danger, #dc2626);
+		color: var(--ui-danger, #dc2626);
 	}
 	body .popover [data-row].menu-danger:not([disabled]) > .row-icon {
-		color: var(--v3-danger, #dc2626);
+		color: var(--ui-danger, #dc2626);
 	}
 	body .popover [data-row].menu-danger:not([disabled]):hover {
-		background: color-mix(in srgb, var(--v3-danger, #dc2626) 10%, transparent);
+		background: color-mix(in srgb, var(--ui-danger, #dc2626) 10%, transparent);
 	}
 	/* A runtime's mark in a small tile, as the New agent menu draws it. */
 	.menu-tile {
@@ -1009,15 +1009,15 @@
 		flex: none;
 		place-items: center;
 		border-radius: 5px;
-		background: var(--v3-bg3);
+		background: var(--ui-bg3);
 	}
 	[disabled] > .menu-tile {
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	.menu-note {
 		margin-left: auto;
 		padding-left: 10px;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 		white-space: nowrap;
 	}
@@ -1029,11 +1029,11 @@
 		width: min(380px, calc(100vw - 32px));
 		overflow: hidden;
 		border-radius: 14px;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow:
 			0 24px 60px rgb(0 0 0 / 25%),
-			0 0 0 1px var(--v3-line);
-		color: var(--v3-fg);
+			0 0 0 1px var(--ui-line);
+		color: var(--ui-fg);
 	}
 	.confirm-head {
 		display: flex;
@@ -1048,8 +1048,8 @@
 		flex: none;
 		place-items: center;
 		border-radius: 7px;
-		background: color-mix(in srgb, var(--v3-danger) 12%, transparent);
-		color: var(--v3-danger);
+		background: color-mix(in srgb, var(--ui-danger) 12%, transparent);
+		color: var(--ui-danger);
 	}
 	.confirm-title {
 		font-size: 15px;
@@ -1063,16 +1063,16 @@
 		border: 0;
 		border-radius: 6px;
 		background: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		cursor: pointer;
 	}
 	.confirm-x:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
 	.confirm-body {
 		padding: 0 18px 16px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 13px;
 		line-height: 1.45;
 		white-space: pre-wrap;
@@ -1082,11 +1082,11 @@
 		justify-content: flex-end;
 		gap: 8px;
 		padding: 12px 18px;
-		border-top: 1px solid var(--v3-line);
+		border-top: 1px solid var(--ui-line);
 	}
 	.confirm-foot .btn[data-danger="true"] {
 		border-color: transparent;
-		background: var(--v3-danger);
+		background: var(--ui-danger);
 		color: #fff;
 	}
 }
@@ -1096,7 +1096,7 @@
 	body .stage-box {
 		width: min(94vw, 900px);
 		border-radius: 14px;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 	}
 	body .stage-head {
 		gap: 12px;
@@ -1111,7 +1111,7 @@
 	body .stage-new {
 		height: 30px;
 		border-radius: 7px;
-		background: var(--v3-accent);
+		background: var(--ui-accent);
 		color: #fff;
 		font-size: 13px;
 		font-weight: 500;
@@ -1128,13 +1128,13 @@
 		padding: 0 9px;
 		border: 0;
 		border-radius: 6px;
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	body .stage-search:focus-within {
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow:
-			inset 0 0 0 1px var(--v3-accent),
-			0 0 0 3px color-mix(in srgb, var(--v3-accent) 18%, transparent);
+			inset 0 0 0 1px var(--ui-accent),
+			0 0 0 3px color-mix(in srgb, var(--ui-accent) 18%, transparent);
 	}
 	body .stage-search > input {
 		font-size: 12.5px;
@@ -1143,7 +1143,7 @@
 		padding: 2px;
 		gap: 1px;
 		border-radius: 7px;
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 		box-shadow: none;
 	}
 	body .stage-sort > button {
@@ -1156,7 +1156,7 @@
 		background: transparent;
 	}
 	body .stage-sort > button[data-on="true"] {
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 		font-weight: 500;
 	}
@@ -1164,8 +1164,8 @@
 		background: #4a4a4a;
 	}
 	body .stage-card[data-here] .stage-open {
-		border-color: var(--v3-accent);
-		box-shadow: 0 0 0 1px var(--v3-accent);
+		border-color: var(--ui-accent);
+		box-shadow: 0 0 0 1px var(--ui-accent);
 	}
 }
 
@@ -1182,8 +1182,8 @@
 		flex: none;
 		overflow: hidden;
 		border-radius: 4px;
-		background: var(--v3-bg2);
-		box-shadow: inset 0 0 0 1px var(--v3-line);
+		background: var(--ui-bg2);
+		box-shadow: inset 0 0 0 1px var(--ui-line);
 	}
 	.switcher-thumb > img {
 		display: block;
@@ -1202,7 +1202,7 @@
 		margin-left: -4px;
 		place-items: center;
 		border-radius: 50%;
-		box-shadow: 0 0 0 2px var(--v3-panel);
+		box-shadow: 0 0 0 2px var(--ui-panel);
 		color: #fff;
 		font-size: 9px;
 		font-weight: 600;
@@ -1231,7 +1231,7 @@
 	body .agent-edit-k,
 	body .agent-edit-row.agent-edit-tags > .agent-edit-k {
 		width: auto;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 12px;
 		font-weight: 500;
 		line-height: 1.3;
@@ -1263,11 +1263,11 @@
 		display: flex;
 		justify-content: flex-end;
 		padding: 12px 18px;
-		border-top: 1px solid var(--v3-line);
+		border-top: 1px solid var(--ui-line);
 	}
 	.agent-edit-foot .btn[data-primary="true"] {
 		border-color: transparent;
-		background: var(--v3-accent);
+		background: var(--ui-accent);
 		color: #fff;
 	}
 }
@@ -1306,25 +1306,25 @@
 		}
 		/* Inside the conversation's top (its box clips what stands above it), across the middle, clear of
 		   its name on the left and its fold on the right. */
-		.v3-chat-resize {
+		.shell-chat-resize {
 			top: 0;
 			right: 30%;
 			left: 30%;
 			height: 22px;
 		}
-		.v3-chat-resize::after {
+		.shell-chat-resize::after {
 			top: 6px;
 			right: auto;
 			left: 50%;
 			width: 40px;
 			height: 4px;
 			border-radius: 2px;
-			background: var(--v3-line2, #d9d9d9);
+			background: var(--ui-line2, #d9d9d9);
 			opacity: 1;
 			transform: translateX(-50%);
 		}
-		.panel-shell[data-chat-resizing] .v3-chat-resize::after {
-			background: var(--v3-accent);
+		.panel-shell[data-chat-resizing] .shell-chat-resize::after {
+			background: var(--ui-accent);
 		}
 	}
 }
@@ -1334,15 +1334,15 @@
    with no border of its own, and buttons with the menus' 7px corners. */
 @layer components {
 	body .comment-popup {
-		border: 1px solid var(--v3-line);
+		border: 1px solid var(--ui-line);
 		border-radius: 12px;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow:
 			0 8px 28px rgb(0 0 0 / 12%),
 			0 0 0 0.5px rgb(0 0 0 / 6%);
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 13px;
-		animation: v3-arrive 160ms var(--v3-ease);
+		animation: shell-arrive 160ms var(--ui-ease);
 	}
 	[data-color-scheme="dark"] body .comment-popup {
 		box-shadow:
@@ -1362,38 +1362,38 @@
 	}
 	body .comment-popup .comment-start:hover,
 	body .comment-popup .comment-act:hover:not(:disabled) {
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	body .comment-popup .comment-act {
-		border-color: var(--v3-line2);
+		border-color: var(--ui-line2);
 	}
 	body .comment-popup .comment-act[data-primary="true"] {
-		border-color: var(--v3-fg);
-		background: var(--v3-fg);
-		color: var(--v3-panel);
+		border-color: var(--ui-fg);
+		background: var(--ui-fg);
+		color: var(--ui-panel);
 	}
 	body .comment-popup .comment-quote {
 		padding: 1px 0 1px 10px;
 		border-left-width: 3px;
 		border-radius: 1px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	body .comment-popup .comment-field {
 		min-height: 72px;
 		padding: 9px 11px;
 		border: 1px solid transparent;
 		border-radius: 9px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 		font-size: 14px;
 		resize: none;
 	}
 	body .comment-popup .comment-field::placeholder {
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 	}
 	body .comment-popup .comment-field:focus {
-		border-color: var(--v3-accent);
-		background: var(--v3-panel);
+		border-color: var(--ui-accent);
+		background: var(--ui-panel);
 	}
 	body .comment-popup .comment-acts .icon-button {
 		border-radius: 7px;
@@ -1405,16 +1405,16 @@
 	.fps-meter {
 		position: fixed;
 		z-index: var(--z-float);
-		/* The top-right bar is 12px from the top and right and 44px tall (`.v3-topright`): 8px under it, its right edge in line. */
+		/* The top-right bar is 12px from the top and right and 44px tall (`.shell-topright`): 8px under it, its right edge in line. */
 		top: calc(env(safe-area-inset-top, 0px) + 64px);
 		right: calc(var(--inset-right, 0px) + 12px);
 		width: 260px;
 		padding: 8px 10px 8px;
-		border: 1px solid var(--v3-line);
+		border: 1px solid var(--ui-line);
 		border-radius: 12px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
-		color: var(--v3-fg);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
+		color: var(--ui-fg);
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
 		pointer-events: none;
@@ -1430,9 +1430,9 @@
 	}
 	.fps-meter[data-level="good"] .fps-n { color: #2ea043; }
 	.fps-meter[data-level="meh"] .fps-n { color: #d29922; }
-	.fps-meter[data-level="bad"] .fps-n { color: var(--v3-danger); }
+	.fps-meter[data-level="bad"] .fps-n { color: var(--ui-danger); }
 	.fps-u {
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	.fps-plot {
 		display: block;
@@ -1440,17 +1440,17 @@
 		height: 56px;
 		margin: 4px 0 4px;
 		border-radius: 6px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
 	.fps-d {
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	.fps-key {
 		display: flex;
 		gap: 10px;
 		margin-top: 2px;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-size: 11px;
 	}
 	.fps-key span::before {

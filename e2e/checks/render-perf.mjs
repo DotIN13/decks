@@ -572,7 +572,7 @@ if (want("images")) {
 
 // --- a long pen stroke --------------------------------------------------------------------------------
 if (want("stroke")) {
-	await page.locator('.v3-tool[data-tool="pen"]:visible').click();
+	await page.locator('.shell-tool[data-tool="pen"]:visible').click();
 	await page.waitForTimeout(300);
 	const per = [];
 	const inkBefore = await page.evaluate(() => [...globalThis.__decksProbes?.rust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);

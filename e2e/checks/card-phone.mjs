@@ -156,7 +156,7 @@ say("…as one edit to that block: the others keep their ids", JSON.stringify(ca
 // A finger picks a picture with a tap and carries it into the card.
 await settle(page, 600);
 const drawn = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
-/* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (v3). */
+/* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (the redesign). */
 const spot = world(view.w / 2 - 60, Math.min(view.h * 0.58 - 80, drawn.y + drawn.height + 40));
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }] });
 const picture = await until(() => page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-picture")));

@@ -42,7 +42,7 @@ export function TopRight(props: {
 				<button
 					ref={api.ref}
 					type="button"
-					class="v3-icon"
+					class="shell-icon"
 					aria-haspopup="menu"
 					aria-expanded={api.open}
 					data-on={api.open ? "soft" : undefined}
@@ -88,7 +88,7 @@ export function TopRight(props: {
 							<span class="row-label flex-1">{item.label}</span>
 							<Show when={item.note}>{(note) => <span class="row-note">{note()}</span>}</Show>
 							<Show when={item.checked}>
-								<span class="v3-more-check" aria-hidden="true">
+								<span class="shell-more-check" aria-hidden="true">
 									<Icon of={Check} size={14} />
 								</span>
 							</Show>
@@ -102,26 +102,26 @@ export function TopRight(props: {
 
 	return (
 		<Show when={!props.menuOnly} fallback={menu()}>
-			<div class="v3-bar v3-topright float pill" data-inset="top">
+			<div class="shell-bar shell-topright float pill" data-inset="top">
 				<Show when={props.here.length > 0}>
-					<span class="v3-here" role="group" aria-label="Agents on this canvas">
+					<span class="shell-here" role="group" aria-label="Agents on this canvas">
 						<For each={props.here.slice(0, 5)}>
 							{(chat) => {
 								const name = () => props.identities[chat.id]?.name ?? chat.name;
 								return (
-									<button type="button" class="v3-here-face" data-current={props.focused === chat.id ? "true" : undefined} data-tip={`${name()} is on this canvas`} aria-label={`Talk to ${name()}`} onClick={() => props.onFocus(chat.id)}>
+									<button type="button" class="shell-here-face" data-current={props.focused === chat.id ? "true" : undefined} data-tip={`${name()} is on this canvas`} aria-label={`Talk to ${name()}`} onClick={() => props.onFocus(chat.id)}>
 										<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={24} ring={1.5} />
 									</button>
 								);
 							}}
 						</For>
 						<Show when={props.here.length > 5}>
-							<span class="v3-here-more">+{props.here.length - 5}</span>
+							<span class="shell-here-more">+{props.here.length - 5}</span>
 						</Show>
 					</span>
-					<span class="v3-sep" aria-hidden="true" />
+					<span class="shell-sep" aria-hidden="true" />
 				</Show>
-				<button type="button" class="v3-icon" data-tip="Present" data-key="⌥P" aria-label="Present" onClick={() => props.onPresent()}>
+				<button type="button" class="shell-icon" data-tip="Present" data-key="⌥P" aria-label="Present" onClick={() => props.onPresent()}>
 					<Icon of={Play} size={17} />
 				</button>
 				{menu()}

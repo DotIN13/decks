@@ -203,7 +203,7 @@
 		.dock .dock-row {
 			gap: 2px !important;
 		}
-		/* Over v3's `.dock .composer-ctx .dial`, which sets its type. */
+		/* Over the redesign's `.dock .composer-ctx .dial`, which sets its type. */
 		.dock .dock-row .composer-ctx .dial {
 			gap: 0;
 			font-size: 0;

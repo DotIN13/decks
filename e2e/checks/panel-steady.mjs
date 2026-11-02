@@ -117,7 +117,7 @@ await settle(page, 400);
 /* The workspace cut, which is the only one, in two lines per agent, which is where it opens. */
 const opened = await page.evaluate(() => ({
 	view: document.querySelector(".panel-view")?.getAttribute("data-view"),
-	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.querySelector(".v3-folder-name")?.textContent}:${one.querySelectorAll(".agent-row").length}`),
+	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.querySelector(".shell-folder-name")?.textContent}:${one.querySelectorAll(".agent-row").length}`),
 }));
 say(
 	"the list opens by workspace, in two lines per agent",
@@ -179,7 +179,7 @@ await page.evaluate(() => {
 						said: row.querySelector(".agent-said")?.textContent?.trim(),
 						tags: [...row.querySelectorAll(".agent-tags .tag")].map((tag) => tag.textContent?.trim()),
 						status: row.dataset.status,
-						section: row.closest(".panel-section")?.querySelector(".v3-folder-name")?.textContent,
+						section: row.closest(".panel-section")?.querySelector(".shell-folder-name")?.textContent,
 					}
 				: null;
 		};

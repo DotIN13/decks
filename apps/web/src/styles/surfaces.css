@@ -8,7 +8,7 @@
 @layer components {
 	/* ---- shared: icon buttons and floating bars ------------------------------------------- */
 
-	.v3-icon {
+	.shell-icon {
 		display: grid;
 		width: 28px;
 		height: 28px;
@@ -18,20 +18,20 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 	}
-	.v3-icon:hover,
-	.v3-icon[data-on="soft"],
-	.v3-icon[aria-haspopup][aria-expanded="true"] {
-		background: var(--v3-bg3);
+	.shell-icon:hover,
+	.shell-icon[data-on="soft"],
+	.shell-icon[aria-haspopup][aria-expanded="true"] {
+		background: var(--ui-bg3);
 	}
-	.v3-icon:focus-visible {
-		outline: 2px solid var(--v3-accent);
+	.shell-icon:focus-visible {
+		outline: 2px solid var(--ui-accent);
 		outline-offset: 1px;
 	}
 
-	.v3-bar.float.pill {
+	.shell-bar.float.pill {
 		position: absolute;
 		z-index: 20;
 		height: 44px;
@@ -39,24 +39,24 @@
 		padding: 0 8px 0 6px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
-	.v3-sep {
+	.shell-sep {
 		width: 1px;
 		height: 20px;
 		flex: none;
 		margin: 0 2px;
-		background: var(--v3-line);
+		background: var(--ui-line);
 	}
-	.v3-chev {
+	.shell-chev {
 		flex: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 
 	/* ---- the top-left bar ------------------------------------------------------------------ */
 
-	.v3-topbar.float.pill {
+	.shell-topbar.float.pill {
 		top: 12px;
 		left: calc(var(--inset-left, 0px) + 12px);
 		width: max-content;
@@ -64,18 +64,18 @@
 		max-width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 32px - var(--topright-w, 0px));
 		transition: left 160ms ease;
 	}
-	.v3-unfold {
-		background: var(--v3-bg2);
+	.shell-unfold {
+		background: var(--ui-bg2);
 	}
-	.v3-deck .switcher {
+	.shell-deck .switcher {
 		height: 32px;
 		padding: 0 8px 0 2px;
 	}
-	.v3-deck .switcher > .v3-chev,
-	.v3-deck .switcher > svg:last-child {
+	.shell-deck .switcher > .shell-chev,
+	.shell-deck .switcher > svg:last-child {
 		display: none;
 	}
-	.v3-agent-chip {
+	.shell-agent-chip {
 		display: flex;
 		height: 32px;
 		align-items: center;
@@ -83,16 +83,16 @@
 		padding: 0 8px 0 6px;
 		border: 0;
 		border-radius: 8px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 	}
-	.v3-agent-chip:hover,
-	.v3-agent-chip[data-open="true"] {
-		background: var(--v3-bg3);
+	.shell-agent-chip:hover,
+	.shell-agent-chip[data-open="true"] {
+		background: var(--ui-bg3);
 	}
-	.v3-agent-name {
+	.shell-agent-name {
 		max-width: 160px;
 		overflow: hidden;
 		font-size: 13px;
@@ -100,11 +100,11 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.v3-agent-kind {
-		color: var(--v3-fg3);
+	.shell-agent-kind {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 	}
-	.v3-canvas-chip {
+	.shell-canvas-chip {
 		display: flex;
 		height: 32px;
 		align-items: center;
@@ -113,30 +113,30 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 	}
-	.v3-canvas-chip:hover,
-	.v3-canvas-chip[data-open="true"] {
-		background: var(--v3-bg3);
+	.shell-canvas-chip:hover,
+	.shell-canvas-chip[data-open="true"] {
+		background: var(--ui-bg3);
 	}
-	.v3-canvas-chip > svg:first-child {
-		color: var(--v3-fg2);
+	.shell-canvas-chip > svg:first-child {
+		color: var(--ui-fg2);
 	}
 	/* Squeezed, the canvas chip gives way and its name ends in an ellipsis; the agent and the icons keep their size. */
-	.v3-topbar.float.pill > * {
+	.shell-topbar.float.pill > * {
 		flex: none;
 	}
-	.v3-topbar.float.pill > .v3-canvas-chip {
+	.shell-topbar.float.pill > .shell-canvas-chip {
 		min-width: 0;
 		flex: 0 1 auto;
 	}
 	/* Tight, the bar drops the agent's kind and its +, which the canvas menu also has (New canvas). */
-	.app[data-tight-top] .v3-topbar :is(.v3-agent-kind, .v3-canvas-chip ~ .v3-icon) {
+	.app[data-tight-top] .shell-topbar :is(.shell-agent-kind, .shell-canvas-chip ~ .shell-icon) {
 		display: none;
 	}
-	.v3-canvas-name {
+	.shell-canvas-name {
 		min-width: 0;
 		max-width: 180px;
 		overflow: hidden;
@@ -145,13 +145,13 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.v3-viewonly {
+	.shell-viewonly {
 		height: 28px;
 		padding: 0 8px;
 		border: 0;
 		border-radius: 8px;
-		background: var(--v3-accent-soft);
-		color: var(--v3-accent);
+		background: var(--ui-accent-soft);
+		color: var(--ui-accent);
 		cursor: pointer;
 		font: inherit;
 		font-size: 12px;
@@ -159,44 +159,44 @@
 
 	/* ---- the top-right bar ----------------------------------------------------------------- */
 
-	.v3-topright.float.pill {
+	.shell-topright.float.pill {
 		top: 12px;
 		right: 12px;
 		padding: 0 8px;
 	}
-	.v3-here {
+	.shell-here {
 		display: flex;
 		align-items: center;
 		padding: 0 4px;
 	}
 	/* Each face keeps the ring the agents list draws (`AgentFace`, 1.5px at 1.5px off), so the
 	   overlap is a little less and the panel-coloured border sits just outside the ring. */
-	.v3-here-face {
+	.shell-here-face {
 		display: grid;
 		margin-left: -5px;
 		padding: 0;
-		border: 3px solid var(--v3-panel);
+		border: 3px solid var(--ui-panel);
 		border-radius: 50%;
 		background: none;
 		cursor: pointer;
 		place-items: center;
 	}
-	.v3-here-face:first-child {
+	.shell-here-face:first-child {
 		margin-left: 0;
 	}
-	.v3-here-face[data-current="true"] {
+	.shell-here-face[data-current="true"] {
 		position: relative;
 		z-index: 1;
 	}
-	.v3-here-more {
+	.shell-here-more {
 		margin-left: 4px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 	}
 
 	/* ---- the zoom bar ---------------------------------------------------------------------- */
 
-	.v3-zoom.float.pill {
+	.shell-zoom.float.pill {
 		/* Under the composer (the dock, 10) where a narrow column makes them meet, over the canvas. */
 		z-index: 9;
 		right: 12px;
@@ -205,31 +205,31 @@
 		gap: 2px;
 		padding: 0 4px;
 	}
-	.v3-zoom-btn {
+	.shell-zoom-btn {
 		width: 30px;
 		height: 30px;
 	}
-	.v3-zoom-value {
+	.shell-zoom-value {
 		width: 46px;
 		height: 30px;
 		padding: 0;
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font-family: var(--font-mono);
 		font-size: 11px;
 		text-align: center;
 	}
-	.v3-zoom-value:hover,
-	.v3-zoom-value[aria-expanded="true"] {
-		background: var(--v3-bg3);
+	.shell-zoom-value:hover,
+	.shell-zoom-value[aria-expanded="true"] {
+		background: var(--ui-bg3);
 	}
 
 	/* ---- the tool column ------------------------------------------------------------------- */
 
-	.pen-tools.v3-tools {
+	.pen-tools.shell-tools {
 		top: 68px;
 		left: calc(var(--inset-left, 0px) + 12px);
 		width: 46px;
@@ -238,11 +238,11 @@
 		padding: 5px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 		transform: none;
 	}
-	.v3-grip {
+	.shell-grip {
 		display: grid;
 		width: 36px;
 		height: 14px;
@@ -253,14 +253,14 @@
 		cursor: grab;
 		touch-action: none;
 	}
-	.v3-grip > i,
-	.v3-tray-grip > i {
+	.shell-grip > i,
+	.shell-tray-grip > i {
 		width: 3px;
 		height: 3px;
 		border-radius: 50%;
-		background: var(--v3-fg3);
+		background: var(--ui-fg3);
 	}
-	.v3-tool {
+	.shell-tool {
 		position: relative;
 		display: grid;
 		width: 36px;
@@ -271,28 +271,28 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 	}
-	.v3-tool:hover,
-	.v3-tool[data-open="true"] {
-		background: var(--v3-bg3);
+	.shell-tool:hover,
+	.shell-tool[data-open="true"] {
+		background: var(--ui-bg3);
 	}
-	.v3-tool[data-on="true"] {
-		background: var(--v3-accent);
+	.shell-tool[data-on="true"] {
+		background: var(--ui-accent);
 		color: #ffffff;
 	}
-	.v3-tool[data-on="true"][data-open="true"],
-	.v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
-		background: var(--v3-bg3);
-		color: var(--v3-fg);
+	.shell-tool[data-on="true"][data-open="true"],
+	.shell-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+		background: var(--ui-bg3);
+		color: var(--ui-fg);
 	}
-	.v3-tool:focus-visible {
-		outline: 2px solid var(--v3-accent);
+	.shell-tool:focus-visible {
+		outline: 2px solid var(--ui-accent);
 		outline-offset: 1px;
 	}
 	/* A family's mark: a small triangle in the corner says a menu is behind the press. */
-	.v3-tool[data-family]::after {
+	.shell-tool[data-family]::after {
 		position: absolute;
 		right: 3px;
 		bottom: 3px;
@@ -303,16 +303,16 @@
 		content: "";
 		opacity: 0.6;
 	}
-	.v3-rule {
+	.shell-rule {
 		width: 24px;
 		height: 1px;
 		flex: none;
 		margin: 3px 0;
-		background: var(--v3-line);
+		background: var(--ui-line);
 	}
 
 	/* The tools as a row above the composer, on a phone. */
-	.v3-tools[data-row="true"] {
+	.shell-tools[data-row="true"] {
 		position: static;
 		display: flex;
 		width: auto;
@@ -327,16 +327,16 @@
 		border-radius: 20px;
 		transform: none;
 	}
-	.v3-tools[data-row="true"] .v3-grip,
-	.v3-tools[data-row="true"] .stowtab {
+	.shell-tools[data-row="true"] .shell-grip,
+	.shell-tools[data-row="true"] .stowtab {
 		display: none;
 	}
-	.v3-tools[data-row="true"] .v3-rule {
+	.shell-tools[data-row="true"] .shell-rule {
 		width: 1px;
 		height: 24px;
 		margin: 0 3px;
 	}
-	.v3-tools[data-row="true"] .v3-tool {
+	.shell-tools[data-row="true"] .shell-tool {
 		width: 40px;
 		height: 40px;
 		border-radius: 12px;
@@ -344,7 +344,7 @@
 
 	/* ---- a tool family's menu: dark in light, light in dark -------------------------------- */
 
-	.v3-menu {
+	.shell-menu {
 		position: fixed;
 		z-index: var(--z-menu, 40);
 		display: flex;
@@ -353,11 +353,11 @@
 		gap: 1px;
 		padding: 6px;
 		border-radius: 8px;
-		background: var(--v3-ink);
-		box-shadow: var(--v3-menu-shadow);
-		color: var(--v3-ink-fg);
+		background: var(--ui-ink);
+		box-shadow: var(--ui-menu-shadow);
+		color: var(--ui-ink-fg);
 	}
-	.v3-menu-row {
+	.shell-menu-row {
 		display: flex;
 		height: 28px;
 		flex: none;
@@ -373,31 +373,31 @@
 		font-size: 12.5px;
 		text-align: left;
 	}
-	.v3-menu-row:hover,
-	.v3-menu-row:focus-visible {
-		background: color-mix(in srgb, var(--v3-ink-fg) 12%, transparent);
+	.shell-menu-row:hover,
+	.shell-menu-row:focus-visible {
+		background: color-mix(in srgb, var(--ui-ink-fg) 12%, transparent);
 		outline: none;
 	}
-	.v3-menu-row[data-on="true"] {
-		background: var(--v3-accent);
+	.shell-menu-row[data-on="true"] {
+		background: var(--ui-accent);
 		color: #ffffff;
 	}
-	.v3-menu-label {
+	.shell-menu-label {
 		flex: 1;
 	}
-	.v3-menu-key {
-		color: var(--v3-ink-key);
+	.shell-menu-key {
+		color: var(--ui-ink-key);
 		font-family: var(--font-mono);
 		font-size: 11px;
 	}
-	.v3-menu-row[data-on="true"] .v3-menu-key {
+	.shell-menu-row[data-on="true"] .shell-menu-key {
 		color: #ffffff80;
 	}
-	.v3-menu-rule {
+	.shell-menu-rule {
 		height: 1px;
 		flex: none;
 		margin: 4px 2px;
-		background: var(--v3-ink-rule);
+		background: var(--ui-ink-rule);
 	}
 
 	/* ---- the side panel -------------------------------------------------------------------- */
@@ -407,7 +407,7 @@
 	 * the root (`camera/insets.ts`), so every change (each step of a resize of this panel) restyled the
 	 * whole conversation and every agent row with them. Held here, a change stops at the panel's edge.
 	 */
-	.panel-shell.v3-panel {
+	.panel-shell.shell-panel {
 		--inset-left: 0px;
 		--inset-right: 0px;
 		--inset-top: 0px;
@@ -415,13 +415,13 @@
 		--band-left: 0px;
 		--band-right: 0px;
 		border: 0;
-		border-right: 1px solid var(--v3-line);
+		border-right: 1px solid var(--ui-line);
 		border-radius: 0;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		box-shadow: none;
 		padding: 0;
 	}
-	.v3-panel-head {
+	.shell-panel-head {
 		display: flex;
 		height: 52px;
 		flex: none;
@@ -429,37 +429,37 @@
 		gap: 8px;
 		padding: 0 10px 0 16px;
 	}
-	.v3-panel-head .panel-mark {
+	.shell-panel-head .panel-mark {
 		min-width: 0;
 		padding: 0;
 	}
-	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the boards inside. */
-	.v3-panel .switcher,
-	.v3-deck .switcher {
+	/* The deck's mark, as the redesign draws it: a 26px square with a 1.4px ring, the boards inside. */
+	.shell-panel .switcher,
+	.shell-deck .switcher {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		border: 0;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font: inherit;
 		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
 	}
-	.v3-panel .switcher-name,
-	.v3-deck .switcher-name {
+	.shell-panel .switcher-name,
+	.shell-deck .switcher-name {
 		font-size: 13px;
 		font-weight: 500;
 	}
-	.v3-nav {
+	.shell-nav {
 		display: flex;
 		flex: none;
 		align-items: center;
 		gap: 2px;
 		padding: 0 10px 8px;
 	}
-	.v3-nav-tab {
+	.shell-nav-tab {
 		display: flex;
 		height: 30px;
 		align-items: center;
@@ -468,28 +468,28 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		cursor: pointer;
 		font: inherit;
 		font-size: 13px;
 	}
-	.v3-nav-tab:hover {
-		background: var(--v3-bg2);
+	.shell-nav-tab:hover {
+		background: var(--ui-bg2);
 	}
-	.v3-nav-tab[data-on="true"] {
-		background: var(--v3-tab-on);
-		color: var(--v3-tab-on-fg);
+	.shell-nav-tab[data-on="true"] {
+		background: var(--ui-tab-on);
+		color: var(--ui-tab-on-fg);
 		font-weight: 500;
 	}
-	.v3-nav-tab[data-on="true"] > svg {
-		color: var(--v3-tab-on-icon);
+	.shell-nav-tab[data-on="true"] > svg {
+		color: var(--ui-tab-on-icon);
 	}
-	.v3-search-wrap {
+	.shell-search-wrap {
 		display: flex;
 		flex: none;
 		padding: 0 12px 8px;
 	}
-	.v3-search {
+	.shell-search {
 		display: flex;
 		height: 32px;
 		min-width: 0;
@@ -498,55 +498,55 @@
 		gap: 8px;
 		padding: 0 6px 0 10px;
 		border-radius: 8px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg3);
+		background: var(--ui-bg2);
+		color: var(--ui-fg3);
 	}
-	.v3-search input {
+	.shell-search input {
 		min-width: 0;
 		flex: 1;
 		border: 0;
 		background: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font: inherit;
 		font-size: 12px;
 		outline: none;
 	}
-	.v3-search input::placeholder {
-		color: var(--v3-fg3);
+	.shell-search input::placeholder {
+		color: var(--ui-fg3);
 	}
-	.v3-kbd {
+	.shell-kbd {
 		display: flex;
 		height: 18px;
 		align-items: center;
 		padding: 0 5px;
-		border: 1px solid var(--v3-line2);
+		border: 1px solid var(--ui-line2);
 		border-radius: 4px;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-family: inherit;
 		font-size: 11px;
 		letter-spacing: 0.5px;
 	}
-	.v3-search-clear {
+	.shell-search-clear {
 		width: 20px;
 		height: 20px;
 	}
 
-	.v3-panel .panel-list {
+	.shell-panel .panel-list {
 		min-height: 0;
 		flex: 1 1 auto;
 		padding: 0 8px 10px;
 	}
-	.v3-panel:has(.v3-chat:not([data-folded="true"])) .panel-list {
+	.shell-panel:has(.shell-chat:not([data-folded="true"])) .panel-list {
 		flex: 0 1 auto;
 		max-height: 52%;
 	}
-	.v3-panel .panel-section {
+	.shell-panel .panel-section {
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
 		margin: 0 0 4px;
 	}
-	.v3-folder-head {
+	.shell-folder-head {
 		display: flex;
 		height: 28px;
 		align-items: center;
@@ -554,7 +554,7 @@
 		padding: 0 4px 0 6px;
 		border-radius: 8px;
 	}
-	.v3-folder-toggle {
+	.shell-folder-toggle {
 		display: flex;
 		min-width: 0;
 		flex: 1;
@@ -563,88 +563,88 @@
 		padding: 0;
 		border: 0;
 		background: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 		text-align: left;
 	}
-	.v3-folder-chev {
+	.shell-folder-chev {
 		flex: none;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 	}
-	.v3-folder-icon {
+	.shell-folder-icon {
 		flex: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
-	.v3-folder-name {
+	.shell-folder-name {
 		font-size: 12.5px;
 		font-weight: 500;
 	}
-	.v3-folder-head .note {
-		color: var(--v3-fg2);
+	.shell-folder-head .note {
+		color: var(--ui-fg2);
 		font-size: 11px;
 	}
-	.v3-folder-head .new-agent.v3-folder-add {
+	.shell-folder-head .new-agent.shell-folder-add {
 		width: 22px;
 		height: 22px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		opacity: 1;
 	}
-	.v3-panel .panel-section[data-drop="true"] .v3-folder-head {
-		background: var(--v3-accent-soft);
+	.shell-panel .panel-section[data-drop="true"] .shell-folder-head {
+		background: var(--ui-accent-soft);
 	}
 
 	/* An agent's row: its face and ring, its name and kind, what it is doing, then its tags. */
-	.v3-panel .agent-list .agent-row {
+	.shell-panel .agent-list .agent-row {
 		border-radius: 10px;
 	}
-	.v3-panel .agent-list .agent-row > button[data-row] {
+	.shell-panel .agent-list .agent-row > button[data-row] {
 		min-height: 0;
 		gap: 10px;
 		padding: 6px 10px 6px 28px;
 		border-radius: 10px;
 	}
-	.v3-panel .agent-list .agent-row:hover {
-		background: var(--v3-bg2);
+	.shell-panel .agent-list .agent-row:hover {
+		background: var(--ui-bg2);
 	}
-	.v3-panel .agent-list .agent-row[data-current="true"],
-	.v3-panel .agent-list .agent-row[data-current="true"]:hover {
-		background: var(--v3-row-on);
+	.shell-panel .agent-list .agent-row[data-current="true"],
+	.shell-panel .agent-list .agent-row[data-current="true"]:hover {
+		background: var(--ui-row-on);
 	}
-	.v3-panel .agent-list .row-label {
-		color: var(--v3-fg);
+	.shell-panel .agent-list .row-label {
+		color: var(--ui-fg);
 		font-size: 13px;
 		font-weight: 400;
 	}
-	.v3-panel .agent-list .agent-row[data-current="true"] .row-label {
+	.shell-panel .agent-list .agent-row[data-current="true"] .row-label {
 		font-weight: 500;
 	}
-	.v3-panel .agent-list .kind {
-		color: var(--v3-fg3);
+	.shell-panel .agent-list .kind {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 	}
-	.v3-panel .agent-list .ago {
-		color: var(--v3-fg3);
+	.shell-panel .agent-list .ago {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 	}
-	.v3-panel .agent-list .ago[data-busy="true"] {
-		color: var(--v3-fg2);
+	.shell-panel .agent-list .ago[data-busy="true"] {
+		color: var(--ui-fg2);
 	}
-	.v3-panel .agent-list .tag {
+	.shell-panel .agent-list .tag {
 		height: 16px;
 		padding: 0 5px;
 		border-radius: 5px;
-		background: var(--v3-bg3);
-		color: var(--v3-fg2);
+		background: var(--ui-bg3);
+		color: var(--ui-fg2);
 		font-family: var(--font-mono);
 		font-size: 10.5px;
 		line-height: 16px;
 	}
-	.v3-panel .agent-list .agent-said {
-		color: var(--v3-fg2);
+	.shell-panel .agent-list .agent-said {
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 	}
-	.v3-new-agent.new-agent {
+	.shell-new-agent.new-agent {
 		display: flex;
 		width: auto;
 		height: 32px;
@@ -654,28 +654,28 @@
 		margin-top: 2px;
 		padding: 0 10px 0 6px;
 		border-radius: 8px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 12.5px;
 	}
-	.v3-new-agent.new-agent:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+	.shell-new-agent.new-agent:hover {
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 	}
 
-	/* The boards list, in v3's type. */
-	.v3-panel .panel-meta {
+	/* The boards list, in the redesign's type. */
+	.shell-panel .panel-meta {
 		height: 28px;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 12.5px;
 		font-weight: 500;
 	}
-	.v3-panel .board-row {
+	.shell-panel .board-row {
 		border-radius: 8px;
 		font-size: 13px;
 	}
 
 	/* The apps list. */
-	.v3-app-row {
+	.shell-app-row {
 		display: flex;
 		width: 100%;
 		height: 36px;
@@ -685,46 +685,46 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 		font-size: 13px;
 		text-align: left;
 	}
-	.v3-app-row:hover,
-	.v3-app-row:focus-visible {
-		background: var(--v3-bg2);
+	.shell-app-row:hover,
+	.shell-app-row:focus-visible {
+		background: var(--ui-bg2);
 		outline: none;
 	}
-	.v3-app-name {
+	.shell-app-name {
 		min-width: 0;
 		flex: 1;
 	}
-	.v3-app-state {
-		color: var(--v3-fg3);
+	.shell-app-state {
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 	}
-	.v3-app-state[data-status="running"] {
+	.shell-app-state[data-status="running"] {
 		color: var(--color-ok, #14ae5c);
 	}
-	.v3-app-state[data-status="broken"] {
-		color: var(--v3-danger);
+	.shell-app-state[data-status="broken"] {
+		color: var(--ui-danger);
 	}
 
 	/* ---- the conversation, under the list -------------------------------------------------- */
 
-	.v3-chat {
+	.shell-chat {
 		display: flex;
 		min-height: 0;
 		flex: 1 1 0;
 		flex-direction: column;
-		border-top: 1px solid var(--v3-line);
+		border-top: 1px solid var(--ui-line);
 	}
-	.v3-chat[data-folded="true"] {
+	.shell-chat[data-folded="true"] {
 		flex: none;
 		margin-top: auto;
 	}
-	.v3-chat-head {
+	.shell-chat-head {
 		display: flex;
 		height: 44px;
 		flex: none;
@@ -732,7 +732,7 @@
 		gap: 8px;
 		padding: 0 10px 0 16px;
 	}
-	.v3-chat-title {
+	.shell-chat-title {
 		display: flex;
 		min-width: 0;
 		align-items: baseline;
@@ -740,34 +740,34 @@
 		padding: 0;
 		border: 0;
 		background: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 	}
-	.v3-chat-name {
+	.shell-chat-name {
 		font-size: 13px;
 		font-weight: 500;
 	}
-	.v3-chat-state {
+	.shell-chat-state {
 		overflow: hidden;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 11.5px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.v3-chat-body {
+	.shell-chat-body {
 		display: flex;
 		min-height: 0;
 		flex: 1;
 		flex-direction: column;
 	}
-	.v3-chat[data-folded="true"] .v3-chat-body {
+	.shell-chat[data-folded="true"] .shell-chat-body {
 		display: none;
 	}
 
 	/* The conversation itself (`@decks/agent-ui`'s `Stream`), laid flat in the panel. */
-	.v3-chat .stream,
-	.v3-chat .stream[data-shown] {
+	.shell-chat .stream,
+	.shell-chat .stream[data-shown] {
 		position: static;
 		inset: auto;
 		width: auto;
@@ -789,7 +789,7 @@
 		border: 0;
 		border-radius: 0;
 	}
-	.v3-chat .stream[data-shown] .stream-head {
+	.shell-chat .stream[data-shown] .stream-head {
 		display: none;
 	}
 	/*
@@ -803,39 +803,39 @@
 	 * was last drawn at all along (`contain-intrinsic-size: auto`), so skipped for a resize it holds its
 	 * place exactly.
 	 */
-	.v3-chat .stream[data-shown] .stream-roll > * {
+	.shell-chat .stream[data-shown] .stream-roll > * {
 		contain-intrinsic-size: auto 96px;
 	}
-	:root[data-panel-resizing] .v3-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
+	:root[data-panel-resizing] .shell-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
 		content-visibility: auto;
 	}
-	.v3-chat .stream[data-shown] .stream-roll {
+	.shell-chat .stream[data-shown] .stream-roll {
 		flex: 1 1 auto;
 		--roll-gap: 14px;
 		gap: var(--roll-gap);
 		padding: 6px 16px 16px;
 	}
-	.v3-chat .stream[data-shown] .stream-card {
+	.shell-chat .stream[data-shown] .stream-card {
 		padding: 0;
 		border: 0;
 		border-radius: 0;
 		background: none;
 		box-shadow: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 13px;
 	}
-	.v3-chat .stream[data-shown] .stream-mine {
-		--mine: var(--v3-bg3);
-		--mine-fg: var(--v3-fg);
+	.shell-chat .stream[data-shown] .stream-mine {
+		--mine: var(--ui-bg3);
+		--mine-fg: var(--ui-fg);
 	}
-	.v3-chat .stream[data-shown] .stream-bubble {
+	.shell-chat .stream[data-shown] .stream-bubble {
 		max-width: 88%;
 		padding: 8px 12px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-bg3);
+		background: var(--ui-bg3);
 		box-shadow: none;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 13px;
 	}
 	/*
@@ -843,47 +843,47 @@
 	 * come up when the pointer is on the message (always, on a touchscreen), so a history of
 	 * questions does not read as a column of controls.
 	 */
-	.v3-chat .stream[data-shown] .stream-acts {
+	.shell-chat .stream[data-shown] .stream-acts {
 		gap: 2px;
 		/* Tucked up against the bubble: the message's 6px gap, less 4. */
 		margin-top: -4px;
 	}
-	.v3-chat .stream[data-shown] .stream-act {
+	.shell-chat .stream[data-shown] .stream-act {
 		height: 22px;
 		gap: 4px;
 		padding: 0 7px 0 6px;
 		border-radius: 6px;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-size: 11.5px;
 		transition:
-			background-color 200ms var(--v3-ease),
-			color 200ms var(--v3-ease),
-			opacity 160ms var(--v3-ease);
+			background-color 200ms var(--ui-ease),
+			color 200ms var(--ui-ease),
+			opacity 160ms var(--ui-ease);
 	}
-	.v3-chat .stream[data-shown] .stream-act:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+	.shell-chat .stream[data-shown] .stream-act:hover {
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 		transition-duration: 120ms;
 	}
-	.v3-chat .stream[data-shown] .stream-act:active {
-		background: var(--v3-bg3);
+	.shell-chat .stream[data-shown] .stream-act:active {
+		background: var(--ui-bg3);
 	}
 	@media (hover: hover) {
-		.v3-chat .stream[data-shown] .stream-mine:not(:hover, :focus-within) .stream-act {
+		.shell-chat .stream[data-shown] .stream-mine:not(:hover, :focus-within) .stream-act {
 			opacity: 0;
 		}
 	}
-	.v3-chat .stream[data-shown] .stream-working {
+	.shell-chat .stream[data-shown] .stream-working {
 		padding: 0;
 		border: 0;
 		background: none;
 		box-shadow: none;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 12px;
 	}
 
 	/* The phone's sheet: the same head and turns, over the canvas, out of the composer. */
-	.v3-chat[data-sheet="true"] {
+	.shell-chat[data-sheet="true"] {
 		position: absolute;
 		z-index: 25;
 		right: 8px;
@@ -893,54 +893,54 @@
 		top: calc(76px + env(safe-area-inset-top));
 		border: 0;
 		border-radius: 26px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 		overflow: hidden;
 	}
 	/*
 	 * The composer stands over the sheet's foot, so the history scrolls on past it: the newest turn
 	 * can always be brought up clear of the composer (`--dock-h`, the composer's measured height).
 	 */
-	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-roll {
+	.shell-chat[data-sheet="true"] .stream[data-shown] .stream-roll {
 		padding-bottom: calc(var(--dock-h, 120px) - 4px);
 	}
 	/* The way back to the latest messages, above the composer rather than under it. */
-	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-jump {
+	.shell-chat[data-sheet="true"] .stream[data-shown] .stream-jump {
 		bottom: calc(var(--dock-h, 120px) - 12px);
 	}
 	/* The handle: the bar, in a band tall enough for a thumb, dragged down to put the sheet away. */
-	.v3-sheet-handle {
+	.shell-sheet-handle {
 		position: relative;
 		width: 36px;
 		height: 4px;
 		flex: none;
 		margin: 8px auto 0;
 		border-radius: 2px;
-		background: var(--v3-fg3);
+		background: var(--ui-fg3);
 		opacity: 0.55;
 		touch-action: none;
 	}
-	.v3-sheet-handle::before {
+	.shell-sheet-handle::before {
 		content: "";
 		position: absolute;
 		inset: -8px -120px -10px;
 	}
-	.v3-chat[data-sheet="true"] .v3-chat-head {
+	.shell-chat[data-sheet="true"] .shell-chat-head {
 		touch-action: none;
 	}
-	.v3-chat[data-sheet="true"][data-dragged="true"] {
+	.shell-chat[data-sheet="true"][data-dragged="true"] {
 		transition: none;
 	}
-	.v3-chat[data-sheet="true"][data-settling="true"] {
-		transition: transform 260ms var(--v3-spring);
+	.shell-chat[data-sheet="true"][data-settling="true"] {
+		transition: transform 260ms var(--ui-spring);
 	}
-	.app[data-phone="true"]:has(.v3-chat[data-sheet="true"]) .dock {
+	.app[data-phone="true"]:has(.shell-chat[data-sheet="true"]) .dock {
 		z-index: 26;
 	}
 
 	/* ---- the status pill over the composer -------------------------------------------------- */
 
-	.v3-status.float {
+	.shell-status.float {
 		display: flex;
 		max-width: 100%;
 		height: 34px;
@@ -950,29 +950,29 @@
 		padding: 0 16px 0 12px;
 		border: 0;
 		border-radius: 999px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
-		color: var(--v3-fg);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
+		color: var(--ui-fg);
 		cursor: pointer;
 		font: inherit;
 		font-size: 13px;
 	}
-	.v3-status-sign {
-		color: var(--v3-spark);
+	.shell-status-sign {
+		color: var(--ui-spark);
 		font-size: 15px;
-		animation: v3-spark 2.4s linear infinite;
+		animation: shell-spark 2.4s linear infinite;
 	}
-	.v3-status[data-waiting="true"] .v3-status-sign {
+	.shell-status[data-waiting="true"] .shell-status-sign {
 		color: var(--color-warn, #e5a000);
 		animation: none;
 	}
-	@keyframes v3-spark {
+	@keyframes shell-spark {
 		to {
 			rotate: 360deg;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.v3-status-sign {
+		.shell-status-sign {
 			animation: none;
 		}
 	}
@@ -986,8 +986,8 @@
 		padding: 8px 8px 6px;
 		border: 0;
 		border-radius: 18px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
 	/*
 	 * Where a drag of the composer can start: a band from 10px above its edge to 16px below it, so
@@ -1014,7 +1014,7 @@
 		height: 4px;
 		margin: 0 0 0 -18px;
 		border-radius: 2px;
-		background: var(--v3-fg3);
+		background: var(--ui-fg3);
 		opacity: 0.55;
 	}
 	.dock .dockfield {
@@ -1024,7 +1024,7 @@
 	}
 	.dock .dockfield::placeholder,
 	.dock [data-placeholder]::before {
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 	}
 	.dock .dock-row {
 		margin-top: 0;
@@ -1034,7 +1034,7 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 8px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	.dock .dock-row .chip-button {
 		height: 32px;
@@ -1042,12 +1042,12 @@
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 14px;
 	}
 	.dock .dock-row .chip-button:hover,
 	.dock .dock-row .chip-button[aria-expanded="true"] {
-		background: var(--v3-bg3);
+		background: var(--ui-bg3);
 	}
 	.dock .dock-row .chip-button > svg:first-child:not(:only-child) {
 		display: none;
@@ -1056,15 +1056,15 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 16px;
-		background: var(--v3-accent);
+		background: var(--ui-accent);
 		color: #ffffff;
 	}
 	.dock .send-button[disabled] {
-		background: var(--v3-bg3);
-		color: var(--v3-fg3);
+		background: var(--ui-bg3);
+		color: var(--ui-fg3);
 	}
 	.dock .send-button[data-stop="true"] {
-		background: var(--v3-danger);
+		background: var(--ui-danger);
 		color: #ffffff;
 	}
 	.dock .dock-to[data-compact="true"] {
@@ -1076,13 +1076,13 @@
 		padding: 0 10px 0 8px;
 		border: 0;
 		border-radius: 12px;
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
+		background: var(--ui-bg2);
+		color: var(--ui-fg);
 		font-size: 14px;
 	}
 	.dock .dock-to[data-compact="true"] .dock-to-chip:hover,
 	.dock .dock-to[data-compact="true"] .dock-to-chip[aria-expanded="true"] {
-		background: var(--v3-bg3);
+		background: var(--ui-bg3);
 	}
 	.dock .dock-to[data-compact="true"] .dock-to-name {
 		max-width: 140px;
@@ -1097,8 +1097,8 @@
 		padding: 6px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
 	.dock .composer-queue-head {
 		display: flex;
@@ -1106,12 +1106,12 @@
 		align-items: center;
 		gap: 6px;
 		padding: 0 8px 0 4px;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 	}
-	.composer-queue-fold.v3-icon {
+	.composer-queue-fold.shell-icon {
 		width: 22px;
 		height: 22px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 	}
 	.composer-queue-title {
 		flex: none;
@@ -1120,7 +1120,7 @@
 	}
 	.composer-queue-note {
 		min-width: 0;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-size: 12px;
 	}
 	.dock .composer-queue-release {
@@ -1128,7 +1128,7 @@
 		padding: 0;
 		border: 0;
 		background: none;
-		color: var(--v3-accent);
+		color: var(--ui-accent);
 		cursor: pointer;
 		font: inherit;
 		font-size: 12px;
@@ -1144,7 +1144,7 @@
 	}
 	.dock .composer-queue-head + .composer-queue-row,
 	.dock .composer-queue-row:hover {
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 	.dock .composer-queue-n {
 		width: auto;
@@ -1152,7 +1152,7 @@
 		min-width: 0;
 		border-radius: 0;
 		background: none;
-		color: var(--v3-fg3);
+		color: var(--ui-fg3);
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 	}
@@ -1160,7 +1160,7 @@
 		min-width: 0;
 		flex: 1;
 		overflow: hidden;
-		color: var(--v3-fg);
+		color: var(--ui-fg);
 		font-size: 13px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1168,7 +1168,7 @@
 	.dock .composer-queue-row .icon-button {
 		width: 26px;
 		height: 26px;
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		opacity: 0;
 	}
 	.dock .composer-queue-head + .composer-queue-row .icon-button,
@@ -1179,7 +1179,7 @@
 
 	/* ---- the pen tray ---------------------------------------------------------------------- */
 
-	.v3-tray-wrap {
+	.shell-tray-wrap {
 		position: absolute;
 		z-index: var(--z-float, 30);
 		top: 68px;
@@ -1195,7 +1195,7 @@
 	 * own padding, standing that much further out, and only the tray takes the pointer: the margin
 	 * round it is the canvas's.
 	 */
-	.app[data-phone="true"] .v3-tray-wrap {
+	.app[data-phone="true"] .shell-tray-wrap {
 		top: calc(76px + env(safe-area-inset-top) - 16px);
 		left: 0;
 		right: 0;
@@ -1204,10 +1204,10 @@
 		pointer-events: none;
 		scrollbar-width: none;
 	}
-	.app[data-phone="true"] .v3-tray-wrap > * {
+	.app[data-phone="true"] .shell-tray-wrap > * {
 		pointer-events: auto;
 	}
-	.v3-tray.float {
+	.shell-tray.float {
 		--tray-body: #f7f7f7;
 		--tray-edge: #c9c9c9;
 		display: flex;
@@ -1218,14 +1218,14 @@
 		overflow: hidden;
 		border: 0;
 		border-radius: 20px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
-	[data-color-scheme="dark"] .v3-tray.float {
+	[data-color-scheme="dark"] .shell-tray.float {
 		--tray-body: #e8e8e8;
 		--tray-edge: #9a9a9a;
 	}
-	.v3-tray-grip {
+	.shell-tray-grip {
 		display: grid;
 		width: 14px;
 		height: 30px;
@@ -1234,14 +1234,14 @@
 		gap: 2px;
 		place-content: center;
 	}
-	.v3-instruments {
+	.shell-instruments {
 		display: flex;
 		height: 96px;
 		align-items: flex-start;
 		gap: 12px;
 		padding: 0 4px;
 	}
-	.v3-instrument {
+	.shell-instrument {
 		width: 26px;
 		height: 90px;
 		flex: none;
@@ -1252,21 +1252,21 @@
 		cursor: pointer;
 		transition: margin-top 160ms ease;
 	}
-	.v3-instrument[data-on="true"] {
+	.shell-instrument[data-on="true"] {
 		margin-top: 8px;
 	}
-	.v3-instrument:focus-visible {
-		outline: 2px solid var(--v3-accent);
+	.shell-instrument:focus-visible {
+		outline: 2px solid var(--ui-accent);
 		outline-offset: 2px;
 		border-radius: 6px;
 	}
-	.v3-tray-sep {
+	.shell-tray-sep {
 		width: 1px;
 		height: 56px;
 		flex: none;
-		background: var(--v3-line);
+		background: var(--ui-line);
 	}
-	.v3-wheel {
+	.shell-wheel {
 		position: relative;
 		width: 34px;
 		height: 34px;
@@ -1274,29 +1274,29 @@
 		border-radius: 50%;
 		background: conic-gradient(#f24822, #e5a000, #14ae5c, #2563eb, #7c3aed, #ec4899, #f24822);
 	}
-	.v3-wheel::before {
+	.shell-wheel::before {
 		position: absolute;
 		inset: 5px;
 		border-radius: 50%;
-		background: var(--v3-panel);
+		background: var(--ui-panel);
 		content: "";
 	}
-	.v3-wheel::after {
+	.shell-wheel::after {
 		position: absolute;
 		inset: 8px;
 		border-radius: 50%;
 		background: var(--current);
 		content: "";
 	}
-	.v3-swatches {
+	.shell-swatches {
 		display: grid;
 		grid-template-columns: repeat(3, 22px);
 		gap: 6px;
 	}
-	.v3-swatches[data-off="true"] {
+	.shell-swatches[data-off="true"] {
 		opacity: 0.35;
 	}
-	.v3-swatch {
+	.shell-swatch {
 		display: grid;
 		width: 22px;
 		height: 22px;
@@ -1307,7 +1307,7 @@
 		background: none;
 		cursor: pointer;
 	}
-	.v3-swatch::before {
+	.shell-swatch::before {
 		width: 17px;
 		height: 17px;
 		border-radius: 50%;
@@ -1315,29 +1315,29 @@
 		box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 15%);
 		content: "";
 	}
-	.v3-swatch[data-on="true"] {
-		box-shadow: 0 0 0 1.5px var(--v3-fg);
+	.shell-swatch[data-on="true"] {
+		box-shadow: 0 0 0 1.5px var(--ui-fg);
 	}
-	.v3-tray-actions {
+	.shell-tray-actions {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 	}
-	.v3-tray-actions .v3-icon {
+	.shell-tray-actions .shell-icon {
 		width: 30px;
 		height: 30px;
 	}
-	.v3-widths.float {
+	.shell-widths.float {
 		display: flex;
 		width: 280px;
 		gap: 4px;
 		padding: 8px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
-	.v3-width {
+	.shell-width {
 		display: grid;
 		height: 34px;
 		flex: 1;
@@ -1348,11 +1348,11 @@
 		background: transparent;
 		cursor: pointer;
 	}
-	.v3-width[data-on="true"] {
-		background: var(--v3-bg2);
-		box-shadow: inset 0 0 0 1.5px var(--v3-accent);
+	.shell-width[data-on="true"] {
+		background: var(--ui-bg2);
+		box-shadow: inset 0 0 0 1.5px var(--ui-accent);
 	}
-	.v3-width > span {
+	.shell-width > span {
 		display: block;
 		width: 22px;
 		border-radius: 4px;
@@ -1366,36 +1366,36 @@
 		width: 272px;
 		border: 0;
 		border-radius: 16px;
-		background: var(--v3-panel);
-		box-shadow: var(--v3-shadow);
+		background: var(--ui-panel);
+		box-shadow: var(--ui-shadow);
 	}
 	.props-panel .props-head {
 		padding: 10px 10px 10px 14px;
-		border-bottom-color: var(--v3-line);
+		border-bottom-color: var(--ui-line);
 	}
 	.props-panel .props-title {
 		font-size: 13px;
 		font-weight: 500;
 	}
 	.props-panel .props-sec {
-		border-top-color: var(--v3-line);
+		border-top-color: var(--ui-line);
 	}
 	.props-panel .field {
 		height: 28px;
 		border: 0;
 		border-radius: 8px;
-		background: var(--v3-bg2);
+		background: var(--ui-bg2);
 	}
 
 	/* ---- present: the canvas alone ---------------------------------------------------------- */
 
-	.app[data-presenting="true"] :is(.v3-chat[data-sheet="true"], .notices) {
+	.app[data-presenting="true"] :is(.shell-chat[data-sheet="true"], .notices) {
 		display: none !important;
 	}
 
 	/* ---- a phone ------------------------------------------------------------------------------ */
 
-	.app[data-phone="true"] .v3-topbar.float.pill {
+	.app[data-phone="true"] .shell-topbar.float.pill {
 		top: calc(8px + env(safe-area-inset-top));
 		right: 8px;
 		left: 8px;
@@ -1404,29 +1404,29 @@
 		padding: 0 8px 0 6px;
 		border-radius: 20px;
 	}
-	.app[data-phone="true"] .v3-topbar [data-phone-hide] {
+	.app[data-phone="true"] .shell-topbar [data-phone-hide] {
 		display: none;
 	}
-	.app[data-phone="true"] .v3-topbar .v3-agent-chip {
+	.app[data-phone="true"] .shell-topbar .shell-agent-chip {
 		height: 36px;
 		border-radius: 12px;
 	}
-	.app[data-phone="true"] .v3-topbar .v3-agent-name {
+	.app[data-phone="true"] .shell-topbar .shell-agent-name {
 		max-width: 96px;
 		font-size: 15px;
 	}
-	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
+	.app[data-phone="true"] .shell-topbar .shell-canvas-name {
 		max-width: 96px;
 		font-size: 15px;
 	}
 	/* The phone's `⋯`: the top-right menu, standing at the right end of the one bar. */
-	.v3-phone-more {
+	.shell-phone-more {
 		position: absolute;
 		z-index: 21;
 		top: calc(8px + env(safe-area-inset-top) + 10px);
 		right: 16px;
 	}
-	.app[data-phone="true"] .v3-topbar.float.pill {
+	.app[data-phone="true"] .shell-topbar.float.pill {
 		padding-right: 48px;
 	}
 	.app[data-phone="true"] .dock {
@@ -1447,36 +1447,36 @@
 		padding-bottom: env(safe-area-inset-bottom);
 	}
 	/* About three quarters of a phone's width, so a good strip of the canvas stays in sight beside it. */
-	.app[data-phone="true"] .panel-shell.v3-panel {
+	.app[data-phone="true"] .panel-shell.shell-panel {
 		width: min(74vw, 288px) !important;
 		padding-top: env(safe-area-inset-top);
 	}
 
 	/* A touch screen: bigger targets in the bars, as the iPad screens draw them. */
 	@media (pointer: coarse) {
-		.v3-bar.float.pill {
+		.shell-bar.float.pill {
 			height: 52px;
 			border-radius: 20px;
 		}
-		.v3-icon {
+		.shell-icon {
 			width: 36px;
 			height: 36px;
 		}
-		.v3-agent-chip,
-		.v3-canvas-chip {
+		.shell-agent-chip,
+		.shell-canvas-chip {
 			height: 36px;
 		}
-		.pen-tools.v3-tools:not([data-row="true"]) {
+		.pen-tools.shell-tools:not([data-row="true"]) {
 			top: 76px;
 			width: 54px;
 			border-radius: 20px;
 		}
-		.v3-tools:not([data-row="true"]) .v3-tool {
+		.shell-tools:not([data-row="true"]) .shell-tool {
 			width: 44px;
 			height: 44px;
 			border-radius: 10px;
 		}
-		.v3-tray-wrap {
+		.shell-tray-wrap {
 			top: 76px;
 			left: calc(var(--inset-left, 0px) + 74px);
 		}
@@ -1488,7 +1488,7 @@
 
 @layer components {
 	.dock .dock-row .chip-sub {
-		color: var(--v3-fg2);
+		color: var(--ui-fg2);
 		font-size: 13px;
 	}
 	/* A phone's composer row: the agent, attach, the model and the mic, as the iPhone screens have it. */
@@ -1496,31 +1496,31 @@
 	.app[data-phone="true"] .dock .dock-row .chip-sub {
 		display: none;
 	}
-	.app[data-phone="true"] .v3-deck .switcher-name {
+	.app[data-phone="true"] .shell-deck .switcher-name {
 		display: none;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] {
+	.app[data-phone="true"] .shell-tools[data-row="true"] {
 		gap: 0;
 		padding: 0 4px;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-tool {
+	.app[data-phone="true"] .shell-tools[data-row="true"] .shell-tool {
 		width: 38px;
 		height: 40px;
 	}
-	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-rule {
+	.app[data-phone="true"] .shell-tools[data-row="true"] .shell-rule {
 		margin: 0 1px;
 	}
 }
 
 @layer components {
 	/* On a phone the open panel pushes the canvas aside, and the bars over it go with it. */
-	.app[data-phone="true"] .v3-topbar.float.pill {
+	.app[data-phone="true"] .shell-topbar.float.pill {
 		right: auto;
 		left: calc(var(--inset-left, 0px) + 8px);
 		width: calc(100vw - 16px);
 		transition: left 200ms ease;
 	}
-	.app[data-phone="true"] .v3-phone-more {
+	.app[data-phone="true"] .shell-phone-more {
 		right: auto;
 		left: calc(var(--inset-left, 0px) + 100vw - 52px);
 		transition: left 200ms ease;

@@ -289,14 +289,14 @@ export async function editMode(page, on = true) {
 	 */
 	void on;
 	/* Select stands alone and is browsing: pressing it puts the pen and the hand down and turns highlights off. */
-	const browse = page.locator('.v3-tool[data-tool="select"]:visible').first();
+	const browse = page.locator('.shell-tool[data-tool="select"]:visible').first();
 	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await page.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
 	await page.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
 /**
- * The canvas in v3's edit mode: outlines under the pointer, a flow board's block grips, Alt for
+ * The canvas in the redesign's edit mode: outlines under the pointer, a flow board's block grips, Alt for
  * distances (the tool column's highlighting select, key E). `editMode` puts it back in browse.
  */
 export async function highlightMode(page) {
@@ -710,12 +710,12 @@ export async function openAgents(page) {
  * this to be a function rather than a selector copied eleven times.
  */
 export async function zoom(page) {
-	const text = await page.locator('.v3-zoom-value').first().textContent();
+	const text = await page.locator('.shell-zoom-value').first().textContent();
 	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
 }
 
 /** The same reading, from inside the page, for a `waitForFunction`. */
-export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
+export const ZOOM_IN_PAGE = `Number((document.querySelector('.shell-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
 
 /**
  * Summon the conversation, and wait until it is actually up.
@@ -730,11 +730,11 @@ export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.t
  */
 export async function openHistory(page) {
 	if ((await page.locator("[data-shown='true']").count()) > 0) return;
-	/* v3: the conversation is the `.v3-chat` section, folded or not; its title unfolds it. */
-	if ((await page.locator(".v3-chat").count()) > 0) {
-		if ((await page.locator(".v3-chat[data-folded='true']").count()) === 0) return;
-		await page.locator(".v3-chat .v3-chat-title").first().click();
-		await page.waitForSelector(".v3-chat:not([data-folded='true'])", { timeout: 6000 });
+	/* The redesign: the conversation is the `.shell-chat` section, folded or not; its title unfolds it. */
+	if ((await page.locator(".shell-chat").count()) > 0) {
+		if ((await page.locator(".shell-chat[data-folded='true']").count()) === 0) return;
+		await page.locator(".shell-chat .shell-chat-title").first().click();
+		await page.waitForSelector(".shell-chat:not([data-folded='true'])", { timeout: 6000 });
 		return;
 	}
 	await page.locator('.pill button[title^="Conversation"]').first().click();
@@ -763,16 +763,16 @@ export async function newAgent(page, kind = "pi") {
 	);
 	await page.keyboard.press("Escape");
 	/*
-	 * v3 has no top-left pill: the `+` is the "New agent" button at the foot of the side panel's
-	 * Agents tab (`.v3-new-agent`). The panel is opened and put on that tab first.
+	 * The redesign has no top-left pill: the `+` is the "New agent" button at the foot of the side panel's
+	 * Agents tab (`.shell-new-agent`). The panel is opened and put on that tab first.
 	 */
 	await openPanel(page);
-	const agentsTab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Agents\s*$/i }).first();
+	const agentsTab = page.locator('.shell-nav [role="tab"]').filter({ hasText: /^\s*Agents\s*$/i }).first();
 	if ((await agentsTab.count()) > 0 && (await agentsTab.getAttribute("aria-selected")) !== "true") {
 		await agentsTab.click();
 		await page.waitForTimeout(250);
 	}
-	await page.locator(".v3-new-agent, .pill .new-agent").first().click();
+	await page.locator(".shell-new-agent, .pill .new-agent").first().click();
 	// The runtimes' rows say each runtime's name (`AgentChoices`): "Pi", "Claude Code", …
 	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: new RegExp(`^\\s*${kind}`, "i") }) }).first().click();
 	/*

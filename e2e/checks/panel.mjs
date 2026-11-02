@@ -2,7 +2,7 @@
  * The side panel: a full-height column at the window's left edge, beside the canvas.
  *
  * Four tabs now — Recent, Canvas, Agents, Apps (`panel/LeftPanel.tsx`, `PANEL_TABS`) — and the
- * Canvas tab is what is on this canvas, boards then drawings, as plain rows (`.v3-item`). The old
+ * Canvas tab is what is on this canvas, boards then drawings, as plain rows (`.shell-item`). The old
  * boards list (the whole deck in canvas → held → deck sections, a dot/bin/hide column per row,
  * a count in each heading, the finger rail) is gone with that redesign, and so are its checks.
  *
@@ -60,10 +60,10 @@ try {
 	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent.trim()));
 	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Canvas"]), JSON.stringify(selected));
 
-	// v3: 30px tabs and a 32px search (`styles/v3.css`, `.v3-nav-tab`, `.v3-search`).
+	// The redesign: 30px tabs and a 32px search (the shell's sheets, `.shell-nav-tab`, `.shell-search`).
 	const header = await page.evaluate(() => ({
-		strip: Math.round(document.querySelector(".panel-shell .v3-nav-tab")?.getBoundingClientRect().height ?? 0),
-		field: Math.round(document.querySelector(".panel-shell .v3-search")?.getBoundingClientRect().height ?? 0),
+		strip: Math.round(document.querySelector(".panel-shell .shell-nav-tab")?.getBoundingClientRect().height ?? 0),
+		field: Math.round(document.querySelector(".panel-shell .shell-search")?.getBoundingClientRect().height ?? 0),
 	}));
 	say("the tabs are 30px and the field 32px", header.strip === 30 && header.field === 32, JSON.stringify(header));
 
@@ -72,12 +72,12 @@ try {
 	 * heading's count is the rows'. The stage's own list (`__decksProbes.boards`) is the reference.
 	 */
 	const listed = await page.evaluate(() => {
-		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
-		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Boards"));
+		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-item[data-kind="board"]')];
+		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-sec')].find((sec) => sec.textContent.startsWith("Boards"));
 		return {
 			rows: rows.length,
 			names: rows.map((row) => row.textContent.trim()),
-			count: Number(head?.querySelector(".v3-sec-n")?.textContent ?? NaN),
+			count: Number(head?.querySelector(".shell-sec-n")?.textContent ?? NaN),
 			stage: (window.__decksProbes?.boards?.() ?? []).length,
 		};
 	});
@@ -88,11 +88,11 @@ try {
 	const word = (listed.names[0] ?? "").split(/[^A-Za-z]+/).filter((w) => w.length >= 4).sort((a, b) => b.length - a.length)[0] ?? "";
 	await page.locator('[data-inset="left"] input').fill(word);
 	await page.waitForTimeout(250);
-	const filtered = await page.locator('.panel-list[data-tab="canvas"] .v3-item').allInnerTexts();
+	const filtered = await page.locator('.panel-list[data-tab="canvas"] .shell-item').allInnerTexts();
 	say("the one field filters the list", word !== "" && filtered.length >= 1 && filtered.every((name) => name.toLowerCase().includes(word.toLowerCase())), `"${word}" → ${JSON.stringify(filtered)}`);
 	await page.locator('[data-inset="left"] input').fill("zzzz-nothing-is-called-this");
 	await page.waitForTimeout(250);
-	say("…and a word nothing has empties it", (await page.locator('.panel-list[data-tab="canvas"] .v3-item').count()) === 0);
+	say("…and a word nothing has empties it", (await page.locator('.panel-list[data-tab="canvas"] .shell-item').count()) === 0);
 	await page.locator('[data-inset="left"] input').fill("");
 
 	/*

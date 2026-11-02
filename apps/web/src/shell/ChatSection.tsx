@@ -38,7 +38,7 @@ export function ChatSection(props: {
 	let section: HTMLElement | undefined;
 	/*
 	 * The conversation's height in the panel is the person's: the line above it is a handle. Dragged,
-	 * it sets the height on the panel (`--v3-chat-h`, `data-chat-sized`), remembered on this device;
+	 * it sets the height on the panel (`--ui-chat-h`, `data-chat-sized`), remembered on this device;
 	 * a double-click gives the panel back its own split. Kept between 120px and all but 160px of the
 	 * panel, so neither the list nor the conversation can be dragged out of reach.
 	 */
@@ -52,10 +52,10 @@ export function ChatSection(props: {
 		const p = panel();
 		if (!p) return;
 		if (h === undefined) {
-			p.style.removeProperty("--v3-chat-h");
+			p.style.removeProperty("--ui-chat-h");
 			delete p.dataset.chatSized;
 		} else {
-			p.style.setProperty("--v3-chat-h", `${clamp(h)}px`);
+			p.style.setProperty("--ui-chat-h", `${clamp(h)}px`);
 			p.dataset.chatSized = "true";
 		}
 	};
@@ -145,7 +145,7 @@ export function ChatSection(props: {
 	const startSheetDrag = (event: PointerEvent) => {
 		if (!props.sheet || !section || event.button !== 0) return;
 		const target = event.target instanceof Element ? event.target : null;
-		if (!target?.closest(".v3-sheet-handle, .v3-chat-head")) return;
+		if (!target?.closest(".shell-sheet-handle, .shell-chat-head")) return;
 		const sheet = section;
 		const start = { y: event.clientY, t: event.timeStamp };
 		// The recent moves, for how fast it was going over the last 80 ms when let go.
@@ -216,13 +216,13 @@ export function ChatSection(props: {
 	};
 	const name = () => props.identity?.name ?? props.chat?.name ?? "No agent";
 	return (
-		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
+		<section ref={section} class="shell-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
 			<Show when={props.sheet}>
-				<span class="v3-sheet-handle" aria-hidden="true" />
+				<span class="shell-sheet-handle" aria-hidden="true" />
 			</Show>
 			<Show when={!props.sheet && !props.folded}>
 				<div
-					class="v3-chat-resize"
+					class="shell-chat-resize"
 					role="separator"
 					aria-orientation="horizontal"
 					aria-label="Conversation height"
@@ -235,16 +235,16 @@ export function ChatSection(props: {
 					}}
 				/>
 			</Show>
-			<div class="v3-chat-head">
+			<div class="shell-chat-head">
 				<Show when={props.chat}>{(chat) => <AgentFace chat={chat()} identity={props.identity} unread={props.unread} size={24} ring={1.5} />}</Show>
-				<button type="button" class="v3-chat-title" title={props.folded ? "Show the conversation" : "Fold the conversation"} onClick={() => props.onFold(!props.folded)}>
-					<span class="v3-chat-name">{name()}</span>
-					<Show when={props.chat && stateWords(props.chat.state, name())}>{(words) => <span class="v3-chat-state">{words()}</span>}</Show>
+				<button type="button" class="shell-chat-title" title={props.folded ? "Show the conversation" : "Fold the conversation"} onClick={() => props.onFold(!props.folded)}>
+					<span class="shell-chat-name">{name()}</span>
+					<Show when={props.chat && stateWords(props.chat.state, name())}>{(words) => <span class="shell-chat-state">{words()}</span>}</Show>
 				</button>
 				<span class="flex-1" />
 				<button
 					type="button"
-					class="v3-icon"
+					class="shell-icon"
 					aria-expanded={!props.folded}
 					data-tip={props.sheet ? "Back into the pill" : props.folded ? "Show the conversation" : "Fold the conversation"}
 					aria-label={props.folded ? "Show the conversation" : "Fold the conversation"}
@@ -253,7 +253,7 @@ export function ChatSection(props: {
 					<Icon of={props.sheet ? ChevronDown : props.folded ? ChevronsUpDown : ChevronsDownUp} size={16} />
 				</button>
 			</div>
-			<div class="v3-chat-body">{props.children}</div>
+			<div class="shell-chat-body">{props.children}</div>
 		</section>
 	);
 }
@@ -268,8 +268,8 @@ export function StatusPill(props: { chat: AgentChat | undefined; identity: Ident
 	return (
 		<Show when={words()}>
 			{(said) => (
-				<button type="button" class="v3-status float" data-waiting={props.chat?.state === "waiting" ? "true" : undefined} title="Show the conversation" onClick={() => props.onOpen()} aria-live="polite">
-					<span class="v3-status-sign" aria-hidden="true">
+				<button type="button" class="shell-status float" data-waiting={props.chat?.state === "waiting" ? "true" : undefined} title="Show the conversation" onClick={() => props.onOpen()} aria-live="polite">
+					<span class="shell-status-sign" aria-hidden="true">
 						✻
 					</span>
 					<span class="truncate">

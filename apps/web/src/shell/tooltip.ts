@@ -1,5 +1,5 @@
 /**
- * The v3 chrome's tooltips: a dark tip with the control's name and its key.
+ * The shell's tooltips: a dark tip with the control's name and its key.
  *
  * The first one waits 450 ms, so a pointer passing over the chrome shows nothing. Once one is up the
  * next follows the pointer at once, sliding along the bar, until the pointer has been off every
@@ -13,7 +13,7 @@ const WARM = 400;
 
 export function installTooltips(): () => void {
 	const tip = document.createElement("div");
-	tip.className = "v3-tip";
+	tip.className = "shell-tip";
 	tip.setAttribute("role", "tooltip");
 	document.body.appendChild(tip);
 	let timer = 0;
@@ -21,13 +21,13 @@ export function installTooltips(): () => void {
 	let current: HTMLElement | null = null;
 
 	const show = (el: HTMLElement) => {
-		if (document.querySelector(".popover, .v3-menu[data-open='true']")) return;
+		if (document.querySelector(".popover, .shell-menu[data-open='true']")) return;
 		const text = el.dataset.tip;
 		if (!text) return;
 		tip.replaceChildren(text);
 		if (el.dataset.key) {
 			const key = document.createElement("span");
-			key.className = "v3-tip-key";
+			key.className = "shell-tip-key";
 			key.textContent = el.dataset.key;
 			tip.appendChild(key);
 		}

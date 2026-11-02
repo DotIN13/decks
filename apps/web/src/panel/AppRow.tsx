@@ -58,13 +58,13 @@ export function AppRow(props: {
 	};
 	return (
 		<div
-			class="v3-app-row"
+			class="shell-app-row"
 			data-status={status()}
 			data-on={props.picked || undefined}
 			title={running() ? `${props.app.title}: double-click to show it on the canvas` : `${props.app.title}: double-click to run it and show it on the canvas`}
 			onClick={() => props.onPick()}
 			onDblClick={(event) => {
-				if ((event.target as Element).closest(".v3-app-more")) return;
+				if ((event.target as Element).closest(".shell-app-more")) return;
 				act("run-show");
 			}}
 			onContextMenu={(event) => {
@@ -73,15 +73,15 @@ export function AppRow(props: {
 				toggle?.();
 			}}
 		>
-			<span class="v3-app-tile" style={{ background: tileColour(props.app.name) }} aria-hidden="true">
+			<span class="shell-app-tile" style={{ background: tileColour(props.app.name) }} aria-hidden="true">
 				<Icon of={AppWindow} size={16} />
 			</span>
-			<span class="v3-app-text">
-				<span class="v3-app-name truncate">{props.app.title}</span>
-				<span class="v3-app-state" data-state={running() ? "on" : moving() ? "busy" : status() === "broken" ? "broken" : "off"}>
+			<span class="shell-app-text">
+				<span class="shell-app-name truncate">{props.app.title}</span>
+				<span class="shell-app-state" data-state={running() ? "on" : moving() ? "busy" : status() === "broken" ? "broken" : "off"}>
 					<i aria-hidden="true" />
-					<span class="v3-app-word">{WORD[status()] ?? status()}</span>
-					<span class="v3-app-path truncate">apps/{props.app.name}</span>
+					<span class="shell-app-word">{WORD[status()] ?? status()}</span>
+					<span class="shell-app-path truncate">apps/{props.app.name}</span>
 				</span>
 			</span>
 			<Popover
@@ -94,7 +94,7 @@ export function AppRow(props: {
 					return (
 						<button
 							type="button"
-							class="v3-app-more"
+							class="shell-app-more"
 							ref={api.ref}
 							data-on={api.open || undefined}
 							aria-haspopup="menu"
@@ -177,12 +177,12 @@ export function AppLogs(props: { title: string; read: () => Promise<string[] | u
 	});
 	return (
 		<Portal>
-			<div class="v3-app-logs" role="dialog" aria-label={`${props.title}: logs`}>
-				<div class="v3-app-logs-head">
+			<div class="shell-app-logs" role="dialog" aria-label={`${props.title}: logs`}>
+				<div class="shell-app-logs-head">
 					<Icon of={Terminal} size={14} />
 					<span class="truncate">{props.title}</span>
 					<span class="flex-1" />
-					<button type="button" class="v3-app-logs-x" aria-label="Close the logs" onClick={props.onClose}>
+					<button type="button" class="shell-app-logs-x" aria-label="Close the logs" onClick={props.onClose}>
 						<Icon of={X} size={14} />
 					</button>
 				</div>

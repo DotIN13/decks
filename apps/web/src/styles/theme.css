@@ -3,84 +3,84 @@
  * the body take them; `.stage` sets the canvas's own back for everything drawn on it, and the stage engine reads
  * its accent off the root element, which this sheet leaves alone. Only the ground under the boards, `--stage`,
  * is the design's. Followed by surfaces.css, motion.css and redesign.css, in that order: the four were one
- * sheet (v3.css), and keep its cascade.
+ * sheet, v3.css, and keep its cascade.
  */
 
 body {
-	--v3-bg: #f5f5f5;
-	--v3-panel: #ffffff;
-	--v3-bg2: #f5f5f5;
-	--v3-bg3: #ebebeb;
-	--v3-line: #e6e6e6;
-	--v3-line2: #d9d9d9;
-	--v3-fg: #1e1e1e;
-	--v3-fg2: #767676;
-	--v3-fg3: #b0b0b0;
-	--v3-accent: #2563eb;
-	--v3-accent-soft: #eaf1fe;
+	--ui-bg: #f5f5f5;
+	--ui-panel: #ffffff;
+	--ui-bg2: #f5f5f5;
+	--ui-bg3: #ebebeb;
+	--ui-line: #e6e6e6;
+	--ui-line2: #d9d9d9;
+	--ui-fg: #1e1e1e;
+	--ui-fg2: #767676;
+	--ui-fg3: #b0b0b0;
+	--ui-accent: #2563eb;
+	--ui-accent-soft: #eaf1fe;
 	/* The open tab and the chosen row: the pale blue wash in light (the dark ones are below). */
-	--v3-tab-on: var(--v3-accent-soft);
-	--v3-tab-on-fg: var(--v3-fg);
-	--v3-tab-on-icon: var(--v3-accent);
+	--ui-tab-on: var(--ui-accent-soft);
+	--ui-tab-on-fg: var(--ui-fg);
+	--ui-tab-on-icon: var(--ui-accent);
 	/* A chosen row is grey, a step under the hover's; only the open tab is blue. */
-	--v3-row-on: #e9e9e9;
-	--v3-row-on-icon: var(--v3-fg);
-	--v3-ink: #1e1e1e;
-	--v3-ink-fg: #ffffff;
-	--v3-ink-key: #ffffff80;
-	--v3-ink-rule: #ffffff1f;
-	--v3-danger: #e5484d;
-	--v3-spark: #d97757;
-	--v3-shadow: 0 2px 14px rgb(0 0 0 / 12%), 0 0 0 0.5px rgb(0 0 0 / 12%);
-	--v3-menu-shadow: 0 6px 24px rgb(0 0 0 / 28%), 0 0 0 0.5px rgb(0 0 0 / 20%);
+	--ui-row-on: #e9e9e9;
+	--ui-row-on-icon: var(--ui-fg);
+	--ui-ink: #1e1e1e;
+	--ui-ink-fg: #ffffff;
+	--ui-ink-key: #ffffff80;
+	--ui-ink-rule: #ffffff1f;
+	--ui-danger: #e5484d;
+	--ui-spark: #d97757;
+	--ui-shadow: 0 2px 14px rgb(0 0 0 / 12%), 0 0 0 0.5px rgb(0 0 0 / 12%);
+	--ui-menu-shadow: 0 6px 24px rgb(0 0 0 / 28%), 0 0 0 0.5px rgb(0 0 0 / 20%);
 
-	/* The app's own tokens, as v3 has them, for the chrome. */
-	--bg: var(--v3-bg);
-	--stage: var(--v3-bg);
-	--panel: var(--v3-panel);
-	--fg: var(--v3-fg);
-	--muted: var(--v3-fg2);
-	--faint: var(--v3-fg3);
-	--line: var(--v3-line);
-	--line-strong: var(--v3-line2);
+	/* The app's own tokens, as the redesign has them, for the chrome. */
+	--bg: var(--ui-bg);
+	--stage: var(--ui-bg);
+	--panel: var(--ui-panel);
+	--fg: var(--ui-fg);
+	--muted: var(--ui-fg2);
+	--faint: var(--ui-fg3);
+	--line: var(--ui-line);
+	--line-strong: var(--ui-line2);
 	--border-strong: transparent;
-	--fill: var(--v3-bg3);
-	--color-accent: var(--v3-accent);
-	--color-accent-soft: var(--v3-accent-soft);
-	--color-danger: var(--v3-danger);
-	--shadow: var(--v3-shadow);
+	--fill: var(--ui-bg3);
+	--color-accent: var(--ui-accent);
+	--color-accent-soft: var(--ui-accent-soft);
+	--color-danger: var(--ui-danger);
+	--shadow: var(--ui-shadow);
 	--radius-panel: 16px;
 	--control-radius: 8px;
 }
 
 [data-color-scheme="dark"] body {
-	--v3-bg: #1e1e1e;
-	--v3-panel: #2c2c2c;
-	--v3-bg2: #383838;
-	--v3-bg3: #444444;
-	--v3-line: #444444;
-	--v3-line2: #555555;
-	--v3-fg: #f0f0f0;
-	--v3-fg2: #a8a8a8;
-	--v3-fg3: #6f6f6f;
-	--v3-accent: #3b82f6;
-	--v3-accent-soft: #1d2b45;
+	--ui-bg: #1e1e1e;
+	--ui-panel: #2c2c2c;
+	--ui-bg2: #383838;
+	--ui-bg3: #444444;
+	--ui-line: #444444;
+	--ui-line2: #555555;
+	--ui-fg: #f0f0f0;
+	--ui-fg2: #a8a8a8;
+	--ui-fg3: #6f6f6f;
+	--ui-accent: #3b82f6;
+	--ui-accent-soft: #1d2b45;
 	/*
 	 * In dark the navy wash read as a smudge. The open tab is a clear blue, light enough to read
 	 * as blue on the dark panel, with pale-blue words; a chosen row is a quiet lifted grey, so blue
 	 * marks only which tab you are on. (Board "Five dark-mode highlights…", the 3 + 4 column.)
 	 */
-	--v3-tab-on: rgb(59 130 246 / 22%);
-	--v3-tab-on-fg: #d6e5ff;
-	--v3-tab-on-icon: #8ab4ff;
-	--v3-row-on: #3a3a3a;
-	--v3-row-on-icon: var(--v3-fg);
-	--v3-ink: #f0f0f0;
-	--v3-ink-fg: #1e1e1e;
-	--v3-ink-key: #00000080;
-	--v3-ink-rule: #0000001f;
-	--v3-shadow: 0 2px 14px rgb(0 0 0 / 45%), 0 0 0 0.5px rgb(255 255 255 / 10%);
-	--v3-menu-shadow: 0 6px 24px rgb(0 0 0 / 55%), 0 0 0 0.5px rgb(0 0 0 / 40%);
+	--ui-tab-on: rgb(59 130 246 / 22%);
+	--ui-tab-on-fg: #d6e5ff;
+	--ui-tab-on-icon: #8ab4ff;
+	--ui-row-on: #3a3a3a;
+	--ui-row-on-icon: var(--ui-fg);
+	--ui-ink: #f0f0f0;
+	--ui-ink-fg: #1e1e1e;
+	--ui-ink-key: #00000080;
+	--ui-ink-rule: #0000001f;
+	--ui-shadow: 0 2px 14px rgb(0 0 0 / 45%), 0 0 0 0.5px rgb(255 255 255 / 10%);
+	--ui-menu-shadow: 0 6px 24px rgb(0 0 0 / 55%), 0 0 0 0.5px rgb(0 0 0 / 40%);
 }
 
 /* The canvas, as it was: everything drawn on it reads the old tokens. */

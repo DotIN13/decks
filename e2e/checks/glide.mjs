@@ -44,7 +44,7 @@ const watched = (press, ms) =>
 			const samples = [];
 			const start = performance.now();
 			if (press.kind === "row") {
-				[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === press.label)?.click();
+				[...document.querySelectorAll('.shell-item[data-kind="board"]')].find((row) => row.title === press.label)?.click();
 			} else {
 				const frame = document.querySelector(`.board-node[data-path$="/${press.path}"] iframe, .board-node[data-path="${press.path}"] iframe`);
 				// The canvas copy writes its links back to the library (`../../../boards/risks.html`), so by the end of the href.
@@ -93,7 +93,7 @@ say(
  * rest the pixels and the reading have to be the same number, and that is the whole argument for
  * writing the signal per frame rather than once at the end.
  */
-const pill = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const pill = await page.evaluate(() => Number((document.querySelector('.shell-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zoom * 100) <= 1, `${pill}% against ${(to.zoom * 100).toFixed(1)}%`);
 
 // --- a link on a board ------------------------------------------------------------------
@@ -105,7 +105,7 @@ say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zo
  */
 await watched(row("plan.html"), 400);
 for (let i = 0; i < 8; i++) {
-	const level = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+	const level = await page.evaluate(() => Number((document.querySelector('.shell-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 	if (level >= 70 && level <= 260) break;
 	await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 	await settle(page, 200);
@@ -133,7 +133,7 @@ const stolen = await page.evaluate(async () => {
 	const stage = document.querySelector(".stage");
 	// Back to the plan: the link above has just flown the camera to risks.html, and pressing the board
 	// the camera is already on has nowhere to glide to, so nothing was ever in flight to take back.
-	[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click();
+	[...document.querySelectorAll('.shell-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click();
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	const midFlight = stage.dataset.gliding === "true";
 	// A wheel over the canvas: the smallest thing a person does that moves the camera.

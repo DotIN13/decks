@@ -9,7 +9,7 @@ import { Icon } from "@decks/ui";
 /**
  * The pen tray: the instruments in a row, the one in hand raised, its colour and its width.
  *
- * The v3 design draws it as a tray of real-looking tools beside the tool column, the way a notes
+ * The redesign draws it as a tray of real-looking tools beside the tool column, the way a notes
  * app on a tablet does. It holds what the canvas's ink can do: a pen, a marker, an eraser and a
  * lasso, five colours and three widths (`@decks/canvas`, `state/ink.ts`). Pressing the instrument
  * already in hand, or `⋯`, opens its widths under the tray.
@@ -77,9 +77,9 @@ export function PenTray(props: {
 	const paints = () => inkTool() === "pen" || inkTool() === "marker";
 
 	return (
-		<div class="v3-tray-wrap" ref={wrap}>
-			<div class="v3-tray float" role="toolbar" aria-label="Pen tray">
-				<span class="v3-tray-grip" ref={grip} data-tip="Drag to move; throw at an edge to put away" aria-hidden="true">
+		<div class="shell-tray-wrap" ref={wrap}>
+			<div class="shell-tray float" role="toolbar" aria-label="Pen tray">
+				<span class="shell-tray-grip" ref={grip} data-tip="Drag to move; throw at an edge to put away" aria-hidden="true">
 					<i />
 					<i />
 					<i />
@@ -87,12 +87,12 @@ export function PenTray(props: {
 					<i />
 					<i />
 				</span>
-				<div class="v3-instruments" role="group" aria-label="Instrument">
+				<div class="shell-instruments" role="group" aria-label="Instrument">
 					<For each={INSTRUMENTS}>
 						{(entry) => (
 							<button
 								type="button"
-								class="v3-instrument"
+								class="shell-instrument"
 								data-on={inkTool() === entry.tool ? "true" : undefined}
 								aria-pressed={inkTool() === entry.tool}
 								data-tip={entry.label.split(":")[0]}
@@ -108,14 +108,14 @@ export function PenTray(props: {
 						)}
 					</For>
 				</div>
-				<span class="v3-tray-sep" aria-hidden="true" />
-				<span class="v3-wheel" aria-hidden="true" style={{ "--current": paint() }} />
-				<div class="v3-swatches" role="group" aria-label="Colour" data-off={paints() ? undefined : "true"}>
+				<span class="shell-tray-sep" aria-hidden="true" />
+				<span class="shell-wheel" aria-hidden="true" style={{ "--current": paint() }} />
+				<div class="shell-swatches" role="group" aria-label="Colour" data-off={paints() ? undefined : "true"}>
 					<For each={INK_COLORS}>
 						{(color) => (
 							<button
 								type="button"
-								class="v3-swatch"
+								class="shell-swatch"
 								data-on={inkColor() === color ? "true" : undefined}
 								aria-pressed={inkColor() === color}
 								disabled={!paints()}
@@ -127,16 +127,16 @@ export function PenTray(props: {
 						)}
 					</For>
 				</div>
-				<div class="v3-tray-actions">
+				<div class="shell-tray-actions">
 					<Show
 						when={inkSelection()}
 						fallback={
-							<button type="button" class="v3-icon" data-on={widths() ? "soft" : undefined} data-tip="Width" aria-label="Width" aria-expanded={widths()} onClick={() => setWidths((open) => !open)}>
+							<button type="button" class="shell-icon" data-on={widths() ? "soft" : undefined} data-tip="Width" aria-label="Width" aria-expanded={widths()} onClick={() => setWidths((open) => !open)}>
 								<Icon of={MoreHorizontal} size={16} />
 							</button>
 						}
 					>
-						<button type="button" class="v3-icon" data-tip="Delete the strokes" data-key="⌫" aria-label="Delete the selected strokes" onClick={deleteSelection}>
+						<button type="button" class="shell-icon" data-tip="Delete the strokes" data-key="⌫" aria-label="Delete the selected strokes" onClick={deleteSelection}>
 							<Icon of={Trash2} size={16} />
 						</button>
 					</Show>
@@ -146,12 +146,12 @@ export function PenTray(props: {
 				<Icon of={ChevronLeft} size={14} />
 			</button>
 			<Show when={widths() && paints()}>
-				<div class="v3-widths float" role="group" aria-label="Width">
+				<div class="shell-widths float" role="group" aria-label="Width">
 					<For each={[0, 1, 2]}>
 						{(index) => (
 							<button
 								type="button"
-								class="v3-width"
+								class="shell-width"
 								data-on={inkWidth() === index ? "true" : undefined}
 								aria-pressed={inkWidth() === index}
 								data-tip={`${sizes()[index]} px`}

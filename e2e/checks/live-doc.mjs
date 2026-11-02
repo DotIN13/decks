@@ -130,7 +130,7 @@ if (found) {
 	 * rests, and a document's picture is not the page being typed in. A pinch (a wheel with Control),
 	 * because over a page a plain wheel scrolls the page, not the camera; `data-moving` says it moved.
 	 */
-	await page.locator(".v3-zoom-value").first().waitFor({ timeout: 3000 }).catch(() => {});
+	await page.locator(".shell-zoom-value").first().waitFor({ timeout: 3000 }).catch(() => {});
 	// Selected for certain: the press that put the caret in it sometimes lands before the selection has settled, and leaves it unselected.
 	const isSelected = () => page.evaluate((n) => document.querySelector(n)?.closest(".board-node")?.dataset.selected === "true", node);
 	if (!(await until(isSelected, 2000))) await selectBoard(page, path);

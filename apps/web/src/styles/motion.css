@@ -13,29 +13,29 @@
  *   transitions their position while they are held or flung.
  * ======================================================================================== */
 body {
-	--v3-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-	--v3-ease-in: cubic-bezier(0.4, 0, 1, 1);
-	--v3-spring: cubic-bezier(0.3, 1.32, 0.55, 1);
+	--ui-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--ui-ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--ui-spring: cubic-bezier(0.3, 1.32, 0.55, 1);
 }
 
 @layer components {
-	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row, .v3-folder-toggle, .composer-queue-release, .v3-new-agent.new-agent),
+	:is(.shell-icon, .shell-tool, .shell-agent-chip, .shell-canvas-chip, .shell-nav-tab, .shell-zoom-value, .shell-app-row, .shell-folder-toggle, .composer-queue-release, .shell-new-agent.new-agent),
 	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button),
-	.v3-panel .agent-list .agent-row {
+	.shell-panel .agent-list .agent-row {
 		transition:
-			background-color 200ms var(--v3-ease),
-			color 200ms var(--v3-ease),
-			box-shadow 200ms var(--v3-ease),
-			transform 90ms var(--v3-ease);
+			background-color 200ms var(--ui-ease),
+			color 200ms var(--ui-ease),
+			box-shadow 200ms var(--ui-ease),
+			transform 90ms var(--ui-ease);
 	}
-	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row),
+	:is(.shell-icon, .shell-tool, .shell-agent-chip, .shell-canvas-chip, .shell-nav-tab, .shell-zoom-value, .shell-app-row),
 	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip),
-	.v3-panel .agent-list .agent-row {
+	.shell-panel .agent-list .agent-row {
 		&:hover {
 			transition-duration: 120ms, 120ms, 120ms, 90ms;
 		}
 	}
-	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-zoom-value),
+	:is(.shell-icon, .shell-tool, .shell-agent-chip, .shell-canvas-chip, .shell-zoom-value),
 	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button) {
 		&:active {
 			transform: scale(0.96);
@@ -43,113 +43,113 @@ body {
 	}
 
 	/* ---- the tool in hand: one marker that slides ---------------------------------------- */
-	.v3-tools {
+	.shell-tools {
 		position: absolute;
 	}
-	.v3-tools[data-row="true"] {
+	.shell-tools[data-row="true"] {
 		position: relative;
 	}
-	.v3-tool-mark {
+	.shell-tool-mark {
 		position: absolute;
 		top: 0;
 		left: 0;
 		width: 36px;
 		height: 36px;
 		border-radius: 8px;
-		background: var(--v3-accent);
-		box-shadow: 0 2px 8px color-mix(in srgb, var(--v3-accent) 30%, transparent);
+		background: var(--ui-accent);
+		box-shadow: 0 2px 8px color-mix(in srgb, var(--ui-accent) 30%, transparent);
 		pointer-events: none;
 		transition:
-			transform 300ms var(--v3-spring),
-			width 300ms var(--v3-spring),
-			height 300ms var(--v3-spring),
-			opacity 160ms var(--v3-ease);
+			transform 300ms var(--ui-spring),
+			width 300ms var(--ui-spring),
+			height 300ms var(--ui-spring),
+			opacity 160ms var(--ui-ease);
 	}
-	.v3-tool-mark[data-shown="false"],
-	.v3-tool-mark:not([data-shown]) {
+	.shell-tool-mark[data-shown="false"],
+	.shell-tool-mark:not([data-shown]) {
 		opacity: 0;
 	}
-	.v3-tools .v3-tool {
+	.shell-tools .shell-tool {
 		position: relative;
 		z-index: 1;
 	}
-	.v3-tools .v3-tool[data-on="true"],
-	.v3-tools .v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+	.shell-tools .shell-tool[data-on="true"],
+	.shell-tools .shell-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
 		background: transparent;
 		color: #ffffff;
 	}
-	.v3-tools .v3-tool[data-on="true"]:hover {
+	.shell-tools .shell-tool[data-on="true"]:hover {
 		background: transparent;
 	}
-	.v3-tools .v3-tool[data-open="true"]:not([data-on="true"]) {
-		background: var(--v3-bg3);
+	.shell-tools .shell-tool[data-open="true"]:not([data-on="true"]) {
+		background: var(--ui-bg3);
 	}
-	.v3-tool[data-family]::after {
-		transition: transform 200ms var(--v3-ease);
+	.shell-tool[data-family]::after {
+		transition: transform 200ms var(--ui-ease);
 	}
-	.v3-tool[data-open="true"]::after {
+	.shell-tool[data-open="true"]::after {
 		transform: translate(1px, 1px);
 	}
 	@media (pointer: coarse) {
-		.v3-tool-mark {
+		.shell-tool-mark {
 			border-radius: 10px;
 		}
 	}
 
 	/* ---- the panel's tab: the same, along the strip --------------------------------------- */
-	.v3-nav {
+	.shell-nav {
 		position: relative;
 	}
-	.v3-nav-mark {
+	.shell-nav-mark {
 		position: absolute;
 		top: 0;
 		left: 0;
 		height: 30px;
 		border-radius: 8px;
-		background: var(--v3-tab-on);
+		background: var(--ui-tab-on);
 		pointer-events: none;
 		transition:
-			transform 280ms var(--v3-spring),
-			width 280ms var(--v3-spring);
+			transform 280ms var(--ui-spring),
+			width 280ms var(--ui-spring);
 	}
-	.v3-nav-tab {
+	.shell-nav-tab {
 		position: relative;
 		z-index: 1;
 	}
-	.v3-nav-tab[data-on="true"],
-	.v3-nav-tab:hover {
+	.shell-nav-tab[data-on="true"],
+	.shell-nav-tab:hover {
 		background: transparent;
 	}
-	.v3-nav-tab:not([data-on="true"]):hover {
-		color: var(--v3-fg);
+	.shell-nav-tab:not([data-on="true"]):hover {
+		color: var(--ui-fg);
 	}
 
 	/* ---- menus grow out of their edge ------------------------------------------------------ */
-	.v3-menu {
+	.shell-menu {
 		opacity: 0;
 		transform: scale(0.96);
 		transform-origin: left top;
 		transition:
-			opacity 90ms var(--v3-ease-in),
-			transform 90ms var(--v3-ease-in);
+			opacity 90ms var(--ui-ease-in),
+			transform 90ms var(--ui-ease-in);
 		pointer-events: none;
 	}
-	.v3-menu[data-above="true"] {
+	.shell-menu[data-above="true"] {
 		transform-origin: left bottom;
 	}
-	.v3-menu[data-open="true"] {
+	.shell-menu[data-open="true"] {
 		opacity: 1;
 		transform: none;
 		pointer-events: auto;
 		transition:
-			opacity 140ms var(--v3-ease),
-			transform 180ms var(--v3-ease);
+			opacity 140ms var(--ui-ease),
+			transform 180ms var(--ui-ease);
 	}
-	.v3-menu-row {
+	.shell-menu-row {
 		transition: none;
 	}
 	.popover[data-placed] {
-		animation: v3-pop 170ms var(--v3-ease);
+		animation: shell-pop 170ms var(--ui-ease);
 		transform-origin: top center;
 	}
 	.popover[data-placed][data-side="above"] {
@@ -158,7 +158,7 @@ body {
 	.popover[data-placed][data-side="beside"] {
 		transform-origin: left top;
 	}
-	@keyframes v3-pop {
+	@keyframes shell-pop {
 		from {
 			opacity: 0;
 			transform: scale(0.96);
@@ -166,7 +166,7 @@ body {
 	}
 
 	/* ---- tooltips ---------------------------------------------------------------------------- */
-	.v3-tip {
+	.shell-tip {
 		position: fixed;
 		z-index: 100;
 		display: flex;
@@ -174,123 +174,123 @@ body {
 		gap: 8px;
 		padding: 5px 8px;
 		border-radius: 6px;
-		background: var(--v3-ink);
-		color: var(--v3-ink-fg);
+		background: var(--ui-ink);
+		color: var(--ui-ink-fg);
 		font: 12px/1.3 var(--font-sans);
 		white-space: nowrap;
 		pointer-events: none;
 		opacity: 0;
 		transform: translateY(-2px);
 		transition:
-			opacity 120ms var(--v3-ease),
-			transform 160ms var(--v3-ease);
+			opacity 120ms var(--ui-ease),
+			transform 160ms var(--ui-ease);
 	}
-	.v3-tip[data-side="right"] {
+	.shell-tip[data-side="right"] {
 		transform: translateX(-3px);
 	}
-	.v3-tip[data-shown="true"] {
+	.shell-tip[data-shown="true"] {
 		opacity: 1;
 		transform: none;
 	}
-	.v3-tip[data-warm="true"] {
+	.shell-tip[data-warm="true"] {
 		transition:
 			opacity 60ms,
-			left 120ms var(--v3-ease),
-			top 120ms var(--v3-ease);
+			left 120ms var(--ui-ease),
+			top 120ms var(--ui-ease);
 	}
-	.v3-tip-key {
-		color: var(--v3-ink-key);
+	.shell-tip-key {
+		color: var(--ui-ink-key);
 		font: 11px var(--font-mono);
 	}
 
 	/* ---- agent rows: the time gives way to the row's actions on approach -------------------- */
-	.v3-panel .agent-list .agent-row :is(.agent-tagbtn, .close) {
+	.shell-panel .agent-list .agent-row :is(.agent-tagbtn, .close) {
 		transition:
-			opacity 160ms var(--v3-ease),
-			transform 200ms var(--v3-ease);
+			opacity 160ms var(--ui-ease),
+			transform 200ms var(--ui-ease);
 	}
-	.v3-panel .agent-list .agent-row:not(:hover, :focus-within) :is(.agent-tagbtn, .close) {
+	.shell-panel .agent-list .agent-row:not(:hover, :focus-within) :is(.agent-tagbtn, .close) {
 		transform: translateX(4px);
 	}
 
 	/* ---- folders fold by their height ------------------------------------------------------- */
-	.v3-folder-chev {
-		transition: transform 220ms var(--v3-ease);
+	.shell-folder-chev {
+		transition: transform 220ms var(--ui-ease);
 	}
 
 	/* ---- the floats: transitions only while they stand at home, never while held or flung --- */
-	.pen-tools.v3-tools:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
-		transition: left 260ms var(--v3-ease);
+	.pen-tools.shell-tools:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--ui-ease);
 	}
-	.v3-tray-wrap:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
-		transition: left 260ms var(--v3-ease);
+	.shell-tray-wrap:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--ui-ease);
 	}
-	.v3-tray-wrap {
+	.shell-tray-wrap {
 		--stowtab-w: 20px;
 		--stowtab-h: 48px;
 	}
-	.v3-tray-wrap[data-stowed] > :not(.stowtab) {
+	.shell-tray-wrap[data-stowed] > :not(.stowtab) {
 		opacity: 0;
 		pointer-events: none;
 	}
-	.v3-tray-grip {
+	.shell-tray-grip {
 		cursor: grab;
 		touch-action: none;
 	}
-	[data-dragging="true"] .v3-tray-grip {
+	[data-dragging="true"] .shell-tray-grip {
 		cursor: grabbing;
 	}
 
 	/* ---- the pen tray: instruments rise on a spring ----------------------------------------- */
-	.v3-instrument {
+	.shell-instrument {
 		margin-top: 22px;
-		transition: transform 320ms var(--v3-spring);
+		transition: transform 320ms var(--ui-spring);
 	}
-	.v3-instrument:hover {
+	.shell-instrument:hover {
 		transform: translateY(-5px);
 	}
-	.v3-instrument[data-on="true"] {
+	.shell-instrument[data-on="true"] {
 		transform: translateY(-14px);
 	}
-	.v3-swatch::before {
-		transition: transform 200ms var(--v3-spring);
+	.shell-swatch::before {
+		transition: transform 200ms var(--ui-spring);
 	}
-	.v3-swatch:hover::before {
+	.shell-swatch:hover::before {
 		transform: scale(1.12);
 	}
-	.v3-swatch {
+	.shell-swatch {
 		position: relative;
 	}
-	.v3-swatch[data-on="true"] {
+	.shell-swatch[data-on="true"] {
 		box-shadow: none;
 	}
-	.v3-swatch::after {
+	.shell-swatch::after {
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		box-shadow: 0 0 0 1.5px var(--v3-fg);
+		box-shadow: 0 0 0 1.5px var(--ui-fg);
 		content: "";
 		opacity: 0;
 		transform: scale(0.7);
 		transition:
-			opacity 160ms var(--v3-ease),
-			transform 260ms var(--v3-spring);
+			opacity 160ms var(--ui-ease),
+			transform 260ms var(--ui-spring);
 	}
-	.v3-swatch[data-on="true"]::after {
+	.shell-swatch[data-on="true"]::after {
 		opacity: 1;
 		transform: none;
 	}
-	.v3-wheel {
-		transition: transform 300ms var(--v3-spring);
+	.shell-wheel {
+		transition: transform 300ms var(--ui-spring);
 	}
-	.v3-tray-wrap {
-		animation: v3-grow 220ms var(--v3-ease);
+	.shell-tray-wrap {
+		animation: shell-grow 220ms var(--ui-ease);
 		transform-origin: left top;
 	}
-	.v3-widths.float {
-		animation: v3-grow 200ms var(--v3-ease);
+	.shell-widths.float {
+		animation: shell-grow 200ms var(--ui-ease);
 	}
-	@keyframes v3-grow {
+	@keyframes shell-grow {
 		from {
 			opacity: 0;
 			transform: translateX(-8px) scale(0.97);
@@ -299,9 +299,9 @@ body {
 
 	/* ---- the properties panel slides in once, for a new selection -------------------------- */
 	.props-panel.panel-float {
-		animation: v3-slide 220ms var(--v3-ease);
+		animation: shell-slide 220ms var(--ui-ease);
 	}
-	@keyframes v3-slide {
+	@keyframes shell-slide {
 		from {
 			opacity: 0;
 			transform: translateX(12px);
@@ -309,20 +309,20 @@ body {
 	}
 
 	/* ---- the status pill pops from the composer --------------------------------------------- */
-	.v3-status.float {
+	.shell-status.float {
 		transform-origin: left bottom;
-		animation: v3-pill 300ms var(--v3-spring);
+		animation: shell-pill 300ms var(--ui-spring);
 		transition:
-			box-shadow 200ms var(--v3-ease),
-			transform 90ms var(--v3-ease);
+			box-shadow 200ms var(--ui-ease),
+			transform 90ms var(--ui-ease);
 	}
-	.v3-status.float:hover {
+	.shell-status.float:hover {
 		box-shadow: 0 8px 28px rgb(0 0 0 / 16%), 0 0 0 0.5px rgb(0 0 0 / 12%);
 	}
-	.v3-status.float:active {
+	.shell-status.float:active {
 		transform: scale(0.97);
 	}
-	@keyframes v3-pill {
+	@keyframes shell-pill {
 		from {
 			opacity: 0;
 			transform: translateY(8px) scale(0.9);
@@ -332,16 +332,16 @@ body {
 	/* ---- the queue: rows hand over their actions on approach ------------------------------- */
 	.dock .composer-queue-row .icon-button {
 		transition:
-			opacity 160ms var(--v3-ease),
-			background-color 200ms var(--v3-ease);
+			opacity 160ms var(--ui-ease),
+			background-color 200ms var(--ui-ease);
 	}
 	.dock .composer-queue {
-		animation: v3-arrive 240ms var(--v3-ease);
+		animation: shell-arrive 240ms var(--ui-ease);
 	}
 	.dock .composer-queue-body {
 		display: grid;
 		grid-template-rows: 1fr;
-		transition: grid-template-rows 240ms var(--v3-ease);
+		transition: grid-template-rows 240ms var(--ui-ease);
 	}
 	.dock .composer-queue[data-folded="true"] .composer-queue-body {
 		grid-template-rows: 0fr;
@@ -351,12 +351,12 @@ body {
 		overflow: hidden;
 	}
 	.composer-queue-fold svg {
-		transition: transform 220ms var(--v3-ease);
+		transition: transform 220ms var(--ui-ease);
 	}
 	.dock .composer-queue[data-folded="true"] .composer-queue-fold svg {
 		transform: rotate(-90deg);
 	}
-	@keyframes v3-arrive {
+	@keyframes shell-arrive {
 		from {
 			opacity: 0;
 			transform: translateY(6px);
@@ -366,33 +366,33 @@ body {
 	/* ---- the composer: the send button turns into stop and back ---------------------------- */
 	.dock .send-button {
 		transition:
-			background-color 220ms var(--v3-ease),
-			color 220ms var(--v3-ease),
-			transform 90ms var(--v3-ease);
+			background-color 220ms var(--ui-ease),
+			color 220ms var(--ui-ease),
+			transform 90ms var(--ui-ease);
 	}
 	.dock .composer-box {
-		transition: box-shadow 200ms var(--v3-ease);
+		transition: box-shadow 200ms var(--ui-ease);
 	}
 	.dock .composer-box:focus-within {
 		box-shadow:
 			0 8px 28px rgb(0 0 0 / 16%),
 			0 0 0 0.5px rgb(0 0 0 / 12%),
-			0 0 0 1px color-mix(in srgb, var(--v3-accent) 22%, transparent);
+			0 0 0 1px color-mix(in srgb, var(--ui-accent) 22%, transparent);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.v3-tool-mark,
-		.v3-nav-mark,
-		.v3-menu,
-		.v3-tip,
-		.v3-instrument,
+		.shell-tool-mark,
+		.shell-nav-mark,
+		.shell-menu,
+		.shell-tip,
+		.shell-instrument,
 		.dock .composer-queue-body {
 			transition: none;
 		}
 		.popover[data-placed],
-		.v3-tray-wrap,
+		.shell-tray-wrap,
 		.props-panel.panel-float,
-		.v3-status.float,
+		.shell-status.float,
 		.dock .composer-queue {
 			animation: none;
 		}
@@ -400,7 +400,7 @@ body {
 }
 
 @layer components {
-	.v3-instrument[data-on="true"] {
+	.shell-instrument[data-on="true"] {
 		margin-top: 22px;
 	}
 }

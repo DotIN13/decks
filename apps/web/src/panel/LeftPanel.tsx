@@ -209,7 +209,7 @@ export function LeftPanel(props: {
 	/** An app's recent output, for its Logs panel. */
 	onAppLogs?: (app: PanelApp) => Promise<string[] | undefined>;
 
-	/** The conversation, under the list: the v3 panel's lower half (`shell/ChatSection.tsx`). */
+	/** The conversation, under the list: the panel's lower half (`shell/ChatSection.tsx`). */
 	chat?: JSX.Element;
 }) {
 	const ids = createUniqueId();
@@ -218,7 +218,7 @@ export function LeftPanel(props: {
 	 * list, not a question about it. Two is what it opens on, because the second line is the
 	 * one fact worth reading at a glance: what each agent is doing.
 	 */
-	/* Two lines per agent, as v3 draws them: the name, kind and state, then the tags. */
+	/* Two lines per agent, as the redesign draws them: the name, kind and state, then the tags. */
 	const lines = (): 1 | 2 => 2;
 	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
 	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
@@ -252,7 +252,7 @@ export function LeftPanel(props: {
 	/** The app picked in the Apps tab, and the one whose logs are open. */
 	const [pickedApp, setPickedApp] = createSignal<string>();
 	const [logsOf, setLogsOf] = createSignal<PanelApp>();
-	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
+	/* Agents first, as the redesign opens; the tab last shown is remembered on this device. */
 	const [tab, setTabRaw] = createSignal<PanelTab>(readTab());
 	const setTab = (next: PanelTab) => {
 		setTabRaw(next);
@@ -451,15 +451,15 @@ export function LeftPanel(props: {
 	const itemRow = (item: CanvasItem) => (
 		<button
 			type="button"
-			class="v3-item"
+			class="shell-item"
 			data-row
 			data-kind={item.kind}
 			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
 			title={item.label}
 			onClick={() => props.onPickItem?.(item)}
 		>
-			<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
-			<span class="v3-item-name truncate">{item.label}</span>
+			<Icon of={ITEM_ICON[item.kind]} size={14} class="shell-item-icon" />
+			<span class="shell-item-name truncate">{item.label}</span>
 		</button>
 	);
 	/** The head's second line: what the tab holds. */
@@ -497,7 +497,7 @@ export function LeftPanel(props: {
 		props.open;
 		requestAnimationFrame(placeNavMark);
 	});
-	/* And again whenever the strip changes width: a narrower panel drops the tabs' icons (`styles/v3.css`). */
+	/* And again whenever the strip changes width: a narrower panel drops the tabs' icons (the shell's sheets). */
 	onMount(() => {
 		if (!nav || typeof ResizeObserver === "undefined") return;
 		const watch = new ResizeObserver(() => placeNavMark());
@@ -665,7 +665,7 @@ export function LeftPanel(props: {
 				style={{ width: `${width()}px` }}
 				data-resizing={resizing() ? "true" : undefined}
 				data-desktop={props.desktop ? "true" : undefined}
-				class="panel-shell v3-panel fixed z-10 top-0 bottom-0 left-0 flex max-w-[86vw] flex-col"
+				class="panel-shell shell-panel fixed z-10 top-0 bottom-0 left-0 flex max-w-[86vw] flex-col"
 			>
 				{/* The right edge, as something to take hold of. A separator in the ARIA
 				    sense: focusable, arrow keys move it, Home puts the default back, and so
@@ -698,28 +698,28 @@ export function LeftPanel(props: {
 				<Show
 					when={props.desktop}
 					fallback={
-						<div class="v3-panel-head">
+						<div class="shell-panel-head">
 							<div class="panel-mark">
 								<Switcher />
 							</div>
 							<span class="flex-1" />
-							<button type="button" class="v3-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+							<button type="button" class="shell-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
 								<Icon of={PanelLeftClose} size={17} />
 							</button>
 						</div>
 					}
 				>
 					{/* Studio's panel head: the canvas, which opens the canvas manager, and under it the deck (its switcher) and what the tab holds. */}
-					<div class="v3-lp-head">
-						<span class="v3-lp-mark" aria-hidden="true">
+					<div class="shell-lp-head">
+						<span class="shell-lp-mark" aria-hidden="true">
 							<DecksLineMark size={17} />
 						</span>
-						<div class="v3-lp-text">
+						<div class="shell-lp-text">
 							{(() => {
 								const title = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
 									<button
 										type="button"
-										class="v3-lp-title"
+										class="shell-lp-title"
 										ref={popover?.ref}
 										data-tip="Canvases"
 										aria-haspopup="menu"
@@ -743,28 +743,28 @@ export function LeftPanel(props: {
 									</Show>
 								);
 							})()}
-							<div class="v3-lp-status">
-								<span class="v3-lp-deck">
+							<div class="shell-lp-status">
+								<span class="shell-lp-deck">
 									<Switcher />
 								</span>
 								<span class="truncate">{headWords()}</span>
 							</div>
 						</div>
-						<div class="v3-lp-buttons">
+						<div class="shell-lp-buttons">
 							<Show when={props.onSettings}>
-								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
+								<button type="button" class="shell-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
 									<Icon of={SettingsIcon} size={16} />
 								</button>
 							</Show>
-							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+							<button type="button" class="shell-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
 								<Icon of={PanelLeftClose} size={16} />
 							</button>
 						</div>
 					</div>
 				</Show>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
-					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
+				<div class="shell-nav" role="tablist" aria-label="Panel" ref={nav}>
+					<span class="shell-nav-mark" ref={navMark} aria-hidden="true" />
 					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
 							<button
@@ -775,7 +775,7 @@ export function LeftPanel(props: {
 								aria-controls={`${ids}-list`}
 								tabindex={tab() === name ? 0 : -1}
 								data-on={tab() === name ? "true" : undefined}
-								class="v3-nav-tab"
+								class="shell-nav-tab"
 								onClick={() => goTab(name)}
 								onKeyDown={(event) => {
 									if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -792,8 +792,8 @@ export function LeftPanel(props: {
 						)}
 					</For>
 				</div>
-				<div class="v3-search-wrap">
-					<label class="v3-search">
+				<div class="shell-search-wrap">
+					<label class="shell-search">
 						<Icon of={Search} class="flex-none" size={14} />
 						<input
 							ref={field}
@@ -818,10 +818,10 @@ export function LeftPanel(props: {
 								}
 							}}
 						/>
-						<Show when={query()} fallback={<kbd class="v3-kbd">⌘K</kbd>}>
+						<Show when={query()} fallback={<kbd class="shell-kbd">⌘K</kbd>}>
 							<button
 								type="button"
-								class="v3-icon v3-search-clear"
+								class="shell-icon shell-search-clear"
 								aria-label="Clear the search"
 								onClick={() => {
 									type("");
@@ -898,18 +898,18 @@ export function LeftPanel(props: {
 										props.onAgentWorkspace?.(id, section.kind === "workspace" ? section.label : null);
 									}}
 								>
-									<div class="v3-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
-										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? `Show ${section.label}` : `Fold ${section.label}`} onClick={() => toggleFolder(section.id)}>
-											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
-											<Icon of={Folder} size={15} class="v3-folder-icon" />
-											<span class="v3-folder-name truncate">{section.label}</span>
+									<div class="shell-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
+										<button type="button" class="shell-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? `Show ${section.label}` : `Fold ${section.label}`} onClick={() => toggleFolder(section.id)}>
+											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="shell-folder-chev" />
+											<Icon of={Folder} size={15} class="shell-folder-icon" />
+											<span class="shell-folder-name truncate">{section.label}</span>
 										</button>
 										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
 										<Show when={props.onNewAgent}>
 											<NewAgentButton
 												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
 												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
-												class="v3-folder-add"
+												class="shell-folder-add"
 												size={14}
 											/>
 										</Show>
@@ -923,8 +923,8 @@ export function LeftPanel(props: {
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
 									*/}
-									{/* Folded by its height (`styles/v3.css`), so the rows slide shut rather than vanish. */}
-									<div class="v3-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
+									{/* Folded by its height (the shell's sheets), so the rows slide shut rather than vanish. */}
+									<div class="shell-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
 									<div class="row-list agent-list" data-lines={lines()}>
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
@@ -951,7 +951,7 @@ export function LeftPanel(props: {
 							)}
 						</For>
 						<Show when={props.onNewAgent}>
-							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label="New agent" class="v3-new-agent" size={15} text="New agent" />
+							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label="New agent" class="shell-new-agent" size={15} text="New agent" />
 						</Show>
 
 						{/* The same shape of empty state the boards list has, and the same reasoning:
@@ -966,7 +966,7 @@ export function LeftPanel(props: {
 					<Show when={tab() === "recent"}>
 						<div class="panel-section" data-kind="recent">
 							<Show when={recentList.length > 0}>
-								<div class="v3-sec">
+								<div class="shell-sec">
 									<span>Recent</span>
 								</div>
 							</Show>
@@ -998,27 +998,27 @@ export function LeftPanel(props: {
 					</Show>
 
 					<Show when={tab() === "canvas"}>
-						<div class="panel-section v3-items" data-kind="canvas">
+						<div class="panel-section shell-items" data-kind="canvas">
 							<Show when={boardItems().length > 0}>
-								<div class="v3-sec">
+								<div class="shell-sec">
 									<span>Boards</span>
 									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{boardItems().length}</span>
+									<span class="shell-sec-n tabular-nums">{boardItems().length}</span>
 								</div>
 								<For each={boardItems()}>{(item) => itemRow(item)}</For>
 							</Show>
 							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
-								<div class="v3-sec">
+								<div class="shell-sec">
 									<span>Drawing</span>
 									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{drawnItems().length}</span>
+									<span class="shell-sec-n tabular-nums">{drawnItems().length}</span>
 								</div>
 								<For each={drawnItems()}>{(item) => itemRow(item)}</For>
 								<Show when={items().arrows.length > 0}>
-									<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
-										<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
-										<span class="v3-item-name truncate">Arrows</span>
-										<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
+									<button type="button" class="shell-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
+										<Icon of={MoveUpRight} size={14} class="shell-item-icon" />
+										<span class="shell-item-name truncate">Arrows</span>
+										<span class="shell-item-n tabular-nums">{items().arrows.length}</span>
 									</button>
 								</Show>
 							</Show>
@@ -1029,7 +1029,7 @@ export function LeftPanel(props: {
 					</Show>
 					<Show when={tab() === "apps"}>
 						{/* The "Apps tab redesigned" mockup: rows 12px in like the search, no heading (the head counts them). */}
-						<div class="panel-section v3-apps" data-kind="apps">
+						<div class="panel-section shell-apps" data-kind="apps">
 							<For each={apps()}>
 								{(app) => (
 									<AppRow

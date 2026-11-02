@@ -26,7 +26,7 @@ const names = paths.map(base).sort();
  * longer has the agent's "held" and "deck" headings; what the agent holds is read off the
  * server's `context.changed` instead (below).
  */
-const panelBoards = () => page.evaluate(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length);
+const panelBoards = () => page.evaluate(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-item[data-kind="board"]').length);
 
 await openPanel(page);
 say("the stage shows what the agent has up", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
@@ -54,7 +54,7 @@ const made = await freshAgent(page, "tiers-fresh");
 await emptyCanvas(page);
 say("an agent holding nothing puts nothing on its stage", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
 await openPanel(page);
-await page.waitForFunction(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item').length === 0, null, { timeout: 4000 }).catch(() => {});
+await page.waitForFunction(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-item').length === 0, null, { timeout: 4000 }).catch(() => {});
 say("…and the panel's Canvas tab lists nothing", (await panelBoards()) === 0, `${await panelBoards()} rows`);
 /*
  * And it is called something nothing else is called.
@@ -87,7 +87,7 @@ for (const path of two) link.send({ type: "board.play", path });
 await page.waitForFunction((wanted) => (window.__decksProbes?.boards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page);
-await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
+await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .shell-item[data-kind="board"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
 say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.length, `${await panelBoards()} rows`);
 
 // The hide button on a board takes it off the stage, and the agent keeps it.

@@ -43,7 +43,7 @@ import {
 import { Icon } from "@decks/ui";
 
 /**
- * The tool column of the v3 harness: select and hand, then what you can put on the canvas
+ * The tool column of the shell: select and hand, then what you can put on the canvas
  * (a board, a note, words, a shape, ink, an arrow, a file), then undo and redo.
  *
  * Three of the tools are families, and a press opens their menu beside the column: the board
@@ -309,7 +309,7 @@ export function ToolColumn(props: {
 		penArrowStyle();
 		lastShape();
 		requestAnimationFrame(() => {
-			const onEl = column?.querySelector<HTMLElement>('.v3-tool[data-on="true"]');
+			const onEl = column?.querySelector<HTMLElement>('.shell-tool[data-on="true"]');
 			if (!mark) return;
 			if (!onEl) {
 				mark.dataset.shown = "false";
@@ -328,7 +328,7 @@ export function ToolColumn(props: {
 	const tool = (spec: { id: string; label: string; key?: string; icon: () => LucideIcon; on: () => boolean; onClick: (button: HTMLElement) => void; family?: Family }): JSX.Element => (
 		<button
 			type="button"
-			class="v3-tool"
+			class="shell-tool"
 			data-tool={spec.id}
 			data-tip={spec.label}
 			data-key={spec.key}
@@ -348,9 +348,9 @@ export function ToolColumn(props: {
 
 	return (
 		<>
-			<div ref={column} class="pen-tools float v3-tools" data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label="Tools">
-				<span ref={mark} class="v3-tool-mark" aria-hidden="true" />
-				<div ref={grip} class="v3-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+			<div ref={column} class="pen-tools float shell-tools" data-row={props.row ? "true" : undefined} role="toolbar" aria-orientation={props.row ? "horizontal" : "vertical"} aria-label="Tools">
+				<span ref={mark} class="shell-tool-mark" aria-hidden="true" />
+				<div ref={grip} class="shell-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
 					<i />
 					<i />
 					<i />
@@ -360,7 +360,7 @@ export function ToolColumn(props: {
 				</div>
 				{tool({ id: "select", label: "Select", key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
 				{tool({ id: "view", label: "Hand or highlight", icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
-				<span class="v3-rule" aria-hidden="true" />
+				<span class="shell-rule" aria-hidden="true" />
 				{tool({ id: "board", label: "Board", key: "D", icon: () => SquarePlus, on: on.board, family: "board", onClick: (b) => openMenu("board", b) })}
 				{tool({ id: "note", label: "Note", key: "N", icon: () => StickyNote, on: on.note, onClick: () => (on.note() ? select() : arm("note")) })}
 				{tool({ id: "text", label: "Text", key: "T", icon: () => Type, on: on.text, onClick: () => (on.text() ? select() : arm("text")) })}
@@ -371,7 +371,7 @@ export function ToolColumn(props: {
 					{tool({ id: "file", label: "Add a file", icon: () => Paperclip, on: () => false, onClick: () => props.onOpenFile?.() })}
 				</Show>
 				<Show when={!props.row}>
-					<span class="v3-rule" aria-hidden="true" />
+					<span class="shell-rule" aria-hidden="true" />
 					{tool({ id: "undo", label: "Undo", key: "⌘Z", icon: () => Undo2, on: () => false, onClick: () => props.onStep("undo") })}
 					{tool({ id: "redo", label: "Redo", key: "⇧⌘Z", icon: () => Redo2, on: () => false, onClick: () => props.onStep("redo") })}
 				</Show>
@@ -425,25 +425,25 @@ function ToolMenu(props: { at: { left: number; top: number }; above: boolean; le
 	});
 	return (
 		<Portal>
-			<div ref={card} class="v3-menu" role="menu" data-open={shown() && !props.leaving ? "true" : "false"} data-above={props.above ? "true" : undefined} style={{ left: `${place().left}px`, top: `${place().top}px` }}>
+			<div ref={card} class="shell-menu" role="menu" data-open={shown() && !props.leaving ? "true" : "false"} data-above={props.above ? "true" : undefined} style={{ left: `${place().left}px`, top: `${place().top}px` }}>
 				<For each={props.choices}>
 					{(choice) => (
 						<>
 							<Show when={choice.rule}>
-								<span class="v3-menu-rule" aria-hidden="true" />
+								<span class="shell-menu-rule" aria-hidden="true" />
 							</Show>
 							<button
 								type="button"
 								role="menuitemradio"
 								aria-checked={props.current === choice.id}
 								data-on={props.current === choice.id ? "true" : undefined}
-								class="v3-menu-row"
+								class="shell-menu-row"
 								onClick={() => {
 									choice.pick();
 									props.onClose();
 								}}
 								onKeyDown={(event) => {
-									const rows = [...(card?.querySelectorAll<HTMLElement>(".v3-menu-row") ?? [])];
+									const rows = [...(card?.querySelectorAll<HTMLElement>(".shell-menu-row") ?? [])];
 									const here = rows.indexOf(event.currentTarget);
 									if (event.key === "ArrowDown") rows[(here + 1) % rows.length]?.focus();
 									else if (event.key === "ArrowUp") rows[(here - 1 + rows.length) % rows.length]?.focus();
@@ -453,8 +453,8 @@ function ToolMenu(props: { at: { left: number; top: number }; above: boolean; le
 								}}
 							>
 								<Icon of={choice.icon} size={15} />
-								<span class="v3-menu-label">{choice.label}</span>
-								<Show when={choice.key}>{(key) => <span class="v3-menu-key">{key()}</span>}</Show>
+								<span class="shell-menu-label">{choice.label}</span>
+								<Show when={choice.key}>{(key) => <span class="shell-menu-key">{key()}</span>}</Show>
 							</button>
 						</>
 					)}

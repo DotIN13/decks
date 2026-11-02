@@ -64,8 +64,8 @@ const spots = await page.evaluate(() => {
 say("the canvas has room for two shapes", spots.length === 2, JSON.stringify(spots));
 
 // --- a shape from the library -----------------------------------------------------------------------
-await page.locator('.v3-tool[data-tool="shape"]').click();
-await page.locator('.v3-menu-row:has-text("More shapes")').click();
+await page.locator('.shell-tool[data-tool="shape"]').click();
+await page.locator('.shell-menu-row:has-text("More shapes")').click();
 say("the shapes button opens the insert panel on its shapes", await page.locator(".insert-panel .insert-cell[data-shape]").count() >= 30);
 await page.locator('.insert-panel .insert-cell[data-shape="Decision"]').click();
 const armed = await page.evaluate(() => document.querySelector(".stage")?.dataset.penTool);
@@ -153,8 +153,8 @@ if (sv) {
 
 // --- an arrow from a side ----------------------------------------------------------------------------
 await page.keyboard.press("Escape");
-await page.locator('.v3-tool[data-tool="shape"]').click();
-await page.locator('.v3-menu-row:has-text("More shapes")').click();
+await page.locator('.shell-tool[data-tool="shape"]').click();
+await page.locator('.shell-menu-row:has-text("More shapes")').click();
 await page.locator('.insert-panel .insert-cell[data-shape="Process"]').click();
 const had2 = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[1].x, spots[1].y);

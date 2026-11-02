@@ -628,7 +628,7 @@ let ITEM_WASH = "";
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
-await page.click('.v3-tool[data-tool="pen"]');
+await page.click('.shell-tool[data-tool="pen"]');
 await page.waitForSelector(".stage-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
@@ -667,7 +667,7 @@ await page.waitForSelector(".stage-ink");
 	await page.mouse.up();
 	const stroke = await until(() => onDisk().children.find((n) => !had2.has(n.id) && n.metadata?.type === "decks.ink"));
 	await settle(page, 400);
-	await page.click('.v3-tray [aria-label^="Lasso"]');
+	await page.click('.shell-tray [aria-label^="Lasso"]');
 	await page.mouse.click(p.x + 80, p.y + 10);
 	const corner = await until(() => page.evaluate(() => {
 		const c = document.querySelector('.ink-corner[data-corner="se"]');

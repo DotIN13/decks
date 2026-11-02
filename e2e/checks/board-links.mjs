@@ -95,7 +95,7 @@ const focus = async (path) => {
 	await settle(page, 900);
 	for (let i = 0; i < 10; i++) {
 		const level = await page.evaluate(() =>
-			Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
+			Number((document.querySelector('.shell-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
 		);
 		if (level >= 70 && level <= 200) break;
 		await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
@@ -156,7 +156,7 @@ const visible = async (path) => {
 };
 const seen = await visible(LINKED);
 say("…with the board it opened in view", seen.in, JSON.stringify({ box: seen.box, camera: await page.evaluate(() => globalThis.__decksProbes?.cameraTransform()) }));
-const zoom = () => page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const zoom = () => page.evaluate(() => Number((document.querySelector('.shell-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 const level = await zoom();
 say("…and close enough to read and to click into, which the pair never was", level >= 50, `${level}%`);
 

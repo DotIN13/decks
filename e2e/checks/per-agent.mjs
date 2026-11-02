@@ -100,7 +100,7 @@ const look = () =>
 		const world = globalThis.__decksProbes?.cameraTransform?.() ?? null;
 		return {
 			world: world ?? "?",
-			zoom: document.querySelector('.v3-zoom-value')?.textContent?.trim(),
+			zoom: document.querySelector('.shell-zoom-value')?.textContent?.trim(),
 			// Every board on the stage, picture or page: a `.board-node` is only a board whose page is live.
 			shown: (window.__decksProbes?.boards?.() ?? []).map((board) => board.path),
 			typed: document.querySelector(".dockfield")?.textContent ?? "",

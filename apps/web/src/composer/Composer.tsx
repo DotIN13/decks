@@ -537,7 +537,7 @@ export function Composer(props: {
 				{(queued) => (
 					<div class="composer-queue" role="list" aria-label="Queued messages" data-folded={queueFolded() ? "true" : undefined}>
 						<div class="composer-queue-head">
-							<button type="button" class="v3-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? "Show the queue" : "Fold the queue"} aria-label={queueFolded() ? "Show the queue" : "Fold the queue"} onClick={() => setQueueFolded(!queueFolded())}>
+							<button type="button" class="shell-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? "Show the queue" : "Fold the queue"} aria-label={queueFolded() ? "Show the queue" : "Fold the queue"} onClick={() => setQueueFolded(!queueFolded())}>
 								<Icon of={queueFolded() ? ChevronRight : ChevronDown} size={14} />
 							</button>
 							<span class="composer-queue-title">
@@ -557,7 +557,7 @@ export function Composer(props: {
 								Send all now
 							</button>
 						</div>
-						{/* Folded by its height, so the rows slide shut rather than vanish (`styles/v3.css`). */}
+						{/* Folded by its height, so the rows slide shut rather than vanish (the shell's sheets). */}
 						<div class="composer-queue-body" aria-hidden={queueFolded()}><div>
 						<For each={queued().items}>
 							{(item, index) => (
@@ -772,7 +772,7 @@ export function Composer(props: {
 						{...(props.onAccountsOpen ? { onAccountsOpen: props.onAccountsOpen } : {})}
 					/>
 
-					{/* How full the context is, before the mic: a ring and its percentage that opens the numbers (v3). */}
+					{/* How full the context is, before the mic: a ring and its percentage that opens the numbers (the redesign). */}
 					<span class="composer-ctx">
 						<ContextDial usage={props.usage} onUsage={props.onUsage} />
 					</span>
@@ -856,7 +856,7 @@ export function Composer(props: {
 			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden" hidden>
 				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
 				<span class="flex-1" />
-				{/* The dial moved into the controls row (v3): this row stays for the hints only. */}
+				{/* The dial moved into the controls row (the redesign): this row stays for the hints only. */}
 			</div>
 		</section>
 	);

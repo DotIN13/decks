@@ -48,23 +48,23 @@ export function TopBar(props: {
 	};
 
 	return (
-		<div class="v3-bar v3-topbar float pill" data-inset="top" data-phone={props.phone ? "true" : undefined}>
+		<div class="shell-bar shell-topbar float pill" data-inset="top" data-phone={props.phone ? "true" : undefined}>
 			<Show when={!props.panelOpen}>
 				<Show
 					when={props.desktop}
 					fallback={
 						<>
-							<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+							<button type="button" class="shell-icon shell-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
 								<Icon of={PanelLeftOpen} size={17} />
 							</button>
-							<span class="v3-deck">
+							<span class="shell-deck">
 								<Switcher />
 							</span>
 						</>
 					}
 				>
 					{/* The panel folded on a desktop: one drawer-open button that brings it back on its last tab. */}
-					<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+					<button type="button" class="shell-icon shell-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
 						<Icon of={PanelLeftOpen} size={17} />
 					</button>
 				</Show>
@@ -82,7 +82,7 @@ export function TopBar(props: {
 				trigger={(api) => (
 					<button
 						type="button"
-						class="v3-agent-chip"
+						class="shell-agent-chip"
 						ref={api.ref}
 						aria-haspopup="menu"
 						aria-expanded={api.open}
@@ -91,19 +91,19 @@ export function TopBar(props: {
 						aria-label={name() ? `Agents, currently ${name()}` : "Agents"}
 						onClick={api.toggle}
 					>
-						<Show when={active()} fallback={<span class="v3-agent-name">No agent</span>}>
+						<Show when={active()} fallback={<span class="shell-agent-name">No agent</span>}>
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={22} ring={1.5} />}
 						</Show>
-						<Show when={name()}>{(label) => <span class="v3-agent-name">{label()}</span>}</Show>
+						<Show when={name()}>{(label) => <span class="shell-agent-name">{label()}</span>}</Show>
 						<Show when={active() && !props.phone}>
-							<span class="v3-agent-kind">{active()!.kind}</span>
+							<span class="shell-agent-kind">{active()!.kind}</span>
 						</Show>
-						<Icon of={ChevronDown} size={13} class="v3-chev" />
+						<Icon of={ChevronDown} size={13} class="shell-chev" />
 					</button>
 				)}
 			/>
 			<Show when={props.onStages}>
-				<span class="v3-sep" aria-hidden="true" data-phone-hide />
+				<span class="shell-sep" aria-hidden="true" data-phone-hide />
 				<Show when={props.phone}>
 					<span class="flex-1" />
 				</Show>
@@ -111,7 +111,7 @@ export function TopBar(props: {
 					const chip = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
 						<button
 							type="button"
-							class="v3-canvas-chip"
+							class="shell-canvas-chip"
 							ref={popover?.ref}
 							data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
 							aria-haspopup={popover ? "menu" : "dialog"}
@@ -121,8 +121,8 @@ export function TopBar(props: {
 							onClick={() => (popover ? popover.toggle() : props.onStages?.())}
 						>
 							<Icon of={Layers} size={16} />
-							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
-							<Icon of={ChevronDown} size={13} class="v3-chev" />
+							<span class="shell-canvas-name">{props.stage ?? "No canvas"}</span>
+							<Icon of={ChevronDown} size={13} class="shell-chev" />
 						</button>
 					);
 					/*
@@ -140,13 +140,13 @@ export function TopBar(props: {
 				})()}
 				<Show when={props.viewOnly}>
 					{(owner) => (
-						<button type="button" class="v3-viewonly" title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`} onClick={() => props.onCopy?.()}>
+						<button type="button" class="shell-viewonly" title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`} onClick={() => props.onCopy?.()}>
 							View only · Make a copy
 						</button>
 					)}
 				</Show>
 				<Show when={props.onNewCanvas && !props.phone}>
-					<button type="button" class="v3-icon" data-tip="New canvas" aria-label="New canvas" onClick={() => props.onNewCanvas?.()}>
+					<button type="button" class="shell-icon" data-tip="New canvas" aria-label="New canvas" onClick={() => props.onNewCanvas?.()}>
 						<Icon of={Plus} size={16} />
 					</button>
 				</Show>
