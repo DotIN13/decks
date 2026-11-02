@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene, type FakeItem } from "./fake-scene.ts";
+import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 import { blockAt, childrenOf, marqueePick, marqueeRect, parentOf, pickAt, pictureAt } from "./pick.ts";
 
 const mark = (type: string) => ({ metadata: { type } });

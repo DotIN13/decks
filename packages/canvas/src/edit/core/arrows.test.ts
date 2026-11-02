@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW } from "@decks/pen";
 import { arrowHandles, arrowLine, arrowOp, bendAt, bendStart, pageAt, droppedEnd, endOf, joinAt, nearSide, newArrowEnds, onSide, pointEnd, resetBendOp, resetEndOp, routeDraft, sideNear, slideAt, slideJoin } from "./arrows.ts";
-import { fakeScene, type FakeItem } from "./fake-scene.ts";
+import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 
 const board = { path: "boards/x.html", x: 0, y: 200, w: 400, h: 300 };
 const box = { x: 0, y: 0, w: 100, h: 50 };

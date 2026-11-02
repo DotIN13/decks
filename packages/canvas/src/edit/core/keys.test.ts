@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene } from "./fake-scene.ts";
+import { fakeScene } from "./fake-scene.test-helper.ts";
 import { penKey, type KeyContext, type KeyPress } from "./keys.ts";
 
 const scene = fakeScene(

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene } from "./fake-scene.ts";
+import { fakeScene } from "./fake-scene.test-helper.ts";
 import { hitReach, anchorAt, arrowAnchors, distances, measure, arrowEnds, pageHandleList, pageHandles, deriveOverlay, draftBox, draftCurve, dropBox, glideShift, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
 
 const boards = [
