@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, serialize } from "@decks/pen";
+import { EDITS_MAX } from "@decks/sync-protocol";
 import { HarnessSync } from "@decks/sync-client";
 import { WebSocketServer } from "ws";
 import { Live, MemoryStore, NotConnected, syncHandler, type Who } from "../src/index.ts";
@@ -110,6 +111,10 @@ test("the handler refuses what a harness may not do", async () => {
 	assert.equal((await call(`/sync/v1/canvases/${id}/files?path=${encodeURIComponent("../../.ssh/x")}`, "mini", { method: "PUT", body: "x" })).status, 400);
 	assert.equal((await call(`/sync/v1/canvases/${id}/files?path=boards/x.html`, "friend", { method: "PUT", body: "x" })).status, 403, "a viewer may not write");
 	assert.equal((await call(`/sync/v1/canvases/${id}/edits`, "friend", { method: "POST", body: JSON.stringify({ base: 1, edits: [] }) })).status, 403);
+	const tooMany = Array.from({ length: EDITS_MAX + 1 }, (_, i) => ({ op: "set", id: "n1", path: ["x"], value: i }));
+	const over = await call(`/sync/v1/canvases/${id}/edits`, "mini", { method: "POST", body: JSON.stringify({ base: 1, edits: tooMany }) });
+	assert.equal(over.status, 413, "more edits than one push may carry");
+	assert.match(((await over.json()) as { error: string }).error, /At most 5000 edits/);
 	assert.equal((await call("/sync/v1/canvases", "mini", { method: "POST", body: JSON.stringify({ name: "../x" }) })).status, 400);
 	assert.equal((await call("/sync/v1/canvases/nope", "mini")).status, 404);
 });

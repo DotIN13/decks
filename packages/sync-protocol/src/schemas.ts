@@ -57,8 +57,10 @@ export type Inventory = z.infer<typeof Inventory>;
 export const Changes = z.union([z.object({ rev: z.number(), changes: z.array(z.array(PenEdit)) }), z.object({ rev: z.number(), tooOld: z.literal(true) })]);
 export type Changes = z.infer<typeof Changes>;
 
+/** The most edits one push may carry: a drag is a few, a paste is one per item; more than this in one body is a bug or an attack, and is refused (413). */
+export const EDITS_MAX = 5000;
 /** Edits made against revision `base`. A body naming its `client` (a page, a harness) is not sent the whole drawing back. */
-export const PushEdits = z.object({ base: z.number(), edits: z.array(PenEdit), client: z.string().max(100).optional() });
+export const PushEdits = z.object({ base: z.number(), edits: z.array(PenEdit).max(EDITS_MAX), client: z.string().max(100).optional() });
 export type PushEdits = z.infer<typeof PushEdits>;
 
 /**

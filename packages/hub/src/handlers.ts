@@ -1,5 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
-import { CANVAS_NAME, CANVAS_NAME_ERROR, CANVAS_PATH_ERROR, Inventory, NewCanvas, PushEdits, safeSyncPath } from "@decks/sync-protocol";
+import { CANVAS_NAME, CANVAS_NAME_ERROR, CANVAS_PATH_ERROR, EDITS_MAX, Inventory, NewCanvas, PushEdits, safeSyncPath } from "@decks/sync-protocol";
 import { changesSince, commitEdits, mayEdit } from "./commit.ts";
 import type { Live } from "./live.ts";
 import type { HubStore, Who } from "./store.ts";
@@ -106,7 +106,9 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 	route("POST", "/sync/v1/canvases/:id/edits", async (req, { who, params }) => {
 		const started = performance.now();
 		if (!mayEdit(store.role(who.user.id, params.id!))) throw new HubError(403, "You may not edit this canvas.");
-		const got = PushEdits.safeParse(await bodyOf(req));
+		const sent = (await bodyOf(req)) as { edits?: unknown } | null;
+		if (Array.isArray(sent?.edits) && sent.edits.length > EDITS_MAX) throw new HubError(413, `At most ${EDITS_MAX} edits in one push; send the rest in another.`);
+		const got = PushEdits.safeParse(sent);
 		if (!got.success) throw new HubError(400, "Send edits: a list from @decks/pen's diff.");
 		const answer = commitEdits(store, live, params.id!, got.data.edits as unknown as PenEdit[], who.harness?.id ?? who.user.id, got.data.client);
 		// How long the edit took, answer included, for a network panel and a bench.
