@@ -12,7 +12,7 @@ import { pagesAhead, pagesOf, createDrawing } from "./model/drawing.ts";
 import { stageMeasure } from "./render/measure.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
 import { InkBar } from "./ui/InkBar.tsx";
-import { setCanvasScheme } from "./lib/theme.ts";
+import { setCanvasScheme } from "./theme.ts";
 import { PenBar } from "./ui/PenBar.tsx";
 import { ItemSlot } from "./items/item-slot.tsx";
 import { Stage, type InkRequest, type StageComment } from "./stage/Stage.tsx";

@@ -45,7 +45,7 @@ import { Icon } from "@decks/ui";
 import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { COARSE } from "../edit/dom/touch-rules.ts";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 import { ICON_LIBRARIES } from "../render/icon-index.ts";
 
 /**

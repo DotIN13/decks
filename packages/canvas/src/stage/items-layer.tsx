@@ -13,7 +13,7 @@ import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
 import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import { drawing } from "../edit/ink.ts";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
 import { isLiveFile } from "../model/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";

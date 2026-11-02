@@ -5,7 +5,7 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { onDismiss, portalLayer } from "@decks/ui";
 import { Icon } from "@decks/ui";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 
 /**
  * A colour picker for the properties panel: a square of shade and brightness, a strip of hues, the

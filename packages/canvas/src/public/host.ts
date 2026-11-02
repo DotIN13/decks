@@ -9,7 +9,7 @@ export * from "../host.ts";
 export * from "../camera/stage-ops.ts";
 export * from "../items/card-reading.ts";
 export * from "../ui/keycaps.ts";
-export * from "../lib/theme.ts";
+export * from "../theme.ts";
 export * from "../render/engine.ts";
 // The knobs the measuring scripts set and the probes the browser checks read (`debug.ts`), typed once.
 export { knobs, probes, type Knobs, type Probes } from "../debug.ts";

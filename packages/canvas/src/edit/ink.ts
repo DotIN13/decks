@@ -1,6 +1,6 @@
 import type { InkColor } from "@decks/ink";
 import { createSignal } from "solid-js";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 import { inkHex } from "../model/ink.ts";
 
 /**

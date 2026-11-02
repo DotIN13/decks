@@ -3,7 +3,7 @@ import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { ownInput } from "./input.ts";
 import { APP_BAR } from "../render/types.ts";
 import { canvasHost } from "../host.ts";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 
 /**
  * The two items with no file of their own that the stage places as it places a card (`drawing.ts`'s

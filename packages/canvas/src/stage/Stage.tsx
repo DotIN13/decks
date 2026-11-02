@@ -18,7 +18,7 @@ import { overlayJson } from "../edit/core/overlay-json.ts";
 import { rgbOf } from "../edit/dom/colours.ts";
 import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
-import { scheme } from "../lib/theme.ts";
+import { scheme } from "../theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
 import { ENGINE, LAYERS } from "../render/device.ts";
