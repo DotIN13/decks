@@ -25,7 +25,6 @@ export const syncRoutes = {
 	accountFiles: { method: "GET", path: "/sync/v1/files", answer: z.object({ files: z.array(SyncFile) }) },
 } as const;
 
-export type SyncRoutes = typeof syncRoutes;
 /** `/sync/v1/canvases/:id` with `{ id: "x" }`: every `:name` filled, encoded. */
 export function syncPath(path: string, params: Record<string, string> = {}): string {
 	return path.replace(/:([a-z]+)/g, (_, key: string) => {
