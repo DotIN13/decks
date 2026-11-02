@@ -43,8 +43,10 @@ From `CONTRIBUTING.md`, and they shape the sequencing in §6:
   behaviour (removing a CSS rule, deleting a global a browser check reads), it names the check that
   would catch it.
 - **The package's surface is the API.** `@decks/canvas`, `@decks/agent-ui` and `@decks/ui` are "for
-  any host" (Decks Studio imports them, §4.6). Their `exports` maps do not change in this plan, and
-  nothing moves into their `styles/` that only the Decks app wants.
+  any host" (Decks Studio imports them, §4.6). This plan adds no change to their `exports` maps or to
+  the names behind them, and nothing moves into their `styles/` that only the Decks app wants. (The
+  branch has already changed those names since Studio's pin; Appendix A lists what, so the
+  reorganization's "nothing" can be told apart from the branch's "a lot".)
 
 ## 3. Dead code, verified
 
@@ -232,9 +234,9 @@ which release that is:
 | layer | lines | what it keeps alive |
 |---|---|---|
 | `apps/server/src/wire/legacy.ts` | 221 | the tab socket's 52 old `ClientMessage` requests, each as an alias of a person's verb |
-| `apps/server/src/routes/agents.ts`, `harness.ts`, parts of `deck.ts`, `google.ts`, `apps.ts` | ~250 | `/api/agents/:id/…`, `/api/harness`, `GET /deck`, `/google/*`, `/apps/:name/seen` as aliases of verbs (Decks Studio reads `/api/agents/:id/…` and `/api/harness`) |
+| `apps/server/src/routes/agents.ts`, `harness.ts`, parts of `deck.ts`, `google.ts`, `apps.ts` | ~250 | `/api/agents/:id/…`, `/api/harness`, `GET /deck`, `/google/*`, `/apps/:name/seen` as aliases of verbs. Decks Studio calls `GET /api/agents/:id/settings`, `POST /api/agents/:id/queue` and `POST /api/agents/:id/:act` (`apps/web/src/harness.ts` in Studio), so these three stay until Studio calls `agent.settings`, `chat.queue` and the person's verbs on `/api/v1` |
 | `packages/protocol/src/names.ts` `OLD_EVENT_NAMES`, `apps/server/src/ws.ts` | ~60 | the 21 old event names, said to a socket whose hello lacks `v: 2` (the iOS app) |
-| `apps/server/src/verbs/renamed.ts` | 46 | the wording of a refusal for the verbs removed with boards; runs nothing |
+| `apps/server/src/verbs/renamed.ts` | 46 | the wording of a refusal for the verbs removed with boards; runs nothing. Studio still calls one of them, `board.list` (now `card.list`), so the wording has a reader |
 | the per-agent `stage.pen` copies on the tab socket | | the drawing a release-ago page expects |
 
 None of this is dead today: the iOS app and Decks Studio send the old shapes. But a layer with no
@@ -447,26 +449,55 @@ from the same object.
 
 ### 4.6 Decks Studio, the other host
 
-Decks Studio vendors this repository and can import only what the packages' `exports` maps name:
-`@decks/canvas`, `/comments`, `/tools`, `/camera`, `/host`, `/card`, `/card-reading`,
-`@decks/agent-ui/chat`, `/composer`, `/alerts`, `/edge`, `/vite`, `@decks/ui`, `/float`,
-`/agent-marks`, and the protocol, pen, hub, sdk and sync packages. No deep import into any `src/`
-reaches it. Its one stylesheet import is `@decks/canvas/canvas.css`, the `dist/canvas.css` that
-`packages/canvas/scripts/build-css.mjs` compiles from `styles/standalone.css`. `v3.css` is the app's
-and has never reached Studio. (The Studio repository was not reachable from the session that wrote
-this; these facts are from the earlier design's check of it and from this tree's `exports` maps.
-Confirm them against Studio's imports before Phase 4.)
+Checked against `DotIN13/decks-studio` at `73612db` (2026-11-02). Studio vendors this repository as
+the submodule `vendor/decks`, tracking `studio-canvas` and **pinned at `c4f12da` of 2026-10-21**,
+before boards became cards and before the canvas frame. It lists thirteen of the packages as
+workspaces and never builds or imports `apps/web` or `apps/server`.
 
-Two constraints follow, and both are already in §4.1 and §4.2:
+What Studio reaches, from its own `apps/` and `packages/` (`vendor/` excluded):
 
-1. **Fold `v3.css` into the app's sheets, never into the packages'.** The 55 rules that override
-   package classes go into `apps/web/src/styles/`; moved into `packages/canvas/styles/` they would
-   ship to Studio in its next `dist/canvas.css` and change its look.
-2. **The package `exports` maps do not change.** `render/` splitting into `render/` and `look/`,
-   `edit/` losing `CardEditor.tsx` and ink, `public/host.ts` narrowing its star export: all are
-   behind the entry points. The one thing Studio could notice is a symbol that `export *` from
-   `engine.ts` exposed and the named list drops; list what Studio imports from `@decks/canvas/host`
-   before writing that list.
+- **Code**: the entry points only. `@decks/canvas` (`fitAll`, `mountCanvas`, `createBoardHost` and
+  four types), `/comments`, `/tools`; `@decks/agent-ui/chat`, `/composer`, `/alerts`, `/vite`;
+  `@decks/ui/float`; `@decks/hub`, `/node`, `/follower`; `@decks/sync-client`, `@decks/sync-protocol`,
+  `@decks/protocol`, `@decks/pen`, `@decks/sdk`, `@decks/board-host`. No deep import into any `src/`,
+  no path alias, no `@decks/canvas/host` or `/camera`, and **no `__decks*` global** (its one probe is
+  its own, `window.__studio`).
+- **Styles**: one import, `@decks/canvas/canvas.css`, the `dist/canvas.css` that its `postinstall`
+  builds from `styles/standalone.css` (chrome, stream, canvas, ink, markdown, properties, tokens,
+  host). `v3.css` is not in that list and has never reached Studio. Studio's markup uses 38 package
+  classes (`stream`, `tool`, `row`, `pill`, `float`, `stage`, …), restyles 24 of them from its own
+  `packages/ui/src/styles.css`, and uses **none of the 23 classes §3.4 deletes**.
+- **The harness**: the SDK's verbs on `/api/v1` (`canvas.insert`, `canvas.fit`, `canvas.screenshot`,
+  `file.url`, and `board.list`, which is now `card.list`), and the alias routes `GET
+  /api/agents/:id/settings`, `POST /api/agents/:id/queue`, `POST /api/agents/:id/:act`; also
+  `/api/stt`, `/api/pair`, `/api/board/*` for a card's page (now `/api/card/*`) and `POST
+  /api/boards/delete` (gone at the tip).
+
+What this says about the plan:
+
+1. **Every move in §4.1 and §4.2 is invisible to Studio.** `render/` into `render/` and `look/`,
+   `edit/` losing `CardEditor.tsx` and ink, the engine split, the probes registry, the web app's
+   whole layout: none of it is behind an import Studio has. Narrowing `public/host.ts`'s star export
+   (§3.3) is safe too, since Studio does not import `@decks/canvas/host`.
+2. **Fold `v3.css` into the app's sheets, never into the packages'.** Eleven of the package classes
+   `v3.css` overrides are classes Studio's own markup uses: `stage`, `float`, `pill`, `kind`, `tag`,
+   `stream`, `field`, `notices`, `close`, `group`, `rule`. Moved into `packages/canvas/styles/`, those
+   overrides would ship in Studio's next `dist/canvas.css` and change what it has styled itself.
+   Moved into `apps/web/src/styles/`, Studio sees exactly what it sees today.
+3. **The reorganization is not what will break Studio's next bump; the branch already has.** The
+   tip exports neither `mountCanvas` nor `createBoardHost`; `BoardComment` is `CardComment`;
+   `@decks/board-host` is `@decks/card-host` and `@decks/board-kit` no longer exists (both are in
+   Studio's `workspaces`, so `npm install` fails before anything compiles); `mountCanvas`'s options
+   are a different shape; two routes and one verb Studio calls are gone or renamed. Appendix A has the
+   list. It is a migration of Studio's one seam (`apps/web/src/canvas/engine.ts`, 77 lines) plus a
+   handful of renames, and it is owed whether or not this plan runs.
+4. **Sequence the bump before Phase 3.** Done first, Studio's migration diff is about the API that
+   changed (Appendix A) and the reorganization can then be shown to change nothing for it: bump the
+   submodule again after Phase 4, `npm install`, open a canvas, and the only diff is the pin. Done
+   after, one bump absorbs both and nobody can tell which change caused what.
+5. **Phase 6 has a named dependency.** The alias routes and `board.list`'s refusal wording stay until
+   Studio's `harness.ts` calls `agent.settings`, `chat.queue` and the person's verbs by name, and
+   `card.list`. Put that in `docs/COMPAT.md` as the condition.
 
 ## 5. Guardrails, so it stays clean
 
@@ -507,9 +538,15 @@ Each line is a commit or a short run of them. Each leaves `npm run typecheck`, `
 **Phase 2: the registry** (half a day)
 11. `debug.ts` with aliases; writers repointed. Then the checks and scripts move; aliases go. Checks as in §4.4.
 
+**Between phases 2 and 3: Decks Studio catches up** (a day, in the Studio repository)
+11a. Bump `vendor/decks` to the tip and make Appendix A's changes: the workspaces list, the seam,
+    the renamed imports, the routes and the verb. Studio's `npm run typecheck`, `npm test`,
+    `npm run vitest` and `scripts/controls.mjs` are its checks. After Phase 4, bump again: the diff
+    should be the pin alone. (§4.6)
+
 **Phase 3: `packages/canvas` layout** (two to three days)
 12. `lib/theme.ts` → `theme.ts`; `render/` → `render/` + `look/`; `edit/CardEditor.tsx` → `cards/`; ink → `ink/`. Pure moves; typecheck proves them; the stale-pointer scan after each.
-13. `public/host.ts`: the named list in place of `export * from engine.ts`. Confirm against Studio's imports first. (§3.3, §4.6)
+13. `public/host.ts`: the named list in place of `export * from engine.ts`. Studio does not import `/host`; the Decks app's own imports are the list. (§3.3, §4.6)
 14. Extract `render/pictures.ts`. Checks: `one-picture`, `zoom-out-pictures`, `placeholder`, `card-fit`.
 15. Extract `render/tiles.ts`. Checks: `tile-pixels`, `stage-goldens`, `render-perf` (measure only).
 16. Extract `render/fonts.ts`, `render/hits.ts`, `render/gestures.ts`, one each. Checks: `text-shots`, `selection`, `item-pill`, `board-links`, `awake-drag`, `pencil-then-finger`, `smooth-edits`.
@@ -530,7 +567,7 @@ Each line is a commit or a short run of them. Each leaves `npm run typecheck`, `
 27. `CONTRIBUTING.md`. (§5)
 
 **Phase 6: the release that removes the compat layers** (when the clients allow)
-28. `wire/legacy.ts` and its directory; the alias routes; `OLD_EVENT_NAMES`; `renamed.ts`'s wording stays as long as agents may say an old verb. Each with its line struck from `COMPAT.md`. Checks: `router.test`, `line.test`, `canvas-frame`, `apps-in-frame`.
+28. `wire/legacy.ts` and its directory; the alias routes once Studio's `harness.ts` calls the verbs (§4.6); `OLD_EVENT_NAMES` once the iOS app says `v: 2`; `renamed.ts`'s wording stays as long as agents may say an old verb. Each with its line struck from `COMPAT.md`. Checks: `router.test`, `line.test`, `canvas-frame`, `apps-in-frame`.
 29. Then, and only then, the server's vocabulary rename: `stage/` → `canvas/`, `StagePens` → `CanvasPens`, `App.boards` → `App.cards`, `stage-boards.ts` → `canvas-cards.ts`, `verbs/board.ts` → `verbs/card.ts`, `stage-admin.ts` → `canvas-admin.ts`. Pure renames, one per commit, after the files that mention the old names most have been deleted rather than renamed. (§4.3)
 
 Phases 1 and 2 can go in any order and in parallel. Phase 3 before Phase 4 only because the canvas
@@ -560,3 +597,38 @@ declarations and section markers; `v3.css` by its own section comments and by th
 names with every other sheet. The scans are heuristics; §3 says where each can be fooled. The
 baseline in §1 was measured in this session with `npm ci`, `npm run typecheck`, `npm run css:order`
 and each workspace's `npm test`.
+
+Studio (§4.6, Appendix A) was checked from a clone of `DotIN13/decks-studio` at `73612db`: every
+`from "@decks/…"` specifier and named import outside `vendor/`, each looked up in this tree's entry
+points at the tip; every `/api/…` string and `verb(…)` call in `apps/web/src`; every class name in
+its `.tsx`, `.html` and `.css` against the package sheets' classes and against `v3.css`'s; and
+`mountCanvas`'s options and the handle methods it calls against `CanvasOptions` and `CanvasHandle` in
+`packages/canvas/src/types.ts`.
+
+## Appendix A. What Decks Studio's next bump needs
+
+Studio's pin is `c4f12da` (2026-10-21). Against the tip, with `vendor/` excluded, these are the
+breaks, each with what does the work now. Nothing here is caused by this plan; all of it is owed by
+the branch's own changes since the pin, and §4.6 says why to do it before Phase 3.
+
+| in Studio | breaks because | now |
+|---|---|---|
+| `package.json` workspaces `vendor/decks/packages/board-kit`, `board-host` | neither directory exists; `npm install` stops here | `vendor/decks/packages/card-host` (`@decks/card-host`); `board-kit` has no successor to list |
+| `import { contentType, LIVE_BOARD_HEADERS, libFile, passes } from "@decks/board-host"` | package and constant renamed | `@decks/card-host`, `LIVE_CARD_HEADERS` |
+| `import { fitAll, mountCanvas, … } from "@decks/canvas"` (`canvas/engine.ts`) | `mountCanvas` is gone | `createEditor(options)` returns an `Editor` whose `handle` is the `CanvasHandle`, `surface()` and `root()` the elements to mount; `fitAll` is still exported |
+| `mountCanvas`'s options `renderer`, `picturesWhileMoving`, `resolveUrl`, `onTool`, `onPillMore`, `onDeleteBoard`, and `boards: { page, picture, mintBoardToken, sandboxed, storageKey, marks }` | none of these fields exist on `CanvasOptions` | `pages: { page, picture, … }` replaces `boards`; `onDeleteCard` replaces `onDeleteBoard`; `base` replaces `resolveUrl`; the renderer is chosen by `render/backends/detect.ts`; the tool in hand is read from `@decks/canvas/tools` (`penTool`) rather than reported; the pill's ⋯ and a card's token are the frame's business now (`frame/`), so a host that mounts the editor inline passes neither |
+| `engine.ts`/`restored`, `engine.reloadBoard(path)`, `engine.ts` | not on `CanvasHandle` | `reloadCard(path)`; `restored` has no successor (views are the editor's, `views: { scope, key }` is still an option); `ts` is gone |
+| `import { createBoardHost } from "@decks/canvas"` (the presented board's token) | gone with boards | a card's page gets its token from the canvas frame's host (`createFramedEditor`'s `CanvasPass`); a host that presents one card itself mints the token it already has (`boardToken` in Studio's `harness.ts`) and passes it in the page's address |
+| `import type { BoardComment } from "@decks/canvas/comments"` | renamed | `CardComment` |
+| `verb(p, "board.list", …)` | refused with `renamed.ts`'s wording | `card.list` |
+| `/api/board/<path>` for a card's page (`harness.ts` 211, `data/tickets.ts`) | the prefix is gone (`auth.test.ts`: "the old prefix is gone") | `/api/card/<path>` |
+| `POST /api/boards/delete` (`harness.ts` 252) | the route is gone | the person's verb `card.delete` on `/api/v1`, or `canvas.delete` for the item |
+| `GET /api/agents/:id/settings`, `POST /api/agents/:id/queue`, `POST /api/agents/:id/:act` | still answered, as aliases (§3.10) | `agent.settings`, `chat.queue`, and the person's verbs (`agent.remove`, `agent.set`, `chat.send`, …); moving now is what lets Phase 6 remove the aliases |
+
+Unchanged and safe: everything Studio imports from `@decks/agent-ui/chat`, `/composer`, `/alerts`,
+`/vite`, `@decks/ui/float`, `@decks/hub` and its `/node` and `/follower`, `@decks/sync-client`,
+`@decks/sync-protocol`, `@decks/protocol`, `@decks/pen` and `@decks/sdk` resolves at the tip by name;
+`@decks/canvas/tools`' `fileCard`, `insertPanel` and `setInsertPanel` do too; `@decks/canvas/canvas.css`
+still builds from `standalone.css`; `/api/stt` and `/api/pair` still answer. The 38 package classes
+Studio's markup uses are all live in this tree, and none of the 23 classes §3.4 deletes is among them
+or in Studio's own sheets.
