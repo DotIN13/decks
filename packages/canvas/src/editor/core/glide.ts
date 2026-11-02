@@ -2,7 +2,7 @@
  * A drop eases in. What a drag let go of glides from where the pointer left it to where it lands,
  * and whatever the layout moved to make room (or to close the gap it left) glides there too: 150 ms,
  * ease-out. The maths is here; the engine runs it at the drawing that answers the drop
- * (`stage/engine.ts`, `settle`), so nothing is drawn where it lands before it has glided there.
+ * (`engine/engine.ts`, `settle`), so nothing is drawn where it lands before it has glided there.
  */
 import type { Offset, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";

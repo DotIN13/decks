@@ -1,8 +1,8 @@
 import type { Board } from "@decks/protocol";
-import type { BoardView } from "./editor/index.ts";
+import type { BoardView } from "../editor/index.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
-import type { RendererChoice } from "./lib/renderer.ts";
-import type { PictureHost } from "./engine/picture.ts";
+import type { RendererChoice } from "../lib/renderer.ts";
+import type { PictureHost } from "../engine/picture.ts";
 
 /**
  * What the stage hands the component that draws one board (`Stage`'s `frame` prop).

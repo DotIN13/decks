@@ -254,7 +254,7 @@ export function OverlayLayer(
 										);
 									})()}
 								</Show>
-								{/* A ✕ at each point on an alignment that lines up (`pen/snap.ts`, `points`). */}
+								{/* A ✕ at each point on an alignment that lines up (`items/snap.ts`, `points`). */}
 								<For each={guide.points ?? []}>
 									{(point) => {
 										const arm = 2.5 / props.zoom;

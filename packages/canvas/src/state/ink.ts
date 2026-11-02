@@ -4,7 +4,7 @@ import { createSignal } from "solid-js";
 /**
  * Drawing: the tool in hand, its colour and width, and what the lasso holds.
  *
- * What is drawn goes on the stage, into its `.pen` file (`canvas/pen/StageInk.tsx`, `pen/ink.ts`),
+ * What is drawn goes on the stage, into its `.pen` file (`canvas/ink/StageInk.tsx`, `ink/ink.ts`),
  * and undoes with the stage's own history. Ink that older builds wrote into a board's file stays
  * in it and is drawn by the board itself.
  */
@@ -46,7 +46,7 @@ export function inkSize(): number {
 	return INK_WIDTHS[tool === "marker" ? "marker" : "pen"][inkWidth()] ?? 4;
 }
 
-/** What the lasso holds: stroke ids on the stage (`canvas/pen/StageInk.tsx`). */
+/** What the lasso holds: stroke ids on the stage (`canvas/ink/StageInk.tsx`). */
 const [inkSelection, setInkSelection] = createSignal<{ path: string; ids: string[] } | undefined>(undefined);
 
 export { inkSelection, setInkSelection };

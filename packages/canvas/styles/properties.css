@@ -1,6 +1,6 @@
 @layer components {
 	/*
-	 * The drawing's properties panel and its insert panel (`canvas/pen/Properties.tsx`, `Insert.tsx`),
+	 * The drawing's properties panel and its insert panel (`canvas/panels/Properties.tsx`, `Insert.tsx`),
 	 * and the marks the stage draws for arrows that keep to a side.
 	 *
 	 * **The properties panel scrolls down and never across.** It is 276px wide, and every row in it is
@@ -301,7 +301,7 @@
 	}
 
 	/*
-	 * The colour picker a colour field's swatch opens (`canvas/pen/ColorPicker.tsx`): shade and
+	 * The colour picker a colour field's swatch opens (`canvas/panels/ColorPicker.tsx`): shade and
 	 * brightness in a square, hue in a strip, the hex, and the swatches. Fixed, over everything, so
 	 * the panel's scrolling never clips it.
 	 */

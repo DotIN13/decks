@@ -94,7 +94,7 @@ export function createEffects(host: EffectHost) {
 	/*
 	 * The ghost of what a drag carries over a card: a picture of the items cut from the sheet as the
 	 * drag starts, laid beside the pointer with a shadow and a slight tilt, as the card's own pieces are
-	 * (`pen/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
+	 * (`cards/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
 	 */
 	let ghost: { el?: HTMLCanvasElement; rect: { left: number; top: number; width: number; height: number } } | undefined;
 	/** Where the carried items lie on screen as the drag starts: the ghost is cut from there. */

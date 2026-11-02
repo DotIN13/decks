@@ -28,7 +28,7 @@ import { AgentHoverCard } from "./AgentHoverCard.tsx";
  * two clusters never did.
  *
  * The tools that add things, and undo and redo, are the stage's own, in a column on the canvas's
- * left edge (`canvas/pen/PenBar.tsx`). A board's own edits still undo with ⌘Z inside the board.
+ * left edge (`canvas/panels/PenBar.tsx`). A board's own edits still undo with ⌘Z inside the board.
  *
  * Presentational on purpose. It takes the chats, the identities and a callback per verb —
  * nothing here reads the socket or `App`'s state, so the whole cluster can be drawn from a

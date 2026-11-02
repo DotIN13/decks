@@ -271,7 +271,7 @@
 	.stage-engine-over {
 	transform-origin: 0 0;
 }
-	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
+	/* The engine could not start (`engine/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
 	.stage-notice {
 	position: absolute;
 	z-index: var(--z-float);
@@ -1132,7 +1132,7 @@
 	.world > .pen-player .pen-player-track > i {
 	background: #fff;
 }
-	/* A sound: the card the still drew, with the same places (`pen/media-look.ts`). */
+	/* A sound: the card the still drew, with the same places (`items/media-look.ts`). */
 	.world > .pen-player[data-kind="audio"] > audio {
 	display: none;
 }
@@ -1194,7 +1194,7 @@
 	position: absolute;
 	pointer-events: none;
 }
-	/* The drawing's tools (`pen/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
+	/* The drawing's tools (`panels/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
 	.pen-tools {
 	position: absolute;
 	z-index: var(--z-float);
@@ -1306,7 +1306,7 @@
 	white-space: pre;
 }
 	/*
-	 * A card typed into as it reads (`pen/CardEditor.tsx`): the canvas's markdown look
+	 * A card typed into as it reads (`cards/CardEditor.tsx`): the canvas's markdown look
 	 * (`pen/markdown-layout.ts`) in CSS, so the words barely move when it opens. Sizes are in ems of the
 	 * card's font size, as there. Its style bar and the ghost of a dragged piece stand outside its box.
 	 */

@@ -110,7 +110,7 @@ const record = async (name, action) => {
 	await run(action);
 	const pageEnd = await run("performance.now()");
 	const wall = Date.now() - start;
-	// The drawing's own word on when it was last sharp and filled in (`stage/engine.ts`, `__decksProbes.sheet`), a moment after the gesture.
+	// The drawing's own word on when it was last sharp and filled in (`engine/engine.ts`, `__decksProbes.sheet`), a moment after the gesture.
 	await settle(4000);
 	const sheet = await run("JSON.stringify(globalThis.__decksProbes?.sheet ?? {})");
 	await send("Timeline.stop");

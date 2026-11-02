@@ -7,7 +7,7 @@ import solid from "vite-plugin-solid";
 export default defineConfig({
 	root: fileURLToPath(new URL(".", import.meta.url)),
 	plugins: [solid(), tailwind()],
-	// The engine's render worker imports the engine's module (`stage/render.worker.ts`).
+	// The engine's render worker imports the engine's module (`engine/render.worker.ts`).
 	worker: { format: "es" },
 	server: {
 		host: "127.0.0.1",

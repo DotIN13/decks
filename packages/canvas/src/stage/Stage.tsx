@@ -1,38 +1,38 @@
 import { hasPlaceholder, placeholderPicture } from "./live-placeholder.ts";
-import { touchedCanvas } from "./camera/touched.ts";
+import { touchedCanvas } from "../camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
 import { For, Show, createEffect, createSelector, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
-import { boxOf, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
-import { canvasBox } from "./camera/insets.ts";
-import { createCameraController } from "./camera/controller.ts";
-import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "./camera/scroll-area.ts";
-import { canvasHost } from "./host.ts";
-import MediaPlayer from "./items/MediaPlayer.tsx";
-import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
+import { boxOf, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { canvasBox } from "../camera/insets.ts";
+import { createCameraController } from "../camera/controller.ts";
+import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "../camera/scroll-area.ts";
+import { canvasHost } from "../host.ts";
+import MediaPlayer from "../items/MediaPlayer.tsx";
+import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
-import { zoomKey } from "./zoom-keys.ts";
-import { coastStart, createTouches, type Finger, type TouchStep } from "./touch.ts";
+import { zoomKey } from "../input/zoom-keys.ts";
+import { coastStart, createTouches, type Finger, type TouchStep } from "../input/touch.ts";
 import { velocityFrom, type Sample } from "@decks/ui";
-import type { RendererChoice } from "./lib/renderer.ts";
-import { createRedrawQueue } from "./engine/redraw-queue.ts";
+import type { RendererChoice } from "../lib/renderer.ts";
+import { createRedrawQueue } from "../engine/redraw-queue.ts";
 import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
-import { BUDGET } from "./device.ts";
-import type { DocEdits, DrawingWriter, SceneBoard } from "./engine/types.ts";
-import { docIndex } from "./cards/doc-index.ts";
-import { BoxIndex } from "./engine/spatial.ts";
-import { StageInk } from "./ink/StageInk.tsx";
-import { inkVariableEdit, isInk, strokeOf } from "./ink/ink.ts";
-import { inkSelection, setInkSelection } from "./state/ink.ts";
-import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
-import { scheme } from "./lib/theme.ts";
+import { BUDGET } from "../device.ts";
+import type { DocEdits, DrawingWriter, SceneBoard } from "../engine/types.ts";
+import { docIndex } from "../cards/doc-index.ts";
+import { BoxIndex } from "../engine/spatial.ts";
+import { StageInk } from "../ink/StageInk.tsx";
+import { inkVariableEdit, isInk, strokeOf } from "../ink/ink.ts";
+import { inkSelection, setInkSelection } from "../state/ink.ts";
+import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "../state/pen-tools.ts";
+import { scheme } from "../lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
-import { firstLine } from "./items/look.ts";
-import { isLiveFile } from "./cards/card-frame.ts";
-import { parseMarkdown } from "./cards/markdown.ts";
-import { untilReleased } from "./held.ts";
-import { StageEngine } from "./engine/engine.ts";
+import { firstLine } from "../items/look.ts";
+import { isLiveFile } from "../cards/card-frame.ts";
+import { parseMarkdown } from "../cards/markdown.ts";
+import { untilReleased } from "../input/held.ts";
+import { StageEngine } from "../engine/engine.ts";
 import {
 	ANCHOR_OUT,
 	ANCHOR_PX,
@@ -62,8 +62,8 @@ import {
 	tsScene,
 	tsSeam,
 	type Overlay,
-} from "./editor/index.ts";
-import { knobs, probes } from "./debug.ts";
+} from "../editor/index.ts";
+import { knobs, probes } from "../debug.ts";
 
 
 /**
@@ -150,7 +150,7 @@ export function Stage(props: {
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
 	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera. `edits`, when the
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
-	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
+	 * place of finding what changed (`engine/engine.ts`, `setDoc`).
 	 */
 	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter };
 	/**
@@ -161,7 +161,7 @@ export function Stage(props: {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
-	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`ink/StageInk.tsx`). */
 	drawing?: boolean;
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
@@ -617,12 +617,12 @@ export function Stage(props: {
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
 	/*
-	 * The stage's engine (`stage/engine.ts`): the drawing and the boards' pictures, drawn with WebGPU
+	 * The stage's engine (`engine/engine.ts`): the drawing and the boards' pictures, drawn with WebGPU
 	 * on two canvases, one under the board pages and one over them, in the same call that moves the
 	 * pages (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
 	const penLayer = new StageEngine();
-	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
+	/* An engine that cannot start says so over the stage (`engine/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
 	const [engineNotice, setEngineNotice] = createSignal<string>();
 	penLayer.failed = (notice) => setEngineNotice(notice);
 	onCleanup(() => penLayer.dispose());
@@ -692,7 +692,7 @@ export function Stage(props: {
 
 	/*
 	 * Editing the drawing by hand, in edit mode (`state/pen-tools.ts` holds the tool and reads the
-	 * editor's selection, `pen/PenBar.tsx` shows them). Every change is sent as the same pen operation an
+	 * editor's selection, `panels/PenBar.tsx` shows them). Every change is sent as the same pen operation an
 	 * agent would send, and the drawing redraws from the server's answer; until it arrives, a drag
 	 * or a resize is drawn as a preview.
 	 *
@@ -2175,7 +2175,7 @@ export function Stage(props: {
 						);
 					}}
 				</For>
-				{/* The engine's canvas over the pages (`stage/engine.ts`): the pictures of boards with no live page, the drawing as tiles with a hole for each board, and what a gesture is moving. */}
+				{/* The engine's canvas over the pages (`engine/engine.ts`): the pictures of boards with no live page, the drawing as tiles with a hole for each board, and what a gesture is moving. */}
 				<canvas
 					class="stage-engine stage-engine-over"
 					aria-hidden="true"

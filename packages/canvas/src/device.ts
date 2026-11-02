@@ -57,7 +57,7 @@ export const BUDGET: LiveBudget = BUDGETS[DEVICE];
  * GPU has, so it is read from what they do say. A phone or tablet is small, and so is a computer whose
  * WebGPU allows buffers under 1 GB or that says it has 4 GB of memory or less; any other is big.
  * Each board's picture is fetched at one width for the class (`PICTURES`) and copied to the GPU once;
- * the GPU makes its smaller sizes and draws it at any zoom from the nearest (`stage/engine.ts`).
+ * the GPU makes its smaller sizes and draws it at any zoom from the nearest (`engine/engine.ts`).
  */
 export type GpuClass = "big" | "small";
 

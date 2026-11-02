@@ -22,7 +22,7 @@
  * message, which the board wrote.
  */
 
-import { onFrameMessage } from "./frame-messages.ts";
+import { onFrameMessage } from "../stage/frame-messages.ts";
 
 /** What a board's page posts up when it can take its token. */
 export interface BoardReady {

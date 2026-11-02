@@ -5,7 +5,7 @@ import { StageEngine } from "@decks/canvas/host";
  * One stage, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
  * and the drawing's Export (`server/stage/shots.ts`).
  *
- * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its
+ * The same pieces as the canvas, and nothing else: the stage's engine (`engine/engine.ts`) on its
  * canvas, over the boards as live frames, framed on the box in the address. No socket, no chrome,
  * no camera to move. When the boards say they are ready and the drawing has stopped redrawing for
  * fonts, icons and images, `window.__shotReady` is set and the picture is taken.

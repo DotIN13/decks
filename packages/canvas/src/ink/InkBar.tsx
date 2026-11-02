@@ -31,7 +31,7 @@ const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: string }> = [
 const COLOR_NAMES: Record<(typeof INK_COLORS)[number], string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
 
 /**
- * What is drawn goes on the stage (`canvas/pen/StageInk.tsx`), so undo and redo are the stage's
+ * What is drawn goes on the stage (`canvas/ink/StageInk.tsx`), so undo and redo are the stage's
  * own, and delete takes what the lasso holds off the stage.
  */
 export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void; onDelete: (ids: string[]) => void }) {

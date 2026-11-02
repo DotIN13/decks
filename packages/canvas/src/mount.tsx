@@ -7,7 +7,7 @@ import { fitInto, frames } from "./camera/camera.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { createBoardHost, type MintBoardToken } from "./board-host.ts";
+import { createBoardHost, type MintBoardToken } from "./board/board-host.ts";
 import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
 import { stageMeasure } from "./engine/measure.ts";
 import type { DocEdits, DrawingWriter } from "./engine/types.ts";
@@ -15,8 +15,8 @@ import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./panels/PenBar.tsx";
-import { PlainBoard } from "./plain-board.tsx";
-import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
+import { PlainBoard } from "./stage/plain-board.tsx";
+import { Stage, type InkRequest, type StageComment } from "./stage/Stage.tsx";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
@@ -80,7 +80,7 @@ export interface CanvasOptions {
 		/** The host is moving to another canvas: the boards hold still until it has. Read reactively. */
 		switching?(): boolean;
 		/** Pictures of boards the host takes itself (in the browser), in place of `picture`. */
-		shots?(): import("./Stage.tsx").StageShots;
+		shots?(): import("./stage/Stage.tsx").StageShots;
 		/** A board's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
 		onHide?(path: string): void;
 		/** Words on a board with a comment waiting on them, kept marked in its page. Read reactively. */

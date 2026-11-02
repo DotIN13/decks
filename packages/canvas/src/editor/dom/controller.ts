@@ -180,7 +180,7 @@ export function createEditor(host: EditorHost) {
 	const ZERO: Offset = { dx: 0, dy: 0 };
 	const shown = part(shownDrag);
 	const shownResize = part((now) => now.shownResize);
-	/** A drop's glide in hand, each frame of it as the engine draws it (`stage/engine.ts`, `onGlide`). */
+	/** A drop's glide in hand, each frame of it as the engine draws it (`engine/engine.ts`, `onGlide`). */
 	const [glide, setGlide] = createSignal<ReadonlyMap<string, Offset> | undefined>(undefined, { equals: false });
 
 	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));

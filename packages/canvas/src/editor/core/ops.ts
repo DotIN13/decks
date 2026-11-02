@@ -212,7 +212,7 @@ export function boardMoves(boards: readonly BoardBox[], paths: readonly string[]
  * so a card dropped into a frame sits concentric with it instead of inside a tighter arc.
  */
 export const FRAME_PAD = 18;
-/** A note's and a card's corner (`pen/look.ts` `NOTE_RADIUS`, held equal by `editor/ops-constants.test.ts`). */
+/** A note's and a card's corner (`items/look.ts` `NOTE_RADIUS`, held equal by `editor/ops-constants.test.ts`). */
 export const NOTE_CORNER = 12;
 export const FRAME_RADIUS = NOTE_CORNER + FRAME_PAD;
 
@@ -231,7 +231,7 @@ export const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial
 	text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 	/*
 	 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
-	 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
+	 * `cards/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
 	 */
 	card: { node: { type: "frame", name: "Card" }, w: 320, h: 48 },
 	note: { node: { type: "note", content: "" }, w: 240, h: 80 },
@@ -242,7 +242,7 @@ export const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pen
 
 /**
  * What a tool makes depends on more than the tool: the shape and the icon picked in the insert
- * panel, ids for the items inside it, and a card's first block (`pen/card-frame.ts` `newCard`,
+ * panel, ids for the items inside it, and a card's first block (`cards/card-frame.ts` `newCard`,
  * passed in because it is markdown's and not core's).
  */
 export type MakeOptions = {
@@ -264,7 +264,7 @@ export function madeSize(tool: MakingTool, shape: string): { w: number; h: numbe
 export function madeNode(tool: MakingTool, id: string, size: { w: number; h: number }, options: MakeOptions): PenNode {
 	if (tool === "shape") return makeShape(shapeKind(options.shape) ?? SHAPES[0]!, { frame: id, outline: options.nextId() }, size);
 	if (tool === "icon") return { type: "icon", id, name: options.icon.name, library: options.icon.library, icon: options.icon.name, fill: "#1f2328", weight: 400 } as PenNode;
-	// A card is a column frame of blocks (`pen/card-frame.ts`), starting with one empty one.
+	// A card is a column frame of blocks (`cards/card-frame.ts`), starting with one empty one.
 	if (tool === "card") return options.card(id, options.nextId());
 	return { ...MADE[tool].node, id } as PenNode;
 }

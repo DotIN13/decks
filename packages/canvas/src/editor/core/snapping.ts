@@ -1,6 +1,6 @@
 /**
  * What a moving selection lines up with, and the box it moves as. The snapping maths itself is
- * `canvas/pen/snap.ts`; this decides what it snaps against.
+ * `canvas/items/snap.ts`; this decides what it snaps against.
  */
 import { isArrow } from "@decks/pen";
 import type { Rect } from "./model.ts";

@@ -7,7 +7,7 @@
  * Run it with `node scripts/render-perf.mjs`, which prints the numbers as one JSON object.
  *
  * - tilesAtLoad, firstSharpMs: the page opened afresh on the canvas, each run; tiles painted until
- *   none have come for 2 s, and the first sharp frame (`sharpAt`, `stage/engine.ts`).
+ *   none have come for 2 s, and the first sharp frame (`sharpAt`, `engine/engine.ts`).
  * - tilesAfterZoom: at rest at 100% on a busy cell, one pinch step of 3% (then 3% again from there,
  *   for each run, so no run finds the last one's tiles kept), tiles painted until quiet.
  * - zoomDraws: page draws per frame over 40 frames of pinch, one CDP wheel event (⌃ held) a frame.
@@ -275,7 +275,7 @@ if (want("draws")) {
 /*
  * From the end of a fast pan at 50% (a fling: 3 frames of 1,500 px, each a window onto drawing not yet
  * painted, along a row of cells of its own each run) to the first frame drawn with no tile of the
- * window missing or at another scale than at rest (`settledAt`, `stage/engine.ts`). A slower pan is
+ * window missing or at another scale than at rest (`settledAt`, `engine/engine.ts`). A slower pan is
  * filled as it goes: the worker paints a tile in about half a millisecond.
  */
 if (want("fill")) {

@@ -1,8 +1,8 @@
 /**
- * A card is typed into as it reads, and written back as the markdown it was (`pen/CardEditor.tsx`).
+ * A card is typed into as it reads, and written back as the markdown it was (`cards/CardEditor.tsx`).
  *
  * The card's markdown is Obsidian's, with coloured words and an agent's CriticMarkup suggestions on
- * top (`pen/card-syntax.ts`). The editor keeps every block it was not asked to change exactly as it
+ * top (`cards/card-syntax.ts`). The editor keeps every block it was not asked to change exactly as it
  * was read — a table, a hidden comment and a code block go through an edit elsewhere untouched — and
  * it answers the four things a person does in one: accept a suggestion, colour a word from the style
  * bar, drag a whole-line piece between lines and an in-line one into a sentence.

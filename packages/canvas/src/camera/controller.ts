@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";
-import { coastStep } from "../touch.ts";
+import { coastStep } from "../input/touch.ts";
 import { springCurve } from "../lib/spring.ts";
 import { knobs } from "../debug.ts";
 

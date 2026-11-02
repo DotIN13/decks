@@ -236,7 +236,7 @@ async function run(engine, { all }) {
 		if (!r) throw new Error(`no ${selector}`);
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	};
-	/** The properties panel, which shows for what is selected (`pen/Properties.tsx`). */
+	/** The properties panel, which shows for what is selected (`panels/Properties.tsx`). */
 	const properties = () => page.locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {

@@ -206,7 +206,7 @@ if (spot) {
 	await page.mouse.click(spot.x + 10, spot.y + 150);
 	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "frame"));
 	cardId = card?.id;
-	// A card is a column frame whose blocks are markdown texts (`pen/card-frame.ts`).
+	// A card is a column frame whose blocks are markdown texts (`cards/card-frame.ts`).
 	say("C then a click makes a card: a column frame holding a markdown block", card?.metadata?.type === "decks.card" && card?.layout === "vertical" && card?.children?.[0]?.metadata?.type === "decks.markdown", JSON.stringify(card));
 	const typing = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")));
 	say("…and it opens for typing", !!typing);

@@ -321,7 +321,7 @@ export function createFileDrops() {
 			try {
 				if (isWords(file)) {
 					const words = await file.text();
-					// A card: a column of its blocks (`canvas/pen/card-frame.ts`), each given its id by the server.
+					// A card: a column of its blocks (`canvas/cards/card-frame.ts`), each given its id by the server.
 					const children = cardChildren(words, [], { fresh: () => "", inner: CARD_W - CARD_PAD * 2 });
 					items.push({ node: { type: "frame", name: file.name, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD, file: file.name }, children }, w: CARD_W });
 					continue;

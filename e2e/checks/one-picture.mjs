@@ -1,7 +1,7 @@
 /**
  * Every board has one picture, fetched once at one width for the device's GPU (`device.ts`,
  * `PICTURES`: 1024 px on a big one, 512 on a small one) and copied to the GPU once; the GPU makes
- * its smaller sizes and draws it at any zoom from the nearest (`stage/engine.ts`, `wantBoardPictures`).
+ * its smaller sizes and draws it at any zoom from the nearest (`engine/engine.ts`, `wantBoardPictures`).
  * A zoom out and back in fetches nothing. Over the budget, pictures shrink on the GPU (`fitPictures`),
  * with no request either. Chromium (a big GPU) and WebKit as an iPhone (a small one).
  */

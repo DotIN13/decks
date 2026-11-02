@@ -5,7 +5,7 @@
  *
  * The engine finds the formulas in words itself (`packages/stage/crates/text/src/math.rs`, the same
  * rules as `formulaText`) and asks for each one once (`typesetFormula`, handed over in
- * `stage/reader.ts`); it sets each as a box its size on the line's baseline. `formulaText` turns
+ * `engine/reader.ts`); it sets each as a box its size on the line's baseline. `formulaText` turns
  * each formula into one private-use character, U+F0000 plus its number, for code that needs a formula
  * to travel in a string.
  *
@@ -59,7 +59,7 @@ export function formulaChar(tex: string, display: boolean): string {
 	return String.fromCodePoint(MATH_FIRST + number);
 }
 
-/** A formula typeset, once: what the stage's engine is handed for `$…$` (`stage/reader.ts`). */
+/** A formula typeset, once: what the stage's engine is handed for `$…$` (`engine/reader.ts`). */
 export function typesetFormula(tex: string, display: boolean): Formula | undefined {
 	const char = formulaChar(tex, display);
 	return formulaOf(char.codePointAt(0)!);

@@ -1,5 +1,5 @@
-import type { ZoomKey } from "./zoom-keys.ts";
-import type { Finger, TouchStep } from "./touch.ts";
+import type { ZoomKey } from "../input/zoom-keys.ts";
+import type { Finger, TouchStep } from "../input/touch.ts";
 
 /**
  * Canvas gestures that begin inside a board.

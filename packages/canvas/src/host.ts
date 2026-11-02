@@ -19,7 +19,7 @@ export interface CanvasHost {
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
 	boardLink(href: string, base: string): string | undefined;
-	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
+	/** Where an icon's SVG is, before the CDN is asked (`items/icons.ts`). Absent: the CDN. */
 	iconUrl?: IconSource;
 	/**
 	 * Where a picture the drawing names (an image fill, a card's picture) is read, given as the

@@ -80,13 +80,13 @@ if (target && new URLSearchParams(location.search).get("handlers")) {
 }
 
 if (target) {
-	// `&pictures-per-frame=N`: how many board pictures go to the GPU a frame (`stage/engine.ts`), for comparing.
+	// `&pictures-per-frame=N`: how many board pictures go to the GPU a frame (`engine/engine.ts`), for comparing.
 	const perFrame = Number(new URLSearchParams(location.search).get("pictures-per-frame"));
 	if (perFrame > 0) knobs.picturesPerFrame = perFrame;
-	// `&picture-mb=N`: the board pictures' GPU budget (`device.ts`, `stage/engine.ts`), for measuring.
+	// `&picture-mb=N`: the board pictures' GPU budget (`device.ts`, `engine/engine.ts`), for measuring.
 	const pictureMB = Number(new URLSearchParams(location.search).get("picture-mb"));
 	if (pictureMB > 0) knobs.pictureMB = pictureMB;
-	// `&skip-levels=0`: the drawing paints new levels during a fast zoom too (`stage/engine.ts`, `fastZoom`), for comparing.
+	// `&skip-levels=0`: the drawing paints new levels during a fast zoom too (`engine/engine.ts`, `fastZoom`), for comparing.
 	if (new URLSearchParams(location.search).get("skip-levels") === "0") knobs.skipLevels = false;
 	const frames: Frame[] = [];
 	const inputs: Array<{ t: number; kind: string; scale?: number }> = [];

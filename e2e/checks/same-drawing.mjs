@@ -3,7 +3,7 @@
  *
  * The stage takes in a change as the edits that made it (`stage.pen.delta`, applied to the app's
  * copy sharing what they did not reach, `editDocument`) and its engine re-lays and reads back only
- * the top-level items they reached (`layoutChanges`, `stage/engine.ts` `laidOut`). This puts it
+ * the top-level items they reached (`layoutChanges`, `engine/engine.ts` `laidOut`). This puts it
  * through every kind of change, from an agent over the wire and from a person's drag, and then asks
  * three things: the page's copy of the drawing is the server's; the layout the stage holds, made up
  * change by change, is the one its engine gives whole; and it is the one a fresh page lays out.

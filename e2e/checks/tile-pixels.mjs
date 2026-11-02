@@ -2,7 +2,7 @@
  * Tiles handed to the page as their bytes draw the same pixels as tiles handed over as pictures.
  *
  * Under WebKit the render worker reads each tile it paints back from its device and posts its bytes
- * (`paintPixels` in `crates/web/src/bind.rs`, `pixelsFirst` in `packages/canvas/src/stage/engine.ts`),
+ * (`paintPixels` in `crates/web/src/bind.rs`, `pixelsFirst` in `packages/canvas/src/engine/engine.ts`),
  * and the page writes them into its texture (`putTilePixels`), because WebKit's copy of a worker's
  * picture into a texture costs the page about 2 ms a tile; Chromium, and WebGL 2 everywhere, keep
  * pictures. Both ways are compared in Chromium and in WebKit as an iPhone (whose WebGPU Playwright

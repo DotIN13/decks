@@ -356,7 +356,7 @@ export type TextEditing = ReturnType<typeof createTextEditing>;
 
 /**
  * The editor laid over the item whose words are typed, in the world, in stage units: a card is
- * typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words, in a textarea.
+ * typed into as it reads (`cards/CardEditor.tsx`); a text or a note as its words, in a textarea.
  */
 export function TextEditor(props: { text: TextEditing; zoom: number }) {
 	return (
@@ -365,7 +365,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 				const look = open.style;
 				const box = () => props.text.box() ?? open.box;
 				const cancel = props.text.cancel;
-				// A card is typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words.
+				// A card is typed into as it reads (`cards/CardEditor.tsx`); a text or a note as its words.
 				if (look.markdown)
 					return (
 						<CardEditor

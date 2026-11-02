@@ -34,7 +34,7 @@ export interface TextLook {
 
 /**
  * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
- * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
+ * (`cards/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
  * `fresh` is an item just made to be typed into, which an empty text does not outlive.
  */
 export type TextSession = {
@@ -51,9 +51,9 @@ export type TextSession = {
 	caretAt?: Pt;
 };
 
-/** The colours of the app's own words and paper, in the scheme now (`pen/look.ts`, `CARD_PALETTE`). */
+/** The colours of the app's own words and paper, in the scheme now (`items/look.ts`, `CARD_PALETTE`). */
 export type Palette = { paper: string; fg: string };
-/** The font the page sets a family in, at a weight and a style (`pen/look.ts`, `pageFont`). */
+/** The font the page sets a family in, at a weight and a style (`items/look.ts`, `pageFont`). */
 export type FontOf = (family: string, weight: number, italic: boolean) => string;
 export type Scheme = "light" | "dark";
 

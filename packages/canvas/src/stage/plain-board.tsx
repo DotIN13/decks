@@ -1,11 +1,11 @@
-import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "./board-storage.ts";
+import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "../board/board-storage.ts";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
-import type { BoardHost } from "./board-host.ts";
+import type { BoardHost } from "../board/board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
-import { measureFrame } from "./extent.ts";
+import { measureFrame } from "../extent.ts";
 import { onFrameMessage } from "./frame-messages.ts";
-import { scheme } from "./lib/theme.ts";
-import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
+import { scheme } from "../lib/theme.ts";
+import { pointFromBoard, type FrameAt } from "../camera/coords.ts";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live board's edge that moves it, in screen pixels outside the border and inside it (as `BoardFrame`). */

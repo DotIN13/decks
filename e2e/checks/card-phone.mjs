@@ -1,5 +1,5 @@
 /**
- * A card on a phone, by touch (`pen/CardEditor.tsx`, `pen/card-frame.ts`).
+ * A card on a phone, by touch (`cards/CardEditor.tsx`, `cards/card-frame.ts`).
  *
  * The same card a desk sees, held in a finger: a double tap opens it as it reads, inside the screen;
  * a tap accepts an agent's suggestion; words typed go into it and a tap on the canvas saves them;
