@@ -14,12 +14,12 @@
  * six were added when this file was split: they are the surfaces that never had a sheet (the
  * rail, the settings window, the marks an agent leaves, markdown, the composer), and they sit
  * at the end because that is where the rules they took used to be — the position this file's
- * own rules had, after all twelve imports. That is also why the split moved as little as it
+ * own rules had, after every import. That is also why the split moved as little as it
  * could: a rule that changes sheets still changes its place, and the gate's report on each of
  * those commits is what says so.
  *
  * **The order is hashed, so it is a fact rather than a convention.** `npm run css:order`
- * flattens these 18 sheets in the order below and hashes every rule with its at-rule chain
+ * flattens these sheets in the order below and hashes every rule with its at-rule chain
  * and its declarations, against the baseline in `styles/cascade-order.json`. Move a rule past
  * another and the check fails naming both; move a rule into another sheet and it passes as
  * long as the flattened order is the same. Comments and whitespace are not part of it, which

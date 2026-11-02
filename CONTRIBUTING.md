@@ -33,7 +33,7 @@ npm test              # the unit tests, no model needed, plus the cascade gate's
 npm run test:e2e      # the browser checks, ~2 min, over a throwaway copy of e2e/fixture/
 ```
 
-**One more, and it is the one that catches what the others cannot.** The app's 13
+**One more, and it is the one that catches what the others cannot.** The app's
 stylesheets all declare inside `@layer components`, so a rule of equal specificity is decided
 by position and by nothing else — and a comment moved, a file split or a rule dragged across
 another changes which one wins while the browser checks (which measure elements, not rules)

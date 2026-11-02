@@ -2,7 +2,7 @@
  * The cascade gate: the order of the app's own CSS rules, flattened and hashed.
  *
  * Step one of the stylesheet restructure, and it comes first because nothing else is safe
- * without it. The app's 13 sheets all declare inside `@layer components`, so a rule of equal
+ * without it. The app's sheets all declare inside `@layer components`, so a rule of equal
  * specificity is decided by *position* and by nothing else — which means every later step (a
  * comment moved out, a file split, a class renamed) can change which rule wins while leaving
  * the rendered page identical in whatever the e2e checks happen to look at.
@@ -29,7 +29,7 @@
  *     npm run css:order -- --update   # re-stamp after an intended change
  *     npm run css:order -- --list     # print every rule, in cascade order
  *
- * The baseline also records how much the order can bite: 976 rules over 13 sheets, and only
+ * The baseline also records how much the order can bite: when it was first stamped, 976 rules over 13 sheets, and only
  * **three** selector-and-property pairs written more than once. The app is not riddled with
  * the same selector defined twice — the duplicated *classes* live inside different compound
  * selectors — so a redefinition cannot be found by reading a file, which is the other reason
