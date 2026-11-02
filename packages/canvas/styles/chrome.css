@@ -212,7 +212,7 @@
 	 * A reading carried on the glyph: the context, over 70% and over 85%.
 	 *
 	 * The corner's `⋯` is the only button that wears this. The number itself moved into that
-	 * menu (`chat/composer/ContextSummary.tsx`), and a full context that only announces itself once
+	 * menu (`composer/ContextSummary.tsx`), and a full context that only announces itself once
 	 * you happen to open a menu is the one thing a reading like this must not become — so the
 	 * alarm stays outside and the numbers go in. Colour only: no dot, no badge, nothing that
 	 * changes the size of a control in a line of them.
@@ -396,7 +396,7 @@
 	}
 
 	/*
-	 * The board pictures' progress (`chrome/PictureProgress.tsx`): a reading in the ⋯ menu, not a
+	 * The board pictures' progress (`shell/PictureProgress.tsx`): a reading in the ⋯ menu, not a
 	 * place to go, so it does not light up under the pointer. Its bar is the row's own width.
 	 */
 	.popover [data-row].picture-progress:hover {

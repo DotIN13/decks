@@ -2,7 +2,7 @@
  * The settings window, and the accounts list inside it.
  *
  * The window's head and body, its groups and rows, the cue picker's strip and switches, the
- * account row and its state (`settings/Settings.tsx`, `alerts/AlertSettings.tsx`). The file exists
+ * account row and its state (`settings/Settings.tsx`, `settings/AlertSettings.tsx`). The file exists
  * because these are one surface: a window with rows, and every row is the same anatomy.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
@@ -10,7 +10,7 @@
 @layer components {
 	/*
  * The settings window: a title, a recessed body, and groups of rows.
- * `settings/Settings.tsx` and `alerts/AlertSettings.tsx`.
+ * `settings/Settings.tsx` and `settings/AlertSettings.tsx`.
  *
  * This vocabulary replaced a three-column grid whose header row named the columns. The grid
  * measured correctly and read like a spreadsheet — and the header was the tell: a control

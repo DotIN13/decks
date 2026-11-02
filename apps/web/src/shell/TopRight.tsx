@@ -5,8 +5,8 @@ import Play from "lucide-solid/icons/play";
 import Check from "lucide-solid/icons/check";
 import { For, Show } from "solid-js";
 import { AgentFace } from "../agents/AgentPill.tsx";
-import { ContextRing } from "../chrome/ContextRing.tsx";
-import { PictureProgress } from "../chrome/PictureProgress.tsx";
+import { ContextRing } from "./ContextRing.tsx";
+import { PictureProgress } from "./PictureProgress.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 import { Icon, Popover } from "@decks/ui";
 

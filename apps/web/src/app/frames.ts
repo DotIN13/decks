@@ -6,7 +6,7 @@ import { seenPicture } from "../canvas/shots/adaptors.ts";
 import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend, receiveToolResult } from "@decks/agent-ui/chat";
-import { agentViews } from "../camera/agent-views.ts";
+import { agentViews } from "../state/views.ts";
 import { runStageCall } from "@decks/canvas/host";
 import { scratch } from "../state/agent.ts";
 import { moveCamera } from "../state/camera.ts";
@@ -480,7 +480,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 									},
 								}, "agent-view"),
 							rememberView: (agentId, camera, selected) => {
-								// On this device, like every other view (`camera/agent-views.ts`): an
+								// On this device, like every other view (`state/views.ts`): an
 								// agent that moved a canvas nobody is looking at is remembered for the
 								// browser that was told, which is the same scope as the ones parked on
 								// a switch.

@@ -3,9 +3,9 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>Stage picture</title>
-		<!-- One stage, drawn for a picture the server takes of it (`src/shot.ts`, `server/stage/shots.ts`). -->
+		<!-- One stage, drawn for a picture the server takes of it (`src/pages/shot.ts`, `server/stage/shots.ts`). -->
 		<style>
-			/* The stage's own colour, `--stage` in `src/index.css`, in the scheme the address asks for (`src/shot.ts` sets it). */
+			/* The stage's own colour, `--stage` in `src/index.css`, in the scheme the address asks for (`src/pages/shot.ts` sets it). */
 			html,
 			body {
 				margin: 0;
@@ -59,6 +59,6 @@
 		<div id="stage">
 			<div id="world"><canvas class="over"></canvas></div>
 		</div>
-		<script type="module" src="/src/shot.ts"></script>
+		<script type="module" src="/src/pages/shot.ts"></script>
 	</body>
 </html>

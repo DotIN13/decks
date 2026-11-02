@@ -1,5 +1,5 @@
 import { FpsMeter, showFps } from "./perf/fps.tsx";
-import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
+import { ConfirmDialog } from "./shell/ConfirmDialog.tsx";
 import { queuedFor } from "./state/queued.ts";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
@@ -29,7 +29,7 @@ import { can } from "./connections/backend.ts";
 import { Icon } from "@decks/ui";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { onPenRefused, pens } from "./state/pens.ts";
-import { optionFor } from "./chat/composer/thinking.ts";
+import { optionFor } from "./composer/thinking.ts";
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
@@ -38,7 +38,7 @@ import { isNews } from "./panel/board-news.ts";
 import type { RendererChoice } from "@decks/canvas/host";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { setPenTool, drawing, setDrawing } from "@decks/canvas/tools";
-import { pageKey } from "./chat/composer/parked.ts";
+import { pageKey } from "./composer/parked.ts";
 import { CommentPopup } from "./markup/CommentPopup.tsx";
 import { commentBlock, withComments } from "./markup/comments.ts";
 import { markComment, unmarkComments } from "./markup/comment-select.ts";
@@ -50,25 +50,25 @@ import { boardUrl } from "./lib/api.ts";
 import { mintBoardToken } from "./board/board-token.ts";
 import { attachBoardFrame } from "./board/frame-hooks.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
-import { Dialog } from "./chat/Dialog.tsx";
-import { Composer } from "./chat/composer/Composer.tsx";
+import { Dialog } from "./composer/Dialog.tsx";
+import { Composer } from "./composer/Composer.tsx";
 import { StageManager } from "./canvas/StageManager.tsx";
 import { stageOf, stages, viewOnly } from "./state/stages.ts";
 import Eraser from "lucide-solid/icons/eraser";
-import { ToolColumn } from "./v3/ToolColumn.tsx";
-import { PenTray } from "./v3/PenTray.tsx";
-import { TopBar } from "./v3/TopBar.tsx";
-import { TopRight } from "./v3/TopRight.tsx";
-import { ZoomBar } from "./v3/ZoomBar.tsx";
-import { ChatSection, StatusPill } from "./v3/ChatSection.tsx";
-import { installTooltips } from "./v3/tooltip.ts";
+import { ToolColumn } from "./shell/ToolColumn.tsx";
+import { PenTray } from "./shell/PenTray.tsx";
+import { TopBar } from "./shell/TopBar.tsx";
+import { TopRight } from "./shell/TopRight.tsx";
+import { ZoomBar } from "./shell/ZoomBar.tsx";
+import { ChatSection, StatusPill } from "./shell/ChatSection.tsx";
+import { installTooltips } from "./shell/tooltip.ts";
 import { syncRings } from "./agents/ring-sync.ts";
-import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
+import { NoticeStrip } from "./shell/NoticeStrip.tsx";
 import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
 import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import type { CanvasItem } from "./panel/canvas-items.ts";
 import { baseTheme, placements } from "@decks/pen";
-import { agentViews } from "./camera/agent-views.ts";
+import { agentViews } from "./state/views.ts";
 import { closeHistory, setInspectable } from "@decks/agent-ui/edge";
 import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
@@ -1627,7 +1627,7 @@ export function App() {
 					)}
 				</Show>
 
-				{/* The tools, in every mode and while the pen is out: the pen is one of them (`v3/ToolColumn.tsx`). On a phone, a row in the dock. */}
+				{/* The tools, in every mode and while the pen is out: the pen is one of them (`shell/ToolColumn.tsx`). On a phone, a row in the dock. */}
 				<Show when={stagePen() && !phone()}>
 					<ToolColumn onStep={penStep} onFloat={mountToolsFloat} onApps={openAppsPanel} onOpenFile={openFileAtMiddle} onPen={setPen} mode={mode()} onMode={(next) => setMode(next)} />
 				</Show>

@@ -2,8 +2,8 @@ import type { AgentUsage } from "@decks/protocol";
 import { Show } from "solid-js";
 import { Popover } from "@decks/ui";
 import { ContextSummary } from "./ContextSummary.tsx";
-import { ContextRing } from "../../chrome/ContextRing.tsx";
-import { contextLevel, contextPercent } from "../../lib/context-usage.ts";
+import { ContextRing } from "../shell/ContextRing.tsx";
+import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 
 /**
  * How full the context is, at the right end of the hint row.
@@ -59,7 +59,7 @@ export function ContextDial(props: {
 								aria-label={`Context ${Math.round(value())}% full — the numbers behind it`}
 								onClick={api.toggle}
 							>
-								{/* The ring is `chrome/ContextRing.tsx`, shared with the `⋯` row on a
+								{/* The ring is `shell/ContextRing.tsx`, shared with the `⋯` row on a
 								    touchscreen — it was written out in both and the two drifted apart on
 								    the radius. */}
 								<ContextRing usage={props.usage} size={16} />

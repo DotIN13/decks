@@ -2,7 +2,7 @@
  * The composer: what sits under the input.
  *
  * The chips' coarse-pointer size and `.composer-box` — the box a file is dragged onto.
- * `chat/composer/` is one component tree and this is its material.
+ * `composer/` is one component tree and this is its material.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
  */
