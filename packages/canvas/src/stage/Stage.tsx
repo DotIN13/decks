@@ -581,15 +581,36 @@ export function Stage(props: StageProps) {
 	 * DOM's own are made invisible once the engine has them (`data-engine-overlays`, `canvas.css`).
 	 */
 	const [engineOverlays, setEngineOverlays] = createSignal(false);
+	/*
+	 * The overlay's colours, read through the browser once a scheme: on a probe of their own inside the stage
+	 * (it inherits the stage's custom properties), never the stage itself. Setting `color` on the stage to read
+	 * one back restyled everything under it, every card included, and it was read at every overlay change: four
+	 * times a move while dragging out a shape or an arrow, which on a large screen held frames to about 48 ms.
+	 */
+	let colourProbe: HTMLSpanElement | undefined;
+	let colours: { dark: string; accent: [number, number, number]; panel: [number, number, number]; guide: [number, number, number] } | undefined;
+	const coloursFor = (dark: string, stage: HTMLElement) => {
+		if (colours?.dark === dark && colourProbe?.isConnected) return colours;
+		if (!colourProbe?.isConnected) {
+			colourProbe = document.createElement("span");
+			colourProbe.className = "stage-colour-probe";
+			colourProbe.style.display = "none";
+			stage.append(colourProbe);
+		}
+		const vars = getComputedStyle(stage);
+		colours = {
+			dark,
+			accent: rgbOf(vars.getPropertyValue("--color-accent").trim() || "#2563eb", colourProbe),
+			panel: rgbOf(vars.getPropertyValue("--panel").trim() || "#fff", colourProbe),
+			guide: [0.949, 0.306, 0.118],
+		};
+		return colours;
+	};
 	createEffect(() => {
 		const dark = scheme();
 		if (!element) return;
-		const colours = untrack(() => {
-			void dark;
-			const read = (name: string) => rgbOf(getComputedStyle(element).getPropertyValue(name).trim() || "#2563eb", element);
-			return { accent: read("--color-accent"), panel: rgbOf(getComputedStyle(element).getPropertyValue("--panel").trim() || "#fff", element), guide: [0.949, 0.306, 0.118] as [number, number, number] };
-		});
-		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, ...colours, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
+		const { accent, panel, guide } = untrack(() => coloursFor(dark, element!));
+		const json = overlayJson(selection.overlay(), ctl.zoom(), { coarse: COARSE, accent, panel, guide, handlePx: HANDLE_DOT_PX, anchorPx: ANCHOR_PX, anchorOut: ANCHOR_OUT });
 		setEngineOverlays(penLayer.setOverlay(json));
 	});
 	penLayer.drawn = () => {

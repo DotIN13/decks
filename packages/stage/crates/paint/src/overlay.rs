@@ -6,7 +6,7 @@
 use crate::list::{Affine, Align, Color, Op, Paint, Shape};
 use crate::mesh;
 use kurbo::BezPath;
-use lyon_tessellation::{LineCap, LineJoin};
+use lyon_tessellation::LineCap;
 use serde::Deserialize;
 
 /// The overlay as the page sends it, in canvas units; `kind` says how each piece is drawn.
@@ -190,20 +190,92 @@ pub fn paint_overlay(o: &Overlay, cam_x: f64, cam_y: f64, s: f64, dpr: f64, ops:
 	}
 }
 
+/*
+ * Lines and dashes are painted as small boxes, one a straight piece, never as triangles: a frame with any
+ * triangle in it is drawn with four samples a pixel over the whole page canvas (`gpu`, `samples_for`), and
+ * a dashed draft or a guide made every frame of a drag do that, which on a large screen held the frame to
+ * about 48 ms. A box's soft edge is its own, at any angle.
+ */
 fn line(ops: &mut Vec<Op>, path: &BezPath, width: f32, cap: LineCap, dash: Option<&[f64]>, color: Color) {
-	if let Some((vertices, indices)) = mesh::stroke(path, width, cap, LineJoin::Round, dash, 1.0) {
-		ops.push(Op::Mesh { vertices, indices, transform: Affine::IDENTITY, paint: Paint::Solid(color) });
-	}
+	stroke_boxes(ops, path, Affine::IDENTITY, width, matches!(cap, LineCap::Round), dash, color);
 }
 
 fn dashed_path(ops: &mut Vec<Op>, path: &BezPath, at: Affine, width: f32, dash: &[f64], color: Color) {
-	if let Some((vertices, indices)) = mesh::stroke(path, width, LineCap::Butt, LineJoin::Miter, Some(dash), 1.0) {
-		ops.push(Op::Mesh { vertices, indices, transform: at, paint: Paint::Solid(color) });
-	}
+	stroke_boxes(ops, path, at, width, false, Some(dash), color);
 }
 
 fn dashed_box(ops: &mut Vec<Op>, w: f32, h: f32, r: f32, at: Affine, width: f32, dash: &[f64], color: Color) {
 	dashed_path(ops, &mesh::rounded_rect_path(w as f64, h as f64, r as f64), at, width, dash, color);
+}
+
+/// `path` stroked `width` wide as boxes along its flattened pieces, dashed by `dash` (on, off, …) when given,
+/// each box's ends rounded when `round`; `at` places it.
+fn stroke_boxes(ops: &mut Vec<Op>, path: &BezPath, at: Affine, width: f32, round: bool, dash: Option<&[f64]>, color: Color) {
+	let mut polylines: Vec<Vec<(f64, f64)>> = Vec::new();
+	kurbo::flatten(path.iter(), 0.25, |el| match el {
+		kurbo::PathEl::MoveTo(p) => polylines.push(vec![(p.x, p.y)]),
+		kurbo::PathEl::LineTo(p) => {
+			if let Some(last) = polylines.last_mut() {
+				last.push((p.x, p.y));
+			}
+		}
+		kurbo::PathEl::ClosePath => {
+			if let Some(last) = polylines.last_mut()
+				&& let Some(&first) = last.first()
+			{
+				last.push(first);
+			}
+		}
+		_ => {}
+	});
+	let pattern: Vec<f64> = dash.map(|d| d.iter().copied().filter(|n| *n > 0.0).collect()).unwrap_or_default();
+	let piece = |ops: &mut Vec<Op>, a: (f64, f64), b: (f64, f64)| {
+		let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+		let len = (dx * dx + dy * dy).sqrt();
+		if len < 1e-3 && !round {
+			return;
+		}
+		let (c, s) = if len < 1e-3 { (1.0, 0.0) } else { (dx / len, dy / len) };
+		let half = width / 2.0;
+		let ext = if round { half } else { 0.0 };
+		// The box in its own space runs along x from -ext to len + ext, and across y from -half to half.
+		let local = Affine([c as f32, s as f32, -s as f32, c as f32, a.0 as f32, a.1 as f32]).then(&Affine::translate(-ext, -half));
+		let shape = Shape { w: len as f32 + 2.0 * ext, h: width, radii: [if round { half } else { 0.0 }; 4], ellipse: false };
+		ops.push(Op::Shape { shape, transform: at.then(&local), paint: Paint::Solid(color), stroke: None });
+	};
+	for points in &polylines {
+		if points.len() < 2 {
+			continue;
+		}
+		if pattern.len() < 2 {
+			for pair in points.windows(2) {
+				piece(ops, pair[0], pair[1]);
+			}
+			continue;
+		}
+		// Dashed: walk the polyline, painting the "on" lengths of the pattern, carried across its corners.
+		let (mut index, mut left, mut on) = (0usize, pattern[0], true);
+		for pair in points.windows(2) {
+			let (a, b) = (pair[0], pair[1]);
+			let len = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+			let mut at_len = 0.0;
+			while at_len < len {
+				let step = left.min(len - at_len);
+				if on {
+					let t0 = at_len / len;
+					let t1 = (at_len + step) / len;
+					piece(ops, (a.0 + (b.0 - a.0) * t0, a.1 + (b.1 - a.1) * t0), (a.0 + (b.0 - a.0) * t1, a.1 + (b.1 - a.1) * t1));
+				}
+				at_len += step;
+				left -= step;
+				if left <= 1e-6 {
+					index = (index + 1) % pattern.len();
+					left = pattern[index];
+					on = !on;
+				}
+			}
+		}
+	}
 }
 
 #[cfg(test)]
@@ -215,8 +287,9 @@ mod overlay_tests {
 		let o = Overlay::parse(r#"{"boxes":[{"x":10,"y":10,"w":100,"h":50,"r":4,"kind":"selection"}],"dots":[{"x":10,"y":10,"px":10,"kind":"handle-round"}],"lines":[{"x1":0,"y1":0,"x2":10,"y2":0,"kind":"guide"}],"paths":[{"x":0,"y":0,"d":"M0 0L10 10","kind":"route"}]}"#).unwrap();
 		let mut ops = Vec::new();
 		paint_overlay(&o, 0.0, 0.0, 2.0, 1.0, &mut ops);
-		// The box, two ops for the dot, a mesh for the line and one for the path.
-		assert_eq!(ops.len(), 5);
+		// The box, two ops for the dot, a box for the solid line, and three dashes for the path (28 long, 6 on, 6 off).
+		assert_eq!(ops.len(), 7);
+		assert!(ops.iter().all(|op| !matches!(op, Op::Mesh { .. })));
 		match &ops[0] {
 			Op::Shape { shape, transform, stroke, .. } => {
 				assert_eq!((shape.w, shape.h), (200.0, 100.0));
@@ -225,6 +298,38 @@ mod overlay_tests {
 			}
 			other => panic!("{other:?}"),
 		}
+	}
+
+	#[test]
+	fn no_overlay_piece_is_painted_with_triangles() {
+		// A triangle anywhere in a frame draws the whole page canvas with four samples a pixel (`gpu`, `samples_for`).
+		let o = Overlay::parse(r#"{"boxes":[{"x":0,"y":0,"w":80,"h":40,"kind":"draft"},{"x":0,"y":0,"w":80,"h":40,"kind":"draft-ellipse"},{"x":0,"y":0,"w":80,"h":40,"kind":"kin-child"},{"x":0,"y":0,"w":80,"h":40,"kind":"slot-frame"}],"lines":[{"x1":0,"y1":0,"x2":90,"y2":30,"kind":"slot"},{"x1":0,"y1":0,"x2":90,"y2":0,"kind":"insert"},{"x1":0,"y1":0,"x2":0,"y2":90,"kind":"guide"},{"x1":0,"y1":0,"x2":90,"y2":0,"kind":"measure-dashed"},{"x1":0,"y1":0,"x2":90,"y2":90,"kind":"draft"}],"paths":[{"x":0,"y":0,"d":"M0 0C60 0 60 80 120 80","kind":"route"}]}"#).unwrap();
+		let mut ops = Vec::new();
+		paint_overlay(&o, 0.0, 0.0, 1.0, 2.0, &mut ops);
+		assert!(ops.len() > 20);
+		assert!(ops.iter().all(|op| !matches!(op, Op::Mesh { .. })));
+	}
+
+	#[test]
+	fn a_dashed_line_paints_its_on_lengths_along_it() {
+		// 120 long, 6 on and 6 off: ten dashes, each 6 long and 2 wide, laid along the line.
+		let o = Overlay::parse(r#"{"lines":[{"x1":0,"y1":0,"x2":120,"y2":0,"kind":"draft"}]}"#).unwrap();
+		let mut ops = Vec::new();
+		paint_overlay(&o, 0.0, 0.0, 1.0, 1.0, &mut ops);
+		assert_eq!(ops.len(), 10);
+		let mut painted = 0.0;
+		for op in &ops {
+			match op {
+				Op::Shape { shape, transform, .. } => {
+					assert!((shape.h - 2.0).abs() < 1e-4);
+					painted += shape.w;
+					let (_, y) = transform.apply(0.0, 0.0);
+					assert!((y + 1.0).abs() < 1e-3, "on the line, centred across it: {y}");
+				}
+				other => panic!("{other:?}"),
+			}
+		}
+		assert!((painted - 60.0).abs() < 1e-3, "half of it painted: {painted}");
 	}
 
 	#[test]

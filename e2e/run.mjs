@@ -138,7 +138,7 @@ const CHECKS = [
 	 */
 	{ file: "shapes.mjs", needsAgent: false },
 	/* A drag bends the arrows joined to what it carries: routed by the engine at each step, no tile painted again. */
-	{ file: "bent-arrows.mjs", needsAgent: false },
+	{ file: "bent-arrows.mjs", needsAgent: false, alone: true },
 	{ file: "item-pill.mjs", needsAgent: false },
 	/* Voice input: the recording has the row to itself, words show as heard, and a refused mic says why. */
 	{ file: "voice.mjs", needsAgent: false },
