@@ -8,6 +8,14 @@ of 2026-10-30) and decks `a34df42` (the tip of `studio-canvas` after the reorgan
 Everything in §2 and §3 was measured, not read off: Studio's `vendor/decks` was pointed at a checkout
 of `a34df42`, its workspaces installed, and its checks run. §7 says exactly how.
 
+## 0. Where this stands
+
+Done on Studio's branch `match-decks-reorg` (from `cards`), four commits, 2026-11-02: the bump to
+`d4b2bcc` and then `703a515` (§6 step 1), the four lines (step 2), and the verbs in place of the alias
+routes (step 5, §4.2) for all eight helpers, with two answers widened in decks for it (`chat.rewind`
+returns the taken-back words, `chat.fork` the new agent's name). Left: a browser against a harness
+(step 3), presence (step 4), `sheet` (step 6).
+
 ## 1. Where Studio stands
 
 Studio vendors this repository as the submodule `vendor/decks`, lists fourteen of its packages as
