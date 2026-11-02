@@ -25,14 +25,6 @@ export function authHeaders(): Record<string, string> {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** The socket's address with the token in it, since a socket cannot carry headers. */
-export function withToken(url: string): string {
-	if (!token) return url;
-	const given = new URL(url);
-	given.searchParams.set("decks_token", token);
-	return given.toString();
-}
-
 /**
  * Whether the harness no longer takes this page's token: it went unused too long, or was taken back.
  * Only a reload gets a new one, as only a tab the person opened is given one.
