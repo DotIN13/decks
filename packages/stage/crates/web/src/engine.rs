@@ -1354,7 +1354,16 @@ impl Worker {
 	pub fn paint(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool, limit: usize, draw: &mut dyn FnMut(Key, DrawList, &mut Atlas)) -> usize {
 		self.settle();
 		let scale = scale_for(camera.zoom * dpr, zooming);
-		self.scale = scale;
+		/*
+		 * A new scale: the stale tiles of the others are let go of now, as an edit lets them go
+		 * (`discard_stale`). Kept, they were never painted again, since no view wants them, and an
+		 * item put down just before a zoom never landed (`landed` waits for every stale tile it is
+		 * on): the page went on drawing it over the tiles that have it, twice over where it is clear.
+		 */
+		if scale.to_bits() != self.scale.to_bits() {
+			self.scale = scale;
+			self.discard_stale();
+		}
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		/*
 		 * While the page holds items lifted (a drag), only what is on screen is painted: the border and
@@ -1794,6 +1803,28 @@ mod tests {
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
 		assert_eq!(worker.landed(), vec!["a".to_owned()]);
 		assert_eq!(page.cards()[0]["id"], "board");
+	}
+
+	#[test]
+	fn an_item_put_down_just_before_a_zoom_lands_at_the_new_scale() {
+		let mut worker = Worker::new(STAGE, false).unwrap();
+		let paint = |worker: &mut Worker, zoom: f64| {
+			let cam = Camera { x: 0.0, y: 0.0, zoom };
+			let keys: Vec<Key> = worker.next(cam, 1.0, 1200.0, 800.0, false, 256).into_iter().map(|(key, _)| key).collect();
+			for key in &keys {
+				worker.sent(*key);
+			}
+			keys.len()
+		};
+		assert!(paint(&mut worker, 2.0) > 0);
+		// Lifted and put down at 200%, then a zoom to 600% before the 200% tiles are painted again:
+		// those are no longer wanted, so the item must not wait on them to land.
+		worker.lift(&["a".into()]);
+		worker.drop_items(&["a".into()]);
+		assert!(worker.landed().is_empty());
+		assert!(paint(&mut worker, 6.0) > 0);
+		while paint(&mut worker, 6.0) > 0 {}
+		assert_eq!(worker.landed(), vec!["a".to_owned()], "landed once the tiles of the scale shown have it");
 	}
 
 	#[test]
