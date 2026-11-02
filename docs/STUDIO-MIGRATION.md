@@ -10,11 +10,15 @@ of `a34df42`, its workspaces installed, and its checks run. §7 says exactly how
 
 ## 0. Where this stands
 
-Done on Studio's branch `match-decks-reorg` (from `cards`), four commits, 2026-11-02: the bump to
-`d4b2bcc` and then `703a515` (§6 step 1), the four lines (step 2), and the verbs in place of the alias
+Done on Studio's branch `match-decks-reorg` (from `cards`), seven commits, 2026-11-02: the bump to
+`d4b2bcc` and then `703a515` (§6 step 1), the four lines (step 2), the verbs in place of the alias
 routes (step 5, §4.2) for all eight helpers, with two answers widened in decks for it (`chat.rewind`
-returns the taken-back words, `chat.fork` the new agent's name). Left: a browser against a harness
-(step 3), presence (step 4), `sheet` (step 6).
+returns the taken-back words, `chat.fork` the new agent's name), presence received and drawn and
+presence sent (step 4, §4.1, two commits), and the frame's `sheet` message hiding the composer
+(step 6, §4.3). Each commit passed Studio's typechecks, and the last its web build and vitest. Left:
+step 3, a browser against a harness on a machine with a GPU (`scripts/demo.mjs`, `scripts/controls.mjs`),
+and a look at the canvas in both schemes (§4.4). The frame's own presence layer on Studio's line
+(`studio-line.ts`, the third step of §4.1) is this repository's and is not started.
 
 ## 1. Where Studio stands
 
