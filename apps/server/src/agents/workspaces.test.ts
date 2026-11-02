@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanWorkspace, MAX_WORKSPACE_LENGTH, roster, sameWorkspace, type RosterEntry } from "./workspaces.ts";
+import { cleanWorkspace, MAX_WORKSPACE_LENGTH, roster, type RosterEntry } from "./workspaces.ts";
 
 /*
  * What a workspace may be called, and who ends up in which one.
@@ -33,13 +33,6 @@ test("a long name is cut at 24, on a word boundary where there is one", () => {
 	assert.ok(long !== null && long.length <= MAX_WORKSPACE_LENGTH, String(long));
 	assert.ok(!long?.endsWith("-"), String(long));
 	assert.equal(cleanWorkspace("reading the panel css and measuring it"), "reading-the-panel-css");
-});
-
-test("the same workspace twice is a no-op, and absence equals absence", () => {
-	assert.equal(sameWorkspace("political-llm", "political-llm"), true);
-	assert.equal(sameWorkspace(undefined, null), true, "no workspace either way is one state");
-	assert.equal(sameWorkspace("political-llm", "irb-84069"), false);
-	assert.equal(sameWorkspace(undefined, "irb-84069"), false);
 });
 
 const entry = (id: string, workspace?: string, context: string[] = []): RosterEntry => ({

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene, type FakeItem } from "./fake-scene.ts";
+import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 import { BOARD_HOLD_MS, initialState, landBoardDrag, landBoardResize, RADIUS_HOLD_MS, SETTLE_MS, step, withSelection, type Effect, type GestureContext, type Input, type PointerInput, type Step } from "./gesture.ts";
 import type { EditorState, Mods } from "./model.ts";
 

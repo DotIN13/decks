@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clickableWhereDrawn, drawScale, MAX_SIDE, needsRedraw, pictureSize } from "./picture.ts";
+import { clickableWhereDrawn, drawScale, MAX_SIDE, pictureSize } from "./picture.ts";
 
 describe("pictureSize", () => {
 	it("is the board's size in device pixels at the zoom it is seen at", () => {
@@ -51,17 +51,6 @@ describe("drawScale", () => {
 	it("has no answer for a frame that has not been laid out, or a picture of nothing", () => {
 		assert.equal(drawScale({ w: 100, h: 100 }, { width: 0, height: 0 }, { x: 1, y: 1 }), undefined);
 		assert.equal(drawScale({ w: 0, h: 0 }, { width: 100, height: 100 }, { x: 1, y: 1 }), undefined);
-	});
-});
-
-describe("needsRedraw", () => {
-	it("draws when there is nothing, when the picture is soft, and when it is wasteful", () => {
-		assert.equal(needsRedraw(undefined, { w: 100, h: 100 }), true);
-		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 100, h: 100 }), false);
-		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 101, h: 100 }), false, "a pixel of rounding is not a repaint");
-		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 110, h: 100 }), true, "10% soft is");
-		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 80, h: 80 }), false, "a little too large is fine");
-		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 40, h: 40 }), true, "six times the pixels is memory");
 	});
 });
 

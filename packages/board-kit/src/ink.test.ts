@@ -1,19 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-	hitStroke,
-	inkBounds,
-	inkCommit,
-	inkHistory,
-	inkRedo,
-	inkShaper,
-	inkUndo,
-	lassoPick,
-	moveStroke,
-	simplify,
-	strokeShape,
-	type InkStroke,
-} from "./ink.ts";
+import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "./ink.ts";
 
 const stroke = (id: string, points: number[], extra: Partial<InkStroke> = {}): InkStroke => ({ id, tool: "pen", color: "red", size: 4, points, ...extra });
 
@@ -53,29 +40,11 @@ test("a lasso takes the strokes it goes round, and not the neighbour it brushes"
 	assert.deepEqual(lassoPick([inside], [0, 0, 1, 1]), [], "two points are not a loop");
 });
 
-test("bounds include the width, and a move carries every point and no pressure", () => {
+test("bounds include the width", () => {
 	const drawn = stroke("a", [10, 10, 0.5, 30, 20, 1]);
 	const box = inkBounds([drawn]);
 	assert.ok(box && box.x < 10 && box.y < 10 && box.x + box.w > 30);
 	assert.equal(inkBounds([]), undefined);
-	assert.deepEqual(moveStroke(drawn, 5, -5).points, [15, 5, 0.5, 35, 15, 1]);
-});
-
-test("undo and redo walk the lists the drawing has been, and a new stroke ends the redo", () => {
-	const a = stroke("a", [0, 0, 0.5]);
-	const b = stroke("b", [1, 1, 0.5]);
-	let history = inkHistory([]);
-	history = inkCommit(history, [a]);
-	history = inkCommit(history, [a, b]);
-	history = inkUndo(history);
-	assert.deepEqual(history.present, [a]);
-	history = inkRedo(history);
-	assert.deepEqual(history.present, [a, b]);
-	history = inkUndo(inkUndo(history));
-	assert.deepEqual(history.present, []);
-	assert.equal(inkUndo(history), history, "nothing before the first list");
-	history = inkCommit(history, [b]);
-	assert.equal(inkRedo(history), history, "drawing again is a new future");
 });
 
 test("a stroke shaped as it grows is the same path, character for character, as shaped whole", () => {

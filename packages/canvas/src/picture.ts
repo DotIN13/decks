@@ -53,23 +53,6 @@ export function pictureSize(board: { w: number; h: number }, zoom: number, dpr: 
 }
 
 /**
- * Whether a picture drawn at one size should be drawn again for another.
- *
- * Not "is it different": a pixel of rounding is not worth a document paint, and a picture a
- * little larger than the screen needs is still sharp. So a redraw is asked for when the
- * picture is *smaller* than the screen wants by more than the tolerance — soft — or larger
- * by more than a factor that makes the memory worth reclaiming.
- */
-export function needsRedraw(have: { w: number; h: number } | undefined, want: { w: number; h: number }, tolerance = 0.02): boolean {
-	if (!have) return true;
-	const ratio = Math.max(want.w / Math.max(1, have.w), want.h / Math.max(1, have.h));
-	if (ratio > 1 + tolerance) return true;
-	// Four times the pixels the screen needs is memory, not sharpness.
-	if (ratio < 0.5) return true;
-	return false;
-}
-
-/**
  * How many backing pixels a canvas has for each CSS pixel it is shown at.
  *
  * **This is the number `drawElementImage` draws in.** An element does not arrive in the

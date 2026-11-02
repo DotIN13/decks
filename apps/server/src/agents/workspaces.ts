@@ -31,17 +31,6 @@ export function cleanWorkspace(raw: unknown): string | null {
 	return slug(raw, MAX_WORKSPACE_LENGTH) || null;
 }
 
-/**
- * Whether two workspaces are the same, so nothing is broadcast for a no-op.
- *
- * An agent that declares its workspace at the top of every turn would otherwise put an
- * `agent.identity` on the wire per turn and re-render every panel watching — the argument
- * `sameTags` makes, with one value instead of a list.
- */
-export function sameWorkspace(a: string | undefined, b: string | null | undefined): boolean {
-	return (a ?? "") === (b ?? "");
-}
-
 /** The least a row has to say to be placed — what `registry.summaries()` already returns. */
 export interface RosterEntry {
 	id: string;

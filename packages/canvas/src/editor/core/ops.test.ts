@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW, makeShape, MARKDOWN, shapeKind, type PenNode } from "@decks/pen";
-import { fakeScene, type FakeItem } from "./fake-scene.ts";
+import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";
 import { arrowInsertOp, boardMoves, copyOps, deleteOps, drawnOp, duplicateOps, FRAME_RADIUS, idMaker, madeNode, madeSize, makeAtOp, movedBy, moveOps, type MakeOptions } from "./ops.ts";
 
 /** Ids as a counter hands them out: the same call writes the same ops. */

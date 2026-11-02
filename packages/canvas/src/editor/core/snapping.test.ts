@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeScene } from "./fake-scene.ts";
+import { fakeScene } from "./fake-scene.test-helper.ts";
 import { selectionBox, snapTargets } from "./snapping.ts";
 
 const view = { x: 0, y: 0, w: 1000, h: 1000 };

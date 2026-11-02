@@ -390,44 +390,6 @@ export function inkBounds(strokes: InkStroke[]): InkBox | undefined {
 	return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-/** The same stroke, somewhere else. */
-export function moveStroke(stroke: InkStroke, dx: number, dy: number): InkStroke {
-	return { ...stroke, points: stroke.points.map((n, i) => (i % 3 === 0 ? round1(n + dx) : i % 3 === 1 ? round1(n + dy) : n)) };
-}
-
 // --- undo and redo -------------------------------------------------------------------
 
-/**
- * Undo and redo for one board's ink: the lists it has been, and where in them it is now.
- *
- * Whole lists rather than inverse operations. A stroke object is shared between every list it
- * appears in, so a step costs an array of references, and "erase three, move two, undo, undo,
- * redo" needs no case analysis at all: every step is "the list is now this".
- */
-export interface InkHistory {
-	past: InkStroke[][];
-	present: InkStroke[];
-	future: InkStroke[][];
-}
-
 const HISTORY_DEPTH = 200;
-
-export function inkHistory(present: InkStroke[] = []): InkHistory {
-	return { past: [], present, future: [] };
-}
-
-export function inkCommit(history: InkHistory, next: InkStroke[]): InkHistory {
-	return { past: [...history.past, history.present].slice(-HISTORY_DEPTH), present: next, future: [] };
-}
-
-export function inkUndo(history: InkHistory): InkHistory {
-	const previous = history.past[history.past.length - 1];
-	if (!previous) return history;
-	return { past: history.past.slice(0, -1), present: previous, future: [history.present, ...history.future] };
-}
-
-export function inkRedo(history: InkHistory): InkHistory {
-	const [next, ...rest] = history.future;
-	if (!next) return history;
-	return { past: [...history.past, history.present], present: next, future: rest };
-}
