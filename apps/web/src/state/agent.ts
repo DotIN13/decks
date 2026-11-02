@@ -61,7 +61,7 @@ export interface AgentRecord {
 }
 
 /** The part that is never drawn, and therefore must not be reactive. */
-export interface AgentScratch {
+interface AgentScratch {
 	/**
 	 * Its history has arrived and is held.
 	 *
@@ -87,7 +87,7 @@ const emptyScratch = (): AgentScratch => ({ historyHeld: false, historyAsked: fa
  * opencode uses for `createServerSession`, and the reason that store has a test file at all.
  * The app's one is below.
  */
-export function createAgentScratch() {
+function createAgentScratch() {
 	const held = new Map<string, AgentScratch>();
 	return {
 		/** The scratch for an agent, created on first ask. */

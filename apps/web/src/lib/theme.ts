@@ -47,7 +47,7 @@ export function toggleScheme(): void {
 }
 
 /** Give one board frame the app's scheme, unless the board chose for itself. */
-export function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
+function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
 	if (!frame) return;
 	try {
 		const root = frame.contentDocument?.documentElement;

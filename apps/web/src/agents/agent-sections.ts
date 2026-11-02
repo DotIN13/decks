@@ -21,7 +21,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
 /** What a list calls the group of agents that have not said which project they are on. */
 export const NO_WORKSPACE = "No workspace";
 
-export type AgentSectionKind = "workspace" | "unfiled";
+type AgentSectionKind = "workspace" | "unfiled";
 
 export interface AgentRow {
 	/**
@@ -71,7 +71,7 @@ export interface AgentSection {
 	note?: string;
 }
 
-export interface AgentListInput {
+interface AgentListInput {
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	unread: Record<string, number>;

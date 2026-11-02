@@ -10,7 +10,7 @@ import { countWords, readingOfBody } from "@decks/canvas/card-reading";
  */
 
 /** How the page reads: its words, its smallest type, its spill, cut boxes and labels on each other (`card-reading.ts`). */
-export function readingOf(doc: Document): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
+function readingOf(doc: Document): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
 	const view = doc.defaultView;
 	if (!view || !doc.body) return { words: countWords(doc.body?.innerText ?? "") };
 	return readingOfBody(doc.body, view, doc.documentElement.scrollWidth - doc.documentElement.clientWidth);

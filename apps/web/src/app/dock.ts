@@ -8,7 +8,7 @@ import type { Floats } from "./floats.ts";
 const STOW_TAB = 36;
 
 /** What the dock needs of the layout, read when the page has mounted. */
-export interface DockLayout {
+interface DockLayout {
 	phone: () => boolean;
 	phoneChat: () => boolean;
 	setPhoneChat: (open: boolean, from?: DOMRect) => void;

@@ -412,7 +412,7 @@ const ago = (at: number) => {
 };
 
 /** The paired front ends, one row per name and site: 44 sessions from one Studio are one row. */
-export function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: string[]; last: number }[] {
+function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: string[]; last: number }[] {
 	const out = new Map<string, { label: string; origin: string; ids: string[]; last: number }>();
 	for (const row of rows) {
 		const key = `${row.label}\u0000${row.origin}`;

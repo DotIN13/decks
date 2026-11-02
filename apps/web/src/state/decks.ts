@@ -64,7 +64,7 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
  * the drawing it is sent has it (`canvas/src/model/drawing.ts`). Refused, the drawing is asked for again, so
  * an edit the canvas drew ahead of the answer goes away; the answer says whether it was made.
  */
-export async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {
+async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {
 	let done: unknown;
 	try {
 		const connection = edit ? connect({ url: decks().address, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();

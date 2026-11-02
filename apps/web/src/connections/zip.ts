@@ -5,12 +5,12 @@
  * its local header, inflated with the browser's own `DecompressionStream`. Only stored and deflated
  * entries are read, which is everything the writer makes and almost every zip tool makes.
  */
-export interface ZipFile {
+interface ZipFile {
 	name: string;
 	bytes(): Promise<Uint8Array>;
 }
 
-export class NotAZip extends Error {}
+class NotAZip extends Error {}
 
 async function inflate(data: Uint8Array): Promise<Uint8Array> {
 	const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));

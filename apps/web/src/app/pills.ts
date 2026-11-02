@@ -15,7 +15,7 @@ import { stageOf } from "../state/canvases.ts";
 import { flyTo } from "./links.ts";
 
 /** What finding a named thing on the canvas reads of the page. */
-export interface PillInputs {
+interface PillInputs {
 	stagePen: () => { doc: Parameters<typeof canvasItems>[0] } | undefined;
 	editorHandle: () => FramedHandle | undefined;
 	setPenSelected: (ids: string[]) => void;

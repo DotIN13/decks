@@ -71,7 +71,7 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 }
 
 /** What a board, an item or a file is called: its title, its name or words, its file's name. */
-export function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
+function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
 	if (node.kind === "file") return node.name ?? (node.id.split("/").pop() || node.id);
 	if (node.kind === "item") return itemName(node.id) ?? node.name ?? node.label;
 	return titleOf(node.id) ?? node.name ?? node.label;
@@ -213,7 +213,7 @@ function readEntry(lines: string[], n: number): WaitingComment {
 const ADDRESS = /(^|\s)@(item:[^\s]+|[^\s@]*\/[^\s]*|[^\s@/]+\.[A-Za-z0-9]{1,8})/g;
 const COMMENT_REF = /\[comment (\d+)\]/g;
 
-export interface SentReading {
+interface SentReading {
 	draft: Draft;
 	/** The comments the message carried, by their pills' ids. */
 	comments: Map<string, WaitingComment>;

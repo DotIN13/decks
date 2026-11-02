@@ -69,7 +69,7 @@ export interface Recording {
 	cancel(): void;
 }
 
-export interface VoiceOptions {
+interface VoiceOptions {
 	/** How loud it is now, 0 to 1, about 20 times a second: the bars beside the timer. */
 	onLevel?: (level: number) => void;
 	/**
@@ -95,7 +95,7 @@ type SpeechRecognitionLike = {
 
 let serverCan: Promise<boolean> | undefined;
 /** Whether this server transcribes, asked once a page. */
-export function serverTranscribes(): Promise<boolean> {
+function serverTranscribes(): Promise<boolean> {
 	serverCan ??= fetch(api("/stt"))
 		.then(async (response) => (response.ok ? ((await response.json()) as { server?: boolean }).server === true : false))
 		.catch(() => false);

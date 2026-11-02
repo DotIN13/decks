@@ -9,7 +9,7 @@ import { send } from "./socket.ts";
  * of the agent it is on (`watchCanvas`), gets it whole, and keeps it current from the edits every
  * change carries; an edit that does not follow what is held asks for the whole again.
  */
-export type StagePen = {
+type StagePen = {
 	stage: string;
 	rev: number;
 	doc: PenDocument;

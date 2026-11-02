@@ -37,10 +37,10 @@ import type { Page, DeckPen } from "@decks/protocol";
  * A list that shows a thing twice is a list you cannot count.
  */
 
-export type SectionKind = "canvas" | "held" | "deck";
+type SectionKind = "canvas" | "held" | "deck";
 
 /** One board, and the two things a row's appearance depends on. */
-export interface PanelRow {
+interface PanelRow {
 	board: Page;
 	/** A `.pen` file listed among the boards (`board` then carries its path and name), placed on the stage by a press. */
 	pen?: DeckPen;
@@ -50,7 +50,7 @@ export interface PanelRow {
 	dim: boolean;
 }
 
-export interface PanelSection {
+interface PanelSection {
 	kind: SectionKind;
 	/**
 	 * The whole label, sentence case, without the count: "On the canvas", "Held, not shown",
@@ -60,7 +60,7 @@ export interface PanelSection {
 	rows: PanelRow[];
 }
 
-export interface PanelInput {
+interface PanelInput {
 	/** Every board there is. The third section is this, minus the two above it. */
 	boards: Page[];
 	/** Boards the canvas took off and keeps a place for, newest first: the second section. */

@@ -22,7 +22,7 @@ import { onCleanup, onMount } from "solid-js";
  */
 
 /** How much of the layout viewport the browser is covering, in CSS pixels. */
-export function obscured(): { top: number; bottom: number } {
+function obscured(): { top: number; bottom: number } {
 	const view = window.visualViewport;
 	if (!view) return { top: 0, bottom: 0 };
 	return {
@@ -39,7 +39,7 @@ export function obscured(): { top: number; bottom: number } {
  * size, which is what iOS does when it scrolls a focused field into view. Watching only
  * the first leaves the dock 40px out after every such nudge.
  */
-export function trackVisualViewport(): () => void {
+function trackVisualViewport(): () => void {
 	const view = window.visualViewport;
 	if (!view) return () => {};
 	const root = document.documentElement;

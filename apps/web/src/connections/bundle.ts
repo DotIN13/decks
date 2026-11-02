@@ -25,9 +25,9 @@ export interface BundleManifest {
 	pictures: Record<string, { light?: string; dark?: string }>;
 }
 
-export const READER = "reader";
+const READER = "reader";
 
-export function cacheName(id: string): string {
+function cacheName(id: string): string {
 	return `decks-bundle-${id}`;
 }
 

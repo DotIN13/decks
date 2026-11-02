@@ -16,7 +16,7 @@ export function can(what: keyof BackendInfo["can"]): boolean {
 }
 
 /** The pairing code on show in this server's Settings, and who holds a token (`auth/issue.ts`). */
-export interface PairingState {
+interface PairingState {
 	code?: string;
 	expires?: number;
 	paired: PairedRow[];

@@ -31,7 +31,7 @@ interface Parked {
 	at: number;
 }
 
-export interface ParkedDrafts {
+interface ParkedDrafts {
 	get(page: string): Draft | undefined;
 	/** Remember a page's draft, or forget it when there is nothing in it. */
 	set(page: string, draft: Draft, now?: number): void;

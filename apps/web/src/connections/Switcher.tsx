@@ -29,7 +29,7 @@ type Reach = "ok" | "off" | "unpaired";
  * IP address and a one-word name like `jules` keep plain http, which is what a Decks on a laptop or
  * a home network serves. A scheme typed is kept as typed.
  */
-export function serverBase(typed: string): string {
+function serverBase(typed: string): string {
 	const text = typed.trim().replace(/\/+$/, "");
 	if (/^https?:\/\//i.test(text)) return text;
 	const host = text.replace(/[:/].*$/, "");

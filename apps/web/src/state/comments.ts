@@ -80,7 +80,7 @@ export type WaitingComment = CardComment & { from?: "canvas" };
 /** The most of any one text a frame draft may carry: longer is cut, with an ellipsis, and the cut is what is sent. */
 export const FRAME_TEXT_LIMIT = 2000;
 /** The most ids a sketch handed over may name. */
-export const FRAME_IDS_LIMIT = 500;
+const FRAME_IDS_LIMIT = 500;
 
 /**
  * Characters that show nothing: zero-width spaces and joiners, bidi controls, word joiners and invisible
@@ -98,7 +98,7 @@ export function frameText(value: unknown, limit = FRAME_TEXT_LIMIT): string {
 }
 
 /** A list of texts from the frame: each cleaned and cut, the empty ones gone, at most `count`. */
-export function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
+function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
 	return (Array.isArray(values) ? values : []).slice(0, count).map((value) => frameText(value)).filter((value) => value !== "");
 }
 

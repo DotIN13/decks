@@ -10,7 +10,7 @@ import { stageOf } from "../state/canvases.ts";
 import { destination, stripMention, withoutName } from "./send-from-bar.ts";
 
 /** What the bar names its pills by, read when a line is sent. */
-export interface BarNames {
+interface BarNames {
 	titleOf: (path: string) => string | undefined;
 	itemName: (id: string) => string | undefined;
 }

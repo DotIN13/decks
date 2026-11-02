@@ -11,7 +11,7 @@ import { stageOf, stages } from "../state/canvases.ts";
 import { reportCamera, setCameraAndReport } from "./camera-report.ts";
 
 /** What the landing reads of the page. */
-export interface LandingInputs {
+interface LandingInputs {
 	views: () => AgentViews;
 	/** The drawing on screen: its doc and the canvas it is (`stagePen`). */
 	stagePen: () => { doc: Parameters<typeof placements>[0]; scope?: string } | undefined;

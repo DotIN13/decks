@@ -27,7 +27,7 @@ export interface Line {
 	connected(): boolean;
 }
 
-export interface CallOptions {
+interface CallOptions {
 	/** The caller's name for the edit this call makes, which comes back in the `made` of the revision that has it. */
 	edit?: string;
 	/** The canvas the call acts on, when not the one on screen. */
