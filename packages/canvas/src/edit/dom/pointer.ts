@@ -112,7 +112,7 @@ export type PointerHost = {
 	/** A note at a screen point, open for typing: what the Note tool and a click there make (`InsertMenu`'s `noteAt`). */
 	noteAt: (event: Client) => void;
 	/** A finger held still for `HOLD_MS` (`touch-rules.ts`): the item's menu at the finger, or the canvas's with no item where the rules ask for one (`ui/HoldMenu.tsx`). */
-	holdMenu?: (menu: { ids: string[]; at: Pt; stage: Pt }) => void;
+	holdMenu?: (menu: { ids: string[]; at: Pt; stage: Pt } | undefined) => void;
 	toggleMedia: (id: string, media: MediaItem) => void;
 	open: Openers;
 	/** The handles the overlay draws, as drawn, for the presses on them. */
@@ -588,9 +588,10 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	};
 
 	/**
-	 * A finger on the drawing. On an item already selected it moves the selection (the finger is
-	 * claimed, so the camera stays put); anywhere else it is a pan unless it lifts where it landed,
-	 * which is a tap: the item is selected, and a second tap on words opens them for typing.
+	 * A finger on the drawing. On an item at least `touch.carry-min-px` big on the screen it carries
+	 * it, selected or not, as on an iPad's own canvases (the finger is claimed, so the camera stays put);
+	 * on a smaller one it is a pan. Either lifts where it landed as a tap: the item is selected, and a
+	 * second tap on words opens them for typing.
 	 */
 	const touchOnDrawing = (event: PointerEvent) => {
 		const at = worldAt(event);
@@ -600,11 +601,14 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		const from = { x: event.clientX, y: event.clientY };
 		const since = performance.now();
 		const selected = editor.items();
-		const carrying = selected.includes(hit.id);
+		// How big the item is on the screen: stage units across 100 px of it.
+		const per100 = Math.abs(worldAt({ clientX: from.x + 100, clientY: from.y } as PointerEvent).x - at.x) || 1;
+		const big = Math.min(hit.box.w, hit.box.h) * (100 / per100) >= RULES.touchCarryMinPx;
+		let carrying = selected.includes(hit.id) || big;
 		/*
-		 * A finger on what is selected carries it: the finger is the editor's, and so is its touch, or the
-		 * stage's native scroll took it and the canvas panned under the finger instead (`keepTouch`). On
-		 * anything else the finger is the stage's to scroll with, and a tap still selects.
+		 * A finger that carries is the editor's, and so is its touch, or the stage's native scroll took it
+		 * and the canvas panned under the finger instead (`keepTouch`). On an item too small to aim at the
+		 * finger is the stage's to scroll with, and a tap still selects.
 		 */
 		if (carrying) {
 			host.claim(pointer);
@@ -639,12 +643,26 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		};
 		const move = (e: PointerEvent) => {
 			if (e.pointerId !== pointer) return;
-			if (held) return;
 			// A second finger: this was the start of a pinch, and whatever it carried goes back.
-			if (host.fingers() > 1) return abandon();
+			if (host.fingers() > 1 && !held) return abandon();
 			// A finger may wobble its slop (8 px) before it means to move; past it the carry begins.
 			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < slopFor("touch")) return;
 			clearTimeout(hold);
+			/*
+			 * Moving on from a hold: its menu closes and the finger carries what it held, the item now
+			 * selected, as an iOS context menu turns into a drag.
+			 */
+			if (held) {
+				held = false;
+				carrying = true;
+				host.holdMenu?.(undefined);
+			}
+			// Not yet the selection: the item alone is, and the carry takes it (an item in the selection carries the whole selection).
+			if (!moved && carrying && !editor.items().includes(hit.id)) {
+				host.onSelect(undefined);
+				editor.pickPages([]);
+				editor.select([hit.id]);
+			}
 			// The editor carries the selection from here (`editor/core/gesture.ts`, a finger's carry): picked up as it first moves.
 			if (!moved && carrying) editor.input({ type: "carry", from: { at, client: from }, ...pointerInput(e, worldAt(e)) });
 			moved = true;

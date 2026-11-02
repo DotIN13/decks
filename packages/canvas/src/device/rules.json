@@ -13,6 +13,7 @@
 		"hold.ms": { "value": 450, "says": "A press held still this long is a hold." },
 		"hold.on-item": { "by": "form", "desk": "none", "tablet": "menu", "phone": "menu", "says": "A hold on an item opens its menu with a preview on touch; on a desk the right button does." },
 		"hold.on-bare": { "by": "form", "desk": "none", "tablet": "marquee", "phone": "marquee", "says": "A hold on bare canvas starts selecting on touch: the finger drags a marquee from there." },
+		"touch.carry-min-px": { "value": 44, "says": "A finger on an item at least this big on the screen both ways carries it, selected or not, and the hold menu it opens turns into a carry once it moves; on a smaller one it pans the canvas, so a canvas far out and full of items can still be moved." },
 		"hover.outline": { "by": "form", "desk": true, "tablet": false, "phone": false, "says": "An outline follows the pointer in edit mode on a desk; touch has no hover." },
 		"press.on-live-page": { "by": "form", "desk": "page", "tablet": "cover", "phone": "cover", "says": "A press on a live card's page goes to the page on a desk (but on its title or edge); on touch a cover takes it until the card is active, so a tap selects and a drag moves." },
 		"drag.copy-with-alt": { "by": "pointer", "mouse": true, "pen": true, "touch": false, "says": "Alt while dragging copies; a finger has no Alt." },

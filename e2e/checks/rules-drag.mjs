@@ -71,6 +71,31 @@ for (const f of FORMS.filter((one) => !only || only.includes(one.form))) {
 	say(tag(`a ${touch ? "finger's" : "mouse's"} drag 3 px short of a neighbour snaps to its edge`), landed && Math.abs(landed.x + landed.w - (ROOM.x + 400)) < 0.6, `right edge ${landed ? landed.x + landed.w - ROOM.x : "?"}, want 400`);
 	say(tag("and the guide is drawn while it is held"), guided.seen);
 
+	if (touch) {
+		// touch.carry-min-px: a finger on an item it has not selected carries it, and a hold that opened the menu carries it once it moves.
+		const drag = async (id, holdMs) => {
+			const from = await t.middle(id);
+			await t.fingers.touch("touchStart", [from]);
+			if (holdMs) await sleep(holdMs);
+			for (let i = 1; i <= 10; i++) {
+				await t.fingers.touch("touchMove", [{ x: from.x + 12 * i, y: from.y + 6 * i }]);
+				await sleep(16);
+			}
+			await t.fingers.touch("touchEnd", []);
+		};
+		await notes(t.canvas, [{ id: "free-a", x: 0, y: 1100, w: 200, h: 120 }, { id: "free-b", x: 0, y: 1360, w: 200, h: 120 }]);
+		await t.look({ x: ROOM.x + 100, y: ROOM.y + 1290 });
+		await t.select([]);
+		await drag("free-a", 0);
+		const a = await until(async () => { const box = await itemBox("free-a"); return box && box.x !== ROOM.x ? box : undefined; }, 3000);
+		say(tag("a finger drag on an item not selected moves it"), !!a && a.x > ROOM.x + 60, `x ${a ? Math.round(a.x - ROOM.x) : "?"}`);
+		await t.select([]);
+		await drag("free-b", rule("hold.ms", f.form, f.os) + 250);
+		const b = await until(async () => { const box = await itemBox("free-b"); return box && box.x !== ROOM.x ? box : undefined; }, 3000);
+		say(tag("a hold that opened the menu carries the item once the finger moves"), !!b && b.x > ROOM.x + 60, `x ${b ? Math.round(b.x - ROOM.x) : "?"}`);
+		const menu = await t.canvas.evaluate(() => !!document.querySelector(".hold-menu"));
+		say(tag("and its menu is closed"), !menu);
+	}
 	say(tag("no errors on the page"), t.errors.length === 0, t.errors.slice(0, 2).join(" | "));
 	await t.close();
 }

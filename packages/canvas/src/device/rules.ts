@@ -63,6 +63,7 @@ export type Rules = {
 	holdMs: number;
 	holdOnItem: "none" | "menu";
 	holdOnBare: "none" | "marquee";
+	touchCarryMinPx: number;
 	hover: boolean;
 	pressOnLivePage: "page" | "cover";
 	copyWithAlt: Record<PointerKind, boolean>;
@@ -126,6 +127,7 @@ export const NAMES: Record<keyof Rules, string> = {
 	holdMs: "hold.ms",
 	holdOnItem: "hold.on-item",
 	holdOnBare: "hold.on-bare",
+	touchCarryMinPx: "touch.carry-min-px",
 	hover: "hover.outline",
 	pressOnLivePage: "press.on-live-page",
 	copyWithAlt: "drag.copy-with-alt",
