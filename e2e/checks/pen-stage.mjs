@@ -48,7 +48,7 @@ const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 const middle = await (async () => {
 	const { found, m } = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
-		const t = new DOMMatrix(globalThis.__decksCameraTransform());
+		const t = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];
 		for (let y = 140; y < 820; y += 30) {
@@ -116,15 +116,15 @@ say("…and the arrow that ends on it follows", !!followed);
 // --- the drawing is drawn --------------------------------------------------------------------------
 const drawn = await until(() => canvas.evaluate(() => {
 	// The drawing is the engine's tiles, on its canvas over the boards.
-	const engine = globalThis.__decksEngine?.stats?.();
+	const engine = globalThis.__decksProbes?.engine?.stats?.();
 	if (engine && engine.tiles > 0 && engine.drawn[1] > 0) return true;
-	// In the canvas frame `__decksEngine` can be an engine made before the one on screen: the sheet's own count says a frame was drawn.
-	if ((globalThis.__decksSheet?.shown ?? 0) > 0 && globalThis.__decksRust?.placed?.has("e2e-note")) return true;
+	// In the canvas frame `__decksProbes.engine` can be an engine made before the one on screen: the sheet's own count says a frame was drawn.
+	if ((globalThis.__decksProbes?.sheet?.shown ?? 0) > 0 && globalThis.__decksProbes?.rust?.placed?.has("e2e-note")) return true;
 	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.
 	const canvas = document.querySelector(".stage-sheet");
 	return !!canvas && !canvas.hidden && parseFloat(canvas.style.width) > 1;
 }), 15000);
-say("the drawing layer is on screen", !!drawn, JSON.stringify(await canvas.evaluate(() => globalThis.__decksEngine?.stats?.())));
+say("the drawing layer is on screen", !!drawn, JSON.stringify(await canvas.evaluate(() => globalThis.__decksProbes?.engine?.stats?.())));
 
 // --- a picture of the stage, taken by the server's own Chromium --------------------------------------
 const shotAt = Date.now();
@@ -150,7 +150,7 @@ await editMode(page, true);
 // Bring the note into view: the camera looks at it through the stage's own transform.
 const note = onDisk().children.find((n) => n.id === "e2e-note");
 const screen = await canvas.evaluate(({ x, y }) => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	return { x: m.e + x * m.a, y: m.f + y * m.a, zoom: m.a };
 }, { x: note.x + 4 / 0.2, y: note.y + 4 / 0.2 });
 const inView = screen.x > 280 && screen.x < 1580 && screen.y > 80 && screen.y < 900;
@@ -175,17 +175,17 @@ if (inView) {
 // On bare canvas right of every board, at 100%, where the camera is moved (`view.move`).
 {
 	const person = await asPerson();
-	const right = await canvas.evaluate(() => Math.max(0, ...globalThis.__decksRust.placedCards.map((b) => b.x + b.w)));
+	const right = await canvas.evaluate(() => Math.max(0, ...globalThis.__decksProbes.rust.placedCards.map((b) => b.x + b.w)));
 	for (let i = 0; i < 4; i++) {
 		await fetch(`${API}/api/v1/view.move`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args: [{ x: right + 3000, y: 0, zoom: 1 }] }) });
-		if (await until(() => canvas.evaluate((x) => Math.abs(globalThis.__decksRust.camera.x - x) < 50 && Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01, right + 3000), 4000)) break;
+		if (await until(() => canvas.evaluate((x) => Math.abs(globalThis.__decksProbes.rust.camera.x - x) < 50 && Math.abs(globalThis.__decksProbes.rust.camera.zoom - 1) < 0.01, right + 3000), 4000)) break;
 	}
 	await rest(page);
 }
 const spots = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
-	const boards = (window.__decksCards?.() ?? []).map((b) => b.rect);
+	const boards = (window.__decksProbes?.cards?.() ?? []).map((b) => b.rect);
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
 	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150), left of
 	// where the properties panel opens on the right once something is selected,
@@ -251,7 +251,7 @@ if (spot) {
 	// --- the corner radius, and a card sized by its width alone ------------------------------------
 	// The rectangle again: it has corners to round, where a card has none.
 	await page.keyboard.press("Escape");
-	const rectBox = () => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
+	const rectBox = () => canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), drawnId);
 	const onRect = await rectBox();
 	await page.mouse.click(onRect.x + onRect.width / 2, onRect.y + onRect.height / 2);
 	await until(() => canvas.evaluate(() => document.querySelectorAll('.pen-handle[data-handle="radius"]').length === 1));
@@ -340,7 +340,7 @@ if (spot) {
 	 */
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
-	const cardBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const cardBox = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), cardId);
 	await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 8);
 	const eight = await until(() => canvas.evaluate(() => {
 		const all = [...document.querySelectorAll('.pen-handle:not([data-handle="radius"])')].map((h) => h.dataset.handle).sort();
@@ -364,7 +364,7 @@ if (spot) {
 	// Its words decide its height: no number in the file, only the floor it was made with (`fit_content(48)`).
 	say("dragging its side sets its width, and leaves its height to its words", !!widened && (widened.height === undefined || /^fit_content(\(\d+(\.\d+)?\))?$/.test(String(widened.height))), JSON.stringify({ width: widened?.width, height: widened?.height }));
 	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
-	const tall = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const tall = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), cardId);
 	const south = await canvas.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect();
 		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
@@ -411,7 +411,7 @@ if (cardItem) {
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
 	const at = await canvas.evaluate(({ x, y }) => {
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
 	}, { x: cardItem.x + 20 + w / 2, y: cardItem.y + 20 + h / 2 });
 	const under = () => canvas.evaluate(({ x, y }) => {

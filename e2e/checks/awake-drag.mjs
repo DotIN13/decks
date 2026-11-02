@@ -30,7 +30,7 @@ setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1000);
 await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
 await page.reload({ waitUntil: "domcontentloaded" });
 const canvas = await canvasFrame(page);
-await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 20 && !!globalThis.__decksRust?.camera, undefined, { timeout: 30000 });
+await canvas.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 20 && !!globalThis.__decksProbes?.rust?.camera, undefined, { timeout: 30000 });
 await canvas.evaluate(() => {
 	const stage = () => document.querySelector(".stage");
 	const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
@@ -41,7 +41,7 @@ await canvas.evaluate(() => {
 	globalThis.__t = {
 		async zoomTo(zoom) {
 			for (let i = 0; i < 200; i++) {
-				const now = globalThis.__decksRust.camera.zoom;
+				const now = globalThis.__decksProbes.rust.camera.zoom;
 				const ln = Math.log(zoom / now);
 				if (Math.abs(ln) < 1e-6) return;
 				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
@@ -50,7 +50,7 @@ await canvas.evaluate(() => {
 		},
 		async panTo(x, y) {
 			for (let i = 0; i < 40; i++) {
-				const c = globalThis.__decksRust.camera;
+				const c = globalThis.__decksProbes.rust.camera;
 				const dx = (x - c.x) * c.zoom;
 				const dy = (y - c.y) * c.zoom;
 				if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -67,8 +67,8 @@ const centreOn = async (path, zoom) => {
 	await canvas.evaluate((z) => globalThis.__t.zoomTo(z), zoom);
 	await rest();
 	const at = await canvas.evaluate((path) => {
-		const c = globalThis.__decksCards().find((one) => one.path === path);
-		const cam = globalThis.__decksRust.camera;
+		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+		const cam = globalThis.__decksProbes.rust.camera;
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, path);
@@ -79,7 +79,7 @@ const centreOn = async (path, zoom) => {
 /** The item's rect on screen, and its bar's if its node has one. */
 const rects = (path) =>
 	canvas.evaluate((path) => {
-		const c = globalThis.__decksCards().find((one) => one.path === path);
+		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
 		const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
 		// A card's bar above its box, or an app's grip over the window bar the engine paints.
 		const bar = node?.querySelector(".plain-card-bar, .app-grip")?.getBoundingClientRect();
@@ -91,7 +91,7 @@ const drag = async (path, label) => {
 	await page.mouse.move(r.item[0] + r.item[2] / 2, r.item[1] + r.item[3] / 2);
 	await page.waitForTimeout(400);
 	r = await rects(path);
-	const probe = await canvas.evaluate(({ x, y }) => ({ under: globalThis.__decksPictureAt?.(x, y), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path}:${n.dataset.state}`), mode: document.querySelector(".stage")?.dataset.mode }), { x: r.item[0] + r.item[2] / 2, y: r.item[1] + r.item[3] / 2 });
+	const probe = await canvas.evaluate(({ x, y }) => ({ under: globalThis.__decksProbes?.pictureAt?.(x, y), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path}:${n.dataset.state}`), mode: document.querySelector(".stage")?.dataset.mode }), { x: r.item[0] + r.item[2] / 2, y: r.item[1] + r.item[3] / 2 });
 	say(`${label}: hovered, its node is there with a bar`, !!r.bar, `${JSON.stringify(r)} ${JSON.stringify(probe)}`);
 	const steady = await canvas.evaluate(async (path) => {
 		const seen = [];
@@ -106,7 +106,7 @@ const drag = async (path, label) => {
 	await page.mouse.move(r.bar[0] + Math.min(60, r.bar[2] / 2), r.bar[1] + r.bar[3] / 2);
 	await page.mouse.down();
 	await page.waitForTimeout(80);
-	const pressed = await canvas.evaluate(() => ({ selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path), awake: globalThis.__decksAwake?.(), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path.split("/").pop()}:${n.dataset.state}`), stage: Object.entries(document.querySelector(".stage")?.dataset ?? {}).filter(([k, v]) => v === "true").map(([k]) => k) }));
+	const pressed = await canvas.evaluate(() => ({ selected: [...document.querySelectorAll('.card-node[data-selected="true"]')].map((n) => n.dataset.path), awake: globalThis.__decksProbes?.awake?.(), nodes: [...document.querySelectorAll(".world .card-node")].map((n) => `${n.dataset.path.split("/").pop()}:${n.dataset.state}`), stage: Object.entries(document.querySelector(".stage")?.dataset ?? {}).filter(([k, v]) => v === "true").map(([k]) => k) }));
 	say(`${label}: pressed on the bar`, true, JSON.stringify(pressed));
 	for (let i = 1; i <= 16; i++) {
 		await page.mouse.move(r.bar[0] + 60 + 20 * i, r.bar[1] + r.bar[3] / 2 + 7.5 * i);
@@ -122,7 +122,7 @@ const drag = async (path, label) => {
 	const after = await rects(path);
 	say(`${label}: moved`, after.item[0] > r.item[0] + 200, `before ${JSON.stringify(r.item)} mid ${JSON.stringify(mid.item)} after ${JSON.stringify(after.item)}`);
 };
-const items = await canvas.evaluate(() => globalThis.__decksCards().map((c) => c.path));
+const items = await canvas.evaluate(() => globalThis.__decksProbes.cards().map((c) => c.path));
 const apps = items.filter((p) => /^item:aa/.test(p));
 
 // A card asleep at 30%, hovered so its bar appears, and dragged by the bar.
@@ -138,11 +138,11 @@ await centreOn(card, 0.3);
 	const from = { x: r.item[0] + r.item[2] / 2, y: r.item[1] + r.item[3] / 2 };
 	await page.mouse.move(from.x, from.y);
 	await page.waitForTimeout(300);
-	const hovered = await canvas.evaluate(({ x, y }) => ({ awake: globalThis.__decksAwake?.(), under: globalThis.__decksPictureAt?.(x, y), el: (() => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${e?.className?.toString().slice(0, 30)}`; })() }), from);
+	const hovered = await canvas.evaluate(({ x, y }) => ({ awake: globalThis.__decksProbes?.awake?.(), under: globalThis.__decksProbes?.pictureAt?.(x, y), el: (() => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${e?.className?.toString().slice(0, 30)}`; })() }), from);
 	say("pictured-card-30: hovered over its picture", true, JSON.stringify(hovered));
 	await page.mouse.down();
 	await page.waitForTimeout(80);
-	const down = await canvas.evaluate(() => ({ awake: globalThis.__decksAwake?.() }));
+	const down = await canvas.evaluate(() => ({ awake: globalThis.__decksProbes?.awake?.() }));
 	say("pictured-card-30: pressed", true, JSON.stringify(down));
 	for (let i = 1; i <= 16; i++) {
 		await page.mouse.move(from.x + 20 * i, from.y + 7.5 * i);

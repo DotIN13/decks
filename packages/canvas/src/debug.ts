@@ -89,19 +89,3 @@ export const knobs: Knobs = { ...DEFAULTS, ...g.__decksKnobs };
 export const probes: Probes = g.__decksProbes ?? { sheet: { shown: 0, tiles: 0 }, pictureFades: 0, cardLists: 0, made: {} };
 g.__decksKnobs = knobs;
 g.__decksProbes = probes;
-
-/*
- * The old one-name globals, for one step: each is an alias of its knob or probe, so a check that
- * still says `__decksRust` or sets `__decksTilePixels` works until the checks say the new names. A
- * value a check set under the old name before this ran is read into its knob first.
- */
-const KNOB_ALIASES: Array<[string, keyof Knobs]> = [["__decksHalfZoom", "halfZoom"], ["__decksPinchTail", "pinchTail"], ["__decksExactCamera", "exactCamera"], ["__decksNoGlide", "noGlide"], ["__decksSkipLevels", "skipLevels"], ["__decksWarm", "warm"], ["__decksTilePixels", "tilePixels"], ["__decksTileBudget", "tileBudget"], ["__decksPictureMB", "pictureMB"], ["__decksPicturesPerFrame", "picturesPerFrame"], ["__decksGlideCost", "glideCost"], ["__decksTouchLog", "touchLog"]];
-const PROBE_ALIASES: Array<[string, keyof Probes]> = [["__decksSheet", "sheet"], ["__decksPictureFades", "pictureFades"], ["__decksCardLists", "cardLists"], ["__decksMade", "made"], ["__decksRust", "rust"], ["__decksEngine", "engine"], ["__decksGlide", "glide"], ["__decksCameraTransform", "cameraTransform"], ["__decksPenBox", "penBox"], ["__decksFrameUnder", "frameUnder"], ["__decksPictureAt", "pictureAt"], ["__decksCardAt", "cardAt"], ["__decksCards", "cards"], ["__decksPictured", "pictured"], ["__decksAwake", "awake"], ["__decksLiveCards", "liveCards"], ["__decksFrameDrawn", "frameDrawn"], ["__decksFrameNews", "frameNews"], ["__decksFrameSelect", "frameSelect"], ["__decksFrameCamera", "frameCamera"], ["__decksFrameState", "frameState"]];
-const anyGlobal = globalThis as Record<string, unknown>;
-for (const [name, key] of KNOB_ALIASES) {
-	if (name in anyGlobal && anyGlobal[name] !== undefined) (knobs as unknown as Record<string, unknown>)[key] = anyGlobal[name];
-	Object.defineProperty(globalThis, name, { configurable: true, get: () => knobs[key], set: (value: unknown) => ((knobs as unknown as Record<string, unknown>)[key] = value) });
-}
-for (const [name, key] of PROBE_ALIASES) {
-	Object.defineProperty(globalThis, name, { configurable: true, get: () => probes[key], set: (value: unknown) => ((probes as unknown as Record<string, unknown>)[key] = value) });
-}

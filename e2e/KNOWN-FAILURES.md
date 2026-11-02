@@ -40,7 +40,7 @@ edits-wait.
 
 - edits-wait (named, Chromium): "a board hidden from its pill: no frame shows it as it was" — 1 or 2 of ~145 frames
   after the click still have the board (two runs out of two). The frame takes it off at once (`frame.tsx`, `takeOff`, a
-  local delete edit), but the engine's boards (`__decksRust.placedCards`) lag the edit by a frame or two. Small, visible for
+  local delete edit), but the engine's boards (`__decksProbes.rust.placedCards`) lag the edit by a frame or two. Small, visible for
   ~15–30 ms. WebKit's "a note made by a double-click … 1 of 92 frames old (count)" was seen once alone and passed in the
   run beside the others: left as a timing flake.
 
@@ -54,7 +54,7 @@ edits-wait.
 - one-picture: the frame asked for a board's picture without `whole=1`, so the server sent the gallery card's picture,
   never at the GPU's widths and never compressed (`frame.tsx`). And a ticketed answer now exposes `X-Decks-Stand-In` to
   the frame (`auth/guard.ts`), so a stand-in is asked for again.
-- context-loss waited on the page for `__decksEngine`, which is in the frame (check bug).
+- context-loss waited on the page for `__decksProbes.engine`, which is in the frame (check bug).
 - focus expected a comment's pill to read only the board's name; it shows the whole comment, marked "from the canvas"
   since d0c7ffaa (check out of date).
 - stage-shot, placeholder, tile-pixels, note-edges, backends, pen-stage pass (they failed only on the render worker).
@@ -64,7 +64,7 @@ edits-wait.
 - per-agent: a new canvas frame opens on the camera its host last put it at (`editor.tsx`), fixed 2026-10-29.
 - stage-gestures: "a scroll during a drag keeps the items and the board under the cursor" was seen once under load; a
   timing flake.
-- pen-stage: `__decksEngine.stats()` can report tiles 0 while the canvas is drawn (`__decksSheet.shown` > 0); the check
+- pen-stage: `__decksProbes.engine.stats()` can report tiles 0 while the canvas is drawn (`__decksProbes.sheet.shown` > 0); the check
   also accepts the sheet's count.
 - Playwright's `locator.click()` on a frame element sometimes lands on the page's side panel (the stage scrolls the
   target into view first): press by coordinates.
@@ -76,14 +76,14 @@ edits-wait.
 A full run (3 workers) failed tiers, pen-stage, context-loss and drop-lands; all four failed the same way on 30df5333,
 before the steps.
 
-- pen-stage, drop-lands (and the named arrows-steady, nudge, edits-wait) read `__decksRust.boards`, which the card
+- pen-stage, drop-lands (and the named arrows-steady, nudge, edits-wait) read `__decksProbes.rust.boards`, which the card
   rename (262d23c2) made `placedCards`: check bug, fixed.
 - context-loss: a lost WebGL context did not drop the engine's record of the pictures the GPU held (`pictureBytes`,
   `heldWidth`, `compressedSize`), so after the restart the picture ladder (262d23c2) thought every card still had its
   picture and fetched none: nothing was drawn. `lose()` (`render/engine.ts`) clears them now. App bug, fixed.
 - tiers' "the hide button takes a board off the stage" fails under load (the full run, four checks at once) and passes
   alone (three runs out of three). The board leaves the frame, is drawn again for a moment, and is gone by the time the
-  message is written: the first read of `__decksCards` still had it, the second did not. Likely the same lag as
+  message is written: the first read of `__decksProbes.cards` still had it, the second did not. Likely the same lag as
   edits-wait's hidden board (an echo of the stage from before the hide), not fixed.
 
 ## The fixture is cards (board-leftovers step 5, part 3, 2026-10-30)

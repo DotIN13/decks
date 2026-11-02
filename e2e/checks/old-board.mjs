@@ -26,8 +26,8 @@ link.close();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 }).catch(() => {});
 const canvas = await canvasFrame(page);
-const listed = await canvas.waitForFunction((path) => (window.__decksCards?.() ?? []).some((one) => one.path === path), SHARED_BOARD, { timeout: 15000 }).then(() => true, () => false);
-say("the board is on the canvas", listed, JSON.stringify(await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path))));
+const listed = await canvas.waitForFunction((path) => (window.__decksProbes?.cards?.() ?? []).some((one) => one.path === path), SHARED_BOARD, { timeout: 15000 }).then(() => true, () => false);
+say("the board is on the canvas", listed, JSON.stringify(await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path))));
 
 // A picture, never a page: no frame and no card root for it.
 const live = await canvas.evaluate((path) => {
@@ -37,16 +37,16 @@ const live = await canvas.evaluate((path) => {
 say("it runs no page of its own: no frame, no card", !live.frame && !live.host, JSON.stringify(live));
 
 // Its picture comes from the server, and the engine holds it to draw where the board is.
-const held = await until(() => canvas.evaluate((path) => window.__decksRust?.heldWidth?.get(`card:${path}`) ?? 0, SHARED_BOARD));
+const held = await until(() => canvas.evaluate((path) => window.__decksProbes?.rust?.heldWidth?.get(`card:${path}`) ?? 0, SHARED_BOARD));
 say("its picture is fetched and held by the engine", held > 0, `${held}px wide`);
 await settle(page, 800);
 const under = await canvas.evaluate((path) => {
-	const r = (window.__decksCards?.() ?? []).find((one) => one.path === path)?.rect;
+	const r = (window.__decksProbes?.cards?.() ?? []).find((one) => one.path === path)?.rect;
 	if (!r) return null;
 	const x = r.x + r.width / 2;
 	const y = r.y + r.height / 2;
 	const node = document.elementFromPoint(x, y)?.closest(".card-node");
-	return { picture: window.__decksPictureAt?.(x, y) ?? null, node: node?.dataset.path ?? null, inert: node?.dataset.inert ?? null };
+	return { picture: window.__decksProbes?.pictureAt?.(x, y) ?? null, node: node?.dataset.path ?? null, inert: node?.dataset.inert ?? null };
 }, SHARED_BOARD);
 // Below the live zoom the stage finds the picture; above it the board's slot is there, inert: it shows the picture and runs nothing.
 say("what is under its middle is the board's picture", under?.picture === SHARED_BOARD || (under?.node === SHARED_BOARD && under.inert === "true"), JSON.stringify(under));

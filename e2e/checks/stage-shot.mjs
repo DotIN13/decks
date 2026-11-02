@@ -38,7 +38,7 @@ const keep = process.env.DECKS_E2E_SHOTS;
 const { browser, page, errors } = await open({ width: 1600, height: 1000, scheme: "light", cards: true });
 // The stage and its engine are in the canvas frame; the screenshots and the pixel counting are the page's.
 const canvas = await canvasFrame(page);
-await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 
 // Empty paper to the right of every board, so the items' surroundings are paper.
 const deck = await deckState();
@@ -67,12 +67,12 @@ say("the text item and the rectangle are on the stage", !!landed);
 /** The canvas's camera: `translate(a, b) scale(z) translate(c, d)` on the world, inside the stage's box. */
 const camera = () =>
 	canvas.evaluate(() => {
-		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
 		const rect = document.querySelector(".stage").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
 	});
 const itemBox = (id) => canvas.evaluate((id) => {
-	const r = window.__decksPenBox?.(id);
+	const r = window.__decksProbes?.penBox?.(id);
 	return r && r.width > 0 ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
 }, id);
 const toScreen = (cam, x, y) => ({ x: cam.left + cam.zoom * (x + cam.cx), y: cam.top + cam.zoom * (y + cam.cy) });
@@ -103,7 +103,7 @@ async function zoomTo(want) {
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
-	await canvas.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksProbes.engine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	await settle(page, 1800);
 	return camera();
 }

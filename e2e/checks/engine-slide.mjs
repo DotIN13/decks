@@ -15,9 +15,9 @@ const { browser, page, errors } = await open({ width: 1400, height: 900, dpr: 2 
 // The canvas and its engine are in the canvas frame.
 const canvas = await canvasFrame(page);
 await settle(page, 1500);
-await canvas.waitForFunction(() => window.__decksRust?.page && window.__decksSheet, null, { timeout: 15000 });
+await canvas.waitForFunction(() => window.__decksProbes?.rust?.page && window.__decksProbes.sheet, null, { timeout: 15000 });
 
-const draws = () => canvas.evaluate(() => window.__decksSheet.shown ?? 0);
+const draws = () => canvas.evaluate(() => window.__decksProbes.sheet.shown ?? 0);
 /** Whether the canvas covers the whole window, as it must at every frame: the sheet holds the window inside it. */
 const covers = () =>
 	canvas.evaluate(() => {
@@ -33,7 +33,7 @@ say("the canvas is the window and a quarter of it on each side", Math.abs(size.c
 
 // The page's time in each draw, from here on.
 await canvas.evaluate(() => {
-	const engine = window.__decksRust.page;
+	const engine = window.__decksProbes.rust.page;
 	const frame = Object.getPrototypeOf(engine).frame;
 	window.__slideMs = [];
 	engine.frame = function (...args) {

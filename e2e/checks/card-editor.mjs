@@ -69,13 +69,13 @@ await editMode(page, true);
 const canvas = await focusCanvas(page);
 // Near life size, so the card is big enough to press into; the zoom keys step by a fifth.
 const matrix = () => canvas.evaluate(() => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
 // The camera opens at the origin and a few seconds later fits what the agent has up: wait for that
 // to land and stay, or it moves the canvas out from under the card's place worked out below.
 for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
-	const now = await canvas.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+	const now = await canvas.evaluate(() => globalThis.__decksProbes?.cameraTransform?.() ?? "");
 	if (now !== last) [last, since] = [now, Date.now()];
 	else if (Date.now() - since > 1500 && !now.includes("scale(1) translate(0px, 0px)")) break;
 }
@@ -91,7 +91,7 @@ for (let i = 0; i < 30; i++) {
 const clear = () => canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	for (let y = 150; y <= 700; y += 50) for (let x = 420; x <= 820; x += 50) if (document.elementFromPoint(x, y) !== stage) return false;
-	return (window.__decksCards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
+	return (window.__decksProbes?.cards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
 });
 for (let i = 0; i < 12 && !(await clear()); i++) {
 	await page.mouse.move(700, 400);
@@ -115,7 +115,7 @@ await settle(page, 400);
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "card-editor", content: SOURCE, metadata: { type: "decks.markdown" }, width: 360 }, box: world }] });
 // Drawn once its fonts have arrived, which is when it is as tall as its markdown.
 const box = await until(async () => {
-	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+	const now = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"));
 	return now && now.height > 300 ? now : undefined;
 }, 12000);
 say("a card in Obsidian's markdown is drawn", !!box && box.height > 300, JSON.stringify(box && { h: Math.round(box.height) }));
@@ -128,7 +128,7 @@ const still = () => canvas.waitForFunction(() => {
 const openCard = async () => {
 	// Where the card is now: the camera has moved since the card was first found.
 	await still();
-	const at = (await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"))) ?? box;
+	const at = (await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"))) ?? box;
 	await page.mouse.dblclick(at.x + 40, at.y + 30);
 	const opened = await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 	await still();
@@ -313,7 +313,7 @@ say("…and the save is edits to those two items: every block keeps its id", JSO
 // The card goes to Obsidian as a .md file, without its colours and with the suggestion's original words.
 await page.keyboard.press("Escape");
 await settle(page, 300);
-const cardBox = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+const cardBox = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"));
 await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 6);
 const exportButton = canvas.locator('[title="Export to Obsidian (.md)"]');
 await exportButton.waitFor({ timeout: 3000 }).catch(() => {});
@@ -398,8 +398,8 @@ say("the bar's menus make a block a heading, and set words in serif and underlin
 await page.keyboard.press("Escape");
 await settle(page, 400);
 const blockIds = (cardNode()?.children ?? []).map((n) => n.id);
-const firstBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[0]);
-const secondBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[1]);
+const firstBox = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), blockIds[0]);
+const secondBox = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), blockIds[1]);
 await page.mouse.dblclick(firstBox.x + 40, (firstBox.y + firstBox.height + secondBox.y) / 2);
 const lineOpen = await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor") && !document.querySelector(".canvas-menu")), 3000);
 await page.keyboard.type("A new line in the gap");
@@ -410,14 +410,14 @@ await page.keyboard.press("Escape");
 await settle(page, 400);
 const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").startsWith("A new line"))?.id;
 // Waited for: the new line's layout comes back from the worker a moment after the file has it.
-const wordsBox = await until(() => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
+const wordsBox = await until(() => canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), wordsId), 8000);
 await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
 await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 // The start of the line, by Home: the card moves the caret itself, where a Mac's Home would scroll the stage
 // (the canvas went 110,000 px up), so the camera is held to where it was too.
-const cameraBefore = await canvas.evaluate(() => globalThis.__decksCameraTransform());
+const cameraBefore = await canvas.evaluate(() => globalThis.__decksProbes.cameraTransform());
 await page.keyboard.press("Home");
-say("Home in a card moves its caret and leaves the canvas where it was", (await canvas.evaluate(() => globalThis.__decksCameraTransform())) === cameraBefore);
+say("Home in a card moves its caret and leaves the canvas where it was", (await canvas.evaluate(() => globalThis.__decksProbes.cameraTransform())) === cameraBefore);
 await page.keyboard.type("Look: ");
 await page.keyboard.press("Control+Enter");
 const caretAt = await until(() => ((cardNode()?.children ?? []).some((n) => n.content === "Look: A new line in the gap") ? true : undefined));
@@ -444,9 +444,9 @@ link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-pic
 await settle(page, 300);
 const beside = { x1: Math.round((880 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "card-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...beside, x2: beside.x1 + 160, y2: beside.y1 + 90 } }] });
-const picture = await until(() => canvas.evaluate(() => globalThis.__decksPenBox?.("card-picture")));
+const picture = await until(() => canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-picture")));
 const kids = where("card-picture")?.kids ?? [];
-const second = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), kids[1]);
+const second = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), kids[1]);
 await page.mouse.click(picture.x + 30, picture.y + 30);
 await settle(page, 200);
 await page.mouse.move(picture.x + 30, picture.y + 30);
@@ -469,7 +469,7 @@ say("…as a ghost of itself, tilted and lifted on a shadow, with no handles rou
 say("…and while it is carried over the card it rides below and right of the pointer", !!carried && carried.x > aim.x && carried.y > aim.y, JSON.stringify({ aim, at: carried && { x: Math.round(carried.x), y: Math.round(carried.y) } }));
 // Once the card has laid it out among its blocks.
 const inside = await until(async () => {
-	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-picture"));
+	const now = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-picture"));
 	return now && Math.abs(now.x - picture.x) > 40 ? now : undefined;
 });
 await page.mouse.click(inside.x + 20, inside.y + 20);
@@ -484,7 +484,7 @@ say("…and dragged off the card it leaves it", !!out && out.inCard === -1, JSON
 
 // A file dropped from the desktop onto the card goes into it as a file's chip, which is ![[path]] in its markdown.
 const before = (cardNode()?.children ?? []).length;
-const onCard = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+const onCard = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"));
 await canvas.evaluate(({ x, y }) => {
 	const data = new DataTransfer();
 	data.items.add(new File(["%PDF-1.4 plan"], "itinerary-2.pdf", { type: "application/pdf" }));
@@ -499,7 +499,7 @@ await page.evaluate(() => {
 	globalThis.__opened = [];
 	window.open = (url) => (globalThis.__opened.push(String(url)), null);
 });
-const chip = await until(() => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), filed?.id));
+const chip = await until(() => canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), filed?.id));
 if (chip) await page.mouse.dblclick(chip.x + chip.width / 2, chip.y + chip.height / 2);
 const opened = await until(() => page.evaluate(() => globalThis.__opened?.[0]), 3000);
 say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test(opened ?? ""), opened);
@@ -508,7 +508,7 @@ say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test
 await page.keyboard.press("Escape");
 await settle(page, 400);
 const blockId = (cardNode()?.children ?? []).find((n) => n.type === "text" && (n.content ?? "").startsWith("Look:"))?.id;
-const blockBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockId);
+const blockBox = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), blockId);
 await page.mouse.move(blockBox.x + 40, blockBox.y + 6);
 // The stage's grip, not the drawing bar's own `.pen-tools .pen-grip`.
 const grip = await until(() => canvas.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);

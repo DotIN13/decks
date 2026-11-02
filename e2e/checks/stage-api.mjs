@@ -16,7 +16,7 @@ const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 // What is on the stage, in the canvas frame (none while the conversation has no canvas); a card placed on a canvas is its copy there, so compared by folder.
 const onCanvas = async () => {
 	const canvas = await canvasFrame(page, { timeout: 5000 }).catch(() => undefined);
-	const paths = canvas ? await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path)) : [];
+	const paths = canvas ? await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path)) : [];
 	return paths.map(base).sort();
 };
 /*

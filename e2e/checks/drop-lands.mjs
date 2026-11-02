@@ -51,10 +51,10 @@ async function laggedSocket(page) {
 async function boardStaysDropped(page, label, { picture }) {
 	const canvas = await canvasFrame(page);
 	// The server draws the pictures, and a busy machine takes a while: wait for one on screen before looking.
-	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
+	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksProbes?.rust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
 	const candidates = await canvas.evaluate((picture) => {
-		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
-		return window.__decksCards()
+		const pictured = new Set(JSON.parse(globalThis.__decksProbes.rust.picturedKey || "[]"));
+		return window.__decksProbes.cards()
 			.filter((one) => {
 				const r = one.rect;
 				return pictured.has(one.path) === picture && r.width >= 40 && r.x >= 300 && r.y >= 60 && r.right <= innerWidth - 200 && r.bottom <= innerHeight - 160;
@@ -68,8 +68,8 @@ async function boardStaysDropped(page, label, { picture }) {
 		const hasNode = (await canvas.locator(`.card-node[data-path="${path}"]`).count()) > 0;
 		grip = hasNode ? await cardEdge(page, path) : null;
 		grip ??= await canvas.evaluate((path) => {
-			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".card-node")?.dataset.path === path;
-			const r = window.__decksCards().find((one) => one.path === path).rect;
+			const at = (x, y) => window.__decksProbes.pictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".card-node")?.dataset.path === path;
+			const r = window.__decksProbes.cards().find((one) => one.path === path).rect;
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
@@ -85,13 +85,13 @@ async function boardStaysDropped(page, label, { picture }) {
 			break;
 		}
 	}
-	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksCards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksProbes.rust.camera.zoom, pictured: globalThis.__decksProbes.rust.picturedKey, boards: window.__decksProbes.cards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
 	const from = await canvas.evaluate((path) => {
-		const board = globalThis.__decksRust.placedCards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes.rust.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	await canvas.evaluate((path) => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes.rust;
 		globalThis.__boardFrames = [];
 		globalThis.__boardSampling = true;
 		const sample = () => {
@@ -126,7 +126,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	});
 	const after = frames.filter((f) => f.t > dropAt);
 	const to = await canvas.evaluate((path) => {
-		const board = globalThis.__decksRust.placedCards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes.rust.placedCards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	say(`${label}: the board moved`, Math.abs(to.x - from.x) > 20 && Math.abs(to.y - from.y) > 10, JSON.stringify({ from, to }));
@@ -146,7 +146,7 @@ async function boardStaysDropped(page, label, { picture }) {
 async function zoomToPictures(page) {
 	const canvas = await canvasFrame(page);
 	for (let i = 0; i < 16; i++) {
-		if (await canvas.evaluate(() => window.__decksCards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		if (await canvas.evaluate(() => window.__decksProbes.cards().some((one) => JSON.parse(globalThis.__decksProbes.rust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -163,7 +163,7 @@ async function zoomToPictures(page) {
 async function liveAndSmall(page) {
 	const view = page.viewportSize();
 	const canvas = await canvasFrame(page);
-	const zoom = () => canvas.evaluate(() => globalThis.__decksRust.camera.zoom);
+	const zoom = () => canvas.evaluate(() => globalThis.__decksProbes.rust.camera.zoom);
 	const middle = { x: (300 + view.width - 200) / 2, y: (60 + view.height - 160) / 2 };
 	await page.mouse.move(middle.x, middle.y);
 	const pinch = async (dy) => {
@@ -175,7 +175,7 @@ async function liveAndSmall(page) {
 	for (let i = 0; i < 40 && (await zoom()) > 0.45; i++) await pinch(40);
 	await rest(page).catch(() => {});
 	const off = await canvas.evaluate((middle) => {
-		const narrowest = window.__decksCards().sort((a, b) => a.rect.width - b.rect.width)[0];
+		const narrowest = window.__decksProbes.cards().sort((a, b) => a.rect.width - b.rect.width)[0];
 		if (!narrowest) return null;
 		const r = narrowest.rect;
 		return { dx: r.x + r.width / 2 - middle.x, dy: r.y + r.height / 2 - middle.y };
@@ -208,17 +208,17 @@ const canvas = await canvasFrame(page);
  * card, and the cards are left clear for the drops at the end.
  */
 {
-	const opening = await canvas.evaluate(() => globalThis.__decksRust.camera);
+	const opening = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
 	await page.mouse.move(700, 450);
 	await page.mouse.wheel((2900 - opening.x) * opening.zoom, 0);
 	await rest(page).catch(() => {});
 	await settle(page, 300);
 }
-const cam = await canvas.evaluate(() => globalThis.__decksRust.camera);
+const cam = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
 const r = await canvas.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }] });
-say("the box is drawn", !!(await until(() => canvas.evaluate(() => globalThis.__decksRust?.placed.get("lift-a")))));
+say("the box is drawn", !!(await until(() => canvas.evaluate(() => globalThis.__decksProbes?.rust?.placed.get("lift-a")))));
 await editMode(page, true);
 const x = r.left + r.width / 2;
 const y = r.top + r.height / 2;
@@ -228,13 +228,13 @@ for (let i = 1; i <= 10; i++) {
 	await page.mouse.move(x + i * 10, y + i * 5);
 	await page.waitForTimeout(30);
 }
-const during = await canvas.evaluate(() => [...globalThis.__decksRust.lifted]);
+const during = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.lifted]);
 say("dragged, the box is lifted", during.includes("lift-a"), JSON.stringify(during));
-const before = await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const before = await canvas.evaluate(() => globalThis.__decksProbes.rust.placed.get("lift-a").box);
 await page.mouse.up();
-const down = await until(async () => (await canvas.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 4000);
+const down = await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 4000);
 say("dropped, it is put down once the saved drawing has come", down);
-const moved = await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const moved = await canvas.evaluate(() => globalThis.__decksProbes.rust.placed.get("lift-a").box);
 say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.stringify({ before, moved }));
 
 // Into a column's slot: the outline rides the glide.
@@ -250,7 +250,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 300 / z, y1: cam.y + 120 / z, x2: cam.x - 200 / z, y2: cam.y + 180 / z } },
 		],
 	});
-	const box = (id) => canvas.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+	const box = (id) => canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id);
 	await until(async () => (await box("lift-r3")) && (await box("lift-b")));
 	await settle(page, 600);
 	await page.keyboard.press("Escape");
@@ -261,7 +261,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await settle(page, 300);
 	// Every frame from here: the selection's outline, and where the engine last said the item glides from.
 	await canvas.evaluate(() => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes.rust;
 		const own = engine.onGlide;
 		engine.onGlide = (shifts) => {
 			globalThis.__lastGlide = shifts;
@@ -271,7 +271,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 		globalThis.__sampling = true;
 		const sample = () => {
 			const outline = document.querySelector(".pen-selection")?.getBoundingClientRect();
-			const drawn = globalThis.__decksPenBox?.("lift-b");
+			const drawn = globalThis.__decksProbes?.penBox?.("lift-b");
 			const shift = globalThis.__lastGlide?.get("lift-b");
 			if (shift && outline && drawn) {
 				const zoom = engine.camera.zoom;
@@ -289,7 +289,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await page.mouse.move(r1.x + 60, (r1.y + r1.height + r2.y) / 2, { steps: 20 });
 	await settle(page, 200);
 	await page.mouse.up();
-	const joined = await until(async () => (await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
+	const joined = await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
 	await settle(page, 400);
 	const frames = await canvas.evaluate(() => {
 		globalThis.__sampling = false;

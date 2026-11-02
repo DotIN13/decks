@@ -128,7 +128,7 @@ const run = async (inFrame) => {
 	if (made?.className !== "Promise" && made?.subtype !== "promise") return made?.value ?? made?.description;
 	return (await send("Runtime.awaitPromise", { promiseObjectId: made.objectId, returnByValue: true })).result?.result?.value;
 };
-const zoom = async () => Number(/scale\(([\d.]+)\)/.exec(await run("String(globalThis.__decksCameraTransform?.())"))?.[1]);
+const zoom = async () => Number(/scale\(([\d.]+)\)/.exec(await run("String(globalThis.__decksProbes?.cameraTransform?.())"))?.[1]);
 for (let i = 0; i < 60 && (await run("typeof __pilot")) !== "object"; i++) await sleep(500);
 await sleep(8000);
 const settle = (ms) => run(`new Promise((done) => setTimeout(done, ${ms}))`);
@@ -137,8 +137,8 @@ const zoomTo = async (want) => {
 	await settle(3000);
 };
 
-// `--flags '{"__decksRecycleTiles":false}'`: globals set in the canvas frame before anything is recorded, for experiments.
-if (arg("flags")) await run(`Object.assign(globalThis, ${arg("flags")}), "set"`);
+// `--flags '{"halfZoom":false}'`: knobs set in the canvas frame before anything is recorded, for experiments.
+if (arg("flags")) await run(`Object.assign(globalThis.__decksKnobs ??= {}, ${arg("flags")}), "set"`);
 await send("Timeline.enable");
 await send("Memory.enable");
 // Garbage collections, with their pauses: a pause is a frame gap with nothing on the main thread's tasks to show for it.
@@ -154,9 +154,9 @@ const record = async (name, action) => {
 	await run(action);
 	const pageEnd = await run("performance.now()");
 	const wall = Date.now() - start;
-	// The drawing's own word on when it was last sharp and filled in (`stage/engine.ts`, `__decksSheet`), a moment after the gesture.
+	// The drawing's own word on when it was last sharp and filled in (`render/engine.ts`, `__decksProbes.sheet`), a moment after the gesture.
 	await settle(4000);
-	const sheet = await run("JSON.stringify(globalThis.__decksSheet ?? {})");
+	const sheet = await run("JSON.stringify(globalThis.__decksProbes.sheet ?? {})");
 	await send("Timeline.stop");
 	await send("Memory.stopTracking");
 	await send("CPUProfiler.stopTracking");

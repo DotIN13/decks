@@ -25,24 +25,24 @@ const went = await call("view.goto", [name]);
 say("the person's screen is on it", went.ok && went.value?.moved !== false, JSON.stringify(went).slice(0, 160));
 await settle(page, 1500);
 const canvas = await canvasFrame(page);
-const onIt = await until(() => canvas.evaluate((name) => String(globalThis.__decksRust?.base ?? "").includes(`/canvases/${name}/`), name), 8000);
-say("the frame on screen is the new, empty canvas", onIt, String(await canvas.evaluate(() => globalThis.__decksRust?.base).catch(() => "")));
+const onIt = await until(() => canvas.evaluate((name) => String(globalThis.__decksProbes?.rust?.base ?? "").includes(`/canvases/${name}/`), name), 8000);
+say("the frame on screen is the new, empty canvas", onIt, String(await canvas.evaluate(() => globalThis.__decksProbes?.rust?.base).catch(() => "")));
 
 const note = await call("canvas.insert", [{ type: "note", id: "ecf-note", content: "Hello from the agent" }, { canvas: name, at: { x1: 100, y1: 100 } }]);
 say("the agent inserted a note", note.ok, JSON.stringify(note).slice(0, 160));
-const seen = await until(() => canvas.evaluate(() => !!globalThis.__decksRust?.placed?.has("ecf-note")).catch(() => false), 6000);
+const seen = await until(() => canvas.evaluate(() => !!globalThis.__decksProbes?.rust?.placed?.has("ecf-note")).catch(() => false), 6000);
 say("the note shows in the frame without a reload", seen, seen ? "seen" : "not seen in 6 s");
 
 const doc = await call("canvas.insert", [{ type: "browser", id: "ecf-doc", width: 600, height: 400, metadata: { type: "decks.document", path: `canvases/${name}/files/notes.md` } }, { canvas: name, at: { x1: 800, y1: 100 } }]);
 say("the agent inserted a document item", doc.ok, JSON.stringify(doc).slice(0, 160));
-const seen2 = await until(() => canvas.evaluate(() => !!globalThis.__decksRust?.placed?.has("ecf-doc")).catch(() => false), 6000);
+const seen2 = await until(() => canvas.evaluate(() => !!globalThis.__decksProbes?.rust?.placed?.has("ecf-doc")).catch(() => false), 6000);
 say("the document shows in the frame without a reload", seen2, seen2 ? "seen" : "not seen in 6 s");
 
 // A document named from the canvas's folder, as agents do: stored as the deck names the file, the file made empty, and the item shown.
 const sloppy = await call("canvas.insert", [{ type: "document", id: "ecf-doc2", path: "files/china.md" }, { canvas: name, at: { x1: 800, y1: 600 } }]);
 const stored = sloppy.value?.metadata?.path;
 say("a document named from the canvas's folder is stored as the deck names it, with a note", sloppy.ok && stored === `canvases/${name}/files/china.md` && (sloppy.notes ?? []).some((n) => /files\/china\.md/.test(n)), JSON.stringify({ stored, notes: sloppy.notes }).slice(0, 300));
-const seen3 = await until(() => canvas.evaluate(() => !!globalThis.__decksRust?.placed?.has("ecf-doc2")).catch(() => false), 6000);
+const seen3 = await until(() => canvas.evaluate(() => !!globalThis.__decksProbes?.rust?.placed?.has("ecf-doc2")).catch(() => false), 6000);
 say("…and it shows in the frame too", seen3, seen3 ? "seen" : "not seen in 6 s");
 say("no errors on the page", errors.length === 0, errors.join(" | ").slice(0, 300));
 link.close?.();

@@ -20,7 +20,7 @@ try {
 					const frames = [];
 					const started = performance.now();
 					const tick = () => {
-						frames.push({ t: Math.round(performance.now() - started), shifts: typeof __decksGlide === "function" ? __decksGlide() : [] });
+						frames.push({ t: Math.round(performance.now() - started), shifts: typeof globalThis.__decksProbes?.glide === "function" ? __decksProbes.glide() : [] });
 						if (performance.now() - started < ms) requestAnimationFrame(tick);
 						else done(frames);
 					};
@@ -81,9 +81,9 @@ try {
 	}
 	// What a glide costs: the engine's time per frame and the gaps between frames, for one note and for forty notes moved at once.
 	const measure = async (ms) => {
-		await frame.evaluate(() => { globalThis.__decksGlideCost = []; });
+		await frame.evaluate(() => { globalThis.__decksKnobs.glideCost = []; });
 		const frames = await sample(ms);
-		const cost = await frame.evaluate(() => globalThis.__decksGlideCost ?? []);
+		const cost = await frame.evaluate(() => globalThis.__decksKnobs.glideCost ?? []);
 		const gaps = frames.slice(1).map((f, i) => f.t - frames[i].t);
 		const p = (list, q) => { const sorted = [...list].sort((a, b) => a - b); return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0; };
 		return { frames: cost.length, costP50: p(cost, 0.5), costP95: p(cost, 0.95), costMax: Math.max(0, ...cost), gapP95: p(gaps, 0.95), gapMax: Math.max(0, ...gaps) };

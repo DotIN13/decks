@@ -38,7 +38,7 @@ const anchor = await canvas.evaluate(async () => {
 	const cursor = { x: 420, y: 300 };
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			globalThis.__decksCameraTransform(),
+			globalThis.__decksProbes.cameraTransform(),
 		);
 		return { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
 	};
@@ -95,7 +95,7 @@ await settle(page, 400);
 const fitted = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();
 	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
-	const nodes = window.__decksCards().map((one) => one.rect);
+	const nodes = window.__decksProbes.cards().map((one) => one.rect);
 	return {
 		inside: nodes.every(
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,
@@ -122,7 +122,7 @@ say("0 fits every board on screen", fitted.inside && fitted.count === expected, 
  * labelled `+` is `=` unshifted, so a handler matching `"+"` never fired.
  */
 const zoomOf = () =>
-	canvas.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksCameraTransform())?.[1] ?? 0));
+	canvas.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksProbes.cameraTransform())?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
 await page.keyboard.press("Control+Equal");

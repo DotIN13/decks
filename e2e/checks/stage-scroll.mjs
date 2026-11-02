@@ -35,7 +35,7 @@ const places = () =>
 	canvas.evaluate(() => {
 		if (document.querySelector(".stage")?.dataset.gliding === "true") return [];
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		const out = [];
 		for (let y = 140; y < window.innerHeight - 160; y += 30) {
@@ -52,7 +52,7 @@ for (const deadline = Date.now() + 8000; !clear && Date.now() < deadline; ) {
 	clear = await firstOnCanvas(page, await places());
 	if (!clear) await settle(page, 200);
 }
-const why = clear ? "" : await canvas.evaluate(() => JSON.stringify({ cam: globalThis.__decksCameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live }));
+const why = clear ? "" : await canvas.evaluate(() => JSON.stringify({ cam: globalThis.__decksProbes.cameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live }));
 say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen) + why);
 
 const scrolled = () => canvas.evaluate(() => {
@@ -68,7 +68,7 @@ if (clear) {
 	const many = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}: words enough to make this card taller than any window.`).join("\n\n");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "tall", content: many, metadata: { type: "decks.markdown" }, width: 320 }, box: { x1: Math.round(clear.world.x), y1: Math.round(clear.world.y) } }] });
 	const card = await until(async () => {
-		const box = await canvas.evaluate(() => globalThis.__decksPenBox?.("tall"));
+		const box = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("tall"));
 		return box && box.height > clear.window * 1.5 ? box : undefined;
 	}, 12000);
 	say("the card is half again the window's height", !!card, JSON.stringify({ h: Math.round(card?.height ?? 0), window: clear.window, ...(await scrolled()) }));

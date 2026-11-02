@@ -32,7 +32,7 @@ function asIPad() {
 /** Each card's rung, as asked or held, whichever is more. */
 const held = (frame) =>
 	frame.evaluate(() => {
-		const engine = window.__decksRust;
+		const engine = window.__decksProbes.rust;
 		const out = {};
 		for (const [key, one] of engine.picturesAsked) if (key.startsWith("card:")) out[key] = Math.max(one.size ?? 0, engine.heldWidth.get(key) ?? 0);
 		return out;
@@ -40,7 +40,7 @@ const held = (frame) =>
 /** The rung each card wants at this zoom, the way `rungFor` chooses it. */
 const wanted = (frame) =>
 	frame.evaluate(() => {
-		const engine = window.__decksRust;
+		const engine = window.__decksProbes.rust;
 		const ladder = engine.pictures.ladder;
 		const out = {};
 		for (const card of engine.placedCards) {
@@ -57,8 +57,8 @@ for (const target of TARGETS) {
 	const { browser, page, errors } = await open({ ...target.open, cards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPad})();` });
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
-	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
-	say(`${name}: the device's ladder is ${ladder.join(" / ")}`, JSON.stringify(await canvas.evaluate(() => window.__decksRust.pictures.ladder)) === JSON.stringify(ladder));
+	await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+	say(`${name}: the device's ladder is ${ladder.join(" / ")}`, JSON.stringify(await canvas.evaluate(() => window.__decksProbes.rust.pictures.ladder)) === JSON.stringify(ladder));
 	const asked = watchCopies(page);
 	await outOfLive(page);
 	for (let i = 0; i < 6; i++) {
@@ -71,13 +71,13 @@ for (const target of TARGETS) {
 	say(`${name}: zoomed out, every card holds at least the rung its drawn width needs, never a width off the ladder`, Object.keys(first).length > 0 && Object.entries(first).every(([key, w]) => ladder.includes(w) && w >= want[key]), JSON.stringify({ first, want }).slice(0, 300));
 	say(`${name}: …and only the ladder's widths are asked for`, asked.every((one) => ladder.includes(one.w)), JSON.stringify(asked.slice(0, 4)));
 	// Compressed wherever the GPU takes ASTC: WebGPU with the feature, or WebGL 2 with `WEBGL_compressed_texture_astc` (any Mac's).
-	if (await canvas.evaluate(() => window.__decksRust.page.compressedPictures())) {
+	if (await canvas.evaluate(() => window.__decksProbes.rust.page.compressedPictures())) {
 		// A first look gets the server's stand-in for a rung it has not made yet, asked again until it has.
 		const cards = Object.keys(first).length;
-		const put = () => canvas.evaluate(() => window.__decksRust.compressedPut);
+		const put = () => canvas.evaluate(() => window.__decksProbes.rust.compressedPut);
 		for (let i = 0; i < 40 && (await put()) < cards; i++) await settle(page, 500);
 		const perPixel = await canvas.evaluate(() => {
-			const engine = window.__decksRust;
+			const engine = window.__decksProbes.rust;
 			const each = [...engine.compressedSize].map(([key, [w, h]]) => engine.pictureBytes.get(key) / (w * h));
 			return each.length ? Math.max(...each) : 0;
 		});
@@ -111,19 +111,19 @@ for (const target of TARGETS) {
 	// A budget far too small: the pictures shrink on the GPU, with no request.
 	const sent = asked.length;
 	const shrunk = await canvas.evaluate(async () => {
-		const engine = window.__decksRust;
+		const engine = window.__decksProbes.rust;
 		const was = engine.heldBytes();
-		window.__decksPictureMB = 0.05;
+		window.__decksKnobs.pictureMB = 0.05;
 		engine.fitPictures();
 		await new Promise((done) => setTimeout(done, 300));
 		return { was, bytes: engine.heldBytes() };
 	});
-	const backend = await canvas.evaluate(() => window.__decksEngine?.stats?.().backend);
+	const backend = await canvas.evaluate(() => window.__decksProbes?.engine?.stats?.().backend);
 	// WebGL 2 cannot copy a compressed picture's smaller sizes (`Gpu::shrink`), so a compressed one does not shrink there.
 	if (backend === "webgl2") say(`${name}: on WebGL 2 compressed pictures do not shrink`, shrunk.bytes <= shrunk.was, JSON.stringify({ backend, ...shrunk }));
 	else say(`${name}: over the budget, pictures shrink on the GPU`, shrunk.bytes < shrunk.was, JSON.stringify({ backend, ...shrunk }));
 	say(`${name}: …with no picture fetched for it`, asked.length === sent, JSON.stringify(asked.slice(sent, sent + 4)));
-	await canvas.evaluate(() => delete window.__decksPictureMB);
+	await canvas.evaluate(() => window.__decksKnobs.pictureMB = undefined);
 	say(`${name}: no errors on the page`, errors.length === 0, errors.join(" | "));
 	await browser.close();
 }

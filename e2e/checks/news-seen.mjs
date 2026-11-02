@@ -29,12 +29,12 @@ page.on("request", (request) => {
 });
 
 // A card on the canvas on screen (the fixture's plan).
-const onStage = await canvas.evaluate(() => (window.__decksCards?.() ?? []).map((one) => one.path));
+const onStage = await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path));
 const deck = await deckState();
 const card = deck.boards.find((board) => board.path === "canvases/auth-refresh/cards/plan/index.html" && onStage.includes(board.path)) ?? deck.boards.find((board) => onStage.includes(board.path));
 say("a card is on the canvas on screen", Boolean(card), JSON.stringify(onStage));
 
-const newsNow = () => canvas.evaluate(() => window.__decksFrameNews?.() ?? {});
+const newsNow = () => canvas.evaluate(() => window.__decksProbes?.frameNews?.() ?? {});
 const waitFor = async (test, ms = 10000) => {
 	const until = Date.now() + ms;
 	while (Date.now() < until) {

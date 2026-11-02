@@ -375,8 +375,8 @@ export async function highlightMode(page) {
 export async function liveZoom(page, { tries = 12 } = {}) {
 	const canvas = await canvasFrame(page);
 	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
-	const boards = () => canvas.evaluate(() => window.__decksCards?.().length ?? document.querySelectorAll(".card-node").length);
-	await canvas.waitForFunction(() => (window.__decksCards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+	const boards = () => canvas.evaluate(() => window.__decksProbes?.cards?.().length ?? document.querySelectorAll(".card-node").length);
+	await canvas.waitForFunction(() => (window.__decksProbes?.cards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
 		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
 		await canvas
@@ -396,7 +396,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 			 * board off screen.
 			 */
 			const seen = (r) => Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) * Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
-			const rects = (window.__decksCards?.() ?? []).map((one) => one.rect);
+			const rects = (window.__decksProbes?.cards?.() ?? []).map((one) => one.rect);
 			const cx = rect.left + rect.width / 2;
 			const cy = rect.top + rect.height / 2;
 			// The centre when it is on a board already, so a desktop lands where it always has.
@@ -419,7 +419,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 export async function ready(page, { timeout = 30000 } = {}) {
 	const canvas = await canvasFrame(page, { timeout });
 	await canvas.waitForFunction(
-		() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksSheet?.shown ?? 0) > 0,
+		() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksProbes?.sheet?.shown ?? 0) > 0,
 		null,
 		{ timeout, polling: 100 },
 	);
@@ -470,7 +470,7 @@ export async function emptyCanvas(page, { timeout = 15000 } = {}) {
 	// A conversation with no canvas yet has no frame at all, which is as empty as a canvas gets.
 	const canvas = await canvasFrame(page, { timeout: Math.min(timeout, 5000) }).catch(() => undefined);
 	if (!canvas) return;
-	await canvas.waitForFunction(() => document.querySelectorAll(".card-node").length === 0 && (window.__decksCards?.().length ?? 0) === 0, null, { timeout });
+	await canvas.waitForFunction(() => document.querySelectorAll(".card-node").length === 0 && (window.__decksProbes?.cards?.().length ?? 0) === 0, null, { timeout });
 }
 
 /**
@@ -906,7 +906,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	// A board is its picture on the stage's sheet; a card, a document or an app awake has a node. The stage says where each is.
 	const candidates = () => canvas.evaluate((wanted) => {
 		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
-		const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
+		const r = node?.getBoundingClientRect() ?? window.__decksProbes?.cards?.().find((one) => one.path === wanted)?.rect;
 		if (!r) return [];
 		const stage = document.querySelector(".stage");
 		const out = [];
@@ -916,7 +916,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 				const y = r.y + r.height * fy;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
 				const hit = document.elementFromPoint(x, y);
-				if (node ? hit && hit.closest(".card-node") === node && !hit.closest("a, button, input, textarea, select") : (hit === stage || stage?.contains(hit)) && window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
+				if (node ? hit && hit.closest(".card-node") === node && !hit.closest("a, button, input, textarea, select") : (hit === stage || stage?.contains(hit)) && window.__decksProbes?.pictureAt?.(x, y) === wanted) out.push({ x, y });
 			}
 		}
 		return out;
@@ -940,7 +940,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const off = await canvas.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
+			const r = node?.getBoundingClientRect() ?? window.__decksProbes?.cards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return null;
 			return { dx: r.x + r.width / 2 - innerWidth / 2, dy: r.y + r.height / 2 - innerHeight / 2 };
 		}, path);
@@ -954,7 +954,7 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const why = await canvas.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksCards?.().find((one) => one.path === wanted)?.rect;
+			const r = node?.getBoundingClientRect() ?? window.__decksProbes?.cards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return "not on the canvas";
 			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
 			return `at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}, its middle under ${hit?.tagName.toLowerCase()}.${String(hit?.className ?? "").split(" ")[0]}`;

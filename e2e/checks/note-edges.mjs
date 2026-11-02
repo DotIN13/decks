@@ -63,14 +63,14 @@ for (const run of RUNS) {
 	const { browser, page, errors } = await open({ ...run.open, scheme: "light", cards: false, init: run.init });
 	/** The canvas frame: the stage and its engine are there (the screenshot and its reading stay the page's). */
 	const canvas = await canvasFrame(page);
-	const opened = await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);
-	const stats = await canvas.evaluate(() => window.__decksEngine?.stats?.());
+	const opened = await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);
+	const stats = await canvas.evaluate(() => window.__decksProbes?.engine?.stats?.());
 	say(`${run.label}: the stage draws with ${run.want}`, opened && stats?.backend === run.want && stats?.workerBackend === run.want, JSON.stringify(stats));
 	// The camera opens at the origin and, a couple of seconds later, goes to what the agent has up:
 	// wait for it to get there and stay, or the note is placed (and later sought) in a view that is gone.
-	await canvas.waitForFunction(() => (window.__decksCards?.().length ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksProbes?.cards?.().length ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await new Promise((r) => setTimeout(r, 150))) {
-		const now = await canvas.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+		const now = await canvas.evaluate(() => globalThis.__decksProbes?.cameraTransform?.() ?? "");
 		if (now !== last) [last, since] = [now, Date.now()];
 		else if (Date.now() - since > 1500 && !now.includes("scale(1) translate(0px, 0px)")) break;
 	}
@@ -79,12 +79,12 @@ for (const run of RUNS) {
 	if (!noteId) {
 		// One note, on empty paper in the first page's view (no board under it), on a stage the later pages open too.
 		const at = await canvas.evaluate(() => {
-			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
+			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
 			if (!m) return null;
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();
 			const zoom = Number(m[3]);
-			const boards = (window.__decksCards?.() ?? []).map((b) => b.rect);
+			const boards = (window.__decksProbes?.cards?.() ?? []).map((b) => b.rect);
 			const free = (x, y) => boards.every((r) => x < r.left - 4 || x > r.right + 4 || y < r.top - 4 || y > r.bottom + 4);
 			// The free spot nearest the middle (clear of the panels at the sides): room for the note and paper to its left.
 			const spots = [];
@@ -106,7 +106,7 @@ for (const run of RUNS) {
 		link.close();
 	}
 	const boxOf = () => canvas.evaluate((id) => {
-		const r = window.__decksPenBox?.(id);
+		const r = window.__decksProbes?.penBox?.(id);
 		return r && r.width > 0 ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
 	}, noteId);
 	// Zoomed in about the note until it is a few hundred pixels wide: its edge many pixels across.
@@ -122,7 +122,7 @@ for (const run of RUNS) {
 	}
 	await settle(page, 600);
 	const box = await until(() => canvas.evaluate((id) => {
-		const r = window.__decksPenBox?.(id);
+		const r = window.__decksProbes?.penBox?.(id);
 		return r && r.width > 0 ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
 	}, noteId));
 	say(`${run.label}: the note is on the stage`, !!box, JSON.stringify(box));
@@ -131,7 +131,7 @@ for (const run of RUNS) {
 		continue;
 	}
 	// Painted into tiles and put on the page.
-	await canvas.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksProbes.engine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	await settle(page, 2500);
 	const dpr = await page.evaluate(() => devicePixelRatio);
 	const png = (await page.screenshot()).toString("base64");

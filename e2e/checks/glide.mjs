@@ -37,7 +37,7 @@ const watched = async (press, ms) => {
 	const sampling = canvas.evaluate(async (ms) => {
 		const camera = () => {
 			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-				globalThis.__decksCameraTransform(),
+				globalThis.__decksProbes.cameraTransform(),
 			);
 			return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 		};
@@ -98,7 +98,7 @@ say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zo
 const stealing = (await canvasFrame(page)).evaluate(async () => {
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			globalThis.__decksCameraTransform(),
+			globalThis.__decksProbes.cameraTransform(),
 		);
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	};

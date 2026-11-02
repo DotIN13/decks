@@ -6,7 +6,7 @@
  * and the page writes them into its texture (`putTilePixels`), because WebKit's copy of a worker's
  * picture into a texture costs the page about 2 ms a tile; Chromium, and WebGL 2 everywhere, keep
  * pictures. Both ways are compared in Chromium and in WebKit as an iPhone (whose WebGPU Playwright
- * has on a page served from 127.0.0.1), with `__decksTilePixels` choosing: three fresh pages on the
+ * has on a page served from 127.0.0.1), with `__decksKnobs.tilePixels` choosing: three fresh pages on the
  * same stage, pictures, bytes, pictures again (the boards' own pictures and their shadows left out, which are made
  * again a little differently on each visit), each screenshotted at rest five zoom steps out from where
  * it opens, eight, and seven (one back in). The two picture pages must agree (the screenshots are steady), and the
@@ -21,18 +21,18 @@ import { canvasFrame, open, rest, say, settle } from "../harness.mjs";
 import { TARGETS, zoomStep } from "../backends-kit.mjs";
 import { join } from "node:path";
 
-const flag = (on) => `globalThis.__decksTilePixels = ${on};`;
+const flag = (on) => `(globalThis.__decksKnobs ??= {}).tilePixels = ${on};`;
 
 /** Wait until the stage is at rest and has every tile of its window at its resting scale. */
 async function sharp(page) {
 	await rest(page, { start: 200, timeout: 8000 }).catch(() => {});
 	// The stage and its engine are in the canvas frame.
 	const canvas = await canvasFrame(page);
-	await canvas.waitForFunction(() => (globalThis.__decksSheet?.settledAt ?? 0) > 0, null, { timeout: 15000 }).catch(() => {});
+	await canvas.waitForFunction(() => (globalThis.__decksProbes?.sheet?.settledAt ?? 0) > 0, null, { timeout: 15000 }).catch(() => {});
 	// Quiet: no tile in for 600 ms.
 	let last = -1;
 	for (let i = 0; i < 40; i++) {
-		const n = await canvas.evaluate(() => globalThis.__decksSheet?.tiles ?? 0);
+		const n = await canvas.evaluate(() => globalThis.__decksProbes?.sheet?.tiles ?? 0);
 		if (n === last) break;
 		last = n;
 		await settle(page, 600);
@@ -42,7 +42,7 @@ async function sharp(page) {
 async function shots(target, on, label) {
 	const { browser, page, errors } = await open({ ...target.open, scheme: "light", init: flag(on) });
 	const canvas = await canvasFrame(page);
-	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
+	await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 });
 	const out = { label, errors, pictures: [], boards: [] };
 	/*
 	 * A screenshot, and where the boards are on it, in its pixels: a board's picture is the page's own
@@ -54,7 +54,7 @@ async function shots(target, on, label) {
 	await canvas.addStyleTag(hidden);
 	const snap = async () => {
 		out.pictures.push((await page.screenshot()).toString("base64"));
-		out.boards.push(await canvas.evaluate(() => (window.__decksCards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
+		out.boards.push(await canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
 	};
 	// Out by fixed steps (not until the boards are pictures, which depends on timing), so every page is at the same zoom.
 	// Where it opens is not compared: live boards' pages differ a little from page to page.
@@ -72,7 +72,7 @@ async function shots(target, on, label) {
 	await zoomStep(page, -25);
 	await sharp(page);
 	await snap();
-	out.stats = await canvas.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
+	out.stats = await canvas.evaluate(() => ({ ...window.__decksProbes.engine.stats(), pixelTiles: globalThis.__decksProbes?.sheet?.pixelTiles ?? 0, tiles: globalThis.__decksProbes?.sheet?.tiles ?? 0 }));
 	out.compare = (a, b, boards) =>
 		page.evaluate(
 			async ([one, two, boards]) => {
@@ -120,7 +120,7 @@ for (const target of TARGETS) {
 	const bytes = await shots(target, true, "bytes");
 	const again = await shots(target, false, "pictures-again");
 	say(`${name}: tiles as pictures when not asked for bytes`, first.stats.pixelTiles === 0 && first.stats.tiles > 0, JSON.stringify(first.stats));
-	say(`${name}: tiles as bytes when asked (__decksTilePixels), on WebGPU`, first.stats.workerBackend === "webgpu" && bytes.stats.pixelTiles > 0 && bytes.stats.pixelTiles === bytes.stats.tiles, JSON.stringify(bytes.stats));
+	say(`${name}: tiles as bytes when asked (__decksKnobs.tilePixels), on WebGPU`, first.stats.workerBackend === "webgpu" && bytes.stats.pixelTiles > 0 && bytes.stats.pixelTiles === bytes.stats.tiles, JSON.stringify(bytes.stats));
 	const views = ["five zoom steps out", "eight steps out", "seven steps out"];
 	for (let i = 0; i < views.length; i++) {
 		const boards = [...first.boards[i], ...again.boards[i], ...bytes.boards[i]];
@@ -149,9 +149,9 @@ for (const target of TARGETS) {
 for (const target of TARGETS) {
 	const { browser, page } = await open({ ...target.open, scheme: "light", cards: false });
 	const canvas = await canvasFrame(page);
-	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
+	await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 });
 	await sharp(page);
-	const stats = await canvas.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
+	const stats = await canvas.evaluate(() => ({ ...window.__decksProbes.engine.stats(), pixelTiles: globalThis.__decksProbes?.sheet?.pixelTiles ?? 0, tiles: globalThis.__decksProbes?.sheet?.tiles ?? 0 }));
 	const webkit = target.open.engine === "webkit";
 	say(`${target.label}: unasked, tiles come as ${webkit ? "bytes" : "pictures"}`, stats.tiles > 0 && (webkit ? stats.pixelTiles === stats.tiles : stats.pixelTiles === 0), JSON.stringify(stats));
 	await browser.close();

@@ -17,7 +17,7 @@ await page.locator('.panel-shell [title^="What the survey round found"]').first(
 await settle(page, 900);
 const NOTES = card("notes");
 const canvas = await canvasFrame(page);
-const onCanvas = await canvas.evaluate((path) => (window.__decksCards?.() ?? []).filter((one) => one.path === path).length, NOTES);
+const onCanvas = await canvas.evaluate((path) => (window.__decksProbes?.cards?.() ?? []).filter((one) => one.path === path).length, NOTES);
 say("the flow board is on the canvas", onCanvas === 1, `${onCanvas} at ${NOTES}`);
 
 await selectCard(page, NOTES);

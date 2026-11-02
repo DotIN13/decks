@@ -172,14 +172,14 @@ await page.mouse.click(spots[1].x, spots[1].y);
 const second = await until(() => shapesNow().find((n) => !had2.has(n.id)));
 say("a second shape, a Process", second?.metadata?.kind === "Process");
 // Select the first again, and draw from its bottom side to the second, once the page has drawn it.
-await until(() => canvas.evaluate((id) => !!window.__decksPenBox?.(id), second?.children?.[0]?.id));
-// A shape is clicked on its outline; the page says where it draws it (`__decksPenBox`, `Stage.tsx`).
+await until(() => canvas.evaluate((id) => !!window.__decksProbes?.penBox?.(id), second?.children?.[0]?.id));
+// A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `Stage.tsx`).
 const first = await canvas.evaluate((id) => {
-	const r = window.__decksPenBox?.(id);
+	const r = window.__decksProbes?.penBox?.(id);
 	return r ? { x: r.x + r.width / 2, y: r.y + r.height / 3 } : undefined;
 }, made?.children?.find((n) => n.type === "path")?.id);
 const target = await canvas.evaluate((id) => {
-	const r = window.__decksPenBox?.(id);
+	const r = window.__decksProbes?.penBox?.(id);
 	return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined;
 }, second?.children?.find((n) => n.type === "path")?.id);
 if (first && target) {
@@ -202,7 +202,7 @@ if (first && target) {
 			say("words on an arrow are its label", !!worded);
 		}
 	}
-} else say("both shapes are on screen", false, JSON.stringify({ first, target, ids: [made?.id, second?.id], boxes: await canvas.evaluate((ids) => ids.map((id) => !!window.__decksPenBox?.(id)), [made?.id, second?.id]) }));
+} else say("both shapes are on screen", false, JSON.stringify({ first, target, ids: [made?.id, second?.id], boxes: await canvas.evaluate((ids) => ids.map((id) => !!window.__decksProbes?.penBox?.(id)), [made?.id, second?.id]) }));
 
 
 // --- a shape covers what it draws, and nothing beside it --------------------------------------------
@@ -216,7 +216,7 @@ if (first && target) {
  * cover the view the checks above leave, and a live board's page is not bare canvas.
  */
 for (let i = 0; i < 12; i++) {
-	const right = await canvas.evaluate(() => Math.max(-Infinity, ...(window.__decksCards?.() ?? []).map(({ rect }) => rect.right)));
+	const right = await canvas.evaluate(() => Math.max(-Infinity, ...(window.__decksProbes?.cards?.() ?? []).map(({ rect }) => rect.right)));
 	if (right < 360) break;
 	// Scrolled where the stage itself is under the pointer: a live board's page keeps a wheel over it.
 	const at = await canvas.evaluate(() => {
@@ -230,7 +230,7 @@ for (let i = 0; i < 12; i++) {
 await settle(page, 400);
 const room = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 800; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
@@ -265,7 +265,7 @@ if (room) {
 			box: { x1: room.world.x, y1: room.world.y + i * (size.h + gap), x2: room.world.x + size.w, y2: room.world.y + i * (size.h + gap) + size.h },
 		})),
 	});
-	const boxOf = (id) => canvas.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const boxOf = (id) => canvas.evaluate((one) => globalThis.__decksProbes?.penBox?.(one), id);
 	const drawn = await until(async () => {
 		const all = { top: await boxOf("oval-top"), out: await boxOf("oval-top-out"), under: await boxOf("oval-under") };
 		return all.top && all.out && all.under && all.top.height > 0 ? all : undefined;
@@ -305,7 +305,7 @@ if (arrowDrawn) {
  */
 const diagonal = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 700; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
@@ -319,7 +319,7 @@ if (diagonal) {
 	const b = { x: a.x + 700, y: a.y + 500 };
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "slash", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: "decks.arrow", from: [a.x, a.y], to: [b.x, b.y], route: "straight" } } }] });
 	const drawn = await until(async () => {
-		const box = await canvas.evaluate(() => globalThis.__decksPenBox?.("slash"));
+		const box = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("slash"));
 		return box && box.width > 40 && box.height > 40 ? box : undefined;
 	});
 	say("the arrow is drawn, with a box of real area", !!drawn, JSON.stringify(drawn && { w: Math.round(drawn.width), h: Math.round(drawn.height) }));
@@ -358,8 +358,8 @@ if (diagonal) {
 			document.body.append(svg);
 			const at = path.getPointAtLength(path.getTotalLength() / 2);
 			svg.remove();
-			const m = new DOMMatrix(globalThis.__decksCameraTransform());
-			const box = globalThis.__decksPenBox?.("slash");
+			const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
+			const box = globalThis.__decksProbes?.penBox?.("slash");
 			return { x: box.x + at.x * m.a, y: box.y + at.y * m.a };
 		}, { geometry });
 		await page.mouse.click(on.x, on.y);
@@ -374,8 +374,8 @@ if (diagonal) {
 		 * harder to hit zoomed out, where 8 stage pixels would be two on the screen.
 		 */
 		const normal = () => canvas.evaluate((one) => {
-			const box = globalThis.__decksPenBox?.("slash");
-			const m = new DOMMatrix(globalThis.__decksCameraTransform());
+			const box = globalThis.__decksProbes?.penBox?.("slash");
+			const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 			// The line alone: the geometry's later subpaths are the head.
@@ -411,7 +411,7 @@ if (diagonal) {
 		for (let i = 0; i < 40; i++) {
 			await page.mouse.wheel(0, -120);
 			await page.waitForTimeout(40);
-			const zoom = await canvas.evaluate(() => new DOMMatrix(globalThis.__decksCameraTransform()).a);
+			const zoom = await canvas.evaluate(() => new DOMMatrix(globalThis.__decksProbes.cameraTransform()).a);
 			if (zoom >= far.zoom * 4) break;
 		}
 		await page.keyboard.up("Control");
@@ -435,7 +435,7 @@ if (diagonal) {
 	// A fresh shape where the screen is, so what this selects does not depend on where the checks above left the camera.
 	const at = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage").getBoundingClientRect();
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const sx = stage.left + stage.width * 0.45, sy = stage.top + stage.height * 0.4;
 		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
 	});
@@ -444,7 +444,7 @@ if (diagonal) {
 	await until(() => onDisk().children.find((n) => n.id === "pill-shape"));
 	await settle(page, 800);
 	const target = onDisk().children.find((n) => n.id === "pill-shape");
-	const middle = await canvas.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); return r && r.width > 4 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }, target?.id);
+	const middle = await canvas.evaluate((id) => { const r = globalThis.__decksProbes?.penBox?.(id); return r && r.width > 4 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }, target?.id);
 	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
@@ -460,7 +460,7 @@ if (diagonal) {
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
 		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
 		// The copy is selected once the drawing has it: the outline moves onto it.
-		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
+		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksProbes?.penBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
 		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
@@ -478,7 +478,7 @@ if (diagonal) {
 	await settle(page, 300);
 	const at = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage").getBoundingClientRect();
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 		const toStage = (sx, sy) => ({ x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d });
 		return { a: toStage(stage.left + stage.width * 0.3, stage.top + stage.height * 0.3), b: toStage(stage.left + stage.width * 0.6, stage.top + stage.height * 0.55), zoom: m.a };
 	});
@@ -491,7 +491,7 @@ if (diagonal) {
 	await until(() => onDisk().children.find((n) => n.id === "bend-arrow")?.geometry);
 	await settle(page, 800);
 	// The arrow is picked on its line: its middle, where the elbow's middle segment is.
-	const line = await canvas.evaluate(() => { const r = globalThis.__decksPenBox?.("bend-arrow"); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+	const line = await canvas.evaluate(() => { const r = globalThis.__decksProbes?.penBox?.("bend-arrow"); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
 	if (line) await page.mouse.click(line.x, line.y);
 	const handles = await until(() => canvas.evaluate(() => {
 		const centre = (el) => { const r = el?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; };
@@ -501,7 +501,7 @@ if (diagonal) {
 	}));
 	say("a selected arrow shows a diamond on its joined end and a handle in its middle", !!handles, JSON.stringify(handles));
 	if (handles) {
-		const box = await canvas.evaluate(() => { const r = globalThis.__decksPenBox?.("bend-a"); return r ? { top: r.top, height: r.height } : undefined; });
+		const box = await canvas.evaluate(() => { const r = globalThis.__decksProbes?.penBox?.("bend-a"); return r ? { top: r.top, height: r.height } : undefined; });
 		// Down the right side to a quarter from its foot: three quarters of the way.
 		await page.mouse.move(handles.from.x, handles.from.y);
 		await page.mouse.down();

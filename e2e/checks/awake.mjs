@@ -49,10 +49,10 @@ await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage ==
 await page.reload({ waitUntil: "domcontentloaded" });
 const canvas = await canvasFrame(page);
 const seven = await canvas
-	.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 7, undefined, { timeout: 30000 })
+	.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 7, undefined, { timeout: 30000 })
 	.then(() => true)
 	.catch(() => false);
-say("the stage shows the seven items", seven, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+say("the stage shows the seven items", seven, String(await canvas.evaluate(() => globalThis.__decksProbes?.cards?.().length)));
 // A look at the placeholders, before their pictures come (`AWAKE_SHOTS=<folder>`).
 const shots = process.env.AWAKE_SHOTS;
 if (shots) await page.screenshot({ path: `${shots}/awake-opening.png` });
@@ -67,7 +67,7 @@ await canvas.evaluate(() => {
 	globalThis.__t = {
 		async zoomTo(zoom) {
 			for (let i = 0; i < 200; i++) {
-				const now = globalThis.__decksRust.camera.zoom;
+				const now = globalThis.__decksProbes.rust.camera.zoom;
 				const ln = Math.log(zoom / now);
 				if (Math.abs(ln) < 1e-6) return;
 				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
@@ -76,7 +76,7 @@ await canvas.evaluate(() => {
 		},
 		async panTo(x, y) {
 			for (let i = 0; i < 40; i++) {
-				const c = globalThis.__decksRust.camera;
+				const c = globalThis.__decksProbes.rust.camera;
 				const dx = (x - c.x) * c.zoom;
 				const dy = (y - c.y) * c.zoom;
 				if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -87,7 +87,7 @@ await canvas.evaluate(() => {
 		},
 		/** The stage at rest: which items have nodes, which windows show an app, how many documents are editors. */
 		state() {
-			const cards = globalThis.__decksCards?.() ?? [];
+			const cards = globalThis.__decksProbes?.cards?.() ?? [];
 			return {
 				nodes: cards.filter((c) => c.node).map((c) => c.path).sort(),
 				// Apps whose window shows the app and whose node is live: a kept app keeps its window loaded, hidden under its picture.
@@ -106,7 +106,7 @@ const rest = (ms = 900, cap = 12000) =>
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
 			const cam = () => {
-				const c = globalThis.__decksRust?.camera;
+				const c = globalThis.__decksProbes?.rust?.camera;
 				return c ? [Math.round(c.x), Math.round(c.y), Math.round(c.zoom * 1000)] : null;
 			};
 			const snap = () => JSON.stringify([globalThis.__t.state(), document.querySelector(".stage")?.dataset.moving, cam()]);
@@ -124,12 +124,12 @@ const rest = (ms = 900, cap = 12000) =>
 		},
 		{ ms, cap },
 	);
-await canvas.waitForFunction(() => !!globalThis.__decksRust?.camera, undefined, { timeout: 20000 }).catch(() => {});
+await canvas.waitForFunction(() => !!globalThis.__decksProbes?.rust?.camera, undefined, { timeout: 20000 }).catch(() => {});
 if (shots) {
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: `${shots}/awake-engine-up.png` });
 }
-const items = await canvas.evaluate(() => globalThis.__decksCards().map((c) => c.path));
+const items = await canvas.evaluate(() => globalThis.__decksProbes.cards().map((c) => c.path));
 const appPaths = items.filter((p) => /^item:aa/.test(p));
 const docPaths = items.filter((p) => /^item:ad/.test(p));
 const cardPaths = items.filter((p) => /cards\//.test(p));
@@ -146,14 +146,14 @@ await rest();
 let state = await canvas.evaluate(() => globalThis.__t.state());
 say("at 30% no item of any kind has a node: every card, app and document is its picture", state.nodes.length === 0 && state.apps.length === 0 && state.documents === 0 && state.cardHosts === 0, JSON.stringify(state));
 // The sheet draws the document's picture, once the server has made one (its file rendered as a card).
-const docPictured = await until(async () => (await canvas.evaluate(() => globalThis.__decksPictured?.() ?? [])).includes(docPaths[0]), 20000);
-say("…and the document is drawn as its picture, of its file", !!docPictured, JSON.stringify(await canvas.evaluate(() => globalThis.__decksPictured?.() ?? [])));
+const docPictured = await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes?.pictured?.() ?? [])).includes(docPaths[0]), 20000);
+say("…and the document is drawn as its picture, of its file", !!docPictured, JSON.stringify(await canvas.evaluate(() => globalThis.__decksProbes?.pictured?.() ?? [])));
 if (shots) {
 	await page.screenshot({ path: `${shots}/awake-30.png` });
 	// The document, centred at 30%, as its picture.
 	const doc = await canvas.evaluate((path) => {
-		const c = globalThis.__decksCards().find((one) => one.path === path);
-		const cam = globalThis.__decksRust.camera;
+		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+		const cam = globalThis.__decksProbes.rust.camera;
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, docPaths[0]);
@@ -174,7 +174,7 @@ const nearApps = await canvas.evaluate(() => {
 	const mx = r.width / 2;
 	const my = r.height / 2;
 	const far = (c) => Math.hypot(Math.max(c.rect.left - r.left - mx, 0, mx - (c.rect.right - r.left)), Math.max(c.rect.top - r.top - my, 0, my - (c.rect.bottom - r.top)));
-	return globalThis.__decksCards().filter((c) => /^item:aa/.test(c.path)).sort((a, b) => far(a) - far(b)).map((c) => c.path);
+	return globalThis.__decksProbes.cards().filter((c) => /^item:aa/.test(c.path)).sort((a, b) => far(a) - far(b)).map((c) => c.path);
 });
 say("at 60% the cards near the screen and the document are awake, with nodes", cardPaths.every((p) => state.nodes.includes(p)) && state.documents === 1 && state.cardHosts === 3, JSON.stringify(state));
 say("…and of three apps near, the two nearest the middle run (the computer's budget of two)", state.apps.length === 2 && state.apps.includes(nearApps[0]) && state.apps.includes(nearApps[1]), `${JSON.stringify(state.apps)} nearest ${JSON.stringify(nearApps)}`);
@@ -190,19 +190,19 @@ const marked = await canvas.evaluate((path) => {
 	return true;
 }, liveCard);
 say("the live card has its root, marked", marked);
-const sizeBefore = await canvas.evaluate((path) => globalThis.__decksCards().find((c) => c.path === path)?.rect.width, liveCard);
+const sizeBefore = await canvas.evaluate((path) => globalThis.__decksProbes.cards().find((c) => c.path === path)?.rect.width, liveCard);
 const resized = await call("canvas.update", [liveCard, { size: { w: 900, h: 760 } }, { canvas: CANVAS }]);
 say("the card is resized by the API", resized.ok === true, JSON.stringify(resized.error ?? "").slice(0, 120));
 const grew = await until(async () => {
-	const w = await canvas.evaluate((path) => globalThis.__decksCards().find((c) => c.path === path)?.rect.width, liveCard);
+	const w = await canvas.evaluate((path) => globalThis.__decksProbes.cards().find((c) => c.path === path)?.rect.width, liveCard);
 	return w !== sizeBefore ? w : undefined;
 }, 8000);
 say("…and the stage shows the new size", !!grew, `${sizeBefore} -> ${grew}`);
 await page.waitForTimeout(2500);
 const kept = await canvas.evaluate((path) => {
 	const node = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path);
-	const page = globalThis.__decksCards().find((c) => c.path === path);
-	return { node: node?.dataset.mark === "before-resize", host: node?.querySelector(".card-host")?.dataset.mark === "before-resize", sized: page?.sized, rev: page?.rev, nodesForPath: [...document.querySelectorAll(".world .card-node")].filter((n) => n.dataset.path === path).map((n) => n.dataset.mark ?? "-"), made: globalThis.__decksMade?.[path] };
+	const page = globalThis.__decksProbes.cards().find((c) => c.path === path);
+	return { node: node?.dataset.mark === "before-resize", host: node?.querySelector(".card-host")?.dataset.mark === "before-resize", sized: page?.sized, rev: page?.rev, nodesForPath: [...document.querySelectorAll(".world .card-node")].filter((n) => n.dataset.path === path).map((n) => n.dataset.mark ?? "-"), made: globalThis.__decksProbes?.made?.[path] };
 }, liveCard);
 say("…and the card keeps the document it had: the same root, its scripts not started over", kept.host, JSON.stringify(kept));
 
@@ -211,8 +211,8 @@ say("…and a sleeping app has no node: it is its picture, not a bar and a butto
 // --- an app that becomes nearest takes a place ----------------------------------------------------------
 at("third app");
 const third = await canvas.evaluate((path) => {
-	const c = globalThis.__decksCards().find((one) => one.path === path);
-	const cam = globalThis.__decksRust.camera;
+	const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+	const cam = globalThis.__decksProbes.rust.camera;
 	const r = document.querySelector(".stage").getBoundingClientRect();
 	// World point of the third app's middle, from its screen rect.
 	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
@@ -252,13 +252,13 @@ const rectNow = () =>
 	canvas.evaluate(() => {
 		const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
 		const stage = document.querySelector(".stage");
-		const c = globalThis.__decksRust?.camera;
+		const c = globalThis.__decksProbes?.rust?.camera;
 		return r ? { x: r.x, y: r.y, width: r.width, height: r.height, scroll: [stage?.scrollLeft, stage?.scrollTop], camera: c && [Math.round(c.x), Math.round(c.y), c.zoom] } : undefined;
 	});
 // Centred on the screen first: the page's side panel floats over the frame's left edge, and a press there is the panel's.
 const centre = await canvas.evaluate(() => {
 	const r = document.querySelector('.card-node[data-state="live"] .app-surface[data-live]')?.closest(".card-node")?.getBoundingClientRect();
-	const cam = globalThis.__decksRust.camera;
+	const cam = globalThis.__decksProbes.rust.camera;
 	const stage = document.querySelector(".stage").getBoundingClientRect();
 	return { x: cam.x + (r.x - stage.x + r.width / 2) / cam.zoom, y: cam.y + (r.y - stage.y + r.height / 2) / cam.zoom };
 });
@@ -281,19 +281,19 @@ at("pill new tab");
 {
 	// Centred on the card first: it is off the screen after the app's section.
 	const middle = await canvas.evaluate((path) => {
-		const c = globalThis.__decksCards().find((one) => one.path === path);
-		const cam = globalThis.__decksRust.camera;
+		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+		const cam = globalThis.__decksProbes.rust.camera;
 		const st = document.querySelector(".stage").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - st.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - st.top + c.rect.height / 2) / cam.zoom };
 	}, cardPaths[0]);
 	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.6, y - 900 / 2 / 0.6), middle);
 	await rest();
-	const r = await canvas.evaluate((path) => { const c = globalThis.__decksCards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, cardPaths[0]);
+	const r = await canvas.evaluate((path) => { const c = globalThis.__decksProbes.cards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, cardPaths[0]);
 	// Near its top: the selected app's pill sits over the card's foot.
 	await page.mouse.click(frameBox.x + r[0] + r[2] / 2, frameBox.y + r[1] + r[3] * 0.3);
-	const picked = await until(async () => ((await canvas.evaluate(() => globalThis.__decksAwake?.().selected)) === cardPaths[0] ? true : undefined), 5000);
+	const picked = await until(async () => ((await canvas.evaluate(() => globalThis.__decksProbes?.awake?.().selected)) === cardPaths[0] ? true : undefined), 5000);
 	const hit = await canvas.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y); return `${el?.tagName}.${el?.className?.toString().slice(0, 40)} in ${el?.closest?.(".card-node")?.dataset.path?.split("/").at(-2) ?? "-"}`; }, { x: r[0] + r[2] / 2, y: r[1] + r[3] * 0.3 });
-	say("a press on the card selects it", !!picked, `${String(await canvas.evaluate(() => globalThis.__decksAwake?.().selected))}; under the press: ${hit}`);
+	say("a press on the card selects it", !!picked, `${String(await canvas.evaluate(() => globalThis.__decksProbes?.awake?.().selected))}; under the press: ${hit}`);
 	const pill = await until(async () => ((await canvas.locator('.card-callout a[aria-label="New tab"]').count()) > 0 ? true : undefined), 5000);
 	say("a press on a card shows its pill with New tab", !!pill);
 	if (pill) {
@@ -312,31 +312,31 @@ at("wheel in app");
 const appFrame = page.frames().find((one) => !one.isDetached() && one.url().includes("/app/t/") && one.url().includes("/small-app-"));
 say("the app's page is loaded in its iframe", !!appFrame, page.frames().map((f) => f.url().slice(0, 60)).join(" | "));
 if (appFrame) {
-	const camBefore = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+	const camBefore = await canvas.evaluate(() => ({ ...globalThis.__decksProbes.rust.camera }));
 	await appFrame.evaluate(() => {
 		for (let i = 0; i < 6; i++) document.body.dispatchEvent(new WheelEvent("wheel", { deltaX: 40, deltaY: 0, clientX: 200, clientY: 300, bubbles: true, cancelable: true }));
 	});
 	const panned = await until(async () => {
-		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksProbes.rust.camera }));
 		return Math.abs(cam.x - camBefore.x) > 20 ? cam : undefined;
 	}, 4000);
-	say("a wheel inside the live app that its page cannot use pans the canvas", !!panned, `camera x ${camBefore.x} -> ${panned?.x ?? (await canvas.evaluate(() => globalThis.__decksRust.camera.x))}`);
+	say("a wheel inside the live app that its page cannot use pans the canvas", !!panned, `camera x ${camBefore.x} -> ${panned?.x ?? (await canvas.evaluate(() => globalThis.__decksProbes.rust.camera.x))}`);
 	await appFrame.evaluate(() => {
 		for (let i = 0; i < 6; i++) document.body.dispatchEvent(new WheelEvent("wheel", { deltaX: 0, deltaY: -30, ctrlKey: true, clientX: 200, clientY: 300, bubbles: true, cancelable: true }));
 	});
 	const zoomed = await until(async () => {
-		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksRust.camera }));
+		const cam = await canvas.evaluate(() => ({ ...globalThis.__decksProbes.rust.camera }));
 		return Math.abs(cam.zoom - camBefore.zoom) > 0.02 ? cam : undefined;
 	}, 4000);
-	say("…and a pinch inside it zooms the canvas", !!zoomed, `zoom ${camBefore.zoom} -> ${zoomed?.zoom ?? (await canvas.evaluate(() => globalThis.__decksRust.camera.zoom))}`);
+	say("…and a pinch inside it zooms the canvas", !!zoomed, `zoom ${camBefore.zoom} -> ${zoomed?.zoom ?? (await canvas.evaluate(() => globalThis.__decksProbes.rust.camera.zoom))}`);
 	await view(0.6);
 	await rest();
 }
 // --- one press in a document selects it and acts ----------------------------------------------------------
 at("document press");
 const docCentre = await canvas.evaluate((path) => {
-	const c = globalThis.__decksCards().find((one) => one.path === path);
-	const cam = globalThis.__decksRust.camera;
+	const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+	const cam = globalThis.__decksProbes.rust.camera;
 	const r = document.querySelector(".stage").getBoundingClientRect();
 	return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 }, docPaths[0]);
@@ -362,38 +362,38 @@ at("back to 30%");
 await view(0.3);
 await rest();
 const appsPictured = await until(async () => {
-	const pictured = await canvas.evaluate(() => globalThis.__decksPictured?.() ?? []);
+	const pictured = await canvas.evaluate(() => globalThis.__decksProbes?.pictured?.() ?? []);
 	return appPaths.every((path) => pictured.includes(path)) ? pictured : undefined;
 }, 10000);
-say("zoomed out to 30%, every app, the ones that ran included, is drawn as its picture, as a card is", !!appsPictured, JSON.stringify(await canvas.evaluate(() => (globalThis.__decksPictured?.() ?? []).filter((p) => p.startsWith("item:")))));
+say("zoomed out to 30%, every app, the ones that ran included, is drawn as its picture, as a card is", !!appsPictured, JSON.stringify(await canvas.evaluate(() => (globalThis.__decksProbes?.pictured?.() ?? []).filter((p) => p.startsWith("item:")))));
 // --- below 40%, a press on a picture wakes it, and a press elsewhere puts it back to sleep: a card and an app alike ----
 at("wake by press");
 const pressPicture = async (path, label) => {
 	// Centred first, so the press is clear of the page's panels.
 	const centre = await canvas.evaluate((path) => {
-		const c = globalThis.__decksCards().find((one) => one.path === path);
-		const cam = globalThis.__decksRust.camera;
+		const c = globalThis.__decksProbes.cards().find((one) => one.path === path);
+		const cam = globalThis.__decksProbes.rust.camera;
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		return { x: cam.x + (c.rect.left - r.left + c.rect.width / 2) / cam.zoom, y: cam.y + (c.rect.top - r.top + c.rect.height / 2) / cam.zoom };
 	}, path);
 	await canvas.evaluate(({ x, y }) => globalThis.__t.panTo(x - 1400 / 2 / 0.3, y - 900 / 2 / 0.3), centre);
 	await rest();
-	const asleep = await canvas.evaluate((path) => ({ pictured: (globalThis.__decksPictured?.() ?? []).includes(path), live: globalThis.__decksAwake?.().live.includes(path) }), path);
+	const asleep = await canvas.evaluate((path) => ({ pictured: (globalThis.__decksProbes?.pictured?.() ?? []).includes(path), live: globalThis.__decksProbes?.awake?.().live.includes(path) }), path);
 	say(`${label}: asleep at 30%, its picture on the sheet`, asleep.pictured && !asleep.live, JSON.stringify(asleep));
-	const r = await canvas.evaluate((path) => { const c = globalThis.__decksCards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, path);
+	const r = await canvas.evaluate((path) => { const c = globalThis.__decksProbes.cards().find((one) => one.path === path); return [c.rect.x, c.rect.y, c.rect.width, c.rect.height]; }, path);
 	await page.mouse.click(frameBox.x + r[0] + r[2] / 2, frameBox.y + r[1] + r[3] * 0.7);
 	const woke = await until(async () => {
-		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksAwake?.().selected, live: globalThis.__decksAwake?.().live.includes(path), node: [...document.querySelectorAll('.card-node[data-state="live"]')].some((n) => n.dataset.path === path) }), path);
+		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksProbes?.awake?.().selected, live: globalThis.__decksProbes?.awake?.().live.includes(path), node: [...document.querySelectorAll('.card-node[data-state="live"]')].some((n) => n.dataset.path === path) }), path);
 		return got.selected === path && got.live && got.node ? got : undefined;
 	}, 8000);
-	say(`${label}: a press on its picture selects it and it goes live, below 40% too`, !!woke, JSON.stringify(woke ?? (await canvas.evaluate(() => globalThis.__decksAwake?.()))));
+	say(`${label}: a press on its picture selects it and it goes live, below 40% too`, !!woke, JSON.stringify(woke ?? (await canvas.evaluate(() => globalThis.__decksProbes?.awake?.()))));
 	// A press on bare canvas, far from it, lets it go.
 	await page.mouse.click(frameBox.x + 1300, frameBox.y + 100);
 	const slept = await until(async () => {
-		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksAwake?.().selected, live: globalThis.__decksAwake?.().live.includes(path), pictured: (globalThis.__decksPictured?.() ?? []).includes(path) }), path);
+		const got = await canvas.evaluate((path) => ({ selected: globalThis.__decksProbes?.awake?.().selected, live: globalThis.__decksProbes?.awake?.().live.includes(path), pictured: (globalThis.__decksProbes?.pictured?.() ?? []).includes(path) }), path);
 		return got.selected !== path && !got.live && got.pictured ? got : undefined;
 	}, 8000);
-	const why = slept ?? (await canvas.evaluate((path) => { const n = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path); const e = globalThis.__decksRust; const placed = e?.placedCards?.find((c) => c.path === path); return { awake: globalThis.__decksAwake?.(), pictured: (globalThis.__decksPictured?.() ?? []).includes(path), node: n && { ...n.dataset }, placed: placed && { live: placed.live, ready: placed.ready, picture: placed.picture?.slice(-40) }, held: e?.heldWidth?.get(`card:${path}`), bytes: e?.pictureBytes?.get(`card:${path}`), rustPictured: e?.page?.pictured?.(), liveKey: e?.liveKey }; }, path));
+	const why = slept ?? (await canvas.evaluate((path) => { const n = [...document.querySelectorAll(".world .card-node")].find((n) => n.dataset.path === path); const e = globalThis.__decksProbes.rust; const placed = e?.placedCards?.find((c) => c.path === path); return { awake: globalThis.__decksProbes?.awake?.(), pictured: (globalThis.__decksProbes?.pictured?.() ?? []).includes(path), node: n && { ...n.dataset }, placed: placed && { live: placed.live, ready: placed.ready, picture: placed.picture?.slice(-40) }, held: e?.heldWidth?.get(`card:${path}`), bytes: e?.pictureBytes?.get(`card:${path}`), rustPictured: e?.page?.pictured?.(), liveKey: e?.liveKey }; }, path));
 	say(`${label}: unselected below 40%, it sleeps and is its picture again`, !!slept, `${JSON.stringify(why)} pictures: ${JSON.stringify(pictureLog.filter((l) => l.includes(nameOf(path))).slice(-6))}`);
 };
 await pressPicture(cardPaths[0], "card");

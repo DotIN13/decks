@@ -123,11 +123,11 @@ const goCanvas = async (name) => {
 	canvas = await canvasFrame(page);
 	await canvas.evaluate(helpers);
 	const ok = await canvas
-		.waitForFunction((n) => (globalThis.__decksCards?.().length ?? 0) >= n, name === "perf" ? 90 : Math.min(20, realPages), { timeout: 30000 })
+		.waitForFunction((n) => (globalThis.__decksProbes?.cards?.().length ?? 0) >= n, name === "perf" ? 90 : Math.min(20, realPages), { timeout: 30000 })
 		.then(() => true)
 		.catch(() => false);
 	if (!ok && process.env.PAN_HEAVY_DEBUG) say("DEBUG", false, JSON.stringify([...new Set(link.received.map((m) => m.type))]), JSON.stringify(link.received.filter((m) => /board|stage$/.test(m.type)).slice(-3)).slice(0, 3000));
-	say(`the stage shows the ${name} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+	say(`the stage shows the ${name} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksProbes?.cards?.().length)));
 };
 
 const helpers = () => {
@@ -140,7 +140,7 @@ const helpers = () => {
 	globalThis.__pan = {
 		async zoomTo(zoom) {
 			for (let i = 0; i < 200; i++) {
-				const now = globalThis.__decksRust.camera.zoom;
+				const now = globalThis.__decksProbes.rust.camera.zoom;
 				const ln = Math.log(zoom / now);
 				if (Math.abs(ln) < 1e-6) return;
 				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
@@ -149,7 +149,7 @@ const helpers = () => {
 		},
 		async panTo(x, y) {
 			for (let i = 0; i < 30; i++) {
-				const c = globalThis.__decksRust.camera;
+				const c = globalThis.__decksProbes.rust.camera;
 				const dx = (x - c.x) * c.zoom;
 				const dy = (y - c.y) * c.zoom;
 				if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -174,7 +174,7 @@ const helpers = () => {
 				// Frames drawn with the cards as pictures, and the cards showing live then, to say which way a pan ran.
 				if (stage()?.dataset.pictures === "true") this.pictured++;
 				if (stage()?.dataset.moving === "true") this.movingFrames = (this.movingFrames ?? 0) + 1;
-				const c = globalThis.__decksRust?.camera;
+				const c = globalThis.__decksProbes?.rust?.camera;
 				if (c) {
 					if (this.last) this.travel = (this.travel ?? 0) + Math.hypot(c.x - this.last.x, c.y - this.last.y) * c.zoom;
 					this.last = { x: c.x, y: c.y };
@@ -203,12 +203,12 @@ const quiet = (ms = 1500, cap = 20000) =>
 	canvas.evaluate(
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
-			let last = globalThis.__decksSheet?.tiles ?? 0;
+			let last = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 			let frames = document.querySelectorAll("iframe").length;
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
-				const n = globalThis.__decksSheet?.tiles ?? 0;
+				const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 				const f = document.querySelectorAll("iframe").length;
 				const d = document.querySelector(".stage")?.dataset;
 				if (n !== last || f !== frames || d?.moving === "true" || d?.gliding === "true") {

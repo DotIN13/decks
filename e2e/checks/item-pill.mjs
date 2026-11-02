@@ -27,13 +27,13 @@ const canvas = await canvasFrame(page);
 
 // An empty place in the middle of the screen, in stage units, with room above it for the pill.
 const spot = await canvas.evaluate(() => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes.cameraTransform());
 	return { x: (560 - m.e) / m.a, y: (420 - m.f) / m.a, zoom: m.a };
 });
 const w = 200 / spot.zoom;
 const h = 120 / spot.zoom;
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-box", fill: "#4c8bf5" }, box: { x1: spot.x, y1: spot.y, x2: spot.x + w, y2: spot.y + h } }] });
-const box = await until(() => canvas.evaluate(() => window.__decksPenBox?.("pill-box")));
+const box = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-box")));
 say("the box is on screen", !!box, JSON.stringify(box));
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -59,7 +59,7 @@ say("a drag from the handle draws an arrow from the top", arrow?.metadata.from?.
 
 // Two items selected have no handles, and their pill keeps its own 10 px.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-two", fill: "#f5a34c" }, box: { x1: spot.x + w + 40 / spot.zoom, y1: spot.y, x2: spot.x + 2 * w + 40 / spot.zoom, y2: spot.y + h } }] });
-const two = await until(() => canvas.evaluate(() => window.__decksPenBox?.("pill-two")));
+const two = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-two")));
 await page.keyboard.press("Escape");
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.keyboard.down("Shift");
@@ -74,16 +74,16 @@ say("two selected have no handles, and the pill sits 10 px above them", both.anc
 // A board is only its picture: a press on it, with Shift, adds it. The canvas is framed whole first, so a board is on screen with the items.
 const person = await asPerson();
 const view = (args) => fetch(`${API}/api/v1/view.move`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) });
-const before = await canvas.evaluate(() => globalThis.__decksRust.camera);
+const before = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
 await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
 await rest(page);
-const [box2, two2] = await canvas.evaluate(() => ["pill-box", "pill-two"].map((id) => window.__decksPenBox(id).toJSON()));
+const [box2, two2] = await canvas.evaluate(() => ["pill-box", "pill-two"].map((id) => window.__decksProbes.penBox(id).toJSON()));
 let press;
 /*
  * A board whose top is on screen first: the pill goes 10 px above the group only when that slot is in
  * the window, and under it otherwise (a board whose top was above the window put it under the group).
  */
-const boards = await canvas.evaluate(() => window.__decksCards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
+const boards = await canvas.evaluate(() => window.__decksProbes.cards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
 boards.sort((a, b) => Number(a.rect.y < 140) - Number(b.rect.y < 140));
 for (const one of boards) {
 	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
@@ -94,7 +94,7 @@ for (const one of boards) {
 		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
 			const x = r.x + r.width * fx;
 			const y = r.y + r.height * fy;
-			if (x > 60 && x < 1340 && y > 90 && y < 860 && stage?.contains(document.elementFromPoint(x, y)) && window.__decksPictureAt(x, y) === path) out.push({ x, y });
+			if (x > 60 && x < 1340 && y > 90 && y < 860 && stage?.contains(document.elementFromPoint(x, y)) && window.__decksProbes.pictureAt(x, y) === path) out.push({ x, y });
 		}
 		return out;
 	}, one);
@@ -128,7 +128,7 @@ if (press) {
 // Back to the view the box was measured in.
 for (let i = 0; i < 4; i++) {
 	await view([{ x: before.x, y: before.y, zoom: before.zoom }]);
-	if (await until(() => canvas.evaluate((b) => Math.abs(globalThis.__decksRust.camera.x - b.x) < 1 && Math.abs(globalThis.__decksRust.camera.zoom - b.zoom) < 0.001, before), 3000)) break;
+	if (await until(() => canvas.evaluate((b) => Math.abs(globalThis.__decksProbes.rust.camera.x - b.x) < 1 && Math.abs(globalThis.__decksProbes.rust.camera.zoom - b.zoom) < 0.001, before), 3000)) break;
 }
 await rest(page);
 
@@ -137,7 +137,7 @@ await rest(page);
  * with an item just above the box, the pill goes under it, on neither the box nor the item above.
  */
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-roof", fill: "#7a7a7a" }, box: { x1: spot.x - 40 / spot.zoom, y1: spot.y - 70 / spot.zoom, x2: spot.x + w + 40 / spot.zoom, y2: spot.y - 20 / spot.zoom } }] });
-const roof = await until(() => canvas.evaluate(() => window.__decksPenBox?.("pill-roof")));
+const roof = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-roof")));
 await page.keyboard.press("Escape");
 await settle(page, 300);
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -164,7 +164,7 @@ if (under) {
 		await page.waitForTimeout(30);
 	}
 	await settle(page, 700);
-	const moved = await canvas.evaluate(() => window.__decksPenBox?.("pill-box"));
+	const moved = await canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-box"));
 	const after = await canvas.evaluate(() => {
 		const r = document.querySelector(".stage-fixed > .card-callout:not([data-hidden])")?.getBoundingClientRect();
 		return r && { x: r.x, y: r.y, width: r.width };

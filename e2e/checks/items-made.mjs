@@ -36,17 +36,17 @@ const file = join(deck.path, "canvases", stageName ?? "?", "canvas.pen");
 const items = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).children ?? [] : []);
 const tagged = (type) => items().filter((node) => node.type === "browser" && node.metadata?.type === type);
 const boardsBefore = tagged("decks.board").length;
-const onStage = async (path) => (await canvasFrame(page)).evaluate((wanted) => (window.__decksCards?.() ?? []).some((one) => one.path === wanted), path);
+const onStage = async (path) => (await canvasFrame(page)).evaluate((wanted) => (window.__decksProbes?.cards?.() ?? []).some((one) => one.path === wanted), path);
 
 // --- a PDF dropped on empty canvas ---------------------------------------------------------
 
 const canvas = await canvasFrame(page);
 /* A point of the frame with no board or card under it: a drop over a card goes into the card. */
 const empty = await canvas.evaluate(() => {
-	const rects = (window.__decksCards?.() ?? []).map((one) => one.rect);
+	const rects = (window.__decksProbes?.cards?.() ?? []).map((one) => one.rect);
 	for (let y = 120; y < window.innerHeight - 120; y += 60)
 		for (let x = 120; x < window.innerWidth - 120; x += 60)
-			if (!rects.some((r) => x > r.x - 40 && x < r.right + 40 && y > r.y - 40 && y < r.bottom + 40) && !globalThis.__decksCardAt?.(x, y)) return { x, y };
+			if (!rects.some((r) => x > r.x - 40 && x < r.right + 40 && y > r.y - 40 && y < r.bottom + 40) && !globalThis.__decksProbes?.cardAt?.(x, y)) return { x, y };
 	return { x: 60, y: window.innerHeight - 60 };
 });
 await canvas.evaluate(({ x, y }) => {

@@ -98,7 +98,7 @@ await canvas.evaluate(() => {
 	};
 });
 
-const inks = () => canvas.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
+const inks = () => canvas.evaluate(() => [...globalThis.__decksProbes.rust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
 
 /** One stroke of `points` points, shaped whole (`whole`) or as it grows: its paths, its frame times, and what the file got. */
 const stroke = async ({ pen, points, whole }) => {

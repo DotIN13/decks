@@ -25,7 +25,7 @@ say("a card to select words in", made.ok === true, JSON.stringify(made).slice(0,
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 let canvas = await canvasFrame(page);
-await canvas.waitForFunction((id) => (globalThis.__decksFrameDrawn?.().children ?? []).some((one) => one.id === id), made.value?.id, { timeout: 10000 });
+await canvas.waitForFunction((id) => (globalThis.__decksProbes?.frameDrawn?.().children ?? []).some((one) => one.id === id), made.value?.id, { timeout: 10000 });
 // Framed as a person does: selected, then the pill's Fit (an agent's view.focus waits while the person is using the canvas).
 await flyToCard(page, made.value?.card);
 await settle(page, 600);

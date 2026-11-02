@@ -16,7 +16,7 @@ const canvas = await canvasFrame(page);
 
 const cameraNow = () =>
 	canvas.evaluate(() => {
-		const m = /scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/.exec(globalThis.__decksCameraTransform());
+		const m = /scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/.exec(globalThis.__decksProbes.cameraTransform());
 		return { zoom: Number(m[1]), x: -Number(m[2]), y: -Number(m[3]) };
 	});
 

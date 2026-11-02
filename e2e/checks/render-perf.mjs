@@ -131,11 +131,11 @@ const quiet = (quietMs = 1500, cap = 30000) =>
 	canvas.evaluate(
 		async ({ quietMs, cap }) => {
 			const t0 = performance.now();
-			let last = globalThis.__decksSheet?.tiles ?? 0;
+			let last = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
-				const n = globalThis.__decksSheet?.tiles ?? 0;
+				const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 				const d = document.querySelector(".stage")?.dataset;
 				if (n !== last || d?.moving === "true" || d?.gliding === "true") {
 					last = n;
@@ -171,13 +171,13 @@ const helpers = () =>
 		};
 		const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 		globalThis.__perf = {
-			camera: () => ({ ...globalThis.__decksRust.camera }),
+			camera: () => ({ ...globalThis.__decksProbes.rust.camera }),
 			wheel,
 			raf,
 			/** Pinch to `zoom` exactly: 64 scroll units per e-fold (`Stage.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
 			async zoomTo(zoom) {
 				for (let i = 0; i < 200; i++) {
-					const now = globalThis.__decksRust.camera.zoom;
+					const now = globalThis.__decksProbes.rust.camera.zoom;
 					const ln = Math.log(zoom / now);
 					if (Math.abs(ln) < 1e-6) return;
 					wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
@@ -186,7 +186,7 @@ const helpers = () =>
 			},
 			async panTo(x, y) {
 				for (let i = 0; i < 20; i++) {
-					const c = globalThis.__decksRust.camera;
+					const c = globalThis.__decksProbes.rust.camera;
 					const dx = (x - c.x) * c.zoom;
 					const dy = (y - c.y) * c.zoom;
 					if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -224,10 +224,10 @@ const keep = (key, values, round) => {
 			await page.goto(`${WEB}/`, { waitUntil: "load" });
 			canvas = await canvasFrame(page);
 		}
-		await canvas.waitForFunction((n) => (globalThis.__decksRust?.placed?.size ?? 0) >= n, Math.min(1000, ITEMS / 2), { timeout: 30000 });
-		await canvas.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
+		await canvas.waitForFunction((n) => (globalThis.__decksProbes?.rust?.placed?.size ?? 0) >= n, Math.min(1000, ITEMS / 2), { timeout: 30000 });
+		await canvas.waitForFunction(() => globalThis.__decksProbes?.sheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
 		await quiet(2000, 40000);
-		const stats = await canvas.evaluate(() => ({ tiles: globalThis.__decksSheet.tiles, sharpAt: globalThis.__decksSheet.sharpAt }));
+		const stats = await canvas.evaluate(() => ({ tiles: globalThis.__decksProbes.sheet.tiles, sharpAt: globalThis.__decksProbes.sheet.sharpAt }));
 		if (run < 0) continue;
 		tiles.push(stats.tiles);
 		sharp.push(stats.sharpAt ?? NaN);
@@ -250,10 +250,10 @@ await quiet();
 if (want("zoom")) {
 	const tiles = [];
 	for (let run = 0; run < RUNS; run++) {
-		const before = await canvas.evaluate(() => globalThis.__decksSheet.tiles);
+		const before = await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles);
 		await canvas.evaluate(() => globalThis.__perf.wheel(0, -64 * Math.log(1.03), true));
 		await quiet(1500);
-		tiles.push((await canvas.evaluate(() => globalThis.__decksSheet.tiles)) - before);
+		tiles.push((await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles)) - before);
 	}
 	keep("tilesAfterZoom", tiles, Math.round);
 }
@@ -263,13 +263,13 @@ if (want("draws")) {
 	const draws = [];
 	const FRAMES = 40;
 	for (let run = 0; run < RUNS; run++) {
-		const before = await canvas.evaluate(() => globalThis.__decksSheet.shown);
+		const before = await canvas.evaluate(() => globalThis.__decksProbes.sheet.shown);
 		// Real wheel input (CDP), ⌃ held as a pinch has it, one event a frame.
 		for (let i = 0; i < FRAMES; i++) {
 			await cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: W / 2, y: H / 2, deltaX: 0, deltaY: i < FRAMES / 2 ? -2 : 2, modifiers: 2 });
 			await frame();
 		}
-		draws.push(((await canvas.evaluate(() => globalThis.__decksSheet.shown)) - before) / FRAMES);
+		draws.push(((await canvas.evaluate(() => globalThis.__decksProbes.sheet.shown)) - before) / FRAMES);
 		await quiet(800);
 	}
 	// A ratio, not a count: to 0.1.
@@ -298,7 +298,7 @@ if (want("fill")) {
 				await p.raf();
 			}
 			while (performance.now() < end + 10000) {
-				const settled = globalThis.__decksSheet?.settledAt ?? 0;
+				const settled = globalThis.__decksProbes?.sheet?.settledAt ?? 0;
 				if (settled > end) return settled - end;
 				await new Promise((done) => setTimeout(done, 4));
 			}
@@ -335,12 +335,12 @@ if (want("drag")) {
 	// note tried; only drags that lifted their note are timed.
 	const notes = await canvas.evaluate(({ W, H }) => {
 		const out = [];
-		for (const [id, placed] of globalThis.__decksRust.placed) {
+		for (const [id, placed] of globalThis.__decksProbes.rust.placed) {
 			if (placed.node.type !== "note" || placed.parent) continue;
-			const r = globalThis.__decksPenBox?.(id);
+			const r = globalThis.__decksProbes?.penBox?.(id);
 			if (!r || r.left < 330 || r.top < 70 || r.right > W - 20 || r.bottom > H - 150) continue;
 			const at = { x: r.left + r.width / 2, y: r.top + Math.min(20, r.height / 2) };
-			if (globalThis.__decksPictureAt?.(at.x, at.y)) continue;
+			if (globalThis.__decksProbes?.pictureAt?.(at.x, at.y)) continue;
 			out.push({ id, ...at });
 		}
 		return out;
@@ -359,7 +359,7 @@ if (want("drag")) {
 		let held = true;
 		for (let s = 1; s <= STEPS; s++) {
 			if (s === 6) {
-				held = await canvas.evaluate(() => globalThis.__decksRust.lifted.size > 0);
+				held = await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size > 0);
 				if (!held) break;
 				before = await taskSeconds();
 			}
@@ -368,7 +368,7 @@ if (want("drag")) {
 		}
 		const step = held ? ((await taskSeconds()) - before) * 1000 / (STEPS - 5) : undefined;
 		await page.mouse.up();
-		await until(async () => (await canvas.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000);
+		await until(async () => (await canvas.evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 5000);
 		await page.keyboard.press("Escape");
 		await quiet(1000);
 		return step;
@@ -394,7 +394,7 @@ if (want("drag")) {
 			if (on.length >= WIDE && off.length >= WIDE) break;
 			for (const flag of at % 2 ? [true, false] : [false, true]) {
 				await canvas.evaluate(({ AB, flag }) => (globalThis[AB] = flag), { AB, flag });
-				const r = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+				const r = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id);
 				const step = r ? await dragOnce({ x: r.x + r.width / 2, y: r.y + Math.min(20, r.height / 2) }) : undefined;
 				if (step !== undefined) (flag ? on : off).push(step);
 			}
@@ -410,7 +410,7 @@ if (want("drag")) {
 // --- an agent's edit to the frame that shows it -------------------------------------------------------
 if (want("edit")) {
 	await canvas.evaluate(() => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes.rust;
 		const before = engine.presented;
 		globalThis.__perfPresented = [];
 		engine.presented = () => {
@@ -423,7 +423,7 @@ if (want("edit")) {
 			globalThis.__perfDocAt = Date.now();
 			// The tiles in when the drawing came: a frame with more shows the edit. Taken here, not at the
 			// first frame after it, which since the page draws once a frame may already have taken them.
-			globalThis.__perfTilesAtDoc = globalThis.__decksSheet.tiles;
+			globalThis.__perfTilesAtDoc = globalThis.__decksProbes.sheet.tiles;
 			return setDoc(...args);
 		};
 	});
@@ -434,10 +434,10 @@ if (want("edit")) {
 		const seen = canvas.evaluate(
 			(id) =>
 				new Promise((done) => {
-					const engine = globalThis.__decksRust;
+					const engine = globalThis.__decksProbes.rust;
 					const check = () => {
 						if (!engine.placed.has(id)) return;
-						if (globalThis.__decksSheet.tiles > globalThis.__perfTilesAtDoc) {
+						if (globalThis.__decksProbes.sheet.tiles > globalThis.__perfTilesAtDoc) {
 							globalThis.__perfPresented = globalThis.__perfPresented.filter((f) => f !== check);
 							done(Date.now());
 						}
@@ -504,15 +504,15 @@ if (want("frameEdit")) {
 	await canvas.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
 	const notes = Array.from({ length: 24 }, (_, i) => ({ type: "note", id: `perf-big-${i}`, metadata: { type: "decks.markdown" }, content: `Note ${i} in the big frame`, width: 220, x: 40 + (i % 6) * 390, y: 40 + Math.floor(i / 6) * 360 }));
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "perf-big", name: "Big frame", layout: "none", fill: "#f3f4f6", width: 2400, height: 1500, children: notes }, box: { x1: HOME.x - 1200, y1: HOME.y - 750 } }] });
-	await until(() => canvas.evaluate(() => globalThis.__decksRust.placed.has("perf-big-23")), 10000);
+	await until(() => canvas.evaluate(() => globalThis.__decksProbes.rust.placed.has("perf-big-23")), 10000);
 	await quiet();
 	const tiles = [];
 	for (let run = 0; run < RUNS; run++) {
-		const before = await canvas.evaluate(() => globalThis.__decksSheet.tiles);
+		const before = await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles);
 		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: "perf-big-8", set: { content: `Note 8, said again ${run}` } }] });
-		await until(() => canvas.evaluate((run) => String(globalThis.__decksRust.placed.get("perf-big-8")?.node.content).endsWith(` ${run}`), run), 5000);
+		await until(() => canvas.evaluate((run) => String(globalThis.__decksProbes.rust.placed.get("perf-big-8")?.node.content).endsWith(` ${run}`), run), 5000);
 		await quiet(1000);
-		tiles.push((await canvas.evaluate(() => globalThis.__decksSheet.tiles)) - before);
+		tiles.push((await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles)) - before);
 	}
 	keep("frameEditTiles", tiles, Math.round);
 }
@@ -537,17 +537,17 @@ if (want("images")) {
 		const run = made++;
 		const ids = Array.from({ length: N }, (_, i) => `perf-picture-${run}-${i}`);
 		const ops = ids.map((id, i) => ({ op: "insert", node: { type: "rectangle", id, width: 400, height: 300, fill: { type: "image", url: `perf-picture.png?run=${run}&n=${i}`, mode: "fill" } }, box: { x1: HOME.x - 1370 + (i % 6) * 460, y1: HOME.y - 690 + Math.floor(i / 6) * 350 } }));
-		const had = await canvas.evaluate(() => globalThis.__decksEngine.stats().pictures);
-		const tilesBefore = await canvas.evaluate(() => globalThis.__decksSheet.tiles);
+		const had = await canvas.evaluate(() => globalThis.__decksProbes.engine.stats().pictures);
+		const tilesBefore = await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles);
 		await frame();
 		const before = await taskSeconds();
 		link.send({ type: "stage.pen.edit", agentId, ops });
-		const all = await until(() => canvas.evaluate((want) => globalThis.__decksEngine.stats().pictures >= want, had + N), 20000);
+		const all = await until(() => canvas.evaluate((want) => globalThis.__decksProbes.engine.stats().pictures >= want, had + N), 20000);
 		await quiet(1000);
 		const task = ((await taskSeconds()) - before) * 1000;
-		tilesPainted.push((await canvas.evaluate(() => globalThis.__decksSheet.tiles)) - tilesBefore);
+		tilesPainted.push((await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles)) - tilesBefore);
 		link.send({ type: "stage.pen.edit", agentId, ops: ids.map((id) => ({ op: "delete", id })) });
-		await until(() => canvas.evaluate((id) => !globalThis.__decksRust.placed.has(id), ids[0]), 10000);
+		await until(() => canvas.evaluate((id) => !globalThis.__decksProbes.rust.placed.has(id), ids[0]), 10000);
 		await quiet(1000);
 		return all ? task : NaN;
 	};
@@ -580,7 +580,7 @@ if (want("stroke")) {
 	await canvas.locator('.v3-tool[data-tool="pen"]:visible').click();
 	await page.waitForTimeout(300);
 	const per = [];
-	const inkBefore = await canvas.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
+	const inkBefore = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
 	// Ten seconds at 60 a second: 600 pointer moves, one a frame, the same path each run, so every
 	// stroke has as many points however fast the frames come; the last 60 are timed.
 	const STEPS = 600;
@@ -602,7 +602,7 @@ if (want("stroke")) {
 		await page.mouse.up();
 		await quiet(1500);
 	}
-	const inkAfter = await canvas.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
+	const inkAfter = await canvas.evaluate(() => [...globalThis.__decksProbes.rust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
 	say("each stroke was drawn as ink", inkAfter - inkBefore === per.length + 1, `${inkAfter - inkBefore} of ${per.length + 1}`);
 	keep("strokeEndMs", per, ms);
 	await page.keyboard.press("Escape");

@@ -33,7 +33,7 @@ const until = async (test, ms = 15000) => {
 const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", cards: true });
 // The stage and its engine are in the canvas frame; the screenshots and the pixel reading are the page's.
 const canvas = await canvasFrame(page);
-await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+await canvas.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 
 const deck = await deckState();
 const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
@@ -60,7 +60,7 @@ const accent = await canvas.evaluate(() => {
 
 const camera = () =>
 	canvas.evaluate(() => {
-		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform?.() ?? "");
 		const rect = document.querySelector(".stage").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
 	});
@@ -89,7 +89,7 @@ async function zoomToOne() {
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
-	await canvas.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksProbes.engine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	await settle(page, 1800);
 	return camera();
 }
@@ -169,7 +169,7 @@ const plain = await onCanvas("no-writer");
 say("with no writer the edge is dashed in the accent", plain.accent.band > 400 && plain.accent.turns >= 10, JSON.stringify(plain));
 say("with no writer there is no name tag", plain.accent.tag < 40 && plain.green.band < 40, JSON.stringify(plain));
 
-await canvas.evaluate(() => window.__decksRust.setWriter({ name: "Atelier", color: "#2eaf5a" }));
+await canvas.evaluate(() => window.__decksProbes.rust.setWriter({ name: "Atelier", color: "#2eaf5a" }));
 await settle(page, 1500);
 const named = await onCanvas("writer");
 say("with a writer the edge is dashed in the writer's colour", named.green.band > 400 && named.green.turns >= 10 && named.accent.band < 40, JSON.stringify(named));

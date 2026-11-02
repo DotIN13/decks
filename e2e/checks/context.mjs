@@ -256,7 +256,7 @@ const agent = {
 		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
 		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
 		// The stage's boards, pictures among them: a phone has one live page at most (`device.ts`), and a tap on a picture selects it as on a page.
-		const found = (globalThis.__decksCards?.() ?? [])
+		const found = (globalThis.__decksProbes?.cards?.() ?? [])
 			.map(({ path, rect: r }) => {
 				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
 				return { path, x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
@@ -264,7 +264,7 @@ const agent = {
 			.sort((a, b) => b.area - a.area)[0];
 		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2, path: found.path } : null;
 	});
-	const under = target ? await canvas.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${String(e?.className).split(" ")[0]} picture=${globalThis.__decksPictureAt?.(x, y)} zoom=${globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
+	const under = target ? await canvas.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${String(e?.className).split(" ")[0]} picture=${globalThis.__decksProbes?.pictureAt?.(x, y)} zoom=${globalThis.__decksProbes?.cameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
 	if (target) await page.touchscreen.tap(target.x, target.y);
 	await settle(page, 900);
 	// The board tapped: a picture has no node to say it is selected, so it is the one under the tap.
@@ -283,7 +283,7 @@ const agent = {
 			// The pill is centred on the board's middle wherever that is, off the screen included (`ui/Callout.tsx`, `place`).
 			centre: Math.round((box(callout).left + box(callout).right) / 2),
 			boardMid: (() => {
-				const r = (window.__decksCards?.() ?? []).find((one) => one.path === path)?.rect;
+				const r = (window.__decksProbes?.cards?.() ?? []).find((one) => one.path === path)?.rect;
 				return r ? Math.round(r.left + r.width / 2) : null;
 			})(),
 		};

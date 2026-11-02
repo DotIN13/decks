@@ -28,13 +28,13 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const cam = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.camera);
+const cam = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.camera);
 const z = cam.zoom;
 const at = (dx, dy, w, h) => ({ x1: cam.x + dx / z, y1: cam.y + dy / z, x2: cam.x + (dx + w) / z, y2: cam.y + (dy + h) / z });
 /** The layout as the stage holds it, made up change by change, and as its engine gives it whole. */
 const layouts = async () =>
 	(await inCanvas(page)).evaluate(() => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes.rust;
 		const r = (n) => Math.round(n * 100) / 100;
 		const held = [...engine.placed.values()].map((p) => [p.node.id, r(p.box.x), r(p.box.y), r(p.box.w), r(p.box.h), p.parent ?? null, p.order]);
 		const whole = JSON.parse(engine.page.layout()).map(([id, x, y, w, h, parent, order]) => [id, r(x), r(y), r(w), r(h), parent, order]);
@@ -78,42 +78,42 @@ say(
 			// Never edited: it only moves down the paint order as items come before it.
 			{ op: "insert", node: { type: "text", id: "sd-z", content: "Last in paint order", fontSize: 18, fill: "#374151" }, box: at(-80, 220, 200, 30) },
 		],
-		() => ["sd-a", "sd-b", "sd-n2", "sd-gone"].every((id) => globalThis.__decksRust.placed.has(id)),
+		() => ["sd-a", "sd-b", "sd-n2", "sd-gone"].every((id) => globalThis.__decksProbes.rust.placed.has(id)),
 	)),
 );
 const arrow = { type: "path", id: "sd-arrow", stroke: "#6b7280", strokeWidth: 3, geometry: "M2 2 L100 50", width: 102, height: 52, viewBox: [0, 0, 102, 52], metadata: { type: "decks.arrow", from: { item: "sd-a" }, to: { item: "sd-b" }, route: "curved" } };
-say("…an arrow joins two of them", !!(await edit([{ op: "insert", node: arrow, box: at(-100, 0, 102, 52) }], () => globalThis.__decksRust.placed.has("sd-arrow"))));
-const tallBefore = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-n2").box.y);
+say("…an arrow joins two of them", !!(await edit([{ op: "insert", node: arrow, box: at(-100, 0, 102, 52) }], () => globalThis.__decksProbes.rust.placed.has("sd-arrow"))));
+const tallBefore = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.placed.get("sd-n2").box.y);
 say(
 	"…longer words in a column's first note move the one under it",
-	!!(await edit([{ op: "update", id: "sd-n1", set: { content: "One, now with a great many more words in it, so that it wraps onto several lines in the column" } }], (y) => globalThis.__decksRust.placed.get("sd-n2").box.y > y + 10, tallBefore)),
+	!!(await edit([{ op: "update", id: "sd-n1", set: { content: "One, now with a great many more words in it, so that it wraps onto several lines in the column" } }], (y) => globalThis.__decksProbes.rust.placed.get("sd-n2").box.y > y + 10, tallBefore)),
 );
-say("…a child added to the column", !!(await edit([{ op: "insert", parent: "sd-col", node: { type: "note", id: "sd-n3", metadata: { type: "decks.markdown" }, content: "Three", width: 160 } }], () => globalThis.__decksRust.placed.get("sd-n3")?.parent === "sd-col")));
-say("…one deleted", !!(await edit([{ op: "delete", id: "sd-gone" }], () => !globalThis.__decksRust.placed.has("sd-gone"))));
-const bx = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-b").box.x);
-say("…one moved, and its arrow follows", !!(await edit([{ op: "update", id: "sd-b", set: { x: Math.round(bx + 80) } }], (x) => globalThis.__decksRust.placed.get("sd-b").box.x > x + 40, bx)));
+say("…a child added to the column", !!(await edit([{ op: "insert", parent: "sd-col", node: { type: "note", id: "sd-n3", metadata: { type: "decks.markdown" }, content: "Three", width: 160 } }], () => globalThis.__decksProbes.rust.placed.get("sd-n3")?.parent === "sd-col")));
+say("…one deleted", !!(await edit([{ op: "delete", id: "sd-gone" }], () => !globalThis.__decksProbes.rust.placed.has("sd-gone"))));
+const bx = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.placed.get("sd-b").box.x);
+say("…one moved, and its arrow follows", !!(await edit([{ op: "update", id: "sd-b", set: { x: Math.round(bx + 80) } }], (x) => globalThis.__decksProbes.rust.placed.get("sd-b").box.x > x + 40, bx)));
 
 // --- a person's drag of the joined box: its arrow bends during the drag and lands with it -------------
 await settle(page, 600);
 await editMode(page, true);
 await focusCanvas(page);
 await page.keyboard.press("Escape");
-const a = await (await inCanvas(page)).evaluate(() => globalThis.__decksPenBox("sd-a").toJSON());
+const a = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.penBox("sd-a").toJSON());
 const ax = a.x + a.width / 2;
 const ay = a.y + a.height / 2;
-const before = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
+const before = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.placed.get("sd-a").box);
 await page.mouse.move(ax, ay);
 await page.mouse.down();
 for (let i = 1; i <= 12; i++) {
 	await page.mouse.move(ax + i * 8, ay - i * 6);
 	await page.waitForTimeout(25);
 }
-const lifted = await (await inCanvas(page)).evaluate(() => [...globalThis.__decksRust.lifted]);
+const lifted = await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.lifted]);
 await agree("a drag's step");
 say("a person's drag lifts the box and bends its arrow", lifted.includes("sd-a") && lifted.includes("sd-arrow"), JSON.stringify(lifted));
 await page.mouse.up();
-say("…and is put down", await until(async () => (await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000), JSON.stringify(await (await inCanvas(page)).evaluate(() => [...globalThis.__decksRust.lifted])));
-const after = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
+say("…and is put down", await until(async () => (await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.lifted.size)) === 0, 5000), JSON.stringify(await (await inCanvas(page)).evaluate(() => [...globalThis.__decksProbes.rust.lifted])));
+const after = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.placed.get("sd-a").box);
 say("…where it was dropped", after.x > before.x && after.y < before.y, JSON.stringify({ before, after }));
 await settle(page, 1200);
 
@@ -128,7 +128,7 @@ const serverDoc = server?.doc;
 say("the page's drawing is the server's", !!serverDoc && JSON.stringify(canon(live.doc)) === JSON.stringify(canon(serverDoc)));
 
 await page.reload({ waitUntil: "load" });
-await until(async () => (await inCanvas(page)).evaluate(() => globalThis.__decksRust?.placed?.has("sd-arrow")), 15000);
+await until(async () => (await inCanvas(page)).evaluate(() => globalThis.__decksProbes?.rust?.placed?.has("sd-arrow")), 15000);
 await settle(page, 1200);
 const fresh = await layouts();
 say("a fresh page lays the drawing out the same", JSON.stringify(fresh.held) === JSON.stringify(live.held), first(fresh.held, live.held) || `${fresh.held.length} items`);

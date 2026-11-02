@@ -38,7 +38,7 @@ say("the card goes in", inserted.ok, JSON.stringify(inserted).slice(0, 300));
 const path = inserted.value?.card;
 const canvasName = path?.split("/")[1];
 // Once the frame has the card in its drawing.
-await until(() => frame.evaluate((id) => !!globalThis.__decksFrameDrawn?.().children?.some((child) => child.id === id), ID));
+await until(() => frame.evaluate((id) => !!globalThis.__decksProbes?.frameDrawn?.().children?.some((child) => child.id === id), ID));
 // The card framed, and its surface up: asked again until it is, since the canvas's opening fit can land after the first.
 const surfaceBox = () => frame.evaluate(() => {
 	const surface = [...document.querySelectorAll(".card-surface")].find((one) => one.getBoundingClientRect().width > 100);

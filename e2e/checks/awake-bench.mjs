@@ -145,10 +145,10 @@ let canvas = await canvasFrame(page, { timeout: 90000 }).catch((error) => {
 });
 at("waiting for 112 items");
 const shown = await canvas
-	.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 112, undefined, { timeout: 30000 })
+	.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 112, undefined, { timeout: 30000 })
 	.then(() => true)
 	.catch(() => false);
-say("the stage shows the awake canvas", shown, String(await canvas.evaluate(() => globalThis.__decksCards?.().length)));
+say("the stage shows the awake canvas", shown, String(await canvas.evaluate(() => globalThis.__decksProbes?.cards?.().length)));
 if (QUERY) say("the canvas frame carries the query", (await canvas.evaluate(() => location.search)).includes(QUERY.split("&")[0]), await canvas.evaluate(() => location.search));
 
 if (PICTURES) {
@@ -184,11 +184,11 @@ if (PICTURES) {
 	if (QUERY) await page.goto(`${page.url().split("?")[0]}?${QUERY}`, { waitUntil: "domcontentloaded" });
 	else await page.reload({ waitUntil: "domcontentloaded" });
 	canvas = await canvasFrame(page, { timeout: 90000 });
-	await canvas.waitForFunction(() => (globalThis.__decksCards?.().length ?? 0) >= 112, undefined, { timeout: 30000 }).catch(() => {});
+	await canvas.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 112, undefined, { timeout: 30000 }).catch(() => {});
 }
 
-/** `AWAKE_BENCH_FLAGS='{"__decksFreezeWorld":true}'`: globals set in the canvas frame before measuring, for experiments. */
-if (process.env.AWAKE_BENCH_FLAGS) await canvas.evaluate((flags) => Object.assign(globalThis, flags), JSON.parse(process.env.AWAKE_BENCH_FLAGS));
+/** `AWAKE_BENCH_FLAGS='{"warm":false}'`: knobs set in the canvas frame before measuring, for experiments. */
+if (process.env.AWAKE_BENCH_FLAGS) await canvas.evaluate((flags) => Object.assign(globalThis.__decksKnobs ??= {}, flags), JSON.parse(process.env.AWAKE_BENCH_FLAGS));
 if (PANEL === "closed") {
 	await page.locator('button[aria-label="Hide the side panel"]').first().click({ timeout: 10000 });
 	await page.waitForTimeout(500);
@@ -205,7 +205,7 @@ await canvas.evaluate(() => {
 	globalThis.__bench = {
 		async zoomTo(zoom) {
 			for (let i = 0; i < 200; i++) {
-				const now = globalThis.__decksRust.camera.zoom;
+				const now = globalThis.__decksProbes.rust.camera.zoom;
 				const ln = Math.log(zoom / now);
 				if (Math.abs(ln) < 1e-6) return;
 				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
@@ -214,7 +214,7 @@ await canvas.evaluate(() => {
 		},
 		async panTo(x, y) {
 			for (let i = 0; i < 30; i++) {
-				const c = globalThis.__decksRust.camera;
+				const c = globalThis.__decksProbes.rust.camera;
 				const dx = (x - c.x) * c.zoom;
 				const dy = (y - c.y) * c.zoom;
 				if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -234,7 +234,7 @@ await canvas.evaluate(() => {
 			};
 		},
 		engine() {
-			const s = globalThis.__decksEngine?.stats?.() ?? {};
+			const s = globalThis.__decksProbes?.engine?.stats?.() ?? {};
 			return s.cardsSent ?? { calls: 0, bytes: 0 };
 		},
 		record() {
@@ -268,12 +268,12 @@ const quiet = (ms = 1200, cap = 15000) =>
 	canvas.evaluate(
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
-			const pictures = () => globalThis.__decksEngine?.stats?.().pictures ?? 0;
-			let last = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
+			const pictures = () => globalThis.__decksProbes?.engine?.stats?.().pictures ?? 0;
+			let last = JSON.stringify([globalThis.__decksProbes?.sheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
 			let at = performance.now();
 			while (performance.now() - t0 < cap) {
 				await new Promise((done) => setTimeout(done, 100));
-				const now = JSON.stringify([globalThis.__decksSheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
+				const now = JSON.stringify([globalThis.__decksProbes?.sheet?.tiles ?? 0, document.querySelectorAll(".world .card-node").length, document.querySelectorAll("iframe").length, pictures()]);
 				const d = document.querySelector(".stage")?.dataset;
 				if (now !== last || d?.moving === "true" || d?.gliding === "true") {
 					last = now;
@@ -320,7 +320,7 @@ const describeLayers = async () => {
 const run = async (kind) => {
 	const before = await metrics();
 	const engineBefore = await canvas.evaluate(() => globalThis.__bench.engine());
-	const listsBefore = await canvas.evaluate(() => globalThis.__decksCardLists ?? 0);
+	const listsBefore = await canvas.evaluate(() => globalThis.__decksProbes.cardLists ?? 0);
 	const nodes = await canvas.evaluate(() => globalThis.__bench.nodes());
 	counts.status = 0;
 	counts.pictures = 0;
@@ -348,7 +348,7 @@ const run = async (kind) => {
 	counting = false;
 	const after = await metrics();
 	const engineAfter = await canvas.evaluate(() => globalThis.__bench.engine());
-	const listsAfter = await canvas.evaluate(() => globalThis.__decksCardLists ?? 0);
+	const listsAfter = await canvas.evaluate(() => globalThis.__decksProbes.cardLists ?? 0);
 	const gaps = got.frames.slice(1).map((t, i) => t - got.frames[i]);
 	const per = (k) => ((after[k] - before[k]) * 1000) / Math.max(1, gaps.length);
 	return {
