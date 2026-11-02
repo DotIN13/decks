@@ -5,8 +5,7 @@ import Send from "lucide-solid/icons/send";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { setCommentDirty, type CommentTarget } from "../state/comments.ts";
-import { onDismiss } from "@decks/ui";
-import { Icon } from "../ui/icons.tsx";
+import { Icon, onDismiss } from "@decks/ui";
 import { popupPlace } from "./comments.ts";
 
 /**

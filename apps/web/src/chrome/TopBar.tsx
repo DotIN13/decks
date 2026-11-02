@@ -6,7 +6,7 @@ import Plus from "lucide-solid/icons/plus";
 import { Show, untrack, type JSX } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 
 /**
  * The bar at the top left: whose canvas this is, and which canvas.

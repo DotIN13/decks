@@ -1,8 +1,7 @@
 import BellOff from "lucide-solid/icons/bell-off";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { createSignal, For, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
-import { Popover } from "@decks/ui";
+import { Icon, Popover } from "@decks/ui";
 import { SetGroup, SetRow, SetSegments } from "../settings/rows.tsx";
 import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs, availability, type Availability, play, request, SILENT, SOUND_FAMILIES, type SoundChoice, soundName } from "@decks/agent-ui/alerts";
 

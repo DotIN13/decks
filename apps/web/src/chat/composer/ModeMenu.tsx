@@ -6,8 +6,7 @@ import SquarePen from "lucide-solid/icons/square-pen";
 import Zap from "lucide-solid/icons/zap";
 import type { LucideIcon } from "lucide-solid";
 import { For, Show } from "solid-js";
-import { Icon } from "../../ui/icons.tsx";
-import { Popover } from "@decks/ui";
+import { Icon, Popover } from "@decks/ui";
 
 /**
  * How much this agent asks before acting, for the rest of the session.

@@ -2,8 +2,7 @@ import Maximize from "lucide-solid/icons/maximize";
 import Minus from "lucide-solid/icons/minus";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
-import { Popover } from "@decks/ui";
+import { Icon, Popover } from "@decks/ui";
 
 const ZOOM_MIN = 0.02;
 const ZOOM_MAX = 4;

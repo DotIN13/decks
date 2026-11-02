@@ -2,8 +2,7 @@ import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
-import { Popover } from "@decks/ui";
-import { Icon } from "../ui/icons.tsx";
+import { Icon, Popover } from "@decks/ui";
 import { NO_WORKSPACE } from "./agent-sections.ts";
 import { WorkspaceField } from "./NewWorkspace.tsx";
 

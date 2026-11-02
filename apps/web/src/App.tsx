@@ -17,7 +17,7 @@ import { ensureHistory } from "./state/history.ts";
 import { mode, selected, setMode } from "./state/selection.ts";
 import { call, on, setFailureSink, setOnScreen, start, warnIfFailed } from "./state/socket.ts";
 import { can } from "./connections/backend.ts";
-import { Icon } from "./ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import {clearDialog, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { pens, rewatch, watchCanvas } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";

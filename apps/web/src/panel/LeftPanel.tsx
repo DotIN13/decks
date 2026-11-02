@@ -24,7 +24,7 @@ import SettingsIcon from "lucide-solid/icons/settings";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
