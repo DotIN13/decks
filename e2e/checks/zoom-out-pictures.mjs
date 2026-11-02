@@ -13,12 +13,12 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 say("the boards are live pages to start", await liveZoom(page));
-await page.waitForFunction(() => window.__decksRust?.page, null, { timeout: 15000 });
+await page.waitForFunction(() => window.__decksProbes?.rust?.page, null, { timeout: 15000 });
 // Long enough for every live board's picture to be fetched and kept ready.
 await settle(page, 2500);
 
 const counts = await page.evaluate(() => {
-	const page = window.__decksRust.page;
+	const page = window.__decksProbes?.rust.page;
 	window.__forgot = 0;
 	window.__put = 0;
 	const forget = page.forgetPicture.bind(page);

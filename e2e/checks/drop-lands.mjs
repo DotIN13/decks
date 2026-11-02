@@ -52,10 +52,10 @@ async function laggedSocket(page) {
  */
 async function boardStaysDropped(page, label, { picture }) {
 	// The server draws the pictures, and a busy machine takes a while: wait for one on screen before looking.
-	if (picture) await page.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
+	if (picture) await page.waitForFunction(() => JSON.parse(globalThis.__decksProbes?.rust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
 	const candidates = await page.evaluate((picture) => {
-		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
-		return window.__decksBoards()
+		const pictured = new Set(JSON.parse(globalThis.__decksProbes?.rust.picturedKey || "[]"));
+		return window.__decksProbes?.boards()
 			.filter((one) => {
 				const r = one.rect;
 				return pictured.has(one.path) === picture && r.width >= 40 && r.x >= 300 && r.y >= 60 && r.right <= innerWidth - 200 && r.bottom <= innerHeight - 160;
@@ -69,8 +69,8 @@ async function boardStaysDropped(page, label, { picture }) {
 		const hasNode = (await page.locator(`.board-node[data-path="${path}"]`).count()) > 0;
 		grip = hasNode ? await boardEdge(page, path) : null;
 		grip ??= await page.evaluate((path) => {
-			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
-			const r = window.__decksBoards().find((one) => one.path === path).rect;
+			const at = (x, y) => window.__decksProbes?.pictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
+			const r = window.__decksProbes?.boards().find((one) => one.path === path).rect;
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
@@ -83,13 +83,13 @@ async function boardStaysDropped(page, label, { picture }) {
 			break;
 		}
 	}
-	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await page.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await page.evaluate(() => ({ zoom: globalThis.__decksProbes?.rust.camera.zoom, pictured: globalThis.__decksProbes?.rust.picturedKey, boards: window.__decksProbes?.boards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
 	const from = await page.evaluate((path) => {
-		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes?.rust.boards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	await page.evaluate((path) => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes?.rust;
 		globalThis.__boardFrames = [];
 		globalThis.__boardSampling = true;
 		const sample = () => {
@@ -124,7 +124,7 @@ async function boardStaysDropped(page, label, { picture }) {
 	});
 	const after = frames.filter((f) => f.t > dropAt);
 	const to = await page.evaluate((path) => {
-		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		const board = globalThis.__decksProbes?.rust.boards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
 	say(`${label}: the board moved`, Math.abs(to.x - from.x) > 20 && Math.abs(to.y - from.y) > 10, JSON.stringify({ from, to }));
@@ -143,7 +143,7 @@ async function boardStaysDropped(page, label, { picture }) {
 /** Zoomed out until the boards are pictures, not pages. */
 async function zoomToPictures(page) {
 	for (let i = 0; i < 16; i++) {
-		if (await page.evaluate(() => window.__decksBoards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		if (await page.evaluate(() => window.__decksProbes?.boards().some((one) => JSON.parse(globalThis.__decksProbes?.rust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -159,7 +159,7 @@ async function zoomToPictures(page) {
  */
 async function liveAndSmall(page) {
 	const view = page.viewportSize();
-	const zoom = () => page.evaluate(() => globalThis.__decksRust.camera.zoom);
+	const zoom = () => page.evaluate(() => globalThis.__decksProbes?.rust.camera.zoom);
 	const middle = { x: (300 + view.width - 200) / 2, y: (60 + view.height - 160) / 2 };
 	await page.mouse.move(middle.x, middle.y);
 	const pinch = async (dy) => {
@@ -171,7 +171,7 @@ async function liveAndSmall(page) {
 	for (let i = 0; i < 40 && (await zoom()) > 0.45; i++) await pinch(40);
 	await rest(page).catch(() => {});
 	const off = await page.evaluate((middle) => {
-		const narrowest = window.__decksBoards().sort((a, b) => a.rect.width - b.rect.width)[0];
+		const narrowest = window.__decksProbes?.boards().sort((a, b) => a.rect.width - b.rect.width)[0];
 		if (!narrowest) return null;
 		const r = narrowest.rect;
 		return { dx: r.x + r.width / 2 - middle.x, dy: r.y + r.height / 2 - middle.y };
@@ -197,11 +197,11 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+const cam = await page.evaluate(() => globalThis.__decksProbes?.rust.camera);
 const r = await page.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }] });
-say("the box is drawn", !!(await until(() => page.evaluate(() => globalThis.__decksRust?.placed.get("lift-a")))));
+say("the box is drawn", !!(await until(() => page.evaluate(() => globalThis.__decksProbes?.rust?.placed.get("lift-a")))));
 await editMode(page, true);
 const x = r.left + r.width / 2;
 const y = r.top + r.height / 2;
@@ -211,13 +211,13 @@ for (let i = 1; i <= 10; i++) {
 	await page.mouse.move(x + i * 10, y + i * 5);
 	await page.waitForTimeout(30);
 }
-const during = await page.evaluate(() => [...globalThis.__decksRust.lifted]);
+const during = await page.evaluate(() => [...globalThis.__decksProbes?.rust.lifted]);
 say("dragged, the box is lifted", during.includes("lift-a"), JSON.stringify(during));
-const before = await page.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const before = await page.evaluate(() => globalThis.__decksProbes?.rust.placed.get("lift-a").box);
 await page.mouse.up();
-const down = await until(async () => (await page.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 4000);
+const down = await until(async () => (await page.evaluate(() => globalThis.__decksProbes?.rust.lifted.size)) === 0, 4000);
 say("dropped, it is put down once the saved drawing has come", down);
-const moved = await page.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const moved = await page.evaluate(() => globalThis.__decksProbes?.rust.placed.get("lift-a").box);
 say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.stringify({ before, moved }));
 
 // Into a column's slot: the outline rides the glide.
@@ -233,7 +233,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 300 / z, y1: cam.y + 120 / z, x2: cam.x - 200 / z, y2: cam.y + 180 / z } },
 		],
 	});
-	const box = (id) => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+	const box = (id) => page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id);
 	await until(async () => (await box("lift-r3")) && (await box("lift-b")));
 	await settle(page, 600);
 	await page.keyboard.press("Escape");
@@ -244,7 +244,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await settle(page, 300);
 	// Every frame from here: the selection's outline, and where the engine last said the item glides from.
 	await page.evaluate(() => {
-		const engine = globalThis.__decksRust;
+		const engine = globalThis.__decksProbes?.rust;
 		const own = engine.onGlide;
 		engine.onGlide = (shifts) => {
 			globalThis.__lastGlide = shifts;
@@ -254,7 +254,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 		globalThis.__sampling = true;
 		const sample = () => {
 			const outline = document.querySelector(".pen-selection")?.getBoundingClientRect();
-			const drawn = globalThis.__decksPenBox?.("lift-b");
+			const drawn = globalThis.__decksProbes?.penBox?.("lift-b");
 			const shift = globalThis.__lastGlide?.get("lift-b");
 			if (shift && outline && drawn) {
 				const zoom = engine.camera.zoom;
@@ -272,7 +272,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await page.mouse.move(r1.x + 60, (r1.y + r1.height + r2.y) / 2, { steps: 20 });
 	await settle(page, 200);
 	await page.mouse.up();
-	const joined = await until(async () => (await page.evaluate(() => globalThis.__decksRust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
+	const joined = await until(async () => (await page.evaluate(() => globalThis.__decksProbes?.rust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
 	await settle(page, 400);
 	const frames = await page.evaluate(() => {
 		globalThis.__sampling = false;

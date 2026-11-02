@@ -25,13 +25,13 @@ await editMode(page, true);
 
 // An empty place in the middle of the screen, in stage units, with room above it for the pill.
 const spot = await page.evaluate(() => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 	return { x: (560 - m.e) / m.a, y: (420 - m.f) / m.a, zoom: m.a };
 });
 const w = 200 / spot.zoom;
 const h = 120 / spot.zoom;
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-box", fill: "#4c8bf5" }, box: { x1: spot.x, y1: spot.y, x2: spot.x + w, y2: spot.y + h } }] });
-const box = await until(() => page.evaluate(() => window.__decksPenBox?.("pill-box")));
+const box = await until(() => page.evaluate(() => window.__decksProbes?.penBox?.("pill-box")));
 say("the box is on screen", !!box, JSON.stringify(box));
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -57,7 +57,7 @@ say("a drag from the handle draws an arrow from the top", arrow?.metadata.from?.
 
 // Two items selected have no handles, and their pill keeps its own 10 px.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-two", fill: "#f5a34c" }, box: { x1: spot.x + w + 40 / spot.zoom, y1: spot.y, x2: spot.x + 2 * w + 40 / spot.zoom, y2: spot.y + h } }] });
-const two = await until(() => page.evaluate(() => window.__decksPenBox?.("pill-two")));
+const two = await until(() => page.evaluate(() => window.__decksProbes?.penBox?.("pill-two")));
 await page.keyboard.press("Escape");
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await page.keyboard.down("Shift");
@@ -77,7 +77,7 @@ let press;
  * A board whose top is on screen first: the pill goes 10 px above the group only when that slot is in
  * the window, and under it otherwise (a board whose top was above the window put it under the group).
  */
-const boards = await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
+const boards = await page.evaluate(() => window.__decksProbes?.boards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
 boards.sort((a, b) => Number(a.rect.y < 140) - Number(b.rect.y < 140));
 for (const one of boards) {
 	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
@@ -87,7 +87,7 @@ for (const one of boards) {
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
-				if (x > 60 && x < 1340 && y > 90 && y < 860 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === path) return { x, y };
+				if (x > 60 && x < 1340 && y > 90 && y < 860 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksProbes?.pictureAt(x, y) === path) return { x, y };
 			}
 		}, one);
 		if (at) press = { ...at, path: one.path, rect };
@@ -144,7 +144,7 @@ if (press) {
  * with an item just above the box, the pill goes under it, on neither the box nor the item above.
  */
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-roof", fill: "#7a7a7a" }, box: { x1: spot.x - 40 / spot.zoom, y1: spot.y - 70 / spot.zoom, x2: spot.x + w + 40 / spot.zoom, y2: spot.y - 20 / spot.zoom } }] });
-const roof = await until(() => page.evaluate(() => window.__decksPenBox?.("pill-roof")));
+const roof = await until(() => page.evaluate(() => window.__decksProbes?.penBox?.("pill-roof")));
 await page.keyboard.press("Escape");
 await settle(page, 300);
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -171,7 +171,7 @@ if (under) {
 		await page.waitForTimeout(30);
 	}
 	await settle(page, 700);
-	const moved = await page.evaluate(() => window.__decksPenBox?.("pill-box"));
+	const moved = await page.evaluate(() => window.__decksProbes?.penBox?.("pill-box"));
 	const after = await page.evaluate(() => {
 		const r = document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect();
 		return r && { x: r.x, y: r.y, width: r.width };

@@ -71,15 +71,15 @@ const dialogText = () => page.evaluate(() => document.querySelector(".dialog-car
 let placed = PATH;
 const focus = async (path) => {
 	// The stage's own list: below the live zoom a board is a picture and has no `.board-node`.
-	for (const other of await page.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path))) {
+	for (const other of await page.evaluate(() => (window.__decksProbes?.boards?.() ?? []).map((one) => one.path))) {
 		if (other !== path) LINK.send({ type: "board.hide", path: other });
 	}
 	await settle(page, 500);
 	// Played over the socket, as `chrome.mjs` does: placing it copies it into the canvas's folder,
 	// so the node is found by its file name, wherever the copy went.
 	LINK.send({ type: "board.play", path });
-	await page.waitForFunction((name) => (window.__decksBoards?.() ?? []).some((one) => one.path.endsWith(`/${name}`)), path.replace("boards/", ""), { timeout: 10000 });
-	placed = await page.evaluate((name) => (window.__decksBoards?.() ?? []).find((one) => one.path.endsWith(`/${name}`))?.path, path.replace("boards/", ""));
+	await page.waitForFunction((name) => (window.__decksProbes?.boards?.() ?? []).some((one) => one.path.endsWith(`/${name}`)), path.replace("boards/", ""), { timeout: 10000 });
+	placed = await page.evaluate((name) => (window.__decksProbes?.boards?.() ?? []).find((one) => one.path.endsWith(`/${name}`))?.path, path.replace("boards/", ""));
 	// The camera to it through the API, not by selecting it: a selecting click lands inside the board,
 	// on the very button this check is about, and would ask the question before anything else does.
 	// It waits while the canvas is in use (`camera/touched.ts`, five seconds untouched), so it is asked again until it moves.

@@ -3,7 +3,7 @@
  * no more at its end than at its start.
  *
  * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/board-kit`; `StageInk.tsx`),
- * only its new points and its end each frame; `globalThis.__inkWhole` shapes it whole every frame,
+ * only its new points and its end each frame; `knobs.inkWhole` shapes it whole every frame,
  * as before. This draws the same strokes both ways in one page, alternating — a mouse's (a line of
  * one width) and a pencil's (an outline, its pressure moving), 600 and 2,000 points, four samples a
  * frame as a fast pencil gives them — and asks:
@@ -53,10 +53,10 @@ await page.waitForSelector(".stage-ink");
 await page.evaluate(() => {
 	/*
 	 * The stroke under the pen is drawn by the engine now (`props.layer.ink`, 540345fc), with no SVG
-	 * path to read; `__inkOnSvg` puts it back on the glass as an `.ink-live` path, the same shape's
+	 * path to read; `knobs.inkOnSvg` puts it back on the glass as an `.ink-live` path, the same shape's
 	 * text, which is what is compared here.
 	 */
-	globalThis.__inkOnSvg = true;
+	(globalThis.__decksKnobs ??= {}).inkOnSvg = true;
 	const sheet = () => document.querySelector(".stage-ink");
 	let state;
 	const send = (type, x, y, pressure) =>
@@ -95,11 +95,11 @@ await page.evaluate(() => {
 	};
 });
 
-const inks = () => page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
+const inks = () => page.evaluate(() => [...globalThis.__decksProbes?.rust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
 
 /** One stroke of `points` points, shaped whole (`whole`) or as it grows: its paths, its frame times, and what the file got. */
 const stroke = async ({ pen, points, whole }) => {
-	await page.evaluate((whole) => (globalThis.__inkWhole = whole), whole);
+	await page.evaluate((whole) => ((globalThis.__decksKnobs ??= {}).inkWhole = whole), whole);
 	const had = new Set((await inks()).map((ink) => ink.id));
 	const frames = Math.round(points / PER_FRAME);
 	await page.evaluate((pen) => globalThis.__ink.down(pen), pen);

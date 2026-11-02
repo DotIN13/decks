@@ -88,7 +88,7 @@ const run = async (expression) => {
 	if (made?.className !== "Promise" && made?.subtype !== "promise") return made?.value ?? made?.description;
 	return (await send("Runtime.awaitPromise", { promiseObjectId: made.objectId, returnByValue: true })).result?.result?.value;
 };
-const zoom = async () => Number(/scale\(([\d.]+)\)/.exec(await run("String(globalThis.__decksCameraTransform?.())"))?.[1]);
+const zoom = async () => Number(/scale\(([\d.]+)\)/.exec(await run("String(globalThis.__decksProbes?.cameraTransform?.())"))?.[1]);
 for (let i = 0; i < 60 && (await run("typeof __pilot")) !== "object"; i++) await sleep(500);
 await sleep(8000);
 const settle = (ms) => run(`new Promise((done) => setTimeout(done, ${ms}))`);
@@ -110,9 +110,9 @@ const record = async (name, action) => {
 	await run(action);
 	const pageEnd = await run("performance.now()");
 	const wall = Date.now() - start;
-	// The drawing's own word on when it was last sharp and filled in (`stage/engine.ts`, `__decksSheet`), a moment after the gesture.
+	// The drawing's own word on when it was last sharp and filled in (`stage/engine.ts`, `__decksProbes.sheet`), a moment after the gesture.
 	await settle(4000);
-	const sheet = await run("JSON.stringify(globalThis.__decksSheet ?? {})");
+	const sheet = await run("JSON.stringify(globalThis.__decksProbes?.sheet ?? {})");
 	await send("Timeline.stop");
 	await send("Memory.stopTracking");
 	await send("CPUProfiler.stopTracking");

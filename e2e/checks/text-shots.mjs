@@ -58,8 +58,8 @@ const on = await until(() => link.received.some((m) => m.type === "stage.pen" &&
 say("the agent is on the text canvas", !!on);
 
 const { browser, page } = await open({ width: W, height: H, dpr: DPR, boards: false });
-await page.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 6, null, { timeout: 30000 });
-await page.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
+await page.waitForFunction(() => (globalThis.__decksProbes?.rust?.placed?.size ?? 0) >= 6, null, { timeout: 30000 });
+await page.waitForFunction(() => globalThis.__decksProbes?.sheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
 
 const quiet = () =>
 	page.evaluate(async () => {
@@ -68,7 +68,7 @@ const quiet = () =>
 		const t0 = at;
 		while (performance.now() - t0 < 20000) {
 			await new Promise((done) => setTimeout(done, 100));
-			const n = globalThis.__decksSheet?.tiles ?? 0;
+			const n = globalThis.__decksProbes?.sheet?.tiles ?? 0;
 			if (n !== last || document.querySelector(".stage")?.dataset.moving === "true") {
 				last = n;
 				at = performance.now();
@@ -85,13 +85,13 @@ const show = (zoom) =>
 			const wheel = (deltaX, deltaY, ctrlKey) => stage.dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, ctrlKey, deltaMode: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
 			const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
 			for (let i = 0; i < 200; i++) {
-				const ln = Math.log(zoom / globalThis.__decksRust.camera.zoom);
+				const ln = Math.log(zoom / globalThis.__decksProbes?.rust.camera.zoom);
 				if (Math.abs(ln) < 1e-6) break;
 				wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
 				await raf();
 			}
 			for (let i = 0; i < 20; i++) {
-				const c = globalThis.__decksRust.camera;
+				const c = globalThis.__decksProbes?.rust.camera;
 				// The camera is the stage point in the middle of the window; the origin goes to ORIGIN.
 				const dx = (-(ORIGIN.x - r.width / 2) / c.zoom - c.x) * c.zoom;
 				const dy = (-(ORIGIN.y - r.height / 2) / c.zoom - c.y) * c.zoom;
@@ -100,7 +100,7 @@ const show = (zoom) =>
 				await raf();
 				await raf();
 			}
-			return { ...globalThis.__decksRust.camera, W, H };
+			return { ...globalThis.__decksProbes?.rust.camera, W, H };
 		},
 		{ zoom, W, H, ORIGIN },
 	);

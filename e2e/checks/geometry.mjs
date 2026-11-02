@@ -285,7 +285,7 @@ const content = await page.evaluate((wanted) => {
 	return Math.ceil(doc.querySelector(".doc").getBoundingClientRect().height);
 }, flowPath);
 await cornerOnScreen(flowPath);
-const zoomNow = await page.evaluate(() => globalThis.__decksRust.camera.zoom);
+const zoomNow = await page.evaluate(() => globalThis.__decksProbes?.rust.camera.zoom);
 await dragHandle(flowPath, 0, -(flowDrawn.h - 260) * zoomNow);
 await page.waitForTimeout(1500);
 const floored = await drawnAt(flowPath);

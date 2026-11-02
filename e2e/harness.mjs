@@ -118,7 +118,7 @@ export async function deckState(api) {
  */
 export async function stagePath(page, path) {
 	return page.evaluate((wanted) => {
-		const all = window.__decksBoards?.() ?? [];
+		const all = window.__decksProbes?.boards?.() ?? [];
 		if (!/^boards\//.test(wanted) || all.some((one) => one.path === wanted)) return wanted;
 		const file = wanted.slice("boards/".length);
 		return all.find((one) => /^canvases\/[^/]+\/boards\//.test(one.path) && one.path.split("/").slice(3).join("/") === file)?.path ?? wanted;
@@ -318,8 +318,8 @@ export async function highlightMode(page) {
 export async function liveZoom(page, { tries = 12 } = {}) {
 	await page.waitForSelector(".stage", { timeout: 30000 });
 	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
-	const boards = () => page.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
-	await page.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+	const boards = () => page.evaluate(() => window.__decksProbes?.boards?.().length ?? document.querySelectorAll(".board-node").length);
+	await page.waitForFunction(() => (window.__decksProbes?.boards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
 		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
 		await page
@@ -345,7 +345,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 			 * board off screen with no page to wait for.
 			 */
 			const seen = (r) => Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) * Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
-			const rects = (window.__decksBoards?.() ?? []).map((one) => one.rect);
+			const rects = (window.__decksProbes?.boards?.() ?? []).map((one) => one.rect);
 			const cx = rect.left + rect.width / 2;
 			const cy = rect.top + rect.height / 2;
 			// The centre when it is on a board already, so a desktop lands where it always has.
@@ -374,7 +374,7 @@ export async function ready(page, { timeout = 30000 } = {}) {
 		() => {
 			if (document.querySelector(".stage")?.dataset.live !== "true") {
 				// The Rust engine has no sheet: ready is its first frame drawn.
-				return document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksEngine?.stats?.().engine === "rust" && (globalThis.__decksSheet?.shown ?? 0) > 0);
+				return document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksProbes?.engine?.stats?.().engine === "rust" && (globalThis.__decksProbes?.sheet?.shown ?? 0) > 0);
 			}
 			const frames = [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")];
 			return frames.length > 0 && frames.every((frame) => frame.contentWindow?.__boardReady === true);
@@ -434,7 +434,7 @@ export async function rest(page, { start = 300, timeout = 6000 } = {}) {
  * before it emptied.
  */
 export async function emptyCanvas(page, { timeout = 15000 } = {}) {
-	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksBoards?.().length ?? 0) === 0, null, { timeout });
+	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksProbes?.boards?.().length ?? 0) === 0, null, { timeout });
 }
 
 /**
@@ -854,7 +854,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	// A board below the live zoom has no node, only its picture on the stage's sheet (`Stage.tsx`): the stage says where it is.
 	const spot = () => page.evaluate((wanted) => {
 		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-		const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+		const r = node?.getBoundingClientRect() ?? window.__decksProbes?.boards?.().find((one) => one.path === wanted)?.rect;
 		if (!r) return null;
 		const stage = document.querySelector(".stage");
 		for (const fy of [0.08, 0.2, 0.35, 0.5, 0.65, 0.8]) {
@@ -863,7 +863,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 				const y = r.y + r.height * fy;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
 				const hit = document.elementFromPoint(x, y);
-				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : hit === stage && window.__decksPictureAt?.(x, y) === wanted) return { x, y };
+				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : hit === stage && window.__decksProbes?.pictureAt?.(x, y) === wanted) return { x, y };
 			}
 		}
 		return null;
@@ -882,7 +882,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const off = await page.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const r = node?.getBoundingClientRect() ?? window.__decksProbes?.boards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return null;
 			return { dx: r.x + r.width / 2 - innerWidth / 2, dy: r.y + r.height / 2 - innerHeight / 2 };
 		}, path);
@@ -896,7 +896,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const why = await page.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const r = node?.getBoundingClientRect() ?? window.__decksProbes?.boards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return "not on the canvas";
 			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
 			return `at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}, its middle under ${hit?.tagName.toLowerCase()}.${String(hit?.className ?? "").split(" ")[0]}`;

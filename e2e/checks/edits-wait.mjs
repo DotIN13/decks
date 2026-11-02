@@ -7,7 +7,7 @@
  * the socket, the edit is made by input (a drag, a key, a click in a panel), and every animation
  * frame from the moment of the committing event (the pointer let go, the key pressed) for 1.5 s it is
  * written down what is drawn: the engine's box and fields for the items the edit touches (its laid
- * out drawing, `__decksRust.placed`), how many items there are, a board's box in the engine and its
+ * out drawing, `__decksProbes.rust.placed`), how many items there are, a board's box in the engine and its
  * page on screen, and the selection's outline. A frame shows the old state when any of those is as
  * it was before the edit and is not as it is once everything has landed.
  *
@@ -63,7 +63,7 @@ const SAMPLER = () => {
 		commitAt: Infinity,
 		armed: false,
 		sample(probe) {
-			const e = globalThis.__decksRust;
+			const e = globalThis.__decksProbes?.rust;
 			const out = {};
 			if (!e) return out;
 			for (const id of probe.items ?? []) {
@@ -198,18 +198,18 @@ async function run(engine, { all }) {
 	const link = await socket();
 	const agentId = await until(() => link.last("agents")?.focused);
 	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
-	const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+	const cam = await page.evaluate(() => globalThis.__decksProbes?.rust.camera);
 	const z = cam.zoom;
 	/** A box in stage units from screen pixels off the middle of the window. */
 	const at = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx / z), y1: Math.round(cam.y + dy / z), x2: Math.round(cam.x + (dx + w) / z), y2: Math.round(cam.y + (dy + h) / z) });
 	const rect = (id, dx, dy, w = 120, h = 80, fill = "#4c8bf5") => ({ op: "insert", node: { type: "rectangle", id, fill }, box: at(dx, dy, w, h) });
-	const box = (id) => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+	const box = (id) => page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id);
 	const centre = async (id) => {
 		const b = await until(() => box(id), 4000);
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
-	const drawn = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => globalThis.__decksRust.placed.has(id)), ids), 6000);
-	const gone = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => !globalThis.__decksRust.placed.has(id)), ids), 6000);
+	const drawn = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => globalThis.__decksProbes?.rust.placed.has(id)), ids), 6000);
+	const gone = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => !globalThis.__decksProbes?.rust.placed.has(id)), ids), 6000);
 	/** Each deleted on its own: one already gone (inside a frame deleted before it) does not keep the rest. */
 	const del = async (...ids) => {
 		for (const id of ids) send([{ op: "delete", id }]);
@@ -251,7 +251,7 @@ async function run(engine, { all }) {
 	// Boards first, where the canvas opens on them.
 	const pick = async () => {
 		const paths = await page.evaluate(() =>
-			window.__decksBoards()
+			window.__decksProbes?.boards()
 				.filter((one) => one.node && one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 				.map((one) => one.path),
 		);
@@ -312,16 +312,16 @@ async function run(engine, { all }) {
 	const person = await asPerson();
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 	const home = (await call("view.camera", [])).value;
-	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksProbes?.rust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		const asked = await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksProbes?.rust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksProbes?.rust.camera.x - x) < 2000, spot.x), 4000));
 		if (!there) console.log(`view.move did not land (${JSON.stringify(asked)}); again`);
 	}
 	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
-	const moved = await page.evaluate(() => globalThis.__decksRust.camera);
+	const moved = await page.evaluate(() => globalThis.__decksProbes?.rust.camera);
 	Object.assign(cam, moved);
 	const zz = moved.zoom;
 	const at2 = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx / zz), y1: Math.round(cam.y + dy / zz), x2: Math.round(cam.x + (dx + w) / zz), y2: Math.round(cam.y + (dy + h) / zz) });
@@ -330,10 +330,10 @@ async function run(engine, { all }) {
 	void rect;
 
 	const items = (...ids) => ({ items: ids });
-	const madeIds = async (had) => (await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id))).filter((id) => !had.includes(id));
+	const madeIds = async (had) => (await page.evaluate(() => [...globalThis.__decksProbes?.rust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id))).filter((id) => !had.includes(id));
 	let had = [];
 	const remember = async () => {
-		had = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id));
+		had = await page.evaluate(() => [...globalThis.__decksProbes?.rust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id));
 	};
 	const dropMade = async () => {
 		const made = await madeIds(had);
@@ -405,7 +405,7 @@ async function run(engine, { all }) {
 			await page.keyboard.press("Shift+ArrowRight");
 		},
 		cleanup: async () => {
-			const both = await page.evaluate(() => ({ note: globalThis.__decksRust.placed.has("ew-agent"), x: globalThis.__decksRust.placed.get("ew-race")?.box.x }));
+			const both = await page.evaluate(() => ({ note: globalThis.__decksProbes?.rust.placed.has("ew-agent"), x: globalThis.__decksProbes?.rust.placed.get("ew-race")?.box.x }));
 			say(`${engine}: …and the agent's note and the person's nudge are both drawn once both have landed`, both.note && Math.abs(both.x - (Math.round(cam.x - 200 / zz) + 10)) < 1.5, JSON.stringify(both));
 			await del("ew-race", "ew-agent");
 		},
@@ -421,8 +421,8 @@ async function run(engine, { all }) {
 		send([{ op: "delete", id: "ew-refused" }]);
 		await page.waitForTimeout(60);
 		await page.keyboard.press("Shift+ArrowRight");
-		const shown = await until(() => page.evaluate(() => globalThis.__decksRust.placed.get("ew-refused")?.box.x), 300);
-		const gone = await until(() => page.evaluate(() => !globalThis.__decksRust.placed.has("ew-refused")), 8000);
+		const shown = await until(() => page.evaluate(() => globalThis.__decksProbes?.rust.placed.get("ew-refused")?.box.x), 300);
+		const gone = await until(() => page.evaluate(() => !globalThis.__decksProbes?.rust.placed.has("ew-refused")), 8000);
 		lag.ms = 0;
 		await until(() => lag.queued === 0, 15000);
 		say(`${engine}: an edit the server refuses is shown at once, then the server's drawing (the item gone) wins`, shown !== undefined && gone, JSON.stringify({ shown, gone }));
@@ -662,7 +662,7 @@ async function run(engine, { all }) {
 				await page.keyboard.press("Escape");
 				// The arrow is picked by its middle handle's line: select it from the drawing's own selection, as a click on it does.
 				const mid = await page.evaluate((id) => {
-					const p = globalThis.__decksRust.placed.get(id);
+					const p = globalThis.__decksProbes?.rust.placed.get(id);
 					return p ? { x: p.box.x + p.box.w / 2, y: p.box.y + p.box.h / 2 } : undefined;
 				}, arrowId);
 				void mid;
@@ -710,7 +710,7 @@ async function run(engine, { all }) {
 		},
 		cleanup: async () => {
 			await dropMade();
-			const arrows = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node.metadata?.type === "decks.arrow").map((p) => p.node.id));
+			const arrows = await page.evaluate(() => [...globalThis.__decksProbes?.rust.placed.values()].filter((p) => p.node.metadata?.type === "decks.arrow").map((p) => p.node.id));
 			await del("ew-a", "ew-b", "ew-c", ...arrows);
 		},
 	});

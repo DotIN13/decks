@@ -23,14 +23,14 @@ function watchCopies(page) {
 function asIPhone() {
 	Object.defineProperty(Navigator.prototype, "platform", { get: () => "iPhone" });
 }
-const held = (page) => page.evaluate(() => Object.fromEntries([...window.__decksRust.picturesAsked.entries()].filter(([key]) => key.startsWith("board:")).map(([key, one]) => [key, one.size ?? 0])));
+const held = (page) => page.evaluate(() => Object.fromEntries([...window.__decksProbes?.rust.picturesAsked.entries()].filter(([key]) => key.startsWith("board:")).map(([key, one]) => [key, one.size ?? 0])));
 
 for (const target of TARGETS) {
 	const name = target.label;
 	const width = target.slug === "chromium" ? 1024 : 512;
 	await resetStage();
 	const { browser, page, errors } = await open({ ...target.open, boards: false, init: target.slug === "chromium" ? undefined : `(${noGpu})(); (${asIPhone})();` });
-	await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+	await page.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 	const asked = watchCopies(page);
 	await outOfLive(page);
 	for (let i = 0; i < 6; i++) {
@@ -45,10 +45,10 @@ for (const target of TARGETS) {
 		// Compressed: asked for so, sent so, and a byte a pixel on the GPU (four, as RGBA, before).
 		// A first look gets the server's stand-in for a size it has not made yet, asked again until it has.
 		const boards = Object.keys(first).length;
-		const put = () => page.evaluate(() => window.__decksRust.compressedPut);
+		const put = () => page.evaluate(() => window.__decksProbes?.rust.compressedPut);
 		for (let i = 0; i < 40 && (await put()) < boards; i++) await settle(page, 500);
 		const perPixel = await page.evaluate(() => {
-			const engine = window.__decksRust;
+			const engine = window.__decksProbes?.rust;
 			const each = [...engine.compressedSize].map(([key, [w, h]]) => engine.pictureBytes.get(key) / (w * h));
 			return each.length ? Math.max(...each) : 0;
 		});
@@ -71,17 +71,17 @@ for (const target of TARGETS) {
 	// A budget far too small: the pictures shrink on the GPU, with no request.
 	const sent = asked.length;
 	const shrunk = await page.evaluate(async () => {
-		window.__decksPictureMB = 0.05;
-		window.__decksRust.fitPictures();
+		(window.__decksKnobs ??= {}).pictureMB = 0.05;
+		window.__decksProbes?.rust.fitPictures();
 		await new Promise((done) => setTimeout(done, 300));
-		return { shrunk: window.__decksRust.shrunk.size, bytes: window.__decksRust.heldBytes() };
+		return { shrunk: window.__decksProbes?.rust.shrunk.size, bytes: window.__decksProbes?.rust.heldBytes() };
 	});
-	const backend = await page.evaluate(() => window.__decksEngine?.stats?.().backend);
+	const backend = await page.evaluate(() => window.__decksProbes?.engine?.stats?.().backend);
 	// WebGL 2 keeps one size of a picture (`Gpu::picture_texture`), so it has nothing smaller to shrink to.
 	if (backend === "webgl2") say(`${name}: on WebGL 2 a picture has one size, so nothing shrinks`, shrunk.shrunk === 0, JSON.stringify({ backend, ...shrunk }));
 	else say(`${name}: over the budget, pictures shrink on the GPU`, shrunk.shrunk > 0, JSON.stringify({ backend, ...shrunk }));
 	say(`${name}: …with no picture fetched for it`, asked.length === sent, JSON.stringify(asked.slice(sent, sent + 4)));
-	await page.evaluate(() => delete window.__decksPictureMB);
+	await page.evaluate(() => delete window.__decksKnobs.pictureMB);
 	say(`${name}: no errors on the page`, errors.length === 0, errors.join(" | "));
 	await browser.close();
 }

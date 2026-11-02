@@ -27,10 +27,10 @@ await resetStage();
 }
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
-await page.waitForFunction(() => window.__decksRust?.page && (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 });
+await page.waitForFunction(() => window.__decksProbes?.rust?.page && (window.__decksProbes?.boards?.().length ?? 0) > 0, null, { timeout: 30000 });
 await settle(page, 1500);
 
-const zoomNow = () => page.evaluate(() => new DOMMatrix(globalThis.__decksCameraTransform()).a);
+const zoomNow = () => page.evaluate(() => new DOMMatrix(globalThis.__decksProbes?.cameraTransform()).a);
 const zoomTo = async (target, x, y, step, gap) => {
 	await page.mouse.move(x, y);
 	for (let i = 0; i < 200; i++) {
@@ -45,7 +45,7 @@ const zoomTo = async (target, x, y, step, gap) => {
 /** Boards the engine leaves to their page while that page is asleep or gone: drawn as nothing. */
 const holes = () =>
 	page.evaluate(() =>
-		window.__decksRust.boards
+		window.__decksProbes?.rust.boards
 			.filter((board) => board.live)
 			.filter((board) => {
 				const frame = document.querySelector(`.world iframe[data-path="${CSS.escape(board.path)}"]`);

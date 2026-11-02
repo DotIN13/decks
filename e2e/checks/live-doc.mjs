@@ -56,7 +56,7 @@ const { browser, page } = await open({ width: 1400, height: 900, boards: false }
 await settle(page, 1500);
 const node = 'iframe[data-path$="e2e-doc.html"]';
 /* The stage's own list: below the live zoom a board is drawn on the sheet and has no frame until it is selected. */
-const docPath = await until(() => page.evaluate(() => (window.__decksBoards?.() ?? []).find((one) => one.path.endsWith("e2e-doc.html"))?.path), 15000);
+const docPath = await until(() => page.evaluate(() => (window.__decksProbes?.boards?.() ?? []).find((one) => one.path.endsWith("e2e-doc.html"))?.path), 15000);
 const found = docPath ? 1 : 0;
 say("the document board is on the canvas", found > 0, String(docPath));
 
@@ -162,7 +162,7 @@ if (found) {
 	await page.mouse.click(1250, 700);
 	await settle(page, 600);
 	const unselected = await page.evaluate((n) => document.querySelector(n)?.closest(".board-node")?.dataset.selected !== "true", node);
-	const rect = await page.evaluate((wanted) => window.__decksBoards?.().find((one) => one.path === wanted)?.rect, path);
+	const rect = await page.evaluate((wanted) => window.__decksProbes?.boards?.().find((one) => one.path === wanted)?.rect, path);
 	let spread = 0;
 	let during = false;
 	if (rect) {
@@ -172,7 +172,7 @@ if (found) {
 		await page.mouse.wheel(0, 1);
 		// No page for it: below the live zoom only the selected board keeps one.
 		during = await page.evaluate((n) => { const frame = document.querySelector(n); return !frame || getComputedStyle(frame).visibility === "hidden"; }, node);
-		const now = await page.evaluate((wanted) => window.__decksBoards?.().find((one) => one.path === wanted)?.rect, path);
+		const now = await page.evaluate((wanted) => window.__decksProbes?.boards?.().find((one) => one.path === wanted)?.rect, path);
 		const shot = await page.screenshot({ clip: { x: now.x + now.width * 0.3, y: now.y + now.height * 0.3, width: Math.max(8, now.width * 0.4), height: Math.max(8, now.height * 0.4) } });
 		spread = await page.evaluate(async (b64) => {
 			const img = new Image();

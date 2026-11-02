@@ -57,7 +57,7 @@ PATH = (await until(async () => { const at = await stagePath(page, PATH); return
 
 // The fixture alone, in front of the camera and big enough to click in (see `board-eval.mjs`).
 // The stage's own list: below the live zoom a board is a picture and has no `.board-node`.
-for (const other of await page.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path))) {
+for (const other of await page.evaluate(() => (window.__decksProbes?.boards?.() ?? []).map((one) => one.path))) {
 	if (other !== PATH) LINK.send({ type: "board.hide", path: other });
 }
 await settle(page, 500);

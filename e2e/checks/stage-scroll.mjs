@@ -33,7 +33,7 @@ const clear = await page
 	.waitForFunction(() => {
 		if (document.querySelector(".stage")?.dataset.gliding === "true") return null;
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 140; y < window.innerHeight - 160; y += 30) {
 			for (let x = 320; x < window.innerWidth - 320; x += 30) {
@@ -45,7 +45,7 @@ const clear = await page
 	}, null, { timeout: 8000, polling: 200 })
 	.then((handle) => handle.jsonValue())
 	.catch(() => undefined);
-const why = clear ? "" : await page.evaluate(() => JSON.stringify({ cam: globalThis.__decksCameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live, at: [[400, 200], [600, 400], [800, 500]].map(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}.${[...e.classList].join(".")}` : null; }) }));
+const why = clear ? "" : await page.evaluate(() => JSON.stringify({ cam: globalThis.__decksProbes?.cameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live, at: [[400, 200], [600, 400], [800, 500]].map(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}.${[...e.classList].join(".")}` : null; }) }));
 say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen) + why);
 
 const scrolled = () => page.evaluate(() => {
@@ -61,7 +61,7 @@ if (clear) {
 	const many = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}: words enough to make this card taller than any window.`).join("\n\n");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "tall", content: many, metadata: { type: "decks.markdown" }, width: 320 }, box: { x1: Math.round(clear.world.x), y1: Math.round(clear.world.y) } }] });
 	const card = await until(async () => {
-		const box = await page.evaluate(() => globalThis.__decksPenBox?.("tall"));
+		const box = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("tall"));
 		return box && box.height > clear.window * 1.5 ? box : undefined;
 	}, 12000);
 	say("the card is half again the window's height", !!card, JSON.stringify({ h: Math.round(card?.height ?? 0), window: clear.window, ...(await scrolled()) }));

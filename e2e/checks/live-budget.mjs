@@ -22,7 +22,7 @@ for (const [kind, most, init] of [
 	await settle(page, 2500);
 	const shown = await page.evaluate(() => ({
 		pages: document.querySelectorAll(".board-node:not([data-hidden-page]) iframe.plain-board-page").length,
-		near: window.__decksBoards().filter((b) => b.rect.right > 0 && b.rect.left < innerWidth && b.rect.bottom > 0 && b.rect.top < innerHeight).length,
+		near: window.__decksProbes?.boards().filter((b) => b.rect.right > 0 && b.rect.left < innerWidth && b.rect.bottom > 0 && b.rect.top < innerHeight).length,
 	}));
 	say(`${kind}: at most ${most} page${most > 1 ? "s" : ""} showing, with ${shown.near} boards in view`, shown.pages >= Math.min(most, shown.near) && shown.pages <= most, JSON.stringify(shown));
 

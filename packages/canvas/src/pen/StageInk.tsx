@@ -6,6 +6,7 @@ import { inkItem } from "./ink.ts";
 import type { StageEngine } from "../stage/engine.ts";
 import type { LiveInk, PenPreview } from "../stage/types.ts";
 import { scheme } from "../lib/theme.ts";
+import { knobs } from "../debug.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
 export const STAGE_INK = "stage";
@@ -80,9 +81,9 @@ export function StageInk(props: {
 		 * Drawn by the engine, the painter that draws the saved stroke: as SVG it came out lighter than
 		 * the engine's 4× multisampled tiles draw the same outline, and the stroke thickened as the copy
 		 * came off. Once a frame, so it holds the frame rate (60 fps on an iPad mini, as the SVG did); the
-		 * SVG is kept behind `__inkOnSvg`.
+		 * SVG is kept behind `knobs.inkOnSvg`.
 		 */
-		if (!(globalThis as { __inkOnSvg?: boolean }).__inkOnSvg) {
+		if (!knobs.inkOnSvg) {
 			props.layer.ink(want);
 			for (const [, path] of shown) path.el.remove();
 			shown.clear();
@@ -239,13 +240,13 @@ export function StageInk(props: {
 	};
 	/*
 	 * The stroke under the pen is shaped as it grows (`inkShaper`): only its new points and its end
-	 * each frame, to the same path as shaping it whole. `__inkWhole` set shapes it whole each frame,
+	 * each frame, to the same path as shaping it whole. `knobs.inkWhole` set shapes it whole each frame,
 	 * as it was, for measuring the two in one page.
 	 */
 	let shaper = inkShaper();
 	const liveOf = (drawn: Extract<Gesture, { kind: "draw" }>): LiveInk => {
 		const stroke = { id: "live", ...drawn.stroke, points: drawn.points };
-		const shape = (globalThis as { __inkWhole?: boolean }).__inkWhole ? strokeShape(stroke) : shaper.shape(stroke);
+		const shape = knobs.inkWhole ? strokeShape(stroke) : shaper.shape(stroke);
 		return {
 			id: "live",
 			d: shape.d,

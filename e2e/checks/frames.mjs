@@ -66,7 +66,7 @@ await editMode(page, true);
 const spot = await page
 	.waitForFunction(() => {
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 170; y < 780; y += 40) {
 			for (let x = 380; x < 1300; x += 40) {
@@ -92,7 +92,7 @@ if (spot) {
 	const both = await until(() => (onDisk().children.some((n) => n.id === "f-box") && onDisk().children.some((n) => n.id === "f-note") ? true : undefined));
 	say("a frame and a loose item start side by side at the top of the file", !!both, JSON.stringify({ note: parentOf("f-note"), frame: parentOf("f-box"), layout: onDisk().children.find((n) => n.id === "f-box")?.layout, clip: onDisk().children.find((n) => n.id === "f-box")?.clip }));
 
-	const boxOf = (id) => page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const boxOf = (id) => page.evaluate((one) => globalThis.__decksProbes?.penBox?.(one), id);
 	const middleOf = async (id) => {
 		const box = await boxOf(id);
 		return box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : undefined;
@@ -106,7 +106,7 @@ if (spot) {
 	 */
 	const from = await until(() => middleOf("f-note"));
 	const into = await until(() => middleOf("f-box"));
-	const wouldTake = await page.evaluate(([x, y]) => globalThis.__decksFrameUnder?.(x, y), [into.x, into.y]);
+	const wouldTake = await page.evaluate(([x, y]) => globalThis.__decksProbes?.frameUnder?.(x, y), [into.x, into.y]);
 	say("both are on screen to drag between", !!from && !!into, JSON.stringify({ from, into, wouldTake }));
 	if (from && into) {
 		await page.mouse.move(from.x, from.y);
@@ -122,7 +122,7 @@ if (spot) {
 		const during = await page.evaluate(() => ({
 			joins: document.querySelectorAll(".pen-join").length,
 			drops: document.querySelectorAll('.pen-join[data-drop="frame"]').length,
-			carried: globalThis.__decksPenBox?.("f-note")?.x,
+			carried: globalThis.__decksProbes?.penBox?.("f-note")?.x,
 			selection: document.querySelectorAll(".pen-selection:not([data-board])").length,
 		}));
 		await page.mouse.up();
@@ -203,7 +203,7 @@ if (spot) {
 	await page.click('.v3-menu-row:has-text("Frame")');
 	const room = await page.evaluate(() => {
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 200; y < 680; y += 40) for (let x = 420; x < 1150; x += 40) if (empty(x, y) && empty(x + 240, y + 200) && empty(x + 420, y + 60)) return { at: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a } };
 	});

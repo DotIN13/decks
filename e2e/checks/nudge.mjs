@@ -81,7 +81,7 @@ const SAMPLER = () => {
 		keys: [],
 		on: false,
 		where(probe) {
-			const e = globalThis.__decksRust;
+			const e = globalThis.__decksProbes?.rust;
 			const out = {};
 			if (!e) return out;
 			const shown = e.shown ? new Map(JSON.parse(e.shown)) : undefined;
@@ -204,7 +204,7 @@ async function run(engine, lags) {
 			say(`${label}: drawn and on the server ${total} along at the end`, ids.every((id) => drawnEnd[id] === total && server[id] === total), JSON.stringify({ total, drawnEnd, server }));
 			if (probe.boards?.length) {
 				// A board's page goes with its box: the page moved on screen as far as the box did (at this zoom).
-				const z = await page.evaluate(() => globalThis.__decksRust.camera.zoom);
+				const z = await page.evaluate(() => globalThis.__decksProbes?.rust.camera.zoom);
 				const pages = probe.boards.map((path) => [path, Math.round(((dx ? end[`page ${path}`]?.[0] - start[`page ${path}`]?.[0] : end[`page ${path}`]?.[1] - start[`page ${path}`]?.[1]) * (dx || dy)) / z)]);
 				// The page's corner is read in whole pixels, so a stage unit or so either way at this zoom.
 				say(`${label}: each board's page moved with it`, pages.every(([, moved]) => Math.abs(moved - total) <= 1.5 / z + 0.5), JSON.stringify({ pages, zoom: z }));
@@ -232,8 +232,8 @@ async function run(engine, lags) {
 	const onScreen = await until(
 		() =>
 			page.evaluate(() =>
-				window
-					.__decksBoards()
+				window.__decksProbes
+					.boards()
 					.filter((one) => one.node && one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 					.map((one) => one.path),
 			),
@@ -262,24 +262,24 @@ async function run(engine, lags) {
 	} else say(`${engine}: boards on screen to nudge`, false, JSON.stringify(onScreen));
 
 	// Items, on bare canvas right of the boards at 100%.
-	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksProbes?.rust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksProbes?.rust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksProbes?.rust.camera.x - x) < 2000, spot.x), 4000));
 	}
 	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
-	const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+	const cam = await page.evaluate(() => globalThis.__decksProbes?.rust.camera);
 	const at = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx), y1: Math.round(cam.y + dy), x2: Math.round(cam.x + dx + w), y2: Math.round(cam.y + dy + h) });
 	send([
 		{ op: "insert", node: { type: "rectangle", id: "nd-a", fill: "#4c8bf5" }, box: at(-300, -150, 120, 80) },
 		{ op: "insert", node: { type: "rectangle", id: "nd-b", fill: "#f5a04c" }, box: at(-300, 50, 120, 80) },
 	]);
-	await until(() => page.evaluate(() => ["nd-a", "nd-b"].every((id) => globalThis.__decksRust.placed.has(id))), 6000);
+	await until(() => page.evaluate(() => ["nd-a", "nd-b"].every((id) => globalThis.__decksProbes?.rust.placed.has(id))), 6000);
 	await settle(page, 400);
 	const centre = async (id) => {
-		const b = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id), 4000);
+		const b = await until(() => page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id), 4000);
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
 	const a = await centre("nd-a");
@@ -296,7 +296,7 @@ async function run(engine, lags) {
 	if (process.env.NUDGE_BOARDS !== "0" && boardsHere.length) {
 		await page.keyboard.press("Escape");
 		await page.keyboard.press("Escape");
-		const board = await page.evaluate((path) => globalThis.__decksRust.boards.find((one) => one.path === path), boardsHere[0]);
+		const board = await page.evaluate((path) => globalThis.__decksProbes?.rust.boards.find((one) => one.path === path), boardsHere[0]);
 		send([
 			{ op: "update", id: "nd-a", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y) } },
 			{ op: "update", id: "nd-b", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y + 200) } },
@@ -305,7 +305,7 @@ async function run(engine, lags) {
 		let moved = false;
 		for (let i = 0; i < 4 && !moved; i++) {
 			await call("view.move", [to]);
-			moved = !!(await until(() => page.evaluate((to) => Math.abs(globalThis.__decksRust.camera.zoom - to.zoom) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - to.x) < 50, to), 4000));
+			moved = !!(await until(() => page.evaluate((to) => Math.abs(globalThis.__decksProbes?.rust.camera.zoom - to.zoom) < 0.01 && Math.abs(globalThis.__decksProbes?.rust.camera.x - to.x) < 50, to), 4000));
 		}
 		say(`${engine}: the camera shows the board and the items at 50%`, moved);
 		await settle(page, 800);

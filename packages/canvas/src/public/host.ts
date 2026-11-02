@@ -16,3 +16,4 @@ export * from "../stage/engine.ts";
 export * from "../board-storage.ts";
 export * from "../board-host.ts";
 export { onFrameMessage } from "../frame-messages.ts";
+export { knobs, probes, type Knobs, type Probes } from "../debug.ts";

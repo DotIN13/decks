@@ -4,6 +4,14 @@
  * second as one JSON line; and the gestures themselves, as `__pilot` for an inspector to call
  * (`scripts/ipad-profile.mjs`). Nothing runs without the parameter.
  */
+import type { Knobs, Probes } from "@decks/canvas/host";
+/*
+ * Through the globals, not an import: this file is loaded before the app, and importing the canvas here
+ * would evaluate the editor's modules ahead of the app's own. The canvas keeps the same objects on
+ * `globalThis` (`debug.ts`) and takes what was set before it loaded.
+ */
+const knobs = ((globalThis as { __decksKnobs?: Partial<Knobs> }).__decksKnobs ??= {});
+const probes = () => (globalThis as { __decksProbes?: Probes }).__decksProbes;
 const target = new URLSearchParams(location.search).get("probe");
 
 type Frame = { t: number; gap: number; busy: number; top: string[]; zoom: number; x: number; y: number; pages: number; tiles: number; sheet: number; pictures: number };
@@ -74,25 +82,25 @@ if (target && new URLSearchParams(location.search).get("handlers")) {
 if (target) {
 	// `&pictures-per-frame=N`: how many board pictures go to the GPU a frame (`stage/engine.ts`), for comparing.
 	const perFrame = Number(new URLSearchParams(location.search).get("pictures-per-frame"));
-	if (perFrame > 0) (globalThis as { __decksPicturesPerFrame?: number }).__decksPicturesPerFrame = perFrame;
+	if (perFrame > 0) knobs.picturesPerFrame = perFrame;
 	// `&picture-mb=N`: the board pictures' GPU budget (`device.ts`, `stage/engine.ts`), for measuring.
 	const pictureMB = Number(new URLSearchParams(location.search).get("picture-mb"));
-	if (pictureMB > 0) (globalThis as { __decksPictureMB?: number }).__decksPictureMB = pictureMB;
+	if (pictureMB > 0) knobs.pictureMB = pictureMB;
 	// `&skip-levels=0`: the drawing paints new levels during a fast zoom too (`stage/engine.ts`, `fastZoom`), for comparing.
-	if (new URLSearchParams(location.search).get("skip-levels") === "0") (globalThis as { __decksSkipLevels?: boolean }).__decksSkipLevels = false;
+	if (new URLSearchParams(location.search).get("skip-levels") === "0") knobs.skipLevels = false;
 	const frames: Frame[] = [];
 	const inputs: Array<{ t: number; kind: string; scale?: number }> = [];
 	const marks: Array<{ t: number; mark: string; ms?: number }> = [];
 	let last = performance.now();
 	const camera = () => {
-		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.e-]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(String((globalThis as { __decksCameraTransform?: () => string }).__decksCameraTransform?.() ?? ""));
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.e-]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(String(probes()?.cameraTransform?.() ?? ""));
 		const stage = document.querySelector<HTMLElement>(".stage");
 		return { zoom: m ? Number(m[3]) : 0, x: stage?.scrollLeft ?? 0, y: stage?.scrollTop ?? 0 };
 	};
 	const tick = (t: number) => {
 		const cam = camera();
-		const engine = (globalThis as { __decksEngine?: { stats: () => { tiles: number; pictures: number } } }).__decksEngine?.stats();
-		const sheet = (globalThis as { __decksSheet?: { tiles?: number } }).__decksSheet;
+		const engine = probes()?.engine?.stats() as { tiles?: number; pictures?: number } | undefined;
+		const sheet = probes()?.sheet;
 		const top = [...frameWork].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, ms]) => `${Math.round(ms * 10) / 10} ${key}`);
 		const busy = Math.round([...frameWork.values()].reduce((a, b) => a + b, 0) * 10) / 10;
 		frameWork = new Map();

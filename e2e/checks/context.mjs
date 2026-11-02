@@ -254,7 +254,7 @@ const agent = {
 		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
 		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
 		// The stage's boards, pictures among them: a phone has one live page at most (`device.ts`), and a tap on a picture selects it as on a page.
-		const found = (globalThis.__decksBoards?.() ?? [])
+		const found = (globalThis.__decksProbes?.boards?.() ?? [])
 			.map(({ rect: r }) => {
 				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
 				return { x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
@@ -262,7 +262,7 @@ const agent = {
 			.sort((a, b) => b.area - a.area)[0];
 		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2 } : null;
 	});
-	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
+	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${globalThis.__decksProbes?.cameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
 	if (target) await page.touchscreen.tap(target.x, target.y);
 	await settle(page, 900);
 	const tapped = await page.evaluate(() => document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null);
@@ -281,7 +281,7 @@ const agent = {
 			centre: Math.round((box(callout).left + box(callout).right) / 2),
 			boardMid: (() => {
 				const path = document.querySelector('.board-node[data-selected="true"]')?.dataset.path;
-				const r = (window.__decksBoards?.() ?? []).find((one) => one.path === path)?.rect;
+				const r = (window.__decksProbes?.boards?.() ?? []).find((one) => one.path === path)?.rect;
 				return r ? Math.round(r.left + r.width / 2) : null;
 			})(),
 		};
@@ -319,7 +319,7 @@ const agent = {
 				const nearMenu = menu && x > menu.left - 12 && x < menu.right + 12 && y > menu.top - 12 && y < menu.bottom + 12;
 				if (!nearMenu && x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
 					// Where the board is on the canvas, not on screen: a pan would move it on screen too.
-					const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+					const zoom = Number(globalThis.__decksProbes?.cameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 					return { x, y, path: node.dataset.path, left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), zoom, band: Math.round(along ? r.height : r.width) };
 				}
 			}
@@ -345,10 +345,10 @@ const agent = {
 			const element = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
 			const node = element.getBoundingClientRect();
 			const outline = document.querySelector('.pen-selection[data-board="true"]')?.getBoundingClientRect();
-			const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+			const zoom = Number(globalThis.__decksProbes?.cameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 			const carried = document.querySelector(".stage-carried:not([hidden])")?.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
 			// With the C++ engine, the picture is the engine's, moved by the drag's offset (`engine-stage.ts`, `carry`).
-			const engine = globalThis.__decksEngine?.carried;
+			const engine = globalThis.__decksProbes?.engine?.carried;
 			const engineCarries = engine?.paths.has(path) ? [Math.round(engine.dx * zoom), Math.round(engine.dy * zoom)] : null;
 			return {
 				hidden: element.hasAttribute("data-carried") && getComputedStyle(element.querySelector(".surface")).visibility === "hidden",

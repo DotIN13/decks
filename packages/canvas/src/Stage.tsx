@@ -63,6 +63,7 @@ import {
 	tsSeam,
 	type Overlay,
 } from "./editor/index.ts";
+import { knobs, probes } from "./debug.ts";
 
 
 /**
@@ -312,7 +313,7 @@ export function Stage(props: {
 	 * (`translate(half the window) scale(zoom) translate(−camera)`), which they read and parse; the
 	 * world's own transform now holds only the origin and the zoom (`camera/scroll-area.ts`).
 	 */
-	(globalThis as { __decksCameraTransform?: () => string }).__decksCameraTransform = () => {
+	probes.cameraTransform = () => {
 		const c = ctl.now();
 		const v = view();
 		return `translate(${v.width / 2}px, ${v.height / 2}px) scale(${c.zoom}) translate(${-c.x}px, ${-c.y}px)`;
@@ -1075,7 +1076,7 @@ export function Stage(props: {
 		return out;
 	};
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
-	(globalThis as { __decksPenBox?: (id: string) => DOMRect | undefined }).__decksPenBox = (id) => {
+	probes.penBox = (id) => {
 		const placed = penLayer.placed.get(id);
 		if (!placed || !element) return undefined;
 		const box = penLayer.bounds.get(id) ?? placed.box;
@@ -1085,12 +1086,12 @@ export function Stage(props: {
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
 	/** For the browser checks: the frame a drop at a point on the screen would go into, and its box. */
-	(globalThis as { __decksFrameUnder?: (clientX: number, clientY: number) => { frame: string | null; world: { x: number; y: number } } }).__decksFrameUnder = (clientX, clientY) => {
+	probes.frameUnder = (clientX, clientY) => {
 		const world = worldAt({ clientX, clientY });
 		return { frame: frameUnder(world, []), world };
 	};
 	/** For the browser checks: every board on the canvas and where it is on screen, node or picture (`rendered`). */
-	(globalThis as { __decksBoards?: () => Array<{ path: string; node: boolean; rect: DOMRect }> }).__decksBoards = () => {
+	probes.boards = () => {
 		if (!element) return [];
 		const r = element.getBoundingClientRect();
 		const nodes = renderedPaths();
@@ -1119,13 +1120,13 @@ export function Stage(props: {
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
 	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
 
-	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? editor.pictureUnder({ clientX: x, clientY: y }) : undefined);
+	probes.pictureAt = (x, y) => (element ? editor.pictureUnder({ clientX: x, clientY: y }) : undefined);
 	/*
 	 * The card under a screen point and the slot between its blocks there, for files dropped from the
 	 * desktop (`app/files.ts`): they go into the card where they land, as a picture or a file dragged
 	 * from the canvas does.
 	 */
-	(globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt = (x, y) => {
+	probes.cardAt = (x, y) => {
 		if (!element) return undefined;
 		const at = toWorld(ctl.now(), view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
 		const id = frameUnder(at, []);
@@ -1475,7 +1476,7 @@ export function Stage(props: {
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
 				trail = [];
 				if (thrown) coast(thrown);
-				else if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
+				else if (pinched && knobs.pinchTail !== true) stoppedMoving();
 			}
 			return { kind: "idle" };
 		}

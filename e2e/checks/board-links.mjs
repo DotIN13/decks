@@ -33,7 +33,7 @@ const FILE = "assets/sketch.svg";
 const link = await socket();
 
 /* The stage's own list: below the live zoom a board is a picture with no `.board-node`. */
-const onCanvas = () => page.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path));
+const onCanvas = () => page.evaluate(() => (window.__decksProbes?.boards?.() ?? []).map((one) => one.path));
 /** Where the frame is, as opposed to what it is *pointed* at: a navigation changes this and nothing else does. */
 const where = () => page.evaluate((wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentWindow.location.pathname, SOURCE);
 const nodeBox = (path) =>
@@ -151,11 +151,11 @@ const view = page.viewportSize();
 const visible = async (path) => {
 	// Where the stage draws it, page or picture: a page comes only once the camera rests.
 	await rest(page).catch(() => {});
-	const box = await page.evaluate((wanted) => (window.__decksBoards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
+	const box = await page.evaluate((wanted) => (window.__decksProbes?.boards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
 	return { in: Boolean(box) && box.x < view.width && box.y < view.height && box.x + box.width > 0 && box.y + box.height > 0, box };
 };
 const seen = await visible(LINKED);
-say("…with the board it opened in view", seen.in, JSON.stringify({ box: seen.box, camera: await page.evaluate(() => globalThis.__decksCameraTransform()) }));
+say("…with the board it opened in view", seen.in, JSON.stringify({ box: seen.box, camera: await page.evaluate(() => globalThis.__decksProbes?.cameraTransform()) }));
 const zoom = () => page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 const level = await zoom();
 say("…and close enough to read and to click into, which the pair never was", level >= 50, `${level}%`);

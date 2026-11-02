@@ -18,15 +18,15 @@ for (const target of TARGETS) {
 	await resetStage();
 	{
 		const { browser, page, errors } = await open({ ...target.open, boards: false, init: noGpu });
-		const stats = () => page.evaluate(() => window.__decksEngine?.stats?.());
-		const opened = await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);
+		const stats = () => page.evaluate(() => window.__decksProbes?.engine?.stats?.());
+		const opened = await page.waitForFunction(() => window.__decksProbes?.engine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);
 		const at = await stats();
 		say(`${name}: no navigator.gpu, the page and the worker draw with WebGL 2`, opened && at?.backend === "webgl2" && at?.workerBackend === "webgl2", JSON.stringify(at));
 		await outOfLive(page);
-		await page.waitForFunction(() => (window.__decksEngine.stats().pictures ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+		await page.waitForFunction(() => (window.__decksProbes?.engine.stats().pictures ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 		await settle(page, 1500);
 		const after = await stats();
-		const pictured = await page.evaluate(() => JSON.parse(window.__decksRust?.page?.pictured?.() ?? "[]").length);
+		const pictured = await page.evaluate(() => JSON.parse(window.__decksProbes?.rust?.page?.pictured?.() ?? "[]").length);
 		say(`${name}: board pictures are put and drawn as pictures`, after.pictures > 0 && pictured > 0, JSON.stringify({ pictures: after.pictures, pictured, tiles: after.tiles }));
 		await shot(page, `step4-${target.slug}-webgl2.png`);
 		/*

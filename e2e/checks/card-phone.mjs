@@ -40,14 +40,14 @@ const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
 
 // Near life size, and off to the side of the boards, so the card has the screen to itself.
 const matrix = () => page.evaluate(() => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
 // The camera opens at the origin and a few seconds later fits what the agent has up: wait for that
 // to land and stay, or it moves the canvas out from under the card's place worked out below.
 const steady = async (opening = false) => {
 	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
-		const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+		const now = await page.evaluate(() => globalThis.__decksProbes?.cameraTransform?.() ?? "");
 		if (now !== last) [last, since] = [now, Date.now()];
 		else if (Date.now() - since > (opening ? 1500 : 500) && !(opening && now.includes("scale(1) translate(0px, 0px)"))) break;
 	}
@@ -98,7 +98,7 @@ link.send({
 	],
 });
 const box = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
+	const now = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
 	return now && now.height > 80 ? now : undefined;
 }, 12000);
 say("a card is drawn on the phone", !!box, JSON.stringify(box && { w: Math.round(box.width), h: Math.round(box.height) }));
@@ -155,12 +155,12 @@ say("…as one edit to that block: the others keep their ids", JSON.stringify(ca
 
 // A finger picks a picture with a tap and carries it into the card.
 await settle(page, 600);
-const drawn = await page.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
+const drawn = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
 /* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (v3). */
 const spot = world(view.w / 2 - 60, Math.min(view.h * 0.58 - 80, drawn.y + drawn.height + 40));
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }] });
-const picture = await until(() => page.evaluate(() => globalThis.__decksPenBox?.("phone-picture")));
-const first = await page.evaluate(() => globalThis.__decksPenBox?.("p-h"));
+const picture = await until(() => page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-picture")));
+const first = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("p-h"));
 const props = () => page.evaluate(() => !!document.querySelector(".props-panel"));
 await page.touchscreen.tap(picture.x + picture.width / 2, picture.y + picture.height / 2);
 await settle(page, 400);
@@ -187,7 +187,7 @@ say("…riding below and right of the finger over the card, clear of it", !!ghos
 
 // A tap on the picture in the card selects it there, its properties with it.
 const inCard = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("phone-picture"));
+	const now = await page.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-picture"));
 	return now && Math.abs(now.y - picture.y) > 20 ? now : undefined;
 });
 await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);

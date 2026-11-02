@@ -28,7 +28,7 @@ await settle(page, 900);
 const onScreen = () =>
 	page.evaluate(() => {
 		const view = { w: window.innerWidth, h: window.innerHeight };
-		return (window.__decksBoards?.() ?? []).map(({ path, rect: box }) => {
+		return (window.__decksProbes?.boards?.() ?? []).map(({ path, rect: box }) => {
 			return {
 				path,
 				x: Math.round(box.x),
@@ -57,14 +57,14 @@ link.send({ type: "board.move", path: stray, x: 0, y: 520_000 });
  * run this check failed on its second assertion about once in twenty, which reads as the
  * hide being broken rather than as the wait being short.
  */
-await page.waitForFunction((path) => !(window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 });
+await page.waitForFunction((path) => !(window.__decksProbes?.boards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 });
 await settle(page, 300);
 
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);
 
 link.send({ type: "board.play", path: stray });
-await page.waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
+await page.waitForFunction((path) => (window.__decksProbes?.boards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
 await settle(page, 1200);
 
 const after = await onScreen();

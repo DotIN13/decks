@@ -37,7 +37,7 @@ const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
 const middle = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 140; y < 820; y += 30) {
 		for (let x = 320; x < 1500; x += 30) {
@@ -101,7 +101,7 @@ say("…and the arrow that ends on it follows", !!followed);
 // --- the drawing is drawn --------------------------------------------------------------------------
 const drawn = await until(() => page.evaluate(() => {
 	// The drawing is the engine's tiles, on its canvas over the boards.
-	const engine = globalThis.__decksEngine?.stats?.();
+	const engine = globalThis.__decksProbes?.engine?.stats?.();
 	if (engine) return engine.tiles > 0 && engine.drawn[1] > 0;
 	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.
 	const canvas = document.querySelector(".stage-sheet");
@@ -133,7 +133,7 @@ await editMode(page, true);
 // Bring the note into view: the camera looks at it through the stage's own transform.
 const note = onDisk().children.find((n) => n.id === "e2e-note");
 const screen = await page.evaluate(({ x, y }) => {
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
+	const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 	return { x: m.e + x * m.a, y: m.f + y * m.a, zoom: m.a };
 }, { x: note.x + 4 / 0.2, y: note.y + 4 / 0.2 });
 const inView = screen.x > 280 && screen.x < 1580 && screen.y > 80 && screen.y < 900;
@@ -158,7 +158,7 @@ if (inView) {
 const spot = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
-	const boards = (window.__decksBoards?.() ?? []).map((b) => b.rect);
+	const boards = (window.__decksProbes?.boards?.() ?? []).map((b) => b.rect);
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
 	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150),
 	// with nothing of the chrome anywhere in it: the tool rail floats over the stage's left side, and
@@ -218,7 +218,7 @@ if (spot) {
 	// --- the corner radius, and a card sized by its width alone ------------------------------------
 	// The rectangle again: it has corners to round, where a card has none.
 	await page.keyboard.press("Escape");
-	const rectBox = () => page.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
+	const rectBox = () => page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), drawnId);
 	const onRect = await rectBox();
 	await page.mouse.click(onRect.x + onRect.width / 2, onRect.y + onRect.height / 2);
 	await until(() => page.evaluate(() => document.querySelectorAll('.pen-handle[data-handle="radius"]').length === 1));
@@ -304,7 +304,7 @@ if (spot) {
 	 */
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
-	const cardBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const cardBox = await page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), cardId);
 	await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 8);
 	const eight = await until(() => page.evaluate(() => {
 		const all = [...document.querySelectorAll('.pen-handle:not([data-handle="radius"])')].map((h) => h.dataset.handle).sort();
@@ -328,7 +328,7 @@ if (spot) {
 	// Its words decide its height: no number in the file, only the floor it was made with (`fit_content(48)`).
 	say("dragging its side sets its width, and leaves its height to its words", !!widened && (widened.height === undefined || /^fit_content(\(\d+(\.\d+)?\))?$/.test(String(widened.height))), JSON.stringify({ width: widened?.width, height: widened?.height }));
 	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
-	const tall = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const tall = await page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), cardId);
 	const south = await page.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect();
 		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
@@ -374,7 +374,7 @@ if (boardItem) {
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
 	const at = await page.evaluate(({ x, y }) => {
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
 	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
 	const under = () => page.evaluate(({ x, y }) => {

@@ -17,7 +17,7 @@ const anchor = await page.evaluate(async () => {
 	const cursor = { x: 420, y: 300 };
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			globalThis.__decksCameraTransform(),
+			globalThis.__decksProbes?.cameraTransform(),
 		);
 		return { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
 	};
@@ -88,7 +88,7 @@ await settle(page, 400);
 const fitted = await page.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();
 	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
-	const nodes = window.__decksBoards().map((one) => one.rect);
+	const nodes = window.__decksProbes?.boards().map((one) => one.rect);
 	return {
 		inside: nodes.every(
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,
@@ -115,7 +115,7 @@ say("0 fits every board on screen", fitted.inside && fitted.count === expected, 
  * labelled `+` is `=` unshifted, so a handler matching `"+"` never fired.
  */
 const zoomOf = () =>
-	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksCameraTransform())?.[1] ?? 0));
+	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksProbes?.cameraTransform())?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
 await page.keyboard.press("Control+Equal");
@@ -442,7 +442,7 @@ say("a live board frame is under the cursor to be dragged on", grab !== null, JS
 const cameraAt = () =>
 	page.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			globalThis.__decksCameraTransform(),
+			globalThis.__decksProbes?.cameraTransform(),
 		);
 		return m ? { x: -Number(m[4]), y: -Number(m[5]), zoom: Number(m[3]) } : null;
 	});
@@ -508,7 +508,7 @@ say(
 await page.keyboard.press("0");
 await rest(page);
 const surface = await page.locator(".board-node .surface").first().boundingBox();
-const camNow = () => page.evaluate(() => globalThis.__decksCameraTransform());
+const camNow = () => page.evaluate(() => globalThis.__decksProbes?.cameraTransform());
 const stuck = [];
 for (let d = -1; d <= 3; d += 0.5) {
 	for (const [side, x, y] of [["left", surface.x + d, surface.y + surface.height / 2], ["top", surface.x + surface.width / 2, surface.y + d]]) {
@@ -534,7 +534,7 @@ say("a scroll landing on a board's outline pans the canvas", stuck.length === 0,
  */
 await page.keyboard.press("0");
 await rest(page);
-await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
+await selectBoard(page, await page.evaluate(() => window.__decksProbes?.boards()[0].path));
 await page.keyboard.press("1");
 await settle(page, 5000);
 await page.evaluate(() => {

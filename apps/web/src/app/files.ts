@@ -16,6 +16,7 @@ import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/stages.ts";
+import { probes } from "@decks/canvas/host";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -184,7 +185,7 @@ export function createFileDrops() {
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
 		if (files.length === 0) return;
 		// Over a card, every file goes into it, between the blocks where it lands.
-		const card = (globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt?.(at.x, at.y);
+		const card = probes.cardAt?.(at.x, at.y);
 		if (card) return intoCard(files, card);
 		const direct = files.filter(onStage);
 		const rest = files.filter((file) => !onStage(file));

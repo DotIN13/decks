@@ -72,7 +72,7 @@ const SAMPLER = () => {
 		armed: false,
 		commitAt: Infinity,
 		where(ids) {
-			const e = globalThis.__decksRust;
+			const e = globalThis.__decksProbes?.rust;
 			const out = {};
 			for (const id of ids) {
 				const p = e?.placed.get(id);
@@ -157,15 +157,15 @@ async function run(engine, lags) {
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 
 	// Bare canvas right of the boards, at 100%.
-	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksProbes?.rust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksProbes?.rust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksProbes?.rust.camera.x - x) < 2000, spot.x), 4000));
 	}
 	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
-	const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+	const cam = await page.evaluate(() => globalThis.__decksProbes?.rust.camera);
 	const X = (dx) => Math.round(cam.x + dx);
 	const Y = (dy) => Math.round(cam.y + dy);
 
@@ -191,12 +191,12 @@ async function run(engine, lags) {
 		arrow("as-a9", "as-box-b", "as-note", { route: "curved" }),
 	]);
 	const arrows = ["as-a1", "as-a2", "as-a3", "as-a4", "as-a5", "as-a6", "as-a7", "as-a8", "as-a9"];
-	const drawn = await until(() => page.evaluate((ids) => ids.every((id) => globalThis.__decksRust.placed.get(id)?.node.geometry !== "M0 0 L1 1"), arrows), 8000);
+	const drawn = await until(() => page.evaluate((ids) => ids.every((id) => globalThis.__decksProbes?.rust.placed.get(id)?.node.geometry !== "M0 0 L1 1"), arrows), 8000);
 	say(`${engine}: the diagram is drawn, its arrows routed by the server`, !!drawn);
 	await settle(page, 800);
 
 	const centre = async (id) => {
-		const b = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id), 4000);
+		const b = await until(() => page.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id), 4000);
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
 	const clickOn = async (id) => {
@@ -297,7 +297,7 @@ async function run(engine, lags) {
 		},
 		undo: async () => {
 			send([{ op: "delete", id: "as-elsewhere" }]);
-			await until(() => page.evaluate(() => !globalThis.__decksRust.placed.has("as-elsewhere")), 4000);
+			await until(() => page.evaluate(() => !globalThis.__decksProbes?.rust.placed.has("as-elsewhere")), 4000);
 		},
 	});
 	await edit("a box nudged with an arrow key", {

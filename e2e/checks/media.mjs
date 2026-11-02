@@ -61,7 +61,7 @@ await editMode(page, true);
 const spot = await page
 	.waitForFunction(() => {
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const m = new DOMMatrix(globalThis.__decksProbes?.cameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 160; y < 760; y += 40) {
 			for (let x = 360; x < 1200; x += 40) {
@@ -108,7 +108,7 @@ if (spot) {
 	// A rectangle is what pen.dev opens, which is the whole reason for the shape.
 	say("…and pen's own type, so another tool can open the stage", written?.every((n) => n.type === "rectangle") === true, JSON.stringify(written?.map((n) => n.type)));
 
-	const boxOf = (id) => page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const boxOf = (id) => page.evaluate((one) => globalThis.__decksProbes?.penBox?.(one), id);
 	const filmBox = await until(async () => {
 		const box = await boxOf("media-film");
 		return box && box.width > 0 ? box : undefined;

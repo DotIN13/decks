@@ -69,7 +69,7 @@ try {
 
 	/*
 	 * The Canvas tab is what is on this canvas: one row per board under "Boards", and the
-	 * heading's count is the rows'. The stage's own list (`__decksBoards`) is the reference.
+	 * heading's count is the rows'. The stage's own list (`__decksProbes.boards`) is the reference.
 	 */
 	const listed = await page.evaluate(() => {
 		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
@@ -78,7 +78,7 @@ try {
 			rows: rows.length,
 			names: rows.map((row) => row.textContent.trim()),
 			count: Number(head?.querySelector(".v3-sec-n")?.textContent ?? NaN),
-			stage: (window.__decksBoards?.() ?? []).length,
+			stage: (window.__decksProbes?.boards?.() ?? []).length,
 		};
 	});
 	say("the Canvas tab lists every board on the canvas, once", listed.rows >= 1 && listed.rows === listed.stage && new Set(listed.names).size === listed.rows, JSON.stringify(listed));

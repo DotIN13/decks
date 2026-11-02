@@ -25,7 +25,7 @@ const focused = await until(() => link.last("agents")?.focused);
 /** The camera, read off the world's own transform, which is what the eye sees. */
 const camera = () =>
 	page.evaluate(() => {
-		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform());
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksProbes?.cameraTransform());
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	});
 
