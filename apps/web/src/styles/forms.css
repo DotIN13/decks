@@ -5,46 +5,6 @@
  * Inside `@layer components` like the rest, so a utility on the same element still wins.
  */
 @layer components {
-	.action-button {
-		display: inline-flex;
-		align-items: center;
-		height: 24px;
-		padding: 0 9px;
-		border: 1px solid var(--line);
-		border-radius: var(--control-radius, 8px);
-		background: transparent;
-		color: var(--muted);
-		cursor: pointer;
-		font: inherit;
-		font-size: var(--type-label);
-		transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-	}
-	.action-button:hover {
-		border-color: var(--line-strong);
-		background: var(--line);
-		color: var(--fg);
-	}
-	.action-button:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 1px;
-	}
-	/* The one that acts, in the accent. */
-	.action-button[data-primary] {
-		border-color: transparent;
-		background: var(--color-accent);
-		color: #fff;
-	}
-	.action-button[data-primary]:hover {
-		border-color: transparent;
-		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
-		color: #fff;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.action-button {
-			transition: none;
-		}
-	}
 	/* *New workspace…* under a rule, at the foot of the list. */
 	.menu-new {
 		margin-top: 4px;

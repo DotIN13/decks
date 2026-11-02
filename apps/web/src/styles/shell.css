@@ -76,10 +76,6 @@
 		background: var(--fg);
 		color: var(--bg);
 	}
-	.panel-mark-name {
-		font-size: var(--type-body);
-		font-weight: 600;
-	}
 
 	/* The sidebar beside the canvas: one hairline on its right, no lift. It is the ground's
 	   neighbour, not something floating on it. */

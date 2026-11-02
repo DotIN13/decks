@@ -9,47 +9,6 @@
  * These rules were in `index.css`. The rules and the notes above them are as they were.
  */
 @layer components {
-	/*
- * An agent at work on a board (`canvas/acts.ts`): the block it holds, and the block it wrote.
- *
- * Both are in board coordinates, so they wrap the block at any zoom; the line and the name are
- * counter-scaled so they are one size on the screen. The hold breathes, because a still outline
- * says nothing is happening; the landing is one sweep across the new content and a fill that
- * fades, then nothing — the changed mark on the title bar is what stays.
- */
-.act-hold,
-.act-land,
-.act-draw {
-	position: absolute;
-	z-index: var(--z-over-board);
-	border-radius: var(--radius-chip);
-	pointer-events: none;
-	--act: var(--color-accent);
-	--line-w: calc(1.5px / var(--zoom, 1));
-}
-	/*
-	 * What an agent holds while it writes, and what it just drew on the stage: a dashed line in its
-	 * colour, the way a design tool marks a collaborator's selection. Counter-scaled like the cursor.
-	 */
-	.act-hold,
-	.act-draw {
-	outline: var(--line-w) dashed var(--act);
-	outline-offset: calc(var(--line-w) * 1.5);
-}
-	.act-land,
-	.act-draw {
-	overflow: hidden;
-	animation: act-settle 900ms ease-out both;
-}
-	:is(.act-land, .act-draw)::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--act) 35%, transparent) 50%, transparent 100%);
-	background-size: 60% 100%;
-	background-repeat: no-repeat;
-	animation: act-sweep 420ms ease-out both;
-}
 	@keyframes act-settle {
 	from {
 		background: color-mix(in srgb, var(--act) 26%, transparent);

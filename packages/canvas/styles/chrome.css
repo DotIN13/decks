@@ -471,8 +471,7 @@
 	   group (`settings/Settings.tsx`). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
-	:is(.popover, .row-list) [data-row] > .row-label,
-	.set-k > .row-label {
+	:is(.popover, .row-list) [data-row] > .row-label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -521,27 +520,10 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	:is(.popover, .row-list) [data-row] > .row-note,
-	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
-	/* A choice from a list, in Settings: the server's speech model, the browser's language (`VoiceSettings`). */
-	.set-select {
+	:is(.popover, .row-list) [data-row] > .row-note {
 		flex: none;
 		width: auto;
 		min-width: 200px;
-	}
-	.set-zone {
-		display: flex;
-		flex: none;
-		align-items: center;
-		gap: 6px;
-	}
-	.set-zone > .field {
-		width: 210px;
-	}
-	.set-k > .row-note {
-		color: var(--faint);
-		font-size: var(--type-note);
-		line-height: 1.4;
 	}
 
 	/*
@@ -1488,13 +1470,6 @@ svg.lucide {
 	border-color: var(--color-accent);
 	box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 22%, transparent);
 }
-	.picker-google-hint {
-	max-width: 440px;
-	margin: 4px 0 0;
-	color: var(--faint);
-	font-size: var(--type-note);
-	line-height: 1.5;
-}
 	/* Google's own sign-in button: white, a hairline, the four-colour G. */
 .picker-google-signin {
 	display: inline-flex;
@@ -1520,11 +1495,6 @@ svg.lucide {
 	/* The same rules, under the same query. */
 	@media (prefers-reduced-motion: reduce) {
 	/* The outline stays; what moves goes. The glow stays too, still. */
-	.act-hold,
-	.act-land,
-	.act-land::before,
-	.act-draw,
-	.act-draw::before,
 	.board-node > .news-glow::after {
 		animation: none;
 	}

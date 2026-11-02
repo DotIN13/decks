@@ -76,143 +76,12 @@
 	 * Every explanation in Settings is one line: a sentence that does not fit is cut with an ellipsis
 	 * and shown whole on hover (`Settings`). The wording is written to fit, so a cut is the exception.
 	 */
-	.settings :is(.set-note, .set-k > .row-note, .row-note) {
+	.settings :is(.set-note, .row-note) {
 	display: block;
 	min-width: 0;
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-}
-	.settings .set-k {
-	min-width: 0;
-}
-	/*
- * One row: what it is on the left, the one control that changes it on the right.
- *
- * The hairline is a top `box-shadow` rather than a border so it does not add a pixel to the
- * row's height, and it is on *every* row including the first — which is the line under the
- * group heading, drawn once instead of twice.
- */
-.set-row {
-	display: flex;
-	min-height: 40px;
-	align-items: center;
-	padding: 8px 12px;
-	gap: 12px;
-	box-shadow: inset 0 1px 0 0 var(--line);
-}
-	/* A name with a sentence under it. Shares `.row-label`/`.row-note` with a described row — see the note on
-   those selectors in `styles/chrome.css`. */
-.set-k {
-	display: flex;
-	min-width: 0;
-	flex: 1;
-	flex-direction: column;
-	gap: 2px;
-}
-	/* The cue chip, wide enough for `Staplebops 01` and fixed, so three of them line up. */
-.set-cue {
-	width: 116px;
-	justify-content: space-between;
-}
-	/* The volume, which is the one control too wide to be a chip. */
-.set-vol {
-	width: 196px;
-}
-	/* The renderer choice: room on each side of a word, which `.segmented` alone does not give,
-   so a bold "Documents" is not pressed against its own highlight. */
-.set-renderer > button,
-.set-pictures > button,
-.set-engine > button,
-.set-recogniser > button {
-	padding: 0 12px;
-	white-space: nowrap;
-}
-
-	/*
- * A standing fact about this browser, inside the group it constrains.
- *
- * Not a `.callout` and not a notice: it is not something that just happened, and it is read
- * once and then ignored. Drawn only when there is something to say — see `PermissionLine`.
- */
-.set-strip {
-	display: flex;
-	align-items: flex-start;
-	padding: 9px 12px;
-	gap: 8px;
-	box-shadow: inset 0 1px 0 0 var(--line);
-	background: color-mix(in srgb, var(--color-warn) 10%, transparent);
-	color: var(--fg);
-	font-size: var(--type-note);
-	line-height: 1.45;
-}
-	.set-strip[data-tone="ask"] {
-	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-	.set-strip > svg {
-	flex: none;
-	margin-top: 1px;
-	color: var(--faint);
-}
-	.set-strip code {
-	font-family: var(--font-mono);
-	font-size: var(--type-micro);
-}
-	/* The account rows sit in the group's body, so the list's own padding comes off. */
-.set-rows {
-	padding: 4px;
-	box-shadow: inset 0 1px 0 0 var(--line);
-}
-	/*
- * "Add an account" as the last row of the group rather than a button on a window footer.
- *
- * Full width and flat, which is the shape a "one more" row has everywhere: it belongs to the
- * list above it, and a bordered button would read as the window's primary action.
- */
-.set-add {
-	display: flex;
-	width: 100%;
-	align-items: center;
-	padding: 10px 12px;
-	gap: 7px;
-	border: 0;
-	background: transparent;
-	box-shadow: inset 0 1px 0 0 var(--line);
-	color: var(--muted);
-	cursor: pointer;
-	font: inherit;
-	font-size: var(--type-ui);
-	transition:
-		background-color 120ms ease,
-		color 120ms ease;
-}
-	.set-add:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-	/*
- * A small control on the right of a settings row — Copy, New code — for a row whose value is
- * text rather than a switch. The same slot the account row's × sits in, as a word.
- */
-.set-mini {
-	flex: none;
-	align-self: center;
-	padding: 3px 9px;
-	border: 1px solid var(--line);
-	border-radius: var(--radius-chip);
-	background: transparent;
-	color: var(--muted);
-	font-size: var(--type-note);
-	font-weight: 600;
-	cursor: pointer;
-}
-	.set-mini:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-	.set-mini:disabled {
-	opacity: 0.5;
-	cursor: default;
 }
 	/*
  * The cue picker: forty-five sounds as five families of numbers.
@@ -271,77 +140,9 @@
 
 	/* The same rules, under the same query. */
 	@media (pointer: coarse) {
-	.set-row {
-		min-height: 48px;
-	}
-	.set-row > .switch {
-		width: 36px;
-		height: 21px;
-		padding: 3px;
-	}
-	.set-row > .switch > i {
-		width: 15px;
-		height: 15px;
-	}
-	.set-row > .switch[data-on="true"] > i {
-		margin-left: 15px;
-	}
-	.set-row .segmented > button {
-		height: 30px;
-		font-size: var(--type-note);
-	}
 	.popover.set-sounds .set-cues > [data-row] {
 		height: 34px;
 	}
-}
-	/*
- * One Claude subscription in the settings panel (`settings/Settings.tsx`) — the one in use,
- * tinted rather than washed, which is the same mark a focused chat row carries so "this is
- * the one" looks the same in both lists.
- *
- * Everything else this row used to spell out is `.row-act` in `chrome.css` now: the box the
- * × sits in, the wash on that box rather than on the button inside it, the 22px slot held
- * whether or not the × is showing, and the reveal on approach. Two surfaces had found the
- * same arrangement independently; the second one is what made it worth naming.
- */
-.account-row[data-current="true"] {
-	background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
-	/*
- * The account in use is dimmed by nothing.
- *
- * Its row is `disabled` — you cannot switch to what you are already on — and the row
- * vocabulary draws a disabled row at 55%, which is right for a model with no key and wrong
- * here: this is the one row in the list that is *in force*, and the tint behind it already
- * says it is not a thing to press.
- */
-.account-row[data-current="true"] [data-row][disabled] {
-	opacity: 1;
-}
-	/* The state word, sized to sit under the name rather than beside it. */
-.account-row .state {
-	font-variant-numeric: tabular-nums;
-}
-	/*
-	 * The × sits beside the email, on the first line, rather than in a column of its own: a
-	 * held column left every row's second line, and the "xx% used" at its end, a control's
-	 * width short of the edge, and the CLI's own row, which has no ×, out of line with them.
-	 */
-.account-row {
-	position: relative;
-}
-.account-row > .close {
-	position: absolute;
-	top: 6px;
-	right: 6px;
-}
-.account-row:has(> .close) .row-label {
-	padding-right: calc(var(--control-sm) + 4px);
-}
-	/* The 5-hour figure (`FiveHour.tsx`) in the row note's own type, set apart from the state word. */
-.account-row .five-hour {
-	margin-left: 10px;
-	font-size: inherit;
 }
 }
 

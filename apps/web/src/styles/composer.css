@@ -8,11 +8,6 @@
  */
 @layer components {
 	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
-	.set-row .chip-button {
-		--control-md: 34px;
-	}
-}
 	/* A file dragged over the input bar: it will be copied into the deck and mentioned (`Composer`). */
 .composer-box[data-dropping="true"] {
 	outline: 2px dashed var(--accent, #3b82f6);

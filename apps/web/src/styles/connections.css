@@ -92,20 +92,12 @@
 		line-height: 1.4;
 	}
 
-	/* The code another Decks types, large enough to read off across a desk. */
-	.pair-code {
-		font-size: var(--type-body);
-		font-weight: 600;
-		letter-spacing: 0.12em;
-		color: var(--fg);
-	}
-
 	/*
 	 * A backend that cannot write (`BackendInfo.can`): a canvas opened from a file. Its controls are
 	 * not drawn rather than drawn and refused: no composer, no conversation, no drawing tools, and in
 	 * the pill nothing but the panel button and the camera.
 	 */
-	.app[data-reader] :is(.dock, .stream, .pen-tools, .pen-bar, .props-panel, .insert-panel),
+	.app[data-reader] :is(.dock, .stream, .pen-tools, .props-panel, .insert-panel),
 	.app[data-reader] .pill :is(.pill-agent, .new-agent, .mode-set, .pill-sep),
 	.app[data-reader] [data-writes] {
 		display: none !important;

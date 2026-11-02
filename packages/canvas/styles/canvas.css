@@ -32,38 +32,9 @@
 		overscroll-behavior: contain;
 	}
 
-	/* A board that fills itself scrolls inside its own frame, so the box only places it. */
-	.focus.focus-fills {
-		overflow: hidden;
-		padding: 0 0 0 var(--inset-left, 0px);
-	}
-
-	/*
-	 * The page's box is the size it is *drawn*, the scaled size, because a CSS transform does not
-	 * change layout: the document inside it is scaled from its own top-left corner, and the two agree
-	 * about where the page ends. Edge to edge, so no corner, no shadow and no margin but the centring
-	 * a page narrower than its room gets.
-	 */
-	.focus-page {
-		margin: 0 auto;
-		overflow: hidden;
-		background: transparent;
-	}
-
 	.focus .board-node > .surface {
 		border-radius: 0;
 		background: transparent;
-	}
-
-	.focus-scaled,
-	.focus-fill {
-		position: relative;
-	}
-
-	/* The canvas's own page, lent to this view (`canvas/borrow.ts`), as it is drawn on the canvas. */
-	:is(.focus-scaled, .focus-fill) > iframe {
-		display: block;
-		border: 0;
 	}
 
 	/*
@@ -105,88 +76,6 @@
 		}
 	}
 
-	.focus-bar.focus-bar-over {
-		border-bottom: 0;
-		background: transparent;
-		pointer-events: none;
-	}
-
-	.focus-bar-start,
-	.focus-bar-end {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		min-width: 0;
-		pointer-events: auto;
-	}
-
-	.focus-bar-over .focus-bar-start {
-		/* Its width is the board bar's left padding, so it ends where the board's name begins. */
-		padding-right: 2px;
-	}
-
-	/* One gap between every control at the right end, the board's own last button included
-	   (`--decks-focus-right` in `lib/board.css` leaves the same 8px). */
-	.focus-bar-end {
-		flex: none;
-		gap: 8px;
-	}
-
-	.focus-crumb {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		min-width: 0;
-		margin-left: 4px;
-		font-size: var(--type-body);
-		white-space: nowrap;
-	}
-
-	.focus-crumb-canvas {
-		overflow: hidden;
-		color: var(--muted);
-		text-overflow: ellipsis;
-	}
-
-	.focus-crumb-slash {
-		color: var(--faint);
-	}
-
-	.focus-crumb-board {
-		overflow: hidden;
-		font-weight: 600;
-		text-overflow: ellipsis;
-	}
-
-	.focus-exit > svg {
-		color: var(--muted);
-	}
-
-	.focus-exit > kbd {
-		display: inline-grid;
-		box-sizing: border-box;
-		min-width: 18px;
-		height: 16px;
-		padding: 0 4px;
-		margin-left: 2px;
-		border: 1px solid var(--line-strong);
-		border-bottom-width: 2px;
-		border-radius: var(--radius-inline);
-		background: var(--layer, var(--bg));
-		color: var(--muted);
-		font: inherit;
-		font-size: var(--type-micro);
-		font-weight: 500;
-		place-items: center;
-	}
-
-	/* No key to name where there is no keyboard. */
-	@media (hover: none) {
-		.focus-exit > kbd {
-			display: none;
-		}
-	}
-
 	/*
 	 * The canvas's own controls go while a board is in focus: its two toolbars and the drawing's
 	 * tools have nothing to act on, and the header carries the three that still mean something
@@ -195,15 +84,6 @@
 	 */
 	.app[data-focus] .float.pill,
 	.app[data-focus] .pen-tools {
-		display: none;
-	}
-
-	.focus-mode {
-		gap: 8px;
-	}
-
-	/* Somebody who can only read has nothing to edit, here as on the canvas's toolbar. */
-	.app[data-reader] .focus-mode {
 		display: none;
 	}
 
@@ -234,43 +114,6 @@
  * frame it replaces — which is what makes the box the board rather than a dialog about it.
  */
 @layer components {
-	.source-editor {
-		position: absolute;
-		z-index: var(--z-board-edit);
-		display: flex;
-		overflow: hidden;
-		flex-direction: column;
-		border-radius: var(--radius, 8px);
-		background: var(--panel);
-		inset: 0;
-	}
-
-	.source-area {
-		flex: 1 1 auto;
-		padding: 16px 18px;
-		border: 0;
-		outline: 0;
-		background: none;
-		color: var(--fg, #111);
-		font-family: var(--mono, ui-monospace, monospace);
-		font-size: var(--type-copy);
-		line-height: 1.6;
-		resize: none;
-		tab-size: 2;
-	}
-
-	/* The two gestures, said once. An editor whose escape hatch is undocumented is one
-	   people leave by reloading the page. */
-	.source-hint {
-		display: flex;
-		flex: 0 0 auto;
-		gap: 12px;
-		justify-content: flex-end;
-		padding: 4px 10px 6px;
-		color: var(--muted, #667);
-		font-family: var(--mono, monospace);
-		font-size: var(--type-hint);
-	}
 	/* --- the stage --------------------------------------------------------------- */
 
 .stage {
@@ -489,9 +332,6 @@
  * title and the path have the whole bar at rest, and give way to the buttons on hover. A touch
  * screen has no hover, so there they are always shown (the (hover: none) rule below).
  */
-@media (hover: hover) {
-	
-}
 	
 	
 	
@@ -698,12 +538,6 @@
 	/* Never scrolled to show a bar's button past the edge, as `hidden` would be. */
 	overflow: clip;
 	pointer-events: none;
-}
-	/* Moved by the camera as one (`Stage.writeTransform`); each bar sits on it at its board's corner times the zoom. */
-	.stage-fixed > .bar-layer > .bar-track {
-	position: absolute;
-	top: 0;
-	left: 0;
 }
 	.stage-fixed > .bar-layer[data-hidden="true"] {
 	display: none;
@@ -963,7 +797,7 @@
 	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
 	 * at work, so they cost that only then.
 	 */
-	.world > .board-slot > .board-node > :is(.agent-cursor, .act-hold, .act-land) {
+	.world > .board-slot > .board-node > .agent-cursor {
 	z-index: 2;
 }
 	.world > .pen-hits {
@@ -1878,14 +1712,6 @@
 	.pen-card-editor .pce-menu[data-open] { display: flex; }
 	.pen-card-editor .pce-bar .pce-opt { justify-content: flex-start; padding: 0 10px; font-size: 14px; }
 	.pen-card-editor .pce-bar .pce-opt small { color: var(--muted); font-size: 12px; }
-	.pen-card-editor .pce-bar .pce-opt-h1 { height: 40px; font-size: 22px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-h2 { height: 36px; font-size: 18px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-h3 { font-size: 16px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-quote { color: var(--muted); }
-	.pen-card-editor .pce-bar .pce-opt-code { font-family: var(--font-mono); font-size: 13px; }
-	.pen-card-editor .pce-bar .pce-size-small { font-size: 12px; }
-	.pen-card-editor .pce-bar .pce-size-large { font-size: 17px; }
-	.pen-card-editor .pce-bar .pce-size-huge { font-size: 21px; }
 	.pen-card-editor .pce-menu.pce-fonts { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; min-width: 220px; }
 	.pen-card-editor .pce-menu.pce-fonts .pce-opt { font-size: 15px; }
 	.pen-card-editor .pce-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
@@ -1939,14 +1765,8 @@
 }
 
 	/* The same rules, under the same query. */
-	@media (hover: none) {
-	
-}
 
 	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
-	
-}
 }
 /* Boards as pictures while the camera moves (`picturesWhileMoving`): the pages are kept but not painted, and the sheet shows each picture. */
 .stage[data-pictures="true"] .board-node:not([data-kept-live]) iframe {
