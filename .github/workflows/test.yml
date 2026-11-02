@@ -55,6 +55,14 @@ jobs:
       # its own step so the log says "the order moved" instead of burying it in a test list.
       - run: npm run css:order
 
+      # Two more gates beside it, each a list of names: every `export` no other file references
+      # (`scripts/dead-exports.mjs`; a package's entry points are its API and are left alone), and
+      # every class a sheet styles that no markup writes (`scripts/dead-css.mjs`). Both came out of
+      # one tidy-up that found 27 re-export shims, some fifty dead exports and 53 dead classes; the
+      # gates are what keeps the count at zero.
+      - run: npm run dead:exports
+      - run: npm run dead:css
+
       # **Before the unit tests, not after.** Three files in `apps/server` drive a real page —
       # `web/bridge.test.ts` over the extension's socket, and two in `app.test.ts` that measure a
       # frame and write the number back — so `npm test` needs a browser. This step used to come

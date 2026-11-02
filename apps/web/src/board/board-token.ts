@@ -1,4 +1,3 @@
-import { createBoardHost } from "@decks/canvas/host";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
 import { stageOnScreen } from "../state/decks.ts";
@@ -22,4 +21,3 @@ export async function mintBoardToken(path: string, stage?: string): Promise<stri
 	return answer.token;
 }
 
-export const boardTokens = createBoardHost({ mint: mintBoardToken });

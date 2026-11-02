@@ -323,7 +323,6 @@ function createUi() {
 	};
 }
 
-export type Ui = ReturnType<typeof createUi>;
 
 
 /** The app's one set of browser state. Tests build their own with `createUi()`. */

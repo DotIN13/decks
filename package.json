@@ -43,6 +43,8 @@
     "vendor": "node scripts/vendor.mjs",
     "build:live-doc": "node scripts/live-doc.mjs",
     "css:order": "node scripts/css-order.mjs",
+    "dead:exports": "node scripts/dead-exports.mjs",
+    "dead:css": "node scripts/dead-css.mjs",
     "dev:example": "DECKS_DATA_DIR=\"$PWD/e2e/fixture\" npm run dev --workspace @decks/server",
     "test:e2e": "node e2e/run.mjs",
     "build:packages": "node scripts/build-packages.mjs",

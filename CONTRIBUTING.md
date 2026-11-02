@@ -30,10 +30,12 @@ to the canvas does not rearrange your own boards or fill your own revisions.
 ```bash
 npm run typecheck     # every workspace, including the extension and the browser checks
 npm test              # the unit tests, no model needed, plus the cascade gate's own tests
+npm run dead:exports  # every export no other file references: exit 1 and the list
+npm run dead:css      # every class a sheet styles and no markup writes: exit 1 and the list
 npm run test:e2e      # the browser checks, ~2 min, over a throwaway copy of e2e/fixture/
 ```
 
-**One more, and it is the one that catches what the others cannot.** The app's 13
+**One more, and it is the one that catches what the others cannot.** The app's
 stylesheets all declare inside `@layer components`, so a rule of equal specificity is decided
 by position and by nothing else — and a comment moved, a file split or a rule dragged across
 another changes which one wins while the browser checks (which measure elements, not rules)
@@ -77,6 +79,24 @@ commit is three commits, and the review will ask for them separately.
 vendored rather than installed (`npm run vendor`) so a board renders offline; the runtime
 carries nothing it does not use.
 
+**Nothing exported for nothing, and nothing styled for nothing.** Two more gates run beside the
+cascade gate: `npm run dead:exports` names every `export` no other file references, and
+`npm run dead:css` names every class a sheet styles and no markup writes. Both exit 1 in CI. A
+package's entry points (`index.ts`, `public/*.ts`, what its `package.json` `exports` names) are
+its API and are left alone; everything else is exported because something imports it.
+
+**When a module moves, move its importers in the same commit.** A one-line
+`export * from "…"` left at the old path is a second name for one thing, and the next reader
+has to learn both. Twenty-seven of them were deleted in one pass once; none should come back.
+
+**Name a folder for what it holds, not when it was made.** `shell/`, `cards/`, `engine/`:
+not `v3/`, `new/`, `old/`. A design iteration's name belongs in the commit that landed it.
+
+**Measuring knobs and test probes go through `debug.ts`.** The canvas puts two objects on
+`globalThis`, `__decksKnobs` and `__decksProbes` (`packages/canvas/src/debug.ts`); a switch the
+engine reads for measuring or a function a browser check calls is a field on one of them, typed
+there, not a new `(globalThis as { __decksX?: … }).__decksX`.
+
 **The file is the artifact.** A board is a plain HTML document, and the app treats it as one:
 edits are splices of the lines they name, a drag rewrites one attribute, and a board written
 by hand has to survive a round trip through the editor byte for byte. Keep that property:
@@ -86,8 +106,8 @@ a change that has to rewrite a board to save it is a bug.
 
 Branch from `main`, keep it focused, and open a pull request. The template asks for what
 changed, why, and how you checked it. CI runs typecheck, the unit tests and the browser
-checks on every pull request; a red build is the first thing looked at, so run the three
-commands above before you push.
+checks on every pull request, with the cascade gate and the two dead-code gates before them; a
+red build is the first thing looked at, so run the commands above before you push.
 
 If you are not sure whether something belongs, open an issue and describe it. "I wanted to
 do X and the app made it hard" is a useful issue.
