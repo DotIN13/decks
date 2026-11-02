@@ -11,9 +11,9 @@
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
-import { baseTheme, diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { baseTheme, diff, isShape, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../cards/font-files.ts";
+import { fontFiles, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../cards/font-files.ts";
 import { iconUrl, parseIcon } from "../items/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { Recovery } from "./recovery.ts";
@@ -29,6 +29,13 @@ import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { PICTURES, readGpuClass } from "../device.ts";
 import { noticeFor } from "./backends/notice.ts";
 import { knobs, probes, type Probes } from "../debug.ts";
+import { pixelsFirst, tileArea, tileBudget, webKit } from "./tiles.ts";
+import { readCompressed } from "./compressed.ts";
+import { FontLoader, type Font } from "./fonts.ts";
+import { hitShapes, onPath } from "./hits.ts";
+// Still the engine's exports, for the hosts that read them from here.
+export { pixelsFirst } from "./tiles.ts";
+export { readCompressed } from "./compressed.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
@@ -38,28 +45,6 @@ const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse
  */
 const REST_MS = 250;
 
-/**
- * A board picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
- * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
- * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
- */
-export function readCompressed(data: Uint8Array): { data: Uint8Array; width: number; height: number; spans: Uint32Array; bytes: number } | undefined {
-	if (data.length < 16 || String.fromCharCode(...data.subarray(0, 4)) !== "DKA1") return undefined;
-	const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-	const width = view.getUint32(4, true);
-	const height = view.getUint32(8, true);
-	const levels = view.getUint32(12, true);
-	const spans = new Uint32Array(levels * 2);
-	let at = 16 + 4 * levels;
-	for (let n = 0; n < levels; n++) {
-		const length = view.getUint32(16 + 4 * n, true);
-		spans[n * 2] = at;
-		spans[n * 2 + 1] = length;
-		at += length;
-	}
-	if (at > data.length || levels === 0) return undefined;
-	return { data, width, height, spans, bytes: at - (16 + 4 * levels) };
-}
 /** Pictures fetched at once, and a stand-in picture asked for again this often, this many times. */
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
@@ -86,60 +71,14 @@ const PICTURES_BATCH_MS = 16;
  */
 const sheetStats = (): Probes["sheet"] => probes.sheet;
 
-const EMPTY = '{"version":"2.14","children":[]}';
-/** Board pictures copied to the GPU in one frame (`putPaced`). */
-const PICTURES_PER_FRAME = 1;
-
-type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
-
-/**
- * Whether the worker hands its tiles to the page as their bytes rather than as pictures: under
- * WebKit (Safari, and every browser on iOS and iPadOS), whose copy of a worker's picture into a
- * texture (`copyExternalImageToTexture`) costs the page's thread about 2 ms a 512-pixel tile on an
- * iPad mini 6, against 0.17 ms to write its bytes (`writeTexture`): a pinch's tiles took 180 to 300
- * ms of it. Chromium copies a picture in about 0.04 ms at the median (now and then 12 ms, waiting
- * on the GPU process, which is why tiles are taken in outside the frame's callback: `takeTilesSoon`),
- * and keeps pictures: as bytes, zooming was as smooth (14 to 20 frames of 180 over 9 ms either
- * way), but a fast pan was filled in 17 to 48 ms instead of 7 to 8, every tile waiting for its read
- * back from the worker's device. WebKit is told by its user agent: AppleWebKit without Chrome's,
- * Chromium's or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is
- * WebKit). `knobs.tilePixels` (true or false), set before the stage opens, says it instead.
- */
-export function pixelsFirst(): boolean {
-	const forced = knobs.tilePixels;
-	if (typeof forced === "boolean") return forced;
-	return webKit();
-}
-
-/** WebKit (Safari, and every browser on iOS and iPadOS), by its user agent, as `pixelsFirst` tells it. */
-function webKit(): boolean {
-	const agent = typeof navigator === "undefined" ? "" : navigator.userAgent;
-	return /AppleWebKit\//.test(agent) && !/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(agent);
-}
-
-/**
- * How much of a frame the page spends taking the worker's tiles in (`takeTiles`): this many
- * milliseconds, and under WebKit, whose clock counts whole milliseconds, no more than `bytes` tiles
- * of bytes (about 0.3 ms each on an iPad mini) or `pictures` tiles of pictures (about 2 ms) a frame
- * either; what is left waits for the next frame, the window's tiles first. A pinch's tiles taken in
- * all at once held frames on an iPad mini for 40 to 100 ms. Three tiles of bytes a frame, tried
- * first, made a pinch's tiles take 300 ms to come in where all at once took 65 (WebKit as an iPad
- * mini on a Mac). `knobs.tileBudget` changes it, for measuring.
- */
-const TILE_BUDGET = { ms: 4, bytes: 12, pictures: 2 };
 /** A zoom faster than this many doublings a second paints no new level (`zoomRate`), over this window of time; and is painted after this long still. */
 const FAST_ZOOM = 1;
 const ZOOM_RATE_MS = 100;
 const FAST_HOLD_MS = 250;
-const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...knobs.tileBudget });
-/** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
-const tileScale = new DataView(new ArrayBuffer(4));
-function tileArea(t: { scale: number; x: number; y: number }): [number, number, number] {
-	tileScale.setUint32(0, t.scale);
-	const side = TILE_SIDE / tileScale.getFloat32(0);
-	return [t.x * side, t.y * side, side];
-}
-const TILE_SIDE = 512;
+const EMPTY = '{"version":"2.14","children":[]}';
+/** Board pictures copied to the GPU in one frame (`putPaced`). */
+const PICTURES_PER_FRAME = 1;
+
 
 /** The engine's compiled module, for the worker to start from (`boot`). */
 function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
@@ -195,18 +134,23 @@ export class StageEngine {
 	private boardKey = "";
 	private viewState: { hidden: string[]; mute: string[]; holes: string[]; scrolls: Record<string, number>; writer?: { name?: string; color: string } } = { hidden: [], mute: [], holes: [], scrolls: {} };
 	private viewKey = "";
-	private fontsAsked = new Set<string>();
 	/**
 	 * Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own
 	 * address for it, stand-in retries, and for a board's the copy's width (0: the whole picture).
 	 */
 	private picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number; failed?: number }>();
-	/** Fonts loaded, kept to give an engine started again after its device was lost. */
-	/**
-	 * The font files fetched, kept for an engine started again as the file (`blob`); `bytes` until
-	 * both engines have them, then handed (transferred, not copied) to the worker.
-	 */
-	private fonts: Font[] = [];
+	/** The font files: fetched once each, kept for an engine started again, and handed to both engines as they land. */
+	private readonly fontLoader = new FontLoader({
+		// A worker still painting its first view waits for them (up to 300 ms) rather than paint it twice.
+		due: () => {
+			if (this.worker) this.post({ type: "fontsDue" });
+		},
+		loaded: (fonts) => {
+			if (!this.page || this.disposed) return;
+			this.giveFonts(fonts, true);
+			this.postFonts(fonts);
+		},
+	});
 	private iconsAsked = new Set<string>();
 	private fetching = 0;
 	private lifted = new Set<string>();
@@ -215,10 +159,6 @@ export class StageEngine {
 	/** Messages posted to the worker that is running now, and that count when the last one that changes what it paints was posted. */
 	private posted = 0;
 	private postedContent = 0;
-	/** Font files asked for and not yet given to the engines. */
-	private fontsPending = 0;
-	/** Font files settled, by key: given to the engines, or not to be had. */
-	private fontsSettled = new Set<string>();
 	/**
 	 * Words measured by the page's engine (`measure.ts`), kept as the server keeps them: by the fonts
 	 * there were (`wordsGeneration`, counted up as fonts are given), kind, width, style and words.
@@ -235,7 +175,7 @@ export class StageEngine {
 		const known = this.wordSizes.get(key);
 		if (known) return known;
 		const files = fontFiles(textNeeds(text, style, markdown));
-		if (files.some((file) => !this.fontsSettled.has(file.key))) {
+		if (files.some((file) => !this.fontLoader.has(file.key))) {
 			this.fetchFonts(files);
 			return undefined;
 		}
@@ -376,7 +316,7 @@ export class StageEngine {
 		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
 		this.lowMemory = !!found.lowMemory;
 		// Fonts already handed to an engine before (this is a restart) are read from their files again.
-		await Promise.all(this.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
+		await Promise.all(this.fontLoader.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
 		if (this.disposed) return gpu.free();
 		this.backend = gpu.backend();
 		this.maxPicture = gpu.maxPictureSize();
@@ -404,11 +344,11 @@ export class StageEngine {
 		this.paused = false;
 		// Fonts already here go to both engines now; those still coming (asked for before the engine
 		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
-		this.giveFonts(this.fonts, false);
+		this.giveFonts(this.fontLoader.fonts, false);
 		setStageWords(this.words);
 		this.needFonts();
-		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc, pixels: pixelsFirst() });
-		this.postFonts(this.fonts);
+		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontLoader.pending > 0, docDue: !this.doc, pixels: pixelsFirst() });
+		this.postFonts(this.fontLoader.fonts);
 		// The camera now, not when the worker says it is ready: a page busy laying out fonts heard that late.
 		this.sendCamera();
 		this.unwatch = found.backend.watch(over, { lost: () => this.lose(), restored: () => void this.restart(), isLost: () => this.page?.lost() ?? false });
@@ -490,7 +430,7 @@ export class StageEngine {
 			case "tiles":
 				// Nothing painted (the worker says it has nothing left for this camera) and nothing waiting: the frame on screen, or the one coming, is filled in.
 				if (!message.tiles.length && !this.tileQueue.length) {
-					this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
+					this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontLoader.pending === 0;
 					if (this.settledNext && !this.dirty) {
 						this.settledNext = false;
 						sheetStats().settledAt = performance.now();
@@ -1170,8 +1110,8 @@ export class StageEngine {
 		const batch = this.tileBatch;
 		if (!this.tileQueue.length && batch) {
 			this.tileBatch = undefined;
-			this.settledNext = batch.rest === 0 && batch.got >= this.posted && this.fontsPending === 0;
-			if (batch.left === 0 && batch.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
+			this.settledNext = batch.rest === 0 && batch.got >= this.posted && this.fontLoader.pending === 0;
+			if (batch.left === 0 && batch.got >= this.postedContent && this.fontLoader.pending === 0) this.sharpNext = true;
 			this.seenAtDraw = batch.sent;
 		}
 		// Drawn in the next frame's one draw (`tick`), which takes what is left after it.
@@ -1696,37 +1636,9 @@ export class StageEngine {
 	}
 	private prefetched = false;
 
+	/** The font files `wanted` not asked for yet are fetched, and given to both engines as they land (`FontLoader`). */
 	private fetchFonts(wanted: readonly FontFile[]): void {
-		const files = wanted.filter((file) => !this.fontsAsked.has(file.key));
-		if (!files.length) return;
-		for (const file of files) this.fontsAsked.add(file.key);
-		this.fontsPending += files.length;
-		// A worker still painting its first view waits for them (up to 300 ms) rather than paint it twice.
-		if (this.worker) this.post({ type: "fontsDue" });
-		void Promise.all(
-			files.map(async (file) => {
-				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
-					try {
-						const response = await fetch(url);
-						if (!response.ok) continue;
-						const blob = await response.blob();
-						return { file, blob, bytes: new Uint8Array(await blob.arrayBuffer()) };
-					} catch {
-						/* the next address */
-					}
-				}
-				return undefined;
-			}),
-		).then((loaded) => {
-			this.fontsPending -= files.length;
-			for (const file of files) this.fontsSettled.add(file.key);
-			// Kept first: an engine started (or started again) is given them from here.
-			const fonts: Font[] = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, blob: one.blob, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
-			this.fonts.push(...fonts);
-			if (!this.page || this.disposed) return;
-			this.giveFonts(fonts, true);
-			this.postFonts(fonts);
-		});
+		this.fontLoader.fetch(wanted);
 	}
 
 	/**
@@ -1750,7 +1662,7 @@ export class StageEngine {
 	 */
 	private postFonts(fonts: readonly Font[]): void {
 		const sent = fonts.filter((font): font is Font & { bytes: Uint8Array } => !!font.bytes);
-		this.post({ type: "fonts", fonts: sent.map(({ family, bytes, fallback }) => ({ name: family, bytes, fallback })), due: this.fontsPending }, sent.map((font) => font.bytes.buffer as ArrayBuffer));
+		this.post({ type: "fonts", fonts: sent.map(({ family, bytes, fallback }) => ({ name: family, bytes, fallback })), due: this.fontLoader.pending }, sent.map((font) => font.bytes.buffer as ArrayBuffer));
 		for (const font of sent) delete (font as Font).bytes;
 	}
 
@@ -1939,54 +1851,13 @@ export class StageEngine {
 	private writeHits(): void {
 		const svg = this.hits;
 		if (!svg) return;
-		const NS = "http://www.w3.org/2000/svg";
 		const band = (2 * BAND_PX) / this.camera.zoom;
 		this.bandZoom = this.camera.zoom;
-		const shapes: SVGElement[] = [];
 		const reach = this.view.width > 0 ? this.windowRect(1) : undefined;
 		this.hitWindow = reach;
 		const list = this.list();
 		const near = reach ? this.index().search(reach).map((at) => list[at]!) : list;
-		for (const placed of near) {
-			const { node, box } = placed;
-			if (node.type === "group" || isShape(node) || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
-			let top = placed;
-			while (top.parent) top = this.placed.get(top.parent) ?? top;
-			if (top.parent) continue;
-			const bounds = this.bounds.get(node.id) ?? box;
-			if (this.boardIndex.search(bounds).length === 0) continue;
-			let shape: SVGElement;
-			if (node.type === "ellipse") {
-				shape = document.createElementNS(NS, "ellipse");
-				shape.setAttribute("cx", String(box.x + box.w / 2));
-				shape.setAttribute("cy", String(box.y + box.h / 2));
-				shape.setAttribute("rx", String(box.w / 2));
-				shape.setAttribute("ry", String(box.h / 2));
-			} else if (node.type === "path" && typeof node.geometry === "string") {
-				const b = node.viewBox ?? (() => {
-					const p = pathBounds(node.geometry as string);
-					return p ? ([p.x, p.y, p.w, p.h] as const) : undefined;
-				})();
-				if (!b || b[2] <= 0 || b[3] <= 0) continue;
-				shape = document.createElementNS(NS, "path");
-				shape.setAttribute("d", node.geometry);
-				shape.setAttribute("transform", `translate(${box.x} ${box.y}) scale(${box.w / b[2]} ${box.h / b[3]}) translate(${-b[0]} ${-b[1]})`);
-				shape.setAttribute("stroke-width", String(Math.max(band, typeof node.strokeWidth === "number" ? node.strokeWidth : 0)));
-				shape.setAttribute("vector-effect", "non-scaling-stroke");
-				shape.style.pointerEvents = node.fill !== undefined && node.fill !== null ? "all" : "stroke";
-			} else {
-				shape = document.createElementNS(NS, "rect");
-				shape.setAttribute("x", String(bounds.x));
-				shape.setAttribute("y", String(bounds.y));
-				shape.setAttribute("width", String(Math.max(0, bounds.w)));
-				shape.setAttribute("height", String(Math.max(0, bounds.h)));
-			}
-			shape.setAttribute("class", "pen-hit");
-			shape.setAttribute("fill", "none");
-			shape.setAttribute("stroke", "none");
-			shape.dataset.id = node.id;
-			shapes.push(shape);
-		}
+		const shapes = hitShapes(near, { placed: this.placed, bounds: this.bounds, boards: this.boardIndex, band });
 		svg.replaceChildren(...shapes);
 	}
 
@@ -2015,28 +1886,10 @@ export class StageEngine {
 
 	// --- questions ------------------------------------------------------------------------------
 
-	/** Whether a stage point is on what a path draws: its line with the press's reach, or inside its fill. */
+	/** Whether a stage point is on what a path draws: its line with the press's reach, or inside its fill (`hits.ts`). */
 	private onPath(placed: Placed, point: { x: number; y: number }): boolean | undefined {
-		const { node } = placed;
-		if (typeof node.geometry !== "string" || !node.geometry) return undefined;
-		const vb = node.viewBox ?? (() => {
-			const b = pathBounds(node.geometry as string);
-			return b ? ([b.x, b.y, b.w, b.h] as const) : undefined;
-		})();
-		if (!vb || vb[2] <= 0 || vb[3] <= 0) return undefined;
 		const ctx = (this.penHit ??= document.createElement("canvas").getContext("2d") ?? undefined);
-		if (!ctx) return undefined;
-		const path = new Path2D(node.geometry);
-		const box = placed.box;
-		const sx = box.w / vb[2];
-		const sy = box.h / vb[3];
-		if (!(sx > 0) || !(sy > 0)) return undefined;
-		const px = (point.x - box.x) / sx + vb[0];
-		const py = (point.y - box.y) / sy + vb[1];
-		const drawn = typeof node.strokeWidth === "number" ? node.strokeWidth : 0;
-		ctx.lineWidth = Math.max(drawn, (2 * BAND_PX) / this.camera.zoom) / Math.max(sx, sy);
-		const filled = node.fill !== undefined && node.fill !== null;
-		return ctx.isPointInStroke(path, px, py) || (filled && ctx.isPointInPath(path, px, py));
+		return ctx ? onPath(placed, point, (2 * BAND_PX) / this.camera.zoom, ctx) : undefined;
 	}
 
 	/**
