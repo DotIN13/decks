@@ -25,6 +25,15 @@
 	/* Fingers pan the stage natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
 	touch-action: pan-x pan-y;
 }
+	/*
+	 * On a tablet and a phone every finger on the canvas is the canvas's own (`pan.by`): it pans, coasts
+	 * and pinches in our code (`stage/input.ts`), and Safari neither scrolls nor coasts the stage. Its
+	 * scroll ran outside the page, so the page heard it late, its coast kept every new finger, and the
+	 * hand-over at each lift raced; a scroll inside a card or a document is still the browser's.
+	 */
+	:where(:root[data-touch]) .stage {
+	touch-action: none;
+}
 	.stage::-webkit-scrollbar {
 	display: none;
 }

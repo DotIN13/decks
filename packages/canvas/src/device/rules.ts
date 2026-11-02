@@ -94,7 +94,7 @@ export type Rules = {
 	nudge: number;
 	nudgeShift: number;
 	duplicateOffset: number;
-	panBy: "browser";
+	panBy: "browser" | "ours";
 	coastBy: "os" | "ours";
 	coastTauMs: number;
 	pinchTravel: number;

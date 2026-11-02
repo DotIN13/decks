@@ -46,9 +46,9 @@
 		"nudge.shift-px": { "value": 10, "says": "With Shift." },
 		"duplicate.offset-px": { "value": 24, "says": "A duplicate lands this far down and right." },
 
-		"pan.by": { "by": "form", "desk": "browser", "tablet": "browser", "phone": "browser", "says": "Who moves the camera for a pan while the pointer is down: the browser's own scroll." },
+		"pan.by": { "by": "form", "desk": "browser", "tablet": "ours", "phone": "ours", "says": "Who moves the camera for a pan while the pointer is down: the browser's own scroll on a desk; on touch the canvas, from every finger on it, so the pan, its coast and a pinch are one owner's and nothing is handed over at the lift." },
 		"coast.by": { "by": "form", "desk": "os", "tablet": "ours", "phone": "ours", "says": "Who carries a pan on after the lift: the trackpad's momentum on a desk; on touch our coast, so a finger landing mid-coast is an ordinary press and a pinch works at once." },
-		"coast.tau-ms": { "value": 325, "says": "Our coast loses about two thirds of its speed in this long." },
+		"coast.tau-ms": { "value": 500, "says": "Our coast loses about two thirds of its speed in this long, as an iOS list does: a flick glides about a second and a half." },
 		"pinch.travel-px": { "value": 64, "says": "A trackpad pinch (Ctrl and the wheel, as Chrome sends it): wheel units per e-fold of the zoom, each event held to ×1.3." },
 		"wheel.travel-px": { "value": 80, "says": "⌘ and a mouse wheel: wheel units per e-fold of the zoom, each event held to ×1.3." },
 		"live.zoom": { "value": 0.4, "says": "Below this zoom every item is its picture." },

@@ -166,67 +166,6 @@ export function createStageInput(deps: StageInputDeps) {
 			for (const kind of ["pointerup", "pointercancel"] as const) window.removeEventListener(kind, letGo, true);
 		});
 		/*
-		 * The coast after a flick, on touch (`coast.by` in the rules): ours, not the browser's. While
-		 * Safari's momentum runs it keeps every finger that lands for its own scroll, so the page never
-		 * hears them and a pinch cannot start until it has run down (in the iOS simulator, a flick and a
-		 * pinch on its momentum: no touch reached the page). So at the lift the momentum is stopped where
-		 * Safari shows it, by a frame with no overflow and no scroll set: `scrollLeft` lags behind what
-		 * Safari shows, and pinning the scroll to it sprang the canvas back. The scroll event the stop
-		 * raises moves the camera there, and the coast starts from it a frame later, from the finger's speed.
-		 */
-		let flick: { t: number; left: number; top: number }[] | undefined;
-		const sampleFlick = () => {
-			if (!flick) return;
-			flick.push({ t: performance.now(), left: element.scrollLeft, top: element.scrollTop });
-			if (flick.length > 12) flick.shift();
-		};
-		const flickStart = (event: TouchEvent) => {
-			// One finger on the glass, left to the browser to scroll: a flick in the making. Any other count is not.
-			flick = event.touches.length === 1 && keptTouches.size === 0 && RULES.coastBy === "ours" ? [{ t: performance.now(), left: element.scrollLeft, top: element.scrollTop }] : undefined;
-		};
-		const flickEnd = (event: TouchEvent) => {
-			const samples = flick;
-			flick = undefined;
-			if (!samples || event.touches.length > 0) return;
-			const now = performance.now();
-			const recent = samples.filter((sample) => now - sample.t <= 100);
-			if (recent.length < 2) return;
-			const first = recent[0]!;
-			const last = recent[recent.length - 1]!;
-			const dt = Math.max(1, last.t - first.t);
-			// The content moves against the scroll: a finger thrown right scrolled left.
-			const v = { vx: -(last.left - first.left) / dt, vy: -(last.top - first.top) / dt };
-			if (Math.hypot(v.vx, v.vy) < 0.15) return;
-			element.style.overflow = "hidden";
-			const stopped = { left: element.scrollLeft, top: element.scrollTop };
-			requestAnimationFrame(() => {
-				element.style.overflow = "";
-				const held = { left: element.scrollLeft, top: element.scrollTop };
-				requestAnimationFrame(() => {
-					/*
-					 * Whether the stop held: Safari's momentum can outlive a frame with no overflow (a short
-					 * flick in the simulator went on scrolling after it). Then the coast is Safari's, and ours
-					 * does not start beside it: two coasts writing the scroll in turn sprang the canvas back
-					 * and forth.
-					 */
-					const still = Math.abs(element.scrollLeft - held.left) < 1 && Math.abs(element.scrollTop - held.top) < 1;
-					const probe = (globalThis as { __decksFlicks?: unknown[] }).__decksFlicks;
-					if (probe) probe.push({ t: Math.round(performance.now()), v, stopped, held, now: { left: element.scrollLeft, top: element.scrollTop }, ours: still });
-					if (still) ctl.coast(v);
-				});
-			});
-		};
-		element.addEventListener("scroll", sampleFlick, { passive: true });
-		element.addEventListener("touchstart", flickStart, { passive: true });
-		element.addEventListener("touchend", flickEnd, { passive: true });
-		element.addEventListener("touchcancel", flickEnd, { passive: true });
-		onCleanup(() => {
-			element.removeEventListener("scroll", sampleFlick);
-			element.removeEventListener("touchstart", flickStart);
-			element.removeEventListener("touchend", flickEnd);
-			element.removeEventListener("touchcancel", flickEnd);
-		});
-		/*
 		 * Two fingers on the canvas are one pinch, and the canvas's own (`touch`, `pinchCamera`): it zooms
 		 * about the fingers and pans with them. So while two are down the browser does not scroll with
 		 * them too, and Safari's gesture events, which describe the same fingers, only stop the page
@@ -482,8 +421,8 @@ export function createStageInput(deps: StageInputDeps) {
 	/**
 	 * Every finger on the canvas, and the camera they move.
 	 *
-	 * Fingers on the stage pan it natively (`camera/scroll-area.ts`): the browser scrolls, and the
-	 * camera follows from the scroll. Two are one pinch, the canvas's own (`touch.ts` reduces the pool,
+	 * One finger pans the camera (`OURS`, on a tablet and a phone; on a desk the browser scrolls and the
+	 * camera follows from the scroll, `camera/scroll-area.ts`). Two are one pinch, the canvas's own (`touch.ts` reduces the pool,
 	 * `pinchCamera` moves the camera), wherever each landed: on bare canvas, on a card or on an item's
 	 * bar. A finger can be **claimed** by whoever it landed on (an item carried by its bar or its edge):
 	 * it still counts towards the pool, so a second finger makes a pinch with the right positions, and a
@@ -533,17 +472,33 @@ export function createStageInput(deps: StageInputDeps) {
 		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 
+	/*
+	 * Who pans for one finger (`pan.by`): on a tablet and a phone the canvas, always, so the pan, its
+	 * coast and a pinch begun on the coast are all this pool's and nothing is handed to Safari at the
+	 * lift (the stage takes no touch of the browser's there, `touch-action: none`). On a desk with a
+	 * touch screen the browser scrolls, and the pool pans only for a finger that caught a moving canvas.
+	 */
+	const OURS = RULES.panBy === "ours";
 	/** The steps of a pan the canvas owns, for the speed it is thrown at (`coastFrom`). */
 	const panSamples: { t: number; dx: number; dy: number }[] = [];
+	/**
+	 * The coast at the lift, from the finger's speed over its last 80 ms: none for a finger that rested
+	 * 50 ms before it lifted (a pan put down, not thrown), and none below a crawl.
+	 */
 	const coastFrom = (samples: readonly { t: number; dx: number; dy: number }[]) => {
 		const now = performance.now();
-		const recent = samples.filter((sample) => now - sample.t <= 100);
-		if (recent.length < 2) return;
-		const dt = Math.max(1, now - recent[0]!.t);
+		const last = samples[samples.length - 1];
+		if (!last || now - last.t > 50) return;
+		const first = samples.findIndex((sample) => now - sample.t <= 80);
+		if (first < 0 || samples.length - first < 2) return;
+		const recent = samples.slice(first);
+		// Each step's movement came since the step before it: the span starts at the sample before the first counted.
+		const from = samples[first - 1]?.t ?? recent[0]!.t - 16;
+		const dt = Math.max(8, last.t - from);
 		const v = { vx: recent.reduce((sum, s) => sum + s.dx, 0) / dt, vy: recent.reduce((sum, s) => sum + s.dy, 0) / dt };
-		if (Math.hypot(v.vx, v.vy) >= 0.15) ctl.coast(v);
+		if (Math.hypot(v.vx, v.vy) >= 0.1) ctl.coast(v);
 	};
-	/** One finger's worth of a gesture. A one-finger pan is the browser's scroll, so only a pinch moves the camera here. */
+	/** One finger's worth of a gesture: a pan (`OURS`, or a finger that caught a moving canvas) or a pinch. */
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		// For the checks: every step of the pool, when asked for (`__decksTouchLog`).
 		const log = (globalThis as { __decksTouchLog?: unknown[] }).__decksTouchLog;
@@ -560,8 +515,8 @@ export function createStageInput(deps: StageInputDeps) {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
-				// A pan the canvas owned (it began on a moving canvas) coasts on with ours, from the finger's last 100 ms.
-				if (caught && !pinched && RULES.coastBy === "ours") coastFrom(panSamples);
+				// A pan the canvas owned coasts on with ours.
+				if ((OURS || caught) && !pinched && RULES.coastBy === "ours") coastFrom(panSamples);
 				panSamples.length = 0;
 				caught = false;
 				setPanning(false);
@@ -576,7 +531,7 @@ export function createStageInput(deps: StageInputDeps) {
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
-		} else if (step.kind === "pan" && caught && !claimed.has(finger.id)) {
+		} else if (step.kind === "pan" && (OURS || caught) && !claimed.has(finger.id)) {
 			panSamples.push({ t: performance.now(), dx: step.dx, dy: step.dy });
 			if (panSamples.length > 12) panSamples.shift();
 			pushCamera(pan(ctl.now(), step.dx, step.dy));
@@ -641,7 +596,8 @@ export function createStageInput(deps: StageInputDeps) {
 		 * fingers that followed stayed the scroll's and no pinch could begin until it had run down. The
 		 * pool pans for the finger instead (`touch`, `caught`), and a second finger is a pinch as ever.
 		 */
-		if (touches.count() === 0) {
+		if (touches.count() === 0 && OURS && ctl.gliding()) ctl.cancelGlide();
+		else if (touches.count() === 0 && !OURS) {
 			caught = ctl.gliding() || performance.now() - lastScroll < COAST_MS;
 			if (caught) {
 				ctl.cancelGlide();
