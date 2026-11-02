@@ -47,7 +47,6 @@ export function createStageEditor(host: StageEditorHost) {
 	const keys = createKeys(editor, { ...host.keys, scene: host.scene, nextIds: host.nextIds, edit: host.onPenEdit });
 	return { ...editor, ...pointer, key: keys.key, textEditing: text, insert };
 }
-export type StageEditor = ReturnType<typeof createStageEditor>;
 
 export type { BoardView, Openers } from "./dom/pointer.ts";
 export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";

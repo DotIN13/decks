@@ -165,8 +165,3 @@ export class BundleBackend {
 		this.readyState = 3;
 	}
 }
-
-/** Whether a connection id is a bundle in this browser, by its list row. */
-export function isBundle(id: string | undefined): boolean {
-	return !!id && connections().some((one) => one.id === id && one.kind === "bundle");
-}

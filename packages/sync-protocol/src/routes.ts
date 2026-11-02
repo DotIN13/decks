@@ -26,7 +26,6 @@ export const syncRoutes = {
 } as const;
 
 export type SyncRoutes = typeof syncRoutes;
-export type SyncRouteName = keyof SyncRoutes;
 
 /** `/sync/v1/canvases/:id` with `{ id: "x" }`: every `:name` filled, encoded. */
 export function syncPath(path: string, params: Record<string, string> = {}): string {

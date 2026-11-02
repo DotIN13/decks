@@ -92,12 +92,6 @@ export function filmLayout(box: MediaBox): FilmLayout {
 	};
 }
 
-/** The play triangle inside a disc, a little right of centre so it reads as pointing rather than sitting. */
-export function playTriangle(cx: number, cy: number, r: number): number[] {
-	const side = r * 0.8;
-	return [cx - side * 0.3, cy - side * 0.5, cx + side * 0.55, cy, cx - side * 0.3, cy + side * 0.5];
-}
-
 /** A running time as a clock, as the board runtime prints it: 1:04, or 1:02:03 past an hour. */
 export function clockOf(seconds: number): string {
 	const whole = Math.max(0, Math.floor(seconds));

@@ -17,7 +17,6 @@ import { coastStart, createTouches, type Finger, type TouchStep } from "./touch.
 import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
-import { openThumbnails } from "./thumb-budget.ts";
 import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
 import { BUDGET } from "./device.ts";
 import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
@@ -1940,15 +1939,11 @@ export function Stage(props: {
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
 	/** Whether a board is drawn as a page rather than its picture. */
 	const paged = (board: Board) => isLive(board.path);
-	/*
-	 * The canvas's thumbnails and the host's word that boards have started, once the app has opened:
-	 * a thumbnail is a document on the same main thread as a board, and the least urgent one.
-	 */
+	/* The host's word that boards have started, once the app has opened and the first board is let in. */
 	let started = false;
 	createEffect(() => {
 		if (started || !props.boardsMayStart) return;
 		started = true;
-		openThumbnails();
 		props.onBoardsStarted?.();
 	});
 

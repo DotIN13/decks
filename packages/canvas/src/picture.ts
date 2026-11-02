@@ -157,11 +157,6 @@ export function clickableWhereDrawn(canvas: HTMLCanvasElement, element: HTMLElem
 	}
 }
 
-export interface PaintEvent extends Event {
-	/** The drawable children whose content changed since the last rendering update. */
-	changedElements?: Element[];
-}
-
 export function elementContext(canvas: HTMLCanvasElement): ElementDrawingContext | undefined {
 	const ctx = canvas.getContext("2d") as ElementDrawingContext | null;
 	return ctx && typeof ctx.drawElementImage === "function" ? ctx : undefined;

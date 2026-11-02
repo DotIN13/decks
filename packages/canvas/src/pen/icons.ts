@@ -169,27 +169,3 @@ function toPath(el: SvgElement): string | undefined {
 			return undefined;
 	}
 }
-
-/** Icons fetched once each; `changed` is called when one lands, so the drawing is redone. */
-export class PenIcons {
-	private readonly known = new Map<string, IconShape | "loading" | "failed">();
-
-	constructor(private readonly changed: () => void) {}
-
-	get(library: string, name: string, weight: number): IconShape | undefined {
-		const url = iconUrl(library, name, weight);
-		if (!url) return undefined;
-		const known = this.known.get(url);
-		if (known && known !== "loading" && known !== "failed") return known;
-		if (known) return undefined;
-		this.known.set(url, "loading");
-		void fetch(url)
-			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
-			.then((text) => {
-				this.known.set(url, parseIcon(text, weight) ?? "failed");
-				this.changed();
-			})
-			.catch(() => this.known.set(url, "failed"));
-		return undefined;
-	}
-}

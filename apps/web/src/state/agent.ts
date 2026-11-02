@@ -123,8 +123,6 @@ export function createAgentScratch() {
 	};
 }
 
-export type AgentScratchStore = ReturnType<typeof createAgentScratch>;
-
 /**
  * The app's one scratch store.
  *

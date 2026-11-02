@@ -23,8 +23,3 @@ export async function mintBoardToken(path: string, stage?: string): Promise<stri
 }
 
 export const boardTokens = createBoardHost({ mint: mintBoardToken });
-
-/** Hand this frame its board's token whenever its page asks; answers what stops it. */
-export function attachBoardToken(frame: HTMLIFrameElement, path: () => string): () => void {
-	return boardTokens.attach(frame, { path, stage: stageOnScreen });
-}

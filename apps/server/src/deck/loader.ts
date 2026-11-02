@@ -24,10 +24,6 @@ const FOREIGN_H = 600;
 const GUTTER = 160;
 const PER_ROW = 3;
 
-export interface DeckWarning {
-	text: string;
-}
-
 /**
  * The open deck: `deck.json`, the boards on disk, and the roots embeds may reach.
  *

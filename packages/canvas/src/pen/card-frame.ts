@@ -24,7 +24,6 @@ import { FILE, isFile, isLiveFile, LIVE_FILE } from "./file-kinds.ts";
 export const CARD_FONT = 16;
 export const CARD_GAP = 16;
 export const CARD_PAD = 20;
-export const CARD_WIDTH = 320;
 export const CARD_RADIUS = 12;
 
 /** A new card, as the card tool makes it: a column holding one empty block. */

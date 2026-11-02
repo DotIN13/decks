@@ -50,8 +50,6 @@ export const edgeOwner = (): EdgeOwner => {
 
 /** The conversation is up. */
 export const historyShown = () => edgeOwner() === "history";
-/** The inspector is up. */
-export const inspectorShown = () => edgeOwner() === "inspector";
 
 /**
  * What the history button draws: off, on, or on-but-yielding.

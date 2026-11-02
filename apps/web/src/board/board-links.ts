@@ -20,25 +20,6 @@
  * is used for anything.
  */
 
-/** What a board posts when a link in it was clicked. */
-export interface BoardOpen {
-	decks: "board.open";
-	path: string;
-}
-
-/**
- * The deck-relative path a board asked for, or `undefined` when the message was not that.
- *
- * `event` is taken structurally rather than as a `MessageEvent` so the guard can be tested
- * without a browser, and it is the same guard the listener below applies.
- */
-export function boardOpenOf(event: { source: unknown; data: unknown }, frame: HTMLIFrameElement): string | undefined {
-	if (event.source !== frame.contentWindow) return undefined;
-	const message = event.data as { decks?: unknown; path?: unknown } | null;
-	if (!message || message.decks !== "board.open" || typeof message.path !== "string") return undefined;
-	return deckPath(message.path);
-}
-
 /**
  * Check a path a board sent against the deck.
  *
@@ -53,23 +34,6 @@ export function deckPath(path: string): string | undefined {
 	const parts = path.split("/");
 	if (parts.some((part) => part === "" || part === "." || part === "..")) return undefined;
 	return path;
-}
-
-/**
- * Listen for a board asking to open another board.
- *
- * Attached per frame and re-attached on every load, like every other wire into a board's
- * document: a reload is a new document, and a listener on the old one went with it.
- */
-export function attachBoardOpen(frame: HTMLIFrameElement, onOpen: (path: string) => void): () => void {
-	const view = frame.ownerDocument.defaultView;
-	if (!view) return () => {};
-	const listener = (event: MessageEvent) => {
-		const path = boardOpenOf(event, frame);
-		if (path) onOpen(path);
-	};
-	view.addEventListener("message", listener);
-	return () => view.removeEventListener("message", listener);
 }
 
 /**

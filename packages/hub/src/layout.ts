@@ -165,11 +165,6 @@ export function referenceFor(name: string, deckPath: string): Resolution {
 	return { refused: `${clean} is not ${canvasOfPath(clean) ? "on this canvas" : "in this canvas's folder"}: ${MAY}` };
 }
 
-/** Whether a deck path is a canvas's own (in its folder), so the canvas may place it as it is. */
-export function ownedBy(name: string, deckPath: string): boolean {
-	return "path" in referenceFor(name, deckPath) && !(DECK_PARTS as readonly string[]).includes(deckPath.split("/")[0]!);
-}
-
 /** The address a board item gives pen.dev for a reference: its own folder's as written, the deck's climbing out. */
 export function urlFor(name: string, reference: string): string {
 	const top = reference.split("/")[0]!;

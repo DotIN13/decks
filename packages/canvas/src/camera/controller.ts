@@ -34,8 +34,6 @@ export interface CameraHost {
 	flush(): void;
 }
 
-export type CameraController = ReturnType<typeof createCameraController>;
-
 export function createCameraController(host: CameraHost) {
 	let localCamera = untrack(() => host.asked().camera);
 	/** When the camera last moved. */

@@ -790,23 +790,6 @@ export async function newAgent(page, kind = "pi") {
 	await page.waitForTimeout(300);
 }
 
-/**
- * Every board in the deck — which is the panel's list, all of it.
- *
- * There is no browser to open and no tab to switch to: the deck is the third section of the
- * one list, under whatever the focused agent is holding. Kept as a name because the checks
- * that call it are asking a question — "is every board reachable from here" — that is still
- * worth asking under that name.
- */
-export async function openAllBoards(page) {
-	// The side panel's Canvas tab lists what is on the canvas, boards among it (`.v3-item`).
-	await openPanel(page);
-	const tab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Canvas\s*$/i }).first();
-	if ((await tab.count()) > 0 && (await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-	await page.waitForSelector('.v3-item[data-kind="board"]', { timeout: 6000 });
-	await page.waitForTimeout(300);
-}
-
 /** A short settle for things with no observable signal — a CSS transition, mostly. */
 export function settle(page, ms = 350) {
 	return page.waitForTimeout(ms);
@@ -857,40 +840,6 @@ export function differ(before, after) {
 		/** Open tags on each side: a bound on markup the edit added or removed. */
 		tags: { before: (before.match(/<[a-zA-Z]/g) ?? []).length, after: (after.match(/<[a-zA-Z]/g) ?? []).length },
 	};
-}
-
-/**
- * The byte range of the `nth` `<tag>…</tag>` in a file, so a check can say what an edit is *inside of*.
- *
- * The open tag is matched by name and closed at its `>`, because a tag with attributes is the common case
- * (`<p class="lead">`) and `indexOf("<p>")` would miss it.
- */
-export function rangeOf(html, tag, nth = 1) {
-	let at = -1;
-	for (let i = 0; i < nth; i++) at = html.indexOf("<" + tag, at + 1);
-	if (at === -1) return undefined;
-	const open = html.indexOf(">", at);
-	const close = open === -1 ? -1 : html.indexOf("</" + tag + ">", open);
-	return open === -1 || close === -1 ? undefined : { start: at, end: close + tag.length + 3, open: open + 1, close };
-}
-
-/**
- * The byte range of the element carrying an attribute, found by its value.
- *
- * For the case where the thing named is not a tag but a component: the file addresses a card by
- * `data-id`, and what an edit to that card may touch is the card's own bytes. Nesting of the same tag is
- * not handled, and does not need to be — the elements this is pointed at hold no element of their own kind.
- */
-export function rangeOfAttr(html, attr, value) {
-	const needle = attr + '="' + value + '"';
-	const at = html.indexOf(needle);
-	if (at === -1) return undefined;
-	const start = html.lastIndexOf("<", at);
-	const name = /^<([a-zA-Z][\w-]*)/.exec(html.slice(start, at));
-	if (start === -1 || !name) return undefined;
-	const open = html.indexOf(">", at);
-	const close = open === -1 ? -1 : html.indexOf("</" + name[1] + ">", open);
-	return open === -1 || close === -1 ? undefined : { start, end: close + name[1].length + 3, open: open + 1, close };
 }
 
 /**
