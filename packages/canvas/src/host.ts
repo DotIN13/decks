@@ -1,4 +1,4 @@
-import { setIconSource, type IconSource } from "./render/icons.ts";
+import { setIconSource, type IconSource } from "./look/icons.ts";
 
 /**
  * What the canvas asks of whoever mounted it, in the few places it reaches past its own state.

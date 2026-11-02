@@ -6,7 +6,7 @@ import { PageCallout } from "../ui/Callout.tsx";
 import { isInk } from "../model/ink.ts";
 import { inkSelection, setInkSelection } from "../edit/ink.ts";
 import { setPenBoxes } from "../edit/pen-tools.ts";
-import { firstLine } from "../render/look.ts";
+import { firstLine } from "../look/look.ts";
 import { parseMarkdown } from "../model/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
 import type { StageEngine } from "../render/engine.ts";

@@ -1,6 +1,6 @@
-import { highlight } from "./highlight.ts";
+import { highlight } from "../look/highlight.ts";
 import { parseMarkdown, type Block } from "../model/markdown.ts";
-import { typesetFormula } from "./math.ts";
+import { typesetFormula } from "../look/math.ts";
 
 /** The app's typesetter, as the engine calls it: TeX in, the formula's outlines out as JSON, or null. */
 export function mathTypesetter(): (tex: string, display: boolean) => string | null {

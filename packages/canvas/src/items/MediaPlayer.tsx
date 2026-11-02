@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../render/media-look.ts";
+import { clockOf, filmLayout, SOUND_INK, soundLayout, waveBars } from "../look/media-look.ts";
 
 /**
  * The one live player, laid over the film or sound it plays (`Stage.tsx` `playing`).

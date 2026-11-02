@@ -16,7 +16,7 @@ import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { setPenTyping } from "../pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../model/card-frame.ts";
 import { CardEditor } from "../CardEditor.tsx";
-import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../render/look.ts";
+import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../look/look.ts";
 import { dropSlot } from "../core/drop.ts";
 import type { Pt, Rect } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";

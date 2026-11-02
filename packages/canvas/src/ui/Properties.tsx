@@ -46,7 +46,7 @@ import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { COARSE } from "../edit/dom/touch-rules.ts";
 import { scheme } from "../theme.ts";
-import { ICON_LIBRARIES } from "../render/icon-index.ts";
+import { ICON_LIBRARIES } from "../look/icon-index.ts";
 
 /**
  * The properties panel: everything about what is selected in the drawing, in the board inspector's

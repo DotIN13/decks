@@ -41,7 +41,7 @@ test("raw HTML shows its words, a <br> breaks the line, and entities are decoded
 });
 
 test("code in a known language is coloured as GitHub colours it, and an unknown one is left plain", async () => {
-	const { highlight } = await import("../render/highlight.ts");
+	const { highlight } = await import("../look/highlight.ts");
 	const runs = highlight('const answer = "yes"; // why', "ts");
 	assert.equal(runs.map((run) => run.text).join(""), 'const answer = "yes"; // why');
 	assert.equal(runs.find((run) => run.text === "const")?.colour, "#cf222e");

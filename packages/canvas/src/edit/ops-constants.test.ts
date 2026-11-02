@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { NOTE_RADIUS } from "../render/look.ts";
+import { NOTE_RADIUS } from "../look/look.ts";
 import { FRAME_PAD, FRAME_RADIUS, NOTE_CORNER } from "./core/ops.ts";
 
 /** Core cannot import the page's look; this holds its copy of a note's corner to it. */
