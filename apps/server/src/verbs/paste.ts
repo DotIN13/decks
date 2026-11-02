@@ -60,11 +60,6 @@ export function heldClip(id: unknown): Held {
 	return one;
 }
 
-/** Forget every copy held: for the checks. */
-export function forgetClips(): void {
-	held.clear();
-}
-
 const PAGE_TAGS = new Set(["decks.card", "decks.board", "decks.document", "decks.app"]);
 const sha = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
 const isFile = (file: string) => {

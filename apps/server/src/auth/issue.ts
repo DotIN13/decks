@@ -224,7 +224,6 @@ export function withSession(html: string, token: string): string {
 
 // --- the routes ----------------------------------------------------------------------
 
-/** What another site is told when its token was given to a page on a different site. */
 export const ELSEWHERE = "This pairing token was given to a page on another site, so it does not work from this one. Pair this page with the harness itself.";
 
 /** What a harness that requires a pairing code says to a connect without one. */
