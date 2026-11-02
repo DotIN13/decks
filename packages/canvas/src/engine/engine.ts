@@ -20,7 +20,7 @@ import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
 import { boundsOf } from "../pen/bounds.ts";
 import { docIndex, drawnNodes } from "../pen/doc-index.ts";
-import { BoxIndex, type Rect } from "../spatial.ts";
+import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";

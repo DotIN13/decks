@@ -18,6 +18,7 @@
 		"@decks/api": "*",
 		"@decks/board-host": "*",
 		"@decks/board-kit": "*",
+		"@decks/canvas": "*",
 		"@decks/docs": "*",
 		"@decks/hub": "*",
 		"@decks/pen": "*",

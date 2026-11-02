@@ -1,7 +1,7 @@
 import { apply, arrowEndItem, baseTheme, diff, editDocument, isArrow, parse, placements, reroute, walk, type Frame, type MeasureText, type PenDocument, type PenEdit, type PenNode, type Placed } from "@decks/pen";
 import type { Board } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
-import type { DocEdits } from "./stage/types.ts";
+import type { DocEdits } from "./engine/types.ts";
 
 /**
  * The drawing a mounted canvas edits (`mount.tsx`): the document, the person's edits applied to it

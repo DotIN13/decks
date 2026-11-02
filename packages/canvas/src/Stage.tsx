@@ -16,12 +16,12 @@ import { zoomKey } from "./zoom-keys.ts";
 import { coastStart, createTouches, type Finger, type TouchStep } from "./touch.ts";
 import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
-import { createRedrawQueue } from "./redraw-queue.ts";
+import { createRedrawQueue } from "./engine/redraw-queue.ts";
 import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
 import { BUDGET } from "./device.ts";
-import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
+import type { DocEdits, DrawingWriter, SceneBoard } from "./engine/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
-import { BoxIndex } from "./spatial.ts";
+import { BoxIndex } from "./engine/spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, isInk, strokeOf } from "./pen/ink.ts";
 import { inkSelection, setInkSelection } from "./state/ink.ts";
@@ -32,7 +32,7 @@ import { firstLine } from "./pen/look.ts";
 import { isLiveFile } from "./pen/card-frame.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
 import { untilReleased } from "./held.ts";
-import { StageEngine } from "./stage/engine.ts";
+import { StageEngine } from "./engine/engine.ts";
 import {
 	ANCHOR_OUT,
 	ANCHOR_PX,

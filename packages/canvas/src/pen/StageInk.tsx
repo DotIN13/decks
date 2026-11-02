@@ -3,8 +3,8 @@ import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../state/ink.ts";
 import { inkItem } from "./ink.ts";
-import type { StageEngine } from "../stage/engine.ts";
-import type { LiveInk, PenPreview } from "../stage/types.ts";
+import type { StageEngine } from "../engine/engine.ts";
+import type { LiveInk, PenPreview } from "../engine/types.ts";
 import { scheme } from "../lib/theme.ts";
 import { knobs } from "../debug.ts";
 
