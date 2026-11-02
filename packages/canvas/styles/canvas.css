@@ -423,12 +423,6 @@
 	overflow: clip;
 	pointer-events: none;
 }
-	/* Moved by the camera as one (`Stage.writeTransform`); each bar sits on it at its board's corner times the zoom. */
-	.stage-fixed > .bar-layer > .bar-track {
-	position: absolute;
-	top: 0;
-	left: 0;
-}
 	.stage-fixed > .bar-layer[data-hidden="true"] {
 	display: none;
 }
@@ -747,7 +741,7 @@
 	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
 	 * at work, so they cost that only then.
 	 */
-	.world > .card-slot > .card-node > :is(.agent-cursor, .act-hold, .act-land) {
+	.world > .card-slot > .card-node > .agent-cursor {
 	z-index: 2;
 }
 	.world > .pen-hits {
