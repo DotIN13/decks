@@ -810,16 +810,6 @@ body {
 		background: var(--v3-bg2);
 		outline: none;
 	}
-	.v3-app-icon {
-		display: grid;
-		width: 24px;
-		height: 24px;
-		flex: none;
-		place-items: center;
-		border-radius: 6px;
-		background: var(--v3-bg3);
-		color: var(--v3-fg2);
-	}
 	.v3-app-name {
 		min-width: 0;
 		flex: 1;
@@ -3541,14 +3531,6 @@ body {
 	.fps-meter[data-level="bad"] .fps-n { color: var(--v3-danger); }
 	.fps-u {
 		color: var(--v3-fg2);
-	}
-	.fps-tag {
-		margin-left: auto;
-		padding: 1px 6px;
-		border-radius: 6px;
-		background: var(--v3-accent-soft);
-		color: var(--v3-fg);
-		font-size: 11px;
 	}
 	.fps-plot {
 		display: block;
