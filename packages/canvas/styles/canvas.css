@@ -88,11 +88,14 @@
 	will-change: transform;
 }
 /*
- * A pinch on pictures (`?card-pictures=1`, `items-layer.tsx`): the awake cards are hidden while the scale
- * moves, and the sheet draws their pictures over where they are, so no card is laid out, painted or
- * given a layer at any step. They stay mounted, and show again at rest under their pictures.
+ * A pinch on pictures (in WebKit, `MOVING`; `?card-pictures=1` elsewhere, `items-layer.tsx`): while the
+ * scale moves every item's node is hidden, its frame and bar with its page, and the sheet draws its
+ * picture, window and title, so nothing of the page's own is painted in the world at any step. Safari
+ * then has no layer of the world's to redraw at each one: on an iPad mini a pinch from 5% to 45% and
+ * back dropped 22 of 160 frames with only the pages hidden, and 2 with the nodes. They stay mounted,
+ * and show again at rest under their pictures.
  */
-.stage[data-card-pictures="true"] .card-node .card-surface {
+.stage[data-card-pictures="true"] .card-node {
 	visibility: hidden;
 }
 .stage[data-card-pictures="true"] .card-node .card-host {

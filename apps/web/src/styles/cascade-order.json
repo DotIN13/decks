@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "e5980c776447e96cd88f91fbe0562b8defc3ea33a5df0507370d2fd0128a0656",
+	"hash": "8ba8c3d44719ae1eb5927386086d57585ae6d6642c647b30df6fada2f710e915",
 	"rules": 1834,
 	"sheets": 21,
 	"ties": 38,
@@ -517,7 +517,7 @@
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage-fixed > *{pointer-events:auto}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-panning=\"true\"]{cursor:grabbing}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-scaling=\"true\"] .card-node :is(.card-host,.document-surface){will-change:transform}"],
-		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-card-pictures=\"true\"] .card-node .card-surface{visibility:hidden}"],
+		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-card-pictures=\"true\"] .card-node{visibility:hidden}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-card-pictures=\"true\"] .card-node .card-host{will-change:auto}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .card-node[data-asleep] :is(.card-surface,.document-surface,.app-surface){content-visibility:hidden}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-sliding=\"true\"] .world{will-change:transform}"],

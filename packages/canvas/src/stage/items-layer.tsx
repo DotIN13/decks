@@ -55,12 +55,12 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	 * A pinch on pictures: while the scale moves, the awake cards are hidden and the sheet draws each as
 	 * its picture, so the page stretches one sheet and lays out, paints and layers no card.
 	 *
-	 * By the engine's table (`render/device.ts`, `MOVING`): off everywhere today. Measured in a simulated
-	 * iPad (`scripts/card-zoom.mjs`, Playwright's iPad Pro 11, CPU 4×, 3 cards awake): it changed nothing
-	 * a pinch costs. Late frames in WebKit 2.0 and 2.0 per pinch off against 2.0 and 0.2 on, noise
-	 * either way; Chromium's paint, raster and layer work 4, 15 and 7 ms per pinch off, 5, 14 and 7 on;
-	 * the main thread's 71–98 ms off, 84–117 on, since each pinch tells the engine twice that its cards
-	 * changed. `?card-pictures=1` or `=0` in the page's address tries the other way, for a measure on a real device.
+	 * By the engine's table (`render/device.ts`, `MOVING`): on in WebKit. Safari runs every page of the
+	 * canvas on one thread and, with no layers of their own there (`LAYERS`), redraws each awake page
+	 * at every step of a scale: on an iPad mini, a pinch from 5% to 45% and back with an app and a card
+	 * awake dropped 29 to 35 of 160 frames, and 4 or 5 with both covered; the drawing itself (the canvas
+	 * hidden) changed nothing. Off in Chromium, where each page is a layer it stretches.
+	 * `?card-pictures=1` or `=0` in the page's address tries the other way.
 	 */
 	const PINCH_ON_PICTURES = (() => {
 		const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("card-pictures");

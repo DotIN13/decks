@@ -53,7 +53,7 @@
 		"live.zoom": { "value": 0.4, "says": "Below this zoom every item is its picture." },
 		"picture.fade-ms": { "value": 180, "says": "A sharper picture cross-fades over the one it replaces in this long." },
 		"layers": { "by": "engine", "webkit": { "scaling": false, "sliding": false }, "chromium": { "scaling": true, "sliding": true }, "other": { "scaling": true, "sliding": true }, "says": "Which items go on layers of their own while the camera moves: none in WebKit; each awake item in a zoom and the world in a pan elsewhere." },
-		"moving": { "by": "engine", "webkit": { "card": "live", "app": "live", "document": "live" }, "chromium": { "card": "live", "app": "live", "document": "live" }, "other": { "card": "live", "app": "live", "document": "live" }, "says": "What an awake item shows while the camera moves." },
+		"moving": { "by": "engine", "webkit": { "card": "cover", "app": "cover", "document": "cover" }, "chromium": { "card": "live", "app": "live", "document": "live" }, "other": { "card": "live", "app": "live", "document": "live" }, "says": "What an awake item shows while the camera moves: in WebKit its picture, since Safari redraws every awake page at each step of a zoom on the canvas's one thread; elsewhere its live page." },
 
 		"tools": { "by": "form", "desk": "column", "tablet": "column", "phone": "row", "says": "The tools: a floating column on a desk and a tablet, a row above the dock on a phone." },
 		"properties": { "by": "form", "desk": "panel", "tablet": "popover", "phone": "sheet", "says": "The properties: a floating panel, a popover by the selection, a sheet from the bottom over the composer." },
