@@ -5,7 +5,7 @@ import { CardSurface } from "./card-surface.tsx";
 import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 import { surfaceState } from "./awake.ts";
 import { APP_BAR } from "../render/types.ts";
-import { COARSE } from "../edit/dom/touch-rules.ts";
+import { COARSE, slopFor } from "../edit/dom/touch-rules.ts";
 
 /** The band along a live item's edge that moves it, in screen pixels outside the border and inside it. */
 const EDGE_OUT_PX = COARSE ? 16 : 8;
@@ -55,7 +55,7 @@ export interface ItemSlotProps {
 	/** Words selected in a card, to comment on: the stage gives this while you may. */
 	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
 	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
-	gestures: { claimTouch(id: number): void; pinching(): boolean };
+	gestures: { claimTouch(id: number): void; pinching(): boolean; /** A finger the stage pans for, from a cover the browser cannot scroll. */ panTouch(id: number): void; /** The first finger caught a moving canvas: its lift is no tap. */ caught(): boolean };
 	/**
 	 * On a touch screen an item's page is covered until it is activated (`items-layer.tsx`): a tap on the
 	 * cover selects, a drag anywhere on it moves the item, a pinch with a finger on it zooms the canvas,
@@ -107,42 +107,62 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 		props.view.select();
 	};
 	/*
-	 * A finger on the bar or the edge moves the item, and a second finger turns it into a pinch: the
-	 * stage counts the finger too (`claimTouch` keeps it from scrolling the stage). The item is carried
-	 * while the finger moves (`view.dragging`) and moved once, on the lift.
+	 * A finger on the item, as a finger on the drawing is: on an item already selected it carries it (the
+	 * stage counts the finger, `claimTouch`, and the item is moved once, on the lift); on any other it pans
+	 * the canvas (`panTouch`: the cover keeps the browser's scroll off, so the stage's own pool pans), and
+	 * only a tap selects. A tap is a lift near where the finger landed, with no second finger down meanwhile
+	 * and no moving canvas caught by it: a pinch or a pan that began on an item never selects it.
 	 */
 	const fingerDrag = (event: PointerEvent) => {
 		if (event.button !== 0) return;
-		props.gestures.claimTouch(event.pointerId);
 		event.preventDefault();
 		const wasSelected = props.selected;
-		props.view.select();
+		if (wasSelected) props.gestures.claimTouch(event.pointerId);
+		else props.gestures.panTouch(event.pointerId);
+		// Whether this finger caught a glide or a coast: the stage judges it as the press bubbles on to it.
+		let stopping = false;
+		queueMicrotask(() => (stopping = props.gestures.caught()));
 		const from = { x: event.clientX, y: event.clientY };
 		const origin = { x: props.board.x, y: props.board.y };
 		const scale = props.zoom || 1;
 		let to: { x: number; y: number } | undefined;
+		let travelled = false;
+		let other = false;
 		let over = false;
+		const second = (next: PointerEvent) => {
+			if (next.pointerType === "touch" && next.pointerId !== event.pointerId) other = true;
+		};
 		const move = (next: PointerEvent) => {
 			if (next.pointerId !== event.pointerId) return;
-			if (props.gestures.pinching()) return finish(true);
+			if (other || props.gestures.pinching()) return finish(true);
+			if (!travelled && Math.hypot(next.clientX - from.x, next.clientY - from.y) < slopFor("touch")) return;
+			travelled = true;
+			if (!wasSelected) return;
 			to = { x: origin.x + (next.clientX - from.x) / scale, y: origin.y + (next.clientY - from.y) / scale };
 			props.view.dragging(to);
 		};
 		const finish = (abandon = false) => {
 			if (over) return;
 			over = true;
+			window.removeEventListener("pointerdown", second, true);
 			window.removeEventListener("pointermove", move);
 			window.removeEventListener("pointerup", end);
-			window.removeEventListener("pointercancel", end);
+			window.removeEventListener("pointercancel", cancel);
 			props.view.dragging(null);
-			if (!abandon && to) props.onMove(Math.round(to.x), Math.round(to.y));
-			// A tap, on the item already selected: activated, and its page takes the fingers from here.
-			else if (!abandon && !to && wasSelected && !props.active) props.onActivate?.();
+			if (abandon || other || stopping) return;
+			if (to) return props.onMove(Math.round(to.x), Math.round(to.y));
+			if (travelled) return;
+			// A tap: on the item already selected it is activated, and its page takes the fingers from here; on any other it selects it.
+			if (wasSelected) {
+				if (!props.active) props.onActivate?.();
+			} else props.view.select();
 		};
 		const end = (done: PointerEvent) => done.pointerId === event.pointerId && finish();
+		const cancel = (done: PointerEvent) => done.pointerId === event.pointerId && finish(true);
+		window.addEventListener("pointerdown", second, true);
 		window.addEventListener("pointermove", move);
 		window.addEventListener("pointerup", end);
-		window.addEventListener("pointercancel", end);
+		window.addEventListener("pointercancel", cancel);
 	};
 	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
 	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));

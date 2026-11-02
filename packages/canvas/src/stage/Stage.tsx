@@ -453,6 +453,7 @@ export function Stage(props: StageProps) {
 			linkAt: (at) => penLayer.linkAt(at),
 			onSelect: (path) => props.onSelect(path),
 			fingers: () => input.touches.count(),
+			caught: () => input.caught(),
 			holdMenu: (menu) => setHoldMenu(menu),
 			pencil: (event) => {
 				if (!props.onPencil) return false;

@@ -93,6 +93,8 @@ export type PointerHost = {
 	onSelect: (path: string | undefined) => void;
 	/** The stage's finger pool: how many fingers are down, a finger the camera must not pan with, a finger handed to it. */
 	fingers: () => number;
+	/** The first finger caught a moving canvas (a glide or a coast): its lift is no tap, as a hand stopping a list does not press it. */
+	caught?: () => boolean;
 	claim: (pointer: number) => void;
 	beginTouch: (event: PointerEvent) => void;
 	/** A finger's press is the editor's (an item, a handle, a board): the stage keeps it from scrolling natively. */
@@ -517,14 +519,20 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		let pinched = false;
 		let travelled = false;
 		let held = false;
+		const stopping = host.caught?.() ?? false;
+		const second = (e: PointerEvent) => {
+			if (e.pointerType === "touch" && e.pointerId !== pointer) pinched = true;
+		};
+		window.addEventListener("pointerdown", second, true);
 		// A finger held still on bare canvas: the canvas's menu at the finger (`holdMenu`), and the lift does nothing more.
 		const hold = setTimeout(() => {
-			if (pinched || travelled || !host.holdMenu || !host.editable() || host.drawing()) return;
+			if (pinched || travelled || stopping || !host.holdMenu || !host.editable() || host.drawing()) return;
 			held = true;
 			host.holdMenu({ ids: [], at: from, stage: worldAt(event) });
 		}, HOLD_MS);
 		const done = () => {
 			clearTimeout(hold);
+			window.removeEventListener("pointerdown", second, true);
 			window.removeEventListener("pointermove", move);
 			window.removeEventListener("pointerup", up);
 			window.removeEventListener("pointercancel", done);
@@ -539,7 +547,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			if (e.pointerId !== pointer) return;
 			done();
 			if (held) return;
-			if (pinched || travelled || performance.now() - since > TAP_MS) return;
+			if (pinched || travelled || stopping || performance.now() - since > TAP_MS) return;
 			batch(() => {
 				editor.select([]);
 				editor.pickPages([]);
@@ -580,12 +588,19 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		}
 		let moved = false;
 		let held = false;
+		// A second finger anywhere makes this a pinch, even if this finger never moves; a finger that caught a moving canvas only stopped it.
+		let pinched = false;
+		const stopping = host.caught?.() ?? false;
+		const second = (e: PointerEvent) => {
+			if (e.pointerType === "touch" && e.pointerId !== pointer) pinched = true;
+		};
+		window.addEventListener("pointerdown", second, true);
 		/*
 		 * Held still for `HOLD_MS`: the item is selected and its menu opens at the finger (`holdMenu`); the
 		 * finger is claimed so the lift neither taps nor pans, and a carry it had begun is let go.
 		 */
 		const hold = setTimeout(() => {
-			if (moved || host.fingers() > 1 || !host.holdMenu) return;
+			if (moved || pinched || stopping || host.fingers() > 1 || !host.holdMenu) return;
 			held = true;
 			host.claim(pointer);
 			host.keepTouch?.(event);
@@ -597,6 +612,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		}, HOLD_MS);
 		const done = () => {
 			clearTimeout(hold);
+			window.removeEventListener("pointerdown", second, true);
 			window.removeEventListener("pointermove", move);
 			window.removeEventListener("pointerup", up);
 			window.removeEventListener("pointercancel", cancel);
@@ -628,7 +644,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 				else editor.input({ type: "cancel" });
 				return;
 			}
-			if (performance.now() - since > TAP_MS) return;
+			if (pinched || stopping || performance.now() - since > TAP_MS) return;
 			const deep = pickAtHere(at, { deep: true });
 			// A film or a sound: a tap plays it or pauses it, and selects it as any tap does.
 			const playable = deep && mediaOf(deep.node) ? deep : mediaOf(hit.node) ? hit : undefined;

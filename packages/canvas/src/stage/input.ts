@@ -425,6 +425,13 @@ export function createStageInput(deps: StageInputDeps) {
 	 * the pinch as ever.
 	 */
 	let caught = false;
+	/**
+	 * A finger landed on a card's cover (`gestures.panTouch`), which the browser cannot scroll from: until the
+	 * last finger lifts this pool pans for it, as for a caught finger, and a throw coasts on the lift (`ctl.coast`).
+	 */
+	let poolPans = false;
+	/** The pool's last pan steps, for the coast after a throw: stage pixels and when. */
+	const panned: Array<{ t: number; dx: number; dy: number }> = [];
 	/** A finger, in the stage's own coordinates: the space the camera works in. */
 	const fingerOf = (event: PointerEvent): Finger => {
 		const at = stagePoint(event);
@@ -440,7 +447,10 @@ export function createStageInput(deps: StageInputDeps) {
 			// A finger on the glass stops a coast, the way a hand stops a spinning list.
 			cancelCoast();
 			touches.down(finger);
-			if (touches.count() === 1) pinched = false;
+			if (touches.count() === 1) {
+				pinched = false;
+				panned.length = 0;
+			}
 			setPanning(true);
 			return { kind: "idle" };
 		}
@@ -448,7 +458,18 @@ export function createStageInput(deps: StageInputDeps) {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
+				// A throw the pool panned for coasts on, as the browser's own scroll would (the last 100 ms of it).
+				const now = performance.now();
+				const recent = panned.filter((one) => now - one.t < 100);
+				if ((caught || poolPans) && !pinched && recent.length > 1 && now - recent.at(-1)!.t < 60) {
+					const span = Math.max(16, recent.at(-1)!.t - recent[0]!.t);
+					const vx = recent.slice(1).reduce((sum, one) => sum + one.dx, 0) / span;
+					const vy = recent.slice(1).reduce((sum, one) => sum + one.dy, 0) / span;
+					if (Math.hypot(vx, vy) > 0.05) ctl.coast({ vx, vy });
+				}
+				panned.length = 0;
 				caught = false;
+				poolPans = false;
 				setPanning(false);
 				if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
 			}
@@ -461,7 +482,9 @@ export function createStageInput(deps: StageInputDeps) {
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
-		} else if (step.kind === "pan" && caught && !claimed.has(finger.id)) {
+		} else if (step.kind === "pan" && (caught || poolPans) && !claimed.has(finger.id)) {
+			panned.push({ t: performance.now(), dx: step.dx, dy: step.dy });
+			if (panned.length > 12) panned.shift();
 			pushCamera(pan(ctl.now(), step.dx, step.dy));
 			deps.editor().panned();
 		}
@@ -584,6 +607,11 @@ export function createStageInput(deps: StageInputDeps) {
 			keptTouches.add(id);
 		},
 		pinching: () => touches.count() > 1,
+		panTouch: (id) => {
+			poolPans = true;
+			keptTouches.add(id);
+		},
+		caught: () => caught,
 	};
 
 	/**
@@ -614,5 +642,5 @@ export function createStageInput(deps: StageInputDeps) {
 		element.addEventListener("pointermove", move);
 	};
 
-	return { grabbing, pressHeld, onWheel, touches, claimed, keptTouches, beginTouch, panFrom, gestures };
+	return { grabbing, pressHeld, onWheel, touches, claimed, keptTouches, beginTouch, panFrom, gestures, caught: () => caught };
 }
