@@ -1628,7 +1628,15 @@ export class DeckAgent {
 		if (!this.backend) return { cancelled: true };
 		// A rewind truncates what is here, so what is here has to be everything there is.
 		this.transcript();
-		const result = await this.backend.rewindTo(entryId);
+		/*
+		 * The runtime hands back what the model was sent, which carries Decks' reminders before the
+		 * person's words (`sent-as.ts`): that text is in no bubble, so it cut nothing and filled the
+		 * input bar with a reminder. The words the person typed, from the bubble paired to this
+		 * entry, are what go back in the bar and say where the transcript is cut.
+		 */
+		const shown = this.translator.userMessages().find((item) => item.entryId === entryId)?.text;
+		const runtime = await this.backend.rewindTo(entryId);
+		const result = runtime.cancelled || !shown ? runtime : { ...runtime, editorText: shown };
 		if (!result.cancelled) {
 			this.translator.truncateToUserMessage(result.editorText);
 			this.emit(this.historyMessage());

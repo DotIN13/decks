@@ -19,11 +19,14 @@ const PORT = Number(process.env.FAKE_MODEL_PORT ?? 4700);
 const LOG = process.env.FAKE_MODEL_LOG;
 const log = (line) => LOG && appendFileSync(LOG, line + "\n");
 
+/** A message's words, whether its content is a string or a list of parts. */
+const textOf = (message) => (typeof message?.content === "string" ? message.content : (message?.content ?? []).map((part) => part.text ?? "").join("\n"));
+
 /** Decide what to answer: text, or tool calls, from the whole conversation so far. */
 function decide(messages, tools) {
 	const names = new Set((tools ?? []).map((t) => t.function?.name));
 	const lastUser = [...messages].reverse().find((m) => m.role === "user");
-	const text = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => p.text ?? "").join("\n");
+	const text = textOf(lastUser);
 	// what happened since the last user message: our own tool calls and their results
 	const since = messages.slice(messages.lastIndexOf(lastUser) + 1);
 	const calls = since.filter((m) => m.role === "assistant").flatMap((m) => m.tool_calls ?? []);
@@ -49,6 +52,18 @@ function decide(messages, tools) {
 		if (calls.length < cmds.length) return { tool_calls: [call("bash", { command: cmds[calls.length] })] };
 		const out = results.map((r) => (typeof r.content === "string" ? r.content : JSON.stringify(r.content))).join("\n");
 		return done(list ? `Done. The boards on the canvas:\n${out.slice(-1500)}` : "Done.");
+	}
+	// "With the decks command, put the cards A and B on your canvas, then read your canvas." / "…take B off your canvas."
+	m = /with the decks command, (put the cards?|take) (.+?) (on|off) your canvas(, then read your canvas)?\.?$/i.exec(text.trim());
+	if (m && names.has("bash")) {
+		const paths = m[2].match(/[\w./-]+\.html/g) ?? [];
+		// A card put on a canvas is that canvas's copy, so it is found again by its folder's name.
+		const folder = (p) => /\/cards\/([^/]+)\/index\.html$/.exec(p)?.[1] ?? p;
+		const find = (p) => `decks canvas read | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const i=JSON.parse(s).items.find((x)=>x.card&&x.card.includes("/cards/${folder(p)}/"));console.log(i?i.card:"")})'`;
+		const cmds = m[3].toLowerCase() === "on" ? paths.map((p) => `decks canvas insert --type card --card ${p}`) : paths.map((p) => `decks canvas delete "$(${find(p)})"`);
+		if (m[4]) cmds.push("decks canvas read");
+		if (calls.length < cmds.length) return { tool_calls: [call("bash", { command: cmds[calls.length] })] };
+		return done("Done.");
 	}
 	// "Add a sticky to boards/plan.html with data-id 'timecheck' at left 1264px top 780px saying 'first turn'."
 	m = /add a sticky to ([\w./-]+) with data-id '([^']+)' at left (\d+)px top (\d+)px saying '([^']+)'/i.exec(text);
@@ -77,7 +92,7 @@ function decide(messages, tools) {
 	m = /change that sticky's text to '([^']+)'/i.exec(text);
 	if (m && names.has("edit")) {
 		// the previous turn's words are in this conversation
-		const earlier = messages.map((x) => (typeof x.content === "string" ? x.content : "")).join("\n");
+		const earlier = messages.map(textOf).join("\n");
 		const first = /saying '([^']+)'/i.exec(earlier)?.[1] ?? "first turn";
 		const edited = [...messages].reverse().find((x) => x.role === "assistant" && (x.tool_calls ?? []).some((c) => c.function?.name === "edit"));
 		const path = edited ? JSON.parse(edited.tool_calls.find((c) => c.function?.name === "edit").function.arguments).path : (/sticky to ([\w./-]+)/i.exec(earlier)?.[1] ?? "boards/plan.html");
@@ -87,7 +102,7 @@ function decide(messages, tools) {
 	}
 	// "what is the last text you gave that sticky in this conversation? Reply with just that text."
 	if (/what (?:is the last )?text (?:you gave|did you give) that sticky/i.test(text)) {
-		const mine = messages.filter((x) => x.role === "assistant" && typeof x.content === "string").map((x) => x.content);
+		const mine = messages.filter((x) => x.role === "assistant").map(textOf).filter(Boolean);
 		const last = [...mine].reverse().map((c) => /"([^"]+)"/.exec(c)?.[1]).find(Boolean);
 		return done(last ?? "first turn");
 	}

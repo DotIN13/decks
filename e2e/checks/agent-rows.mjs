@@ -50,7 +50,9 @@ const rows = () =>
 	);
 
 /**
- * The faces in the corner — every agent except the one whose window this is.
+ * The faces in the top bar (`TopRight.tsx`): the agents on this canvas, the one you are talking to
+ * among them (`data-current`). The v3 design (f149de73) put these where the corner stack was, which
+ * drew every agent but the focused one.
  *
  * `ringed` is read from the computed outline rather than from a class, because that is the
  * whole mechanism: `.agent-face[data-status]:not([data-status="idle"])` is what draws the
@@ -59,10 +61,11 @@ const rows = () =>
  */
 const faces = () =>
 	page.evaluate(() =>
-		[...document.querySelectorAll(".agent-stack .agent-facebtn")].map((button) => {
+		[...document.querySelectorAll(".v3-topright .v3-here-face")].map((button) => {
 			const face = button.querySelector(".agent-face");
 			return {
 				label: button.getAttribute("aria-label") ?? "",
+				current: button.dataset.current === "true",
 				status: face?.dataset.status ?? "",
 				ringed: face ? getComputedStyle(face).outlineStyle !== "none" : false,
 			};
@@ -84,7 +87,8 @@ say("…each with a face and a name", fresh.every((row) => row.face && row.name.
 say("…and no line of the last message under it", fresh.every((row) => row.lines === 0));
 say(
 	"a fresh agent's row says it has never run",
-	current(fresh)?.words === "never run" && current(fresh)?.status === "idle",
+	// "new", `rowWords`' word for an agent that never ran (it said "never run" before the v3 design).
+	current(fresh)?.words === "new" && current(fresh)?.status === "idle",
 	JSON.stringify(current(fresh)),
 );
 /*
@@ -94,13 +98,11 @@ say(
  * `deleted-board` and `agent-close` created are still on the list by the time this runs.
  * `STACK_CAP` is 3, after which the stack says `+n`.
  */
-const cap = (n) => Math.min(3, n);
 const quiet = await faces();
-const others = fresh.filter((row) => !row.current).length;
 say(
-	"the corner draws the other agents even while nothing is happening",
-	quiet.length === cap(others) && quiet.length > 0,
-	`${quiet.length} faces for ${others} other agents`,
+	"the top bar draws the agents on this canvas even while nothing is happening, the one you are in marked",
+	quiet.length > 0 && quiet.length <= 5 && quiet.filter((f) => f.current).length === 1,
+	`${quiet.length} faces, ${quiet.filter((f) => f.current).length} current`,
 );
 say(
 	"…every one of them unringed, which is how it says nothing is happening",
@@ -163,7 +165,8 @@ for (let i = 0; i < 200; i += 1) {
 }
 say(
 	"an agent that answers while you are elsewhere goes green",
-	answered?.status === "done" && /^done/.test(answered?.words ?? ""),
+	// The status says done; the words say only how long ago ("now"), since the ring is what says unread.
+	answered?.status === "done" && /^(now|\d+[smhd])$/.test(answered?.words ?? ""),
 	JSON.stringify(answered),
 );
 const green = await faces();
@@ -174,8 +177,8 @@ say(
 );
 const listed = await rows();
 say(
-	"the agent you are in has no face in the corner — it is top left with its name",
-	green.length === cap(listed.filter((row) => !row.current).length),
+	"the agent you are in is a face there too, marked as the one you are talking to, and never ringed",
+	green.filter((f) => f.current).length === 1 && green.filter((f) => f.current).every((f) => !f.ringed),
 	`${green.length} faces, ${listed.length} rows`,
 );
 
@@ -198,7 +201,7 @@ say(
 	after.every((f) => !f.ringed && f.status !== "done"),
 	JSON.stringify(after),
 );
-say("…the row still says when it last ran, not what it said", /^idle · /.test(read?.words ?? "") && read?.lines === 0, JSON.stringify(read?.words));
+say("…the row still says when it last ran, not what it said", /^(now|\d+[smhd])$/.test(read?.words ?? "") && read?.lines === 0, JSON.stringify(read?.words));
 
 await page.keyboard.press("Escape");
 say("no page errors", errors.length === 0, errors.join(" | "));

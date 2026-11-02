@@ -77,7 +77,8 @@ try {
 	 * Asked from memory, so the board cannot answer for it:
 	 * a runtime whose conversation still held the second turn would say "second turn".
 	 */
-	const lastReply = async () => (await page.locator(".stream .stream-roll > *").last().innerText()).trim();
+	// The roll ends on its foot (`.stream-edge`, a scroll target) and, while a turn runs, the working sign: the reply is the last card before them.
+	const lastReply = async () => (await page.locator(".stream .stream-roll > .stream-card:not(.stream-working)").last().innerText()).trim();
 	await page.locator(".dockfield").fill("");
 	await ask(page, "Without reading or touching any file: what is the last text you gave that sticky in this conversation? Reply with just that text.");
 	const remembered = await lastReply();
