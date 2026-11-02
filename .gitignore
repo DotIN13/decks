@@ -40,3 +40,9 @@ dist-public/
 # The antigravity runtime's own home, created under the data directory on first use.
 /e2e/fixture/antigravity-home/
 dist-packages/
+
+# The fake agent's directory holds two files of ours (models.json, settings.json); pi writes its
+# sessions and caches beside them when the checks run against the fake model (e2e/fake-model.mjs).
+/e2e/fake-agent/*
+!/e2e/fake-agent/models.json
+!/e2e/fake-agent/settings.json
