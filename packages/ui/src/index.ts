@@ -13,3 +13,4 @@ export { LABEL_LIMIT, shortLabel } from "./labels.ts";
 export { velocityFrom, type Sample, type Velocity } from "./velocity.ts";
 export { ScribbleCatch, isScribbleCatch, pencil } from "./scribble.tsx";
 export { dismissMenus, onDismiss } from "./dismiss.ts";
+export { cssEscape } from "./css.ts";

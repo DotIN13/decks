@@ -1,4 +1,5 @@
 import type { Page, Camera, StageCall } from "@decks/protocol";
+import { cssEscape } from "@decks/ui";
 import { boxOf, fit } from "./camera.ts";
 
 /**
@@ -206,9 +207,3 @@ export function highlight(path: string, id: string): void {
 	};
 }
 
-/** `CSS.escape` is everywhere it matters, but a board path is user data either way. */
-function cssEscape(value: string): string {
-	return typeof CSS !== "undefined" && typeof CSS.escape === "function"
-		? CSS.escape(value)
-		: value.replace(/["\\]/g, "\\$&");
-}

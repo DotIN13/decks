@@ -1,4 +1,4 @@
-import { dayKey, formatDate, yearOf } from "@decks/ui";
+import { cssEscape, dayKey, formatDate, yearOf } from "@decks/ui";
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
@@ -688,7 +688,3 @@ function divides(before: number | undefined, at: number | undefined): string | u
 	return formatDate(at, { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
-/** An item id is user data; escape it before it goes in a selector. */
-function cssEscape(value: string): string {
-	return typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(value) : value.replace(/["\\]/g, "\\$&");
-}
