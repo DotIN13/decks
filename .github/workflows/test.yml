@@ -55,6 +55,13 @@ jobs:
       # its own step so the log says "the order moved" instead of burying it in a test list.
       - run: npm run css:order
 
+      # **Three more gates, each its own line for the same reason.** An exported symbol nothing
+      # references, a class no markup writes, and a comment naming a file that no longer exists are
+      # the three kinds of residue a reorganization leaves behind and a reader pays for; typecheck
+      # and the tests are blind to all three. `scripts/dead-exports.mjs`, `dead-css.mjs` and
+      # `stale-paths.mjs` each exit 1 naming what they found.
+      - run: npm run gates
+
       # **Before the unit tests, not after.** Three files in `apps/server` drive a real page —
       # `web/bridge.test.ts` over the extension's socket, and two in `app.test.ts` that measure a
       # frame and write the number back — so `npm test` needs a browser. This step used to come

@@ -9,6 +9,7 @@ is the one a reader cannot tell apart from dead code, which is why this file exi
 | script | command | what it does |
 |---|---|---|
 | `css-order.mjs` | `npm run css:order` | the cascade gate: flattens `apps/web/src/index.css`, hashes the rules in order, compares to `apps/web/src/styles/cascade-order.json`; `-- --update` re-stamps |
+| `dead-exports.mjs`, `dead-css.mjs`, `stale-paths.mjs` | `npm run gates` (CI runs it after `css:order`) | an exported symbol nothing references, a class no markup writes, a comment naming a file that does not exist: each exits 1 naming what it found; `dead-exports.mjs --over` also lists exports used only in their own file |
 | `vendor.mjs` | `npm run vendor` | copies the card primitives (d3, KaTeX, marked, highlight.js, mermaid, pdf.js) from `node_modules` into `packages/card-host/lib` |
 | `live-doc.mjs` | `npm run build:live-doc` | bundles `runtime/live-doc.ts` into `packages/card-host/lib/live-doc.js` |
 | `build-packages.mjs` | `npm run build:packages` | builds the public `@decks/*` packages into `dist-packages/` for npm |

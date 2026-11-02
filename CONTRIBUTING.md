@@ -77,6 +77,15 @@ commit is three commits, and the review will ask for them separately.
 vendored rather than installed (`npm run vendor`) so a board renders offline; the runtime
 carries nothing it does not use.
 
+**A name points at a thing that exists.** When a module moves, its importers move in the same
+commit; a one-line re-export left at the old path is a second name for one thing, and two names for
+one rule is how the wrong one wins. A comment that names a file names one that exists (`npm run
+gates` checks). A directory is named for what it holds, not for when it was made. A layer kept "for
+one release" says which release, for whom and under which test, in `docs/COMPAT.md`. A knob a
+measuring script sets or a probe a browser check reads goes through `packages/canvas/src/debug.ts`,
+never a global of its own. A test helper beside production code is `*.test-helper.ts`, and a test sits
+beside what it tests.
+
 **The file is the artifact.** A board is a plain HTML document, and the app treats it as one:
 edits are splices of the lines they name, a drag rewrites one attribute, and a board written
 by hand has to survive a round trip through the editor byte for byte. Keep that property:
