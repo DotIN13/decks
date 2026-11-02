@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { messageParts } from "../chat/composer/pill-about.ts";
+import { messageParts } from "../composer/pill-about.ts";
 import type { Draft } from "@decks/agent-ui/composer";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";

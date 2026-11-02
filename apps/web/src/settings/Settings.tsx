@@ -1,6 +1,6 @@
 import { chooseShowFps, showFps } from "../perf/fps.tsx";
 import { STT_MODELS, type ClaudeAccount, type PairedRow, type WebStatus } from "@decks/protocol";
-import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../chat/composer/voice.ts";
+import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../composer/voice.ts";
 import Bell from "lucide-solid/icons/bell";
 import Cloud from "lucide-solid/icons/cloud";
 import Globe from "lucide-solid/icons/globe";
@@ -18,7 +18,7 @@ import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
 import { can, pairing } from "../connections/backend.ts";
-import { AlertSettings } from "../alerts/AlertSettings.tsx";
+import { AlertSettings } from "./AlertSettings.tsx";
 import type { AlertPrefs } from "@decks/agent-ui/alerts";
 
 /** The six sections, in the order the left of the window lists them. */
@@ -56,7 +56,7 @@ const saved = (): Section => {
  * `FilePicker` gives: the tap that opened it lands a `click` here afterwards.
  */
 export function Settings(props: {
-	/** What the app may interrupt you with (`alerts/AlertSettings.tsx`). */
+	/** What the app may interrupt you with (`settings/AlertSettings.tsx`). */
 	prefs: AlertPrefs;
 	onPrefs: (prefs: AlertPrefs) => void;
 	/** The install's Claude subscriptions; a conversation picks one in its model picker. */
@@ -375,7 +375,7 @@ function AccountRow(props: { account: ClaudeAccount; next: boolean; onForget: ()
 /* ---------------------------------------------------------------------------------------- */
 /* Voice                                                                                      */
 
-/** The composer's mic (`chat/composer/voice.ts`): the recogniser, the server's model, the browser's language. */
+/** The composer's mic (`composer/voice.ts`): the recogniser, the server's model, the browser's language. */
 function VoiceSettings() {
 	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
 	return (

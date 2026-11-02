@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 
 /**
- * A yes-or-no question the app asks the person, drawn once by `ui/ConfirmDialog.tsx`.
+ * A yes-or-no question the app asks the person, drawn once by `shell/ConfirmDialog.tsx`.
  *
  * One at a time: a second question waits for the first to be answered, so two uploads over the
  * size line dropped together are asked about one after the other rather than stacked.

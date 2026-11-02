@@ -1,9 +1,9 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import { createMemo, Show } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import { AgentFace, AgentMenu } from "../../agents/AgentPill.tsx";
+import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Icon } from "@decks/ui";
-import type { Destination } from "../../app/send-from-bar.ts";
+import type { Destination } from "../app/send-from-bar.ts";
 
 export interface RecipientProps {
 	chats: AgentChat[];

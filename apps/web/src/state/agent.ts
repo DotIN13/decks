@@ -66,7 +66,7 @@ export interface AgentScratch {
 	 * Its history has arrived and is held.
 	 *
 	 * The view it was left in used to live here too, in memory and gone on a reload. It is
-	 * `camera/agent-views.ts`'s now, in `localStorage`, because where you were looking is a fact
+	 * `state/views.ts`'s now, in `localStorage`, because where you were looking is a fact
 	 * about *this device* rather than about the conversation.
 	 */
 	historyHeld: boolean;

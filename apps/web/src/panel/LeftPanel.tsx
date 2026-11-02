@@ -197,7 +197,7 @@ export function LeftPanel(props: {
 	/** An app's recent output, for its Logs panel. */
 	onAppLogs?: (app: PanelApp) => Promise<string[] | undefined>;
 
-	/** The conversation, under the list: the v3 panel's lower half (`chrome/ChatSection.tsx`). */
+	/** The conversation, under the list: the v3 panel's lower half (`shell/ChatSection.tsx`). */
 	chat?: JSX.Element;
 }) {
 	const ids = createUniqueId();
@@ -682,7 +682,7 @@ export function LeftPanel(props: {
 				*/}
 				{/*
 					The head: the deck's mark and name (the switcher, `connections/Switcher.tsx`), and the
-					button that folds the panel away. Folded, the top bar carries both (`chrome/TopBar.tsx`).
+					button that folds the panel away. Folded, the top bar carries both (`shell/TopBar.tsx`).
 				*/}
 				<Show
 					when={props.desktop}

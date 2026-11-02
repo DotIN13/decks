@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { commentBlock, withComments } from "../../markup/comments.ts";
-import type { WaitingComment } from "../../state/comments.ts";
+import { commentBlock, withComments } from "../markup/comments.ts";
+import type { WaitingComment } from "../state/comments.ts";
 import { draftForAgent, draftComments, fileMention, type Draft, type DraftMention } from "@decks/agent-ui/composer";
-import { withoutName } from "../../app/send-from-bar.ts";
+import { withoutName } from "../app/send-from-bar.ts";
 import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messageParts, pathName, readParts, readSent } from "./pill-about.ts";
 
 const mine: WaitingComment = { id: "c1", board: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };

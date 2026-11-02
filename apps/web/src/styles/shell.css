@@ -182,7 +182,7 @@
 	}
 	/*
 	 * Who gets the line: the word `To` and a chip with the agent's face and name. The chip
-	 * opens the pill's agent menu (`chat/composer/Recipient.tsx`).
+	 * opens the pill's agent menu (`composer/Recipient.tsx`).
 	 */
 	.dock-to {
 		display: flex;

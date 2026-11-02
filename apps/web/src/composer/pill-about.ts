@@ -1,7 +1,7 @@
 import { commentLabel, type Draft, type DraftMention, mentionAddress, type PillAbout, shortLabel } from "@decks/agent-ui/composer";
 import type { MessageMention, MessagePart } from "@decks/protocol";
-import { commentItem } from "../../markup/comments.ts";
-import type { WaitingComment } from "../../state/comments.ts";
+import { commentItem } from "../markup/comments.ts";
+import type { WaitingComment } from "../state/comments.ts";
 
 /**
  * What a pill is about, for its tooltip and its card (`@decks/agent-ui` `pill-card.ts`), what a sent

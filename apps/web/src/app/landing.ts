@@ -2,7 +2,7 @@ import type { Page, Camera } from "@decks/protocol";
 import { createEffect, onCleanup, onMount, untrack } from "solid-js";
 import { boxOf, canvasBox, createLanding, type CameraOwner } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
-import type { AgentViews } from "../camera/agent-views.ts";
+import type { AgentViews } from "../state/views.ts";
 import { scheme } from "../lib/theme.ts";
 import { camera, moveCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";

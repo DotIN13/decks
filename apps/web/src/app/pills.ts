@@ -5,7 +5,7 @@ import type { FramedHandle } from "@decks/canvas";
 import { setMineReader } from "@decks/agent-ui/chat";
 import { api } from "../connections/connection.ts";
 import { openAuthed } from "../lib/authed.tsx";
-import { aboutSent, readParts, readSent } from "../chat/composer/pill-about.ts";
+import { aboutSent, readParts, readSent } from "../composer/pill-about.ts";
 import type { DraftMention } from "@decks/agent-ui/composer";
 import { camera, moveCamera } from "../state/camera.ts";
 import type { WaitingComment } from "../state/comments.ts";

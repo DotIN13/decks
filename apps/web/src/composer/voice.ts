@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
-import { api } from "../../connections/connection.ts";
-import { authHeaders } from "../../lib/session.ts";
+import { api } from "../connections/connection.ts";
+import { authHeaders } from "../lib/session.ts";
 
 /**
  * This browser's choices for the mic, from Settings: which recogniser, and what language the browser's

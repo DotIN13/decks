@@ -168,7 +168,7 @@ await settle(page, 500);
 /*
  * The Settings redesign (`settings/Settings.tsx`): a window of six sections on a grey left, the
  * open one on the right under its name, opening on Notifications. Notifications is one table
- * (`alerts/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
+ * (`settings/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
  * When / Sound / Banner, then Volume as four stops, then the permission line when the browser
  * will not show banners. The Sounds and Banners groups this replaced printed every moment twice.
  */

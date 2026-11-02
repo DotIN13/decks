@@ -1,5 +1,5 @@
 import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
-import FiveHour from "../../settings/FiveHour.tsx";
+import FiveHour from "../settings/FiveHour.tsx";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";

@@ -84,7 +84,7 @@ function createUi() {
 				 * Whole mentions rather than ids, because what is dragged is the only thing that
 				 * knows what to call it — a board its title, an item its name on the stage — and a
 				 * label worked out again at the other end would be a second answer to the same
-				 * question (`chat/composer/draft.ts`).
+				 * question (`composer/draft.ts`).
 				 */
 				pills?: Array<{ kind: "card" | "item"; id: string; label: string }>;
 				/** Files attached or dropped, by their path in the deck: each a pill where the caret is. */

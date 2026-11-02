@@ -5,7 +5,7 @@ import type { AgentState, Camera, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend, receiveToolResult } from "@decks/agent-ui/chat";
 import { viewToPark } from "@decks/canvas/camera";
-import { agentViews } from "../camera/agent-views.ts";
+import { agentViews } from "../state/views.ts";
 import { runStageCall } from "@decks/canvas/host";
 import { scratch } from "../state/agent.ts";
 import { reportCamera } from "./camera-report.ts";
@@ -25,7 +25,7 @@ import { receiveStages } from "../state/stages.ts";
 /**
  * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the
  * canvas frame for the canvas it shows (`viewFor`). On this device, like every other view
- * (`camera/agent-views.ts`): an agent that moved a canvas nobody is looking at is remembered for the
+ * (`state/views.ts`): an agent that moved a canvas nobody is looking at is remembered for the
  * browser that was told, in the same store the landing parks views in and takes them from when that
  * chat opens (`camera/landing.ts`).
  */

@@ -733,7 +733,7 @@ export class PictureService {
 			let shotClip = clip;
 			if (CARD_PATH.test(job.board.path)) {
 				/*
-				 * A card is drawn by the web app's `measure.html` (`apps/web/src/measure.ts`, `picture=1`), as
+				 * A card is drawn by the web app's `measure.html` (`apps/web/src/pages/measure.ts`, `picture=1`), as
 				 * the canvas frame draws it: `mountCard` in a closed shadow root at its width, card.css before its
 				 * own styles, its modules handed the card, in the scheme asked for. It says it is ready once its
 				 * height has held and its fonts have come, and how tall it came to: never below its box.

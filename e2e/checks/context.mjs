@@ -59,7 +59,7 @@ const agent = {
 	 * and a ring at zero makes the wrong one, which is the one somebody would act on.
 	 */
 	/*
-	 * On a desktop the reading is the composer's dial (`chat/composer/ContextDial.tsx`, in
+	 * On a desktop the reading is the composer's dial (`composer/ContextDial.tsx`, in
 	 * `.composer-ctx`): a ring and the percentage, which opens the numbers as a popover. `⋯` has
 	 * no context row here any more — that row is a phone's (below) — but it still wears the warning.
 	 */

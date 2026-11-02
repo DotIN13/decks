@@ -1,5 +1,5 @@
 /**
- * Speech to text for the composer's mic (`chat/composer/voice.ts`): one recording in, its words out.
+ * Speech to text for the composer's mic (`composer/voice.ts`): one recording in, its words out.
  *
  * OpenAI's transcriber, with the key in `OPENAI_API_KEY` on the server: about half a cent a minute,
  * any browser, and Chinese and English mixed in one sentence, which the browsers' own recognisers

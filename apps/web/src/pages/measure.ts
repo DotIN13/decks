@@ -1,5 +1,5 @@
 import { mountCard } from "@decks/canvas/card";
-import { measureFrame } from "./measure/page.ts";
+import { measureFrame } from "./measure-page.ts";
 
 /**
  * One card (or a page), measured for `decks.canvas.fit` when no canvas has measured it
@@ -14,7 +14,7 @@ import { measureFrame } from "./measure/page.ts";
  * moment after waking was never seen, and fit read the card without its script.
  *
  * Anything else the deck lists (a document page, a board on a friend's canvas) is laid out in a frame
- * at its own size and measured as a page (`measure/page.ts`).
+ * at its own size and measured as a page (`pages/measure-page.ts`).
  *
  * **The card's picture is taken here too** (`picture=1`, `server/pictures/service.ts`): the same card,
  * mounted the same way, in the scheme asked for (`scheme=`), so what the canvas shows for a card that is
