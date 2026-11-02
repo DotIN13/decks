@@ -294,7 +294,8 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 		},
 		onExport: (ids) => end.emit("export", { ids }),
 		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
-		inkAgent: () => ctx.busy().writer?.name,
+		// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
+		inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
 		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
 		onDeleteCard: async (path) => {
 			if (studio) return takeOff(path);
