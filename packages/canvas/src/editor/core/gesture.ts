@@ -14,7 +14,7 @@
  * gesture's entry in `settling` comes due two seconds on (`tick`) with no new drawing since.
  */
 import { isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } from "@decks/pen";
-import { snapMove, type Guide } from "../../pen/snap.ts";
+import { snapMove, type Guide } from "../../items/snap.ts";
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
 import { landingBoxes } from "./glide.ts";

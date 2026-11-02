@@ -4,6 +4,6 @@
  * chain they are tried in, the card and formula readers the engine is given, and the icon sets.
  * None of it touches the DOM, so a Node process can import it.
  */
-export { fontFiles, isFallbackFamily, textNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
+export { fontFiles, isFallbackFamily, textNeeds, type FontFile, type FontNeed } from "../cards/font-files.ts";
 export { cardReader, mathTypesetter } from "../engine/reader.ts";
-export { iconUrl, parseIcon } from "../pen/icons.ts";
+export { iconUrl, parseIcon } from "../items/icons.ts";

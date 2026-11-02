@@ -14,7 +14,7 @@ import type { DocEdits, DrawingWriter } from "./engine/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
-import { PenBar } from "./pen/PenBar.tsx";
+import { PenBar } from "./panels/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
 import type { RendererChoice } from "./lib/renderer.ts";

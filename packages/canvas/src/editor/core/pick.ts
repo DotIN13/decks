@@ -3,7 +3,7 @@
  * `onLine`); this decides which of it the editor means.
  */
 import { isCard, isMarkdownText, isShape, type PenNode, type Placed } from "@decks/pen";
-import { isFile, isLiveFile } from "../../pen/file-kinds.ts";
+import { isFile, isLiveFile } from "../../items/file-kinds.ts";
 import type { BoardBox, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 

@@ -1,5 +1,5 @@
-import { FALLBACK_FAMILY, FONT_CDN, fontsourceId, roundWeight } from "./font-files.ts";
-import type { Block } from "./markdown.ts";
+import { FALLBACK_FAMILY, FONT_CDN, fontsourceId, roundWeight } from "../cards/font-files.ts";
+import type { Block } from "../cards/markdown.ts";
 
 /**
  * What the stage's own HTML takes from how the engine draws: a card's palette and where its first
@@ -41,7 +41,7 @@ export function firstLine(block: Block | undefined, size: number, lineHeight?: n
 	}
 }
 /** The serif a page font is fetched in for the editor (`card-syntax.ts`, `FACE_ALIAS`). */
-export { SERIF_FAMILY } from "./font-files.ts";
+export { SERIF_FAMILY } from "../cards/font-files.ts";
 
 /** A note's and a board's corner on the canvas (`--radius-panel`). */
 export const NOTE_RADIUS = 12;

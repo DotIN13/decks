@@ -3,7 +3,7 @@
  * bar and ink bar, what the canvas asks its host, the renderer it picks, the scheme, board pictures
  * and measuring, the agents' stage calls, keys, and board tokens and storage.
  */
-export { PenBar } from "../pen/PenBar.tsx";
+export { PenBar } from "../panels/PenBar.tsx";
 export { InkBar } from "../ink/InkBar.tsx";
 export * from "../host.ts";
 export * from "../stage-ops.ts";

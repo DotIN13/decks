@@ -8,7 +8,7 @@
  * they are typed, the still copy left where the editor was, and a card saved block by block.
  */
 import { baseTheme, CARD, color, fillsOf, indexOf, isCard, isMarkdown, isMarkdownText, isShape, NOTE_PAD, textStyleOf, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import { isFile } from "../../pen/file-kinds.ts";
+import { isFile } from "../../items/file-kinds.ts";
 import type { Pt, Rect } from "./model.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLook`). */

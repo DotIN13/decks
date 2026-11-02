@@ -3,8 +3,8 @@ import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../state/pen-tools.ts";
 import { Icon } from "@decks/ui";
-import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "./icon-index.ts";
-import { iconUrl } from "./icons.ts";
+import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "../items/icon-index.ts";
+import { iconUrl } from "../items/icons.ts";
 
 /**
  * The insert panel: the shape library, or the icons — two panels, one for each button in the tool

@@ -5,7 +5,7 @@
  * (`resizeOp`, `hugAgainOp`, `radiusOp`). The pointer loop itself is the page's.
  */
 import { isCard, isMarkdown, isShape, maxRadius, NOTE_PAD, shapeRadius, type Op, type PenNode } from "@decks/pen";
-import { snapEdges, type Guide } from "../../pen/snap.ts";
+import { snapEdges, type Guide } from "../../items/snap.ts";
 import type { Pt, Rect } from "./model.ts";
 
 /** The eight handles round a single selection, by the edges each one moves. */

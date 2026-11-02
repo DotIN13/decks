@@ -14,9 +14,9 @@ import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDo
 import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { setPenTyping } from "../../state/pen-tools.ts";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../pen/card-frame.ts";
-import { CardEditor } from "../../pen/CardEditor.tsx";
-import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../pen/look.ts";
+import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../cards/card-frame.ts";
+import { CardEditor } from "../../cards/CardEditor.tsx";
+import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../items/look.ts";
 import { dropSlot } from "../core/drop.ts";
 import type { Pt, Rect } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";

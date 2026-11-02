@@ -12,7 +12,7 @@
  * whose inputs changed; `deriveOverlay` is all of them at once.
  */
 import { ARROW, arrowRoute, isArrow, sidePoint, type ArrowSide, type PenNode } from "@decks/pen";
-import type { Box, Guide } from "../../pen/snap.ts";
+import type { Box, Guide } from "../../items/snap.ts";
 import { arrowHandles, type ArrowHandles, type RouteDraft } from "./arrows.ts";
 import type { BoardBox, Pt, Rect } from "./model.ts";
 import { childrenOf, marqueeRect, parentOf } from "./pick.ts";

@@ -3,7 +3,7 @@
  * from the page: no Solid, no DOM, no engine (`core/imports.test.ts` holds that).
  */
 import type { Frame } from "@decks/pen";
-import type { Guide } from "../../pen/snap.ts";
+import type { Guide } from "../../items/snap.ts";
 import type { Gesture } from "./gesture.ts";
 import type { TextSession } from "./text.ts";
 

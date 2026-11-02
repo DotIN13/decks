@@ -13,13 +13,13 @@
 import type { PageEngine } from "@decks/stage";
 import { baseTheme, diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
-import { iconUrl, parseIcon } from "../pen/icons.ts";
+import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../cards/font-files.ts";
+import { iconUrl, parseIcon } from "../items/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { Recovery } from "./recovery.ts";
-import { snapMove, type Box, type Guide } from "../pen/snap.ts";
-import { boundsOf } from "../pen/bounds.ts";
-import { docIndex, drawnNodes } from "../pen/doc-index.ts";
+import { snapMove, type Box, type Guide } from "../items/snap.ts";
+import { boundsOf } from "../items/bounds.ts";
+import { docIndex, drawnNodes } from "../cards/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { setStageWords, type Words } from "./measure.ts";
