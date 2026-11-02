@@ -32,7 +32,7 @@ import type { FramedHandle } from "@decks/canvas";
 import { Dialog } from "./agents/Dialog.tsx";
 import { Composer } from "./composer/Composer.tsx";
 import { CanvasManager } from "./canvases/CanvasManager.tsx";
-import { stageOf, stages, viewOnly } from "./state/canvases.ts";
+import { moveTo, stageOf, stages, viewOnly } from "./state/canvases.ts";
 import { TopBar } from "./shell/TopBar.tsx";
 import { TopRight } from "./shell/TopRight.tsx";
 import { ChatSection, StatusPill } from "./shell/ChatSection.tsx";
@@ -427,7 +427,10 @@ export function App() {
 	const openCanvas = (name: string) => {
 		const agentId = state.focused;
 		if (!agentId || stageOf(agentId)?.name === name) return;
-		void act("agent.update", [{ canvas: name }], agentId);
+		// On screen at once; the server is told beside it, and a refusal (a notice from act) moves back.
+		void moveTo(agentId, name, async () => {
+			if ((await act("agent.update", [{ canvas: name }], agentId)) === undefined) throw new Error(`not moved to ${name}`);
+		}).catch(() => undefined);
 	};
 
 	/** The canvas switcher around a trigger: the panel head's title and the top bar's canvas chip both use it. */

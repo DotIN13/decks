@@ -15,11 +15,40 @@ export { stages };
 
 export function receiveStages(message: Extract<ServerMessage, { type: "canvas.list" }>): void {
 	setStages(message.stages);
+	// A move the server now shows is done; one it shows otherwise stays until its own answer comes back.
+	const going = moving();
+	if (going && message.stages.some((one) => one.name === going.canvas && one.agents.some((agent) => agent.id === going.agent))) setMoving(undefined);
+}
+
+/**
+ * A move to another canvas this page has made and the server has not shown yet (`moveTo`): the page
+ * goes there at once, and every reader of `stageOf` with it, rather than waiting for the server's
+ * answer and the canvas list after it.
+ */
+const [moving, setMoving] = createSignal<{ agent: string; canvas: string }>();
+
+/**
+ * Move an agent to a canvas on this page now, while `send` tells the server: the canvas on screen follows
+ * at once. A move the server refuses goes back, and the refusal is passed on.
+ */
+export async function moveTo(agent: string, canvas: string, send: () => Promise<unknown>): Promise<void> {
+	setMoving({ agent, canvas });
+	try {
+		await send();
+	} catch (error) {
+		if (moving()?.agent === agent && moving()?.canvas === canvas) setMoving(undefined);
+		throw error;
+	}
 }
 
 /** The stage a given agent is on, by name, or nothing when it has never drawn. */
 export function stageOf(agentId: string | undefined): StageRow | undefined {
 	if (!agentId) return undefined;
+	const going = moving();
+	if (going?.agent === agentId) {
+		const there = stages().find((one) => one.name === going.canvas);
+		if (there) return there;
+	}
 	return stages().find((one) => one.agents.some((agent) => agent.id === agentId));
 }
 

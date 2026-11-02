@@ -12,7 +12,29 @@ import { deckAddress, stageOnScreen } from "../state/decks.ts";
  * pictures with it in their address, since it has no token and no cookie of its own. It lives an
  * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `frame/outside/host.tsx`).
  */
-export async function canvasPass(canvas: string): Promise<CanvasPass> {
+export function canvasPass(canvas: string): Promise<CanvasPass> {
+	/*
+	 * One pass per canvas for the first half of its life, given again to whoever asks: a card's
+	 * pictures, modules and sheets carry the pass in their address, so a new pass at every visit made
+	 * every address new and the browser fetched every card again. The host asks again at half its
+	 * life (`renew`), which is when this lets it go, so a renewal gets a new one.
+	 */
+	const kept = passes.get(canvas);
+	if (kept && Date.now() < kept.until) return kept.pass;
+	const pass = askPass(canvas);
+	const entry = { pass, until: Date.now() + 25 * 60_000 };
+	passes.set(canvas, entry);
+	void pass.then(
+		(got) => (entry.until = Date.now() + (got.expires - Date.now()) / 2 - 60_000),
+		() => passes.get(canvas) === entry && passes.delete(canvas),
+	);
+	return pass;
+}
+
+/** The pass each canvas was last given, and until when it is given again. */
+const passes = new Map<string, { pass: Promise<CanvasPass>; until: number }>();
+
+async function askPass(canvas: string): Promise<CanvasPass> {
 	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ canvas }) });
 	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string };
 	if (!answer.pass) throw new Error(`No pass for the canvas ${canvas}: ${answer.error ?? response.status}`);
