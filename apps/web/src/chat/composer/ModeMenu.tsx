@@ -7,7 +7,7 @@ import Zap from "lucide-solid/icons/zap";
 import type { LucideIcon } from "lucide-solid";
 import { For, Show } from "solid-js";
 import { Icon } from "../../ui/icons.tsx";
-import { Popover } from "../../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 
 /**
  * How much this agent asks before acting, for the rest of the session.

@@ -11,7 +11,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 
 export type PanelApp = { name: string; title: string; status: string; board: string };
 

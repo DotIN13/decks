@@ -1,6 +1,6 @@
 import type { AgentUsage } from "@decks/protocol";
 import { Show } from "solid-js";
-import { Popover } from "../../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 import { ContextSummary } from "./ContextSummary.tsx";
 import { ContextRing } from "../../chrome/ContextRing.tsx";
 import { contextLevel, contextPercent } from "../../lib/context-usage.ts";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Draft } from "./draft.ts";
+import type { Draft } from "@decks/agent-ui/composer";
 import { DRAFTS_KEY, DRAFTS_LIMIT, pageKey, parkedDrafts, reconcilePills } from "./parked.ts";
 
 const memory = () => {

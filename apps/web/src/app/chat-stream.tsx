@@ -2,7 +2,7 @@ import type { ComponentProps } from "solid-js";
 import { clearPreview, preview, state } from "../state/deck.ts";
 import { loadEarlier } from "../state/history.ts";
 import { call, warnIfFailed } from "../state/socket.ts";
-import { Stream } from "../chat/Stream.tsx";
+import { Stream } from "@decks/agent-ui/chat";
 
 type TranscriptItem = ComponentProps<typeof Stream>["items"][number];
 type AgentChat = (typeof state.chats)[number];

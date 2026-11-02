@@ -1,4 +1,4 @@
-import { draftIsEmpty, normalize, parseDraft, type Draft } from "./draft.ts";
+import { draftIsEmpty, normalize, parseDraft, type Draft } from "@decks/agent-ui/composer";
 
 /**
  * What was being typed on each page, so that leaving a page never loses a message.

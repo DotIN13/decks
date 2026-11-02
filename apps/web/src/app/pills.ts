@@ -6,7 +6,7 @@ import { setMineReader } from "@decks/agent-ui/chat";
 import { api } from "../connections/connection.ts";
 import { openAuthed } from "../lib/authed.tsx";
 import { aboutSent, readParts, readSent } from "../chat/composer/pill-about.ts";
-import type { DraftMention } from "../chat/composer/draft.ts";
+import type { DraftMention } from "@decks/agent-ui/composer";
 import { camera, moveCamera } from "../state/camera.ts";
 import type { WaitingComment } from "../state/comments.ts";
 import { state } from "../state/deck.ts";

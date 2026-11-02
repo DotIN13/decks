@@ -5,7 +5,7 @@ import Search from "lucide-solid/icons/search";
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 import { searchStages } from "../state/stages.ts";
 import { AuthedImg } from "../lib/authed.tsx";
 

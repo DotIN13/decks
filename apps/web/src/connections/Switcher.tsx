@@ -7,7 +7,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DecksMark, Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 import { state } from "../state/deck.ts";
 import { stageOf } from "../state/stages.ts";
 import { backend, can } from "./backend.ts";

@@ -4,7 +4,7 @@ import { resetDeck } from "../state/deck.ts";
 import { resetPens } from "../state/pens.ts";
 import { resetStages } from "../state/stages.ts";
 import { resetHistory } from "../state/history.ts";
-import { resetToolResults } from "../chat/tool-results.ts";
+import { resetToolResults } from "@decks/agent-ui/chat";
 import { scratch } from "../state/agent.ts";
 import { setMode, setSelected } from "../state/selection.ts";
 import { setDrawing, setInkSelection } from "@decks/canvas/tools";

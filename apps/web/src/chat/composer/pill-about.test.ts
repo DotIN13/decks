@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentBlock, withComments } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/comments.ts";
-import { draftForAgent, draftComments, fileMention, type Draft, type DraftMention } from "./draft.ts";
+import { draftForAgent, draftComments, fileMention, type Draft, type DraftMention } from "@decks/agent-ui/composer";
 import { withoutName } from "../../app/send-from-bar.ts";
 import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messageParts, pathName, readParts, readSent } from "./pill-about.ts";
 

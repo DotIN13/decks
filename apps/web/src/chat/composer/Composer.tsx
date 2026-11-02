@@ -14,10 +14,8 @@ import { joinHeard, micMissing, startRecording, type Recording } from "./voice.t
 import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../app/files/file-drop.ts";
 import type { WaitingComment } from "../../state/comments.ts";
-import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
-import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
+import { type Draft, draftComments, DraftField, type DraftFieldApi, draftForAgent, draftIsEmpty, type DraftMention, draftText, fileMention, normalize, type PillHost, textDraft } from "@decks/agent-ui/composer";
 import { aboutAddress, aboutComment, commentPill, type ItemName, type TitleOf } from "./pill-about.ts";
-import type { PillHost } from "@decks/agent-ui/composer";
 import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";

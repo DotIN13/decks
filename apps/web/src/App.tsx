@@ -7,7 +7,7 @@ import {createComputed, createEffect, createMemo, createSignal, onCleanup, onMou
 import { createStore, reconcile } from "solid-js/store";
 import { createFileDrops } from "./app/files/drops.ts";
 import { Settings } from "./settings/Settings.tsx";
-import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
+import {forgetAskedResults, setToolResultSender} from "@decks/agent-ui/chat";
 import { createAlerts } from "./app/alerts.ts";
 import { camera } from "./state/camera.ts";
 import { handleFrame, type FrameHooks } from "./app/socket-messages.ts";
@@ -42,7 +42,7 @@ import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
 import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import { agentViews } from "./camera/agent-views.ts";
-import { closeHistory } from "./state/edge.ts";
+import { closeHistory } from "@decks/agent-ui/edge";
 import { watchInsets } from "@decks/canvas/camera";
 import { installViewport } from "./app/viewport.ts";
 import { scheme } from "./lib/theme.ts";

@@ -5,7 +5,7 @@ import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { Icon } from "../../ui/icons.tsx";
-import { Popover } from "../../ui/Popover.tsx";
+import { Popover } from "@decks/ui";
 import { levelsFor, nearestLevel, optionFor } from "./thinking.ts";
 
 /**
