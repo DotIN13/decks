@@ -74,9 +74,22 @@ export class Live {
 	private readonly bus: LiveBus | undefined;
 
 	/** Whether a socket hears about a canvas: its person may see it, and a socket held to one canvas (`only`, a canvas frame's) hears that one alone. */
-	private hears(who: Who & { only?: string }, canvas: string): boolean {
+	private async hears(who: Who & { only?: string }, canvas: string): Promise<boolean> {
 		if (who.only !== undefined && who.only !== canvas) return false;
-		return !!this.store.role(who.user.id, canvas);
+		return !!(await this.store.role(who.user.id, canvas));
+	}
+
+	/**
+	 * `text` to every socket that hears `canvas`, but `from`'s (and, when `pagesOnly`, to no harness).
+	 * The roles are asked of the store together; a store that answers at once is sent to at once, so
+	 * what happened reaches the sockets before the request that caused it is answered, as it always did.
+	 */
+	private fanOut(canvas: string, text: string, from?: { ws: LiveSocket }, pagesOnly = false): void | Promise<void> {
+		const sockets = [...this.sockets].filter((s) => s !== from && !(pagesOnly && s.who.harness));
+		const asked = sockets.map((s) => (s.who.only !== undefined && s.who.only !== canvas ? false : this.store.role(s.who.user.id, canvas)));
+		const deliver = (roles: unknown[]) => sockets.forEach((s, i) => roles[i] && s.ws.send(text));
+		if (asked.every((r) => !(r instanceof Promise))) return deliver(asked);
+		return Promise.all(asked.map((r) => Promise.resolve(r).catch(() => undefined))).then(deliver);
 	}
 
 	private readonly sockets = new Set<{ ws: LiveSocket; who: Who & { only?: string } }>();
@@ -92,8 +105,7 @@ export class Live {
 
 	/** Who is present, said to every other socket that hears the canvas: pages and harnesses alike, never the sender; and to the other processes. */
 	private present(event: PresenceEvent, from: { ws: LiveSocket } | undefined, publish = true): void {
-		const text = JSON.stringify(event);
-		for (const s of this.sockets) if (s !== from && this.hears(s.who, event.canvas)) s.ws.send(text);
+		void this.fanOut(event.canvas, JSON.stringify(event), from);
 		if (publish) this.bus?.publish({ kind: "presence", node: this.node, event });
 	}
 
@@ -123,7 +135,7 @@ export class Live {
 	}
 
 	private sendCanvas(canvas: string, text: string): void {
-		for (const s of this.sockets) if (this.hears(s.who, canvas)) s.ws.send(text);
+		void this.fanOut(canvas, text);
 	}
 
 	/** A socket; `only` holds it to one canvas, for a canvas frame, which hears that canvas and sends no cursor. */
@@ -139,7 +151,7 @@ export class Live {
 		/** Whom this harness's socket relayed on each canvas (kind and id): said gone when the harness goes. */
 		const relayed = new Map<string, Set<string>>();
 		ws.on("message", (raw) => {
-			if (who.harness) return this.fromHarness(entry, who.harness, raw, relayed);
+			if (who.harness) return void this.fromHarness(entry, who.harness, raw, relayed);
 			if (who.only !== undefined) return;
 			let got: LiveSend;
 			try {
@@ -147,17 +159,21 @@ export class Live {
 			} catch {
 				return;
 			}
-			if (!store.role(who.user.id, got.canvas)) return;
-			pointed.add(got.canvas);
-			if (got.type === "cursor") {
-				// The older form: said as it was to pages that read it, and as presence to everyone.
-				const event: LiveEvent = { type: "cursor", canvas: got.canvas, user: who.user.id, name: who.user.name, x: got.x, y: got.y };
-				for (const s of this.sockets) if (s !== entry && !s.who.harness && this.hears(s.who, got.canvas)) s.ws.send(JSON.stringify(event));
-				this.present({ type: "presence", canvas: got.canvas, by: me, pointer: { x: got.x, y: got.y } }, entry);
-				return;
-			}
-			const { type: _type, ...presence } = got;
-			this.present({ type: "presence", ...presence, by: me }, entry);
+			const relay = () => {
+				pointed.add(got.canvas);
+				if (got.type === "cursor") {
+					// The older form: said as it was to pages that read it, and as presence to everyone.
+					const event: LiveEvent = { type: "cursor", canvas: got.canvas, user: who.user.id, name: who.user.name, x: got.x, y: got.y };
+					void this.fanOut(got.canvas, JSON.stringify(event), entry, true);
+					this.present({ type: "presence", canvas: got.canvas, by: me, pointer: { x: got.x, y: got.y } }, entry);
+					return;
+				}
+				const { type: _type, ...presence } = got;
+				this.present({ type: "presence", ...presence, by: me }, entry);
+			};
+			const role = store.role(who.user.id, got.canvas);
+			if (role instanceof Promise) void role.then((r) => r && relay(), () => undefined);
+			else if (role) relay();
 		});
 		ws.on("close", () => {
 			this.sockets.delete(entry);
@@ -165,7 +181,7 @@ export class Live {
 			const harness = who.harness?.id;
 			if (harness && ![...this.sockets].some((s) => s.who.harness?.id === harness)) for (const ask of [...this.asks.values()]) if (ask.harness === harness) ask.done(new NotConnected("That harness went away."));
 			for (const canvas of pointed) {
-				for (const s of this.sockets) if (!s.who.harness && this.hears(s.who, canvas)) s.ws.send(JSON.stringify({ type: "cursor.gone", canvas, user: who.user.id } satisfies LiveEvent));
+				void this.fanOut(canvas, JSON.stringify({ type: "cursor.gone", canvas, user: who.user.id } satisfies LiveEvent), undefined, true);
 				this.present({ type: "presence", canvas, by: me, gone: true }, entry);
 			}
 			// Everyone a harness relayed goes with it.
@@ -255,7 +271,7 @@ export class Live {
 
 	/** A harness's answer to an ask: taken only from the harness it was asked of. */
 	/** What a harness says on its socket: an answer to an ask, or where someone on it is (`presence`, relayed with the harness named). */
-	private fromHarness(entry: { ws: LiveSocket; who: Who }, harness: { id: string; name: string }, raw: unknown, relayed: Map<string, Set<string>>): void {
+	private async fromHarness(entry: { ws: LiveSocket; who: Who }, harness: { id: string; name: string }, raw: unknown, relayed: Map<string, Set<string>>): Promise<void> {
 		let got: HarnessSend;
 		try {
 			got = HarnessSend.parse(JSON.parse(String(raw)));
@@ -263,7 +279,7 @@ export class Live {
 			return;
 		}
 		if (got.type === "token") return this.answered(harness.id, got);
-		if (!this.store.role(entry.who.user.id, got.canvas)) return;
+		if (!(await this.store.role(entry.who.user.id, got.canvas))) return;
 		const { type: _type, by, ...presence } = got;
 		const keys = relayed.get(got.canvas) ?? new Set<string>();
 		if (got.gone) keys.delete(`${by.kind}:${by.id}`);

@@ -47,8 +47,9 @@ test("what one process says reaches the other's sockets, once, and never comes b
 
 	a.canvasChanged({ id: launch.id, rev: 2, base: 1, by: "ada", changes: [{ op: "meta" }] });
 	await tick();
-	assert.equal(bobOnB.last.type, "canvas");
-	assert.equal(bobOnB.last.rev, 2);
+	const changed = bobOnB.last as { type: string; rev: number };
+	assert.equal(changed.type, "canvas");
+	assert.equal(changed.rev, 2);
 	// Nothing is said twice: the bus's copy is not published again.
 	await tick();
 	assert.equal(bobOnB.sent.length, before[1]! + 3);

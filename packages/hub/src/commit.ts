@@ -1,7 +1,7 @@
 import { diff, type PenDocument, type PenEdit } from "@decks/pen";
 import type { Changes, EditsAnswer, Role } from "@decks/sync-protocol";
 import { merge } from "./merge.ts";
-import type { HubStore } from "./store.ts";
+import { Stale, type HubStore } from "./store.ts";
 import type { Live } from "./live.ts";
 
 /** Whether a role may change a canvas. */
@@ -17,12 +17,36 @@ export const mayEdit = (role: Role | undefined): boolean => role === "owner" || 
  *
  * A caller that names itself (`client`) keeps its own copy and is not sent the drawing back.
  */
-export function commitEdits(store: HubStore, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): EditsAnswer {
-	const current = store.canvas(id);
+export function commitEdits(store: HubStore, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): Promise<EditsAnswer> {
+	// One push of a canvas at a time in this process (the store answering later would let two interleave between the read and the write); `Stale` covers another process.
+	const previous = inFlight.get(id) ?? Promise.resolve();
+	const mine = previous.then(() => commitNow(store, live, id, edits, by, client));
+	inFlight.set(id, mine.then(() => undefined, () => undefined));
+	void mine.finally(() => inFlight.get(id) === mine && inFlight.delete(id));
+	return mine;
+}
+
+const inFlight = new Map<string, Promise<unknown>>();
+
+async function commitNow(store: HubStore, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): Promise<EditsAnswer> {
+	let current = await store.canvas(id);
 	if (!current) throw new Error(`No canvas ${id}.`);
-	const merged = merge(current.pen, edits as PenEdit[]);
-	const happened = merged.adjusted || merged.dropped.length ? diff(current.pen, merged.doc) : changesNothing(current.pen, merged.edits) ? [] : merged.edits;
-	const rev = happened.length ? store.commitCanvas(id, merged.doc, happened, by) : current.rev;
+	let merged = merge(current.pen, edits as PenEdit[]);
+	let happened = merged.adjusted || merged.dropped.length ? diff(current.pen, merged.doc) : changesNothing(current.pen, merged.edits) ? [] : merged.edits;
+	let rev = current.rev;
+	for (let attempt = 0; happened.length; attempt++) {
+		try {
+			rev = await store.commitCanvas(id, merged.doc, happened, by, current.rev);
+			break;
+		} catch (error) {
+			// Another process kept a revision meanwhile: merge onto what the canvas is now, a few times.
+			if (!(error instanceof Stale) || attempt >= 5) throw error;
+			current = (await store.canvas(id))!;
+			merged = merge(current.pen, edits as PenEdit[]);
+			happened = merged.adjusted || merged.dropped.length ? diff(current.pen, merged.doc) : changesNothing(current.pen, merged.edits) ? [] : merged.edits;
+			rev = current.rev;
+		}
+	}
 	if (happened.length) live?.canvasChanged({ id, rev, base: current.rev, by, ...(client ? { client } : {}), changes: happened });
 	return {
 		rev,
@@ -36,9 +60,9 @@ export function commitEdits(store: HubStore, live: Live | undefined, id: string,
 }
 
 /** `changes?since=N`: the revisions after N, or `tooOld` when the log no longer reaches back to N. */
-export function changesSince(store: HubStore, id: string, since: number): Changes {
-	const got = store.changesSince(id, since);
-	const rev = store.revOf(id);
+export async function changesSince(store: HubStore, id: string, since: number): Promise<Changes> {
+	const got = await store.changesSince(id, since);
+	const rev = await store.revOf(id);
 	return got ? { rev, changes: got.map((c) => c.edits as Changes extends { changes: infer C } ? C extends (infer R)[] ? R : never : never) } : { rev, tooOld: true };
 }
 

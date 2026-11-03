@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { emptyDocument, type PenDocument, type PenEdit } from "@decks/pen";
 import type { HarnessApp, Role, SyncCanvas, SyncFile } from "@decks/sync-protocol";
-import type { HubStore, Stored } from "./store.ts";
+import { Stale, type HubStore, type Stored } from "./store.ts";
 
 interface Kept {
 	canvas: SyncCanvas;
@@ -67,8 +67,9 @@ export class MemoryStore implements HubStore {
 		return k.log.filter((c) => c.rev > since);
 	}
 
-	commitCanvas(id: string, pen: PenDocument, edits: PenEdit[], _by: string): number {
+	commitCanvas(id: string, pen: PenDocument, edits: PenEdit[], _by: string, onto?: number): number {
 		const k = this.kept.get(id)!;
+		if (onto !== undefined && onto !== k.canvas.rev) throw new Stale(id, onto, k.canvas.rev);
 		k.pen = pen;
 		k.canvas.rev += 1;
 		k.log.push({ rev: k.canvas.rev, edits });

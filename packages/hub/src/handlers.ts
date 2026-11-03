@@ -65,13 +65,13 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 			throw new HubError(400, "The body is not JSON.");
 		}
 	};
-	const roleOr404 = (who: Who, id: string) => {
-		const role = store.role(who.user.id, id);
+	const roleOr404 = async (who: Who, id: string) => {
+		const role = await store.role(who.user.id, id);
 		if (!role) throw new HubError(404, "No such canvas.");
 		return role;
 	};
-	const editable = (who: Who, id: string) => {
-		if (!mayEdit(roleOr404(who, id))) throw new HubError(403, "This canvas is shared with you to view.");
+	const editable = async (who: Who, id: string) => {
+		if (!mayEdit(await roleOr404(who, id))) throw new HubError(403, "This canvas is shared with you to view.");
 	};
 	const pathParam = (url: URL) => {
 		const path = url.searchParams.get("path");
@@ -81,60 +81,60 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 	const baseParam = (url: URL) => (url.searchParams.has("base") ? Number(url.searchParams.get("base")) : undefined);
 
 	route("GET", "/sync/v1/hello", (_req, { who }) => json(200, { user: who.user, harness: who.harness }));
-	route("GET", "/sync/v1/canvases", (_req, { who }) => json(200, { canvases: store.canvases(who.user.id) }));
+	route("GET", "/sync/v1/canvases", async (_req, { who }) => json(200, { canvases: await store.canvases(who.user.id) }));
 	route("POST", "/sync/v1/canvases", async (req, { who }) => {
 		const got = NewCanvas.safeParse(await bodyOf(req));
 		if (!got.success || !CANVAS_NAME.test(got.data.name)) throw new HubError(400, CANVAS_NAME_ERROR);
 		const { name, title, pen } = got.data;
-		const existing = store.canvases(who.user.id).find((c) => c.owner === who.user.id && c.name === name);
+		const existing = (await store.canvases(who.user.id)).find((c) => c.owner === who.user.id && c.name === name);
 		if (existing) return json(200, { canvas: existing, existed: true });
-		const canvas = store.createCanvas(who.user.id, title || name, name, pen as unknown as PenDocument | undefined);
+		const canvas = await store.createCanvas(who.user.id, title || name, name, pen as unknown as PenDocument | undefined);
 		live?.toUser(who.user.id, { type: "canvases" });
 		return json(201, { canvas });
 	});
-	route("GET", "/sync/v1/canvases/:id", (_req, { who, params, url }) => {
-		const role = roleOr404(who, params.id!);
+	route("GET", "/sync/v1/canvases/:id", async (_req, { who, params, url }) => {
+		const role = await roleOr404(who, params.id!);
 		const since = Number(url.searchParams.get("since") ?? "0");
-		const c = store.canvas(params.id!)!;
-		const changes = since > 0 ? store.changesSince(params.id!, since) : undefined;
+		const c = (await store.canvas(params.id!))!;
+		const changes = since > 0 ? await store.changesSince(params.id!, since) : undefined;
 		return json(200, changes ? { id: c.id, rev: c.rev, changes } : { id: c.id, rev: c.rev, title: c.title, name: c.name, role, pen: c.pen });
 	});
-	route("GET", "/sync/v1/canvases/:id/changes", (_req, { who, params, url }) => {
-		roleOr404(who, params.id!);
-		return json(200, changesSince(store, params.id!, Number(url.searchParams.get("since"))));
+	route("GET", "/sync/v1/canvases/:id/changes", async (_req, { who, params, url }) => {
+		await roleOr404(who, params.id!);
+		return json(200, await changesSince(store, params.id!, Number(url.searchParams.get("since"))));
 	});
 	route("POST", "/sync/v1/canvases/:id/edits", async (req, { who, params }) => {
 		const started = performance.now();
-		if (!mayEdit(store.role(who.user.id, params.id!))) throw new HubError(403, "You may not edit this canvas.");
+		if (!mayEdit(await store.role(who.user.id, params.id!))) throw new HubError(403, "You may not edit this canvas.");
 		const sent = (await bodyOf(req)) as { edits?: unknown } | null;
 		if (Array.isArray(sent?.edits) && sent.edits.length > EDITS_MAX) throw new HubError(413, `At most ${EDITS_MAX} edits in one push; send the rest in another.`);
 		const got = PushEdits.safeParse(sent);
 		if (!got.success) throw new HubError(400, "Send edits: a list from @decks/pen's diff.");
-		const answer = commitEdits(store, live, params.id!, got.data.edits as unknown as PenEdit[], who.harness?.id ?? who.user.id, got.data.client);
+		const answer = await commitEdits(store, live, params.id!, got.data.edits as unknown as PenEdit[], who.harness?.id ?? who.user.id, got.data.client);
 		// How long the edit took, answer included, for a network panel and a bench.
 		return json(200, answer, { "Server-Timing": `edit;dur=${(performance.now() - started).toFixed(1)}` });
 	});
-	route("GET", "/sync/v1/canvases/:id/files", (_req, { who, params }) => {
-		roleOr404(who, params.id!);
-		return json(200, { files: store.canvasFiles(params.id!) });
+	route("GET", "/sync/v1/canvases/:id/files", async (_req, { who, params }) => {
+		await roleOr404(who, params.id!);
+		return json(200, { files: await store.canvasFiles(params.id!) });
 	});
 	route("PUT", "/sync/v1/canvases/:id/files", async (req, { who, params, url }) => {
-		editable(who, params.id!);
+		await editable(who, params.id!);
 		const path = pathParam(url);
 		const put = await store.putCanvasFile(params.id!, path, await bytesOf(req), baseParam(url), who.harness?.id ?? who.user.id);
 		if (put.current) live?.toCanvas(params.id!, { type: "file", canvas: params.id!, path, version: put.version, hash: put.hash, by: who.harness?.id ?? who.user.id });
 		return json(200, { path, ...put });
 	});
-	route("DELETE", "/sync/v1/canvases/:id/files", (_req, { who, params, url }) => {
-		editable(who, params.id!);
+	route("DELETE", "/sync/v1/canvases/:id/files", async (_req, { who, params, url }) => {
+		await editable(who, params.id!);
 		const path = pathParam(url);
-		if (!store.removeCanvasFile(params.id!, path, baseParam(url))) throw new HubError(409, "The service's copy changed since; it stays.");
+		if (!(await store.removeCanvasFile(params.id!, path, baseParam(url)))) throw new HubError(409, "The service's copy changed since; it stays.");
 		live?.toCanvas(params.id!, { type: "file", canvas: params.id!, path, version: 0, hash: "", by: who.harness?.id ?? who.user.id });
 		return json(200, { path, deleted: true });
 	});
 	/** Bytes by their hash, for a file this account (or someone sharing a canvas with it) has or had. */
 	route("GET", "/sync/v1/blobs/:hash", async (_req, { who, params }) => {
-		const bytes = store.mayReadBlob(who.user.id, params.hash!) ? await store.blob(params.hash!) : undefined;
+		const bytes = (await store.mayReadBlob(who.user.id, params.hash!)) ? await store.blob(params.hash!) : undefined;
 		if (!bytes) throw new HubError(404, "No such blob.");
 		return new Response(bytes as unknown as ArrayBuffer, { status: 200, headers: { "Content-Type": "application/octet-stream" } });
 	});
@@ -143,7 +143,7 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 		if (!store.setInventory || !who.harness) throw new HubError(404, "This service keeps no inventory.");
 		const got = Inventory.safeParse(await bodyOf(req));
 		if (!got.success) throw new HubError(400, got.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; "));
-		store.setInventory(who.harness.id, got.data.apps);
+		await store.setInventory(who.harness.id, got.data.apps);
 		live?.toUser(who.user.id, { type: "harnesses" });
 		return json(200, { apps: got.data.apps.length });
 	});

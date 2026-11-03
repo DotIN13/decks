@@ -10,4 +10,4 @@ export { changesNothing, changesSince, commitEdits, mayEdit } from "./commit.ts"
 export { ASK_MS, INLINE_MAX, Live, MemoryBus, NotConnected, type LiveBus, type LiveBusMessage, type LiveSocket } from "./live.ts";
 export { HubError, syncHandler, type SyncHandlerOptions } from "./handlers.ts";
 export { MemoryStore } from "./memory-store.ts";
-export type { HubStore, Stored, Who } from "./store.ts";
+export { Stale, type HubStore, type Maybe, type Stored, type Who } from "./store.ts";
