@@ -23,7 +23,7 @@ export const BUNDLE_PARTS: readonly string[] = [...OWN_PARTS, ...MIRRORED_PARTS,
  * underscores, starting with a letter or digit, at most 100. No slash, backslash, space or NUL can be in it.
  */
 export const CANVAS_NAME = /^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]{0,99}$/u;
-export const CANVAS_NAME_ERROR = "Name the canvas folder: letters, digits, dots, dashes and underscores, starting with a letter or digit, at most 100.";
+export const CANVAS_NAME_ERROR = "Name the canvas folder: letters and digits of any script, dots, dashes and underscores, starting with a letter or digit, at most 100, with no spaces or slashes.";
 
 /** Whether a canvas name from the other side may name a folder. */
 export function safeCanvasName(name: unknown): name is string {
