@@ -1,5 +1,5 @@
 import type { Camera } from "@decks/protocol";
-import { onCleanup, untrack, type JSX } from "solid-js";
+import { createSignal, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { createFramedEditor, type FramedEditorOptions, type FramedHandle } from "@decks/canvas";
 import { drawing } from "@decks/canvas/tools";
 import { canvasPass, cardAgentCall } from "../canvases/pass.ts";
@@ -10,7 +10,9 @@ import { stageOf, stages } from "../state/canvases.ts";
 import { setDrawingEditor } from "../state/decks.ts";
 import { mode, selected, setMode, setSelected } from "../state/selection.ts";
 import { reportCameraSoon } from "./camera-report.ts";
-import { exportPicture, frameComment, frameInk, frameRefer } from "./frame-handoffs.ts";
+import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
+import { CommentPopup } from "../markup/CommentPopup.tsx";
+import type { StageComment } from "@decks/canvas";
 import type { createFileDrops } from "./files/drops.ts";
 import { rememberView } from "./socket-messages.ts";
 import { openLinkedPage } from "./links.ts";
@@ -55,6 +57,16 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 	 * canvas, on this device) and agents moving the view work as before; and it answers what the frame
 	 * hands over: drafts for the composer, a card's agent calls, apps, uploads, views for other agents.
 	 */
+	/** The comment box, drawn here on the page where the frame says (`onComment`): its Send now is yours to send. */
+	const [commenting, setCommenting] = createSignal<StageComment>();
+	/*
+	 * What the frame says is quoted and named is the frame's, so a card's script can write it: it is cut short
+	 * here, and the box shows the whole of what is left (`.comment-quote` scrolls rather than clamps), so what
+	 * Send now sends is what you saw. The words are yours, typed in this page.
+	 */
+	const QUOTE_MAX = 280;
+	const TITLE_MAX = 120;
+	const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 	const editor = createFramedEditor({
 		// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
 		dark: untrack(scheme) === "dark",
@@ -73,6 +85,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		onViewport: () => reportCameraSoon(camera()),
 		onExport: exportPicture,
 		onRefer: frameRefer,
+		onComment: (target) => setCommenting(target),
 		frame: {
 			pass: canvasPass,
 			// Between canvases that are yours alone the frame moves in place; a friend's, or one someone else may edit, gets a frame of its own.
@@ -102,5 +115,29 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 		setEditorHandle(undefined);
 		editor.dispose();
 	});
-	return editor.surface();
+	const canvasLeft = () => document.querySelector("iframe.canvas-frame")?.getBoundingClientRect().left ?? 0;
+	return (
+		<>
+			{editor.surface()}
+			<Show when={commenting()} keyed>
+				{(target) => (
+					<CommentPopup
+						target={{ path: target.path, title: cut(target.title, TITLE_MAX), quote: cut(target.quote, QUOTE_MAX), ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), anchor: () => target.anchor(), ...(target.open ? { open: true } : {}) }}
+						moved={() => camera()}
+						left={canvasLeft()}
+						canSend={!!state.focused}
+						onKeep={(text) => {
+							pageComment({ ...target, title: cut(target.title, TITLE_MAX), quote: cut(target.quote, QUOTE_MAX) }, text, false);
+							setCommenting(undefined);
+						}}
+						onSend={(text) => {
+							pageComment({ ...target, title: cut(target.title, TITLE_MAX), quote: cut(target.quote, QUOTE_MAX) }, text, true);
+							setCommenting(undefined);
+						}}
+						onClose={() => setCommenting(undefined)}
+					/>
+				)}
+			</Show>
+		</>
+	);
 }

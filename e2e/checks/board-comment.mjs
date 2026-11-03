@@ -6,7 +6,7 @@
  * that opens the box in the frame, and a kept comment goes over the input bar on the page for the
  * next message, a draft that is never sent on its own.
  */
-import { API, asPerson, canvasFrame, flyToCard, focusCanvas, open, resetStage, rest, say, settle } from "../harness.mjs";
+import { API, asPerson, canvasFrame, flyToCard, focusCanvas, open, openHistory, pressCardAction, resetStage, rest, say, selectCard, settle } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -54,7 +54,8 @@ if (line) {
 	await page.mouse.down();
 	await page.mouse.move(line.x + line.w, line.y, { steps: 8 });
 	await page.mouse.up();
-	const popup = canvas.locator(".comment-popup");
+	// The page draws the box, where the frame says (`pageComments`): its Send now is a press of yours.
+	const popup = page.locator(".comment-popup");
 	const offered = await until(() => popup.isVisible().catch(() => false));
 	say("selected words in a card offer a comment over them", offered);
 	if (offered) {
@@ -69,8 +70,29 @@ if (line) {
 			await page.keyboard.press("Enter");
 			const kept = await until(async () => !(await popup.isVisible().catch(() => false)) && (await page.locator(".dock").innerText().catch(() => "")).includes(quote.trim().slice(0, 12)));
 			say("kept, it goes over the input bar with the next message", kept, await page.locator(".dock").innerText().catch(() => ""));
+
+
 		}
 	}
+}
+
+// The card's pill has Comment too, which opens the box at once; and Send now sends it to the agent as a message of its own.
+await focusCanvas(page);
+await page.keyboard.press("Escape");
+await selectCard(page, made.value?.card);
+await pressCardAction(page, "Comment");
+const box = page.locator(".comment-popup");
+const field = box.locator(".comment-field");
+const boxOpen = await until(() => field.isVisible().catch(() => false));
+say("the pill's Comment opens the box at once, drawn by the page", !!boxOpen);
+if (boxOpen) {
+	await field.fill("Sent straight away");
+	await box.locator('.comment-act[data-primary="true"]').click();
+	await openHistory(page);
+	// Sent as the composer sends a comment with no words beside it: a message of its own, holding the comment's pill, named for the card.
+	const sent = await until(() => page.locator('.stream .stream-mine [data-kind="comment"][data-mention-name="Words"]').count().then((n) => n > 0), 10000);
+	say("Send now sends it to the agent at once, as a message of its own", !!sent, JSON.stringify(await page.locator(".stream .stream-mine").allInnerTexts().catch(() => [])).slice(0, 300));
+	say("…and the box goes", !(await box.isVisible().catch(() => false)));
 }
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));

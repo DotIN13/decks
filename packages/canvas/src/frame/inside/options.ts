@@ -288,9 +288,10 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 		onViewport: (viewport) => end.emit("viewport", viewport),
 		onRefer: (pills) => end.emit("composer", { pills }),
 		onComment: (target) => {
-			if (chrome) return void ctx.setComment(target);
+			// The page draws the box when it can (`pageComments`): a Send now pressed there is yours, where one pressed in this frame could be a card's script.
+			if (chrome && !start.look.pageComments) return void ctx.setComment(target);
 			const at = rectOf(target.anchor());
-			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}) });
+			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
 		},
 		onExport: (ids) => end.emit("export", { ids }),
 		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),

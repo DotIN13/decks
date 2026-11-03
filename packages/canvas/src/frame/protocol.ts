@@ -55,7 +55,7 @@ export interface Start {
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same pass: `…/api/t/<pass>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }> };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -129,7 +129,7 @@ interface FrameToPage {
 	/** Once the camera rests; or a view kept for another conversation (`agent`), for the page to keep as that agent's view and the harness to answer its `view.camera` by. */
 	camera: { camera: Camera; agent?: string; selected?: string };
 	viewport: { width: number; height: number };
-	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
+	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect; /** The box at once (a pill's Comment), not the small button words selected show first. */ open?: boolean };
 	export: { ids: string[] };
 	store: { key: string; value: string | null };
 	/** A value an app inside the canvas saved in its browser storage (`decks-canvas.js`, as `decks-storage`), for the page to keep under the app's name. */

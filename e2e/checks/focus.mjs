@@ -27,13 +27,14 @@ say("the pill over the board offers fit, a tab, a comment, delete and going away
 
 // Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
 await pressCardAction(page, "Comment");
-await canvas.waitForSelector(".comment-popup", { timeout: 4000 });
-const straight = await canvas.locator(".comment-popup .comment-field").isVisible().catch(() => false);
+// The page draws the box (`pageComments`), over the canvas frame, so its Send now is a press of yours.
+await page.waitForSelector(".comment-popup", { timeout: 4000 });
+const straight = await page.locator(".comment-popup .comment-field").isVisible().catch(() => false);
 say("the pill's Comment opens the box straight away, not the small button", straight);
 // Opened by its button when it did not, so the rest is still checked.
-if (!straight) await canvas.locator(".comment-popup .comment-start").click().catch(() => {});
-await canvas.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
-const whole = await canvas.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
+if (!straight) await page.locator(".comment-popup .comment-start").click().catch(() => {});
+await page.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
+const whole = await page.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
 say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole card"), JSON.stringify(whole));
 await page.keyboard.type("Shorter, please.");
 await page.keyboard.press("Enter");

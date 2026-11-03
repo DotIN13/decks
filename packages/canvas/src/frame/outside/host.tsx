@@ -285,7 +285,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 				backend,
 				files: { base: pass.files, expires: pass.expires },
 				pictures: pass.pictures,
-				look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
+				look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(options.onComment ? { pageComments: true } : {}), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
 				camera: localCamera,
 				...(pen?.writer ? { writer: pen.writer } : {}),
 				stored,
@@ -405,7 +405,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 			options.onCamera?.(data.camera);
 		});
 		page.on("viewport", (data) => options.onViewport?.(data));
-		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), anchor: () => onPage(data.at) }));
+		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), ...(data.open ? { open: true } : {}), anchor: () => onPage(data.at) }));
 		page.on("export", (data) => options.onExport?.(data.ids));
 		page.on("app-store", (data) => {
 			if (!storage || !data.app || data.app.includes(":")) return;

@@ -49,6 +49,7 @@ import { scheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
 import { act, editDrawing, setPersonStage } from "./state/decks.ts";
 import { createBar } from "./app/bar.ts";
+import { setCommentSender } from "./app/frame-handoffs.ts";
 import { createFloats } from "./app/floats.ts";
 import { createDock } from "./app/dock.ts";
 import { createCameraLanding, reportCameraOnArrival } from "./app/landing.ts";
@@ -144,6 +145,8 @@ export function App() {
 	 * the canvas calls them, read when the line is sent.
 	 */
 	const { barText, setBarText, agentName, barContext, sendFromBar } = createBar({ titleOf: (path) => titleOf(path), itemName: (id) => itemName(id) });
+	// A comment's Send now, from the page's own comment box: sent as the composer sends a comment with no words beside it.
+	setCommentSender((ids) => sendFromBar("", ids));
 
 
 	/** The canvas on screen, when it is a friend's shared with you to view (`state/canvases.ts`). */

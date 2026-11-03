@@ -30,6 +30,28 @@ export const frameComment = (handed: { path: string; title: string; quote: strin
 	}
 };
 
+/** How the page sends waiting comments now, as a message of their own (`createBar`'s send, set by `App`). */
+let sendComments: ((ids: string[]) => void) | undefined;
+export const setCommentSender = (send: (ids: string[]) => void) => {
+	sendComments = send;
+};
+
+/**
+ * A comment written in the page's own comment box (the frame says where, `onComment`; the page draws it):
+ * kept over the input bar for your next message, or sent now. Sent from here, since the press on Send now
+ * was the page's and so yours, where a send asked for by the frame could have been a card's script.
+ */
+export const pageComment = (target: { path: string; title?: string; quote: string; component?: string; items?: string[] }, text: string, send: boolean) => {
+	const agentId = state.focused;
+	if (!agentId) return;
+	const canvas = stageOf(agentId)?.name;
+	const comment = cleanFrameComment({ path: target.path, title: target.title ?? "", quote: target.quote, text, ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) });
+	const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
+	addComment(agentId, canvas, note);
+	if (send && sendComments) return sendComments([note.id]);
+	setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
+};
+
 export const frameInk = (request: InkRequest) => {
 	const agentId = state.focused;
 	const text = inkAsked(cleanFrameInk(request));
