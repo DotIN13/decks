@@ -39,6 +39,14 @@ const MIRRORED: readonly string[] = MIRRORED_PARTS;
  * What it remembers between runs is in `<deck>/.decks/`: `studio-sync.json` (each canvas's revision
  * and its files' versions), `sync/<canvas id>.pen` (each canvas's drawing as both sides last agreed
  * on, what local edits are worked out against) and `studio-hashes.json` (the hash cache).
+ *
+ * A canvas is its Studio id, not its folder name (`canvas.json` carries the id with the folder). A
+ * folder this state does not know is matched by that id first: renamed, copied from another machine,
+ * or found after `.decks/` was lost, it is adopted and its differences merged, never uploaded twice
+ * and never overwritten. One with no id whose name Studio already has is adopted the same way. A
+ * file both sides have, differently, with no version agreed on, is a conflict: Studio's copy stays
+ * current, this one is kept beside it as `<name>.conflict-<when>.<ext>` and goes up like any file,
+ * so both are seen everywhere and a person chooses.
  */
 export interface SyncOptions {
 	deck: string;
@@ -158,6 +166,17 @@ export function landingFor(deck: string, path: string): { full: string } | { ref
 	return { full };
 }
 
+/** `boards/plan.html` kept beside a conflict as `boards/plan.conflict-20261103-0012.html`; a second one the same minute gets the seconds too. */
+export function conflictName(path: string, now = new Date()): string {
+	const at = path.lastIndexOf("/");
+	const file = path.slice(at + 1);
+	const dot = file.lastIndexOf(".");
+	const stem = dot > 0 ? file.slice(0, dot) : file;
+	const ext = dot > 0 ? file.slice(dot) : "";
+	const stamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 13);
+	return `${path.slice(0, at + 1)}${stem}.conflict-${stamp}${ext}`;
+}
+
 /** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension. */
 const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
 
@@ -204,6 +223,8 @@ export class HarnessSync {
 	private dirtyPictures = new Set<string>();
 	/** Something only a full pass covers: a new canvas, a share, a lost connection. */
 	private fullDue = false;
+	/** Canvases (by name) adopted this pass: their first push adds what is here and removes nothing, since what is in Studio was never seen here. */
+	private adopted = new Set<string>();
 	/** When every file was last hashed whatever the cache said. */
 	private checkedAt = 0;
 	/** Whether Studio answers `changes?since=` (one from before 2026-10-21 does not: the whole drawing then). */
@@ -458,11 +479,29 @@ export class HarnessSync {
 	private async syncCanvases(fresh: boolean) {
 		let remote: SyncCanvas[] = (await this.call("GET", "/sync/v1/canvases")).canvases;
 		const known = new Set(Object.values(this.state.canvases).map((c) => c.id));
-		// Every canvas of this deck Studio has not seen goes up, the first time this harness connects and after.
+		/*
+		 * Every folder this state does not know: one of Studio's canvases under another name (renamed, or the
+		 * state lost) is adopted; a copy of one, or a canvas Studio has not seen, goes up; one whose name
+		 * Studio already has is adopted too. Adopted means Studio's drawing is taken as the agreed one and
+		 * what differs here goes up as edits, later in this pass (`syncCanvas`); nothing here is overwritten.
+		 */
 		for (const name of this.localCanvases()) {
 			if (this.state.canvases[name]) continue;
+			const claimed = this.studioIdOf(name);
+			const mine = claimed ? remote.find((c) => c.id === claimed && c.owner === this.user) : undefined;
+			const elsewhere = mine && Object.entries(this.state.canvases).some(([other, c]) => c.id === mine.id && other !== name && existsSync(join(this.folder(other), "canvas.pen")));
+			if (mine && !elsewhere) {
+				const before = Object.keys(this.state.canvases).find((other) => this.state.canvases[other]!.id === mine.id);
+				if (before) this.forgetCanvas(before);
+				await this.adopt(name, mine.id, known, before ? `was ${before}, renamed` : "is one of yours already in Studio");
+				continue;
+			}
 			const text = readFileSync(join(this.folder(name), "canvas.pen"), "utf8");
-			const { canvas } = await this.call("POST", "/sync/v1/canvases", { name, title: this.titleOf(name), pen: parse(text) });
+			const { canvas, existed } = await this.call("POST", "/sync/v1/canvases", { name, title: this.titleOf(name), pen: parse(text) });
+			if (existed) {
+				await this.adopt(name, canvas.id, known, "has the name of one of yours already in Studio");
+				continue;
+			}
 			const full = await this.call("GET", `/sync/v1/canvases/${canvas.id}`);
 			this.state.canvases[name] = { id: canvas.id, rev: full.rev, files: {} };
 			this.keepBase(canvas.id, full.pen);
@@ -470,7 +509,7 @@ export class HarnessSync {
 			this.writeMeta(name, { studio: canvas.id });
 			known.add(canvas.id);
 			this.pictureDue.add(name);
-			this.log(`uploaded canvas ${name}`);
+			this.log(`uploaded canvas ${name}${mine ? ` (a copy of ${mine.name}, now its own canvas)` : ""}`);
 		}
 		remote = (await this.call("GET", "/sync/v1/canvases")).canvases;
 		const byId = new Map(remote.map((c) => [c.id, c]));
@@ -513,6 +552,32 @@ export class HarnessSync {
 			await this.syncCanvasFiles(name, c, fresh);
 		}
 		await this.syncCanvasPictures();
+	}
+
+	/** The Studio id a folder's `canvas.json` carries, or undefined. */
+	private studioIdOf(name: string): string | undefined {
+		try {
+			const id = (JSON.parse(readFileSync(join(this.folder(name), "canvas.json"), "utf8")) as { studio?: unknown }).studio;
+			return typeof id === "string" && /^[A-Za-z0-9_-]+$/.test(id) ? id : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
+	 * A folder here taken as one of Studio's canvases: Studio's drawing becomes the agreed one and the
+	 * folder's own file is left as it is, so `syncCanvas` sends what differs as edits and the merge comes
+	 * back; its files start with no agreed version, so one that differs is a conflict (`syncCanvasFiles`).
+	 */
+	private async adopt(name: string, id: string, known: Set<string>, why: string) {
+		const full = await this.call("GET", `/sync/v1/canvases/${id}`);
+		this.state.canvases[name] = { id, rev: full.rev, files: {} };
+		this.keepBase(id, full.pen);
+		this.writeMeta(name, { studio: id });
+		known.add(id);
+		this.adopted.add(name);
+		this.pictureDue.add(name);
+		this.log(`canvas ${name} ${why}: what is here and not there is merged into it`);
 	}
 
 	/**
@@ -574,7 +639,9 @@ export class HarnessSync {
 			s.rev = full.rev;
 			base = this.base.get(s.id)!;
 		}
-		const edits = local.same ? [] : diff(base.doc, local.doc);
+		let edits = local.same ? [] : diff(base.doc, local.doc);
+		// A folder adopted this pass: its items and words go up, but nothing Studio has is removed, since this folder never saw it.
+		if (this.adopted.delete(name)) edits = edits.filter((e) => e.op !== "remove");
 		let next: { doc: PenDocument; rev: number } | undefined;
 		if (edits.length && remote.role !== "view") {
 			this.pictureDue.add(name);
@@ -892,14 +959,15 @@ export class HarnessSync {
 				continue;
 			}
 			const bytes = got.bytes ?? readFileSync(full);
-			const base = was?.version ?? there?.version;
+			/*
+			 * Both have the file, differently, and no version was agreed on (a folder adopted, a state lost):
+			 * a conflict before anything is sent, Studio's copy staying current. With a base, the put says
+			 * whether Studio moved on since: current when not, a conflict when it did.
+			 */
+			const base = was?.version ?? (there ? 0 : undefined);
 			const put = await this.call("PUT", `/sync/v1/canvases/${s.id}/files?path=${encodeURIComponent(path)}${base !== undefined ? `&base=${base}` : ""}`, undefined, bytes);
 			if (put.current) known[path] = { version: put.version, hash };
-			else {
-				this.conflicts.push(`${name}:${path}`);
-				this.log(`${path} of ${name} changed in Studio too: Studio's stays current, yours is kept there as version ${put.version}`);
-				await this.download(name, path, remote.get(path)!);
-			}
+			else await this.conflicted(name, s, path, full, bytes, hash, put.version, remote.get(path)!);
 		}
 		for (const [path, f] of remote) {
 			if (path.startsWith(`${PICTURES}/`) || local.has(path)) continue;
@@ -910,6 +978,30 @@ export class HarnessSync {
 			await this.download(name, path, f);
 		}
 		if (writable) await this.syncPictures(name, s.id, remote);
+	}
+
+	/**
+	 * A file changed here and in Studio since both last agreed, or never agreed on: Studio's stays
+	 * current and comes down; this copy is kept there as a version, and here beside the file as
+	 * `<name>.conflict-<when>.<ext>`, a file like any other that goes up on the next pass, so both
+	 * copies are seen on every machine and a person chooses. Pictures just take Studio's.
+	 */
+	private async conflicted(name: string, s: CanvasState, path: string, full: string, bytes: Uint8Array, hash: string, version: number, theirs: SyncFile) {
+		if (!path.startsWith(`${PICTURES}/`)) {
+			const copy = conflictName(path);
+			const landing = landingFor(this.o.deck, this.deckPathOf(name, copy));
+			if (!("refused" in landing) && !existsSync(landing.full)) {
+				mkdirSync(dirname(landing.full), { recursive: true });
+				writeFileSync(landing.full, bytes);
+				this.hashes.wrote(landing.full, hash);
+				this.dirtyFiles.add(name);
+				this.soon(300);
+			}
+			this.conflicts.push(`${name}:${path}`);
+			this.log(`${path} of ${name} changed in Studio too: Studio's stays current, yours is kept there as version ${version} and here as ${copy}`);
+		}
+		await this.download(name, path, theirs);
+		void s;
 	}
 
 	private async download(name: string, path: string, f: SyncFile) {
