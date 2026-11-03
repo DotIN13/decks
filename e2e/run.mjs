@@ -217,6 +217,8 @@ const CHECKS = [
 	{ file: "card-copy.mjs", needsAgent: false },
 	/* Keys pressed in a card are the card's until Escape: nothing nudges or deletes it from inside; ⌘− still zooms. */
 	{ file: "card-keys.mjs", needsAgent: false },
+	/* A new agent opens at once: its conversation and its canvas on screen. */
+	{ file: "new-agent-opens.mjs", needsAgent: false },
 	/* An agent's view.cursor on a card puts a named arrow in the frame, and null takes it away. */
 	{ file: "agent-cursor.mjs", needsAgent: false },
 	/* Every change of place glides, whoever made it: an agent's move is drawn from where the item was, an insert rises in, a moved card's slot follows. Alone: it times frames on the main thread. */

@@ -398,6 +398,11 @@ export function App() {
 	 * stack, a row in the panel — and several copies of these steps is several chances to
 	 * forget one.
 	 */
+	/** Start an agent beside the one on screen, and open it: its conversation, and its canvas with it, as a click on its row would. */
+	const newAgent = async (spec: { kind?: string; workspace?: string }) => {
+		const answer = warnIfFailed(await call<{ id: string }>("agent.add", [{ ...spec, ...(state.focused ? { near: state.focused } : {}) }]));
+		if (answer.ok && answer.value?.id) focusAgent(answer.value.id);
+	};
 	const focusAgent = (id: string) => {
 		const leaving = state.focused;
 		if (leaving === id) return;
@@ -545,7 +550,7 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={focusAgent}
-					onNew={(kind) => void call("agent.add", [{ ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed)}
+					onNew={(kind) => void newAgent({ ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
 					onMoreAgents={openAgentsPanel}
 					phone={phone()}
@@ -699,7 +704,7 @@ export function App() {
 					identities={state.identities}
 					unread={unread}
 					onFocusAgent={focusAgent}
-					onNewAgent={(workspace, kind) => void call("agent.add", [{ kind, ...(workspace ? { workspace } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed)}
+					onNewAgent={(workspace, kind) => void newAgent({ ...(kind ? { kind } : {}), ...(workspace ? { workspace } : {}) })}
 					onCloseAgent={closeAgent}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
@@ -872,7 +877,7 @@ export function App() {
 							dest: destination(barText(), barContext()),
 							label: destinationLabel(destination(barText(), barContext())),
 							onPick: focusAgent,
-							onNew: (kind) => void call("agent.add", [{ ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }]).then(warnIfFailed),
+							onNew: (kind) => void newAgent({ ...(kind ? { kind } : {}) }),
 							onClose: closeAgent,
 							onMore: openAgentsPanel,
 						}}
