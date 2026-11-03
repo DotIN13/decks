@@ -75,8 +75,43 @@ ${withDeckImports(input.deckImports)}
 <body class="board" style="width:${input.w}px">
 <div class="card-body" id="decks-card">${html}</div>
 <script type="module">
+	// The card as the canvas hands it to its scripts (\`@decks/canvas\`, \`items/card.ts\`, CardContext), on this page of its own.
 	const root = document.getElementById("decks-card");
-	const card = { root, document, signal: new AbortController().signal, url: location.href.replace(/[?#].*$/, ""), theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light", size: { w: ${input.w}, h: root.offsetHeight }, store: localStorage, page: true };
+	// On the canvas the root is the card's shadow root, which has getElementById; here it is the card's element, given the same.
+	root.getElementById = (id) => root.querySelector("#" + CSS.escape(id));
+	const url = location.href.replace(/[?#].*$/, "");
+	const path = ${JSON.stringify(input.path)};
+	const dark = matchMedia("(prefers-color-scheme: dark)");
+	const listeners = { theme: new Set(), size: new Set() };
+	const key = (name) => "decks.card:" + path + ":" + name;
+	const calls = (verb) => new Proxy(function () {}, {
+		get: (_target, name) => (typeof name === "string" && name !== "then" ? calls(verb ? verb + "." + name : name) : undefined),
+		apply: () => Promise.reject(new Error(verb + ": a card opened in a tab of its own makes no calls; open it on its canvas.")),
+	});
+	const card = {
+		root,
+		document,
+		signal: new AbortController().signal,
+		url,
+		file: (name) => new URL(name, url).href,
+		theme: document.documentElement.dataset.theme === "dark" || (!document.documentElement.dataset.theme && dark.matches) ? "dark" : "light",
+		size: { w: ${input.w}, h: root.offsetHeight },
+		elements: customElements,
+		store: { getItem: (name) => localStorage.getItem(key(name)), setItem: (name, value) => localStorage.setItem(key(name), value), removeItem: (name) => localStorage.removeItem(key(name)) },
+		on: (what, listener) => void listeners[what]?.add(listener),
+		decks: calls(""),
+		path,
+		page: true,
+	};
+	dark.addEventListener("change", () => {
+		if (document.documentElement.dataset.theme) return;
+		card.theme = dark.matches ? "dark" : "light";
+		for (const listener of listeners.theme) listener();
+	});
+	new ResizeObserver(() => {
+		card.size = { w: root.offsetWidth, h: root.offsetHeight };
+		for (const listener of listeners.size) listener();
+	}).observe(root);
 	for (const url of ${JSON.stringify(urls)}) {
 		try {
 			const m = await import(new URL(url, location.href).href);
