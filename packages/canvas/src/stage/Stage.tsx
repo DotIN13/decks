@@ -534,7 +534,7 @@ export function Stage(props: StageProps) {
 	const resolvedColours = new Map<string, string>();
 	/**
 	 * A writer's colour as the sheet can paint it. A board with no writer's colour glows in
-	 * `var(--color-accent)`, which a canvas does not understand: the 2D one drew it in its default
+	 * `var(--canvas-accent)`, which a canvas does not understand: the 2D one drew it in its default
 	 * black and Skia in nothing. So a `var()` is looked up here, on the page, in the current scheme.
 	 */
 	const resolveColour = (colour: string) => {
@@ -555,7 +555,7 @@ export function Stage(props: StageProps) {
 	 */
 	createEffect(() => {
 		const writer = props.pen?.writer;
-		const color = resolveColour(writer?.color ?? "var(--color-accent)");
+		const color = resolveColour(writer?.color ?? "var(--canvas-accent)");
 		penLayer.setWriter(writer?.name ? { name: writer.name, color } : { color });
 	});
 
@@ -600,8 +600,8 @@ export function Stage(props: StageProps) {
 		const vars = getComputedStyle(stage);
 		colours = {
 			dark,
-			accent: rgbOf(vars.getPropertyValue("--color-accent").trim() || "#2563eb", colourProbe),
-			panel: rgbOf(vars.getPropertyValue("--panel").trim() || "#fff", colourProbe),
+			accent: rgbOf(vars.getPropertyValue("--canvas-accent").trim() || "#2563eb", colourProbe),
+			panel: rgbOf(vars.getPropertyValue("--canvas-panel").trim() || "#fff", colourProbe),
 			guide: [0.949, 0.306, 0.118],
 		};
 		return colours;

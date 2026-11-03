@@ -43,7 +43,7 @@
     "vendor": "node scripts/vendor.mjs",
     "build:live-doc": "node scripts/live-doc.mjs",
     "css:order": "node scripts/css-order.mjs",
-    "gates": "node scripts/dead-exports.mjs && node scripts/dead-css.mjs && node scripts/stale-paths.mjs",
+    "gates": "node scripts/dead-exports.mjs && node scripts/dead-css.mjs && node scripts/stale-paths.mjs && node scripts/surface-gate.mjs",
     "dev:example": "DECKS_DATA_DIR=\"$PWD/e2e/fixture\" npm run dev --workspace @decks/server",
     "test:e2e": "node e2e/run.mjs",
     "build:packages": "node scripts/build-packages.mjs",

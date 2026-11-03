@@ -129,7 +129,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`items/news.ts`). */
 	const news = () => {
 		const out: Record<string, string> = {};
-		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--color-accent)";
+		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--canvas-accent)";
 		return out;
 	};
 	const [busy, setBusy] = createSignal<{ writer?: { name?: string; color: string } }>(start.writer ? { writer: start.writer } : {});

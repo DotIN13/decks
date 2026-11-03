@@ -179,7 +179,7 @@ export function sayer(root: HTMLElement): (text: string) => void {
 		line.className = "frame-said";
 		line.setAttribute("role", "status");
 		line.textContent = text;
-		line.style.cssText = "position:fixed;left:50%;bottom:calc(var(--frame-dock, 0px) + 24px);transform:translateX(-50%);max-width:min(560px,90vw);padding:8px 14px;border-radius:10px;background:var(--panel,#222);color:var(--fg,#fff);border:1px solid var(--line-strong,#8886);box-shadow:0 6px 24px #0003;font:13px/1.4 var(--font-sans,system-ui);z-index:50;pointer-events:none";
+		line.style.cssText = "position:fixed;left:50%;bottom:calc(var(--frame-dock, 0px) + 24px);transform:translateX(-50%);max-width:min(560px,90vw);padding:8px 14px;border-radius:10px;background:var(--canvas-panel,#222);color:var(--canvas-fg,#fff);border:1px solid var(--canvas-line-strong,#8886);box-shadow:0 6px 24px #0003;font:13px/1.4 var(--canvas-font-sans,system-ui);z-index:50;pointer-events:none";
 		root.append(line);
 		shown = line;
 		hide = setTimeout(() => line.remove(), 5000);

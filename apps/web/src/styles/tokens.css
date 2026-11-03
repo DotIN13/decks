@@ -327,3 +327,38 @@
 		--radius-item: 14px;
 	}
 }
+
+/*
+ * The canvas surface's tokens (`@decks/canvas`, `surface-tokens.css`), from this app's own: the surface reads
+ * only these, so this is the whole of how the Decks app themes the canvas. On `.stage`, where `v3.css` sets the
+ * canvas's own look back, so each resolves to what the surface drew with before it had tokens of its own.
+ */
+@layer components {
+	.stage {
+		--canvas-accent: var(--color-accent);
+		--canvas-accent-soft: var(--color-accent-soft);
+		--canvas-warn: var(--color-warn);
+		--canvas-fg: var(--fg);
+		--canvas-muted: var(--muted);
+		--canvas-faint: var(--faint);
+		--canvas-line: var(--line);
+		--canvas-line-strong: var(--line-strong);
+		--canvas-panel: var(--panel);
+		--canvas-bg: var(--bg);
+		--canvas-bg-deep: var(--bg-deep);
+		--canvas-stage: var(--stage);
+		--canvas-shadow: var(--shadow);
+		--canvas-radius: var(--radius-panel);
+		--canvas-radius-thumb: var(--radius-thumb);
+		--canvas-radius-pill: var(--radius-pill);
+		--canvas-font-sans: var(--font-sans);
+		--canvas-font-mono: var(--font-mono);
+		--canvas-type-label: var(--type-label);
+		--canvas-type-ui: var(--type-ui);
+		--canvas-type-copy: var(--type-copy);
+		--canvas-type-body: var(--type-body);
+		--canvas-type-name: var(--type-name);
+		--canvas-type-title: var(--type-title);
+		--canvas-z-float: var(--z-float);
+	}
+}

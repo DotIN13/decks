@@ -1510,13 +1510,6 @@ svg.lucide {
 	box-shadow: 0 1px 3px rgb(60 64 67 / 20%);
 }
 
-	/* The same rules, under the same query. */
-	@media (prefers-reduced-motion: reduce) {
-	/* The glow stays still. */
-	.card-node > .news-glow::after {
-		animation: none;
-	}
-}
 	.picker-backdrop {
 	position: absolute;
 	z-index: var(--z-backdrop);

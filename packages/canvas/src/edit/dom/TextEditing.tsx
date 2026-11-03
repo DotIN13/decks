@@ -396,7 +396,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 								background: look.paper ?? "transparent",
 								// Rounded only where the item is: a note or a card has corners, words on the canvas do not.
 								"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-								"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)`,
+								"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
 							}}
 							onInput={(value) => props.text.preview(open.id, value)}
 							onCommit={props.text.commit}
@@ -427,7 +427,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							color: look.ink,
 							background: look.paper ?? "transparent",
 							"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)`,
+							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
 						}}
 						value={open.value}
 						ref={(el) => {

@@ -1,0 +1,17 @@
+{
+	"note": "The surface's classes an app's sheets may name (`scripts/surface-gate.mjs`): where an app hangs its own parts, sets the canvas tokens, or reads the canvas's state. Anything else of the surface's is themed through its --canvas-* tokens, never restyled from outside. A hook renamed or removed is a breaking change for every app.",
+	"hooks": [
+		{
+			"class": "decks-canvas",
+			"why": "the canvas frame's root: set the --canvas-* tokens here, and read its state (data-phone)"
+		},
+		{
+			"class": "stage",
+			"why": "the canvas: set the --canvas-* tokens here, and read its state (data-pen-tool, data-moving, data-engine-overlays)"
+		},
+		{
+			"class": "stage-fixed",
+			"why": "the layer held to the window over the canvas, where an app places its own parts: the pill, the hold menu, the tool column"
+		}
+	]
+}

@@ -1,0 +1,61 @@
+/*
+ * The canvas surface, for any host: what both apps share and theme through `--canvas-*` tokens
+ * (`surface-tokens.css`). The stage and the world, card slots and their title bars, what a card shows,
+ * live ink and the lasso, an agent's marks and cursors. The kit around it (the controls, the pill, the
+ * hold menu, the tool column, the ink tray, the properties panel, the comment box, the conversation) is
+ * each app's own and is not here: the Decks app has it in `apps/web/src/styles/kit/`.
+ *
+ * It needs Tailwind v4 for the utilities the package's markup uses; `dist/surface.css` is this built, scoped
+ * to the canvas and in one layer, `decks`, for a host with no Tailwind of its own.
+ */
+@import "tailwindcss";
+/*
+ * The package's own components use Tailwind utilities too (the conversation's cards are
+ * `flex flex-col`), and a host's build does not look inside a dependency for them: without this
+ * an agent's reply sat beside its tool rows a word wide.
+ */
+@source "../src";
+/*
+ * The theme names the package's markup is written with (`bg-panel`, `text-muted`, `h-control`), for a host
+ * with no Tailwind theme of its own: the colours from the canvas tokens, the control scale as the Decks app has it.
+ * The Decks app does not read this file; its own theme is in `apps/web/src/styles/tokens.css`.
+ */
+@theme inline {
+	--color-bg: var(--canvas-bg);
+	--color-bg-deep: var(--canvas-bg-deep);
+	--color-panel: var(--canvas-panel);
+	--color-stage: var(--canvas-stage);
+	--color-fg: var(--canvas-fg);
+	--color-muted: var(--canvas-muted);
+	--color-faint: var(--canvas-faint);
+	--color-line: var(--canvas-line);
+	--color-line-strong: var(--canvas-line-strong);
+	--color-accent: var(--canvas-accent);
+	--color-warn: var(--canvas-warn);
+	--color-ok: #2eaf5a;
+	--color-danger: #d92e3c;
+	--spacing-control: 28px;
+	--spacing-control-md: 26px;
+	--spacing-control-sm: 22px;
+	--spacing-field: 24px;
+	--radius-control: 8px;
+	--radius-row: 14px;
+	--radius-panel: var(--canvas-radius);
+	--shadow-panel: var(--canvas-shadow);
+	--text-tag: 9.5px;
+	--text-micro: 10px;
+	--text-hint: 10.5px;
+	--text-note: 11px;
+	--text-label: var(--canvas-type-label);
+	--text-ui: var(--canvas-type-ui);
+	--text-copy: var(--canvas-type-copy);
+	--text-body: var(--canvas-type-body);
+	--text-name: var(--canvas-type-name);
+	--text-title: var(--canvas-type-title);
+	--font-mono: var(--canvas-font-mono);
+}
+@import "./surface-tokens.css";
+@import "./canvas.css";
+@import "./ink.css";
+@import "./marks.css";
+@import "./host.css";

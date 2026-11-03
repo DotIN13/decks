@@ -96,7 +96,7 @@ export function OverlayLayer(
 							top: `${box().y}px`,
 							width: `${box().w}px`,
 							height: `${box().h}px`,
-							"box-shadow": `0 0 0 ${(many() && box().role !== "marquee" ? 1 : 1.5) / props.zoom}px var(--color-accent)`,
+							"box-shadow": `0 0 0 ${(many() && box().role !== "marquee" ? 1 : 1.5) / props.zoom}px var(--canvas-accent)`,
 						}}
 					/>
 				)}
@@ -107,7 +107,7 @@ export function OverlayLayer(
 						<Show when={frame().many}>
 							<div
 								class="pen-selection-box"
-								style={{ left: `${frame().x}px`, top: `${frame().y}px`, width: `${frame().w}px`, height: `${frame().h}px`, "box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)` }}
+								style={{ left: `${frame().x}px`, top: `${frame().y}px`, width: `${frame().w}px`, height: `${frame().h}px`, "box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)` }}
 							/>
 						</Show>
 						{/* Its size in pixels, under it: below the arrow anchor when one shows there. */}
@@ -156,7 +156,7 @@ export function OverlayLayer(
 							top: `${box().y}px`,
 							width: `${box().w}px`,
 							height: `${box().h}px`,
-							"box-shadow": `0 0 0 ${2 / props.zoom}px var(--color-accent)`,
+							"box-shadow": `0 0 0 ${2 / props.zoom}px var(--canvas-accent)`,
 						}}
 					/>
 				)}
@@ -165,7 +165,7 @@ export function OverlayLayer(
 				{(box) => (
 					<div
 						class="pen-join"
-						style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${2 / props.zoom}px var(--color-accent)` }}
+						style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${2 / props.zoom}px var(--canvas-accent)` }}
 					/>
 				)}
 			</For>
@@ -179,7 +179,7 @@ export function OverlayLayer(
 					<div
 						class="pen-join"
 						data-drop="frame"
-						style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.zoom}px var(--color-accent)` }}
+						style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.zoom}px var(--canvas-accent)` }}
 					/>
 				)}
 			</Show>
@@ -327,7 +327,7 @@ export function OverlayLayer(
 							class="pen-handle"
 							data-bend={o().arrow?.route}
 							title="Drag to bend the arrow; double-click for its automatic route"
-							style={{ ...knob(middle().x, middle().y, px), "border-radius": "50%", "box-shadow": o().arrow?.bent ? "inset 0 0 0 2.5px var(--color-accent)" : undefined }}
+							style={{ ...knob(middle().x, middle().y, px), "border-radius": "50%", "box-shadow": o().arrow?.bent ? "inset 0 0 0 2.5px var(--canvas-accent)" : undefined }}
 							onPointerDown={(event) => props.onArrowBend(event)}
 						/>
 					);
@@ -336,14 +336,14 @@ export function OverlayLayer(
 			<Show when={o().route}>
 				{(route) => (
 					<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-						<path transform={`translate(${route().x} ${route().y})`} d={route().d} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
+						<path transform={`translate(${route().x} ${route().y})`} d={route().d} fill="none" stroke="var(--canvas-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
 					</svg>
 				)}
 			</Show>
 			<Show when={o().endDraft}>
 				{(line) => (
 					<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-						<line x1={line().x1} y1={line().y1} x2={line().x2} y2={line().y2} stroke="var(--color-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
+						<line x1={line().x1} y1={line().y1} x2={line().x2} y2={line().y2} stroke="var(--canvas-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
 					</svg>
 				)}
 			</Show>
@@ -408,7 +408,7 @@ export function OverlayLayer(
 						fallback={
 							<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
 								{/* The curve a new arrow is drawn with (`route: "curved"`), between the two points. */}
-								<path d={draftCurve(draft())} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
+								<path d={draftCurve(draft())} fill="none" stroke="var(--canvas-accent)" stroke-width={2 / props.zoom} stroke-dasharray={`${6 / props.zoom}`} />
 							</svg>
 						}
 					>

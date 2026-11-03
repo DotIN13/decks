@@ -4,7 +4,7 @@
  * In `styles/` beside the others rather than in `index.css` for the reason stated at the top
  * of that file — a surface with its own vocabulary is easier to read as a file than as a section.
  */
-@layer components {
+@layer decks.surface {
 	/* --- the stage --------------------------------------------------------------- */
 
 .stage {
@@ -21,7 +21,7 @@
 	overflow: scroll;
 	scrollbar-width: none;
 	overscroll-behavior: none;
-	background: var(--stage);
+	background: var(--canvas-stage);
 	/* Fingers pan the stage natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
 	touch-action: pan-x pan-y;
 }
@@ -190,18 +190,18 @@
 	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
 	.stage-notice {
 	position: absolute;
-	z-index: var(--z-float);
+	z-index: var(--canvas-z-float);
 	top: 50%;
 	left: 50%;
 	max-width: min(420px, calc(100% - 48px));
 	padding: 14px 18px;
 	transform: translate(-50%, -50%);
-	border: 1px solid var(--line-strong);
-	border-radius: var(--radius-panel, 12px);
-	background: var(--panel);
-	box-shadow: var(--shadow);
-	color: var(--fg);
-	font-size: var(--type-copy);
+	border: 1px solid var(--canvas-line-strong);
+	border-radius: var(--canvas-radius, 12px);
+	background: var(--canvas-panel);
+	box-shadow: var(--canvas-shadow);
+	color: var(--canvas-fg);
+	font-size: var(--canvas-type-copy);
 	line-height: 1.45;
 	text-align: center;
 	text-wrap: balance;
@@ -282,10 +282,10 @@
  */
 .card-node > .shade {
 	position: absolute;
-	border-radius: var(--radius-board, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
+	border-radius: var(--canvas-card-radius, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
 	/* No shadow: a board lies flat on the canvas, its edge the 1px outline alone. */
 	inset: 0;
-	outline: 1px solid var(--line);
+	outline: 1px solid var(--canvas-line);
 	pointer-events: none;
 }
 	/*
@@ -307,7 +307,7 @@
 .card-node > .news-glow {
 	position: absolute;
 	inset: 0;
-	border-radius: var(--radius-board, 12px);
+	border-radius: var(--canvas-card-radius, 12px);
 	pointer-events: none;
 	opacity: 1;
 	transition: opacity var(--read-ms, 1500ms) ease-out;
@@ -316,9 +316,9 @@
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: var(--radius-board, 12px);
+	border-radius: var(--canvas-card-radius, 12px);
 	box-shadow:
-		0 0 60px 10px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
+		0 0 60px 10px color-mix(in srgb, var(--canvas-news, var(--canvas-accent)) 40%, transparent),
 		0 4px 18px rgb(0 0 0 / 19%);
 	will-change: opacity;
 	animation: news-breathe 2.6s ease-in-out infinite;
@@ -363,20 +363,20 @@
 	.card-node > .surface {
 	position: relative;
 	overflow: hidden;
-	border-radius: var(--radius-board, 12px);
-	background: var(--bg);
+	border-radius: var(--canvas-card-radius, 12px);
+	background: var(--canvas-bg);
 }
 	/* On a touch screen the page is covered until the item is activated (`item-slot.tsx`): a finger on it is the stage's. */
 	.card-node > .touch-cover {
 	position: absolute;
 	inset: 0;
 	z-index: 3;
-	border-radius: var(--radius-board, 12px);
+	border-radius: var(--canvas-card-radius, 12px);
 	touch-action: none;
 }
 	/* Activated by a second tap: its page has the fingers, and a thin ring of the accent inside its edge says so until something else is selected. */
 	.card-node[data-active] > .surface {
-	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 60%, transparent);
+	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--canvas-accent) 60%, transparent);
 }
 	/* A board's place among the others, which never moves (`Stage`): no box of its own. */
 	.world > .card-slot {
@@ -462,7 +462,7 @@
 	align-items: center;
 	gap: 8px;
 	height: 24px;
-	color: var(--muted);
+	color: var(--canvas-muted);
 	font-size: 13px;
 	cursor: grab;
 	pointer-events: auto;
@@ -479,15 +479,15 @@
 	white-space: nowrap;
 }
 	.bar-layer .chrome[data-selected] .title {
-	color: var(--fg);
+	color: var(--canvas-fg);
 }
 	/* The path gives way first when the bar is narrow: a nowrap item will not shrink below its content otherwise. */
 	.bar-layer .chrome .file {
 	overflow: hidden;
 	min-width: 0;
 	flex-shrink: 3;
-	color: var(--faint);
-	font-family: var(--font-mono);
+	color: var(--canvas-faint);
+	font-family: var(--canvas-font-mono);
 	font-size: 11px;
 	line-height: 20px;
 	text-overflow: ellipsis;
@@ -513,17 +513,17 @@
 	border: 0;
 	border-radius: 5px;
 	background: none;
-	color: var(--muted);
+	color: var(--canvas-muted);
 	text-decoration: none;
 	cursor: pointer;
 	place-items: center;
 }
 	.bar-layer .chrome .act:hover {
-	background: var(--line);
-	color: var(--fg);
+	background: var(--canvas-line);
+	color: var(--canvas-fg);
 }
 	.bar-layer .chrome .act[aria-pressed="true"] {
-	color: var(--color-accent);
+	color: var(--canvas-accent);
 }
 	.bar-layer .chrome .act svg {
 	width: 13px;
@@ -540,156 +540,8 @@
 	left: -5px;
 	width: 1px;
 	height: 12px;
-	background: var(--line-strong);
+	background: var(--canvas-line-strong);
 	content: "";
-}
-	/*
-	 * The pill over a selected card (`ui/Callout.tsx`): the comment popup's card
-	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
-	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
-	 */
-	.stage-fixed > .card-callout {
-	position: absolute;
-	z-index: 6;
-	display: flex;
-	align-items: center;
-	gap: 2px;
-	height: calc(var(--control, 28px) + 10px);
-	padding: 0 5px;
-	border: 1px solid var(--border-strong);
-	border-radius: var(--radius-panel, 12px);
-	background: var(--panel);
-	box-shadow: var(--shadow-menu);
-	color: var(--fg);
-	transform: translate(-50%, -100%);
-	pointer-events: auto;
-	animation: card-callout-in 90ms ease-out;
-}
-	.stage-fixed > .card-callout[data-below="true"] {
-	transform: translate(-50%, 0);
-	animation-name: card-callout-in-below;
-}
-	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
-	.stage-fixed > .card-callout:not([data-hidden]) {
-	transition: opacity 90ms ease-out;
-}
-	/* The menu a hold opens on a touch screen (`ui/HoldMenu.tsx`): at the finger, glass, a preview on top, rows a finger's height. */
-	.stage-fixed > .hold-menu {
-	position: absolute;
-	z-index: 8;
-	padding: 6px;
-	border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
-	border-radius: 16px;
-	background: color-mix(in srgb, var(--panel) 86%, transparent);
-	-webkit-backdrop-filter: saturate(180%) blur(20px);
-	backdrop-filter: saturate(180%) blur(20px);
-	box-shadow: 0 12px 36px rgb(0 0 0 / 18%);
-	color: var(--fg);
-	pointer-events: auto;
-	animation: hold-menu-in 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-	@keyframes hold-menu-in {
-	from {
-		opacity: 0;
-		transform: scale(0.94);
-	}
-}
-	.stage-fixed > .hold-menu > .hold-preview {
-	margin: 2px 4px 8px;
-	padding: 8px 10px;
-	border-radius: 10px;
-	background: var(--fill);
-	color: var(--muted);
-	font-size: 13px;
-	line-height: 1.35;
-	overflow: hidden;
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-}
-	.stage-fixed > .hold-menu > .hold-item {
-	display: flex;
-	width: 100%;
-	height: 44px;
-	align-items: center;
-	justify-content: space-between;
-	padding: 0 12px;
-	border: 0;
-	border-radius: 10px;
-	background: none;
-	color: var(--fg);
-	font: inherit;
-	font-size: 16px;
-	text-align: left;
-	cursor: pointer;
-}
-	.stage-fixed > .hold-menu > .hold-item:active {
-	background: var(--fill);
-}
-	.stage-fixed > .hold-menu > .hold-item[data-danger] {
-	color: var(--color-danger);
-}
-	.stage-fixed > .hold-menu > .hold-item > small {
-	color: var(--muted);
-	font-size: 13px;
-}
-	.stage-fixed > .card-callout[data-hidden] {
-	visibility: hidden;
-	opacity: 0;
-}
-	.stage-fixed > .card-callout > a.icon-button {
-	color: var(--muted);
-	text-decoration: none;
-}
-	/* A hairline before Hide: the one action that takes the board away. */
-	.stage-fixed > .card-callout > .callout-rule {
-	width: 1px;
-	height: 16px;
-	margin: 0 2px;
-	background: var(--line-strong);
-}
-	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
-	.stage-fixed > .card-callout > .callout-word {
-	display: flex;
-	flex: none;
-	align-items: center;
-	gap: 6px;
-	height: var(--control, 28px);
-	padding: 0 9px;
-	border: 0;
-	border-radius: var(--control-radius, 8px);
-	background: none;
-	color: var(--fg);
-	cursor: pointer;
-	font: inherit;
-	font-size: 13px;
-	font-weight: 500;
-	white-space: nowrap;
-}
-	.stage-fixed > .card-callout > .callout-word > svg {
-	color: var(--muted);
-}
-	.stage-fixed > .card-callout > .callout-word:hover {
-	background: var(--fill);
-}
-	.stage-fixed > .card-callout > .callout-ask > svg {
-	color: var(--color-accent);
-}
-	/* Delete, on drawn items: the one action that cannot be put back with Show. */
-	.stage-fixed > .card-callout > .icon-button.callout-danger {
-	color: var(--color-danger);
-}
-	@keyframes card-callout-in {
-	from {
-		opacity: 0;
-		transform: translate(-50%, calc(-100% + 4px));
-	}
-}
-	@keyframes card-callout-in-below {
-	from {
-		opacity: 0;
-		transform: translate(-50%, -4px);
-	}
 }
 	/* The band along an awake item's edge that moves it (`item-slot.tsx`): invisible, a move cursor. */
 	.stage .card-edge {
@@ -767,7 +619,7 @@
 	position: absolute;
 	border-radius: 4px;
 	pointer-events: none;
-	outline: 1px solid var(--color-accent);
+	outline: 1px solid var(--canvas-accent);
 	outline-offset: 0;
 	opacity: 0.45;
 }
@@ -776,7 +628,7 @@
 	opacity: 0.55;
 }
 	.world > .pen-kin[data-round="true"] {
-	border-radius: var(--radius-board, 12px);
+	border-radius: var(--canvas-card-radius, 12px);
 }
 	/* One box round everything selected, when there is more than one thing (each has its own thin line). */
 	.world > .pen-selection-box {
@@ -790,7 +642,7 @@
 	transform-origin: 0 0;
 	padding: 2px 6px;
 	border-radius: 4px;
-	background: var(--color-accent);
+	background: var(--canvas-accent);
 	color: #fff;
 	font-size: 12px;
 	font-weight: 500;
@@ -810,7 +662,7 @@
 	pointer-events: none;
 }
 	.world > .pen-join {
-	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+	background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
 }
 	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
 	/* A card's block's grip, in the card's margin, to drag the block by (`Stage.tsx`, `gripBox`). */
@@ -823,19 +675,19 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--faint);
+	color: var(--canvas-faint);
 	border-radius: 4px;
 	cursor: grab;
 	touch-action: none;
 }
-	.world > .pen-grip:hover { color: var(--fg); background: var(--line); }
+	.world > .pen-grip:hover { color: var(--canvas-fg); background: var(--canvas-line); }
 	.world > .pen-grip:active { cursor: grabbing; }
 	.world > .pen-grip[data-hidden] { visibility: hidden; }
 	.world > .pen-grip svg { stroke-width: 1.75; flex: none; }
 	.world > .pen-insert {
 	position: absolute;
 	border-radius: 999px;
-	background: var(--color-accent);
+	background: var(--canvas-accent);
 	pointer-events: none;
 }
 	/* The other places a drag could land near the pointer: dashed slot lines, and dashed frames that place what they hold. */
@@ -847,20 +699,20 @@
 	pointer-events: none;
 }
 	.world > .pen-slots line {
-	stroke: var(--color-accent);
+	stroke: var(--canvas-accent);
 	stroke-linecap: round;
 	opacity: 0.7;
 }
 	.world > .pen-slot-frame {
 	position: absolute;
 	border-radius: 4px;
-	outline: 1.5px dashed var(--color-accent);
+	outline: 1.5px dashed var(--canvas-accent);
 	opacity: 0.6;
 	pointer-events: none;
 }
 	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
 	.world > :is(.pen-hover, .pen-selection):is([data-page="true"], [data-round="true"]) {
-	border-radius: var(--radius-board, 12px);
+	border-radius: var(--canvas-card-radius, 12px);
 }
 	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
 	.world > .pen-guides {
@@ -922,8 +774,8 @@
 	box-sizing: border-box;
 	border: 0;
 	border-radius: 2px;
-	background: var(--panel);
-	box-shadow: inset 0 0 0 1.5px var(--color-accent);
+	background: var(--canvas-panel);
+	box-shadow: inset 0 0 0 1.5px var(--canvas-accent);
 	/* A finger on a handle resizes: the stage's native scroll (`touch-action: pan-x pan-y`) must not take it and cancel the press. */
 	touch-action: none;
 }
@@ -982,7 +834,7 @@
 	z-index: 2;
 	/* Presses on the picture are the canvas's: a click plays or pauses, a drag moves the item. */
 	pointer-events: none;
-	font-family: var(--font-sans);
+	font-family: var(--canvas-font-sans);
 }
 	.world > .pen-player button,
 	.world > .pen-player [role="slider"] {
@@ -1152,8 +1004,8 @@
 	.world > .pen-draft {
 	position: absolute;
 	box-sizing: border-box;
-	border: 1.5px dashed var(--color-accent);
-	background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+	border: 1.5px dashed var(--canvas-accent);
+	background: color-mix(in srgb, var(--canvas-accent) 8%, transparent);
 	pointer-events: none;
 }
 	.world > .pen-draft[data-tool="ellipse"] {
@@ -1162,89 +1014,6 @@
 	.world > .pen-draft-line {
 	position: absolute;
 	pointer-events: none;
-}
-	/* The drawing's tools (`pen/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
-	.pen-tools {
-	position: absolute;
-	z-index: var(--z-float);
-	top: 50%;
-	left: calc(var(--inset-left, 0px) + 12px);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 2px;
-	padding: 5px;
-	transform: translateY(-50%);
-}
-	/* A window too short for the column: it scrolls rather than running off both ends. */
-	.pen-tools {
-	max-height: calc(100% - 2 * (var(--control, 28px) + 32px));
-	overflow-y: auto;
-	scrollbar-width: none;
-}
-	/*
-	 * The column as a float (`App.tsx`, `chrome/float.ts`): the grip at its head is where a drag
-	 * starts, away from home the inline position wins over the centring transform, and thrown
-	 * hard at the left edge it stands behind it with only its tab showing.
-	 */
-	.pen-grip {
-	display: flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	width: 100%;
-	height: 14px;
-	color: var(--faint);
-	cursor: grab;
-	touch-action: none;
-}
-	.pen-grip:hover {
-	color: var(--muted);
-}
-	.pen-tools[data-dragging="true"],
-	.pen-tools[data-dragging="true"] .pen-grip {
-	cursor: grabbing;
-}
-	.pen-tools[data-floating="true"] {
-	transform: none;
-}
-	/* The canvas's left edge is the sidebar's right, not the window's: put away on the left,
-	   the column still stands over the sidebar, so it gives up its own paint and its clicks,
-	   and the tab (`.stowtab`, `shell.css`) is all there is of it. */
-	.pen-tools {
-	--stowtab-w: 20px;
-	--stowtab-h: 48px;
-}
-	.pen-tools[data-stowed] {
-	overflow: hidden;
-	border-color: transparent;
-	background: transparent;
-	box-shadow: none;
-	pointer-events: none;
-}
-	/* Under a finger the grip and the tab are finger-sized, and the tools 36px. */
-	@media (pointer: coarse) {
-		.pen-grip {
-			height: 22px;
-		}
-		.pen-tools {
-			gap: 1px;
-			padding: 4px;
-		}
-		.pen-tools > .icon-button {
-			width: 36px;
-			height: 36px;
-		}
-		.pen-tools {
-			--stowtab-w: 28px;
-			--stowtab-h: 56px;
-		}
-	}
-	.pen-tools > .pen-rule {
-	width: 18px;
-	height: 1px;
-	margin: 3px 0;
-	background: var(--line-strong);
 }
 	/* A tool is armed: the press is the drawing's, even over a board, and the cursor says so. */
 	.stage[data-pen-tool] {
@@ -1267,7 +1036,7 @@
 	overflow: hidden;
 	resize: none;
 	field-sizing: content;
-	caret-color: var(--color-accent);
+	caret-color: var(--canvas-accent);
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
@@ -1307,15 +1076,15 @@
 	.pen-card-editor h2 { font-size: 1.3em; }
 	.pen-card-editor h3 { font-size: 1.12em; }
 	.pen-card-editor h4 { font-size: 1em; }
-	.pen-card-editor h5 { font-size: 0.9em; color: var(--muted); }
-	.pen-card-editor h6 { font-size: 0.85em; color: var(--muted); }
+	.pen-card-editor h5 { font-size: 0.9em; color: var(--canvas-muted); }
+	.pen-card-editor h6 { font-size: 0.85em; color: var(--canvas-muted); }
 	.pen-card-editor :is(ul, ol) {
 	padding-left: 1.6em;
 	list-style: disc outside;
 }
 	.pen-card-editor ol { list-style-type: decimal; }
 	.pen-card-editor :is(ul, ol) ul { list-style-type: circle; }
-	.pen-card-editor li::marker { color: var(--muted); }
+	.pen-card-editor li::marker { color: var(--canvas-muted); }
 	.pen-card-editor li + li { margin-top: 0.2em; }
 	.pen-card-editor li > :is(ul, ol, p) {
 	margin: 0;
@@ -1334,18 +1103,18 @@
 	height: 0.85em;
 	margin-right: 0.45em;
 	vertical-align: -0.08em;
-	border: 1px solid var(--line-strong);
+	border: 1px solid var(--canvas-line-strong);
 	border-radius: 0.21em;
 	cursor: pointer;
 }
 	.pen-card-editor .pce-check[data-on] {
-	background: var(--color-accent);
-	border-color: var(--color-accent);
+	background: var(--canvas-accent);
+	border-color: var(--canvas-accent);
 }
 	.pen-card-editor blockquote {
 	padding-left: calc(2px + 0.9em);
-	border-left: 2px solid var(--line-strong);
-	color: var(--muted);
+	border-left: 2px solid var(--canvas-line-strong);
+	color: var(--canvas-muted);
 }
 	.pen-card-editor blockquote > p { margin: 0; }
 	.pen-card-editor blockquote > p + p { margin-top: 1em; }
@@ -1376,36 +1145,36 @@
 	padding: 0.45em 0.75em;
 	text-align: left;
 	vertical-align: top;
-	border-bottom: 1px solid var(--line);
+	border-bottom: 1px solid var(--canvas-line);
 }
 	.pen-card-editor .pce-table :is(th, td):first-child { padding-left: 0; }
 	.pen-card-editor .pce-table :is(th, td):last-child { padding-right: 0; }
 	.pen-card-editor .pce-table th {
 	font-size: 0.9em;
 	font-weight: 600;
-	color: var(--muted);
-	border-bottom-color: var(--line-strong);
+	color: var(--canvas-muted);
+	border-bottom-color: var(--canvas-line-strong);
 }
 	.pen-card-editor .pce-table tr:last-child td { border-bottom: none; }
 	.pen-card-editor code {
-	font-family: var(--font-mono);
+	font-family: var(--canvas-font-mono);
 	font-size: 0.88em;
-	background: var(--line);
+	background: var(--canvas-line);
 	border-radius: 3px;
 	padding: 0 0.2em;
 }
 	.pen-card-editor pre.pce-code {
-	font-family: var(--font-mono);
+	font-family: var(--canvas-font-mono);
 	font-size: 0.88em;
-	background: var(--bg-deep);
+	background: var(--canvas-bg-deep);
 	border-radius: 8px;
 	padding: 0.85em;
 	white-space: pre-wrap;
 }
 	.pen-card-editor a[data-href] {
-	color: var(--color-accent);
+	color: var(--canvas-accent);
 	text-decoration: underline;
-	text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+	text-decoration-color: color-mix(in srgb, var(--canvas-accent) 40%, transparent);
 }
 	.pen-card-editor mark { background: #facc1573; color: inherit; border-radius: 2px; }
 	.pen-card-editor mark[data-c="red"] { background: #f8717159; }
@@ -1440,39 +1209,39 @@
 	[data-color-scheme="dark"] .pen-card-editor .pce-sug ins { color: #7aa2ff; background: #7aa2ff26; }
 	/* What the editor keeps as markdown, and shows rather than types into. */
 	.pen-card-editor .pce-atom {
-	color: var(--muted);
+	color: var(--canvas-muted);
 }
 	.pen-card-editor .pce-faint {
-	color: var(--faint);
+	color: var(--canvas-faint);
 	font-size: 0.85em;
 }
 	.pen-card-editor div.pce-raw,
 	.pen-card-editor pre.pce-rawedit {
 	display: block;
-	font-family: var(--font-mono);
+	font-family: var(--canvas-font-mono);
 	font-size: 0.8em;
 	white-space: pre-wrap;
-	background: var(--bg-deep);
+	background: var(--canvas-bg-deep);
 	border-radius: 8px;
 	padding: 0.6em 0.75em;
 	cursor: default;
 }
 	.pen-card-editor pre.pce-rawedit {
-	color: var(--fg);
+	color: var(--canvas-fg);
 	cursor: text;
-	outline: 1px dashed var(--line-strong);
+	outline: 1px dashed var(--canvas-line-strong);
 }
 	.pen-card-editor div.pce-held {
 	display: block;
 	width: fit-content;
 	padding: 0.4em 0.75em;
-	border: 1px dashed var(--line-strong);
+	border: 1px dashed var(--canvas-line-strong);
 	border-radius: 8px;
 	font-size: 0.9em;
 }
 	.pen-card-editor .pce-rule {
 	height: 1px;
-	background: var(--line);
+	background: var(--canvas-line);
 	margin-block: 0.5em 1em;
 }
 	/* An agent's suggestion: what it adds in blue, what it takes out struck through in red. */
@@ -1483,16 +1252,16 @@
 	background: #2563eb1f;
 }
 	.pen-card-editor .pce-sug button {
-	font: 600 0.75em var(--font-sans, inherit);
+	font: 600 0.75em var(--canvas-font-sans, inherit);
 	width: 1.5em;
 	height: 1.5em;
 	margin-left: 0.2em;
 	padding: 0;
 	vertical-align: 0.1em;
-	border: 1px solid var(--line-strong);
+	border: 1px solid var(--canvas-line-strong);
 	border-radius: 999px;
-	background: var(--panel);
-	color: var(--fg);
+	background: var(--canvas-panel);
+	color: var(--canvas-fg);
 	cursor: pointer;
 }
 	.pen-card-editor .pce-why { font-size: 0.8em; margin-left: 0.15em; }
@@ -1502,7 +1271,7 @@
 	align-items: center;
 	gap: 0.4em;
 	padding: 0.1em 0.45em;
-	border: 1px solid var(--line-strong);
+	border: 1px solid var(--canvas-line-strong);
 	border-radius: 6px;
 	cursor: grab;
 	user-select: none;
@@ -1517,9 +1286,9 @@
 	padding: 0;
 	border: none;
 	font-size: 1em;
-	color: var(--color-accent);
+	color: var(--canvas-accent);
 	text-decoration: underline;
-	text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+	text-decoration-color: color-mix(in srgb, var(--canvas-accent) 40%, transparent);
 }
 	.pen-card-editor .pce-piece[data-kind="wiki"] > .pce-ic { display: none; }
 	.pen-card-editor .pce-piece.pce-block {
@@ -1527,7 +1296,7 @@
 	width: fit-content;
 	max-width: 100%;
 	padding: 0.6em 0.75em;
-	background: var(--bg-deep);
+	background: var(--canvas-bg-deep);
 	border-color: transparent;
 	border-radius: 8px;
 }
@@ -1550,8 +1319,8 @@
 	min-height: 3em;
 	justify-content: center;
 	align-items: center;
-	background: var(--bg-deep);
-	color: var(--muted);
+	background: var(--canvas-bg-deep);
+	color: var(--canvas-muted);
 	font-size: 0.875em;
 }
 	.pen-card-editor .pce-piece[data-kind="img"]:not(:has(img)) > span::before { content: "🖼 "; }
@@ -1563,7 +1332,7 @@
 	 */
 	.pen-drag-ghost {
 	position: fixed;
-	z-index: var(--z-float, 30);
+	z-index: var(--canvas-z-float, 30);
 	pointer-events: none;
 	opacity: 0.92;
 	rotate: 2deg;
@@ -1578,7 +1347,7 @@
 	margin: 0;
 	max-width: 190px;
 	opacity: 0.9;
-	background: var(--panel);
+	background: var(--canvas-panel);
 	box-shadow: 0 10px 28px rgb(0 0 0 / 22%);
 	rotate: 2deg;
 }
@@ -1587,7 +1356,7 @@
 	display: none;
 	z-index: 4;
 	pointer-events: none;
-	background: var(--color-accent);
+	background: var(--canvas-accent);
 	border-radius: 2px;
 }
 	/*
@@ -1600,8 +1369,8 @@
 	position: absolute;
 	z-index: 6;
 	transform-origin: 0 0;
-	font: 14px/1 var(--font-sans, system-ui);
-	color: var(--fg);
+	font: 14px/1 var(--canvas-font-sans, system-ui);
+	color: var(--canvas-fg);
 	cursor: default;
 }
 	/* Shown over a selection, gone while the camera moves and back with a fade, as the board pill is. */
@@ -1627,8 +1396,8 @@
 	overflow-x: auto;
 	scrollbar-width: none;
 	padding: 5px 6px;
-	background: var(--panel);
-	border: 1px solid var(--line);
+	background: var(--canvas-panel);
+	border: 1px solid var(--canvas-line);
 	border-radius: 12px;
 	box-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 6px 18px rgb(0 0 0 / 8%);
 }
@@ -1644,18 +1413,18 @@
 	gap: 6px;
 	height: 32px;
 	border-radius: 8px;
-	color: var(--fg);
+	color: var(--canvas-fg);
 	cursor: pointer;
 	white-space: nowrap;
 }
-	.pen-card-editor .pce-bar .pce-icon { width: 32px; color: color-mix(in srgb, var(--fg) 82%, transparent); }
+	.pen-card-editor .pce-bar .pce-icon { width: 32px; color: color-mix(in srgb, var(--canvas-fg) 82%, transparent); }
 	/* Line icons at a hairline's weight beside the words, not lucide's default 2. */
 	.pen-card-editor .pce-bar svg { stroke-width: 1.5; }
-	.pen-card-editor .pce-bar button:hover { background: var(--line); }
-	.pen-card-editor .pce-bar button[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent); }
+	.pen-card-editor .pce-bar button:hover { background: var(--canvas-line); }
+	.pen-card-editor .pce-bar button[aria-pressed="true"] { background: var(--canvas-accent-soft); color: var(--canvas-accent); }
 	.pen-card-editor .pce-bar .pce-pick {
 	padding: 0 8px 0 10px;
-	border: 1px solid var(--line-strong);
+	border: 1px solid var(--canvas-line-strong);
 	justify-content: space-between;
 	margin-right: 4px;
 }
@@ -1664,7 +1433,7 @@
 	.pen-card-editor .pce-bar .pce-pick-font { min-width: 128px; max-width: 160px; }
 	.pen-card-editor .pce-bar .pce-pick-font span { overflow: hidden; text-overflow: ellipsis; }
 	.pen-card-editor .pce-bar .pce-pick-size { min-width: 92px; }
-	.pen-card-editor .pce-bar .pce-sep { flex: none; width: 1px; height: 20px; margin: 0 6px; background: var(--line-strong); }
+	.pen-card-editor .pce-bar .pce-sep { flex: none; width: 1px; height: 20px; margin: 0 6px; background: var(--canvas-line-strong); }
 	/* The menus: under their button, on the app's panel, outside the row so its scroll does not cut them. */
 	.pen-card-editor .pce-menu {
 	position: absolute;
@@ -1673,28 +1442,28 @@
 	flex-direction: column;
 	min-width: 180px;
 	padding: 6px;
-	background: var(--panel);
-	border: 1px solid var(--line);
+	background: var(--canvas-panel);
+	border: 1px solid var(--canvas-line);
 	border-radius: 12px;
 	box-shadow: 0 10px 30px rgb(0 0 0 / 14%);
 }
 	.pen-card-editor .pce-menu[data-open] { display: flex; }
 	.pen-card-editor .pce-bar .pce-opt { justify-content: flex-start; padding: 0 10px; font-size: 14px; }
-	.pen-card-editor .pce-bar .pce-opt small { color: var(--muted); font-size: 12px; }
+	.pen-card-editor .pce-bar .pce-opt small { color: var(--canvas-muted); font-size: 12px; }
 	.pen-card-editor .pce-bar .pce-opt-h1 { height: 40px; font-size: 22px; font-weight: 600; }
 	.pen-card-editor .pce-bar .pce-opt-h2 { height: 36px; font-size: 18px; font-weight: 600; }
 	.pen-card-editor .pce-bar .pce-opt-h3 { font-size: 16px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-quote { color: var(--muted); }
-	.pen-card-editor .pce-bar .pce-opt-code { font-family: var(--font-mono); font-size: 13px; }
+	.pen-card-editor .pce-bar .pce-opt-quote { color: var(--canvas-muted); }
+	.pen-card-editor .pce-bar .pce-opt-code { font-family: var(--canvas-font-mono); font-size: 13px; }
 	.pen-card-editor .pce-bar .pce-size-small { font-size: 12px; }
 	.pen-card-editor .pce-bar .pce-size-large { font-size: 17px; }
 	.pen-card-editor .pce-bar .pce-size-huge { font-size: 21px; }
 	.pen-card-editor .pce-menu.pce-fonts { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; min-width: 220px; }
 	.pen-card-editor .pce-menu.pce-fonts .pce-opt { font-size: 15px; }
-	.pen-card-editor .pce-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+	.pen-card-editor .pce-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--canvas-muted); }
 	.pen-card-editor .pce-menu.pce-swatches[data-open] { flex-flow: row wrap; gap: 4px; width: 172px; min-width: 0; }
 	.pen-card-editor .pce-menu.pce-swatches .pce-opt { flex-basis: 100%; }
-	.pen-card-editor .pce-bar .pce-sw { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); }
+	.pen-card-editor .pce-bar .pce-sw { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--canvas-line-strong); }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="yellow"] { background: #facc15; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="orange"] { background: #fb923c; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="red"] { background: #f87171; }
@@ -1713,9 +1482,9 @@
 	align-items: center;
 	justify-content: center;
 	height: 100%;
-	color: var(--faint);
-	font-family: var(--font-mono);
-	font-size: var(--type-ui);
+	color: var(--canvas-faint);
+	font-family: var(--canvas-font-mono);
+	font-size: var(--canvas-type-ui);
 }
 	/*
  * Its slot is held whether or not it is showing, so a row does not reflow under the cursor
@@ -1735,7 +1504,7 @@
  * started it holds the other way back.
  */
 .stage[data-previewing="true"] .card-node > .shade {
-	outline-color: var(--color-warn);
+	outline-color: var(--canvas-warn);
 }
 	/* The same rules, under the same query. */
 	@media (hover: none) {
@@ -1748,7 +1517,7 @@
 }
 }
 /* An item's slot (`item-slot.tsx`), in both the Decks app and any host of the canvas. */
-@layer components {
+@layer decks.surface {
 	/* An item's title above it, to move it by, outside its box so the item and the sheet's picture of
 	   it both start at the box's top. Sized in stage pixels, so it
 	   scales with the board and a zoom writes nothing to it. */
@@ -1770,7 +1539,7 @@
 		white-space: nowrap;
 		text-overflow: ellipsis;
 		font-size: 12px;
-		color: var(--muted);
+		color: var(--canvas-muted);
 		cursor: grab;
 		user-select: none;
 		/* A finger on the bar carries the board, as its edge does: never a native scroll of the stage. */
@@ -1785,9 +1554,9 @@
 		padding: 2px 8px;
 		font: inherit;
 		font-size: 12px;
-		color: var(--fg);
-		background: var(--panel);
-		border: 1px solid var(--line-strong);
+		color: var(--canvas-fg);
+		background: var(--canvas-panel);
+		border: 1px solid var(--canvas-line-strong);
 		border-radius: 6px;
 		cursor: pointer;
 	}
@@ -1795,7 +1564,7 @@
 
 /* ---- a document or an app item, in a board's place (`item-surfaces.tsx`) ------------------- */
 
-@layer components {
+@layer decks.surface {
 	/*
 	 * An app's body: the page's part of the window, below the bar the engine paints (`engine.rs`,
 	 * `paint_window`; `APP_BAR` sets its top). The engine paints the window's paper, bar, lights, name,
@@ -1816,7 +1585,7 @@
 		overflow: hidden;
 		background: var(--app-bg);
 		color: var(--app-fg);
-		font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-sans, system-ui), sans-serif;
+		font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--canvas-font-sans, system-ui), sans-serif;
 	}
 	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface {
 		--app-bg: #1f1f21;
@@ -1886,5 +1655,41 @@
 	}
 	:where(.decks-canvas, .decks-layer) .document-surface .dp {
 		height: 100%;
+	}
+}
+
+@layer decks.surface {
+	/* Where an arrow end can keep to: the four sides' middles, the one it is near filled. */
+	/* Drawn at screen size and scaled to the world (`OverlayLayer.tsx`, `knob`); the ring an inset line, not a border a browser rounds. */
+	.world > .pen-side,
+	.world > .pen-anchor {
+		position: absolute;
+		z-index: 3;
+		box-sizing: border-box;
+		border: 0;
+		border-radius: 50%;
+		background: var(--canvas-panel);
+		box-shadow: inset 0 0 0 1.5px var(--canvas-accent);
+	}
+	.world > .pen-side {
+		pointer-events: none;
+	}
+	.world > .pen-side[data-on="true"] {
+		background: var(--canvas-accent);
+	}
+	.world > .pen-anchor {
+		background: color-mix(in srgb, var(--canvas-accent) 22%, var(--canvas-panel));
+		cursor: crosshair;
+		opacity: 0.85;
+	}
+	.world > .pen-anchor:hover {
+		background: var(--canvas-accent);
+		opacity: 1;
+	}
+	/* A card's news glow stays still for a reader who asked for less motion. */
+	@media (prefers-reduced-motion: reduce) {
+		.card-node > .news-glow::after {
+			animation: none;
+		}
 	}
 }

@@ -613,31 +613,4 @@
 		line-height: 1.4;
 	}
 
-	/* Where an arrow end can keep to: the four sides' middles, the one it is near filled. */
-	/* Drawn at screen size and scaled to the world (`OverlayLayer.tsx`, `knob`); the ring an inset line, not a border a browser rounds. */
-	.world > .pen-side,
-	.world > .pen-anchor {
-		position: absolute;
-		z-index: 3;
-		box-sizing: border-box;
-		border: 0;
-		border-radius: 50%;
-		background: var(--panel);
-		box-shadow: inset 0 0 0 1.5px var(--color-accent);
-	}
-	.world > .pen-side {
-		pointer-events: none;
-	}
-	.world > .pen-side[data-on="true"] {
-		background: var(--color-accent);
-	}
-	.world > .pen-anchor {
-		background: color-mix(in srgb, var(--color-accent) 22%, var(--panel));
-		cursor: crosshair;
-		opacity: 0.85;
-	}
-	.world > .pen-anchor:hover {
-		background: var(--color-accent);
-		opacity: 1;
-	}
 }

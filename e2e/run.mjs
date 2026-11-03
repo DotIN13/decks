@@ -219,6 +219,8 @@ const CHECKS = [
 	{ file: "smooth-edits.mjs", needsAgent: false, alone: true },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
+	/* Pictures of the canvas and its kit in light and dark, for a change to the look before and after (`LOOK_SHOTS`). Run only when named. */
+	{ file: "look-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

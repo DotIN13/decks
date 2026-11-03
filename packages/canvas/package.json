@@ -12,8 +12,8 @@
 		"./host": "./src/public/host.ts",
 		"./card-reading": "./src/items/card-reading.ts",
 		"./card": "./src/items/card.ts",
-		"./styles.css": "./styles/standalone.css",
-		"./canvas.css": "./dist/canvas.css",
+		"./styles.css": "./styles/surface.css",
+		"./surface.css": "./dist/surface.css",
 		"./styles/*": "./styles/*"
 	},
 	"scripts": {

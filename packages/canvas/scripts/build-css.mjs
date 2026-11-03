@@ -1,7 +1,7 @@
 /**
- * Build `dist/canvas.css`: the canvas's whole stylesheet for any host, with no Tailwind needed there.
+ * Build `dist/surface.css`: the canvas surface's stylesheet for any host, with no Tailwind needed there.
  *
- * Tailwind compiles `styles/standalone.css` with the classes the canvas's sources use. Then every
+ * Tailwind compiles `styles/surface.css` with the classes the canvas's sources use. Then every
  * rule is scoped to the canvas: a selector `S` becomes `:where(.decks-canvas, .decks-layer) S`
  * (`.decks-layer` is where the canvas's popovers go, at the end of the page), and `:root`, `html`
  * and `body` become the canvas itself. `:where` adds nothing to a selector's weight, so the
@@ -20,7 +20,7 @@ import postcss from "postcss";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = join(here, "..");
-const entry = join(pkg, "styles", "standalone.css");
+const entry = join(pkg, "styles", "surface.css");
 const ROOT = ":where(.decks-canvas, .decks-layer)";
 
 const compiler = await compile(readFileSync(entry, "utf8"), { base: dirname(entry), onDependency: () => {} });
@@ -51,6 +51,11 @@ function scope(sel) {
 }
 
 const root = postcss.parse(built);
+// The surface's own layer (`decks.surface`) is the app's ranking against its kit; in here the whole bundle is one
+// layer, `decks`, and the surface sits in its `components`, under the utilities its markup uses, as it was written.
+root.walkAtRules("layer", (at) => {
+	if (at.params === "decks.surface") at.params = "components";
+});
 const top = [];
 root.walkAtRules((at) => {
 	// Names and fonts are the page's: they cannot sit in a layer's selectors, so they stay at the top.
@@ -68,5 +73,5 @@ out.append(...top, layered);
 
 mkdirSync(join(pkg, "dist"), { recursive: true });
 const banner = "/* @decks/canvas: the canvas's stylesheet, scoped to .decks-canvas in @layer decks. Built by scripts/build-css.mjs; do not edit. */\n";
-writeFileSync(join(pkg, "dist", "canvas.css"), banner + out.toString());
-console.log(`[canvas] dist/canvas.css: ${candidates.length} classes, ${(out.toString().length / 1024).toFixed(0)} KB`);
+writeFileSync(join(pkg, "dist", "surface.css"), banner + out.toString());
+console.log(`[canvas] dist/surface.css: ${candidates.length} classes, ${(out.toString().length / 1024).toFixed(0)} KB`);

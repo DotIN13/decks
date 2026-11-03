@@ -5,7 +5,7 @@
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
  */
-@layer components {
+@layer decks.surface {
 	/*
 	 * What an agent just drew (`frame/inside/marks.ts`): a mark on each item it touched, drawn in the
 	 * stage's world in canvas units, so it is counter-scaled by `--zoom` like the cursor. An insert or
@@ -187,7 +187,7 @@
 	height: 8px;
 	margin: -4px 0 0 -4px;
 	border: 2px solid var(--cursor-color);
-	border-radius: var(--radius-pill);
+	border-radius: var(--canvas-radius-pill);
 	opacity: 0;
 	animation: cursor-ping 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }

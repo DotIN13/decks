@@ -1,0 +1,54 @@
+/*
+ * The ink tray: the pen's tools, colours and widths (`ui/InkBar.tsx`).
+ * The harness's own kit (`styles/kit/`): moved out of `@decks/canvas`, which keeps only the canvas surface.
+ */
+@layer components {
+	/* The drawing tools: a second row under the top-left cluster. */
+	.ink-bar {
+		position: absolute;
+		z-index: var(--z-float);
+		top: calc(var(--control, 28px) + 32px);
+		left: calc(var(--inset-left, 0px) + 12px);
+		max-width: calc(100% - var(--inset-left, 0px) - 24px);
+		gap: 2px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	.ink-bar .icon-button:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.inkbar-swatches,
+	.inkbar-widths {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.inkbar-swatch {
+		display: grid;
+		flex: none;
+		width: var(--control, 28px);
+		height: var(--control, 28px);
+		place-items: center;
+		border-radius: 50%;
+	}
+	.inkbar-swatch::before {
+		content: "";
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--swatch);
+		box-shadow: 0 0 0 1px var(--line-strong);
+	}
+	.inkbar-swatch[data-on="true"]::before {
+		box-shadow:
+			0 0 0 2px var(--layer, var(--panel)),
+			0 0 0 4px var(--swatch);
+	}
+	.inkbar-width > span {
+		display: block;
+		width: 16px;
+		border-radius: var(--radius-inline);
+		background: currentColor;
+	}
+}

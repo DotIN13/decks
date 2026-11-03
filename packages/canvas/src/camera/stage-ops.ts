@@ -169,7 +169,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 							x: at.x,
 							y: at.y,
 							label: typeof args.label === "string" ? args.label : "agent",
-							color: typeof args.color === "string" ? args.color : "var(--color-accent)",
+							color: typeof args.color === "string" ? args.color : "var(--canvas-accent)",
 						}
 					: null,
 			);

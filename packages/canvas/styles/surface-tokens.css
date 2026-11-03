@@ -1,0 +1,57 @@
+/*
+ * The canvas surface's tokens: the one contract between the surface (`surface.css`) and an app.
+ *
+ * The surface's sheets read these and nothing else of the app's: its colours, its type, its corners and
+ * the layer its floating parts sit at. An app themes the canvas by setting them on `.stage` (or on the
+ * frame's root, `.decks-canvas`); the Decks app maps its own tokens onto them (`apps/web/src/styles/tokens.css`).
+ * What is here are the defaults, the canvas as the Decks app draws it, for a host that maps nothing.
+ *
+ * The engine paints the drawing, the cards' pictures and the selection with no CSS: it reads
+ * `--canvas-accent` and `--canvas-panel` off the stage for the outlines and handles, and the light or dark
+ * scheme for the rest. A card's own content keeps its own tokens (`--b-*`, `card-host/lib/theme.css`).
+ */
+@layer decks.surface {
+	:where(.decks-canvas, .stage) {
+		--canvas-accent: #3b5cf6;
+		--canvas-accent-soft: #d7e2fc;
+		--canvas-warn: #e7af36;
+		--canvas-fg: #161616;
+		--canvas-muted: #5c5c5c;
+		--canvas-faint: #808080;
+		--canvas-line: #0000001a;
+		--canvas-line-strong: #00000033;
+		--canvas-panel: #ffffff;
+		--canvas-bg: #f5f5f5;
+		--canvas-bg-deep: #f2f2f2;
+		--canvas-stage: #f5f5f5;
+		--canvas-shadow: 0 1px 2px #0000000d, 0 6px 18px #0000000f;
+		--canvas-radius: 12px;
+		--canvas-radius-thumb: 5px;
+		--canvas-radius-pill: 999px;
+		--canvas-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		--canvas-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+		--canvas-type-label: 11.5px;
+		--canvas-type-ui: 12px;
+		--canvas-type-copy: 12.5px;
+		--canvas-type-body: 13px;
+		--canvas-type-name: 14px;
+		--canvas-type-title: 15px;
+		--canvas-z-float: 30;
+	}
+	:where([data-color-scheme="dark"]) :where(.decks-canvas, .stage) {
+		--canvas-fg: #fafafa;
+		--canvas-muted: #aeaeae;
+		--canvas-line: #ffffff1f;
+		--canvas-line-strong: #ffffff3d;
+		--canvas-panel: #242424;
+		--canvas-bg: #1e1e1e;
+		--canvas-bg-deep: #080808;
+		--canvas-stage: #1e1e1e;
+		--canvas-shadow: 0 1px 2px #00000066, 0 6px 18px #0000004d;
+	}
+	@media (pointer: coarse) {
+		:where(.decks-canvas, .stage) {
+			--canvas-radius: 26px;
+		}
+	}
+}

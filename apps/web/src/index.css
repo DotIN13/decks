@@ -1,3 +1,10 @@
+/*
+ * The layers, first, so they rank as named: the canvas surface (`@decks/canvas`, in `decks.surface`) under the
+ * app's own sheets (`components`), so a rule of the app's wins over the surface's whatever their order or weight,
+ * and both under Tailwind's utilities. The surface is themed through its tokens (`styles/tokens.css`), not
+ * overridden: a gate (`scripts/surface-gate.mjs`) keeps the app's sheets off its classes.
+ */
+@layer theme, base, decks.surface, components, utilities;
 @import "tailwindcss";
 /*
  * The app's stylesheets, in cascade order — and this file is the entry point: the ladder, the
@@ -25,26 +32,31 @@
  * long as the flattened order is the same. Comments and whitespace are not part of it, which
  * is why the prose in this file could be rewritten and the hash did not move.
  */
-@import "../../../packages/canvas/styles/chrome.css";
+@import "./styles/kit/chrome.css";
 @import "./styles/agents.css";
 @import "./styles/panel.css";
 @import "./styles/forms.css";
 @import "./styles/inspector.css";
-@import "../../../packages/agent-ui/styles/stream.css";
+@import "./styles/stream.css";
 @import "./styles/dock.css";
 @import "./styles/usage.css";
+@import "../../../packages/canvas/styles/surface-tokens.css";
 @import "../../../packages/canvas/styles/canvas.css";
+@import "./styles/kit/callout.css";
+@import "./styles/kit/tools.css";
 @import "./styles/canvases.css";
 @import "./styles/shell.css";
 @import "../../../packages/canvas/styles/ink.css";
+@import "./styles/kit/ink-tray.css";
+@import "./styles/kit/comment.css";
 @import "./styles/settings.css";
-@import "./styles/marks.css";
-@import "../../../packages/canvas/styles/markdown.css";
+@import "../../../packages/canvas/styles/marks.css";
+@import "./styles/markdown.css";
 @import "./styles/composer.css";
 @import "./styles/connections.css";
-@import "../../../packages/canvas/styles/properties.css";
+@import "./styles/kit/properties.css";
 /* The tokens are the canvas's (`@decks/canvas`), after every sheet, where they always were. */
-@import "../../../packages/canvas/styles/tokens.css";
+@import "./styles/tokens.css";
 /* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
 @import "./styles/v3.css";
 

@@ -881,7 +881,7 @@
 		color: var(--color-accent);
 	}
 
-	/* --- the four working marks (Pi's and Claude's ported from picone's `styles/app.css`) --- */
+	/* --- the four working marks (Pi's and Claude's ported from picone's own app stylesheet) --- */
 
 	/*
 	 * Pi builds. Ten character cells appear in reading order and fall away again, which is

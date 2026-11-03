@@ -1,18 +1,18 @@
 /*
  * What the Decks app's shell gives the canvas, for a page that holds it on its own (the canvas
- * frame's root, `.decks-canvas`): a box to fill, the page's type and colours, and the floating panel's card.
+ * frame's root, `.decks-canvas`): a box to fill, and the canvas's type and colours.
  * The Decks app has these in `shell.css`, `panel.css` and `index.css`, and does not import this.
  */
-@layer components {
+@layer decks.surface {
 	.decks-canvas {
 		position: relative;
 		width: 100%;
 		height: 100%;
 		overflow: clip;
-		background: var(--bg);
-		color: var(--fg);
-		font-family: var(--font-sans);
-		font-size: var(--type-body);
+		background: var(--canvas-bg);
+		color: var(--canvas-fg);
+		font-family: var(--canvas-font-sans);
+		font-size: var(--canvas-type-body);
 		-webkit-font-smoothing: antialiased;
 		touch-action: manipulation;
 	}
@@ -23,11 +23,4 @@
 		inset: 0;
 	}
 
-	.panel-float {
-		position: absolute;
-		border: 1px solid var(--line);
-		border-radius: var(--radius-panel, 12px);
-		background: var(--panel);
-		box-shadow: var(--shadow);
-	}
 }
