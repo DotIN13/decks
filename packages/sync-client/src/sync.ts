@@ -234,6 +234,16 @@ export class HarnessSync {
 	private boardLinks = new Map<string, { size: number; mtimeMs: number; targets: string[] }>();
 	/** Canvases Studio refused to take up, so each refusal is logged once. */
 	private refused = new Set<string>();
+	/**
+	 * Until when Studio asked this harness to send no more of a kind (a 429's Retry-After): files (a
+	 * canvas's files and pictures, which share Studio's files-a-minute and bytes-an-hour limits) or
+	 * edits. What is held is sent by the pass that runs when the wait is over (`hold`), and the rest of
+	 * a pass goes on meanwhile: a backlog of pictures never stops a drawing's edits.
+	 */
+	private held: Record<"files" | "edits", number> = { files: 0, edits: 0 };
+	private resume?: NodeJS.Timeout;
+	/** Files Studio refused for themselves (too large for the space left, a path it will not keep), by canvas and path, with the bytes' hash: not sent again until they change, or until the next full recheck. */
+	private refusedFiles = new Map<string, string>();
 	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
 	private thumbOwner = new Map<string, string>();
 
@@ -279,8 +289,61 @@ export class HarnessSync {
 		const text = await res.text();
 		cost.received += Buffer.byteLength(text);
 		const json = JSON.parse(text);
-		if (!res.ok) throw Object.assign(new Error(`${method} ${path}: ${res.status} ${json.error ?? ""}`), { status: res.status });
+		if (!res.ok) throw Object.assign(new Error(`${method} ${path}: ${res.status} ${json.error ?? ""}`), { status: res.status, retryAfter: Number(res.headers.get("retry-after")) || undefined });
 		return json;
+	}
+
+	/** Whether Studio asked for no more of this kind for now. */
+	private holding(kind: "files" | "edits"): boolean {
+		return Date.now() < this.held[kind];
+	}
+
+	/** Studio asked for a wait (429): none of this kind until then, and a pass when it is over, which sends what waited. */
+	private hold(kind: "files" | "edits", seconds = 60) {
+		const ms = Math.min(Math.max(seconds, 1), 3600) * 1000;
+		if (!this.holding(kind)) this.log(`Studio asked for no more ${kind} for ${Math.round(ms / 1000)} s: the rest go up then`);
+		this.held[kind] = Math.max(this.held[kind], Date.now() + ms);
+		const at = Math.max(this.held.files, this.held.edits) - Date.now();
+		clearTimeout(this.resume);
+		this.resume = setTimeout(() => {
+			if (!this.stopped) void this.sync();
+		}, at + 500);
+	}
+
+	/**
+	 * A file up to Studio, the one way every file goes, a canvas's own, a card's picture, a canvas's
+	 * picture: not sent while Studio asks for a wait or while it refused these same bytes; a 429 holds
+	 * every file until Studio's Retry-After, a refusal of this file alone (any other 4xx but 401) is
+	 * said once and skipped, and the pass goes on with what else it has. Studio down, or the key
+	 * refused, still ends the pass. Answers what Studio said, or undefined when nothing was sent.
+	 */
+	private async upload(name: string, id: string, path: string, bytes: Uint8Array, hash: string, base?: number): Promise<any | undefined> {
+		const key = `${name}:${path}`;
+		if (this.holding("files") || this.refusedFiles.get(key) === hash) return undefined;
+		try {
+			const answer = await this.call("PUT", `/sync/v1/canvases/${id}/files?path=${encodeURIComponent(path)}${base !== undefined ? `&base=${base}` : ""}`, undefined, bytes);
+			this.refusedFiles.delete(key);
+			return answer;
+		} catch (error) {
+			const { status, retryAfter } = error as { status?: number; retryAfter?: number };
+			if (status === 429) return void this.hold("files", retryAfter);
+			if (status === undefined || status >= 500 || status === 401) throw error;
+			if (this.refusedFiles.get(key) !== hash) this.log(`did not upload ${path} of ${name}: ${(error as Error).message}`);
+			this.refusedFiles.set(key, hash);
+			return undefined;
+		}
+	}
+
+	/** Edits up to Studio; undefined, held, when Studio asks for a wait: the file still differs from what was agreed, so the next pass finds them again. */
+	private async postEdits(id: string, body: unknown): Promise<any | undefined> {
+		if (this.holding("edits")) return undefined;
+		try {
+			return await this.call("POST", `/sync/v1/canvases/${id}/edits`, body);
+		} catch (error) {
+			const { status, retryAfter } = error as { status?: number; retryAfter?: number };
+			if (status !== 429) throw error;
+			return void this.hold("edits", retryAfter);
+		}
 	}
 
 	/** The state, only this account's to read, written when it changed: it holds revisions and file versions, no drawings. */
@@ -342,7 +405,10 @@ export class HarnessSync {
 		await this.hello();
 		this.fullDue = false;
 		const fresh = Date.now() - this.checkedAt >= RECHECK_MS;
-		if (fresh) this.penSeen.clear();
+		if (fresh) {
+			this.penSeen.clear();
+			this.refusedFiles.clear();
+		}
 		this.pull.clear();
 		this.dirtyPens.clear();
 		this.dirtyFiles.clear();
@@ -388,8 +454,10 @@ export class HarnessSync {
 			// A canvas Studio has not listed to this harness yet (new here, or just shared): a full pass takes it up.
 			if (!c) return this.pass();
 			if (pens.has(name)) await this.syncCanvas(name, c);
-			if (files.has(name)) await this.syncCanvasFiles(name, c, false);
-			else if (pictures.has(name) && c.role !== "view") await this.syncPictures(name, s.id);
+			if (files.has(name)) {
+				const remote = await this.syncCanvasFiles(name, c, false);
+				if (remote && c.role !== "view") await this.syncPictures(name, s.id, remote);
+			} else if (pictures.has(name) && c.role !== "view") await this.syncPictures(name, s.id);
 		}
 		await this.syncCanvasPictures();
 		this.save();
@@ -544,6 +612,7 @@ export class HarnessSync {
 			this.state.canvases[name] = { id: c.id, rev: full.rev, files: {} };
 			this.log(this.shared(name) ? `${c.ownerName || "a friend"} shared ${c.title}: it is in ${canvasFolder(name)}` : `downloaded canvas ${name}`);
 		}
+		const synced: [string, SyncCanvas][] = [];
 		for (const [name, s] of Object.entries(this.state.canvases)) {
 			const c = byId.get(s.id);
 			if (!safeCanvasFolder(name.split("/").at(-1)) || (name.includes("/") && !this.shared(name))) {
@@ -563,7 +632,21 @@ export class HarnessSync {
 			else this.writeMeta(name, { othersEdit: c.othersEdit === true });
 			this.latest.set(c.id, Math.max(this.latest.get(c.id) ?? 0, c.rev));
 			await this.syncCanvas(name, c);
-			await this.syncCanvasFiles(name, c, fresh);
+			synced.push([name, c]);
+		}
+		/*
+		 * Every canvas's drawing first, then every canvas's files, then the cards' pictures: Studio takes
+		 * so many files a minute from a harness, so what a person made goes up before what can be taken again.
+		 */
+		const lists = new Map<string, Map<string, SyncFile>>();
+		for (const [name, c] of synced) {
+			const remote = await this.syncCanvasFiles(name, c, fresh);
+			if (remote) lists.set(name, remote);
+		}
+		for (const [name, c] of synced) {
+			const s = this.state.canvases[name];
+			const remote = lists.get(name);
+			if (s && remote && c.role !== "view" && !this.holding("files")) await this.syncPictures(name, s.id, remote);
 		}
 		await this.syncCanvasPictures();
 	}
@@ -659,7 +742,8 @@ export class HarnessSync {
 		let next: { doc: PenDocument; rev: number } | undefined;
 		if (edits.length && remote.role !== "view") {
 			this.pictureDue.add(name);
-			const r = await this.call("POST", `/sync/v1/canvases/${s.id}/edits`, { base: s.rev, edits, client: this.me });
+			const r = await this.postEdits(s.id, { base: s.rev, edits, client: this.me });
+			if (!r) return;
 			if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
 			if (r.pen) next = { doc: r.pen, rev: r.rev }; // A Studio from before edits were answered with changes.
 			else if (r.base === s.rev) next = { doc: loosely(base.doc, r.changes ?? []), rev: r.rev };
@@ -911,9 +995,9 @@ export class HarnessSync {
 		return out;
 	}
 
-	private async syncCanvasFiles(name: string, c: SyncCanvas, fresh: boolean) {
+	private async syncCanvasFiles(name: string, c: SyncCanvas, fresh: boolean): Promise<Map<string, SyncFile> | undefined> {
 		const s = this.state.canvases[name];
-		if (!s) return;
+		if (!s) return undefined;
 		const writable = c.role !== "view";
 		const remote = new Map<string, SyncFile>(((await this.call("GET", `/sync/v1/canvases/${s.id}/files`)).files as SyncFile[]).map((f) => [f.path, f]));
 		const local = this.bundle(name);
@@ -979,7 +1063,8 @@ export class HarnessSync {
 			 * whether Studio moved on since: current when not, a conflict when it did.
 			 */
 			const base = was?.version ?? (there ? 0 : undefined);
-			const put = await this.call("PUT", `/sync/v1/canvases/${s.id}/files?path=${encodeURIComponent(path)}${base !== undefined ? `&base=${base}` : ""}`, undefined, bytes);
+			const put = await this.upload(name, s.id, path, bytes, hash, base);
+			if (!put) continue;
 			if (put.current) known[path] = { version: put.version, hash };
 			else await this.conflicted(name, s, path, full, bytes, hash, put.version, remote.get(path)!);
 		}
@@ -991,7 +1076,7 @@ export class HarnessSync {
 			}
 			await this.download(name, path, f);
 		}
-		if (writable) await this.syncPictures(name, s.id, remote);
+		return remote;
 	}
 
 	/**
@@ -1052,6 +1137,8 @@ export class HarnessSync {
 	private async takeCanvasPictures() {
 		if (!this.o.harness) return;
 		for (const name of [...this.pictureDue]) {
+			// Studio asked for a wait: the pictures stay due, taken when it is over.
+			if (this.holding("files")) return;
 			const s = this.state.canvases[name];
 			if (!s || Date.now() - (this.pictureAt.get(name) ?? 0) < 60_000) continue;
 			this.pictureDue.delete(name);
@@ -1065,7 +1152,12 @@ export class HarnessSync {
 				const shot = (await res.json()) as { ok?: boolean; value?: { file?: string } };
 				if (!shot.ok || !shot.value?.file) continue;
 				const file = shot.value.file.startsWith("/") ? shot.value.file : join(this.o.deck, shot.value.file);
-				await this.call("PUT", `/sync/v1/canvases/${s.id}/files?path=${encodeURIComponent(`${PICTURES}/canvas.light.jpg`)}`, undefined, readFileSync(file));
+				const bytes = readFileSync(file);
+				const sent = await this.upload(name, s.id, `${PICTURES}/canvas.light.jpg`, bytes, hashOf(bytes));
+				if (!sent && this.holding("files")) {
+					this.pictureDue.add(name);
+					this.pictureAt.delete(name);
+				}
 			} catch (error) {
 				this.log(`no picture of canvas ${name}: ${(error as Error).message}`);
 			}
@@ -1101,7 +1193,8 @@ export class HarnessSync {
 				const full = join(dir, newest.t);
 				const got = this.hashes.hash(full);
 				if (!got || there.get(target)?.hash === got.hash) continue;
-				await this.call("PUT", `/sync/v1/canvases/${id}/files?path=${encodeURIComponent(target)}`, undefined, got.bytes ?? readFileSync(full));
+				await this.upload(name, id, target, got.bytes ?? readFileSync(full), got.hash);
+				if (this.holding("files")) return;
 			}
 		}
 	}
@@ -1167,7 +1260,9 @@ export class HarnessSync {
 		}
 		const edits = queued.flat();
 		this.pictureDue.add(name);
-		const r = await this.call("POST", `/sync/v1/canvases/${s.id}/edits`, { base: s.rev, edits, client: this.me });
+		const r = await this.postEdits(s.id, { base: s.rev, edits, client: this.me });
+		// Held: the file holds them, and the pass after the wait compares it (`syncCanvas`).
+		if (!r) return void this.dirtyPens.add(name);
 		if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
 		let next: { doc: PenDocument; rev: number };
 		if (r.pen) next = { doc: r.pen, rev: r.rev };
@@ -1365,6 +1460,7 @@ export class HarnessSync {
 		this.stopped = true;
 		clearTimeout(this.pending);
 		clearInterval(this.timer);
+		clearTimeout(this.resume);
 		for (const w of this.watchers) w.close();
 		this.ws?.close();
 		await this.running;
