@@ -321,6 +321,8 @@ impl Page {
 	/// Everything laid out again, after a batch of fonts (`hold_font`).
 	pub fn lay_out(&mut self) {
 		self.scene.update(&self.doc, None, &self.text);
+		// The cards' titles and placeholders' words too: laid before their font came, they were kept empty until the card list next changed.
+		self.titles.borrow_mut().clear();
 	}
 
 	/// Every item as laid out, in paint order: `[id, x, y, w, h, parent, order, theme]`.
