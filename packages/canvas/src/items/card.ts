@@ -540,10 +540,16 @@ export function wordsSelectedInCards(): boolean {
 	const roots = [...openRoots];
 	const selection = getSelection() as (Selection & { getComposedRanges?: (options: { shadowRoots: ShadowRoot[] }) => StaticRange[] }) | null;
 	if (selection?.getComposedRanges) {
+		const inside = (ranges: StaticRange[]) => ranges.some((range) => !range.collapsed && roots.some((root) => root.contains(range.startContainer)));
 		try {
-			if (selection.getComposedRanges({ shadowRoots: roots }).some((range) => !range.collapsed && roots.some((root) => root.contains(range.startContainer)))) return true;
+			if (inside(selection.getComposedRanges({ shadowRoots: roots }))) return true;
 		} catch {
-			/* a browser with the older signature: asked root by root below */
+			// Safari 17's form: the roots as arguments.
+			try {
+				if (inside((selection.getComposedRanges as unknown as (...given: ShadowRoot[]) => StaticRange[]).apply(selection, roots))) return true;
+			} catch {
+				/* asked root by root below */
+			}
 		}
 	}
 	return roots.some((root) => ((root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.()?.toString() ?? "").trim() !== "");

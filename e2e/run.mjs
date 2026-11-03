@@ -219,6 +219,8 @@ const CHECKS = [
 	{ file: "card-keys.mjs", needsAgent: false },
 	/* A card opened in a tab of its own runs its scripts with the whole card: card.file, on, store, path, decks. */
 	{ file: "card-tab.mjs", needsAgent: false },
+	/* A card's links to its canvas's files: Open in a tab, Download saved under its name. */
+	{ file: "card-links.mjs", needsAgent: false },
 	/* A new agent opens at once: its conversation and its canvas on screen. */
 	{ file: "new-agent-opens.mjs", needsAgent: false },
 	/* An agent's view.cursor on a card puts a named arrow in the frame, and null takes it away. */
