@@ -232,6 +232,8 @@ export class HarnessSync {
 	/** The deck files each canvas's boards point at, by canvas name, and each board's links by its deck path with its size and time. */
 	private links = new Map<string, Set<string>>();
 	private boardLinks = new Map<string, { size: number; mtimeMs: number; targets: string[] }>();
+	/** Canvases Studio refused to take up, so each refusal is logged once. */
+	private refused = new Set<string>();
 	/** Which canvas a board picture in `.decks/thumbs` belongs to, by its file name's prefix. */
 	private thumbOwner = new Map<string, string>();
 
@@ -497,7 +499,19 @@ export class HarnessSync {
 				continue;
 			}
 			const text = readFileSync(join(this.folder(name), "canvas.pen"), "utf8");
-			const { canvas, existed } = await this.call("POST", "/sync/v1/canvases", { name, title: this.titleOf(name), pen: parse(text) });
+			let made: { canvas: SyncCanvas; existed?: boolean };
+			try {
+				made = await this.call("POST", "/sync/v1/canvases", { name, title: this.titleOf(name), pen: parse(text) });
+			} catch (error) {
+				// Studio refuses this one (its name, its size): the rest of the deck still syncs, and the refusal is said once, not every pass.
+				const status = (error as { status?: number }).status;
+				if (status === undefined || status >= 500 || status === 401 || status === 429) throw error;
+				if (!this.refused.has(name)) this.log(`did not upload canvas ${name}: ${(error as Error).message}`);
+				this.refused.add(name);
+				continue;
+			}
+			this.refused.delete(name);
+			const { canvas, existed } = made;
 			if (existed) {
 				await this.adopt(name, canvas.id, known, "has the name of one of yours already in Studio");
 				continue;

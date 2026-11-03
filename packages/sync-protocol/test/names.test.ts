@@ -9,7 +9,9 @@ test("paths stay inside a canvas's bundle", () => {
 
 test("names are one plain segment", () => {
 	assert.ok(safeCanvasName("my-canvas_1.2"));
-	for (const bad of ["..", ".x", "a/b", "", "x".repeat(101)]) assert.ok(!safeCanvasName(bad), bad);
+	// A deck names a canvas from its title, in any script.
+	for (const good of ["第二集-v2-旁白录音-片段修改与审片", "café-notes", "Ελληνικά", "हिन्दी-नोट्स"]) assert.ok(safeCanvasName(good), good);
+	for (const bad of ["..", ".x", "a/b", "a\\b", "a b", "-x", "a\0b", "", "x".repeat(101)]) assert.ok(!safeCanvasName(bad), bad);
 });
 
 test("secrets never sync", () => {

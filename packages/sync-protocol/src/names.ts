@@ -17,8 +17,12 @@ export const PICTURES = ".pictures";
 /** Every top-level part a synced file of a canvas can be in. */
 export const BUNDLE_PARTS: readonly string[] = [...OWN_PARTS, ...MIRRORED_PARTS, PICTURES];
 
-/** A canvas's folder name as the service keeps it: letters, digits, dots, dashes and underscores, starting with a letter or digit, at most 100. */
-export const CANVAS_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+/**
+ * A canvas's folder name as the service keeps it: letters and digits of any script (a deck names a canvas
+ * from its title, so `第二集-v2-旁白录音` is one), with the marks that join them, dots, dashes and
+ * underscores, starting with a letter or digit, at most 100. No slash, backslash, space or NUL can be in it.
+ */
+export const CANVAS_NAME = /^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]{0,99}$/u;
 export const CANVAS_NAME_ERROR = "Name the canvas folder: letters, digits, dots, dashes and underscores, starting with a letter or digit, at most 100.";
 
 /** Whether a canvas name from the other side may name a folder. */
