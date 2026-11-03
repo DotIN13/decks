@@ -2115,8 +2115,8 @@ fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: 
 		"app" => "App",
 		"document" => "Document",
 		"board" => "Board",
-		// A card its host has no copy of and nothing to send it from (`items/missing.ts`): said, so it is not taken for one still loading.
-		"missing" => "Card · not here: Studio has no copy, and no harness with it is in reach",
+		// A card its host has no copy of and nothing to send it from (`items/missing.ts`): said, so it is not taken for one still loading; why is under the title.
+		"missing" => "Card · missing",
 		_ => "Card",
 	};
 	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };
@@ -2134,9 +2134,17 @@ fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: 
 		return;
 	}
 	let title = titles.entry(format!("ph:{kind}:{room}:{}", p.title)).or_insert_with(|| text.lay_words(&p.title, &big, Some(room), stage_text::Align::Left, false, false));
+	let title_height = title.height as f64;
 	// Cut at the paper's foot: a long title on a short paper shows its first lines.
 	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
 	stage_paint::painter::draw_laid(ctx, title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
+	// A missing card says why under its title, as large as reads from a little way off: nothing is coming until a source has it.
+	if p.kind == "missing" {
+		let note = stage_scene::layout::TextStyle { family: "Inter".into(), size: 20.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+		let why = "Studio has no copy of this card yet, and no harness of yours with it is in reach.";
+		let laid = titles.entry(format!("ph-missing:{room}")).or_insert_with(|| text.lay_words(why, &note, Some(room), stage_text::Align::Left, false, false));
+		stage_paint::painter::draw_laid(ctx, laid, (pad, title_top + title_height + 14.0), &[Color::straight(faint, 1.0)], &m, ops);
+	}
 	ops.push(Op::PopClip);
 }
 
