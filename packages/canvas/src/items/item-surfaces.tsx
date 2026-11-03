@@ -174,8 +174,9 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 					class="app-surface-frame"
 					title={about()?.title ?? props.app}
 					src={url()}
-					sandbox="allow-scripts allow-forms allow-modals allow-downloads"
-					allow="clipboard-read; clipboard-write; fullscreen"
+					/* No more than the canvas frame around it has (`frame/outside/host.tsx`), and the same reasons for what is left out. */
+					sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-popups allow-pointer-lock allow-top-navigation-to-custom-protocols"
+					allow="clipboard-read; clipboard-write; fullscreen; autoplay; picture-in-picture; screen-wake-lock; web-share; gamepad; encrypted-media; accelerometer; gyroscope; xr-spatial-tracking"
 					style={{ "pointer-events": props.selected ? "auto" : "none" }}
 					on:load={() => setLoaded(true)}
 				/>

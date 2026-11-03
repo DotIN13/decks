@@ -45,6 +45,20 @@ say("the app runs inside the canvas frame, on the pass in its path", !!found, pa
 // Each look waits a second at most: an app frame that is still loading has no #count yet, and the next look finds it.
 const counted = await until(async () => (await appFrame()?.locator("#count").textContent({ timeout: 1000 }))?.includes("Pressed 0"));
 say("…and its page loads there, scripts and all", !!counted);
+// What the frames pass down to an app: autoplay and the other features that ask for nothing, never what reaches Decks's page or your login.
+const granted = await appFrame()?.evaluate(() => {
+	const policy = document.featurePolicy ?? document.permissionsPolicy;
+	const allows = (feature) => policy?.allowsFeature?.(feature) ?? null;
+	let reachesPage = true;
+	try {
+		void top.document.body;
+	} catch {
+		reachesPage = false;
+	}
+	return { autoplay: allows("autoplay"), pictureInPicture: allows("picture-in-picture"), payment: allows("payment"), passkeys: allows("publickey-credentials-get"), origin: origin, reachesPage };
+});
+say("an app is passed autoplay and picture-in-picture, as the canvas frame is", granted?.autoplay === true && granted?.pictureInPicture === true, JSON.stringify(granted));
+say("…but not payment or passkeys, keeps its blank origin, and cannot reach the Decks page", granted?.payment === false && granted?.passkeys === false && granted?.origin === "null" && granted?.reachesPage === false, JSON.stringify(granted));
 
 const canvas = await canvasFrame(page);
 const takes = () => canvas.evaluate(() => getComputedStyle(document.querySelector(".app-surface-frame")).pointerEvents);
