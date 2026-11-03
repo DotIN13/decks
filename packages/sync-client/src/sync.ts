@@ -635,14 +635,19 @@ export class HarnessSync {
 			synced.push([name, c]);
 		}
 		/*
-		 * Every canvas's drawing first, then every canvas's files, then the cards' pictures: Studio takes
-		 * so many files a minute from a harness, so what a person made goes up before what can be taken again.
+		 * Every canvas's drawing first, then every canvas's files, then each canvas's picture, then the
+		 * cards' pictures: Studio takes so many files a minute from a harness, so what a person made goes
+		 * up before what can be taken again, and the picture Studio's list shows before the cards' (which
+		 * a canvas in Studio takes from the harness while one is in reach).
 		 */
 		const lists = new Map<string, Map<string, SyncFile>>();
 		for (const [name, c] of synced) {
 			const remote = await this.syncCanvasFiles(name, c, fresh);
-			if (remote) lists.set(name, remote);
+			if (!remote) continue;
+			lists.set(name, remote);
+			if (c.role !== "view" && !remote.has(`${PICTURES}/canvas.light.jpg`)) this.pictureDue.add(name);
 		}
+		await this.syncCanvasPictures();
 		for (const [name, c] of synced) {
 			const s = this.state.canvases[name];
 			const remote = lists.get(name);
