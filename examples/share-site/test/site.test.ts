@@ -53,7 +53,7 @@ test("two pages and a harness keep one canvas in step through the site", async (
 	writeFileSync(join(deck, "canvases", "plan", "canvas.pen"), serialize({ version: "2.14", children: [{ id: "n1", type: "note", content: "from the harness", x: 0, y: 0 }] } as never));
 	const harness = new HarnessSync({ deck, studio: site.url, key: "ada-mini", log: () => {} });
 	await harness.sync();
-	const id = site.store.canvases("bob")[0]!.id;
+	const id = (await site.store.canvases("bob"))[0]!.id;
 
 	const ada = await page("ada-key", id), bob = await page("bob-key", id);
 	assert.equal((bob.doc().children[0] as { content: string }).content, "from the harness");
