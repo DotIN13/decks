@@ -10,6 +10,7 @@ import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../protocol.ts";
+import { forgetMissing } from "../../items/missing.ts";
 
 /**
  * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its
@@ -52,6 +53,7 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 		running = running.then((stop) => {
 			stop?.();
 			endLife();
+			forgetMissing();
 			root.replaceChildren();
 			addEventListener("message", onStart);
 			parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");

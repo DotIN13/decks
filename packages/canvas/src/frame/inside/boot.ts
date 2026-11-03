@@ -13,6 +13,7 @@ import { installPresence } from "./presence.ts";
 import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
+import { forgetMissing } from "../../items/missing.ts";
 
 /**
  * What the frame holds once `start` has come: who keeps the canvas, the drawing first read, the
@@ -41,6 +42,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		currentToken = data.token;
 		backend.setToken(data.token);
 		studio?.setToken(data.token);
+		// Another source (a harness back in reach, or gone) or the next pass on it: what was missing is asked for again.
+		if (data.files && data.files.base !== filesBase) forgetMissing();
 		if (data.files) filesBase = data.files.base;
 		if (data.pictures) picturesAt = data.pictures;
 	});

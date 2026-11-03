@@ -13,6 +13,7 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
+import { markMissing, saysMissing } from "../items/missing.ts";
 import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
@@ -1797,6 +1798,12 @@ export class StageEngine {
 		this.fetching++;
 		void fetch(url, { credentials: "same-origin" })
 			.then(async (response) => {
+				// The host has no copy and no source: painted as its placeholder, saying so, and not asked again.
+				if (card && saysMissing(response)) {
+					const path = this.cardByKey.get(key)?.path;
+					if (path) markMissing(path);
+					return;
+				}
 				if (!response.ok) throw new Error(String(response.status));
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
 				if (card && response.headers.get("Content-Type")?.startsWith("application/vnd.decks.astc")) {

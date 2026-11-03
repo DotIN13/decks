@@ -5,6 +5,7 @@ import { ownInput } from "./input.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { cardLoader } from "./card-load.ts";
 import { scheme } from "../theme.ts";
+import { markMissing } from "./missing.ts";
 import { canvasHost, openInTab } from "../host.ts";
 
 /** The cards mounted on this page, by path: how each is written out for an agent's screenshot (`card-snapshot.ts`). */
@@ -76,6 +77,7 @@ export function CardSurface(props: {
 			return url.href;
 		},
 		read: (url) => fetch(url, { cache: "no-cache" }),
+		missing: () => markMissing(props.path),
 		mount: (html) => {
 			if (!host) return;
 			mount(html);

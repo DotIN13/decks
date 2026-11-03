@@ -2115,6 +2115,8 @@ fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: 
 		"app" => "App",
 		"document" => "Document",
 		"board" => "Board",
+		// A card its host has no copy of and nothing to send it from (`items/missing.ts`): said, so it is not taken for one still loading.
+		"missing" => "Card · not here: Studio has no copy, and no harness with it is in reach",
 		_ => "Card",
 	};
 	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };

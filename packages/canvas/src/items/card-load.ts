@@ -1,3 +1,5 @@
+import { saysMissing } from "./missing.ts";
+
 /**
  * How a card's file is read (`card-surface.tsx`): its HTML mounted once it has come, and nothing done
  * when it has not. A file that did not come (a ticket run out, the server restarting, a network hiccup)
@@ -14,7 +16,9 @@ interface CardLoad {
 export function cardLoader(options: {
 	/** The file's address now. */
 	url(): string;
-	read(url: string): Promise<Pick<Response, "ok" | "text">>;
+	read(url: string): Promise<Pick<Response, "ok" | "text"> & Partial<Pick<Response, "status" | "headers">>>;
+	/** The host said it has no copy and no source (`items/missing.ts`): not asked again. */
+	missing?(): void;
 	/** The file's HTML, to mount. */
 	mount(html: string): void;
 	/** How long to wait before the one retry. */
@@ -38,6 +42,10 @@ export function cardLoader(options: {
 		let html: string | undefined;
 		try {
 			const response = await options.read(options.url());
+			if (response.status !== undefined && saysMissing({ status: response.status, headers: response.headers })) {
+				if (ask === asked) options.missing?.();
+				return;
+			}
 			html = response.ok ? await response.text() : undefined;
 		} catch {
 			html = undefined;

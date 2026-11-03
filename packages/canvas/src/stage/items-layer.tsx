@@ -7,6 +7,7 @@ import { canvasHost, openInTab } from "../host.ts";
 import { appShowing } from "../items/item-surfaces.tsx";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";
+import { missing } from "../items/missing.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
@@ -255,7 +256,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item === "document" && board.file ? props.shots().picture({ path: board.file, rev: board.rev }, look) : board.item ? "" : props.shots().picture(board, look),
 						// Painted on its paper until its picture comes; an app's window carries its name and status in every state.
 						title: board.title,
-						kind: board.card ? "card" : (board.item ?? "board"),
+						kind: board.card ? (missing().has(board.path) ? "missing" : "card") : (board.item ?? "board"),
 						...(board.item === "app" && board.app ? { status: states.get(board.app) ?? "" } : {}),
 						...(news?.[board.path] ? { news: resolveColour(news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
@@ -370,7 +371,8 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
 	/** The placed items as the chooser sees them: the same order as `props.boards` and `pageIndex`, each with its kind. */
-	const awakeItems = createMemo<readonly AwakeItem[]>(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, kind: board.card ? "card" : board.item })));
+	// A card its host has no copy of (`items/missing.ts`) is never woken, as a board is not: its page would be blank paper, and the sheet paints why.
+	const awakeItems = createMemo<readonly AwakeItem[]>(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, kind: board.card ? (missing().has(board.path) ? undefined : "card") : board.item })));
 	/*
 	 * Which items are awake (`items/awake.ts`): chosen from the camera at rest, so nothing mounts or
 	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, each kind

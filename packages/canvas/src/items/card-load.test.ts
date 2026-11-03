@@ -63,3 +63,39 @@ test("a stopped card mounts nothing that was on its way, and makes no retry", as
 	assert.deepEqual(mounted, []);
 	assert.equal(timers.length, 0);
 });
+
+test("a card its host has no copy of (404 with X-Decks-Missing) is said to be missing, not mounted and not asked for again", async () => {
+	const mounted: string[] = [];
+	const timers: Array<() => void> = [];
+	let missing = 0;
+	const loader = cardLoader({
+		url: () => "/api/live/P/cards/a@1/index.html?raw=1",
+		read: async () => ({ ok: false, status: 404, headers: new Headers({ "X-Decks-Missing": "1" }), text: async () => "" }),
+		mount: (html) => mounted.push(html),
+		missing: () => missing++,
+		setTimer: (run) => timers.push(run),
+		clearTimer: () => timers.splice(0),
+	});
+	loader.load();
+	await settle();
+	assert.equal(missing, 1);
+	assert.deepEqual(mounted, []);
+	assert.equal(timers.length, 0, "no retry: there is nothing to come");
+});
+
+test("a plain 404 is a failure like any other: asked for once more, not said to be missing", async () => {
+	const timers: Array<() => void> = [];
+	let missing = 0;
+	const loader = cardLoader({
+		url: () => "/api/t/T/card/canvases/c/cards/a@1/index.html?raw=1",
+		read: async () => ({ ok: false, status: 404, headers: new Headers(), text: async () => "" }),
+		mount: () => {},
+		missing: () => missing++,
+		setTimer: (run) => timers.push(run),
+		clearTimer: () => timers.splice(0),
+	});
+	loader.load();
+	await settle();
+	assert.equal(missing, 0);
+	assert.equal(timers.length, 1);
+});

@@ -53,7 +53,8 @@ export interface SceneCard {
 	glow?: boolean;
 	/** Its title and kind, painted on its paper while it has no picture (`engine.rs`, `frame`). */
 	title?: string;
-	kind?: "card" | "app" | "document" | "board";
+	/** `missing`: a card its host has no copy of and no source for (`items/missing.ts`), its placeholder saying so. */
+	kind?: "card" | "app" | "document" | "board" | "missing";
 	/** An app's status, for the dot on its window's bar. */
 	status?: string;
 }
