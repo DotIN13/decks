@@ -220,8 +220,8 @@ export interface Verbs {
 		/** Every canvas in the deck, and which agents have it open. */
 		list(): Promise<Canvas[]>;
 		/**
-		 * A new, empty canvas, named from a title. Nobody moves to it: agent.update({ canvas }) makes it
-		 * your home, view.goto shows it.
+		 * A new, empty canvas, named from a title. Nobody moves to it: view.goto moves your conversation
+		 * there, and the person's screen with it when yours is the chat on screen.
 		 */
 		create(title: string): Promise<Canvas>;
 		/**
@@ -269,8 +269,9 @@ export interface Verbs {
 		/**
 		 * Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the
 		 * project) or tags (up to four, for what you are doing now), or your home canvas: the one the app
-		 * shows beside you, and what decks.here() means for a call that names none. Set the first four
-		 * early in every session.
+		 * shows beside you, and what decks.here() means for a call that names none. A new home is moved to
+		 * as view.goto moves: the screen follows when your chat is on screen, and the person is asked first
+		 * while they use the canvas. Set the first four early in every session.
 		 */
 		update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Promise<Agent>;
 		/** Say these cards carry your work, without showing them: you become their writer. */
@@ -307,11 +308,20 @@ export interface Verbs {
 		create(spec: { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; workspace?: string; tags?: string[]; canvas?: string }): Promise<Agent>;
 	};
 	view: {
-		/** Bring the person's screen to a canvas. Only the view moves; nobody's home canvas changes. */
+		/**
+		 * Move your conversation to a canvas, as the person's canvas switcher does: it becomes your home
+		 * canvas, and the person's screen goes with it when your chat is the one on screen. In the
+		 * background it just moves, and the person sees it when they open your chat. While they are using
+		 * the canvas they are offered a button instead, and nothing moves until they press it. `moved` says
+		 * whether the screen went.
+		 */
 		goto(canvas: string): Promise<{ canvas: string; moved: boolean; note?: string }>;
 		/**
-		 * Move the camera to a card or a drawn item on a canvas (a list frames them all), optionally
-		 * outlining one data-id block inside a card. `animate: true` glides.
+		 * Move the camera to a card or a drawn item (a list frames them all), optionally outlining one
+		 * data-id block inside a card. `animate: true` glides. The canvas is the one named, else the one a
+		 * card's path names, else your own; one not your own is gone to first, as view.goto goes. In the
+		 * background your view waits for your chat; while the person is using the canvas they are offered a
+		 * button.
 		 */
 		focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean }): Promise<{ canvas: string; target: string | string[]; deferred?: string }>;
 		/** Where the person's screen is looking, and its zoom. */

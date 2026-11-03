@@ -49,7 +49,7 @@ export interface FrameHooks {
 	landed(): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
-	/** Open another conversation, as a click on its row does: what `view.goto` uses to show its canvas. */
+	/** Open another conversation, as a click on its row does. */
 	focusAgent?(id: string): void;
 	/** Move a conversation to a canvas, as the person: an agent's offered `view.goto` they said Go to. */
 	moveConversation?(id: string, canvas: string): void;

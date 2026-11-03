@@ -635,7 +635,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const from = canvasOf(options?.canvas);
 				const name = copySharedCanvas(service.deckPath(), pens, from, options?.title);
 				service.stagesChanged();
-				notes.push(`${name} is your own copy of ${pens.titleOf(from)}: change it as you like, it syncs as your canvas and never changes theirs. decks view goto ${name} shows it.`);
+				notes.push(`${name} is your own copy of ${pens.titleOf(from)}: change it as you like, it syncs as your canvas and never changes theirs. decks view goto ${name} moves you there.`);
 				return canvasRow(name);
 			},
 			create: async (title: string) => {
@@ -643,7 +643,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const pens = needPens();
 				const name = pens.claim(title.trim());
 				service.stagesChanged();
-				notes.push(`${name} is made and empty. Nobody is on it yet: decks agent update --canvas ${name} makes it your home, decks view goto ${name} shows it.`);
+				notes.push(`${name} is made and empty. Nobody is on it yet: decks view goto ${name} moves you there, and the person's screen with you when your chat is on screen.`);
 				return canvasRow(name);
 			},
 		},

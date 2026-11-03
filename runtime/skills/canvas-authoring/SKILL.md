@@ -48,15 +48,20 @@ bash: `decks canvas read`, `decks canvas insert '{…}' --beside <id>`, `decks c
 ## Canvases
 
 Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. Left out, it is
-`decks.here()`, your home canvas, the one the person sees beside you. None of these moves you:
+`decks.here()`, your home canvas, the one the person sees beside you. The first three move nobody:
 
 ```ts
 await decks.canvas.list();                    // every canvas: { name, title, open: [agents], cards }
 await decks.canvas.create("Launch plan");     // a new, empty canvas; nobody is moved to it
 await decks.canvas.read({ canvas: "deploy" }); // another canvas, read where it is
-await decks.agent.update({ canvas: "deploy" }); // make it your home: the person sees it beside you
-await decks.view.goto("deploy");              // bring the person's screen there
+await decks.view.goto("deploy");              // move your conversation there: it becomes your home
 ```
+
+`view.goto` does what the person's canvas switcher does, for your conversation only: when your chat is
+the one on screen, the screen goes with you; in the background you just move, and the person sees it
+when they open your chat; while they are using the canvas they get a button instead, and nothing moves
+until they press it (`moved: false`, with a note). `agent.update({ canvas })` moves you the same way.
+`view.focus` on a card of another canvas goes there first by the same rule.
 
 Two agents with one home canvas share its cards and its drawing. Make a new canvas for a new
 piece of work; make an old one your home to continue it.

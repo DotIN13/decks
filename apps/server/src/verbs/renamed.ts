@@ -22,7 +22,7 @@ const RENAMED: ReadonlyMap<string, string> = new Map([
 	["viewport", "decks.view.viewport"],
 	["screenshot", "decks.canvas.screenshot"],
 	["stages", "decks.canvas.list"],
-	["open", "decks.agent.update({ canvas }), then decks.view.goto"],
+	["open", "decks.view.goto"],
 	["newStage", "decks.canvas.create, then decks.agent.update({ canvas })"],
 	["title", "decks.canvas.rename, or decks.here() to read"],
 	["pen.read", "decks.canvas.read (a frame file: decks.canvas.read({ frame }))"],

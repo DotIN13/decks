@@ -189,7 +189,7 @@ test("card.create writes a card and places nothing", async () => {
 test("an old name is no call: it is refused with the call that does its work now", async () => {
 	const { call, cleanup } = await open();
 	try {
-		for (const [old, now] of [["boards", /decks\.canvas\.read, or decks\.card\.list/], ["board.create", /decks\.card\.create/], ["open", /decks\.agent\.update\(\{ canvas \}\), then decks\.view\.goto/], ["pen.edit", /decks\.canvas\.batch/], ["apps.board", /decks\.apps\.item/]] as const) {
+		for (const [old, now] of [["boards", /decks\.canvas\.read, or decks\.card\.list/], ["board.create", /decks\.card\.create/], ["open", /use decks\.view\.goto/], ["pen.edit", /decks\.canvas\.batch/], ["apps.board", /decks\.apps\.item/]] as const) {
 			const answer = await call(old, []);
 			assert.equal(answer.ok, false, old);
 			assert.match(answer.error ?? "", new RegExp(`^${old.replace(".", "\\.")} was an old name and has been removed: use `), old);
