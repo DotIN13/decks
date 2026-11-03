@@ -124,6 +124,11 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 					selectCard(selected);
 					ctx.setOffer(undefined);
 				} }),
+				// An agent on screen moving to another canvas while the person is using this one: the page moves it when they press Go.
+				offerGoto: (from, canvas) => ctx.setOffer({ agent: from, what: "canvas", go: () => {
+					end.emit("goto", { agent: from, canvas });
+					ctx.setOffer(undefined);
+				} }),
 				// Kept by the page with the views it parks (`camera/landing.ts`): it arrives when that chat opens.
 				rememberView: (id, to, selected) => end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
 				select: selectCard,

@@ -194,3 +194,54 @@ test("while the person is using the canvas, the agent on screen is offered a but
 	assert.deepEqual(offered.at(-1)?.camera, { x: 10, y: 20, zoom: 1 });
 	assert.equal(offered.at(-1)?.what, "view");
 });
+
+/*
+ * An agent moving its own conversation to another canvas (`view.goto`, `agent.update --canvas`, and
+ * `view.focus` on a card of another canvas), as the person's canvas switcher moves one: never another
+ * agent's conversation brought on screen in its place.
+ */
+function gotoHost(focused: string | undefined, hands: boolean) {
+	const offers: Array<{ agentId: string; stage: string }> = [];
+	const api: StageOpsHost = {
+		boards: () => [],
+		viewport: () => ({ width: 1200, height: 800 }),
+		focused: () => focused,
+		stageOnScreen: () => "plan",
+		setCamera: () => {},
+		rememberView: () => {},
+		select: () => {},
+		reload: () => {},
+		cursor: () => true,
+		handsOn: () => hands,
+		offerGoto: (agentId, stage) => offers.push({ agentId, stage }),
+	};
+	return { api, offers };
+}
+const goto = (agentId: string, stage: string, extra: Record<string, unknown> = {}): StageCall => ({ id: "g", op: "goto", agentId, args: { stage, ...extra } });
+
+test("an agent in the background just moves to another canvas: nothing on screen changes and nobody is asked", () => {
+	const { api, offers } = gotoHost("A", true);
+	assert.deepEqual(runStageCall(goto("B", "promo"), api), { apply: true });
+	assert.equal(offers.length, 0);
+});
+
+test("the agent on screen moves, and the screen with it, while the person is not using the canvas", () => {
+	const { api, offers } = gotoHost("A", false);
+	assert.deepEqual(runStageCall(goto("A", "promo"), api), { apply: true, onScreen: true });
+	assert.equal(offers.length, 0);
+});
+
+test("while the person is using the canvas, the agent on screen asks: a button is offered and nothing moves", () => {
+	const { api, offers } = gotoHost("A", true);
+	const answer = runStageCall(goto("A", "promo"), api) as { offered?: string; apply?: boolean };
+	assert.match(answer.offered ?? "", /using the canvas/);
+	assert.equal(answer.apply, undefined);
+	assert.deepEqual(offers, [{ agentId: "A", stage: "promo" }]);
+});
+
+test("the canvas already on screen, or the person's own call, is never asked about", () => {
+	const { api, offers } = gotoHost("A", true);
+	assert.deepEqual(runStageCall(goto("A", "plan"), api), { apply: true, onScreen: true });
+	assert.deepEqual(runStageCall(goto("A", "promo", { person: true }), api), { apply: true, onScreen: true });
+	assert.equal(offers.length, 0);
+});

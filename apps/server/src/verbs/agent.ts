@@ -1,6 +1,7 @@
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import { escapeXml } from "./context.ts";
 import type { VerbContext } from "./context.ts";
+import { moveHome } from "./move-home.ts";
 
 /**
  * Who works: you (`agent.me`, `agent.update`), the canvas a call means (`here`), the cards you
@@ -60,12 +61,9 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				const { canvas, ...rest } = patch ?? {};
 				const said = Object.keys(rest).length ? await setIdentity(ctx, rest) : undefined;
 				if (canvas !== undefined) {
-					// The person may move a conversation to a canvas, as the canvas manager does; a board may not.
-					if (!agent.setHome || agent.board) throw new Error("Only an agent has a home canvas to change.");
-					const name = canvasOf(canvas);
-					agent.setHome(name);
-					// Who is on which canvas is in every browser's canvas list.
-					service.stagesChanged();
+					// As the canvas switcher moves a conversation (`move-home.ts`): the person's at once; an agent's own asks the person first only while they are using the canvas on screen.
+					const moved = await moveHome(ctx, canvasOf(canvas));
+					if (moved.offered) notes.push(`Your canvas did not change yet: ${moved.offered}.`);
 				}
 				const avatarChanged = (said as { avatarChanged?: string } | undefined)?.avatarChanged;
 				return { ...me(), ...(avatarChanged ? { avatarChanged } : {}) };

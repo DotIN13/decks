@@ -137,6 +137,8 @@ interface FrameToPage {
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
 	/** A press or Escape in the frame, which the page does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
 	away: Record<string, never>;
+	/** The person pressed Go on an agent's move to another canvas (`view.goto` offered): the page moves that conversation there, as its canvas switcher does. */
+	goto: { agent: string; canvas: string };
 }
 
 /** The calls the frame makes of the page, and what each answers. */

@@ -4,11 +4,12 @@
  *
  * - `view.reload({ card })` is counted over every open page: this page shows the card, so one
  *   page reloads; named with a canvas this page is not showing, none does.
- * - `view.goto(canvas)` shows a canvas by opening a conversation on it; with nobody on that
- *   canvas it says it could not, and on the canvas already it says so.
- * - `view.focus(card, { canvas })` on the canvas on screen moves the view, and on another
- *   canvas says the screen shows another one.
- * - None of them changed the canvas file.
+ * - `view.goto(canvas)` moves the conversation on screen to the canvas, as the canvas switcher
+ *   does, and the screen with it: the same conversation stays on screen, whoever else is on it.
+ * - `view.focus(card)` with no canvas goes to the canvas the card's path names, and frames it;
+ *   `view.focus(item, { canvas })` goes to that canvas first.
+ * - None of them changed a canvas file. (Whether an agent's own call asks a person using the
+ *   canvas, or moves quietly in the background, is `camera/stage-ops.test.ts`.)
  */
 import { API, asPerson, open, resetStage, say, settle } from "../harness.mjs";
 
@@ -38,22 +39,31 @@ const none = await call("view.reload", [{ card, canvas: other.name }], agent);
 say("named with a canvas no page shows, no page reloads", none.ok && none.value.reloaded === 0, JSON.stringify(none));
 
 const already = await call("view.goto", [home.name], agent);
-say("view.goto the canvas on screen says it is there already", already.ok && already.value.moved === true, JSON.stringify(already));
-const nobody = await call("view.goto", [other.name], agent);
-say("view.goto a canvas nobody is on says it could not show it", nobody.ok && nobody.value.moved === false && /no conversation is on that canvas/.test(nobody.value.note ?? ""), JSON.stringify(nobody));
+say("view.goto the canvas on screen says it is there", already.ok && already.value.moved === true, JSON.stringify(already));
+const focusedBefore = await page.evaluate(() => document.querySelector(".v3-agent-name")?.textContent ?? "");
+const went = await call("view.goto", [other.name], agent);
+const there = (await call("here", [], agent)).value;
+say("view.goto another canvas moves the conversation there, and the screen with it", went.ok && went.value.moved === true && there?.name === other.name, JSON.stringify({ went, there: there?.name }));
+await settle(page, 1200);
+const screenAfter = await page.evaluate(() => document.querySelector(".v3-agent-name")?.textContent ?? "");
+say("the same conversation is still the one on screen", screenAfter === focusedBefore, `${focusedBefore} → ${screenAfter}`);
 
 // The screen is the person's for a few seconds after they last touched it (the harness's own setup counts).
 await settle(page, 6500);
 const focused = await call("view.focus", [card], agent);
-say("view.focus on the canvas on screen moves the view", focused.ok && !focused.value.deferred, JSON.stringify(focused));
+const back = (await call("here", [], agent)).value;
+say("view.focus a card with no canvas goes to the canvas its path names and frames it", focused.ok && !focused.value.deferred && back?.name === home.name, JSON.stringify({ focused, here: back?.name }));
 await call("canvas.insert", [{ type: "note", id: "far-note", content: "over here" }, { canvas: other.name, at: { x1: 0, y1: 0 } }], agent);
+await settle(page, 6500);
 const elsewhere = await call("view.focus", ["far-note", { canvas: other.name }], agent);
-say("view.focus on another canvas says the screen shows a different one", elsewhere.ok && /another canvas/.test(elsewhere.value.deferred ?? ""), JSON.stringify(elsewhere));
+const after = (await call("here", [], agent)).value;
+say("view.focus on another canvas goes there first, then frames the item", elsewhere.ok && !elsewhere.value.deferred && after?.name === other.name, JSON.stringify({ elsewhere, here: after?.name }));
+await call("view.goto", [home.name], agent);
 
 const camera = await call("view.camera", [], agent);
 say("view.camera reads x, y and zoom", camera.ok && ["x", "y", "zoom"].every((key) => typeof camera.value[key] === "number"), JSON.stringify(camera.value));
 
 await settle(page, 400);
-say("no view call changed the home canvas", JSON.stringify((await call("canvas.read", [], agent)).value.items) === before);
+say("no view call changed the home canvas", JSON.stringify((await call("canvas.read", [{ canvas: home.name }], agent)).value.items) === before);
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();

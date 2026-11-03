@@ -51,6 +51,8 @@ export interface FrameHooks {
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
 	/** Open another conversation, as a click on its row does: what `view.goto` uses to show its canvas. */
 	focusAgent?(id: string): void;
+	/** Move a conversation to a canvas, as the person: an agent's offered `view.goto` they said Go to. */
+	moveConversation?(id: string, canvas: string): void;
 }
 
 /**
@@ -404,6 +406,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * The canvas in its frame answers an agent's view on the canvas it shows, from its own stream
 					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
 					 */
+					// An agent moving to another canvas while its own is on screen: the frame answers, which knows whether the person is using the canvas.
+					// The person's own move asks nobody, so this page answers it, whether or not that frame is up yet.
+					if (message.call.op === "goto" && message.call.agentId && (message.call.args as { person?: unknown } | undefined)?.person !== true && stageOf(message.call.agentId)?.name === stageOf(state.focused)?.name && document.querySelector("iframe.canvas-frame")) return;
 					if (["show", "camera", "reload", "cursor", "shot"].includes(message.call.op)) {
 						const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
 						const screen = stageOf(state.focused)?.name;
@@ -447,14 +452,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							 */
 							focused: () => state.focused,
 							stageOnScreen: () => stageOf(state.focused)?.name,
-							// The caller's own conversation when it is on that canvas, else any that is.
-							agentOn: (stage, prefer) => {
-								if (prefer && stageOf(prefer)?.name === stage) return prefer;
-								return state.chats.map((chat) => chat.id).find((id) => stageOf(id)?.name === stage);
-							},
-							goto: (agentId) => hooks.focusAgent?.(agentId),
-							offerGoto: (agentId, stage, target) =>
-								offer(`${nameOf(agentId)} wants to show you the canvas ${stage}`, { label: "Go", run: () => hooks.focusAgent?.(target) }, "agent-view"),
+							offerGoto: (agentId, stage) => offer(`${nameOf(agentId)} wants to take you to the canvas ${stage}`, { label: "Go", run: () => hooks.moveConversation?.(agentId, stage) }, "agent-view"),
 							/*
 							 * What reaches this page is never for the canvas on screen, whose frame carries out its own
 							 * calls (above): a view for another conversation is remembered for it, and nothing on this

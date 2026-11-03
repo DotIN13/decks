@@ -299,6 +299,7 @@ export function App() {
 		raise,
 		landed,
 		focusAgent: (id) => focusAgent(id),
+		moveConversation: (id, canvas) => moveConversation(id, canvas),
 	};
 
 	/** The file picker, for the composer's paperclip. */
@@ -426,15 +427,19 @@ export function App() {
 	const { frameWhenPlaced, playAndFrame } = createFraming(stagePages);
 
 
-	/** Move the conversation to a canvas: the stage manager's pick, and the panel's Open. The camera follows when the server says the agent is there (the canvas effect below). */
-	const openCanvas = (name: string) => {
-		const agentId = state.focused;
+	/**
+	 * Move a conversation to a canvas, as the person: the stage manager's pick and the panel's Open move the one on screen,
+	 * and an agent's move the person said Go to (`view.goto` offered) moves that agent's. The camera follows when the server
+	 * says the agent is there (the canvas effect below).
+	 */
+	const moveConversation = (agentId: string | undefined, name: string) => {
 		if (!agentId || stageOf(agentId)?.name === name) return;
 		// On screen at once; the server is told beside it, and a refusal (a notice from act) moves back.
 		void moveTo(agentId, name, async () => {
 			if ((await act("agent.update", [{ canvas: name }], agentId)) === undefined) throw new Error(`not moved to ${name}`);
 		}).catch(() => undefined);
 	};
+	const openCanvas = (name: string) => moveConversation(state.focused, name);
 
 	/** The canvas switcher around a trigger: the panel head's title and the top bar's canvas chip both use it. */
 	const canvasMenu = (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
@@ -494,6 +499,7 @@ export function App() {
 		openAppsPanel,
 		files,
 		frameWhenPlaced,
+		moveConversation,
 	};
 
 

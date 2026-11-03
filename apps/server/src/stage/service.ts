@@ -426,7 +426,7 @@ export class StageService {
 	async show(
 		agentId: string,
 		paths: string[],
-		options: { fit?: "board" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>; stage?: string } = {},
+		options: { fit?: "board" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }>; stage?: string; timeoutMs?: number } = {},
 	): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
 			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
@@ -437,7 +437,8 @@ export class StageService {
 		 * The browser would have to ask its own canvas the same question and could get a
 		 * different answer while a file is being rewritten.
 		 */
-		const answer = await this.ask(agentId, { op: "show", args: { paths, ...options } });
+		const { timeoutMs, ...args } = options;
+		const answer = await this.ask(agentId, { op: "show", args: { paths, ...args } }, timeoutMs);
 		const result = (answer ?? {}) as { shown?: unknown; deferred?: unknown; skipped?: unknown; error?: unknown };
 		// With a canvas named (`view.focus`), a browser showing another says so, as does one that is not there.
 		const why = typeof result.deferred === "string" ? result.deferred : options.stage && typeof result.skipped === "string" ? result.skipped : options.stage && typeof result.error === "string" ? result.error : undefined;
@@ -465,13 +466,15 @@ export class StageService {
 	}
 
 	/**
-	 * Bring the person's screen to a canvas (`view.goto`). The browser does it by opening a
-	 * conversation that is on that canvas, the caller's own first; it answers whether it moved.
+	 * Whether an agent may move its own conversation to a canvas now (`view.goto`, `agent.update --canvas`),
+	 * as the browser says (`stage-ops.ts`, `goto`): in the background, or with nobody watching, it may; on
+	 * screen it may and the screen goes with it, unless the person is using the canvas, who is offered a
+	 * button instead (`offered`), which moves it when pressed. The move itself is the caller's to make.
 	 */
-	async goto(agentId: string, stage: string): Promise<{ moved: boolean; note?: string }> {
-		const answer = (await this.ask(agentId, { op: "goto", args: { stage } })) as { moved?: unknown; note?: unknown; deferred?: unknown; skipped?: unknown; error?: unknown } | undefined;
-		const note = [answer?.note, answer?.deferred, answer?.skipped, answer?.error].find((one): one is string => typeof one === "string");
-		return { moved: answer?.moved === true, ...(note ? { note } : {}) };
+	async mayMove(agentId: string, stage: string, person = false): Promise<{ apply: boolean; onScreen: boolean; offered?: string }> {
+		const answer = (await this.ask(agentId, { op: "goto", args: { stage, ...(person ? { person: true } : {}) } })) as { apply?: unknown; onScreen?: unknown; offered?: unknown } | undefined;
+		if (typeof answer?.offered === "string") return { apply: false, onScreen: true, offered: answer.offered };
+		return { apply: true, onScreen: answer?.onScreen === true };
 	}
 
 	async cursor(agentId: string, path: string, at: { x: number; y: number } | null, label: string, color: string): Promise<void> {

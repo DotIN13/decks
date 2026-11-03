@@ -376,6 +376,8 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 	}
 	if (message.type === "view.called") {
 		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
+		// An agent moving to another canvas: the frame showing the canvas it is on now answers, which knows whether the person is using it.
+		if (call?.op === "goto") return !!call.agentId && (call.args as { person?: unknown } | undefined)?.person !== true && app.agents.get(call.agentId)?.stageName() === canvas;
 		if (!call || !["show", "camera", "reload", "cursor", "shot"].includes(call.op ?? "")) return false;
 		// A cursor, a reload or a card's picture names a card: the frame showing the canvas it is on answers, whoever's home that is.
 		if ((call.op === "cursor" || call.op === "reload" || call.op === "shot") && typeof call.args?.path === "string") return boardOnCanvas(app, call.args.path, canvas);

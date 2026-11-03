@@ -116,7 +116,7 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			<Show when={chrome.offer()} keyed>
 				{(offer) => (
 					<div class="v3-bar float pill frame-offer" role="status">
-						<span>An agent wants to {offer.what === "card" ? "show you a card" : "move the view"}</span>
+						<span>An agent wants to {offer.what === "card" ? "show you a card" : offer.what === "canvas" ? "take you to another canvas" : "move the view"}</span>
 						<button type="button" class="frame-offer-go" onClick={() => offer.go()}>
 							Go
 						</button>

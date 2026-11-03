@@ -62,6 +62,8 @@ export interface FrameHostOptions {
 	focused?(): string | undefined;
 	/** A view for another conversation, from an agent's `decks view …` on this canvas: the page keeps it for when that chat opens, and the harness hears it, to answer that agent's `view.camera`. */
 	viewFor?(agent: string, camera: Camera, selected?: string): void;
+	/** Move a conversation to a canvas, as the page's canvas switcher does: an agent's `view.goto` the person said Go to. */
+	moveTo?(agent: string, canvas: string): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(drop: { files: File[]; at: { x: number; y: number }; card?: CardSlot }): void;
 }
@@ -397,6 +399,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 				/* not an address */
 			}
 		});
+		page.on("goto", (data) => options.frame.moveTo?.(data.agent, data.canvas));
 		page.on("camera", (data) => {
 			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera, data.selected);
 			fromFrame.camera = data.camera;

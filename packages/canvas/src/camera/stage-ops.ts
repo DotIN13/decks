@@ -22,12 +22,8 @@ export interface StageOpsHost {
 	focused(): string | undefined;
 	/** The canvas on this screen, by folder name. */
 	stageOnScreen?(): string | undefined;
-	/** A conversation on that canvas, `prefer` first when it is on it. */
-	agentOn?(stage: string, prefer?: string): string | undefined;
-	/** Show that conversation, and so its canvas (`view.goto`). */
-	goto?(agentId: string): void;
-	/** Offer a button that goes there instead. */
-	offerGoto?(agentId: string, stage: string, target: string): void;
+	/** Offer a button that moves that conversation to the canvas, and the screen with it (`view.goto` while the person is using the canvas). */
+	offerGoto?(agentId: string, stage: string): void;
 	/**
 	 * Move the view, and *arrive* at it when the caller asked for that.
 	 *
@@ -144,19 +140,23 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			return { reloaded: args.path };
 		}
 
+		/*
+		 * An agent moving its own conversation to a canvas (`view.goto`, `agent.update --canvas`), as the
+		 * person's canvas switcher does: never another agent's conversation shown in its place. Asked only
+		 * whether it may: in the background it just moves (`apply`); on screen the screen moves with it
+		 * (`onScreen`), unless the person is using the canvas, who is offered a button instead.
+		 */
 		case "goto": {
 			const stage = args.stage;
 			if (typeof stage !== "string" || !stage) return { error: "goto needs a canvas" };
-			if (host.stageOnScreen?.() === stage) return { moved: true, note: "the person's screen was on that canvas already" };
-			const target = host.agentOn?.(stage, call.agentId);
-			if (!target || !host.goto) return { moved: false, note: "no conversation is on that canvas, and a screen shows a canvas beside a conversation: decks agent update --canvas makes it your home, then view goto shows it" };
-			// Someone else's call, or the person mid-gesture: offered, not done.
-			if (call.agentId !== host.focused() || host.handsOn?.()) {
-				host.offerGoto?.(call.agentId, stage, target);
-				return { moved: false, deferred: "the person was offered a button to go there, since the screen is theirs right now" };
+			if (!call.agentId || call.agentId !== host.focused()) return { apply: true };
+			// The person moving it themselves (a call with their own token): nobody to ask.
+			if (args.person === true) return { apply: true, onScreen: true };
+			if (host.stageOnScreen?.() !== stage && host.handsOn?.()) {
+				host.offerGoto?.(call.agentId, stage);
+				return { offered: "the person is using the canvas, so they were offered a button to go to that one" };
 			}
-			host.goto(target);
-			return { moved: true };
+			return { apply: true, onScreen: true };
 		}
 
 		case "cursor": {

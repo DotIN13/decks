@@ -31,11 +31,13 @@ export interface CanvasHostInputs {
 	openAppsPanel: () => void;
 	files: ReturnType<typeof createFileDrops>;
 	frameWhenPlaced: (path: string) => void;
+	/** Move a conversation to a canvas, as the person (`App.tsx`): an agent's offered `view.goto` they said Go to in the frame. */
+	moveConversation: (agentId: string, canvas: string) => void;
 }
 
 /** The canvas: made once, as a component, so nothing read while it is made makes it again. */
 export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
-	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced } = props.host;
+	const { stagePen, personMoved, setPenSelected, setEditorHandle, dockCover, composerBox, underSheet, openAppsPanel, files, frameWhenPlaced, moveConversation } = props.host;
 	/**
 	 * A file of any kind, chosen in the file picker and placed in the middle of the view by what it is:
 	 * the frame's tool column's "Add a file" (`frame/chrome.tsx`), which asks the page for its picker.
@@ -105,6 +107,7 @@ export function CanvasHost(props: { host: CanvasHostInputs }): JSX.Element {
 			focused: () => state.focused,
 			agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])),
 			viewFor: rememberView,
+			moveTo: moveConversation,
 		},
 	});
 	setEditorHandle(editor.handle);
