@@ -1,6 +1,7 @@
 import { life } from "./life.ts";
 import { baseTheme, CLIP_TYPE, clipFromHtml, clipHtml, clipItems, clipText, ids as idsOf, isArrow, parseClip, pastedItems, placements, walk, type Clip, type PenNode } from "@decks/pen";
 import { toWorld } from "../../camera/camera.ts";
+import { wordsSelectedInCards } from "../../items/card.ts";
 import type { CanvasHandle } from "../../types.ts";
 
 /**
@@ -43,10 +44,10 @@ function typing(): boolean {
 	return !!at && (at.matches("input, textarea, select") || (at as HTMLElement).isContentEditable);
 }
 
-/** Words selected on the page (in a card, a note): a copy of those is the browser's. */
+/** Words selected on the page (a note's) or in a card, whose closed root the page's selection does not see into: a copy of those is the browser's. */
 function wordsSelected(): boolean {
 	const selection = getSelection();
-	return !!selection && !selection.isCollapsed && selection.toString().trim() !== "";
+	return (!!selection && !selection.isCollapsed && selection.toString().trim() !== "") || wordsSelectedInCards();
 }
 
 /** Whether an item needs a file copied to land on another canvas: a card or a board, a picture, a film, a file piece. */

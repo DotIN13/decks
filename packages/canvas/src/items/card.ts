@@ -528,6 +528,28 @@ const registryPerRoot = (() => {
 })();
 
 /**
+ * The roots of the cards mounted now. Each is closed, so nothing outside a card reaches into it, and so
+ * the frame's selection (`getSelection()`) sees none of the words selected in one: the frame's ⌘C asks
+ * these whether any are (`wordsSelectedInCards`), so a copy of a card's words is the browser's.
+ */
+const openRoots = new Set<ShadowRoot>();
+
+/** Whether words are selected in a mounted card: by the selection's composed ranges where the browser has them, else by each root's own selection (Chromium's). */
+export function wordsSelectedInCards(): boolean {
+	if (!openRoots.size) return false;
+	const roots = [...openRoots];
+	const selection = getSelection() as (Selection & { getComposedRanges?: (options: { shadowRoots: ShadowRoot[] }) => StaticRange[] }) | null;
+	if (selection?.getComposedRanges) {
+		try {
+			if (selection.getComposedRanges({ shadowRoots: roots }).some((range) => !range.collapsed && roots.some((root) => root.contains(range.startContainer)))) return true;
+		} catch {
+			/* a browser with the older signature: asked root by root below */
+		}
+	}
+	return roots.some((root) => ((root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.()?.toString() ?? "").trim() !== "");
+}
+
+/**
  * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
  * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
  * they arrive.
@@ -535,6 +557,7 @@ const registryPerRoot = (() => {
 export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
 	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
+	openRoots.add(root);
 	host.dataset.theme = source.theme;
 	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
 	const lib = new URL("../../lib/", source.url).href;
@@ -676,6 +699,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 				}
 			}
 			root.replaceChildren();
+			openRoots.delete(root);
 		},
 	};
 }
