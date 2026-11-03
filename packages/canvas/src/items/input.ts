@@ -1,3 +1,4 @@
+import { zoomKey } from "../camera/zoom-keys.ts";
 import { INTERACTIVE, scrollsInside } from "./card.ts";
 
 /**
@@ -10,7 +11,10 @@ import { INTERACTIVE, scrollsInside } from "./card.ts";
  * - **A finger** pans the canvas across the item, unless it lands on one of the item's controls; a
  *   primary finger selects the item as it would a picture.
  * - **A wheel** scrolls what inside the item can take it, and pans the canvas otherwise; a pinch always zooms.
- * - **Keys** typed into the item's own fields stay in it, so Delete in a text box deletes a letter, not the item.
+ * - **Keys** pressed while the focus is in the item are the item's: a press in a card puts the focus in it
+ *   (its body takes the focus), and its scripts hear the keys there; Delete, the arrows, Space and the
+ *   letters do nothing to the canvas. Escape leaves the item, the focus back on the canvas and the item
+ *   still selected, where Delete and the arrows act on it again; ⌘+, ⌘− and ⌘0 zoom from anywhere.
  *
  * `target` is where the listeners go (a card's closed shadow root, which alone can tell a press on the
  * card's button from one on its background; an element otherwise), `host` the element whose own
@@ -25,12 +29,6 @@ interface OwnInput {
 
 /** Whether the event's target is one of the item's own controls. */
 const onControl = (event: Event) => event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
-
-/** Whether the event's target takes typing. */
-export const inField = (event: Event) => {
-	const target = event.composedPath()[0];
-	return target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.localName));
-};
 
 export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput): void {
 	target.addEventListener("pointerdown", (event) => {
@@ -56,5 +54,22 @@ export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput
 		},
 		{ passive: true },
 	);
-	for (const type of ["keydown", "keyup", "keypress"]) target.addEventListener(type, (event) => inField(event) && event.stopPropagation());
+	for (const type of ["keydown", "keyup", "keypress"])
+		target.addEventListener(type, (event) => {
+			const key = event as KeyboardEvent;
+			// The canvas's zoom, wherever the focus is (`stage/input.ts`).
+			if (zoomKey(key)) return;
+			event.stopPropagation();
+			if (type === "keydown" && key.key === "Escape") {
+				key.preventDefault();
+				leave(host);
+			}
+		});
+}
+
+/** Out of the item: the focus back on the canvas it sits on, the item still selected. */
+function leave(host: HTMLElement): void {
+	const stage = host.closest<HTMLElement>(".stage");
+	if (stage) stage.focus({ preventScroll: true });
+	else (document.activeElement as HTMLElement | null)?.blur?.();
 }
