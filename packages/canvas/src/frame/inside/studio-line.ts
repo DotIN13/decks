@@ -1,5 +1,6 @@
 import { CanvasFollower } from "@decks/hub/follower";
 import type { PenDocument, PenEdit } from "@decks/pen";
+import type { Presence, ServerMessage } from "@decks/protocol";
 
 /**
  * The canvas frame's line to Decks Studio, where a canvas is kept by Studio rather than a harness:
@@ -9,14 +10,18 @@ import type { PenDocument, PenEdit } from "@decks/pen";
  *
  * The drawing is kept in step as Studio's own page keeps it (`@decks/hub`'s `CanvasFollower`): the
  * page's edits shown at once and sent in order, Studio's revisions applied as they are said, the
- * whole drawing only when its log no longer reaches back.
+ * whole drawing only when its log no longer reaches back. The same socket carries presence both
+ * ways: where this frame's person is, said as `presence` (`presence.ts`, as `presence.set` is said
+ * on a harness's line), and where everyone else on the canvas is, heard as `presence.changed`.
  */
 export interface StudioLine {
 	drawing(): Promise<{ doc: PenDocument; rev: number }>;
-	/** Follow the canvas: each newer drawing as it comes. Answers what stops it. */
-	follow(show: (doc: PenDocument) => void, now: () => PenDocument, rev: number): () => void;
+	/** Follow the canvas: each newer drawing as it comes, and everyone else's presence on it (`heard`). Answers what stops it. */
+	follow(show: (doc: PenDocument) => void, now: () => PenDocument, rev: number, heard?: (message: Extract<ServerMessage, { type: "presence.changed" }>) => void): () => void;
 	/** Your edits, already shown, sent in order. */
 	save(edits: PenEdit[]): void;
+	/** Where this frame's person is on the canvas, for the others on it: only what changed, and only down an open socket. */
+	presence(presence: Presence): void;
 	setToken(token: string): void;
 }
 
@@ -33,6 +38,7 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 	};
 	let follower: CanvasFollower | undefined;
 	let saving = Promise.resolve();
+	let socket: WebSocket | undefined;
 
 	return {
 		async drawing() {
@@ -40,7 +46,7 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 			return { doc: got.pen, rev: got.rev };
 		},
 
-		follow(show, now, rev) {
+		follow(show, now, rev, heard) {
 			follower = new CanvasFollower(
 				{
 					doc: now,
@@ -55,7 +61,6 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 				client,
 			);
 			let stopped = false;
-			let socket: WebSocket | undefined;
 			const open = () => {
 				if (stopped) return;
 				const url = new URL(`${base.replace(/\/api$/, "")}/live`);
@@ -64,14 +69,16 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 				url.searchParams.set("frame", token);
 				socket = new WebSocket(url);
 				socket.onmessage = (message) => {
-					let event: { type?: string; id?: string };
+					let event: { type?: string; id?: string; canvas?: string };
 					try {
-						event = JSON.parse(String(message.data)) as { type?: string; id?: string };
+						event = JSON.parse(String(message.data)) as { type?: string; id?: string; canvas?: string };
 					} catch {
 						return;
 					}
 					if (event.type === "hello") void follower?.catchUp();
 					else if (event.type === "canvas" && event.id === canvas) follower?.heard(event as never);
+					// Someone else on this canvas, as Studio relays it: the same message a harness's line says.
+					else if (event.type === "presence" && event.canvas === canvas) heard?.({ ...(event as object), type: "presence.changed" } as Extract<ServerMessage, { type: "presence.changed" }>);
 				};
 				socket.onclose = () => setTimeout(open, 2000);
 			};
@@ -94,6 +101,10 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 					console.warn("Not saved:", error);
 				}
 			});
+		},
+
+		presence(presence) {
+			if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "presence", canvas, ...presence }));
 		},
 
 		setToken(next) {

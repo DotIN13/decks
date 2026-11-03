@@ -138,7 +138,7 @@ export class Live {
 		void this.fanOut(canvas, text);
 	}
 
-	/** A socket; `only` holds it to one canvas, for a canvas frame, which hears that canvas and sends no cursor. */
+	/** A socket; `only` holds it to one canvas, for a canvas frame, which hears that canvas and says where its person is on it. */
 	add(ws: LiveSocket, who: Who & { only?: string }): void {
 		const store = this.store;
 		const entry = { ws, who };
@@ -152,13 +152,14 @@ export class Live {
 		const relayed = new Map<string, Set<string>>();
 		ws.on("message", (raw) => {
 			if (who.harness) return void this.fromHarness(entry, who.harness, raw, relayed);
-			if (who.only !== undefined) return;
 			let got: LiveSend;
 			try {
 				got = LiveSend.parse(JSON.parse(String(raw)));
 			} catch {
 				return;
 			}
+			// A canvas frame's socket speaks for its one canvas and nothing else; the older `cursor` is a page's form.
+			if (who.only !== undefined && (got.canvas !== who.only || got.type !== "presence")) return;
 			const relay = () => {
 				pointed.add(got.canvas);
 				if (got.type === "cursor") {

@@ -28,8 +28,8 @@ export const LEAVE_MS = 650;
  * Presence: where everyone else on this canvas is, and where this frame is for them.
  *
  * Out: the pointer in canvas units at most twenty times a second while it moves, gone when it leaves
- * the window; the selection when it changes; the camera when it rests. Each is one `presence.set`
- * carrying only what changed. In: `presence.changed` for every other line on the canvas, kept by
+ * the window; the selection when it changes; the camera when it rests, with the viewport's size so the
+ * others can draw what this frame sees. Each is one `presence.set` carrying only what changed. In: `presence.changed` for every other line on the canvas, kept by
  * who said it, and dropped when they go (`gone`). Nothing here is drawn: `frame.tsx` draws the
  * pointers as cursors and the selections as outlines from `present()`.
  */
@@ -79,8 +79,11 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 		present,
 		/** The selection changed: said as it is. */
 		selection: (ids: readonly string[]) => options.send({ selection: [...ids] }),
-		/** The camera rests here. */
-		camera: (camera: Camera) => options.send({ camera }),
+		/** The camera rests here, over a viewport this big. */
+		camera: (camera: Camera) => {
+			const view = options.viewport();
+			options.send({ camera: { ...camera, w: view.width, h: view.height } });
+		},
 		/**
 		 * An agent at work on a card (`agent.act`): its cursor at the card, or at the first box it drew,
 		 * and the card outlined in its colour, as a person's presence is; gone a moment after it is done.

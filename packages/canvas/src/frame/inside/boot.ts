@@ -78,8 +78,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	reflect();
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
-	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`). */
-	const presence = studio ? undefined : installPresence({ camera, send: (one) => backend.presence(one), viewport: () => ({ width: innerWidth, height: innerHeight }) });
+	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`); said down the harness's line, or Studio's. */
+	const presence = installPresence({ camera, send: (one) => (studio ? studio.presence(one) : backend.presence(one)), viewport: () => ({ width: innerWidth, height: innerHeight }) });
 	/** Marks over what agents draw, each for a moment in the agent's colour (`marks.ts`). */
 	const marks = installMarks();
 	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */

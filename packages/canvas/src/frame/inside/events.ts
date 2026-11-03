@@ -182,6 +182,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 			},
 			() => handle.document(),
 			first.rev,
+			(message) => void ctx.presence?.hear(message),
 		);
 	else backend.follow((message) => {
 		if (message.type === "view.called") return stageCall(message.call);

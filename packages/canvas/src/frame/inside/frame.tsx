@@ -111,10 +111,30 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		return list;
 	};
-	/* Only while a cursor or an outline is out: nothing to see, nothing in the world. Placed in canvas units; the world's own transform scrolls and scales it. */
+	/**
+	 * Where each other person is looking: their camera's viewport in canvas units, when their line said its
+	 * size, as a faint dashed box with their name. People only: an agent's camera is nobody's eyes.
+	 */
+	const viewports = () => {
+		const list: Array<{ key: string; x: number; y: number; w: number; h: number; color: string; label: string }> = [];
+		for (const [key, one] of others()) {
+			const cam = one.camera;
+			if (!cam || !cam.w || !cam.h || one.by.kind !== "person" || one.leaving) continue;
+			list.push({ key, x: cam.x - cam.w / 2 / cam.zoom, y: cam.y - cam.h / 2 / cam.zoom, w: cam.w / cam.zoom, h: cam.h / cam.zoom, color: one.by.color, label: labelOf(one.by) });
+		}
+		return list;
+	};
+	/* Only while a cursor, an outline or a viewport is out: nothing to see, nothing in the world. Placed in canvas units; the world's own transform scrolls and scales it. */
 	const cursors = () => (
-		<Show when={cursorAt() || pointerKeys().length || outlines().length || ctx.marks.list().length}>
+		<Show when={cursorAt() || pointerKeys().length || outlines().length || viewports().length || ctx.marks.list().length}>
 			<div class="frame-cursors" style={{ position: "absolute", left: "0", top: "0", "pointer-events": "none", "z-index": "5" }}>
+					<For each={viewports()}>
+						{(box) => (
+							<div class="frame-presence-viewport" style={{ position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, border: `${1 / camera().zoom}px dashed ${box.color}`, "border-radius": `${6 / camera().zoom}px`, "box-sizing": "border-box", opacity: "0.55" }}>
+								<span style={{ position: "absolute", left: `${6 / camera().zoom}px`, top: `${6 / camera().zoom}px`, transform: `scale(${1 / camera().zoom})`, "transform-origin": "0 0", "will-change": "transform", color: box.color, font: "600 11px/1.4 system-ui, sans-serif", "white-space": "nowrap", opacity: "0.9" }}>{box.label} is looking here</span>
+							</div>
+						)}
+					</For>
 					<For each={outlines()}>
 						{(box) => (
 							<div class="frame-presence-outline" style={{ position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, border: `${1.5 / camera().zoom}px solid ${box.color}`, "border-radius": `${4 / camera().zoom}px`, "box-sizing": "border-box" }}>
