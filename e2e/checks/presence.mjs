@@ -6,8 +6,7 @@
  * at most twenty times a second, the selection when it changes), and the harness says it to every other
  * line watching the canvas (`presence.changed`), never to the one who said it. The other frame draws the
  * pointer as a cursor with a name tag and the selection as an outline in the same colour
- * (`frame/inside/presence.ts`, `frame.tsx`); where another person is looking is a dashed box, but not
- * for the same person's other window. Nothing of it is written anywhere.
+ * (`frame/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
  */
 import { card, canvasFrame, open, resetStage, rest, say, selectCard } from "../harness.mjs";
 
@@ -31,9 +30,6 @@ try {
 	say("B sees A's pointer as a cursor", (await cursor.count()) === 1, `${await cursor.count()} cursors`);
 	say("the cursor is named for another window", (await cursor.first().locator(".label").textContent().catch(() => "")) === "Another window");
 	say("A sees no cursor of its own", (await frameA.locator(".frame-cursors .agent-cursor").count()) === 0);
-	// Where A is looking is said too (its camera, with its size), but A is the same person in another window: no viewport box over B's canvas, which would sit on the agents' cursors' layer.
-	await b.page.waitForTimeout(800);
-	say("B draws no viewport box for the same person's other window", (await frameB.locator(".frame-presence-viewport").count()) === 0, `${await frameB.locator(".frame-presence-viewport").count()} boxes`);
 
 	// A selects a card; B outlines it in A's colour.
 	await selectCard(a.page, card("plan"));

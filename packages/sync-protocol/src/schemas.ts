@@ -96,16 +96,12 @@ export const Hello = z.object({
 });
 export type Hello = z.infer<typeof Hello>;
 
-/**
- * Where someone is on a canvas: the pointer in canvas units, the items selected, the camera (its
- * centre and zoom, and the viewport's size in screen pixels when known, `w` and `h`, so the others
- * can draw what they see); each part only when it changed, `null` gone.
- */
+/** Where someone is on a canvas: the pointer in canvas units, the items selected, the camera; each part only when it changed, `null` gone. */
 export const Presence = z.object({
 	canvas: z.string(),
 	pointer: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
 	selection: z.array(z.string().max(200)).max(200).optional(),
-	camera: z.object({ x: z.number(), y: z.number(), zoom: z.number(), w: z.number().optional(), h: z.number().optional() }).nullable().optional(),
+	camera: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).nullable().optional(),
 	gone: z.literal(true).optional(),
 });
 export type Presence = z.infer<typeof Presence>;

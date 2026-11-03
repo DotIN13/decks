@@ -304,8 +304,7 @@ export type ClientMessage =
 export interface Presence {
 	pointer?: { x: number; y: number } | null;
 	selection?: string[];
-	/** The camera, with the viewport's size in screen pixels (`w`, `h`) when known, so the others can draw what this line sees. */
-	camera?: (Camera & { w?: number; h?: number }) | null;
+	camera?: Camera | null;
 }
 /** Who is present: a person on one line (by the line's id), or an agent; `harness` names the one they are on when it is not this one. */
 export interface PresenceBy {
@@ -343,7 +342,7 @@ export type LineClientMessage =
 	| { type: "card.seen"; path: string }
 	| { type: "card.extent"; path: string; rev: number; w: number; h: number; [key: string]: unknown }
 	/** Where this line is on a watched canvas, at most twenty times a second; what it leaves out is as it was. */
-	| { type: "presence.set"; canvas: string; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: (Camera & { w?: number; h?: number }) | null };
+	| { type: "presence.set"; canvas: string; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null };
 
 export type ServerMessage =
 	| { type: "deck.changed"; deck: DeckState }
@@ -470,7 +469,7 @@ export type ServerMessage =
 	/** The line's answer to a `call`, under the call's `id` (`LineClientMessage`). */
 	| { type: "call.answered"; id: string; ok: boolean; value?: unknown; error?: string; notes?: string[] }
 	/** Someone else on a canvas moved, selected or looked elsewhere, or left (`gone`): never logged, never a revision. */
-	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: (Camera & { w?: number; h?: number }) | null }
+	| { type: "presence.changed"; canvas: string; by: PresenceBy; gone?: true; pointer?: { x: number; y: number } | null; selection?: string[]; camera?: Camera | null }
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
 	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**

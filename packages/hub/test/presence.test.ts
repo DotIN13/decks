@@ -5,7 +5,7 @@ import { Live, MemoryStore, type LiveSocket } from "../src/index.ts";
 /*
  * Presence through the relay: a page's, a canvas frame's (a socket held to one canvas, which speaks for
  * its person on that canvas alone) and a harness's, each reaching the others on the canvas and nobody
- * else; the camera carrying the viewport's size; everyone told when a socket goes.
+ * else; everyone told when a socket goes.
  */
 const store = new MemoryStore();
 const ada = { id: "ada", name: "Ada" };
@@ -35,13 +35,13 @@ test("a frame's presence reaches the pages and the harness on its canvas, as its
 	live.add(bobsPage.ws, { user: bob });
 	live.add(elsewhere.ws, { user: ada, only: other.id });
 
-	frame.say({ type: "presence", canvas: plan.id, pointer: { x: 10, y: 20 }, camera: { x: 0, y: 0, zoom: 2, w: 800, h: 600 } });
+	frame.say({ type: "presence", canvas: plan.id, pointer: { x: 10, y: 20 }, camera: { x: 0, y: 0, zoom: 2 } });
 	await tick();
 	for (const [who, s] of [["the page", page], ["the harness", harness], ["Bob's page", bobsPage]] as const) {
 		const got = s.presences();
 		assert.equal(got.length, 1, `${who} heard it`);
 		assert.deepEqual(got[0]!.pointer, { x: 10, y: 20 });
-		assert.deepEqual(got[0]!.camera, { x: 0, y: 0, zoom: 2, w: 800, h: 600 }, "the viewport's size travels with the camera");
+		assert.deepEqual(got[0]!.camera, { x: 0, y: 0, zoom: 2 });
 		const by = got[0]!.by as { kind: string; id: string; name: string; harness?: string };
 		assert.equal(by.kind, "person");
 		assert.equal(by.name, "Ada");
