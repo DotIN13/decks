@@ -1483,6 +1483,19 @@ export class StageEngine {
 		this.cardsSent.calls++;
 		this.cardsSent.bytes += sent.length;
 		this.page.setCards(sent);
+		/*
+		 * The fonts the engine paints cards' own words in, over and above the drawing's: their titles and a
+		 * placeholder's kind (Inter 600, `engine.rs`, `paint_placeholder`, `paint_title`) and a missing card's
+		 * why (Inter 500), with the fallbacks their characters need. A canvas whose drawing has no words of
+		 * its own was never given them, so no card title or placeholder was ever painted on it.
+		 */
+		const titles = cards.map((b) => b.title ?? "").join(" ");
+		this.fetchFonts(
+			fontFiles([
+				{ family: "Inter", weight: 600, italic: false, text: `${titles} Card App Document Board · missing` },
+				...(cards.some((b) => b.kind === "missing") ? [{ family: "Inter", weight: 500, italic: false, text: "Studio has no copy of this card yet, and no harness of yours with it is in reach." }] : []),
+			]),
+		);
 		const boxes = cards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
 		this.indexed = cards;
 		if (boxes !== this.cardBoxes) {
