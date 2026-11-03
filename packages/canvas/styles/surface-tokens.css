@@ -11,7 +11,10 @@
  * scheme for the rest. A card's own content keeps its own tokens (`--b-*`, `card-host/lib/theme.css`).
  */
 @layer decks.surface {
-	:where(.decks-canvas, .stage) {
+	/* On the page's root as well as the canvas's, so a host's bundle, which holds every rule to the canvas, reaches the frame's root (`:root` becomes it). */
+	:root,
+	.decks-canvas,
+	.stage {
 		--canvas-accent: #3b5cf6;
 		--canvas-accent-soft: #d7e2fc;
 		--canvas-warn: #e7af36;
@@ -38,7 +41,9 @@
 		--canvas-type-title: 15px;
 		--canvas-z-float: 30;
 	}
-	:where([data-color-scheme="dark"]) :where(.decks-canvas, .stage) {
+	[data-color-scheme="dark"],
+	[data-color-scheme="dark"] .decks-canvas,
+	[data-color-scheme="dark"] .stage {
 		--canvas-fg: #fafafa;
 		--canvas-muted: #aeaeae;
 		--canvas-line: #ffffff1f;
@@ -50,7 +55,9 @@
 		--canvas-shadow: 0 1px 2px #00000066, 0 6px 18px #0000004d;
 	}
 	@media (pointer: coarse) {
-		:where(.decks-canvas, .stage) {
+		:root,
+		.decks-canvas,
+		.stage {
 			--canvas-radius: 26px;
 		}
 	}
