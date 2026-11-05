@@ -17,6 +17,9 @@ await rest(page);
 const path = card("plan");
 await selectCard(page, path);
 await settle(page, 1000);
+// Awake, with its page, not still its picture: under load the page comes a moment after the selection.
+await frame.waitForFunction((wanted) => [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted)?.querySelector(".card-host"), path, { timeout: 10000 }).catch(() => {});
+await settle(page, 300);
 const host = await frame.evaluate((wanted) => {
 	const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted);
 	const r = node?.querySelector(".card-host")?.getBoundingClientRect();

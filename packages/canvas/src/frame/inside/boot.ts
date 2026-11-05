@@ -14,6 +14,7 @@ import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
 import { forgetMissing } from "../../items/missing.ts";
+import { giveDeckImports } from "../../items/card.ts";
 
 /**
  * What the frame holds once `start` has come: who keeps the canvas, the drawing first read, the
@@ -156,6 +157,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
 	 */
 	const folder = `canvases/${start.canvas.name}/`;
+	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.
+	if (start.imports) giveDeckImports(start.imports, new URL(folder, start.files.base).href);
 	// On Studio the address is the canvas's own folder already.
 	const inFolder = (path: string) => (studio || path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
 	/*

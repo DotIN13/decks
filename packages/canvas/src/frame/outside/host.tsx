@@ -76,6 +76,8 @@ export interface CanvasPass {
 	pictures: string;
 	expires: number;
 	kind?: "harness" | "studio";
+	/** The deck's import map (`/api/passes`): names to another site's addresses, or to paths under `assets/`, read beside the canvas's cards. Left out (Studio's), each card looks for one itself. */
+	imports?: Record<string, string>;
 }
 
 /** How long after a failed renewal it is asked for again. */
@@ -287,6 +289,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 				backend,
 				files: { base: pass.files, expires: pass.expires },
 				pictures: pass.pictures,
+				...(pass.imports ? { imports: pass.imports } : {}),
 				look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(options.onComment ? { pageComments: true } : {}), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
 				camera: localCamera,
 				...(pen?.writer ? { writer: pen.writer } : {}),

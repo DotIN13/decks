@@ -46,6 +46,7 @@ import { resolveDoc } from "./docs/resolve.ts";
 import { documentItemPath } from "./docs/item-path.ts";
 import { Writers } from "./docs/writers.ts";
 import { appActor, canvasHolds, canvasHoldsDocument } from "./stage/caller-run.ts";
+import { deckImportPaths } from "./cards/cards.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -117,6 +118,19 @@ export class App {
 	/** Which boards may run their own code, and the list the first question writes (`auth/app-trust.ts`). */
 	readonly appTrust: AppTrust;
 	/** Whether a card or board is placed on a canvas: a canvas pass reads it as one of that canvas's (`auth/guard.ts`). */
+	/**
+	 * The deck's import map, as the canvas frame is handed it (`/api/passes`): names to another site's addresses,
+	 * or to paths under `assets/`, which the frame reads from beside its canvas's cards, where the deck's `assets/`
+	 * is served (`routes/card-path.ts`) on the pass it already has. Read when asked: it is small, and may change.
+	 */
+	deckImports(): Record<string, string> {
+		const file = join(this.deck.path, "assets", "importmap.json");
+		try {
+			return existsSync(file) ? deckImportPaths(readFileSync(file, "utf8")) : {};
+		} catch {
+			return {};
+		}
+	}
 	placedOn(path: string, canvas: string): boolean {
 		// An app's picture (`apps/<name>`) is the canvas's to read when the app is placed on it.
 		const app = /^apps\/([^/]+)$/.exec(path)?.[1];

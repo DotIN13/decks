@@ -487,6 +487,31 @@ async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement,
 	await cardCode(body, lib).catch((error) => console.warn("card code:", error));
 }
 
+/** Whether the host handed the deck's import map (`giveDeckImports`): then no card looks for it. */
+let deckImportsGiven = false;
+
+/**
+ * The deck's import map as the host hands it for the whole canvas (the harness's `/api/passes`): names to
+ * another site's addresses, or to paths under `assets/` read at `base` (the canvas's folder on its pass). Added to the
+ * page's import map at once, before any card's script, as `deckImports` adds one it found; an empty map
+ * adds nothing and asks for nothing. A name the page already maps keeps its first address.
+ */
+export function giveDeckImports(given: Record<string, string>, base: string): void {
+	deckImportsGiven = true;
+	const imports: Record<string, string> = {};
+	for (const [name, address] of Object.entries(given)) {
+		if (typeof address !== "string" || !name) continue;
+		if (/^https:\/\//.test(address)) imports[name] = address;
+		else if (!/^[a-z][a-z0-9+.-]*:|^\/|(?:^|\/)\.\.(?:\/|$)/i.test(address)) imports[name] = new URL(address, base).href;
+	}
+	if (!Object.keys(imports).length || document.querySelector("script[data-deck-imports]")) return;
+	const script = document.createElement("script");
+	script.type = "importmap";
+	script.dataset.deckImports = "";
+	script.textContent = JSON.stringify({ imports });
+	document.head.append(script);
+}
+
 /**
  * The deck's own libraries, beside the boards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
  * added to the page's import map once, before the first card's script that could name one. An address
@@ -494,6 +519,8 @@ async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement,
  * first address, as import maps do, so a deck cannot swap the boards' d3.
  */
 function deckImports(cardUrl: string): Promise<void> {
+	// Handed by the host for the whole canvas (`giveDeckImports`): nothing to look for.
+	if (deckImportsGiven) return Promise.resolve();
 	const at = new URL("../../assets/importmap.json", cardUrl).href;
 	return once(`importmap:${at}`, async () => {
 		try {

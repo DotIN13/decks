@@ -1,4 +1,5 @@
 import { cardModules, runsInCard } from "@decks/card-host";
+import { posix } from "node:path";
 import { IMPORT_MAP } from "./size.ts";
 
 const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
@@ -29,6 +30,25 @@ function withDeckImports(extra: Record<string, string> | undefined): string {
 	const map = JSON.parse(IMPORT_MAP) as { imports: Record<string, string> };
 	for (const [name, address] of Object.entries(extra)) if (!(name in map.imports)) map.imports[name] = address;
 	return JSON.stringify(map, null, 2);
+}
+
+/**
+ * The deck's import map for the canvas frame (`/api/passes`, `imports`): another site's addresses as they are,
+ * the deck's own as paths under `assets/` (the frame reads them beside its canvas's cards), and none that leaves `assets/`
+ * or names a hidden folder.
+ */
+export function deckImportPaths(text: string | undefined): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [name, address] of Object.entries(readDeckImports(text, "assets/"))) {
+		if (/^https:\/\//.test(address)) {
+			out[name] = address;
+			continue;
+		}
+		const path = posix.normalize(address);
+		if (!path.startsWith("assets/") || path.split("/").some((part) => part === ".." || part.startsWith("."))) continue;
+		out[name] = path;
+	}
+	return out;
 }
 
 /** A deck's `assets/importmap.json` read for a card's page: names to addresses, relative ones from the deck's `assets/`. */

@@ -364,7 +364,9 @@ export function doorRoutes(app: App): express.Router {
 		}
 		const role = pens.sharing(canvas)?.role === "view" ? "view" : "edit";
 		const { pass, expires } = app.passes.canvas(canvas, role, req.tokenId);
-		res.set("cache-control", "no-store").json({ pass, role, expires });
+		// The deck's import map, for the frame to hand its cards before their scripts run; none for a friend's canvas, whose cards run no script.
+		const imports = pens.sharing(canvas) ? {} : app.deckImports();
+		res.set("cache-control", "no-store").json({ pass, role, expires, imports });
 	});
 
 	/**

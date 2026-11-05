@@ -221,6 +221,8 @@ const CHECKS = [
 	{ file: "card-tab.mjs", needsAgent: false },
 	/* A card's links to its canvas's files: Open in a tab, Download saved under its name. */
 	{ file: "card-links.mjs", needsAgent: false },
+	/* The deck's import map reaches every card on the canvas from the harness, and nothing asks for one the deck lacks. */
+	{ file: "deck-imports.mjs", needsAgent: false },
 	/* A new agent opens at once: its conversation and its canvas on screen. */
 	{ file: "new-agent-opens.mjs", needsAgent: false },
 	/* An agent's view.cursor on a card puts a named arrow in the frame, and null takes it away. */

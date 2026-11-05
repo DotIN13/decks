@@ -31,6 +31,9 @@ const rectOf = (path) => canvas.evaluate((wanted) => (window.__decksProbes?.card
 const press = async (n) => {
 	await flyToCard(page, CARD);
 	await settle(page, 400);
+	// Awake, with its page and its links, not still its picture.
+	await canvas.waitForFunction((wanted) => [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === wanted)?.dataset.state === "live", CARD, { timeout: 8000 }).catch(() => {});
+	await settle(page, 300);
 	const r = await rectOf(CARD);
 	await page.mouse.click(r.x + r.width * 0.15 + 40, r.y + r.height * (n * 0.5 + 0.25));
 };

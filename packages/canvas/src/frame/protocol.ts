@@ -55,6 +55,8 @@ export interface Start {
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same pass: `…/api/t/<pass>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;
+	/** The deck's import map, given once for every card on the canvas: names to another site's addresses, or to paths under `assets/`, read beside the canvas's cards. Left out, each card looks for the deck's own. */
+	imports?: Record<string, string>;
 	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }>; /** The page draws the comment box (`onComment`), so its Send now is a press of yours the page can send on; the frame only says where. */ pageComments?: boolean };
 	camera?: Camera;
 	writer?: { name?: string; color: string };

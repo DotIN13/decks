@@ -36,7 +36,7 @@ const passes = new Map<string, { pass: Promise<CanvasPass>; until: number }>();
 
 async function askPass(canvas: string): Promise<CanvasPass> {
 	const response = await fetch(api("/passes"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ canvas }) });
-	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string };
+	const answer = (await response.json().catch(() => ({}))) as { pass?: string; expires?: number; error?: string; imports?: Record<string, string> };
 	if (!answer.pass) throw new Error(`No pass for the canvas ${canvas}: ${answer.error ?? response.status}`);
 	const at = (rest: string) => new URL(api(`/t/${answer.pass}/${rest}`), location.href).href;
 	return {
@@ -45,6 +45,8 @@ async function askPass(canvas: string): Promise<CanvasPass> {
 		files: at("card/"),
 		pictures: at("thumb/"),
 		expires: answer.expires ?? Date.now() + 3_600_000,
+		// The deck's import map, handed to the frame once: none (an older harness) and each card looks for it itself.
+		...(answer.imports ? { imports: answer.imports } : {}),
 	};
 }
 
