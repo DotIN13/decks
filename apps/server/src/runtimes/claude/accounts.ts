@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
-import { homedir } from "node:os";
+import { createHash, randomUUID } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
+import { homedir, userInfo } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 /**
@@ -108,6 +109,14 @@ export interface ClaudeAccount {
 	orgName?: string;
 	/** `pro`, `max`, `enterprise` — what the plan is, as the CLI reports it. */
 	plan?: string;
+	/** How it signed in: a Claude subscription, or an Anthropic API (Console) account. */
+	kind?: "subscription" | "api";
+	/**
+	 * For an API account, which key it holds: a hash of the key's last 20 characters, which the
+	 * CLI itself keeps in the account's `.claude.json`. Never the key. Two sign-ins with one key
+	 * are one row.
+	 */
+	key?: string;
 	addedAt: number;
 }
 
@@ -142,7 +151,53 @@ interface ClaudeHome {
 	configFile: string;
 	/** macOS keeps tokens in the keychain rather than in a file — see `hasCredentials`. */
 	platform: NodeJS.Platform;
+	/** The macOS keychain, as the CLI uses it; injected so a test never touches the real one. */
+	keychain?: Keychain;
 }
+
+/** The two keychain calls a sign-in that replaces another needs. */
+export interface Keychain {
+	read(service: string): string | undefined;
+	write(service: string, value: string): void;
+}
+
+/** The account name the CLI files its keychain entries under (its `R0`). */
+function keychainUser(): string {
+	let user: string;
+	try {
+		user = process.env.USER || userInfo().username;
+	} catch {
+		user = "claude-code-user";
+	}
+	return /^[a-zA-Z0-9._-]+$/.test(user) ? user : "claude-code-user";
+}
+
+/**
+ * The real keychain, through `security`. The value is written through `security -i`'s stdin
+ * and as hex, so a token is never on a command line where `ps` could read it.
+ */
+const systemKeychain: Keychain = {
+	read(service) {
+		try {
+			const out = execFileSync("security", ["find-generic-password", "-a", keychainUser(), "-w", "-s", service], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+			return out.replace(/\n$/, "") || undefined;
+		} catch {
+			return undefined;
+		}
+	},
+	write(service, value) {
+		const hex = Buffer.from(value, "utf8").toString("hex");
+		spawnSync("security", ["-i"], { input: `add-generic-password -U -a "${keychainUser()}" -s "${service}" -X ${hex}\n`, stdio: ["pipe", "ignore", "ignore"] });
+	},
+};
+
+/** The suffix the CLI puts on a keychain entry for a config directory: `-` and 8 hex of its sha256. */
+function keychainSuffix(dir: string): string {
+	return `-${createHash("sha256").update(dir.normalize("NFC")).digest("hex").slice(0, 8)}`;
+}
+
+/** The fields of `.claude.json` that say who a directory is signed in as. */
+const SIGNED_IN_FIELDS = ["oauthAccount", "primaryApiKey", "customApiKeyResponses"] as const;
 
 /** What the CLI's own login is on this machine, read from the environment once. */
 function claudeHome(): ClaudeHome {
@@ -787,19 +842,91 @@ export class ClaudeAccounts {
 	 * it — and because the first account added would otherwise sit there doing nothing while
 	 * the deck went on using the CLI's default.
 	 *
-	 * Every sign-in is a row of its own, whether or not its email is already on the list,
-	 * the CLI's own login's included. Nothing is merged or replaced: the person asked for
-	 * every login to be kept, so one subscription signed in twice is two rows, each with its
-	 * own credentials, and either can be removed by hand.
+	 * A sign-in to an account already on the list *replaces that row's login*: subscriptions
+	 * are the same account when their email is, API accounts when their key is. The new
+	 * credentials are written over the old row's, under the old row's id, so every agent on
+	 * it and every running chat goes on spending it with the fresh login, and nothing has to
+	 * be told; the new directory then goes.
+	 *
+	 * **Except the CLI's own row**, which never takes part: it is synthesised by `list()` and
+	 * its credentials are the CLI's, not Decks', so signing in as that account adds a row.
 	 */
-	remember(account: Omit<ClaudeAccount, "addedAt"> & { addedAt?: number }): ClaudeAccount {
+	remember(account: Omit<ClaudeAccount, "addedAt"> & { addedAt?: number }): ClaudeAccount & { replaced?: true } {
 		const index = this.read();
 		const entry: ClaudeAccount = { ...account, addedAt: account.addedAt ?? Date.now() };
+		if (entry.kind === "api" && !entry.key) {
+			const key = this.keyOf(entry.id);
+			if (key) entry.key = key;
+		}
+		const same = (other: ClaudeAccount): boolean => {
+			if (other.id === entry.id || other.id === DEFAULT_ACCOUNT) return false;
+			if (entry.kind === "api") return other.kind === "api" && !!entry.key && other.key === entry.key;
+			return other.kind !== "api" && !!entry.email && other.email === entry.email;
+		};
+		const old = index.accounts.find(same);
+		if (old) {
+			this.overwrite(entry.id, old.id);
+			this.discard(entry.id);
+			const row: ClaudeAccount = { ...old, ...entry, id: old.id, addedAt: old.addedAt };
+			index.accounts = index.accounts.filter((other) => other.id !== entry.id).map((other) => (other.id === old.id ? row : other));
+			index.active = old.id;
+			this.write(index);
+			this.repoint();
+			return { ...row, replaced: true };
+		}
 		index.accounts = [...index.accounts.filter((other) => other.id !== entry.id), entry];
 		index.active = entry.id;
 		this.write(index);
 		this.repoint();
 		return entry;
+	}
+
+	/**
+	 * Which API key a directory holds, as a hash of its last 20 characters: from `primaryApiKey`
+	 * where the CLI keeps the key in the file, else from `customApiKeyResponses.approved`, where
+	 * it records those 20 characters on every platform when it saves a key.
+	 */
+	keyOf(id: string): string | undefined {
+		const config = this.readConfig(join(this.configDir(id), ".claude.json"));
+		const primary = typeof config.primaryApiKey === "string" ? config.primaryApiKey.trim().slice(-20) : undefined;
+		const approved = (config.customApiKeyResponses as { approved?: unknown } | undefined)?.approved;
+		const tail = primary || (Array.isArray(approved) ? approved.filter((one): one is string => typeof one === "string").at(-1) : undefined);
+		return tail ? createHash("sha256").update(tail).digest("hex").slice(0, 16) : undefined;
+	}
+
+	private readConfig(file: string): Record<string, unknown> {
+		try {
+			const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;
+			return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+		} catch {
+			return {};
+		}
+	}
+
+	/**
+	 * Write one directory's login over another's: the credentials file, the fields of
+	 * `.claude.json` that say who it is, and on macOS the two keychain entries the CLI keys by
+	 * the directory (`Claude Code-credentials-<hash>` for a subscription, `Claude Code-<hash>`
+	 * for an API key). The rest of the old directory, its project trust and settings, stays.
+	 */
+	private overwrite(from: string, into: string): void {
+		const fromDir = this.configDir(from);
+		const intoDir = this.configDir(into);
+		const credentials = join(fromDir, ".credentials.json");
+		if (existsSync(credentials)) writeFileSync(join(intoDir, ".credentials.json"), readFileSync(credentials), { mode: 0o600 });
+		const fresh = this.readConfig(join(fromDir, ".claude.json"));
+		const config = this.readConfig(join(intoDir, ".claude.json"));
+		for (const field of SIGNED_IN_FIELDS) {
+			if (field in fresh) config[field] = fresh[field];
+			else delete config[field];
+		}
+		writeFileSync(join(intoDir, ".claude.json"), JSON.stringify(config, null, 2), { mode: 0o600 });
+		if (this.home.platform !== "darwin") return;
+		const keychain = this.home.keychain ?? systemKeychain;
+		for (const service of ["Claude Code-credentials", "Claude Code"]) {
+			const value = keychain.read(service + keychainSuffix(fromDir));
+			if (value) keychain.write(service + keychainSuffix(intoDir), value);
+		}
 	}
 
 	/**
@@ -983,6 +1110,8 @@ function validate(raw: unknown): Index {
 				...(text(account.email) ? { email: text(account.email)! } : {}),
 				...(text(account.orgName) ? { orgName: text(account.orgName)! } : {}),
 				...(text(account.plan) ? { plan: text(account.plan)! } : {}),
+				...(account.kind === "api" || account.kind === "subscription" ? { kind: account.kind } : {}),
+				...(text(account.key) ? { key: text(account.key)! } : {}),
 				addedAt: time(account.addedAt) ?? Date.now(),
 			};
 		})

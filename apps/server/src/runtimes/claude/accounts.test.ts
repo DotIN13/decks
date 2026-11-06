@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -216,18 +217,62 @@ test("signing in adds an account, makes it active, and points the symlink at it"
 });
 
 /*
- * Every sign-in is kept: signing in twice to one account is two rows, each with its own
- * credentials, and the newer one in force.
+ * Signing in again to a subscription already on the list writes the new login over that row:
+ * one row, under its old id, with the new credentials, and the new directory gone.
  */
-test("signing in again to the same account adds a second row", () => {
+test("signing in again to the same subscription replaces its row's login", () => {
 	const { accounts, cleanup } = store();
 	const first = add(accounts, "one@example.com");
-	const again = add(accounts, "one@example.com");
+	const { id, configDir } = accounts.begin();
+	writeFileSync(join(configDir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "fresh" } }));
+	writeFileSync(join(configDir, ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "one@example.com" } }));
+	const row = accounts.remember({ id, email: "one@example.com", kind: "subscription" });
 
-	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, first, again]);
-	assert.equal(accounts.activeId(), again, "the newer one in force");
-	assert.equal(existsSync(accounts.configDir(first)), true, "and the first keeps its credentials");
+	assert.equal(row.replaced, true);
+	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, first], "one row, under its old id");
+	assert.equal(accounts.activeId(), first, "and in force");
+	assert.match(readFileSync(join(accounts.configDir(first), ".credentials.json"), "utf8"), /fresh/, "with the new credentials");
+	assert.equal(existsSync(configDir), false, "and the new directory gone");
 	cleanup();
+});
+
+/* An API account is the same account when its key is, whatever its email says. */
+test("API accounts are one row per key", () => {
+	const { accounts, cleanup } = store();
+	const login = (tail: string, email = "dev@example.com") => {
+		const { id, configDir } = accounts.begin();
+		writeFileSync(join(configDir, ".claude.json"), JSON.stringify({ customApiKeyResponses: { approved: [tail], rejected: [] } }));
+		return accounts.remember({ id, email, kind: "api" });
+	};
+	const one = login("aaaaaaaaaaaaaaaaaaaa");
+	const two = login("bbbbbbbbbbbbbbbbbbbb");
+	assert.notEqual(one.id, two.id, "another key on one email is another row");
+	assert.equal(typeof one.key, "string");
+	assert.ok(!JSON.stringify(accounts.list()).includes("aaaaaaaaaaaaaaaaaaaa"), "and the key itself is never on the list");
+	const again = login("aaaaaaaaaaaaaaaaaaaa", "other@example.com");
+	assert.equal(again.id, one.id, "the same key again replaces its row");
+	assert.equal(again.replaced, true);
+	// A subscription with that email is a row of its own.
+	const sub = add(accounts, "dev@example.com");
+	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, one.id, two.id, sub]);
+	cleanup();
+});
+
+/* On macOS the login is in the keychain, keyed by the directory: copied onto the old row's entries. */
+test("on macOS a replacing login copies its keychain entries onto the old row's", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-accounts-"));
+	const entries = new Map<string, string>();
+	const keychain = { read: (service: string) => entries.get(service), write: (service: string, value: string) => void entries.set(service, value) };
+	const home = join(dir, "home");
+	mkdirSync(home, { recursive: true });
+	const accounts = new ClaudeAccounts(dir, { configDir: home, configFile: join(dir, "home.json"), platform: "darwin", keychain });
+	const suffix = (path: string) => `-${createHash("sha256").update(path).digest("hex").slice(0, 8)}`;
+	const first = add(accounts, "one@example.com");
+	const { id } = accounts.begin();
+	entries.set(`Claude Code-credentials${suffix(accounts.configDir(id))}`, "new-token");
+	accounts.remember({ id, email: "one@example.com", kind: "subscription" });
+	assert.equal(entries.get(`Claude Code-credentials${suffix(accounts.configDir(first))}`), "new-token");
+	rmSync(dir, { recursive: true, force: true });
 });
 
 test("forgetting an account takes its credentials with it and moves off it", () => {

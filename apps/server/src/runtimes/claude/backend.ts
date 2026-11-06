@@ -784,13 +784,15 @@ export class ClaudeBackend implements AgentBackend {
 		 */
 		if (into && accounts && "remember" in accounts) {
 			const identity = await claudeIdentity(into.configDir);
-			// Added as a row of its own, even when it is the CLI's own login or an email already on
-			// the list: every sign-in is kept (`ClaudeAccounts.remember`).
-			const remembered = (accounts as { remember(account: { id: string; email?: string; orgName?: string; plan?: string }): { email?: string } }).remember({
+			// A row of its own, or the new login written over the row already on the list for this
+			// subscription (same email) or API account (same key) (`ClaudeAccounts.remember`).
+			const remembered = (accounts as { remember(account: { id: string; email?: string; orgName?: string; plan?: string; kind: "subscription" | "api" }): { email?: string; replaced?: true } }).remember({
 				id: into.id,
 				...identity,
+				kind: method.flag === "--console" ? "api" : "subscription",
 			});
-			notice("info", `Signed in as ${remembered.email ?? `your ${method.noun}`}, and now using it.`);
+			const who = remembered.email ?? `your ${method.noun}`;
+			notice("info", remembered.replaced ? `Signed in again as ${who}: its row now has the new login, and is in use.` : `Signed in as ${who}, and now using it.`);
 			this.context.accountsChanged?.();
 			// No restart: the account is a symlink every session reads its credentials through,
 			// so this one picks it up on its next request (`claude/accounts.ts`).
