@@ -181,22 +181,18 @@ export function PageCallout(props: {
 	const [more, setMore] = createSignal(false);
 	let moreButton: HTMLButtonElement | undefined;
 	/*
-	 * Where the menu opens, measured once it is drawn: away from the card (up when the pill is over the
-	 * card's top edge, down when under its bottom one), unless only the other side has room; its left
-	 * edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the stage.
+	 * Where the menu opens, measured once it is drawn: always down, under the pill, as the person asked;
+	 * its left edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the stage.
 	 */
-	const [menuAt, setMenuAt] = createSignal<{ left: number; up: boolean }>();
+	const [menuAt, setMenuAt] = createSignal<{ left: number }>();
 	const placeMenu = (menu: HTMLDivElement) => {
 		const stage = element?.parentElement?.getBoundingClientRect();
 		if (!element || !moreButton || !stage) return;
 		const pill = element.getBoundingClientRect();
 		const button = moreButton.getBoundingClientRect();
-		const { offsetWidth: w, offsetHeight: h } = menu;
-		const room = { up: pill.top - stage.top - 8, down: stage.bottom - pill.bottom - 8 };
-		let up = !place().below;
-		if (room[up ? "up" : "down"] < h + 6 && room[up ? "down" : "up"] > room[up ? "up" : "down"]) up = !up;
+		const w = menu.offsetWidth;
 		const left = Math.max(stage.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, stage.right - 8 - w - pill.left));
-		setMenuAt({ left, up });
+		setMenuAt({ left });
 	};
 	createEffect(on(more, (open) => open || setMenuAt(undefined)));
 	createEffect(on(() => props.hidden, (hidden) => hidden && setMore(false)));
@@ -315,8 +311,7 @@ export function PageCallout(props: {
 						class="callout-more"
 						role="menu"
 						aria-label="More card actions"
-						data-up={menuAt()?.up ? "true" : undefined}
-						style={menuAt() ? { left: `${menuAt()!.left}px`, ...(menuAt()!.up ? { bottom: "calc(100% + 6px)" } : { top: "calc(100% + 6px)" }) } : { visibility: "hidden", top: "calc(100% + 6px)", left: "0" }}
+						style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
 					>
 						<Show when={props.onExport}>
 							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PNG" onClick={pick(() => props.onExport?.("png"))}>
