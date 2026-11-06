@@ -563,6 +563,23 @@ impl Page {
 		self.scene.vars.radii(&item.props, &root.placed[i as usize].theme).map(|v| v.clamp(0.0, limit) as f32)
 	}
 
+	/// A carried card's own frame (`paint`'s `frame_parts`), on the screen at `x`, `y` and scale `s`:
+	/// what goes under its picture and what goes over it. None for a card whose item frames nothing.
+	fn carried_frame(&self, id: &str, x: f32, y: f32, s: f64) -> Option<(Vec<Op>, Vec<Op>)> {
+		let (r, i) = self.scene.find(id)?;
+		let root = &self.scene.roots[r];
+		let item = &root.tree.items[i as usize];
+		if !stage_paint::painter::has_frame(item) {
+			return None;
+		}
+		let placed = &root.placed[i as usize];
+		let skip = HashSet::new();
+		let image = |_: &str| None;
+		let ctx = Context::new(&self.scene, &skip, &image);
+		let transform = stage_paint::list::Affine::translate(x, y).then(&stage_paint::list::Affine::scale(s as f32));
+		Some(stage_paint::painter::frame_parts(&ctx, item, &placed.theme, placed.rect.w, placed.rect.h, transform))
+	}
+
 	/// The boards on the stage: where each goes, for the page to place its picture or its page.
 	pub fn cards(&self) -> Value {
 		let mut out = Vec::new();
@@ -699,6 +716,11 @@ impl Page {
 			let limit = (board.w.min(board.h) / 2.0).max(0.0) as f32;
 			let radii = if app { [12.0 * s as f32; 4] } else { board.corners.map_or_else(|| self.card_radii(&board.id, board.w, board.h), |c| c.map(|r| r.min(limit))).map(|r| r * s as f32) };
 			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii, ellipse: false };
+			// Carried, its own frame goes with it: its shadow under its picture here, its outline over it (the tiles have left it out).
+			let frame = if carried && !app { self.carried_frame(&board.id, x, y, s) } else { None };
+			if let Some((under, _)) = &frame {
+				over.ops.extend(under.iter().cloned());
+			}
 			over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
 			// An app's body is below its bar: its picture and its placeholder go there.
 			let bar = if app { (APP_BAR * s).round() as f32 } else { 0.0 };
@@ -733,6 +755,9 @@ impl Page {
 				}
 			} else if !board.title.is_empty() {
 				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone(), radii });
+			}
+			if let Some((_, outline)) = frame {
+				over.ops.extend(outline);
 			}
 			// Drawn here, so its node stays unseen: carried, or asleep as its picture or its placeholder.
 			if board.live {
@@ -1863,6 +1888,34 @@ mod tests {
 		assert_eq!(page.card_radii("sq", 400.0, 300.0), [0.0, 4.0, 8.0, 150.0], "its own, none rounder than half its shorter side");
 		assert_eq!(page.card_radii("plain", 400.0, 300.0), [12.0; 4]);
 		assert_eq!(page.card_radii("gone", 400.0, 300.0), [12.0; 4]);
+	}
+
+	/// A carried card that frames itself has its shadow drawn under its picture and its outline over it, where the drag has it.
+	#[test]
+	fn a_carried_card_takes_its_frame_with_it() {
+		let doc = r##"{"version":"2.14","children":[{"type":"browser","id":"b","x":0,"y":0,"width":400,"height":300,"url":"u","cornerRadius":0,"stroke":"#ff0000","strokeWidth":6,"effect":{"type":"shadow","offset":{"x":0,"y":0},"blur":0,"spread":14,"color":"#0000ff"}}]}"##;
+		let mut page = Page::new(doc, false, "s").unwrap();
+		page.cards = vec![CardPlace { path: "p".into(), id: "b".into(), picture: "card:p".into(), x: 0.0, y: 0.0, w: 400.0, h: 300.0, live: true, news: None, glow: false, title: String::new(), kind: "card".into(), status: String::new(), corners: Some([0.0; 4]) }];
+		let cam = Camera { x: -100.0, y: -100.0, zoom: 1.0 };
+		page.carry = (["p".to_owned()].into_iter().collect(), 50.0, 20.0);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
+		let shadow = over.ops.iter().position(|op| matches!(op, Op::Shadow { .. }));
+		let paper = over.ops.iter().position(|op| matches!(op, Op::Shape { stroke: None, .. }));
+		let outline = over.ops.iter().position(|op| matches!(op, Op::Shape { stroke: Some(_), .. }));
+		assert!(matches!((shadow, paper, outline), (Some(a), Some(b), Some(c)) if a < b && b < c), "shadow, then its paper, then its outline: {shadow:?} {paper:?} {outline:?}");
+		let Some(Op::Shadow { transform, .. }) = over.ops.iter().find(|op| matches!(op, Op::Shadow { .. })) else { panic!() };
+		assert_eq!(transform.apply(0.0, 0.0), (150.0, 120.0), "where the drag has it");
+		// At 40%: the outline round the picture, at the picture's place on the screen.
+		let cam = Camera { x: -100.0, y: -100.0, zoom: 0.4 };
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
+		let picture_at = over.ops.iter().find_map(|op| match op { Op::Shape { stroke: None, transform, .. } => Some(transform.apply(0.0, 0.0)), _ => None }).unwrap();
+		let Some(Op::Shape { transform, shape, .. }) = over.ops.iter().find(|op| matches!(op, Op::Shape { stroke: Some(_), .. })) else { panic!() };
+		assert_eq!(transform.apply(0.0, 0.0), picture_at, "the outline where the picture is");
+		assert!((transform.apply(shape.w, shape.h).0 - picture_at.0 - 160.0).abs() < 1.0, "and as wide: {:?} {shape:?}", transform);
+		// Not carried: nothing of its frame here, the tiles have it.
+		page.carry = (HashSet::new(), 0.0, 0.0);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
+		assert!(!over.ops.iter().any(|op| matches!(op, Op::Shadow { .. })));
 	}
 
 	#[test]

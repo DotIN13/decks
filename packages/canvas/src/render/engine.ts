@@ -1461,7 +1461,7 @@ export class StageEngine {
 		const was = this.placedCards;
 		this.placedCards = cards;
 		if (!this.page) return;
-		const key = JSON.stringify(cards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.news, b.glow, b.picture, b.title, b.kind, b.status]));
+		const key = JSON.stringify(cards.map((b) => [b.path, b.id, b.x, b.y, b.w, b.h, b.news, b.glow, b.picture, b.title, b.kind, b.status, b.corners]));
 		const live = JSON.stringify(cards.filter((b) => b.live).map((b) => b.path));
 		if (key === this.cardKey) {
 			// The same boxes as the ones the index was made for: it answers for these too.
@@ -1479,7 +1479,8 @@ export class StageEngine {
 		}
 		this.cardKey = key;
 		this.liveKey = live;
-		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind, status: b.status })));
+		// Its item's id and corners too: the engine cuts its picture to the corners, and draws the frame of a carried card from its item (`engine.rs`, `carried_frame`).
+		const sent = JSON.stringify(cards.map((b) => ({ path: b.path, id: b.id, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow, title: b.title, kind: b.kind, status: b.status, corners: b.corners })));
 		this.cardsSent.calls++;
 		this.cardsSent.bytes += sent.length;
 		this.page.setCards(sent);
@@ -1556,6 +1557,11 @@ export class StageEngine {
 				clearTimeout(this.cardsLanding);
 			}
 			this.lift(this.page.setPreview(this.shown ?? "[]"));
+			// A card that frames itself (its own outline or shadow, painted with the drawing) is left out of the tiles while it is carried, once: the stage draws its frame round its picture where the drag has it (`engine.rs`, `carried_frame`), and it goes back with the rest when the drag lands.
+			const framed = paths
+				.map((path) => this.placedCards.find((card) => card.path === path)?.id)
+				.filter((id): id is string => !!id && !this.lifted.has(id) && framesItself(this.doc, id));
+			if (framed.length) this.lift(JSON.stringify(framed));
 			this.laidOut(this.shown === undefined || this.moveOnly);
 		} else if (this.cardsOnly && this.shown === undefined) {
 			clearTimeout(this.cardsLanding);
@@ -2459,4 +2465,10 @@ function startWorker(url: string): Worker {
 	}
 	const absolute = new URL(url, location.href).href;
 	return new Worker(`data:text/javascript,${encodeURIComponent(`import ${JSON.stringify(absolute)};`)}`, { type: "module" });
+}
+
+/** Whether a top-level item of the drawing frames itself: its own outline or shadow (`paint`'s `has_frame`). */
+function framesItself(doc: PenDocument | undefined, id: string): boolean {
+	const node = doc?.children?.find((one) => one.id === id) as { stroke?: unknown; strokeWidth?: unknown; effect?: unknown } | undefined;
+	return !!node && ((node.stroke !== undefined && node.stroke !== null) || node.strokeWidth !== undefined || (node.effect !== undefined && node.effect !== null));
 }

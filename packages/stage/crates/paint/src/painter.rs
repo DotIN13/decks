@@ -810,15 +810,28 @@ fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4
 /// is drawn in the canvas's line colour, outside the edge, as the canvas's own 1 px outline is; with
 /// neither, nothing is drawn here and the canvas keeps that outline (`.card-node > .shade`).
 fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, ops: &mut Vec<Op>) {
+	let shape = rrect(&ctx.scene.vars, item, theme, w, h);
+	let (under, over) = frame_parts(ctx, item, theme, w, h, transform);
+	ops.extend(under);
+	ops.push(Op::Erase { shape, transform });
+	ops.extend(over);
+}
+
+/// A browser item's frame in two halves: what goes under its page or picture (its shadows) and what
+/// goes over it (its outline). The tiles draw them round the hole they leave (`browser_frame`); a card
+/// a drag carries is left out of the tiles, and the stage draws them round its picture where the
+/// drag has it (`stage-web`'s `frame`).
+pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine) -> (Vec<Op>, Vec<Op>) {
 	let vars = &ctx.scene.vars;
 	let shape = rrect(vars, item, theme, w, h);
+	let mut under = Vec::new();
+	let mut over = Vec::new();
 	for (dx, dy, blur, spread, c) in shadows(vars, item, theme, false) {
-		ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
+		under.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
 	}
-	ops.push(Op::Erase { shape, transform });
 	if stroke_of(vars, item, theme).is_some() {
-		shape_stroke(ctx, item, theme, shape, transform, ops);
-		return;
+		shape_stroke(ctx, item, theme, shape, transform, &mut over);
+		return (under, over);
 	}
 	let width = vars.num(item.get("strokeWidth").filter(|v| !v.is_object()), theme, 0.0) as f32;
 	if width > 0.0 {
@@ -828,8 +841,14 @@ fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, tran
 			_ => Align::Outside,
 		};
 		let edge = if ctx.dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.1] };
-		ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((width, align)) });
+		over.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((width, align)) });
 	}
+	(under, over)
+}
+
+/// Whether a browser item frames itself (its own outline or shadow), so a drag must carry the frame with it.
+pub fn has_frame(item: &Item) -> bool {
+	item.get("stroke").is_some_and(|v| !v.is_null()) || item.get("strokeWidth").is_some() || item.get("effect").is_some_and(|v| !v.is_null())
 }
 
 fn card_edge(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
