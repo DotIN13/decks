@@ -219,6 +219,7 @@ const CHECKS = [
 	{ file: "card-frame.mjs", needsAgent: false },
 	{ file: "card-frame-drag.mjs", needsAgent: false, named: true },
 	{ file: "card-frame-demo.mjs", needsAgent: false, named: true },
+	{ file: "card-files-img.mjs", needsAgent: false },
 	/* Keys pressed in a card are the card's until Escape: nothing nudges or deletes it from inside; ⌘− still zooms. */
 	{ file: "card-keys.mjs", needsAgent: false },
 	/* A card opened in a tab of its own runs its scripts with the whole card: card.file, on, store, path, decks. */

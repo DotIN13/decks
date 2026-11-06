@@ -119,6 +119,8 @@ describe("snapshotOfCard", () => {
 			`root.getElementById("box").scrollTop = 120; const img = root.querySelector("img"); img.setAttribute("src", img.getAttribute("src").replace("ORIGIN", location.origin));`,
 		);
 		assert.match(html, /data-decks-scroll="0,120"/);
-		assert.match(html, /<img src="\/api\/t\/abc\/card\/canvases\/c\/cards\/x@1\/a.png">/);
+		// Without the canvas pass: the server's Chrome reads `/api/card/…` on a pass of its own.
+		assert.match(html, /<img src="\/api\/card\/canvases\/c\/cards\/x@1\/a.png">/);
+		assert.doesNotMatch(html, /\/api\/t\//);
 	});
 });

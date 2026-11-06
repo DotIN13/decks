@@ -148,6 +148,16 @@ function rulesOf(sheet: CSSStyleSheet | null | undefined): string {
  * in attributes and in its styles' `url()`s alike, so the whole text is rewritten.
  */
 function siteRelative(html: string, origin: string): string {
-	if (!origin || origin === "null") return html;
-	return html.split(`${origin}/`).join("/");
+	const local = !origin || origin === "null" ? html : html.split(`${origin}/`).join("/");
+	return passFree(local);
+}
+
+/**
+ * The canvas pass taken out of every address (`/api/t/<pass>/card/…` becomes `/api/card/…`): the server's
+ * Chrome reads the harness on a pass of its own (`pictures/pool.ts`, `withOwnReads`), which may read
+ * `/api/card/…` and nothing under another pass's address, so a card's pictures from its canvas's `files/`
+ * were refused and drawn broken; and the person's pass has no business in a page sent to the server.
+ */
+export function passFree(html: string): string {
+	return html.replace(/\/api\/t\/[^/"'\s)]+\/(card|thumb)\//g, "/api/$1/");
 }
