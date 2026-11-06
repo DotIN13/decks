@@ -204,13 +204,15 @@ pub struct PageEngine {
 	page: Page,
 	gpu: Option<Gpu>,
 	size: (u32, u32),
+	/// Meshes in the last frame drawn: any at all and the GPU draws the whole canvas with four samples a pixel.
+	meshes: u32,
 }
 
 #[wasm_bindgen]
 impl PageEngine {
 	#[wasm_bindgen(constructor)]
 	pub fn new(text: &str, dark: bool, session: &str) -> Result<PageEngine, JsError> {
-		Ok(PageEngine { page: Page::new(text, dark, session).map_err(err)?, gpu: None, size: (0, 0) })
+		Ok(PageEngine { page: Page::new(text, dark, session).map_err(err)?, gpu: None, size: (0, 0), meshes: 0 })
 	}
 
 	#[wasm_bindgen(js_name = setGpu)]
@@ -660,8 +662,15 @@ impl PageEngine {
 		let over = self.page.frame(Camera { x, y, zoom }, dpr, width, height, want);
 		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
 		let n = over.ops.len() as u32;
+		self.meshes = over.ops.iter().filter(|op| matches!(op, stage_paint::Op::Mesh { .. })).count() as u32;
 		gpu.draw(Target::Screen, &over);
 		n
+	}
+
+	/// How many meshes the last frame drew (`frame`): for the checks, a frame meant to cost the GPU little draws none.
+	#[wasm_bindgen(js_name = lastMeshes)]
+	pub fn last_meshes(&self) -> u32 {
+		self.meshes
 	}
 
 	/// Make now, in idle time before the first gesture, what a zoom or a drag would otherwise make

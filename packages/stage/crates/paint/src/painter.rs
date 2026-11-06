@@ -811,7 +811,7 @@ fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4
 /// neither, nothing is drawn here and the canvas keeps that outline (`.card-node > .shade`).
 fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, ops: &mut Vec<Op>) {
 	let shape = rrect(&ctx.scene.vars, item, theme, w, h);
-	let (under, over) = frame_parts(ctx, item, theme, w, h, transform);
+	let (under, over) = frame_parts(ctx, item, theme, w, h, transform, false);
 	ops.extend(under);
 	ops.push(Op::Erase { shape, transform });
 	ops.extend(over);
@@ -821,7 +821,12 @@ fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, tran
 /// goes over it (its outline). The tiles draw them round the hole they leave (`browser_frame`); a card
 /// a drag carries is left out of the tiles, and the stage draws them round its picture where the
 /// drag has it (`stage-web`'s `frame`).
-pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine) -> (Vec<Op>, Vec<Op>) {
+///
+/// `quick` is for a frame drawn at every step of a drag: a dashed or dotted outline comes as one plain
+/// shape per dash along the straight edges, with no mesh. A mesh anywhere in the page's frame makes the
+/// GPU draw the whole canvas with four samples a pixel (`gpu`, `samples_for`), which a dashed card's drag
+/// paid at every step; the tiles, painted once, keep the tessellated outline, corners included.
+pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, quick: bool) -> (Vec<Op>, Vec<Op>) {
 	let vars = &ctx.scene.vars;
 	let shape = rrect(vars, item, theme, w, h);
 	let mut under = Vec::new();
@@ -829,8 +834,13 @@ pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, tr
 	for (dx, dy, blur, spread, c) in shadows(vars, item, theme, false) {
 		under.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
 	}
-	if stroke_of(vars, item, theme).is_some() {
-		shape_stroke(ctx, item, theme, shape, transform, &mut over);
+	if let Some(stroke) = stroke_of(vars, item, theme) {
+		let [top, right, bottom, left] = stroke.widths;
+		let dash = if quick && top == right && right == bottom && bottom == left { dash_of(item, top) } else { None };
+		match (dash, stroke.fills.iter().find_map(|f| paint_of(ctx, f, theme, w, h))) {
+			(Some(dash), Some(paint)) => dashes(shape, transform, top, stroke.align, &dash, item.get("strokeDash").and_then(Value::as_str) == Some("dotted"), paint, &mut over),
+			_ => shape_stroke(ctx, item, theme, shape, transform, &mut over),
+		}
 		return (under, over);
 	}
 	let width = vars.num(item.get("strokeWidth").filter(|v| !v.is_object()), theme, 0.0) as f32;
@@ -844,6 +854,37 @@ pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, tr
 		over.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((width, align)) });
 	}
 	(under, over)
+}
+
+/// A dashed or dotted outline as plain shapes along a box's four straight edges: a bar per dash, a circle
+/// per dot, on the line its alignment puts it on; the corners' curves are left out.
+#[allow(clippy::too_many_arguments)]
+fn dashes(shape: Shape, transform: Affine, width: f32, align: Align, dash: &[f64], dotted: bool, paint: Paint, ops: &mut Vec<Op>) {
+	let w = width as f64;
+	// Where the line's middle runs, in from the box's edge.
+	let inset = match align {
+		Align::Inside => w / 2.0,
+		Align::Center => 0.0,
+		Align::Outside => -w / 2.0,
+	};
+	let (bw, bh) = (shape.w as f64 - 2.0 * inset, shape.h as f64 - 2.0 * inset);
+	let r = (shape.radii[0] as f64 - inset).max(0.0).min(bw / 2.0).min(bh / 2.0);
+	let (on, off) = (dash.first().copied().unwrap_or(w * 4.0).max(0.0), dash.get(1).copied().unwrap_or(w * 3.0).max(0.5));
+	// Each edge: where it starts, which way it runs, and how long its straight part is.
+	let edges = [((inset + r, inset), (1.0, 0.0), bw - 2.0 * r), ((inset + bw, inset + r), (0.0, 1.0), bh - 2.0 * r), ((inset + bw - r, inset + bh), (-1.0, 0.0), bw - 2.0 * r), ((inset, inset + bh - r), (0.0, -1.0), bh - 2.0 * r)];
+	for ((x0, y0), (dx, dy), run) in edges {
+		let mut t = 0.0;
+		while t < run {
+			let len = if dotted { 0.0 } else { on.min(run - t) };
+			let (ax, ay) = (x0 + dx * t, y0 + dy * t);
+			let (bx, by) = (ax + dx * len, ay + dy * len);
+			let (left, top) = (ax.min(bx) - w / 2.0, ay.min(by) - w / 2.0);
+			let (sw, sh) = (if dotted { w } else { (bx - ax).abs() + if dx == 0.0 { w } else { 0.0 } }, if dotted { w } else { (by - ay).abs() + if dy == 0.0 { w } else { 0.0 } });
+			let (left, top) = if dotted { (ax - w / 2.0, ay - w / 2.0) } else if dx == 0.0 { (left, ay.min(by)) } else { (ax.min(bx), top) };
+			ops.push(Op::Shape { shape: Shape { w: sw as f32, h: sh as f32, radii: [0.0; 4], ellipse: dotted }, transform: transform.then(&Affine::translate(left as f32, top as f32)), paint: paint.clone(), stroke: None });
+			t += if dotted { off.max(w * 1.5) } else { on + off };
+		}
+	}
 }
 
 /// Whether a browser item frames itself (its own outline or shadow), so a drag must carry the frame with it.

@@ -416,7 +416,6 @@ impl Shooter {
 			if !board.rect.meets(&area) {
 				continue;
 			}
-			let [tl, tr, br, bl] = radii;
 			let shape = |w: f32, h: f32| Shape { w, h, radii, ellipse: false };
 			let (x, y, bw, bh) = snap(&board.rect);
 			laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: Paint::Solid(Color(board_paper)), stroke: None });
@@ -428,10 +427,13 @@ impl Shooter {
 				if tall >= bh {
 					laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, bh / tall]), stroke: None });
 				} else {
+					// Both parts cut to the box's corners, as the stage draws them: a last strip shorter than a corner keeps its curve.
 					let last = (ph as f32 - 0.5) / ph.max(1) as f32;
-					let part = |h: f32, radii: [f32; 4]| Shape { w: bw, h, radii, ellipse: false };
-					laid_out.push(Op::Shape { shape: part(tall, [tl, tr, 0.0, 0.0]), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
-					laid_out.push(Op::Shape { shape: part(bh - tall, [0.0, 0.0, br, bl]), transform: Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+					let part = |h: f32| Shape { w: bw, h, radii: [0.0; 4], ellipse: false };
+					laid_out.push(Op::PushClip(stage_paint::list::Clip { shape: shape(bw, bh), transform: Affine::translate(x, y) }));
+					laid_out.push(Op::Shape { shape: part(tall), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+					laid_out.push(Op::Shape { shape: part(bh - tall), transform: Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+					laid_out.push(Op::PopClip);
 				}
 			}
 		}

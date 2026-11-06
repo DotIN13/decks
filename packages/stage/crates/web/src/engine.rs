@@ -577,7 +577,7 @@ impl Page {
 		let image = |_: &str| None;
 		let ctx = Context::new(&self.scene, &skip, &image);
 		let transform = stage_paint::list::Affine::translate(x, y).then(&stage_paint::list::Affine::scale(s as f32));
-		Some(stage_paint::painter::frame_parts(&ctx, item, &placed.theme, placed.rect.w, placed.rect.h, transform))
+		Some(stage_paint::painter::frame_parts(&ctx, item, &placed.theme, placed.rect.w, placed.rect.h, transform, true))
 	}
 
 	/// The boards on the stage: where each goes, for the page to place its picture or its page.
@@ -732,17 +732,19 @@ impl Page {
 				 * grew) has its last row drawn on down to the box's foot, as the page's own background goes
 				 * on below its content: never stretched, and never bare paper under it.
 				 */
-				let [tl, tr, br, bl] = radii;
 				let paint_picture = |over: &mut DrawList, texture: u32, pw: u32, ph: u32, opacity: f32| {
 					let tall = (ph as f32 / pw.max(1) as f32 * w).round();
 					let image = |uv: [f32; 4]| stage_paint::list::Paint::Image { texture, opacity, uv };
 					if tall >= h {
 						over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, h / tall]), stroke: None });
 					} else {
+						// Both parts cut to the box's corners, not each rounded: a last strip shorter than a corner would lose its curve.
 						let last = (ph as f32 - 0.5) / ph.max(1) as f32;
-						let part = |h: f32, radii: [f32; 4]| stage_paint::list::Shape { w, h, radii, ellipse: false };
-						over.push(Op::Shape { shape: part(tall, [tl, tr, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
-						over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, br, bl]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+						let part = |h: f32| stage_paint::list::Shape { w, h, radii: [0.0; 4], ellipse: false };
+						over.push(Op::PushClip(stage_paint::list::Clip { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y) }));
+						over.push(Op::Shape { shape: part(tall), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+						over.push(Op::Shape { shape: part(h - tall), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+						over.push(Op::PopClip);
 					}
 				};
 				// The picture this one replaced stays under it while it fades in (`picture_unlaid`, `fade_pictures`).
@@ -1912,6 +1914,15 @@ mod tests {
 		let Some(Op::Shape { transform, shape, .. }) = over.ops.iter().find(|op| matches!(op, Op::Shape { stroke: Some(_), .. })) else { panic!() };
 		assert_eq!(transform.apply(0.0, 0.0), picture_at, "the outline where the picture is");
 		assert!((transform.apply(shape.w, shape.h).0 - picture_at.0 - 160.0).abs() < 1.0, "and as wide: {:?} {shape:?}", transform);
+		// A dashed outline, carried, is plain shapes and no mesh: a mesh in the frame draws the whole canvas with four samples a pixel.
+		let dashed = r##"{"version":"2.14","children":[{"type":"browser","id":"b","x":0,"y":0,"width":400,"height":300,"url":"u","cornerRadius":0,"stroke":"#ffffff","strokeWidth":2,"strokeDash":"dashed"}]}"##;
+		let mut dpage = Page::new(dashed, false, "s").unwrap();
+		dpage.cards = page.cards.clone();
+		dpage.carry = (["p".to_owned()].into_iter().collect(), 50.0, 20.0);
+		let over = dpage.frame(cam, 1.0, 1200.0, 800.0, 0);
+		assert!(!over.ops.iter().any(|op| matches!(op, Op::Mesh { .. })), "no mesh");
+		let bars = over.ops.iter().filter(|op| matches!(op, Op::Shape { shape, .. } if (shape.w.min(shape.h) - 2.0).abs() < 0.01)).count();
+		assert!(bars > 40, "a bar per dash round the card: {bars}");
 		// Not carried: nothing of its frame here, the tiles have it.
 		page.carry = (HashSet::new(), 0.0, 0.0);
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);

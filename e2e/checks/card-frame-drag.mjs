@@ -19,6 +19,9 @@ const html = `<style>:host { background: #000 }</style><div class="doc"><p style
 const plain = await call("canvas.insert", [{ type: "card", title: "Plain", html, width: 400, height: 240 }, { at: { x1: -3000, y1: -3000 } }]);
 const framed = await call("canvas.insert", [{ type: "card", title: "Framed", html, width: 400, height: 240 }, { at: { x1: -2500, y1: -3000 } }]);
 await call("canvas.update", [framed.value?.id, { set: { cornerRadius: 0, stroke: "#ff0000", strokeWidth: 16, strokeAlignment: "outer", effect: { type: "shadow", offset: { x: 0, y: 0 }, blur: 0, spread: 30, color: "#0000ff" } } }]);
+const dashed = await call("canvas.insert", [{ type: "card", title: "Dashed", html, width: 400, height: 240 }, { at: { x1: -3000, y1: -2600 } }]);
+await call("canvas.update", [dashed.value?.id, { set: { cornerRadius: 0, stroke: "#ffffff", strokeWidth: 3, strokeDash: "dashed" } }]);
+const C = dashed.value.card;
 const A = plain.value.card;
 const B = framed.value.card;
 
@@ -49,7 +52,7 @@ const onScreen = (r) => r && r.x > 420 && r.y > 120 && r.x + r.w < 1100 && r.y +
 
 await flyToCard(page, B);
 await page.mouse.move(1300, 450);
-for (let i = 0; i < 12 && !(onScreen(await rect(A)) && onScreen(await rect(B))); i++) {
+for (let i = 0; i < 12 && !(onScreen(await rect(A)) && onScreen(await rect(B)) && onScreen(await rect(C))); i++) {
 	await page.keyboard.press("ControlOrMeta+Minus");
 	await settle(page, 300);
 }
@@ -72,8 +75,10 @@ const drag = async (path, label) => {
 	await canvas.evaluate(() => {
 		globalThis.__frames = [];
 		globalThis.__tilesAt = globalThis.__tilesIn ?? 0;
+		globalThis.__meshes = 0;
 		const tick = (t) => {
 			globalThis.__frames.push(t);
+			globalThis.__meshes = Math.max(globalThis.__meshes, globalThis.__decksProbes?.rust?.page?.lastMeshes?.() ?? 0);
 			if (globalThis.__frames.length < 2000 && !globalThis.__stop) requestAnimationFrame(tick);
 		};
 		globalThis.__stop = false;
@@ -87,7 +92,7 @@ const drag = async (path, label) => {
 		globalThis.__stop = true;
 		const f = globalThis.__frames;
 		const gaps = f.slice(1).map((t, i) => t - f[i]).sort((a, b) => a - b);
-		return { tiles: (globalThis.__tilesIn ?? 0) - globalThis.__tilesAt, frames: f.length, slowest: Math.round(gaps.at(-1) ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), counting: globalThis.__tilesIn !== undefined };
+		return { tiles: (globalThis.__tilesIn ?? 0) - globalThis.__tilesAt, frames: f.length, slowest: Math.round(gaps.at(-1) ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), meshes: globalThis.__meshes, counting: globalThis.__tilesIn !== undefined };
 	});
 	await page.waitForTimeout(300);
 	if (process.env.FRAME_SHOTS) await page.screenshot({ path: `${process.env.FRAME_SHOTS}/drag-${label}.png` });
@@ -121,7 +126,9 @@ const red = (c) => c[0] > 140 && c[1] < 80 && c[0] > c[2];
 
 const p = await drag(A, "plain");
 const f = await drag(B, "framed");
-if (process.env.FRAME_SHOTS) (await import("node:fs")).writeFileSync(`${process.env.FRAME_SHOTS}/numbers.json`, JSON.stringify({ plain: p, framed: f }, null, 1));
+// A dashed outline was a mesh, and a mesh in the frame makes the GPU draw the whole canvas with four samples a pixel: at every step of its drag.
+const d = await drag(C, "dashed");
+if (process.env.FRAME_SHOTS) (await import("node:fs")).writeFileSync(`${process.env.FRAME_SHOTS}/numbers.json`, JSON.stringify({ plain: p, framed: f, dashed: d }, null, 1));
 say("the worker's tiles are counted", !!p?.counting, JSON.stringify(p));
 say("dragging the plain card: no tiles while it moves", p?.tiles === 0, JSON.stringify(p));
 say("mid-drag, the framed card's red outline goes with it", !!f && red(f.carriedEdge), JSON.stringify(f?.carriedEdge));
@@ -129,5 +136,8 @@ say("…and none is left where it was", !!f && !red(f.leftBehind), JSON.stringif
 say("dragging the framed card: only the tiles that take it out, a few, while it moves", !!f && f.tiles <= 8, JSON.stringify(f));
 say("…its slowest frame no slower than the plain card's, give or take 20 ms", !!p && !!f && f.slowest <= p.slowest + 20, `plain ${JSON.stringify(p)} · framed ${JSON.stringify(f)}`);
 say("…and the drawing put back once it lands, in a few tiles more than the plain card's at most", !!p && !!f && f.landing <= p.landing + 8, `plain ${p?.landing} · framed ${f?.landing} tiles on landing`);
+say("dragging the dashed card: no frame of it draws a mesh, which would make the GPU draw the whole canvas with four samples a pixel", d?.meshes === 0, JSON.stringify({ plain: p?.meshes, framed: f?.meshes, dashed: d?.meshes }));
+say("dragging the dashed card: as many frames as the plain card's, give or take a tenth", !!p && !!d && d.frames >= p.frames * 0.9, `plain ${p?.frames} · dashed ${d?.frames} frames`);
+say("…its slowest frame no slower than the plain card's, give or take 20 ms", !!p && !!d && d.slowest <= p.slowest + 20, `plain ${p?.slowest} · dashed ${d?.slowest} ms`);
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();
