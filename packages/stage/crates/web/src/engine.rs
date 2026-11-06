@@ -550,6 +550,19 @@ impl Page {
 		json!(ids)
 	}
 
+	/// A card's corners in stage units, top-left clockwise: its item's `cornerRadius`, no rounder than
+	/// half its shorter side, as the drawing's hole for it is (`paint`'s `rrect`); 12 when it has none.
+	fn card_radii(&self, id: &str, w: f64, h: f64) -> [f32; 4] {
+		let Some((r, i)) = self.scene.find(id) else { return [12.0; 4] };
+		let root = &self.scene.roots[r];
+		let item = &root.tree.items[i as usize];
+		if item.get("cornerRadius").is_none() {
+			return [12.0; 4];
+		}
+		let limit = (w.min(h) / 2.0).max(0.0);
+		self.scene.vars.radii(&item.props, &root.placed[i as usize].theme).map(|v| v.clamp(0.0, limit) as f32)
+	}
+
 	/// The boards on the stage: where each goes, for the page to place its picture or its page.
 	pub fn cards(&self) -> Value {
 		let mut out = Vec::new();
@@ -676,13 +689,16 @@ impl Page {
 			}
 			// Its title above it, in every state, live too, as the bar over it read: only where a 12 px line is more than a smudge; an app's name is on its window.
 			if !app && !board.title.is_empty() && s * 12.0 >= 5.0 {
-				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
+				titled.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone(), radii: [0.0; 4] });
 			}
 			// A live item is drawn here only while a drag carries it: as its picture, or as its paper and title until it has one.
 			if board.live && !carried {
 				continue;
 			}
-			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii: [12.0 * s as f32; 4], ellipse: false };
+			// Its corners are its item's `cornerRadius`, 12 when it has none, as the hole the drawing leaves for it is.
+			let limit = (board.w.min(board.h) / 2.0).max(0.0) as f32;
+			let radii = if app { [12.0 * s as f32; 4] } else { board.corners.map_or_else(|| self.card_radii(&board.id, board.w, board.h), |c| c.map(|r| r.min(limit))).map(|r| r * s as f32) };
+			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii, ellipse: false };
 			over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
 			// An app's body is below its bar: its picture and its placeholder go there.
 			let bar = if app { (APP_BAR * s).round() as f32 } else { 0.0 };
@@ -694,7 +710,7 @@ impl Page {
 				 * grew) has its last row drawn on down to the box's foot, as the page's own background goes
 				 * on below its content: never stretched, and never bare paper under it.
 				 */
-				let r = 12.0 * s as f32;
+				let [tl, tr, br, bl] = radii;
 				let paint_picture = |over: &mut DrawList, texture: u32, pw: u32, ph: u32, opacity: f32| {
 					let tall = (ph as f32 / pw.max(1) as f32 * w).round();
 					let image = |uv: [f32; 4]| stage_paint::list::Paint::Image { texture, opacity, uv };
@@ -703,8 +719,8 @@ impl Page {
 					} else {
 						let last = (ph as f32 - 0.5) / ph.max(1) as f32;
 						let part = |h: f32, radii: [f32; 4]| stage_paint::list::Shape { w, h, radii, ellipse: false };
-						over.push(Op::Shape { shape: part(tall, [r, r, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
-						over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, r, r]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+						over.push(Op::Shape { shape: part(tall, [tl, tr, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+						over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, br, bl]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
 					}
 				};
 				// The picture this one replaced stays under it while it fades in (`picture_unlaid`, `fade_pictures`).
@@ -716,7 +732,7 @@ impl Page {
 					None => paint_picture(&mut over, texture, pw, ph, 1.0),
 				}
 			} else if !board.title.is_empty() {
-				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone() });
+				placeholders.push(Placeholder { x, y, w, h, title: board.title.clone(), kind: board.kind.clone(), radii });
 			}
 			// Drawn here, so its node stays unseen: carried, or asleep as its picture or its placeholder.
 			if board.live {
@@ -1839,13 +1855,23 @@ mod tests {
 		assert_eq!(worker.landed(), vec!["a".to_owned()], "landed once the tiles of the scale shown have it");
 	}
 
+	/// A sleeping card's picture has its item's corners, as the drawing's hole for it does; 12 with none.
+	#[test]
+	fn a_cards_picture_has_its_items_corners() {
+		let doc = r##"{"version":"2.14","children":[{"type":"browser","id":"sq","x":0,"y":0,"width":400,"height":300,"url":"u","cornerRadius":[0,4,8,200]},{"type":"browser","id":"plain","x":500,"y":0,"width":400,"height":300,"url":"v"}]}"##;
+		let page = Page::new(doc, false, "s").unwrap();
+		assert_eq!(page.card_radii("sq", 400.0, 300.0), [0.0, 4.0, 8.0, 150.0], "its own, none rounder than half its shorter side");
+		assert_eq!(page.card_radii("plain", 400.0, 300.0), [12.0; 4]);
+		assert_eq!(page.card_radii("gone", 400.0, 300.0), [12.0; 4]);
+	}
+
 	#[test]
 	fn a_sleeping_boards_picture_lies_over_its_page_and_under_the_tiles() {
 		let mut page = Page::new(STAGE, false, "s").unwrap();
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
 		page.pictures.held.insert("card:boards/x.html".into(), (900, 400, 300));
-		let board = |live| CardPlace { path: "boards/x.html".into(), id: "x".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new(), status: String::new() };
+		let board = |live| CardPlace { path: "boards/x.html".into(), id: "x".into(), picture: "card:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false, title: String::new(), kind: String::new(), status: String::new(), corners: None };
 		page.cards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
@@ -2078,6 +2104,9 @@ pub struct CardPlace {
 	pub kind: String,
 	/// An app's status ("running", "asleep", "stopped", …), for the dot on its window's bar.
 	pub status: String,
+	/// Its item's own corners in stage units, top-left clockwise, as the page read them off the
+	/// drawing (`Page.corners`); none, the scene's or 12 (`card_radii`).
+	pub corners: Option<[f32; 4]>,
 }
 
 /// An app's window bar, in stage units: the page's iframe sits below it (`items/item-surfaces.tsx`, `APP_BAR`).
@@ -2102,6 +2131,8 @@ struct Placeholder {
 	h: f32,
 	title: String,
 	kind: String,
+	/// Its corners on the screen, as its picture's would be.
+	radii: [f32; 4],
 }
 
 /// A placeholder's words: the kind small and faint at the top-left, the title under it, cut to the paper.
@@ -2122,7 +2153,7 @@ fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: 
 	let faint = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
 	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, p.y as f64]);
 	// A hairline round the paper: on a dark canvas the paper is nearly the ground's colour, and the words alone would float.
-	ops.push(Op::Shape { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [12.0 * scale as f32; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y), paint: stage_paint::list::Paint::Solid(Color::straight([faint[0], faint[1], faint[2], 0.35], 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
+	ops.push(Op::Shape { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: p.radii, ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y), paint: stage_paint::list::Paint::Solid(Color::straight([faint[0], faint[1], faint[2], 0.35], 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
 	let kind = match p.kind.as_str() {
 		"app" => "App",
 		"document" => "Document",

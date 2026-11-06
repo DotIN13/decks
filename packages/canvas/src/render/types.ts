@@ -37,6 +37,8 @@ export interface SceneCard {
 	path: string;
 	/** Its item on the drawing, when known: a glide's offset is kept under it (`engine.rs`, `offsets`). */
 	id?: string;
+	/** Its item's own corners, top-left clockwise (`Page.corners`): its picture and paper are cut to them. */
+	corners?: readonly number[];
 	x: number;
 	y: number;
 	w: number;

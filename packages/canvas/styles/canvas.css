@@ -280,9 +280,13 @@
  * the app measured the same shape, 42ms → 20ms.) Radius and clipping on the surface itself
  * are fine — only the decorations that paint *outside* the box trigger it.
  */
+.card-node[data-outlined] > .shade {
+	/* Its item draws its own outline, with the drawing (`paint`'s `browser_frame`). */
+	outline: none;
+}
 .card-node > .shade {
 	position: absolute;
-	border-radius: var(--canvas-card-radius, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px)); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
 	/* No shadow: a board lies flat on the canvas, its edge the 1px outline alone. */
 	inset: 0;
 	outline: 1px solid var(--canvas-line);
@@ -307,7 +311,7 @@
 .card-node > .news-glow {
 	position: absolute;
 	inset: 0;
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 	pointer-events: none;
 	opacity: 1;
 	transition: opacity var(--read-ms, 1500ms) ease-out;
@@ -316,7 +320,7 @@
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 	box-shadow:
 		0 0 60px 10px color-mix(in srgb, var(--canvas-news, var(--canvas-accent)) 40%, transparent),
 		0 4px 18px rgb(0 0 0 / 19%);
@@ -363,7 +367,7 @@
 	.card-node > .surface {
 	position: relative;
 	overflow: hidden;
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 	background: var(--canvas-bg);
 }
 	/* On a touch screen the page is covered until the item is activated (`item-slot.tsx`): a finger on it is the stage's. */
@@ -371,7 +375,7 @@
 	position: absolute;
 	inset: 0;
 	z-index: 3;
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 	touch-action: none;
 }
 	/* Activated by a second tap: its page has the fingers, and a thin ring of the accent inside its edge says so until something else is selected. */
@@ -628,7 +632,7 @@
 	opacity: 0.55;
 }
 	.world > .pen-kin[data-round="true"] {
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 }
 	/* One box round everything selected, when there is more than one thing (each has its own thin line). */
 	.world > .pen-selection-box {
@@ -712,7 +716,7 @@
 }
 	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
 	.world > :is(.pen-hover, .pen-selection):is([data-page="true"], [data-round="true"]) {
-	border-radius: var(--canvas-card-radius, 12px);
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
 }
 	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
 	.world > .pen-guides {

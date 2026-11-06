@@ -322,7 +322,7 @@ A JavaScript file that makes the item's children in pen.dev.
 
 ### `browser`
 
-A live web page. On a Decks canvas this is a board.
+A live web page. On a Decks canvas this is a card, an app, a document or an old board, framed by its own `cornerRadius`, `stroke` and `effect`: a 12 px corner and the canvas's 1 px outline when they are left out.
 
 | field | values | meaning |
 |---|---|---|

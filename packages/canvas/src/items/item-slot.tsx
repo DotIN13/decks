@@ -219,6 +219,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 			data-covered={props.covered ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			data-active={props.active ? "" : undefined}
+			data-outlined={props.board.outlined ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
 			style={{
@@ -227,6 +228,8 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 				transform: shift(),
 				width: `${size().w}px`,
 				height: `${size().h}px`,
+				// Its item's own corners, as the drawing's hole for it has them (`model/drawing.ts`, `cardFrame`).
+				...(props.board.corners ? { "--canvas-item-corners": props.board.corners.map((r) => `${r}px`).join(" ") } : {}),
 			}}
 		>
 			<div class="shade" aria-hidden="true" />

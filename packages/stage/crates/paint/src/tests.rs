@@ -238,3 +238,25 @@ fn a_blurred_item_is_a_blurred_layer_over_what_it_and_its_children_paint() {
 	let Op::PushLayer { blur: Some(small), .. } = &list.ops[4] else { panic!() };
 	assert_eq!(small.sigma, 2.0);
 }
+
+/// A card's frame is its browser item's own pen fields: its shadow under the hole the drawing leaves
+/// for its page, its outline over it, in its corners; with none, only the hole, and the canvas keeps its outline.
+#[test]
+fn a_browser_item_is_framed_by_its_own_corner_outline_and_shadow() {
+	let (_, plain) = scene(json!({ "version": "2.10", "children": [{ "type": "browser", "id": "b", "x": 0, "y": 0, "width": 200, "height": 100, "url": "cards/x/index.html" }] }));
+	assert_eq!(kinds(&paint(&plain, Rect { x: -50.0, y: -50.0, w: 300.0, h: 200.0 }, 1.0)), vec!["erase"]);
+	let (_, framed) = scene(json!({ "version": "2.10", "children": [{
+		"type": "browser", "id": "b", "x": 0, "y": 0, "width": 200, "height": 100, "url": "cards/x/index.html",
+		"cornerRadius": 0, "stroke": "#ff0000", "strokeWidth": 4, "strokeAlignment": "outer",
+		"effect": { "type": "shadow", "offset": { "x": 0, "y": 8 }, "blur": 24, "color": "#00000040" }
+	}] }));
+	let list = paint(&framed, Rect { x: -50.0, y: -50.0, w: 300.0, h: 200.0 }, 1.0);
+	assert_eq!(kinds(&list), vec!["shadow", "erase", "stroke"]);
+	let Some(Op::Erase { shape, .. }) = list.ops.iter().find(|op| matches!(op, Op::Erase { .. })) else { panic!() };
+	assert_eq!(shape.radii, [0.0; 4], "the hole is in its own corners");
+	// A bare width is an outline in the canvas's line colour; a width of 0 is no outline at all.
+	let (_, bare) = scene(json!({ "version": "2.10", "children": [{ "type": "browser", "id": "b", "x": 0, "y": 0, "width": 200, "height": 100, "url": "u", "strokeWidth": 2 }] }));
+	assert_eq!(kinds(&paint(&bare, Rect { x: -50.0, y: -50.0, w: 300.0, h: 200.0 }, 1.0)), vec!["erase", "stroke"]);
+	let (_, none) = scene(json!({ "version": "2.10", "children": [{ "type": "browser", "id": "b", "x": 0, "y": 0, "width": 200, "height": 100, "url": "u", "strokeWidth": 0 }] }));
+	assert_eq!(kinds(&paint(&none, Rect { x: -50.0, y: -50.0, w: 300.0, h: 200.0 }, 1.0)), vec!["erase"]);
+}

@@ -95,6 +95,16 @@ export interface Page {
 	sized?: true;
 	/** An app item's app, by name. */
 	app?: string;
+	/**
+	 * Its item's own corners, from its `cornerRadius`, top-left clockwise in stage units; absent, the
+	 * canvas's 12 px. Read off the drawing (`model/drawing.ts`, `pagesOf`), as its place is.
+	 */
+	corners?: [number, number, number, number];
+	/**
+	 * Its item draws its own outline (`stroke` or `strokeWidth`, painted with the drawing), so the
+	 * canvas's 1 px one round it gives way.
+	 */
+	outlined?: true;
 	x: number;
 	y: number;
 	w: number;

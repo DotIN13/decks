@@ -1,4 +1,4 @@
-import { apply, withDecksColors, baseTheme, diff, editDocument, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
+import { apply, withDecksColors, baseTheme, diff, editDocument, num as penNum, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Page } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
@@ -101,6 +101,26 @@ const pagePath = (node: PenNode) => {
 };
 const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 
+/**
+ * How a card's item frames it, from its own pen fields: its corners (`cornerRadius`, one number or
+ * four, a variable resolved in the light theme) and whether it draws its own outline. The shadow and
+ * the outline are painted with the drawing (`paint`'s `browser_frame`); the page only needs to round
+ * its corners to the same shape and leave its own outline off.
+ */
+export function cardFrame(doc: PenDocument, node: PenNode): Pick<Page, "corners" | "outlined"> {
+	const out: Pick<Page, "corners" | "outlined"> = {};
+	const radius = (node as { cornerRadius?: unknown }).cornerRadius;
+	if (radius !== undefined && radius !== null) {
+		const theme = baseTheme(doc, "light");
+		const list = Array.isArray(radius) ? radius : [radius, radius, radius, radius];
+		const at = (i: number) => Math.max(0, penNum(doc, list[i] ?? list[0], theme, 0));
+		out.corners = [at(0), at(1), at(2), at(3)];
+	}
+	const own = node as { stroke?: unknown; strokeWidth?: unknown };
+	if ((own.stroke !== undefined && own.stroke !== null) || own.strokeWidth !== undefined) out.outlined = true;
+	return out;
+}
+
 /** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
 export function pagesOf(doc: PenDocument): Page[] {
 	const boards: Page[] = [];
@@ -117,6 +137,7 @@ export function pagesOf(doc: PenDocument): Page[] {
 			inContext: [],
 			...(isCardItem(node) ? { card: true as const } : {}),
 			...itemFields(node),
+			...cardFrame(doc, node),
 		});
 	}
 	return boards;

@@ -37,9 +37,9 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 	const z = Math.max(zoom, 1e-6);
 	const many = !!o.selectionFrame?.many;
 	for (const k of o.kin) boxes.push({ x: k.x, y: k.y, w: k.w, h: k.h, r: k.round ? ROUND : SQUARE, kind: k.kin === "child" ? "kin-child" : "kin" });
-	for (const b of o.outlines) boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: b.round || b.role === "page" ? ROUND : SQUARE, kind: many && b.role !== "marquee" ? "selection-thin" : "selection" });
+	for (const b of o.outlines) boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: b.corner ?? (b.round || b.role === "page" ? ROUND : SQUARE), kind: many && b.role !== "marquee" ? "selection-thin" : "selection" });
 	if (o.selectionFrame?.many) boxes.push({ x: o.selectionFrame.x, y: o.selectionFrame.y, w: o.selectionFrame.w, h: o.selectionFrame.h, r: SQUARE, kind: "selection-box" });
-	if (o.hover) boxes.push({ x: o.hover.x, y: o.hover.y, w: o.hover.w, h: o.hover.h, r: o.hover.board || o.hover.round ? ROUND : SQUARE, kind: "hover" });
+	if (o.hover) boxes.push({ x: o.hover.x, y: o.hover.y, w: o.hover.w, h: o.hover.h, r: o.hover.corner ?? (o.hover.board || o.hover.round ? ROUND : SQUARE), kind: "hover" });
 	for (const j of o.joins) boxes.push({ x: j.x, y: j.y, w: j.w, h: j.h, r: SQUARE, kind: "join" });
 	if (o.drop) boxes.push({ x: o.drop.x, y: o.drop.y, w: o.drop.w, h: o.drop.h, r: SQUARE, kind: "join" });
 	for (const f of o.slotFrames) boxes.push({ x: f.x, y: f.y, w: f.w, h: f.h, r: SQUARE, kind: "slot-frame" });

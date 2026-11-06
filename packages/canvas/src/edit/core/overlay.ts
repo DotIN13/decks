@@ -33,11 +33,13 @@ export type Outline = Rect & {
 	role: "item" | "page" | "marquee";
 	/** Notes and cards have a board's corners, and so does the outline round one. */
 	round?: true;
+	/** A card's own corner (`PageBox.corners`), which its outline follows rather than a board's. */
+	corner?: number;
 };
 /** The selected board's eight handles. */
 export type PageHandles = Outline & { path: string };
 /** The outline round what the pointer is over: an item (`id`) or a board (`board`). */
-type HoverBox = Rect & { id?: string; board?: true; round?: true };
+type HoverBox = Rect & { id?: string; board?: true; round?: true; corner?: number };
 /** Where a card block's grip goes: level with the middle of the block's first line, at its left edge. */
 type GripBox = { id: string; x: number; y: number };
 /** The frame a drag would drop into. */
@@ -145,7 +147,7 @@ export function glideShift(glide: ReadonlyMap<string, Offset> | undefined, scene
 	return NO_SHIFT;
 }
 
-const outline = (id: string, role: Outline["role"], box: Rect, round?: true): Outline => ({ id, role, x: box.x, y: box.y, w: box.w, h: box.h, ...(round ? { round } : {}) });
+const outline = (id: string, role: Outline["role"], box: Rect, round?: true, corner?: number): Outline => ({ id, role, x: box.x, y: box.y, w: box.w, h: box.h, ...(round ? { round } : {}), ...(corner !== undefined ? { corner } : {}) });
 
 /**
  * Where each selected item is now, moved by any drag and sized by any resize in progress; each
@@ -174,7 +176,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 		const board = input.boards.find((candidate) => candidate.path === path);
 		if (!board) continue;
 		const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
-		out.push(outline(`page:${path}`, "page", { x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h }));
+		out.push(outline(`page:${path}`, "page", { x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h }, undefined, board.corners?.[0]));
 	}
 	// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
 	const chosen = input.selected;
@@ -184,7 +186,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 		const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
 		// Carried by a finger on its edge: outlined where the finger has it.
 		const at = carried?.path === board.path ? carried : { x: board.x + shift.dx, y: board.y + shift.dy };
-		out.push(outline(`page:${board.path}`, "page", sized?.path === board.path ? sized : { x: at.x, y: at.y, w: board.w, h: board.h }));
+		out.push(outline(`page:${board.path}`, "page", sized?.path === board.path ? sized : { x: at.x, y: at.y, w: board.w, h: board.h }, undefined, board.corners?.[0]));
 	}
 	if (input.marquee) out.push(outline("", "marquee", marqueeRect(input.marquee)));
 	return out;
@@ -275,7 +277,7 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 	if (bounds) return { ...bounds, x: bounds.x + glide.dx, y: bounds.y + glide.dy, id, ...(rounded(scene, id!) ? { round: true as const } : {}) };
 	const path = input.board;
 	const board = path && path !== input.selected && !input.busy ? input.boards.find((candidate) => candidate.path === path) : undefined;
-	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
+	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true, ...(board.corners ? { corner: board.corners[0]! } : {}) } : undefined;
 }
 
 type KinInput = {

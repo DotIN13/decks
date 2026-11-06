@@ -15,7 +15,8 @@ export type Rect = Frame;
  * board that reads top to bottom needs for its content: what it is drawn at, at least, and what a
  * drag of its height cannot go under, since its height is a floor its content raises.
  */
-export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number };
+/** A card, board, document or app on the stage; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
+export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number; corners?: readonly number[] };
 /**
  * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
  * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).

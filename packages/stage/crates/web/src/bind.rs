@@ -512,6 +512,10 @@ impl PageEngine {
 					title: b.get("title").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
 					kind: b.get("kind").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
 					status: b.get("status").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+					corners: b.get("corners").and_then(serde_json::Value::as_array).filter(|list| list.len() == 4).map(|list| {
+						let at = |i: usize| list[i].as_f64().unwrap_or(12.0).max(0.0) as f32;
+						[at(0), at(1), at(2), at(3)]
+					}),
 				})
 			})
 			.collect();

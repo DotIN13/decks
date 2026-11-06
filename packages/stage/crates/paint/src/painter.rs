@@ -517,7 +517,11 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 	let transform = to_affine(&m);
 	// Something live shows here, under the drawing: a hole, in the item's place in the order.
 	if ctx.holes.is_some_and(|h| h.contains(&item.id)) {
-		ops.push(Op::Erase { shape: rrect(vars, item, theme, w, h), transform });
+		if item.kind() == "browser" {
+			browser_frame(ctx, item, theme, w, h, transform, ops);
+		} else {
+			ops.push(Op::Erase { shape: rrect(vars, item, theme, w, h), transform });
+		}
 		return;
 	}
 	// How many target pixels a unit of the item's own space is: what curves are flattened to.
@@ -624,10 +628,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 		}
 		// A board: its page (or its picture) is under the drawing, so the drawing has a hole for it
 		// here, in its place in the order. What comes later draws over the board.
-		"browser" => {
-			let shape = rrect(vars, item, theme, w, h);
-			ops.push(Op::Erase { shape, transform });
-		}
+		"browser" => browser_frame(ctx, item, theme, w, h, transform, ops),
 		"icon" | "icon_font" => icon(ctx, item, theme, w, h, transform, pixels, ops),
 		kind => {
 			// Anything this build cannot draw, and broken refs, as a dashed outline that says so.
@@ -802,6 +803,35 @@ fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4
 }
 
 /// A card's hairline edge, outside its box as a CSS outline is.
+/// A browser item (a card, an app, a document, a board): its page or its picture lies under the
+/// drawing, so the drawing has a hole for it, its own `cornerRadius`'s shape. Its pen fields frame it:
+/// its `effect` shadows go under the hole (only what falls outside the box shows), and its outline
+/// (`stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash`) over it. A `strokeWidth` with no `stroke`
+/// is drawn in the canvas's line colour, outside the edge, as the canvas's own 1 px outline is; with
+/// neither, nothing is drawn here and the canvas keeps that outline (`.card-node > .shade`).
+fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, ops: &mut Vec<Op>) {
+	let vars = &ctx.scene.vars;
+	let shape = rrect(vars, item, theme, w, h);
+	for (dx, dy, blur, spread, c) in shadows(vars, item, theme, false) {
+		ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
+	}
+	ops.push(Op::Erase { shape, transform });
+	if stroke_of(vars, item, theme).is_some() {
+		shape_stroke(ctx, item, theme, shape, transform, ops);
+		return;
+	}
+	let width = vars.num(item.get("strokeWidth").filter(|v| !v.is_object()), theme, 0.0) as f32;
+	if width > 0.0 {
+		let align = match item.get("strokeAlignment").and_then(Value::as_str) {
+			Some("inner") => Align::Inside,
+			Some("center") => Align::Center,
+			_ => Align::Outside,
+		};
+		let edge = if ctx.dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.1] };
+		ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((width, align)) });
+	}
+}
+
 fn card_edge(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
 	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.1] };
 	ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, Align::Outside)) });

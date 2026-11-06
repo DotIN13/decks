@@ -56,6 +56,13 @@ Boards are retired: everything that used to be a board is now a card. Old boards
 - The tokens follow the app's light and dark mode: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
   --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger
   --b-radius --b-font --b-mono`. Never hardcode a colour the tokens cover.
+- **The card's ground is its own, its frame is its item's.** `:host { background: … }` in the card's
+  style colours the whole card. Its corner, outline and shadow are the fields of its item on the
+  canvas, pen's own: `decks canvas update <path> --set.cornerRadius 0` (one number, or four from the
+  top-left), `--set.stroke '"$decks-accent-blue"' --set.strokeWidth 2` (`strokeAlignment`
+  `inner` | `center` | `outer`, `strokeDash` `dashed` | `dotted`; `strokeWidth 0` is no outline), and
+  `--set.effect '{"type":"shadow","offset":{"x":0,"y":8},"blur":24,"color":"#00000033"}'`. Left out, a
+  card has a 12 px corner, the canvas's 1 px outline and no shadow.
 - **What the card keeps beside it goes in its folder**: `card.css` (`<link rel="stylesheet"
   href="card.css">`), `chart.js` (`import { draw } from "./chart.js"`), `data.json`
   (`fetch(card.file("data.json"))`), `pics/q3.png` (`<img src="pics/q3.png">`). Every address in a

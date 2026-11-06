@@ -63,7 +63,7 @@ const WHAT = {
 	icon: "An icon from a library: lucide, feather, phosphor or Material Symbols.",
 	icon_font: "The older icon item, as some files still have it.",
 	script: "A JavaScript file that makes the item's children in pen.dev.",
-	browser: "A live web page. On a Decks canvas this is a board.",
+	browser: "A live web page. On a Decks canvas this is a card, an app, a document or an old board, framed by its own `cornerRadius`, `stroke` and `effect`: a 12 px corner and the canvas's 1 px outline when they are left out.",
 	ref: "A copy of an item marked `reusable: true`. Any other field set on it overrides the copy.",
 };
 

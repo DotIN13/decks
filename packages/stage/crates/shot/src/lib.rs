@@ -391,12 +391,33 @@ impl Shooter {
 			let y1 = ((r.bottom() - area.y) * s).round();
 			(x0 as f32, y0 as f32, (x1 - x0) as f32, (y1 - y0) as f32)
 		};
-		let radius = (BOARD_RADIUS * s) as f32;
-		let shape = |w: f32, h: f32| Shape { w, h, radii: [radius; 4], ellipse: false };
-		for board in &request.cards {
+		/*
+		 * A board's corners are its item's `cornerRadius` (`BOARD_RADIUS` when it has none), as the hole
+		 * the drawing leaves for it: its item is the browser item laid in its place.
+		 */
+		let corners = |rect: &Rect| -> [f32; 4] {
+			let scene = &self.laid.as_ref().expect("laid out").scene;
+			for root in &scene.roots {
+				for (item, place) in root.tree.items.iter().zip(&root.placed) {
+					let r = place.rect;
+					if item.kind() == "browser" && (r.x - rect.x).abs() < 0.5 && (r.y - rect.y).abs() < 0.5 && (r.w - rect.w).abs() < 0.5 && (r.h - rect.h).abs() < 0.5 {
+						if item.get("cornerRadius").is_none() {
+							break;
+						}
+						let limit = (rect.w.min(rect.h) / 2.0).max(0.0);
+						return scene.vars.radii(&item.props, &place.theme).map(|v| (v.clamp(0.0, limit) * s) as f32);
+					}
+				}
+			}
+			[(BOARD_RADIUS * s) as f32; 4]
+		};
+		let all_radii: Vec<[f32; 4]> = request.cards.iter().map(|board| corners(&board.rect)).collect();
+		for (board, &radii) in request.cards.iter().zip(&all_radii) {
 			if !board.rect.meets(&area) {
 				continue;
 			}
+			let [tl, tr, br, bl] = radii;
+			let shape = |w: f32, h: f32| Shape { w, h, radii, ellipse: false };
 			let (x, y, bw, bh) = snap(&board.rect);
 			laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: Paint::Solid(Color(board_paper)), stroke: None });
 			if let Some(file) = &board.picture {
@@ -409,8 +430,8 @@ impl Shooter {
 				} else {
 					let last = (ph as f32 - 0.5) / ph.max(1) as f32;
 					let part = |h: f32, radii: [f32; 4]| Shape { w: bw, h, radii, ellipse: false };
-					laid_out.push(Op::Shape { shape: part(tall, [radius, radius, 0.0, 0.0]), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
-					laid_out.push(Op::Shape { shape: part(bh - tall, [0.0, 0.0, radius, radius]), transform: Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+					laid_out.push(Op::Shape { shape: part(tall, [tl, tr, 0.0, 0.0]), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+					laid_out.push(Op::Shape { shape: part(bh - tall, [0.0, 0.0, br, bl]), transform: Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
 				}
 			}
 		}

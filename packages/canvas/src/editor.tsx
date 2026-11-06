@@ -198,7 +198,19 @@ export function createEditor(
 	 * show only when something else happened to run this again.
 	 */
 	createComputed(() => {
-		const given = options.pages?.list ? options.pages.list().map((board) => ({ ...board })) : pagesOf(doc());
+		/*
+		 * A host's list is its server's, which knows nothing of how an item frames its card: its corners
+		 * and whether it draws its own outline are the drawing's, read here so a change shows at once.
+		 */
+		// By its path, or by its path's end: the host names a card from the deck, the drawing from its canvas (`items-layer.tsx` matches the same way).
+		const framed = options.pages?.list ? pagesOf(doc()).filter((one) => one.corners || one.outlined) : [];
+		const given = options.pages?.list
+			? options.pages.list().map((board) => {
+					const drawn = framed.find((one) => one.path === board.path) ?? framed.find((one) => board.path.endsWith(`/${one.path}`));
+					const { corners: _c, outlined: _o, ...rest } = board;
+					return { ...rest, ...(drawn?.corners ? { corners: drawn.corners } : {}), ...(drawn?.outlined ? { outlined: drawn.outlined } : {}) };
+				})
+			: pagesOf(doc());
 		// The host's own list is its server's: a board the person moved, sized or took off is shown so until the server has it.
 		setPages(reconcile(options.pages?.list && drawing.waiting() ? pagesAhead(given, drawing.given(), doc()) : given, { key: "path" }));
 	});

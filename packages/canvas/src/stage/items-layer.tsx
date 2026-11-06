@@ -242,6 +242,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 					return {
 						path: board.path,
 						...(id ? { id } : {}),
+						...(board.corners ? { corners: board.corners } : {}),
 						x: sized?.x ?? board.x,
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,

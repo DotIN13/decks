@@ -475,6 +475,9 @@ fn reach(vars: &Vars, item: &tree::Item, theme: &Theme) -> f64 {
 		};
 		// A mitred corner of a path reaches further than half the width; four widths covers it.
 		r = r.max(if item.kind() == "path" { w * 4.0 } else { w });
+	} else if item.kind() == "browser" {
+		// A browser item's bare width is an outline in the canvas's line colour, outside its edge (`paint`'s `browser_frame`).
+		r = r.max(vars.num(item.get("strokeWidth").filter(|v| !v.is_object()), theme, 0.0));
 	}
 	let effects = match item.get("effect") {
 		Some(Value::Array(list)) => list.iter().collect(),
