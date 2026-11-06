@@ -276,7 +276,8 @@ function cardSheet(lib: string): Promise<string | undefined> {
 				 * inherits into it (the app's type, a frame's text-size-adjust): a card is laid out the same in
 				 * the canvas frame, on the server's page that measures and pictures it, and on a phone.
 				 */
-				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg); " + HOST_RESET + " }";
+				// No ground of its own: the paper is the host's, so a card's `:host { background }` is its whole ground.
+				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root; background: none }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg); " + HOST_RESET + " }";
 			return css;
 		} catch {
 			// Asked for again by the next card: a pass run out or a restart is not the end of the card's look.

@@ -215,6 +215,7 @@ const CHECKS = [
 	{ file: "presence.mjs", needsAgent: false },
 	/* Words selected in a card copy as words, not the card as an item; with none selected the card copies as a clip. */
 	{ file: "card-copy.mjs", needsAgent: false },
+	{ file: "card-ground.mjs", needsAgent: false },
 	/* Keys pressed in a card are the card's until Escape: nothing nudges or deletes it from inside; ⌘− still zooms. */
 	{ file: "card-keys.mjs", needsAgent: false },
 	/* A card opened in a tab of its own runs its scripts with the whole card: card.file, on, store, path, decks. */
