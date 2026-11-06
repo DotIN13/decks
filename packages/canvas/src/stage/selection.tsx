@@ -68,6 +68,7 @@ export function createSelection(deps: SelectionDeps) {
 	const groupPicked = () => editor.pagePicks().length + editor.items().length > 1;
 	// After the editor, which it reads: a stage made with a board already selected reads it at once.
 	const calloutPage = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
+	const calloutPath = createMemo(() => calloutPage()?.path);
 
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
 	const selectMade = (made: string[]) => editor.selectMade(made);
@@ -316,26 +317,37 @@ export function createSelection(deps: SelectionDeps) {
 				(`PageCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
-			<Show when={!props.drawing ? calloutPage() : undefined} keyed>
-				{(board) => (
+			{/* Keyed by the card's path, not its object: the board list is made again at each change, and a pill made again would shut its ⋯ menu. */}
+			<Show when={!props.drawing ? calloutPath() : undefined} keyed>
+				{(path) => {
+					let last = calloutPage()!;
+					const board = () => (last = calloutPage() ?? last);
+					return (
 					<PageCallout
-						board={board}
-						box={boxOf(board)}
-						obstacles={() => pillObstacles(boxOf(board))}
-						label={`${board.title}: card actions`}
+						board={board()}
+						box={boxOf(board())}
+						obstacles={() => pillObstacles(boxOf(board()))}
+						label={`${board().title}: card actions`}
 						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
 						camera={ctl.settled()}
 						view={view()}
-						onOpen={() => pushCamera(frame([boxOf(board)]))}
-						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-						{...(props.onDeleteCard ? { onDelete: () => props.onDeleteCard?.(board.path) } : {})}
+						onOpen={() => pushCamera(frame([boxOf(board())]))}
+						// ✕ lets the card go, as a press on bare canvas does: nothing changes on the canvas.
+						onClose={() => {
+							editor.pickPages([]);
+							props.onSelect(undefined);
+						}}
+						onCopyPath={() => void navigator.clipboard?.writeText(path).catch(() => {})}
+						{...(props.onExport && board().item !== "app" ? { onExport: (format: "png" | "pdf") => props.onExport?.([path], format) } : {})}
+						{...(props.onHide ? { onHide: () => props.onHide?.(path) } : {})}
+						{...(props.onDeleteCard ? { onDelete: () => props.onDeleteCard?.(path) } : {})}
 						{...(props.onComment
 							? {
 									onComment: () =>
 										props.onComment?.({
-											path: board.path,
+											path: path,
 											quote: "",
-											title: board.title,
+											title: board().title,
 											// Under the pill, which follows the board as the camera moves.
 											anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(),
 											open: true,
@@ -343,7 +355,8 @@ export function createSelection(deps: SelectionDeps) {
 								}
 							: {})}
 					/>
-				)}
+					);
+				}}
 			</Show>
 			<Show when={calloutItems()}>
 				{(items) => (

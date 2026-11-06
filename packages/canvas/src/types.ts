@@ -126,7 +126,7 @@ export interface CanvasOptions {
 	/** Comment on a board or on drawn items (the comment buttons; absent: none). */
 	onComment?: (comment: StageComment) => void;
 	/** Export drawn items as a picture (the properties panel's export; absent: nothing happens). */
-	onExport?: (ids: string[]) => void;
+	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	/**
 	 * Draw the canvas's own column of tools. Default: true. A host with its own tools turns it off
 	 * and drives them with `setTool`; the properties panel still shows for what is selected.

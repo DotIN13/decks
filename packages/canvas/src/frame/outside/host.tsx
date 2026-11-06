@@ -116,7 +116,7 @@ export interface FramedEditorOptions {
 	/** A comment from a frame with no chrome of its own (its pill's Comment): the page opens its own box. */
 	onComment?: (comment: StageComment) => void;
 	/** Export drawn items as a picture. */
-	onExport?: (ids: string[]) => void;
+	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	frame: FrameHostOptions;
 }
 
@@ -412,7 +412,7 @@ export function createFramedEditor(options: Options): FramedEditor {
 		});
 		page.on("viewport", (data) => options.onViewport?.(data));
 		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), ...(data.open ? { open: true } : {}), anchor: () => onPage(data.at) }));
-		page.on("export", (data) => options.onExport?.(data.ids));
+		page.on("export", (data) => options.onExport?.(data.ids, data.format));
 		page.on("app-store", (data) => {
 			if (!storage || !data.app || data.app.includes(":")) return;
 			const key = `${APP_STORE}${data.app}:${data.key}`;

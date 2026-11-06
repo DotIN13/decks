@@ -234,6 +234,7 @@ export function createEditor(
 			boards={pages}
 			pen={pen()}
 			{...editing}
+			{...(options.onExport ? { onExport: options.onExport } : {})}
 			onPenStep={step}
 			drawing={inking()}
 			onPencil={() => {

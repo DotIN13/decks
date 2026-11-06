@@ -322,10 +322,11 @@ async function run(engine, { all }) {
 				setup: async () => {
 					const grip = await pictureSpot(board.path);
 					await page.mouse.click(grip.x, grip.y);
-					await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
+					await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').first().click({ timeout: 3000 });
+					await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]').first().waitFor({ timeout: 3000 });
 				},
 				commit: async (arm) => {
-					const r = await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					const r = await (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]').first().boundingBox();
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 					await arm();
 					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);

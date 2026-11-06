@@ -288,7 +288,7 @@ const agent = {
 			})(),
 		};
 	}, tapped);
-	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "New tab", "Comment", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
+	say("a tap on a board shows its menu: Fit, New tab, Comment, Close and More", menu !== null && ["Fit", "New tab", "Comment", "Close", "More"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
 	/*
 	 * On the screen whenever the board's middle leaves it room: the pill keeps its edge, centred on what it is
 	 * for, and is carried off the screen with it rather than pushed on (8075ccea). The board tapped is

@@ -140,6 +140,8 @@ export type StageProps = {
 	world?: () => JSX.Element;
 	/** The stage's engine, once made: for what the editor's handle answers from its layout (`itemBox`). */
 	onEngine?: (engine: StageEngine) => void;
+	/** A picture of a card to download, from the card pill's ⋯ menu (absent: no Export there). */
+	onExport?: (ids: string[], format?: "png" | "pdf") => void;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteCard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */

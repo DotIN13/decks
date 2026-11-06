@@ -16,6 +16,10 @@ import Scan from "lucide-solid/icons/scan";
 import Shapes from "lucide-solid/icons/shapes";
 import LayoutTemplate from "lucide-solid/icons/layout-template";
 import Send from "lucide-solid/icons/send";
+import Ellipsis from "lucide-solid/icons/ellipsis";
+import ImageDown from "lucide-solid/icons/image-down";
+import FileDown from "lucide-solid/icons/file-down";
+import Link from "lucide-solid/icons/link";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
@@ -29,7 +33,8 @@ const GAP = 10;
  *
  * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
- * actions (a new tab, hide) are not offered.
+ * actions (a new tab, hide) are not offered. A card's pill is Fit, New tab, Comment, ✕ (let it go)
+ * and ⋯, a menu of Export as PNG or PDF, Copy path and Delete (off the canvas, its folder kept).
  */
 export function PageCallout(props: {
 	board?: Page;
@@ -42,6 +47,11 @@ export function PageCallout(props: {
 	/** Fit the item to the screen. New tab is the host's to open (`openInTab`): inside the canvas frame a link opens none, the sandbox allows no popup, so the page opens it. */
 	onOpen: () => void;
 	onHide?: () => void;
+	/** A card's pill: let the card go (✕), as a press on bare canvas does. */
+	onClose?: () => void;
+	/** A card's pill, in its ⋯ menu: a picture of the card to download, and its path to the clipboard. */
+	onExport?: (format: "png" | "pdf") => void;
+	onCopyPath?: () => void;
 	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
 	onComment?: () => void;
 	/** For drawn items: copy them, take them off the canvas. */
@@ -164,6 +174,37 @@ export function PageCallout(props: {
 		return { x: top.x, y: below ? bottom.y + gap : top.y - gap, below, arrow: width() > 0 ? width() / 2 : undefined };
 	};
 	const stop = (event: Event) => event.stopPropagation();
+	/*
+	 * A card's ⋯ menu: what is done less often, under the pill, gone at a press anywhere else, at Escape,
+	 * or when the pill hides for a movement.
+	 */
+	const [more, setMore] = createSignal(false);
+	createEffect(on(() => props.hidden, (hidden) => hidden && setMore(false)));
+	createEffect(() => {
+		if (!more()) return;
+		const away = (event: Event) => {
+			if (element && event.target instanceof Node && element.contains(event.target)) return;
+			setMore(false);
+		};
+		const key = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			event.stopPropagation();
+			setMore(false);
+		};
+		window.addEventListener("pointerdown", away, true);
+		window.addEventListener("keydown", key, true);
+		onCleanup(() => {
+			window.removeEventListener("pointerdown", away, true);
+			window.removeEventListener("keydown", key, true);
+		});
+	});
+	const pick = (run?: () => void) => () => {
+		setMore(false);
+		run?.();
+	};
+	const card = () => !!props.board && !!props.onClose;
+	// Hide first: it takes the card off at once, as an edit of yours; Delete waits for the harness to answer. Both keep its folder.
+	const remove = () => props.onHide ?? props.onDelete;
 	return (
 		<div
 			ref={element}
@@ -221,17 +262,60 @@ export function PageCallout(props: {
 					<Icon of={Copy} size={16} />
 				</button>
 			</Show>
-			<Show when={props.onDelete}>
-				<span class="callout-rule" aria-hidden="true" />
-				<button type="button" role="menuitem" class="icon-button callout-danger" aria-label="Delete" title="Delete" onClick={() => props.onDelete?.()}>
-					<Icon of={Trash} size={16} />
-				</button>
-			</Show>
-			<Show when={props.onHide}>
-				<span class="callout-rule" aria-hidden="true" />
-				<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+			<Show
+				when={card()}
+				fallback={
+					<>
+						<Show when={props.onDelete}>
+							<span class="callout-rule" aria-hidden="true" />
+							<button type="button" role="menuitem" class="icon-button callout-danger" aria-label="Delete" title="Delete" onClick={() => props.onDelete?.()}>
+								<Icon of={Trash} size={16} />
+							</button>
+						</Show>
+						<Show when={props.onHide}>
+							<span class="callout-rule" aria-hidden="true" />
+							<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+								<Icon of={X} size={17} />
+							</button>
+						</Show>
+					</>
+				}
+			>
+				{/* A card's pill: Fit, New tab, Comment, then ✕ to let it go and ⋯ for the rest. */}
+				<button type="button" role="menuitem" class="icon-button" aria-label="Close" title="Deselect the card" onClick={() => props.onClose?.()}>
 					<Icon of={X} size={17} />
 				</button>
+				<span class="callout-rule" aria-hidden="true" />
+				<button type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
+					<Icon of={Ellipsis} size={17} />
+				</button>
+				<Show when={more()}>
+					<div class="callout-more" role="menu" aria-label="More card actions">
+						<Show when={props.onExport}>
+							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PNG" onClick={pick(() => props.onExport?.("png"))}>
+								<Icon of={ImageDown} size={15} />
+								Export as PNG
+							</button>
+							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PDF" onClick={pick(() => props.onExport?.("pdf"))}>
+								<Icon of={FileDown} size={15} />
+								Export as PDF
+							</button>
+						</Show>
+						<Show when={props.onCopyPath}>
+							<button type="button" role="menuitem" class="callout-more-item" aria-label="Copy path" onClick={pick(props.onCopyPath)}>
+								<Icon of={Link} size={15} />
+								Copy path
+							</button>
+						</Show>
+						<Show when={remove()}>
+							<span class="callout-more-rule" aria-hidden="true" />
+							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title="Take the card off the canvas; its folder stays in the deck" onClick={pick(remove())}>
+								<Icon of={Trash} size={15} />
+								Delete
+							</button>
+						</Show>
+					</div>
+				</Show>
 			</Show>
 		</div>
 	);

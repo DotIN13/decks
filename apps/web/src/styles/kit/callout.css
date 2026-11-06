@@ -139,6 +139,64 @@
 	.stage-fixed > .card-callout > .icon-button.callout-danger {
 	color: var(--color-danger);
 }
+	/* ⋯ pressed: held down while its menu is open. */
+	.stage-fixed > .card-callout > .icon-button[data-on] {
+	background: var(--fill);
+	color: var(--fg);
+}
+	/* A card's ⋯ menu (`ui/Callout.tsx`): the pill's own card, under its right end, rows in words. */
+	.stage-fixed > .card-callout > .callout-more {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: -1px;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 176px;
+	padding: 4px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-panel, 12px);
+	background: var(--panel);
+	box-shadow: var(--shadow-menu);
+	animation: callout-more-in 90ms ease-out;
+}
+	.stage-fixed > .card-callout > .callout-more > .callout-more-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 30px;
+	padding: 0 9px;
+	border: 0;
+	border-radius: var(--control-radius, 8px);
+	background: none;
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	white-space: nowrap;
+}
+	.stage-fixed > .card-callout > .callout-more > .callout-more-item > svg {
+	color: var(--muted);
+}
+	.stage-fixed > .card-callout > .callout-more > .callout-more-item:hover {
+	background: var(--fill);
+}
+	.stage-fixed > .card-callout > .callout-more > .callout-more-danger,
+	.stage-fixed > .card-callout > .callout-more > .callout-more-danger > svg {
+	color: var(--color-danger);
+}
+	.stage-fixed > .card-callout > .callout-more > .callout-more-rule {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--line-strong);
+}
+	@keyframes callout-more-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
 	@keyframes card-callout-in {
 	from {
 		opacity: 0;

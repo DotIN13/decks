@@ -4,7 +4,8 @@
  * This check used to be about the Focus view (the canvas as one scrollable page, its exit button,
  * its header and its key). Commit 62f57b32 removed the Focus view, the title bars and in-board
  * editing on purpose, so everything that tested them is gone. What is left still applies: the pill
- * over a selected board offers exactly Fit, New tab, Comment and Hide, and its Comment opens a
+ * over a selected board offers exactly Fit, New tab, Comment, Close and More (a menu of Export, Copy
+ * path and Delete), and its Comment opens a
  * focused box about the whole board whose Enter puts a pill over the composer.
  */
 import { canvasFrame, card, open, pressCardAction, say, selectCard, settle } from "../harness.mjs";
@@ -23,7 +24,30 @@ say("the flow board is on the canvas", onCanvas === 1, `${onCanvas} at ${NOTES}`
 await selectCard(page, NOTES);
 const bar = await canvas.evaluate(() => [...document.querySelectorAll(".card-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
 // Delete is there because the canvas frame can delete a card's or board's file (`frame/frame.tsx`, `onDeleteBoard`).
-say("the pill over the board offers fit, a tab, a comment, delete and going away, in that order", bar.join(",") === "Fit,New tab,Comment,Delete,Hide", JSON.stringify(bar));
+say("the pill over the board offers fit, a tab, a comment, close and more, in that order", bar.join(",") === "Fit,New tab,Comment,Close,More", JSON.stringify(bar));
+
+// More opens the card's menu under the pill: the two exports, its path, and Delete; Escape shuts it and keeps the card selected.
+await pressCardAction(page, "More");
+const menu = await canvas.evaluate(() => [...document.querySelectorAll(".card-callout .callout-more [role=menuitem]")].map((one) => one.getAttribute("aria-label") ?? ""));
+say("More opens a menu of Export as PNG, Export as PDF, Copy path and Delete", menu.join(",") === "Export as PNG,Export as PDF,Copy path,Delete", JSON.stringify(menu));
+await page.keyboard.press("Escape");
+const shut = await canvas.evaluate(() => ({ menu: !!document.querySelector(".card-callout .callout-more"), pill: !!document.querySelector(".stage-fixed > .card-callout") }));
+say("Escape shuts the menu and leaves the card selected", !shut.menu && shut.pill, JSON.stringify(shut));
+// Export as PNG downloads a picture of the card, taken on the server.
+await pressCardAction(page, "More");
+const download = page.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+await pressCardAction(page, "Export as PNG");
+const saved = await download;
+const file = saved ? await saved.path().catch(() => null) : null;
+const bytes = file ? (await import("node:fs")).readFileSync(file) : null;
+say("Export as PNG downloads a PNG of the card", !!bytes && bytes.length > 1000 && bytes.subarray(1, 4).toString() === "PNG", saved ? `${saved.suggestedFilename()} ${bytes?.length ?? 0} bytes` : "no download");
+// Close lets the card go, as a press on bare canvas does: no pill, and the card still on the canvas.
+await settle(page, 400);
+await pressCardAction(page, "Close");
+await settle(page, 300);
+const gone = await canvas.evaluate((path) => ({ pill: !!document.querySelector(".stage-fixed > .card-callout"), still: (window.__decksProbes?.cards?.() ?? []).some((one) => one.path === path) }), NOTES);
+say("Close lets the card go and leaves it on the canvas", !gone.pill && gone.still, JSON.stringify(gone));
+await selectCard(page, NOTES);
 
 // Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
 await pressCardAction(page, "Comment");

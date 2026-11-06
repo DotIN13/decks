@@ -132,7 +132,7 @@ interface FrameToPage {
 	camera: { camera: Camera; agent?: string; selected?: string };
 	viewport: { width: number; height: number };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect; /** The box at once (a pill's Comment), not the small button words selected show first. */ open?: boolean };
-	export: { ids: string[] };
+	export: { ids: string[]; format?: "png" | "pdf" };
 	store: { key: string; value: string | null };
 	/** A value an app inside the canvas saved in its browser storage (`decks-canvas.js`, as `decks-storage`), for the page to keep under the app's name. */
 	"app-store": { app: string; key: string; value: string | null };

@@ -293,7 +293,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			const at = rectOf(target.anchor());
 			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
 		},
-		onExport: (ids) => end.emit("export", { ids }),
+		onExport: (ids, format) => end.emit("export", { ids, ...(format ? { format } : {}) }),
 		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
 		// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
 		inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
