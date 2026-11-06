@@ -216,18 +216,17 @@ test("signing in adds an account, makes it active, and points the symlink at it"
 });
 
 /*
- * Signing in twice to one account replaces its row rather than adding a second.
- *
- * Two rows for one email is a list nobody can reason about, and the newer sign-in is the
- * fresher set of credentials — so the older directory goes with the row.
+ * Every sign-in is kept: signing in twice to one account is two rows, each with its own
+ * credentials, and the newer one in force.
  */
-test("signing in again to the same account replaces it", () => {
+test("signing in again to the same account adds a second row", () => {
 	const { accounts, cleanup } = store();
 	const first = add(accounts, "one@example.com");
 	const again = add(accounts, "one@example.com");
 
-	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, again]);
-	assert.equal(existsSync(accounts.configDir(first)), false, "and the credentials of the row it replaced are gone");
+	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, first, again]);
+	assert.equal(accounts.activeId(), again, "the newer one in force");
+	assert.equal(existsSync(accounts.configDir(first)), true, "and the first keeps its credentials");
 	cleanup();
 });
 
@@ -338,51 +337,23 @@ test("recording the default account's name leaves the list in the order it publi
 });
 
 /*
- * The pair that could not be told apart, and could not be got rid of.
- *
- * Signing in as the subscription the CLI is *already* on used to produce two rows with the
- * same email — one removable and one not — because `remember()` dropped the CLI's row as a
- * duplicate and `describeDefault()` put it back on the next read of the panel. The store's
- * half of the fix is these two: the CLI's row is never the duplicate that gets removed, and
- * `abandon()` is what a caller uses when the login it just did turns out to be that account.
+ * Signing in as the subscription the CLI is already on adds a row of its own, and the CLI's
+ * own row stays at the head of the list, labelled.
  */
 test("the CLI's own row is never removed as a duplicate of an added account", () => {
 	const { accounts, cleanup } = store();
 	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "enterprise" });
 
 	// The same email, added by hand. Whatever else happens, the first row stays.
-	add(accounts, "me@example.com");
+	const copy = add(accounts, "me@example.com");
 
 	const ids = accounts.list().map((account) => account.id);
-	assert.equal(ids[0], DEFAULT_ACCOUNT, "still the head of the list");
+	assert.deepEqual(ids, [DEFAULT_ACCOUNT, copy], "two rows, the CLI's own at the head of the list");
 	assert.equal(
 		accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.email,
 		"me@example.com",
 		"and still labelled, rather than dropped and re-synthesised nameless",
 	);
-	cleanup();
-});
-
-test("abandoning a login leaves the CLI's own account in force, and the link on it", () => {
-	const { accounts, dir, cleanup } = store();
-	accounts.describeDefault({ email: "me@example.com" });
-	const other = add(accounts, "other@example.com");
-	assert.equal(accounts.activeId(), other, "the added account is in force");
-
-	// The login that turns out to be the CLI's own subscription.
-	const { id, configDir } = accounts.begin();
-	writeFileSync(join(configDir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "not-a-real-token" } }));
-	const landed = accounts.abandon(id);
-
-	assert.equal(landed.id, DEFAULT_ACCOUNT, "and says which row you ended up on");
-	assert.equal(accounts.activeId(), DEFAULT_ACCOUNT, "that subscription, by the shorter route");
-	assert.equal(existsSync(configDir), false, "the second copy of the credentials is gone");
-	assert.deepEqual(
-		accounts.list().map((account) => account.id),
-		[DEFAULT_ACCOUNT, other],
-		"no third row for an account that was never added",
-	);
-	assert.equal(pointsAt(dir), accounts.configDir(DEFAULT_ACCOUNT), "and the link is aimed back at the CLI's own, not left dangling");
 	cleanup();
 });
 

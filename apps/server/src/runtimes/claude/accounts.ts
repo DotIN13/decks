@@ -787,58 +787,19 @@ export class ClaudeAccounts {
 	 * it — and because the first account added would otherwise sit there doing nothing while
 	 * the deck went on using the CLI's default.
 	 *
-	 * A second sign-in to an account already on the list *replaces* it rather than joining
-	 * it. Two rows for one email is a list that cannot be reasoned about, and the second
-	 * sign-in is the fresher set of credentials.
-	 *
-	 * **Except the CLI's own row, which is never the duplicate that gets removed.** It is
-	 * synthesised by `list()` and re-labelled by `describeDefault()` on every publish, so
-	 * dropping it here removed it for exactly as long as it took the panel to read the list
-	 * again — and what came back was a second row with the same email, one with a × and one
-	 * without, for a single subscription. Signing in as the account the CLI is already on is
-	 * `abandon()`'s case, not this one; the caller decides which, because only it can ask the
-	 * CLI whether that login is currently signed in at all.
+	 * Every sign-in is a row of its own, whether or not its email is already on the list,
+	 * the CLI's own login's included. Nothing is merged or replaced: the person asked for
+	 * every login to be kept, so one subscription signed in twice is two rows, each with its
+	 * own credentials, and either can be removed by hand.
 	 */
 	remember(account: Omit<ClaudeAccount, "addedAt"> & { addedAt?: number }): ClaudeAccount {
 		const index = this.read();
 		const entry: ClaudeAccount = { ...account, addedAt: account.addedAt ?? Date.now() };
-		const duplicate = entry.email
-			? index.accounts.find((other) => other.email === entry.email && other.id !== entry.id && other.id !== DEFAULT_ACCOUNT)
-			: undefined;
-		if (duplicate) {
-			// The directory of the row being replaced is dropped with it, or it would sit
-			// there holding credentials nothing can reach.
-			this.discard(duplicate.id);
-			index.accounts = index.accounts.filter((other) => other.id !== duplicate.id);
-		}
 		index.accounts = [...index.accounts.filter((other) => other.id !== entry.id), entry];
 		index.active = entry.id;
 		this.write(index);
 		this.repoint();
 		return entry;
-	}
-
-	/**
-	 * Give up on an account that was begun but must not join the list.
-	 *
-	 * The case is signing in as the subscription the CLI is *already* signed in as: the login
-	 * worked and wrote real credentials, but they are a second copy of the first row's, and
-	 * one subscription drawn as two accounts is a list that cannot be reasoned about — two
-	 * identical rows, one removable and one not, and a rotation that "switches" to the same
-	 * rate limit it just left.
-	 *
-	 * So the directory goes and the row is never written; what is left in force is the CLI's
-	 * own login, which is that same subscription by a shorter route. Returns the row the
-	 * caller ends up on, so it has something to say.
-	 */
-	abandon(id: string): ClaudeAccount {
-		this.discard(id);
-		const index = this.read();
-		index.accounts = index.accounts.filter((account) => account.id !== id);
-		index.active = DEFAULT_ACCOUNT;
-		this.write(index);
-		this.repoint();
-		return this.list().find((account) => account.id === DEFAULT_ACCOUNT) ?? { id: DEFAULT_ACCOUNT, addedAt: 0 };
 	}
 
 	/**
