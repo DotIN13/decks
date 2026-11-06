@@ -507,6 +507,16 @@ impl Page {
 		let vars = &self.scene.vars;
 		{
 			for (item, place) in root.tree.items.iter().zip(&root.placed) {
+				// An arrow's words, in the face the painter sets them in (`stage_paint`, `arrow_label`).
+				if item.kind() == "path" {
+					let meta = item.get("metadata");
+					if meta.and_then(|m| m.get("type")).and_then(Value::as_str) == Some("decks.arrow") {
+						if let Some(label) = meta.and_then(|m| m.get("label")).and_then(Value::as_str).filter(|l| !l.trim().is_empty()) {
+							out.push(json!({ "family": "Inter", "weight": 500, "italic": false, "text": label }));
+						}
+					}
+					continue;
+				}
 				if !matches!(item.kind(), "text" | "note" | "prompt" | "context") {
 					continue;
 				}

@@ -582,6 +582,9 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 		"path" => {
 			let Some(path) = mesh::geometry_path(item, w, h) else { return };
 			path_ops(ctx, item, theme, &path, w, h, transform, pixels, false, ops);
+			if meta_type(item) == Some(ARROW) {
+				arrow_label(ctx, item, &path, transform, &m, ops);
+			}
 		}
 		"note" | "prompt" | "context" => {
 			let markdown = meta_type(item) == Some(MARKDOWN);
@@ -742,6 +745,46 @@ fn path_ops(ctx: &Context, item: &Item, theme: &Theme, path: &kurbo::BezPath, w:
 	if let Some((vertices, indices)) = mesh::stroke(path, width, stroke.cap, stroke.join, dash.as_deref(), pixels) {
 		ops.push(Op::Mesh { vertices, indices, transform, paint });
 	}
+}
+
+/// The point halfway along a path's length, in its own space: where an arrow's words go.
+fn halfway(path: &kurbo::BezPath) -> Option<kurbo::Point> {
+	let mut points: Vec<kurbo::Point> = Vec::new();
+	kurbo::flatten(path.iter(), 0.25, |element| match element {
+		kurbo::PathEl::MoveTo(p) | kurbo::PathEl::LineTo(p) => points.push(p),
+		_ => {}
+	});
+	let total: f64 = points.windows(2).map(|pair| pair[0].distance(pair[1])).sum();
+	if points.len() < 2 || total <= 0.0 {
+		return points.first().copied();
+	}
+	let mut left = total / 2.0;
+	for pair in points.windows(2) {
+		let step = pair[0].distance(pair[1]);
+		if step >= left && step > 0.0 {
+			return Some(pair[0].lerp(pair[1], left / step));
+		}
+		left -= step;
+	}
+	points.last().copied()
+}
+
+/// An arrow's words (`metadata.label`, "yes", "then"), set on the middle of its line, on a patch of the
+/// canvas's ground so the line does not run through them: in its own space, so they move and scale with it.
+fn arrow_label(ctx: &Context, item: &Item, path: &kurbo::BezPath, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let Some(words) = item.get("metadata").and_then(|meta| meta.get("label")).and_then(Value::as_str).map(str::trim).filter(|w| !w.is_empty()) else { return };
+	let Some(mid) = halfway(path) else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 14.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let laid = text.lay(&[Span::plain(words, &style)], None, stage_text::Align::Left);
+	let (lw, lh) = (laid.width as f64, laid.height as f64);
+	let (pad_x, pad_y) = (6.0, 2.0);
+	let (x, y) = (mid.x - lw / 2.0, mid.y - lh / 2.0);
+	let ground = if ctx.dark { [0.118, 0.118, 0.125, 1.0] } else { [0.961, 0.961, 0.961, 1.0] };
+	let patch = Shape { w: (lw + pad_x * 2.0) as f32, h: (lh + pad_y * 2.0) as f32, radii: [4.0; 4], ellipse: false };
+	ops.push(Op::Shape { shape: patch, transform: transform.then(&Affine::translate((x - pad_x) as f32, (y - pad_y) as f32)), paint: Paint::Solid(Color::straight(ground, 1.0)), stroke: None });
+	let ink = if ctx.dark { [0.78, 0.78, 0.8, 1.0] } else { [0.33, 0.34, 0.37, 1.0] };
+	draw_laid(ctx, &laid, (x, y), &[Color::straight(ink, 1.0)], m, ops);
 }
 
 /// A card's paper: the app's two-layer shadow for the scheme, then the paper.
