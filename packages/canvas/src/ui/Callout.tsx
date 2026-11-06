@@ -179,6 +179,26 @@ export function PageCallout(props: {
 	 * or when the pill hides for a movement.
 	 */
 	const [more, setMore] = createSignal(false);
+	let moreButton: HTMLButtonElement | undefined;
+	/*
+	 * Where the menu opens, measured once it is drawn: away from the card (up when the pill is over the
+	 * card's top edge, down when under its bottom one), unless only the other side has room; its left
+	 * edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the stage.
+	 */
+	const [menuAt, setMenuAt] = createSignal<{ left: number; up: boolean }>();
+	const placeMenu = (menu: HTMLDivElement) => {
+		const stage = element?.parentElement?.getBoundingClientRect();
+		if (!element || !moreButton || !stage) return;
+		const pill = element.getBoundingClientRect();
+		const button = moreButton.getBoundingClientRect();
+		const { offsetWidth: w, offsetHeight: h } = menu;
+		const room = { up: pill.top - stage.top - 8, down: stage.bottom - pill.bottom - 8 };
+		let up = !place().below;
+		if (room[up ? "up" : "down"] < h + 6 && room[up ? "down" : "up"] > room[up ? "up" : "down"]) up = !up;
+		const left = Math.max(stage.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, stage.right - 8 - w - pill.left));
+		setMenuAt({ left, up });
+	};
+	createEffect(on(more, (open) => open || setMenuAt(undefined)));
 	createEffect(on(() => props.hidden, (hidden) => hidden && setMore(false)));
 	createEffect(() => {
 		if (!more()) return;
@@ -286,11 +306,18 @@ export function PageCallout(props: {
 					<Icon of={X} size={17} />
 				</button>
 				<span class="callout-rule" aria-hidden="true" />
-				<button type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
+				<button ref={moreButton} type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
 					<Icon of={Ellipsis} size={17} />
 				</button>
 				<Show when={more()}>
-					<div class="callout-more" role="menu" aria-label="More card actions">
+					<div
+						ref={(menu) => requestAnimationFrame(() => placeMenu(menu))}
+						class="callout-more"
+						role="menu"
+						aria-label="More card actions"
+						data-up={menuAt()?.up ? "true" : undefined}
+						style={menuAt() ? { left: `${menuAt()!.left}px`, ...(menuAt()!.up ? { bottom: "calc(100% + 6px)" } : { top: "calc(100% + 6px)" }) } : { visibility: "hidden", top: "calc(100% + 6px)", left: "0" }}
+					>
 						<Show when={props.onExport}>
 							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PNG" onClick={pick(() => props.onExport?.("png"))}>
 								<Icon of={ImageDown} size={15} />

@@ -30,6 +30,18 @@ say("the pill over the board offers fit, a tab, a comment, close and more, in th
 await pressCardAction(page, "More");
 const menu = await canvas.evaluate(() => [...document.querySelectorAll(".card-callout .callout-more [role=menuitem]")].map((one) => one.getAttribute("aria-label") ?? ""));
 say("More opens a menu of Export as PNG, Export as PDF, Copy path and Delete", menu.join(",") === "Export as PNG,Export as PDF,Copy path,Delete", JSON.stringify(menu));
+// It hangs from the ⋯ button, on the pill's side away from the card, whole on the screen.
+await settle(page, 200);
+const hang = await canvas.evaluate(() => {
+	const pill = document.querySelector(".stage-fixed > .card-callout");
+	const menu = pill?.querySelector(".callout-more");
+	const more = pill?.querySelector('[aria-label="More"]');
+	if (!pill || !menu || !more) return null;
+	const [p, m, b] = [pill, menu, more].map((one) => one.getBoundingClientRect());
+	const below = pill.dataset.below === "true";
+	return { below, away: below ? m.top >= p.bottom : m.bottom <= p.top, under: Math.abs(m.left - (b.left - 4)) < 2, onScreen: m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight, pill: [Math.round(p.left), Math.round(p.top), Math.round(p.bottom)], menu: [Math.round(m.left), Math.round(m.top), Math.round(m.bottom)] };
+});
+say("the menu hangs from ⋯, away from the card, whole on the screen", !!hang && hang.away && hang.under && hang.onScreen, JSON.stringify(hang));
 await page.keyboard.press("Escape");
 const shut = await canvas.evaluate(() => ({ menu: !!document.querySelector(".card-callout .callout-more"), pill: !!document.querySelector(".stage-fixed > .card-callout") }));
 say("Escape shuts the menu and leaves the card selected", !shut.menu && shut.pill, JSON.stringify(shut));

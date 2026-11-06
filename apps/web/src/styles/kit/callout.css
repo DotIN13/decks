@@ -144,11 +144,9 @@
 	background: var(--fill);
 	color: var(--fg);
 }
-	/* A card's ⋯ menu (`ui/Callout.tsx`): the pill's own card, under its right end, rows in words. */
+	/* A card's ⋯ menu (`ui/Callout.tsx`): the pill's own card, hanging from the ⋯ button away from the card (placed there, `placeMenu`), rows in words. */
 	.stage-fixed > .card-callout > .callout-more {
 	position: absolute;
-	top: calc(100% + 6px);
-	right: -1px;
 	z-index: 1;
 	display: flex;
 	flex-direction: column;
@@ -190,6 +188,15 @@
 	height: 1px;
 	margin: 4px 6px;
 	background: var(--line-strong);
+}
+	.stage-fixed > .card-callout > .callout-more[data-up] {
+	animation-name: callout-more-in-up;
+}
+	@keyframes callout-more-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
 }
 	@keyframes callout-more-in {
 	from {
