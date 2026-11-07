@@ -40,6 +40,12 @@
 				background: #fff;
 				box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
 			}
+			/* Printed as a PDF, a blurred shadow comes out as a hard grey block beside the card: a hairline instead. */
+			@media print {
+				#world > iframe {
+					box-shadow: 0 0 0 1px rgb(0 0 0 / 10%);
+				}
+			}
 			/*
 			 * The engine's canvas, over the boards and inside the world exactly as on the canvas
 			 * (`Stage.tsx`, `.stage-engine-over` in `styles/canvas.css`): the engine places it in stage

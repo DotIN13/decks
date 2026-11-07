@@ -477,6 +477,12 @@ async function run(engine, { all }) {
 			send([rect2("ew-pilldel", -200, -100)]);
 			await drawn("ew-pilldel");
 			await clickOn("ew-pilldel");
+			// Delete sits in the pill's ⋯ menu, opened where it is, as the pill's other buttons are pressed.
+			const more = (await cv()).locator('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]').first();
+			await more.waitFor({ timeout: 3000 });
+			await settle(page, 300);
+			const m = await more.boundingBox();
+			await page.mouse.click(m.x + m.width / 2, m.y + m.height / 2);
 		},
 		commit: (arm) => pillButton("Delete", arm),
 	});

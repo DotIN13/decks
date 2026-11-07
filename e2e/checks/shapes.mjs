@@ -426,7 +426,7 @@ if (diagonal) {
 
 /*
  * The board's pill, over a selected drawn item, with what makes sense for one (`BoardCallout`): zoom to
- * it, comment, duplicate and delete (Properties left the pill on purpose). Its Duplicate selects the copy, and its Delete takes
+ * it, comment, duplicate, close and ⋯ (export, delete; Properties left the pill on purpose). Its Duplicate selects the copy, and its Delete takes
  * that copy away, leaving the first.
  */
 {
@@ -449,7 +449,7 @@ if (diagonal) {
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
 		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
-		say("a selected shape gets the pill: zoom, comment, duplicate and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Delete"]), JSON.stringify(labels));
+		say("a selected shape gets the pill: zoom, comment, duplicate, close and more", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Close", "More"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
 		// Pressed by its coordinates: a locator's click scrolls its target into view, and the stage is a scroll container.
 		const pressOn = async (selector) => {
@@ -462,6 +462,9 @@ if (diagonal) {
 		// The copy is selected once the drawing has it: the outline moves onto it.
 		await until(() => canvas.evaluate((id) => { const r = globalThis.__decksProbes?.penBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
+		// Delete sits in the pill's ⋯ menu.
+		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="More"]');
+		await settle(page, 100);
 		await pressOn('.stage-fixed > .card-callout:not([data-hidden]) [aria-label="Delete"]');
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
 		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);

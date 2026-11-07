@@ -947,6 +947,12 @@ export class StageEngine {
 	 * pan rather than drawn, made the worker paint that margin too (120 tiles at rest, not 50).
 	 */
 	private fitCanvases(): void {
+		/*
+		 * Not before there is a canvas to size: a view set first (the shot page sets it before it attaches the
+		 * canvas) recorded the size with nothing sized, so the canvas, attached later, was taken as sized and
+		 * kept its own CSS size, its backing's in CSS pixels: at a density of 2 the drawing came out twice as big.
+		 */
+		if (!this.over) return;
 		const dpr = Math.min(2, devicePixelRatio || 1);
 		// The sheet: the window and a margin round it (`drawRect`).
 		const cssW = Math.round(this.view.width * (1 + 2 * SHEET_MARGIN));

@@ -1,10 +1,11 @@
 import { normalizeBoardPath } from "../deck/schema.ts";
 import { UploadRefused } from "../files/upload.ts";
-import { boardOnCanvas } from "../verbs/router.ts";
+import { boardOnCanvas, runVerb } from "../verbs/router.ts";
 import { renderSnapshot } from "../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../pictures/compress.ts";
-import { existsSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { imageKind } from "../stage/shots.ts";
 import { keptWidth, pictureType } from "../pictures/ladder.ts";
 import type { AppPage } from "../pictures/service.ts";
 import type { Page as DeckPage } from "@decks/protocol";
@@ -17,6 +18,9 @@ import express, { type Router } from "express";
 /**
  * Pictures: of every card (`pictures/service.ts`), of a stage, a canvas as a bundle, a stage's .pen for `shot.html`, and a page drawn from a snapshot.
  */
+/** A picture's own type, from its bytes: one card's picture may come back as WebP though PNG was asked for. */
+const imageType = (bytes: Buffer) => imageKind(bytes)?.mime ?? "png";
+
 export function register(api: Router, { app }: RouteDeps): void {
 	/** How far the server has got keeping a picture of every board (`PictureService.index`), for the ⋯ menu. */
 	api.get("/pictures", (_req, res) => {
@@ -254,37 +258,49 @@ export function register(api: Router, { app }: RouteDeps): void {
 	});
 
 	/**
-	 * A picture of what is selected on an agent's stage, to download: the drawing's Export
-	 * button. `of` is a comma-separated list of item ids, or nothing for the whole stage; `box` is
-	 * `x1,y1,x2,y2` on the stage instead, `scale` the pixels per CSS pixel (2 by default), and
-	 * `live=1` takes it in the browser with live boards. The box taken is answered in `X-Shot-Box`,
-	 * and how it was taken (`native`, or `chromium: why`) in `X-Shot-How`.
+	 * A picture of what is selected on a canvas, to download: the pill's Export and the properties
+	 * panel's. Taken by `canvas.screenshot`, the call `decks canvas screenshot` makes, for whoever asks,
+	 * so a download is drawn exactly as an agent's screenshot is: one card alone as the person's browser
+	 * has it, anything else (drawn items, a group, a PDF) by the canvas's screenshot. `canvas` names the
+	 * canvas (else `agent`'s home); `of` is a comma-separated list of item ids and card paths, or nothing
+	 * for the whole canvas; `box` is `x1,y1,x2,y2` instead; `scale` the pixels per canvas unit (2 by
+	 * default); `live=1` takes it in the browser with live cards. The box taken is answered in
+	 * `X-Shot-Box`, how it was taken in `X-Shot-How`, and the file is named `name` when given.
 	 */
 	api.get(
 		"/stage-shot",
 		asyncRoute(async (req, res) => {
-			const shots = app.stage.shots;
 			const agent = app.agents.get(String(req.query.agent ?? ""));
-			const stage = agent?.stageName(false);
-			if (!shots || !stage) {
-				res.status(404).type("text").send("That agent has no stage to picture.");
+			const stage = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.stageName(false);
+			if (!stage) {
+				res.status(404).type("text").send("Say which canvas to picture.");
 				return;
 			}
 			const box = typeof req.query.box === "string" ? req.query.box.split(",").map(Number) : undefined;
-			const of = box ? { x1: box[0], y1: box[1], x2: box[2], y2: box[3] } : typeof req.query.of === "string" && req.query.of ? req.query.of.split(",") : undefined;
+			const listed = typeof req.query.of === "string" && req.query.of ? req.query.of.split(",") : undefined;
+			const of = box ? { x1: box[0], y1: box[1], x2: box[2], y2: box[3] } : listed && listed.length === 1 ? listed[0] : listed;
 			const format = req.query.format === "jpeg" || req.query.format === "pdf" ? req.query.format : "png";
 			const scale = typeof req.query.scale === "string" && Number.isFinite(Number(req.query.scale)) ? Number(req.query.scale) : 2;
 			const live = req.query.live === "1" || req.query.live === "true";
-			try {
-				const shot = await shots.take({ stage, of, format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light", ...(live ? { live } : {}) });
-				res.setHeader("X-Shot-Box", JSON.stringify(shot.box));
-				res.setHeader("X-Shot-How", encodeURIComponent(shot.how));
-				res.setHeader("Content-Disposition", `attachment; filename="${stage}.${format === "jpeg" ? "jpg" : format}"`);
-				res.type(format === "pdf" ? "application/pdf" : format === "jpeg" ? "jpeg" : "png");
-				res.send(shot.bytes);
-			} catch (error) {
-				res.status(503).type("text").send((error as Error).message);
+			const options = { canvas: stage, ...(of !== undefined ? { of } : {}), format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
+			const { status, answer } = await runVerb(app, req.principal, { ...req.headers, "x-decks-stage": stage }, "canvas.screenshot", [options], req.socket.remoteAddress);
+			if (!answer.ok) {
+				res.status(status === 422 ? 503 : status).type("text").send(answer.error ?? "The picture could not be taken.");
+				return;
 			}
+			const shot = answer.value as { file: string; box: unknown; how?: string };
+			const file = resolve(app.stage.deckPath(), shot.file);
+			const bytes = readFileSync(file);
+			// Taken for this download only: not kept among the agents' screenshots.
+			if (shot.file.startsWith(".decks/shots/")) rmSync(file, { force: true });
+			const ext = format === "jpeg" ? "jpg" : format;
+			const name = typeof req.query.name === "string" && /^[\w.-]{1,80}$/.test(req.query.name) ? req.query.name : stage;
+			res.setHeader("X-Shot-Box", JSON.stringify(shot.box));
+			res.setHeader("X-Shot-How", encodeURIComponent(shot.how ?? ""));
+			res.setHeader("Content-Disposition", `attachment; filename="${name}.${ext}"`);
+			res.setHeader("Cache-Control", "no-store");
+			res.type(format === "pdf" ? "application/pdf" : format === "jpeg" ? "jpeg" : imageType(bytes));
+			res.send(bytes);
 		}),
 	);
 

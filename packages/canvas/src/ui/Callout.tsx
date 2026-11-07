@@ -47,9 +47,9 @@ export function PageCallout(props: {
 	/** Fit the item to the screen. New tab is the host's to open (`openInTab`): inside the canvas frame a link opens none, the sandbox allows no popup, so the page opens it. */
 	onOpen: () => void;
 	onHide?: () => void;
-	/** A card's pill: let the card go (✕), as a press on bare canvas does. */
+	/** Let what is selected go (✕), as a press on bare canvas does: a card, drawn items, a group. */
 	onClose?: () => void;
-	/** A card's pill, in its ⋯ menu: a picture of the card to download, and its path to the clipboard. */
+	/** In the ⋯ menu: a picture of what is selected to download, taken as `decks canvas screenshot` takes it; a card's path to the clipboard. */
 	onExport?: (format: "png" | "pdf") => void;
 	onCopyPath?: () => void;
 	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
@@ -218,7 +218,8 @@ export function PageCallout(props: {
 		setMore(false);
 		run?.();
 	};
-	const card = () => !!props.board && !!props.onClose;
+	/** A card's pill, or drawn items' and a group's: ✕ and ⋯ in place of Delete and Hide. The lasso's has neither. */
+	const card = () => !!props.onClose;
 	// Hide first: it takes the card off at once, as an edit of yours; Delete waits for the harness to answer. Both keep its folder.
 	const remove = () => props.onHide ?? props.onDelete;
 	return (
@@ -298,7 +299,7 @@ export function PageCallout(props: {
 				}
 			>
 				{/* A card's pill: Fit, New tab, Comment, then ✕ to let it go and ⋯ for the rest. */}
-				<button type="button" role="menuitem" class="icon-button" aria-label="Close" title="Deselect the card" onClick={() => props.onClose?.()}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Close" title={props.board ? "Deselect the card" : "Deselect"} onClick={() => props.onClose?.()}>
 					<Icon of={X} size={17} />
 				</button>
 				<span class="callout-rule" aria-hidden="true" />
@@ -310,7 +311,7 @@ export function PageCallout(props: {
 						ref={(menu) => requestAnimationFrame(() => placeMenu(menu))}
 						class="callout-more"
 						role="menu"
-						aria-label="More card actions"
+						aria-label={props.board ? "More card actions" : "More actions"}
 						style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
 					>
 						<Show when={props.onExport}>
@@ -331,7 +332,7 @@ export function PageCallout(props: {
 						</Show>
 						<Show when={remove()}>
 							<span class="callout-more-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title="Take the card off the canvas; its folder stays in the deck" onClick={pick(remove())}>
+							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
 								<Icon of={Trash} size={15} />
 								Delete
 							</button>

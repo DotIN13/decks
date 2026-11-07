@@ -218,6 +218,8 @@ export function createSelection(deps: SelectionDeps) {
 		const y = Math.min(...all.map((one) => one.y));
 		const box = { x, y, w: Math.max(...all.map((one) => one.x + one.w)) - x, h: Math.max(...all.map((one) => one.y + one.h)) - y };
 		const ids = outlines.map((one) => one.id);
+		/* The cards picked with them, by path: what a picture of the group takes with the items (`canvas.screenshot`'s `of`). */
+		const cards = all.filter((one) => one.id.startsWith("page:")).map((one) => one.id.slice(5));
 		const words = ids.map((id) => quoteOf(penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
 		const first = penLayer.placed.get(ids[0]!)?.node;
 		const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -226,7 +228,7 @@ export function createSelection(deps: SelectionDeps) {
 			: ids.length > 1
 				? `${ids.length} items`
 				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
-		return { box, ids, words, name };
+		return { box, ids, cards, words, name };
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
@@ -369,6 +371,13 @@ export function createSelection(deps: SelectionDeps) {
 						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([items().box]))}
+						// ✕ lets the items and cards go, as Escape does; ⋯ holds a picture of them all, cards included.
+						onClose={() => {
+							editor.select([]);
+							editor.pickPages([]);
+							props.onSelect(undefined);
+						}}
+						{...(props.onExport ? { onExport: (format: "png" | "pdf") => props.onExport?.([...items().ids, ...items().cards], format) } : {})}
 						// What acts on drawn items: a group of boards alone has only Open.
 						{...(items().ids.length
 							? {

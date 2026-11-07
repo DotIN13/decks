@@ -72,20 +72,21 @@ export const frameRefer = (pills: Parameters<typeof cleanFramePills>[0]) =>
 /** A picture of these drawn items to download, taken by the server. */
 export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	const agentId = state.focused;
-	if (!agentId) return;
-	// Taken on the server, which can take a moment; fetched with this tab's token (a plain link carries none, and was refused), then saved.
+	const canvas = stageOf(agentId)?.name;
+	if (!agentId || !canvas) return;
+	// Taken on the server by canvas.screenshot, as decks canvas screenshot takes it, which can take a moment; fetched with this tab's token (a plain link carries none, and was refused), then saved.
 	notice("info", "Taking the picture…");
 	// A card's picture is named after its folder; drawn items after the canvas, as the server names it.
 	const card = ids.length === 1 ? /(?:^|\/)cards\/([^/]+)\//.exec(ids[0] ?? "")?.[1] : undefined;
 	void (async () => {
 		try {
-			const response = await fetch(api(`/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
+			const response = await fetch(api(`/stage-shot?${new URLSearchParams({ canvas, agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
 			if (!response.ok) throw new Error((await response.text().catch(() => "")) || `the server answered ${response.status}`);
 			const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1];
 			const local = URL.createObjectURL(await response.blob());
 			const link = document.createElement("a");
 			link.href = local;
-			link.download = card ? `${card}.${format}` : (named ?? `picture.${format}`);
+			link.download = card ? `${card}.${format}` : (named ?? `${canvas}.${format}`);
 			link.click();
 			setTimeout(() => URL.revokeObjectURL(local), 60_000);
 		} catch (error) {
