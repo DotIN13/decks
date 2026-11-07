@@ -33,8 +33,8 @@ const GAP = 10;
  *
  * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
- * actions (a new tab, hide) are not offered. A card's pill is Fit, New tab, Comment, ✕ (let it go)
- * and ⋯, a menu of Export as PNG or PDF, Copy path and Delete (off the canvas, its folder kept).
+ * actions (a new tab, hide) are not offered. A card's pill is Fit, New tab, Comment, ✕ (hide)
+ * and ⋯, a menu of Export as PNG or PDF, Copy path and Delete; drawn items' and a group's end in ⋯ too.
  */
 export function PageCallout(props: {
 	board?: Page;
@@ -46,9 +46,8 @@ export function PageCallout(props: {
 	view: Viewport;
 	/** Fit the item to the screen. New tab is the host's to open (`openInTab`): inside the canvas frame a link opens none, the sandbox allows no popup, so the page opens it. */
 	onOpen: () => void;
+	/** A card's ✕: take it off the canvas at once, its folder kept. */
 	onHide?: () => void;
-	/** Let what is selected go (✕), as a press on bare canvas does: a card, drawn items, a group. */
-	onClose?: () => void;
 	/** In the ⋯ menu: a picture of what is selected to download, taken as `decks canvas screenshot` takes it; a card's path to the clipboard. */
 	onExport?: (format: "png" | "pdf") => void;
 	onCopyPath?: () => void;
@@ -218,10 +217,9 @@ export function PageCallout(props: {
 		setMore(false);
 		run?.();
 	};
-	/** A card's pill, or drawn items' and a group's: ✕ and ⋯ in place of Delete and Hide. The lasso's has neither. */
-	const card = () => !!props.onClose;
-	// Hide first: it takes the card off at once, as an edit of yours; Delete waits for the harness to answer. Both keep its folder.
-	const remove = () => props.onHide ?? props.onDelete;
+	/** A card's pill, or drawn items' and a group's that can be exported: a ⋯ menu in place of the Delete button. The lasso's has none. */
+	const withMenu = () => !!props.board || !!props.onExport;
+	const remove = () => props.onDelete;
 	return (
 		<div
 			ref={element}
@@ -280,7 +278,7 @@ export function PageCallout(props: {
 				</button>
 			</Show>
 			<Show
-				when={card()}
+				when={withMenu()}
 				fallback={
 					<>
 						<Show when={props.onDelete}>
@@ -298,10 +296,12 @@ export function PageCallout(props: {
 					</>
 				}
 			>
-				{/* A card's pill: Fit, New tab, Comment, then ✕ to let it go and ⋯ for the rest. */}
-				<button type="button" role="menuitem" class="icon-button" aria-label="Close" title={props.board ? "Deselect the card" : "Deselect"} onClick={() => props.onClose?.()}>
-					<Icon of={X} size={17} />
-				</button>
+				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
+				<Show when={props.board && props.onHide}>
+					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+						<Icon of={X} size={17} />
+					</button>
+				</Show>
 				<span class="callout-rule" aria-hidden="true" />
 				<button ref={moreButton} type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
 					<Icon of={Ellipsis} size={17} />

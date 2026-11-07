@@ -426,7 +426,7 @@ if (diagonal) {
 
 /*
  * The board's pill, over a selected drawn item, with what makes sense for one (`BoardCallout`): zoom to
- * it, comment, duplicate, close and ⋯ (export, delete; Properties left the pill on purpose). Its Duplicate selects the copy, and its Delete takes
+ * it, comment, duplicate and ⋯ (export, delete; Properties left the pill on purpose). Its Duplicate selects the copy, and its Delete takes
  * that copy away, leaving the first.
  */
 {
@@ -449,7 +449,7 @@ if (diagonal) {
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
 		const labels = await until(() => canvas.evaluate(() => [...document.querySelectorAll(".stage-fixed > .card-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
-		say("a selected shape gets the pill: zoom, comment, duplicate, close and more", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Close", "More"]), JSON.stringify(labels));
+		say("a selected shape gets the pill: zoom, comment, duplicate and more", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "More"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
 		// Pressed by its coordinates: a locator's click scrolls its target into view, and the stage is a scroll container.
 		const pressOn = async (selector) => {

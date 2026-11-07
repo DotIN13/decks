@@ -97,15 +97,7 @@ say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.l
 // neighbouring board begins — which is a fact about the camera, not about hiding.
 const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? two[0];
 await selectCard(page, first);
-// Delete sits in the pill's ⋯ menu: it takes the board off the canvas and keeps its file, as Hide did.
-await pressCardAction(page, "More");
-{
-	// Pressed where it is, once the camera rests: pressCardAction may frame the card first, and a moving camera shuts the menu.
-	await settle(page, 700);
-	const del = (await canvasFrame(page)).locator('.stage-fixed > .card-callout .callout-more [aria-label="Delete"]').first();
-	if (!(await del.isVisible().catch(() => false))) await pressCardAction(page, "More");
-	await del.click({ timeout: 3000 });
-}
+await pressCardAction(page, "Hide");
 await (await canvasFrame(page)).waitForFunction((wanted) => !(window.__decksProbes?.cards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*

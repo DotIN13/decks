@@ -334,11 +334,6 @@ export function createSelection(deps: SelectionDeps) {
 						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([boxOf(board())]))}
-						// ✕ lets the card go, as a press on bare canvas does: nothing changes on the canvas.
-						onClose={() => {
-							editor.pickPages([]);
-							props.onSelect(undefined);
-						}}
 						onCopyPath={() => void navigator.clipboard?.writeText(path).catch(() => {})}
 						{...(props.onExport && board().item !== "app" ? { onExport: (format: "png" | "pdf") => props.onExport?.([path], format) } : {})}
 						{...(props.onHide ? { onHide: () => props.onHide?.(path) } : {})}
@@ -371,12 +366,7 @@ export function createSelection(deps: SelectionDeps) {
 						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([items().box]))}
-						// ✕ lets the items and cards go, as Escape does; ⋯ holds a picture of them all, cards included.
-						onClose={() => {
-							editor.select([]);
-							editor.pickPages([]);
-							props.onSelect(undefined);
-						}}
+						// ⋯ holds a picture of them all, cards included.
 						{...(props.onExport ? { onExport: (format: "png" | "pdf") => props.onExport?.([...items().ids, ...items().cards], format) } : {})}
 						// What acts on drawn items: a group of boards alone has only Open.
 						{...(items().ids.length
