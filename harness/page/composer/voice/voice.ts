@@ -145,13 +145,8 @@ export function micError(error: unknown): string {
 export async function startRecording(options: VoiceOptions = {}): Promise<Recording> {
 	const missing = micMissing();
 	if (missing) throw new Error(missing);
-	const choice = recogniser();
-	const serverHas = choice === "browser" ? false : await serverTranscribes();
 	const Recogniser = browserRecogniser();
-	if (choice === "server" && !serverHas) throw new Error("This server has no speech recogniser: set OPENAI_API_KEY in its environment, or pick the browser's in Settings.");
-	if (choice === "browser" && !Recogniser) throw new Error("This browser has no speech recogniser: pick the server's in Settings.");
-	const onServer = serverHas;
-	if (!onServer && !Recogniser) throw new Error("This server has no speech recogniser, and nor has this browser: set OPENAI_API_KEY on the server.");
+	const onServer = await chooseServer(recogniser(), Recogniser !== undefined);
 	let stream: MediaStream;
 	try {
 		stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -163,39 +158,52 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 		levels.stop();
 		for (const track of stream.getTracks()) track.stop();
 	};
+	return onServer ? recordForServer(stream, release) : listenInBrowser(new Recogniser!(), options, release);
+}
 
-	if (onServer) {
-		const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((one) => MediaRecorder.isTypeSupported?.(one)) ?? "";
-		const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
-		const chunks: Blob[] = [];
-		recorder.ondataavailable = (event) => {
-			if (event.data.size > 0) chunks.push(event.data);
-		};
-		recorder.start(250);
-		const stopped = () =>
-			new Promise<void>((done) => {
-				if (recorder.state === "inactive") return done();
-				recorder.onstop = () => done();
-				recorder.stop();
-			});
-		return {
-			async stop() {
-				await stopped();
-				release();
-				const audio = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
-				if (audio.size === 0) return "";
-				const response = await fetch(api("/stt"), { method: "POST", headers: { ...authHeaders(), "content-type": audio.type }, body: audio });
-				const body = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
-				if (!response.ok) throw new Error(body.error ?? `The server could not transcribe it (${response.status}).`);
-				return body.text ?? "";
-			},
-			cancel() {
-				void stopped().then(release);
-			},
-		};
-	}
+/** Whether the server transcribes this take; refused, in words, when neither side can. */
+async function chooseServer(choice: Recogniser, browserHas: boolean): Promise<boolean> {
+	const serverHas = choice === "browser" ? false : await serverTranscribes();
+	if (choice === "server" && !serverHas) throw new Error("This server has no speech recogniser: set OPENAI_API_KEY in its environment, or pick the browser's in Settings.");
+	if (choice === "browser" && !browserHas) throw new Error("This browser has no speech recogniser: pick the server's in Settings.");
+	if (!serverHas && !browserHas) throw new Error("This server has no speech recogniser, and nor has this browser: set OPENAI_API_KEY on the server.");
+	return serverHas;
+}
 
-	const recognition = new Recogniser!();
+/** Record the take, and send it whole to the server's recogniser when it stops. */
+function recordForServer(stream: MediaStream, release: () => void): Recording {
+	const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((one) => MediaRecorder.isTypeSupported?.(one)) ?? "";
+	const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+	const chunks: Blob[] = [];
+	recorder.ondataavailable = (event) => {
+		if (event.data.size > 0) chunks.push(event.data);
+	};
+	recorder.start(250);
+	const stopped = () =>
+		new Promise<void>((done) => {
+			if (recorder.state === "inactive") return done();
+			recorder.onstop = () => done();
+			recorder.stop();
+		});
+	return {
+		async stop() {
+			await stopped();
+			release();
+			const audio = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
+			if (audio.size === 0) return "";
+			const response = await fetch(api("/stt"), { method: "POST", headers: { ...authHeaders(), "content-type": audio.type }, body: audio });
+			const body = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+			if (!response.ok) throw new Error(body.error ?? `The server could not transcribe it (${response.status}).`);
+			return body.text ?? "";
+		},
+		cancel() {
+			void stopped().then(release);
+		},
+	};
+}
+
+/** Let the browser's recogniser listen, telling what it has heard as it goes. */
+function listenInBrowser(recognition: SpeechRecognitionLike, options: VoiceOptions, release: () => void): Recording {
 	recognition.lang = options.lang ?? (voiceLang() || navigator.language || "en-US");
 	recognition.continuous = true;
 	recognition.interimResults = true;

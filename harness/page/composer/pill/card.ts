@@ -134,76 +134,92 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	if (again) return;
 	const about = host.about(node);
 	if (!about) return;
-
 	const card = document.createElement("div");
 	card.className = "floatcard pill-card";
 	card.setAttribute("role", "dialog");
 	card.setAttribute("aria-label", about.name);
+	const { head, x } = cardHead(about, node, host);
+	const body = cardBody(about);
+	const acts = cardActs(body, () => place(card, pill), host.remove ? () => (closePillCard(), host.remove!(node)) : undefined);
+	card.append(head, body.el, acts);
+	document.body.append(card);
+	place(card, pill);
+	pill.setAttribute("aria-expanded", "true");
+	const close = dismissals(card, pill);
+	x.onclick = () => close(true);
+	setOpen({ pill, card, close: () => close() });
+}
+
+/** The first line names what the pill is about, with its kind's icon; a press shows it. */
+function cardHead(about: PillAbout, node: DraftMention, host: PillHost): { head: HTMLElement; x: HTMLButtonElement } {
 	const head = document.createElement("div");
 	head.className = "pill-card-head";
-	// The first line names what it is about, with its kind's icon; a press shows it.
 	const name = button("pill-card-name", svg(BODIES[about.of], 15, "pill-card-icon"));
 	const label = document.createElement("span");
 	label.className = "pill-card-label";
 	label.textContent = about.name;
 	name.append(label);
-	// One line, cut with an ellipsis (`ink.css`); the whole name is in the title.
+	// One line, cut with an ellipsis; the whole name is in the title.
 	name.title = `${about.name} — ${about.of === "file" ? "open the file" : "show it on the canvas"}`;
 	if (about.canvas) name.dataset.canvas = "true";
 	if (host.show) name.onclick = () => host.show!(node);
 	else name.disabled = true;
 	const x = button("pill-card-x", svg(BODIES.x, 14, "pill-card-icon"), "Close");
 	head.append(name, x);
+	return { head, x };
+}
 
-	const body = document.createElement("div");
-	body.className = "pill-card-body";
+/** The card's body: the quoted words and the note, or the exact text the agent receives. */
+function cardBody(about: PillAbout): { el: HTMLElement; shown: () => void; exact: () => void } {
+	const el = document.createElement("div");
+	el.className = "pill-card-body";
 	const shown = () => {
-		body.replaceChildren();
+		el.replaceChildren();
 		if (about.quote) {
 			const quote = document.createElement("blockquote");
 			quote.textContent = about.quote;
-			body.append(quote);
+			el.append(quote);
 		}
 		const note = document.createElement("div");
 		note.textContent = about.note || about.source;
-		body.append(note);
+		el.append(note);
+	};
+	// The one place the whole of it is: a field of its own that scrolls.
+	const exact = () => {
+		const pre = document.createElement("pre");
+		pre.textContent = about.exact;
+		pre.tabIndex = 0;
+		el.replaceChildren(pre);
 	};
 	shown();
+	return { el, shown, exact };
+}
 
+/** The card's buttons: the exact words and back, and Remove when the host can take a pill out. */
+function cardActs(body: ReturnType<typeof cardBody>, replace: () => void, remove: (() => void) | undefined): HTMLElement {
 	const acts = document.createElement("div");
 	acts.className = "pill-card-acts";
-	// The exact words the agent receives for this pill, and back.
 	const exact = button("", "Exact text");
 	exact.dataset.act = "exact";
 	exact.onclick = () => {
 		const showing = exact.textContent === "Exact text";
-		if (showing) {
-			// The one place the whole of it is: a field of its own that scrolls (`ink.css`).
-			const pre = document.createElement("pre");
-			pre.textContent = about.exact;
-			pre.tabIndex = 0;
-			body.replaceChildren(pre);
-		} else shown();
+		if (showing) body.exact();
+		else body.shown();
 		exact.textContent = showing ? "As shown" : "Exact text";
-		place(card, pill);
+		replace();
 	};
 	acts.append(exact);
-	if (host.remove) {
-		const remove = button("", "Remove");
-		remove.dataset.act = "remove";
-		remove.onclick = () => {
-			closePillCard();
-			host.remove!(node);
-		};
-		acts.append(remove);
+	if (remove) {
+		const take = button("", "Remove");
+		take.dataset.act = "remove";
+		take.onclick = remove;
+		acts.append(take);
 	}
-	card.append(head, body, acts);
-	document.body.append(card);
-	place(card, pill);
-	pill.setAttribute("aria-expanded", "true");
+	return acts;
+}
 
-	// Put away by ×, Escape, or a press anywhere but the card and its pill. Escape is the card's
-	// alone: in the composer it would otherwise clear the whole draft.
+/** Put away by ×, Escape (the card's alone), a press elsewhere, a scroll, a resize, or the canvas frame. */
+function dismissals(card: HTMLElement, pill: HTMLElement): (back?: boolean) => void {
 	const key = (event: KeyboardEvent) => {
 		if (event.key !== "Escape") return;
 		event.preventDefault();
@@ -212,14 +228,13 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	};
 	const press = (event: PointerEvent) => {
 		const target = event.target as Node | null;
-		if (target && (card.contains(target) || pill.contains(target))) return;
-		close();
+		if (!target || !(card.contains(target) || pill.contains(target))) close();
 	};
-	// The card is fixed to the window: when what is under it moves, it goes rather than float off its pill.
-	const moved = (event: Event) => {
-		if (!card.contains(event.target as Node | null)) close();
-	};
-	/** `back`: put away by a key or its ×, so the keyboard goes back to the field the pill is in. */
+	// Fixed to the window: when what is under it moves, it goes rather than float off its pill.
+	const moved = (event: Event) => !card.contains(event.target as Node | null) && close();
+	const resized = () => close();
+	// A press in a frame reaches no listener here; the window losing focus to it says so.
+	const away = () => setTimeout(() => document.activeElement?.tagName === "IFRAME" && close());
 	const close = (back = false) => {
 		document.removeEventListener("keydown", key, true);
 		document.removeEventListener("pointerdown", press, true);
@@ -230,28 +245,28 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 		card.remove();
 		pill.setAttribute("aria-expanded", "false");
 		if (open()?.card === card) setOpen(undefined);
-		const field = pill.closest<HTMLElement>("[contenteditable='true']");
-		if (back && field && pill.isConnected) {
-			field.focus();
-			const range = document.createRange();
-			range.setStartAfter(pill);
-			range.collapse(true);
-			getSelection()?.removeAllRanges();
-			getSelection()?.addRange(range);
-		}
+		if (back) returnCaret(pill);
 	};
-	// A press in a frame (the canvas) reaches no listener here; the window losing focus to it says so.
-	const away = () => setTimeout(() => document.activeElement?.tagName === "IFRAME" && close());
-	x.onclick = () => close(true);
 	document.addEventListener("keydown", key, true);
 	document.addEventListener("pointerdown", press, true);
 	document.addEventListener("scroll", moved, true);
-	const resized = () => close();
 	addEventListener("resize", resized);
 	addEventListener("blur", away);
-	// A press in the canvas frame, said by the frame (`@decks/ui` dismiss): the blur above misses one when the frame already had focus.
+	// A press in the canvas frame, said by the frame: the blur above misses one when it already had focus.
 	const stopDismiss = onDismiss(() => close());
-	setOpen({ pill, card, close: () => close() });
+	return close;
+}
+
+/** Put away by a key or its ×, the keyboard goes back to the field, just after the pill. */
+function returnCaret(pill: HTMLElement): void {
+	const field = pill.closest<HTMLElement>("[contenteditable='true']");
+	if (!field || !pill.isConnected) return;
+	field.focus();
+	const range = document.createRange();
+	range.setStartAfter(pill);
+	range.collapse(true);
+	getSelection()?.removeAllRanges();
+	getSelection()?.addRange(range);
 }
 
 /**
