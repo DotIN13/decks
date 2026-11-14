@@ -149,7 +149,10 @@ export function listen(built: Built, port: number, host = "127.0.0.1"): Promise<
 		});
 	});
 	const upgrades = built.features.flatMap((feature) => (feature.routes ?? []).filter((route) => route.upgrade));
+	const lines = new Set<Duplex>();
 	server.on("upgrade", (req, socket, head) => {
+		lines.add(socket);
+		socket.on("close", () => lines.delete(socket));
 		const path = new URL(req.url ?? "/", "http://decks.local").pathname;
 		const peer = path === SOCKET_PATH ? accept(req, socket) : undefined;
 		if (peer) return socketDoor(built, peer);
@@ -163,7 +166,11 @@ export function listen(built: Built, port: number, host = "127.0.0.1"): Promise<
 			const at = server.address();
 			const real = typeof at === "object" && at ? at.port : port;
 			built.setUrl(`http://${host}:${real}`);
-			const close = () => new Promise<void>((closed) => (server.closeAllConnections(), server.close(() => closed())));
+			const close = () => new Promise<void>((closed) => {
+				for (const line of lines) line.destroy();
+				server.closeAllConnections();
+				server.close(() => closed());
+			});
 			done({ url: `http://${host}:${real}`, port: real, server, close });
 		});
 	});

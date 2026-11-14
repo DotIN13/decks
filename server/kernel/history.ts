@@ -6,7 +6,9 @@ import { toDeckPath, type Bytes, type Deck, type DeckPath, type Entry, type File
 // Every write is recorded as a revision, with its bytes kept once by hash,
 // so any file at any moment can be read and restored. A change made on the
 // disk outside the server (by "disk") is recorded when the deck hears it.
-// A file that was there before history began is recorded at revision 0.
+// A file that was there before history began is recorded at revision 0,
+// on its first read, write, remove or move, so a change made on the disk
+// after it was read can still be undone.
 
 type Kept = { path: DeckPath; rev: number; by: string; at: number; kind: "written" | "deleted"; hash?: string };
 
@@ -16,6 +18,9 @@ const keyOf = (kept: Kept, seq: number) => `log/${String(kept.rev).padStart(12, 
 export class HistoryDeck implements Deck {
 	private log: Kept[] = [];
 	private seq = 0;
+	private seen = new Set<DeckPath>();
+	private watchers = new Set<(change: FileChange) => void>();
+	private stopInner: Stop | undefined;
 
 	constructor(
 		private inner: Deck,
@@ -33,8 +38,13 @@ export class HistoryDeck implements Deck {
 		return this.log.reduce((top, one) => Math.max(top, one.rev), 0);
 	}
 
-	read(path: DeckPath): Promise<Bytes> {
-		return this.inner.read(path);
+	async read(path: DeckPath): Promise<Bytes> {
+		const bytes = await this.inner.read(path);
+		if (!this.latest(path, Infinity) && !this.seen.has(path)) {
+			this.seen.add(path);
+			await this.record({ path, rev: 0, by: "before", at: 0, kind: "written" }, bytes);
+		}
+		return bytes;
 	}
 
 	list(dir: DeckPath | ""): Promise<Entry[]> {
@@ -66,11 +76,20 @@ export class HistoryDeck implements Deck {
 		return done;
 	}
 
+	/** One watch on the inner deck, however many listen, so a change is recorded once. */
 	watch(on: (change: FileChange) => void): Stop {
-		return this.inner.watch((change) => {
-			if (change.by === "disk") void this.hear(change).finally(() => on(change));
-			else on(change);
+		this.watchers.add(on);
+		this.stopInner ??= this.inner.watch((change) => {
+			const tell = () => this.watchers.forEach((one) => one(change));
+			if (change.by === "disk") void this.hear(change).finally(tell);
+			else tell();
 		});
+		return () => {
+			this.watchers.delete(on);
+			if (this.watchers.size > 0) return;
+			this.stopInner?.();
+			this.stopInner = undefined;
+		};
 	}
 
 	async revisions(path: DeckPath): Promise<Revision[]> {

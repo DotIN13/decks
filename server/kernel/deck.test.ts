@@ -137,6 +137,24 @@ test("folder: a change made on the disk is heard by disk and recorded", async ()
 	}
 });
 
+test("folder: a file read before the disk changes it keeps its old words, each change recorded once", async () => {
+	const made = await folder({ "a.txt": "before" });
+	const root = (made.deck as unknown as { inner: FolderDeck }).inner.root;
+	try {
+		await made.deck.read(p("a.txt"));
+		const stops = [made.deck.watch(() => {}), made.deck.watch(() => {}), made.deck.watch(() => {})];
+		const heard = await new Promise<FileChange>((done) => {
+			const stop = made.deck.watch((c) => (stop(), done(c)));
+			setTimeout(() => void writeFile(join(root, "a.txt"), "outside"), 50);
+		});
+		assert.equal(text(await made.deck.readAt(p("a.txt"), heard.rev - 1)), "before");
+		assert.equal((await made.deck.revisions(p("a.txt"))).length, 2);
+		stops.forEach((stop) => stop());
+	} finally {
+		await made.done();
+	}
+});
+
 test("folder: a symlink out of the deck is refused, and a remove lands in the trash", async () => {
 	const made = await folder({ "a.txt": "1" });
 	const root = (made.deck as unknown as { inner: FolderDeck }).inner.root;

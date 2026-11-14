@@ -50,7 +50,10 @@ async function main(): Promise<void> {
 	const args = argsOf(process.argv.slice(2));
 	const running = await startServer({ ...args, features: features({ appRun: join(args.deck, ".decks", "app-run") }) });
 	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
-	const stop = () => void running.close().then(() => process.exit(0));
+	const stop = () => {
+		setTimeout(() => process.exit(0), 3000).unref();
+		void running.close().then(() => process.exit(0));
+	};
 	process.on("SIGINT", stop);
 	process.on("SIGTERM", stop);
 }
