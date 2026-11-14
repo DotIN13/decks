@@ -155,3 +155,15 @@ async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promis
 	}
 	return read();
 }
+
+test("item.changed comes after the file is written, so a listener reads the new drawing", async () => {
+	const s = await start();
+	let seen = "";
+	s.kernel.events.on((await import("../../protocol/index.ts")).events.itemChanged, () => {
+		void s.deck.read(toDeckPath("canvases/plan/canvas.pen")).then((b) => { seen = new TextDecoder().decode(b); });
+	});
+	await s.value("item.update", { id: "a", set: { content: "fresh" } }, ann);
+	await new Promise((r) => setTimeout(r, 5));
+	assert.match(seen, /"fresh"/);
+	await s.close();
+});

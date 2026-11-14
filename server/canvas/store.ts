@@ -148,8 +148,8 @@ export class CanvasStore {
 	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller): void {
 		kept.mine.push(text);
 		if (kept.mine.length > 20) kept.mine.shift();
-		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).catch(() => undefined);
-		this.kernel.events.emit(events.itemChanged, { canvas: kept.canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+		const announce = () => this.kernel.events.emit(events.itemChanged, { canvas: kept.canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(announce, () => undefined);
 	}
 
 	private async heard(path: DeckPath, kind: "written" | "deleted", by: string): Promise<void> {
