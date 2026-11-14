@@ -1,5 +1,5 @@
 import tailwind from "@tailwindcss/vite";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
@@ -15,16 +15,17 @@ const HOST = process.env.DECKS_PAGE_HOST ?? "127.0.0.1";
 
 type Lock = { url: string; token: string };
 
-/** The server to proxy and its person token: DECKS_URL and DECKS_TOKEN, else the lock file of DECKS_DECK. */
+/** The server to proxy and its person token: the lock file of DECKS_DECK, else DECKS_URL and DECKS_TOKEN. */
 function server(): Lock {
-	if (process.env.DECKS_URL) return { url: process.env.DECKS_URL, token: process.env.DECKS_TOKEN ?? "" };
 	const deck = process.env.DECKS_DECK;
-	if (!deck) return { url: "http://127.0.0.1:4620", token: process.env.DECKS_TOKEN ?? "" };
-	try {
-		return JSON.parse(readFileSync(join(deck, ".decks/server.json"), "utf8")) as Lock;
-	} catch {
-		return { url: "http://127.0.0.1:4620", token: "" };
+	if (deck) {
+		try {
+			return JSON.parse(readFileSync(join(deck, ".decks/server.json"), "utf8")) as Lock;
+		} catch {
+			return { url: "http://127.0.0.1:4620", token: "" };
+		}
 	}
+	return { url: process.env.DECKS_URL ?? "http://127.0.0.1:4620", token: process.env.DECKS_TOKEN ?? "" };
 }
 
 /** GET /page.json: where the page's calls go (its own origin) and the token they carry. Loopback only. */
@@ -42,8 +43,11 @@ function pageJson(): Plugin {
 	};
 }
 
+const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const target = () => server().url;
-const pass = (ws = false) => ({ target: target(), changeOrigin: false, ws, xfwd: true });
+/** A path that is a file of the page's own (app/, files/) is served here, not passed on. */
+const own = (url = "") => (existsSync(join(ROOT, decodeURIComponent(url.split("?")[0] ?? ""))) ? url : undefined);
+const pass = (ws = false) => ({ target: target(), changeOrigin: false, ws, xfwd: true, bypass: (req: { url?: string }) => own(req.url) });
 
 export default defineConfig({
 	plugins: [solid(), tailwind(), pageJson(), decksSounds()],
