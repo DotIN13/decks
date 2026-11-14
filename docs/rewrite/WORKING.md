@@ -68,6 +68,8 @@ lines or fewer, plain words, no em dashes.
 - **Your progress card** is one `progress.json`, at the path in your brief. Keep it true after every
   step: the step's status, its tests with real counts and the command, the files you changed and why.
   Edit it in place (never a rename-save such as `sed -i`). It is what the person watches.
+  A step's `tests` is a **list**, each entry `{ "suite": "…", "passed": 12, "failed": 0, "failures": ["name"],
+  "command": "…" }`. Not a sentence and not one bare object: a wrong shape once left cards blank.
 - **A decision for the person** goes in the decisions card's `progress.json` (path in your brief), as an
   entry in `decisions` with `"agent": "<your name>"`, a question, why it matters, and options with one
   marked `"recommended": true`. Read the file just before you write it, and change only your own
