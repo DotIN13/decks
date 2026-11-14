@@ -60,7 +60,6 @@
 	"harness/page/settings/AlertSettings.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/settings/FiveHour.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/settings/rows.tsx: a .tsx in the page must be a part's view.tsx": 1,
-	"harness/page/settings/Settings.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/settings/UsageModal.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/shell/ConfirmDialog.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/shell/ContextRing.tsx: a .tsx in the page must be a part's view.tsx": 1,
