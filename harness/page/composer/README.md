@@ -12,7 +12,8 @@ behaviour are today's.
 - One part per folder, each `model.ts` (no DOM, unit tested), `view.tsx`, `actions.ts`:
   `bar/` (the composer), `draft/` (the field), `model-picker/`, `mode-menu/`, `slash-menu/`,
   `mention-menu/`, `recipient/`, `context/`, `hints/`.
-- `pill/` (a pill's words and its card), `about/` (what a pill is about), `voice/`.
+- `pill/` (a pill's words, its card, what it is about; `pill/compat` reads old messages),
+  `voice/`, and the tests that cross the server: `send.test.ts`, `entries.test.ts`.
 
 ## May import
 
@@ -28,8 +29,9 @@ behaviour are today's.
    draft itself on the clipboard; paste takes the draft back, else plain words.
 3. `@` opens the mention menu and `/` at the start opens the slash menu; both filter as you type
    and take Enter, Tab and the arrows.
-4. Enter sends, Shift+Enter breaks the line. While the agent works, Enter queues instead, and
-   the queue shows above the field: each waiting message can be sent now or removed.
+4. Enter sends, Shift+Enter breaks the line. While the agent works, Enter steers its turn and
+   Ctrl+Enter (⌘ on a Mac) queues; the queue shows above the field, each line can be put back,
+   sent now or removed, and an empty box offers Stop.
 5. A message is sent whole: its words, and each pill as a part with its kind, id, name and who
    put it in (`chat.send` with `parts`). Comments waiting on the canvas go with it and are
    then gone from the bar.
