@@ -12,6 +12,7 @@ import { decksSounds } from "@decks/agent-ui/vite";
 
 const PORT = Number(process.env.DECKS_PAGE_PORT ?? 4680);
 const HOST = process.env.DECKS_PAGE_HOST ?? "127.0.0.1";
+const LOOPBACK = ["127.0.0.1", "localhost", "::1"].includes(HOST);
 
 type Lock = { url: string; token: string };
 
@@ -43,6 +44,14 @@ function pageJson(): Plugin {
 	};
 }
 
+/** Today's browser checks read the person's token from the page's HTML, as a meta tag: given on loopback only. */
+function sessionMeta(): Plugin {
+	return {
+		name: "decks-session-meta",
+		transformIndexHtml: (html) => (LOOPBACK ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="decks-session" content="${server().token}">`) : html),
+	};
+}
+
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const target = () => server().url;
 /** A path that is a file of the page's own (app/, files/) is served here, not passed on. */
@@ -50,7 +59,7 @@ const own = (url = "") => (existsSync(join(ROOT, decodeURIComponent(url.split("?
 const pass = (ws = false) => ({ target: target(), changeOrigin: false, ws, xfwd: true, bypass: (req: { url?: string }) => own(req.url) });
 
 export default defineConfig({
-	plugins: [solid(), tailwind(), pageJson(), decksSounds()],
+	plugins: [solid(), tailwind(), pageJson(), sessionMeta(), decksSounds()],
 	server: {
 		host: HOST,
 		// The canvas frame is sandboxed, so its origin is "null"; its modules are fetched cross-origin.
