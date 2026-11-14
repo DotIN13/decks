@@ -6,7 +6,8 @@
 		"protocol/",
 		"tools/gen/",
 		"docs/rewrite/calls.md",
-		"clients/"
+		"clients/",
+		"tools/clients/"
 	],
 	"Warden": [
 		"AGENTS.md",
