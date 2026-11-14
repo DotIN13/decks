@@ -59,3 +59,15 @@ test("every old event name is told as one the server emits", async () => {
 	assert.deepEqual(said, { type: "canvas.changed", canvas: "c", rev: 3, doc: { children: [] }, base: "/b/", by: "x" });
 	assert.deepEqual(await told("card.changed", { canvas: "c", ids: ["p"] }, async () => undefined), { type: "card.changed", canvas: "c", ids: ["p"] });
 });
+
+test("an old name posted to /api/v1 answers through the kernel's translator", async () => {
+	const server = await testServer({ features: features(), deck: { "canvases/c/canvas.pen": JSON.stringify({ version: "2.14", children: [{ type: "note", id: "n", x: 0, y: 0, content: "hi" }] }) } });
+	const doors = await server.listen(0);
+	const post = (name: string, body: unknown) => fetch(`${doors.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify(body) }).then((r) => r.json() as Promise<{ ok: boolean; value?: { items?: unknown[] } }>);
+	const read = await post("canvas.read", { args: [{ canvas: "c" }] });
+	assert.equal(read.ok, true);
+	assert.equal(read.value?.items?.length, 1, "canvas.read answers { items } as it did");
+	assert.equal((await post("canvas.file", { args: [] })).ok, false);
+	await doors.close();
+	await server.close();
+});

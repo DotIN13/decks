@@ -92,3 +92,11 @@ export function answerBack(old: string, value: unknown): unknown {
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
 	return value;
 }
+
+/** The kernel's translator: an old name the protocol does not declare, as its new call. */
+export function translate(name: string, args: unknown): { name: string; args: Args; back: (value: unknown) => unknown } | { refusal: Refusal } | undefined {
+	const raw = isObject(args) && Array.isArray(args.args) ? args.args : args;
+	const turned = turn(name, raw);
+	if ("refusal" in turned) return BY_OLD.has(name) || GONE.has(name) ? turned : undefined;
+	return { name: turned.name, args: turned.args, back: (value) => answerBack(name, value) };
+}
