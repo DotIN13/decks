@@ -6,6 +6,8 @@ import { argsOf, Usage } from "./args.ts";
 import { help } from "./help.ts";
 import { login, logout } from "./login.ts";
 
+export { login };
+
 // The decks command: decks <noun> <verb> for every call, and help, events,
 // login, logout, serve, attach and detach. The value goes to stdout, a
 // string as it is and anything else as JSON; notes and refusals to stderr.
@@ -40,10 +42,10 @@ async function special(words: string[], io: Io): Promise<number | undefined> {
 	return undefined;
 }
 
-/** decks serve: Decks-local in the foreground, on a deck folder. */
+/** decks serve: Decks-local in the foreground, on a deck folder; tsx loads the old packages it still uses. */
 function serve(words: string[]): Promise<number> {
 	const main = new URL("../../server/main.ts", import.meta.url);
-	const child = spawn(process.execPath, [main.pathname, ...words], { stdio: "inherit" });
+	const child = spawn(process.execPath, ["--import", import.meta.resolve("tsx"), main.pathname, ...words], { stdio: "inherit" });
 	return new Promise((resolve) => child.on("exit", (code) => resolve(code ?? 1)));
 }
 

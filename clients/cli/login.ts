@@ -24,7 +24,8 @@ export async function login(words: string[], file: string): Promise<string> {
 	} catch (error) {
 		throw new DecksError({ code: "unavailable", message: `Could not reach Decks at ${found.url}: ${(error as Error).message}.` });
 	}
-	const answer = (await response.json().catch(() => ({}))) as { token?: string; name?: string; error?: { code: never; message: string } };
+	const body = (await response.json().catch(() => ({}))) as { ok?: boolean; value?: { token?: string; name?: string }; error?: { code: never; message: string; hint?: string } };
+	const answer = { ...body.value, error: body.error };
 	if (!answer.token) throw new DecksError(answer.error ?? { code: "refused", message: `Decks at ${found.url} gave no token (${response.status}).`, hint: "deck.pair" });
 	const tokens = { ...tokensFromFile(file), [found.url]: answer.token };
 	mkdirSync(dirname(file), { recursive: true, mode: 0o700 });

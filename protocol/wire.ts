@@ -10,6 +10,10 @@ export const callPath = (name: string): string => `${API}/${name}`;
 export const SOCKET_PATH = `${API}/socket`;
 /** Trade a pairing code, or the lock file's token, for a terminal's own. No call needs it first. */
 export const LOGIN_PATH = `${API}/login`;
+/** Every deck file, and a card as a page of its own, by deck path: what file.url and card.url answer. */
+export const FILES_PATH = "/files/";
+/** MCP as JSON-RPC over HTTP, on the caller's bearer token: the server's own door. */
+export const MCP_PATH = "/mcp";
 
 /** Where a client finds a server and who it is, when it is not told. */
 export const ENV = { url: "DECKS_URL", token: "DECKS_TOKEN", deck: "DECKS_DECK", tools: "DECKS_TOOLS", home: "DECKS_HOME" } as const;
@@ -30,7 +34,7 @@ export const Envelope = named(
 );
 
 export const Login = named("Login", obj({ code: opt(str()), label: opt(str()) }), "POST /api/v1/login: a code, or the lock's token as the bearer.");
-export const LoginAnswer = named("LoginAnswer", obj({ token: str(), name: str() }));
+export const LoginAnswer = named("LoginAnswer", obj({ token: str(), name: str() }), "The value of login's envelope.");
 
 const Who = obj({ kind: lit(...WHO), id: str(), name: str(), canvas: opt(str()) });
 
