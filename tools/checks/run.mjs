@@ -1,0 +1,147 @@
+#!/usr/bin/env node
+// Runs today's browser checks, unchanged, against the new programs: node tools/checks/run.mjs <check> ...
+// Per check: Decks-local on a fresh fixture copy, the harness, and the page, each on ports of its own.
+// A heavy job: node tools/heavy.mjs --wait -- node tools/checks/run.mjs <check>. Only server: --only-server.
+import { spawn } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { connect } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const ROOT = resolve(new URL("../..", import.meta.url).pathname);
+const FIXTURE = join(ROOT, "tools/fixtures/deck");
+const BASE = Number(process.env.CHECKS_PORT ?? 4612);
+const WAIT_MS = 60_000;
+const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
+
+/** How each program starts, given its ports and the deck. Edit here when an owner changes theirs. */
+export const PROGRAMS = {
+	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
+	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: join(ROOT, "e2e/fake-agent"), DECKS_DATA_DIR: home } }),
+	page: ({ deck, web }) => ({ cmd: "npm", args: ["run", "dev", "--workspace", "@decks-next/page"], env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web) } }),
+};
+
+export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
+
+/** The person's token, from the lock file the server writes in the deck. */
+function personToken(deck) {
+	return JSON.parse(readFileSync(join(deck, ".decks/server.json"), "utf8")).token;
+}
+
+/** The page is ready once its dev server answers /page.json. */
+const pageReady = (ports) => fetch(`http://127.0.0.1:${ports.web}/page.json`).then((r) => r.ok, () => false);
+
+/** The harness listens on no port: it is ready once the server relays runtime.list to it. */
+async function harnessReady(ports, deck) {
+	try {
+		const answer = await fetch(`http://127.0.0.1:${ports.server}/api/v1/runtime.list`, { method: "POST", headers: { authorization: `Bearer ${personToken(deck)}`, "content-type": "application/json" }, body: "{}" });
+		return ((await answer.json()) ?? {}).ok === true;
+	} catch {
+		return false;
+	}
+}
+
+const listening = (port) => new Promise((done) => {
+	const socket = connect(port, "127.0.0.1");
+	socket.once("connect", () => (socket.destroy(), done(true)));
+	socket.once("error", () => done(false));
+});
+
+async function until(ready, child, name) {
+	const end = Date.now() + WAIT_MS;
+	while (Date.now() < end) {
+		if (child.exitCode !== null) throw new Error(`${name} exited (${child.exitCode}) before it was ready`);
+		if (await ready()) return;
+		await new Promise((r) => setTimeout(r, 250));
+	}
+	throw new Error(`${name} was not ready in ${WAIT_MS / 1000} s`);
+}
+
+/** This shell's environment without any DECKS_ variable: a check must never reach the person's own Decks. */
+const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("DECKS_")));
+
+function launch(name, { cmd, args, env = {} }, log) {
+	const child = spawn(cmd, args, { cwd: ROOT, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+	for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => log.push(`[${name}] ${chunk}`));
+	return child;
+}
+
+const signal = (child, name) => {
+	try { process.kill(-child.pid, name); } catch {}
+};
+const stop = (child) => signal(child, "SIGTERM");
+
+/** SIGTERM to the program's whole group, then SIGKILL if it has not exited after a grace period. */
+async function stopAndWait(child) {
+	if (child.exitCode !== null || child.signalCode !== null) return signal(child, "SIGKILL");
+	const exited = new Promise((done) => child.once("exit", done));
+	stop(child);
+	await Promise.race([exited, new Promise((r) => setTimeout(r, 3_000))]);
+	signal(child, "SIGKILL");
+}
+
+/** One check, start to end: the programs up, the check run, everything stopped and the copy gone. */
+export async function runCheck(file, i, { onlyServer = false } = {}) {
+	const ports = portsFor(i);
+	for (const port of Object.values(ports)) if (await listening(port)) return { file, ok: false, why: `port ${port} is in use` };
+	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
+	const deck = join(scratch, "deck");
+	const home = join(scratch, "home");
+	cpSync(FIXTURE, deck, { recursive: true });
+	mkdirSync(home);
+	const log = [];
+	const started = [];
+	try {
+		const names = onlyServer ? ["server"] : ["server", "harness", "page"];
+		for (const name of names) {
+			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home }), log);
+			started.push(child);
+			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
+			await until(ready, child, name);
+		}
+		const web = onlyServer ? ports.server : ports.web;
+		// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
+		const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
+		const check = launch("check", { cmd: process.execPath, args: [join(ROOT, "e2e/checks", file)], env }, log);
+		started.push(check);
+		const code = await new Promise((done) => {
+			const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
+			check.on("exit", (c) => (clearTimeout(timer), done(c)));
+		});
+		return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
+	} catch (error) {
+		return { file, ok: false, why: error.message, log };
+	} finally {
+		await Promise.all(started.reverse().map(stopAndWait));
+		rmSync(scratch, { recursive: true, force: true });
+	}
+}
+
+/** The first line of a check's output that says it failed, else the exit. */
+function firstFailure(log, code) {
+	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
+	const bad = lines.find((l) => /✗|FAIL|not ok|Error|refusing/i.test(l));
+	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
+}
+
+async function main(argv) {
+	const onlyServer = argv.includes("--only-server");
+	const files = argv.filter((a) => !a.startsWith("--")).map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
+	if (!files.length) return console.error("usage: node tools/checks/run.mjs [--only-server] <check> ..."), 2;
+	const missing = files.filter((f) => !existsSync(join(ROOT, "e2e/checks", f)));
+	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
+	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
+	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [join(ROOT, "e2e/fake-model.mjs")] }, []);
+	let failed = 0;
+	for (const file of files) {
+		const result = await runCheck(file, 0, { onlyServer });
+		if (!result.ok) failed++;
+		console.log(`${result.ok ? "pass" : "FAIL"}  ${file}${result.ok ? "" : `  ${result.why}`}`);
+		if (!result.ok && process.env.CHECKS_VERBOSE === "1") console.log(result.log?.join("").split("\n").slice(-40).join("\n"));
+	}
+	if (model) stop(model);
+	console.log(`${files.length - failed} of ${files.length} checks pass`);
+	return failed ? 1 : 0;
+}
+
+if (process.argv[1] === new URL(import.meta.url).pathname) process.exitCode = await main(process.argv.slice(2));
