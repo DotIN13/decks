@@ -1,3 +1,4 @@
 {
+	"dead-exports: harness/runtimes/shared/gdocs.ts: gdocsWords": 1,
 	"stale-paths: harness/page/lib/media.ts: lib/panels.ts": 1
 }
