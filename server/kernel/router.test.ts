@@ -106,3 +106,18 @@ test("a token issued to a caller resolves to it until revoked, and describe give
 	assert.equal(server.callers.resolve(token), undefined);
 	await server.close();
 });
+
+test("a handler makes another feature's call as the same caller, and a refusal throws", async () => {
+	const relay = defineFeature({
+		name: "relay",
+		calls: [handle(calls.port.list, async (ctx) => [await ctx.call("port.open", { port: ctx.caller.kind === "agent" ? 7 : -1 })] as never)],
+	});
+	const opener = defineFeature({ name: "opener", calls: probeFeature().calls.filter((one) => one.call.name === "port.open") });
+	const server = await testServer({ features: [relay, opener] });
+	const answer = await server.call("port.list", {}, "agent");
+	assert.equal(answer.ok && (answer.value as { port: number }[])[0]?.port, 7);
+	assert.deepEqual(answer.notes, ["opened 7"]);
+	const card = await server.call("port.list", {}, callers.app("x"));
+	assert.equal(card.ok ? "" : card.error.code, "refused");
+	await server.close();
+});

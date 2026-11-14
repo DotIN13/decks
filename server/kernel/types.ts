@@ -72,6 +72,8 @@ export interface Context {
 	store: Store;
 	/** The connection the call came on; undefined for a one-shot HTTP call. */
 	client?: Client;
+	/** Make another call through the router, as the same caller and client; a refusal throws Refused. */
+	call<T = unknown>(name: string, args: Record<string, unknown>): Promise<T>;
 }
 
 /** A pen.dev node as the drawing's file holds it. */

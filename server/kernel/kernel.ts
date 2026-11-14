@@ -1,4 +1,4 @@
-import { Refused, type Caller } from "../../protocol/index.ts";
+import { Refused, type Caller, type Envelope } from "../../protocol/index.ts";
 import { Callers } from "./callers.ts";
 import { EventBus } from "./events.ts";
 import { HistoryDeck } from "./history.ts";
@@ -38,8 +38,9 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds };
 	source = canvasSource(features, kernel);
-	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, ...(client ? { client } : {}) });
-	const router = new Router(routesOf(features), makeContext, options.checkAnswers ?? false);
+	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
+	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });
+	const router: Router = new Router(routesOf(features), makeContext, options.checkAnswers ?? false);
 	const stops: Stop[] = [];
 	for (const one of features) {
 		const stop = await one.start?.(kernel);
@@ -52,7 +53,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	return { kernel, router, events, callers, history, features, stop };
 }
 
-type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string; client?: Context["client"] };
+type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string;
+	call: (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => Promise<Envelope<unknown>>; client?: Context["client"] };
 
 function contextFor(parts: ContextParts): Context {
 	const { caller, kernel } = parts;
@@ -64,6 +66,12 @@ function contextFor(parts: ContextParts): Context {
 		note: (text) => void parts.notes.push(text),
 		canvas: (name) => parts.canvas(asked(caller, name)),
 		canvasName: (name) => parts.nameOf(asked(caller, name)),
+		async call<T>(name: string, args: Record<string, unknown>): Promise<T> {
+			const answer = await parts.call(name, args, caller, parts.client);
+			for (const note of answer.notes) parts.notes.push(note);
+			if (!answer.ok) throw new Refused(answer.error.code, answer.error.message, answer.error.hint);
+			return answer.value as T;
+		},
 		...(parts.client ? { client: parts.client } : {}),
 	};
 }

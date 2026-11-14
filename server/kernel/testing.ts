@@ -1,4 +1,4 @@
-import type { Caller, Envelope, Who } from "../../protocol/index.ts";
+import { Refused, type Caller, type Envelope, type Who } from "../../protocol/index.ts";
 import type { Heard } from "./events.ts";
 import { LOCAL_PERSON } from "./callers.ts";
 import { listen } from "./doors/http.ts";
@@ -85,6 +85,9 @@ export function testContext(over: Partial<Context> = {}): Context & { notes: str
 		events: { emit() {}, on: () => () => {} },
 		note: (text) => void notes.push(text),
 		store: new MemoryStore(),
+		call: async (name) => {
+			throw new Refused("unavailable", `testContext makes no calls (${name}); give call in over, or use testServer.`);
+		},
 		notes,
 		...over,
 	};
