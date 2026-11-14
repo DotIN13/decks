@@ -1,5 +1,12 @@
 {
 	"stale-paths: docs/rewrite/DESIGN.md: actions.ts": 1,
 	"stale-paths: docs/rewrite/DESIGN.md: calls.ts": 1,
-	"stale-paths: docs/rewrite/DESIGN.md: view.tsx": 1
+	"stale-paths: docs/rewrite/DESIGN.md: view.tsx": 1,
+	"stale-paths: harness/page/chat/README.md: actions.ts": 1,
+	"stale-paths: harness/page/chat/README.md: view.tsx": 1,
+	"stale-paths: harness/page/composer/README.md: actions.ts": 1,
+	"stale-paths: harness/page/composer/README.md: view.tsx": 1,
+	"stale-paths: harness/page/lib/media.ts: lib/panels.ts": 1,
+	"stale-paths: harness/page/README.md: actions.ts": 1,
+	"stale-paths: harness/page/README.md: view.tsx": 2
 }

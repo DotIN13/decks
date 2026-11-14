@@ -84,7 +84,7 @@ export const MOVED = ["harness/page/", "harness/runtimes/", "harness/prompts/", 
 /** Records today's counts for keys under one moved folder, leaving every other key as it was. */
 export function adoptBaseline(root, name, counts, prefix) {
 	const next = { ...readBaseline(root, name) };
-	const under = (key) => key.replace(/^(dead-exports|dead-css|stale-paths|surface-gate): /, "").startsWith(prefix);
+	const under = (key) => { const k = key.replace(/^(dead-exports|dead-css|stale-paths|surface-gate): /, ""); return k.startsWith(prefix) || k.startsWith(`${prefix.slice(0, -1)}:`); };
 	for (const key of Object.keys(next)) if (under(key)) delete next[key];
 	for (const [key, n] of counts) if (under(key)) next[key] = n;
 	const sorted = Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)));
