@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Proves the frame feature end to end: the page opens with /canvas-frame.html taken from
+// In compat/ because it reads today's canvas page by its old class names. Proves the frame feature: the page opens with /canvas-frame.html taken from
 // Decks-local's server/frame (its build), the frame draws the fixture canvas, and a nudge of a
 // card in it reaches the drawing's file. Needs server/frame/dist (node server/frame/build.mjs).
-// A heavy job: node tools/heavy.mjs --wait -- node tools/checks/frame-probe.mjs
+// A heavy job: node tools/heavy.mjs --wait -- node tools/checks/compat/frame-probe.mjs
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { runPrograms } from "./run.mjs";
+import { runPrograms } from "../run.mjs";
 
 const card = "canvases/auth-refresh/cards/plan/index.html";
 const xOf = (deck) => JSON.parse(readFileSync(join(deck, "canvases/auth-refresh/canvas.pen"), "utf8")).children.find((n) => n.metadata?.path === "cards/plan/index.html")?.x;
