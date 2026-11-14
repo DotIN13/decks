@@ -3,8 +3,9 @@ import { any, arr, int, lit, named, obj, opt, str, union } from "./schema.ts";
 
 // How a call travels, the same for every server and client. HTTP: POST
 // /api/v1/<name> with the arguments as one JSON object, answered with the
-// envelope. Socket: /api/v1/socket, JSON messages, hello first. A host that
-// offered harness calls gets a request for each and sends one reply.
+// envelope. Socket: /api/v1/socket, JSON messages, hello first. A host gets
+// an ask for each harness call it offered and sends one reply; it tells the
+// harness's events, which the server fans out like its own.
 
 export const API = "/api/v1";
 export const callPath = (name: string): string => `${API}/${name}`;
@@ -47,6 +48,7 @@ export const ClientMessage = named(
 		obj({ type: lit("call"), id: str(), name: str(), args: any() }),
 		obj({ type: lit("watch"), events: opt(arr(str())), canvas: opt(str()) }),
 		obj({ type: lit("reply"), id: str(), envelope: Envelope }),
+		obj({ type: lit("tell"), name: str(), payload: any() }),
 	),
 );
 
@@ -57,6 +59,6 @@ export const ServerMessage = named(
 		obj({ type: lit("hello"), protocol: str(), caller: Who }),
 		obj({ type: lit("answer"), id: str(), envelope: Envelope }),
 		obj({ type: lit("event"), name: str(), payload: any() }),
-		obj({ type: lit("request"), id: str(), name: str(), args: any(), caller: Who }),
+		obj({ type: lit("ask"), id: str(), name: str(), args: any(), caller: Who }),
 	),
 );
