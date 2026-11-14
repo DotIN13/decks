@@ -699,7 +699,7 @@
 	"harness/page/canvases/CanvasOps.tsx: stage": 2,
 	"harness/page/canvases/CanvasSwitcher.tsx: board": 1,
 	"harness/page/canvases/CanvasSwitcher.tsx: stage": 19,
-	"harness/page/composer/pill/about.test.ts: board": 20,
+	"harness/page/composer/pill/about.test.ts: board": 4,
 	"harness/page/composer/pill/about.ts: board": 8,
 	"harness/page/connections/bundle.ts: board": 4,
 	"harness/page/connections/bundle.ts: stage": 3,
