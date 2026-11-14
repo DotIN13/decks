@@ -30,14 +30,15 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const events = new EventBus();
 	const features = [ownFeature(callers, clock), ...options.features];
 	let source: CanvasSource | undefined;
-	const canvas = (name: string): CanvasDoc => {
+	const nameOf = (name: string): string => {
 		if (!source) throw new Refused("unavailable", "No feature on this server keeps canvases yet.");
-		return source.doc(source.name(name));
+		return source.name(name);
 	};
+	const canvas = (name: string): CanvasDoc => source!.doc(nameOf(name));
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds };
 	source = canvasSource(features, kernel);
-	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, ...(client ? { client } : {}) });
+	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, ...(client ? { client } : {}) });
 	const router = new Router(routesOf(features), makeContext, options.checkAnswers ?? false);
 	const stops: Stop[] = [];
 	for (const one of features) {
@@ -51,7 +52,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	return { kernel, router, events, callers, history, features, stop };
 }
 
-type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; client?: Context["client"] };
+type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string; client?: Context["client"] };
 
 function contextFor(parts: ContextParts): Context {
 	const { caller, kernel } = parts;
@@ -61,11 +62,14 @@ function contextFor(parts: ContextParts): Context {
 		events: kernel.events,
 		store: kernel.store(parts.feature),
 		note: (text) => void parts.notes.push(text),
-		canvas(name) {
-			const named = name ?? caller.canvas;
-			if (!named) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
-			return parts.canvas(named);
-		},
+		canvas: (name) => parts.canvas(asked(caller, name)),
+		canvasName: (name) => parts.nameOf(asked(caller, name)),
 		...(parts.client ? { client: parts.client } : {}),
 	};
+}
+
+function asked(caller: Caller, name: string | undefined): string {
+	const named = name ?? caller.canvas;
+	if (!named) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
+	return named;
 }

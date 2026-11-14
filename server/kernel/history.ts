@@ -67,8 +67,8 @@ export class HistoryDeck implements Deck {
 
 	watch(on: (change: FileChange) => void): Stop {
 		return this.inner.watch((change) => {
-			if (change.by === "disk") void this.hear(change);
-			on(change);
+			if (change.by === "disk") void this.hear(change).finally(() => on(change));
+			else on(change);
 		});
 	}
 

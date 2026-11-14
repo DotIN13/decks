@@ -64,6 +64,8 @@ export interface Context {
 	caller: Caller;
 	deck: Deck;
 	canvas(name?: string): CanvasDoc;
+	/** A canvas's name from a name or title; left out, the caller's here. Refuses as canvas() does. */
+	canvasName(name?: string): string;
 	events: Events;
 	note(text: string): void;
 	/** The handling feature's own private state, never readable as a deck file. */

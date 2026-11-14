@@ -3,7 +3,7 @@ import type { Heard } from "./events.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { MemoryStore, memoryStores } from "./store.ts";
-import type { CanvasDoc, Context, Deck, Feature } from "./types.ts";
+import type { CanvasDoc, Client, Context, Deck, Feature } from "./types.ts";
 
 // For a feature's tests: the real kernel and router on an in-memory deck.
 // Make a call by name as any caller, read every event it emitted, read the
@@ -20,7 +20,7 @@ export type TestServer = Built & {
 	deck: Deck;
 	/** Every event emitted since the server started, oldest first. */
 	heard: Heard[];
-	call(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<Envelope<unknown>>;
+	call(name: string, args?: Record<string, unknown>, as?: Caller | Who, client?: Client): Promise<Envelope<unknown>>;
 	/** The value of a call that must succeed; a refusal throws with its message. */
 	value<T = unknown>(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<T>;
 	/** A token that calls as this caller through the doors. */
@@ -41,7 +41,7 @@ export async function testServer(options: { features?: Feature[]; deck?: Deck | 
 	const built = await buildKernel({ deck, stores: memoryStores(), features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}) });
 	const heard: Heard[] = [];
 	const stopHearing = built.events.subscribe({ caller: callers.person }, (one) => void heard.push(one));
-	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who) => built.router.call(name, args, asCaller(as));
+	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who, client?: Client) => built.router.call(name, args, asCaller(as), client);
 	return {
 		...built,
 		deck: built.history,
@@ -73,6 +73,7 @@ export function testContext(over: Partial<Context> = {}): Context & { notes: str
 		caller: callers.person,
 		deck: new MemoryDeck(),
 		canvas: () => noCanvas,
+		canvasName: (name) => name ?? "test",
 		events: { emit() {}, on: () => () => {} },
 		note: (text) => void notes.push(text),
 		store: new MemoryStore(),
