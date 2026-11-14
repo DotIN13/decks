@@ -1,12 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
-import { fixtureFiles } from "../compat/line.test.ts";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { upgradeDeck } from "./feature.ts";
 import { memoryVersion, readRecord } from "./version.ts";
 
 // README rules: the fixture deck (its friend's canvas still holds an old board) opens and is
 // recorded at the floor; an older shape is refused naming it; migrations run once, in order.
+
+const FIXTURE = new URL("../../tools/fixtures/deck/", import.meta.url).pathname;
+
+function fixtureFiles(dir = FIXTURE): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const name of readdirSync(dir)) {
+		const path = join(dir, name);
+		if (statSync(path).isDirectory()) Object.assign(out, fixtureFiles(path));
+		else if (!/\.(pdf|png|jpg)$/.test(name)) out[relative(FIXTURE, path)] = readFileSync(path, "utf8");
+	}
+	return out;
+}
 
 const text = (deck: MemoryDeck, path: string) => deck.read(path as never).then((b) => new TextDecoder().decode(b));
 
