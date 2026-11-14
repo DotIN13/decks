@@ -1,5 +1,7 @@
 import type { Caller, Envelope, Who } from "../../protocol/index.ts";
 import type { Heard } from "./events.ts";
+import { LOCAL_PERSON } from "./callers.ts";
+import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { MemoryStore, memoryStores } from "./store.ts";
@@ -25,6 +27,8 @@ export type TestServer = Built & {
 	value<T = unknown>(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<T>;
 	/** A token that calls as this caller through the doors. */
 	token(who: Caller): string;
+	/** The real doors (HTTP, socket, MCP) on a port; 0 picks a free one. token calls as the person. */
+	listen(port?: number): Promise<{ url: string; port: number; token: string; close(): Promise<void> }>;
 	close(): Promise<void>;
 };
 
@@ -53,6 +57,10 @@ export async function testServer(options: { features?: Feature[]; deck?: Deck | 
 			return answer.value as T;
 		},
 		token: (who) => built.callers.issue(who),
+		async listen(port = 0) {
+			const served = await listen(built, port);
+			return { url: served.url, port: served.port, token: built.callers.issue(LOCAL_PERSON, "test"), close: served.close };
+		},
 		async close() {
 			stopHearing();
 			await built.stop();

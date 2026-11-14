@@ -49,6 +49,11 @@ export class Router {
 		}
 	}
 
+	/** A handler's context for a feature's route. */
+	context(feature: string, caller: Caller, notes: string[], client?: Client): Context {
+		return this.makeContext(feature, caller, notes, client);
+	}
+
 	/** The calls this caller may make here: handled, and open to its kind. */
 	callable(caller: Caller): AnyCall[] {
 		return [...this.entries.values()].map((entry) => entry.call).filter((call) => call.who.includes(caller.kind));
