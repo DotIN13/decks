@@ -25,7 +25,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 4. Each kept apply is one change: the next revision of that drawing, the caller who made it and
    the ops. Revisions start at 0 when the server opens a drawing and rise by one per change.
 5. `since(rev)` gives the changes after rev, oldest first. Undo, sync and news read it.
-6. A change is written to the file and announced as `item.changed` with the ids it touched.
+6. A change is announced as `item.changed` with the ids it touched, and a call that makes it
+   answers once the file is written.
 7. A place is one of `at` (the top-left corner), `beside` (160 px right of an item, tops aligned)
    or `below` (160 px under it, lefts aligned). Two at once is refused. A later op may be beside
    an item an earlier op made. An insert given no place keeps its own x and y, or else goes

@@ -33,23 +33,24 @@ const isArrow = (item: Item) => (item as { metadata?: { type?: unknown } }).meta
 
 export function itemCalls(store: CanvasStore, clips: Clips) {
 	const at = (ctx: Context, on: On) => drawingOf(store, ctx, on);
+	const written = async <T>(value: T): Promise<T> => { await store.flush(); return value; };
 	return handleAll(calls.item, {
 		list: (ctx, a) => at(ctx, a).read({ ...(a.depth !== undefined ? { depth: a.depth } : {}), ...(a.resolve ? { resolve: a.resolve } : {}), ...(a.theme ? { theme: a.theme } : {}) }),
 		get: (ctx, a) => at(ctx, a).read({ ids: [a.id], ...(a.depth !== undefined ? { depth: a.depth } : {}), ...(a.resolve ? { resolve: a.resolve } : {}) })[0]!,
-		insert: (ctx, { item, at: corner, beside, below, parent, index, ...on }) => one(at(ctx, on), { op: "insert", item, ...defined({ at: corner, beside, below, parent, index }) }, ctx),
-		update: (ctx, { id, set, at: corner, size, ...on }) => one(at(ctx, on), { op: "update", id, ...defined({ set, at: corner, size }) }, ctx),
-		replace: (ctx, { id, item, ...on }) => one(at(ctx, on), { op: "replace", id, item }, ctx),
+		insert: (ctx, { item, at: corner, beside, below, parent, index, ...on }) => written(one(at(ctx, on), { op: "insert", item, ...defined({ at: corner, beside, below, parent, index }) }, ctx)),
+		update: (ctx, { id, set, at: corner, size, ...on }) => written(one(at(ctx, on), { op: "update", id, ...defined({ set, at: corner, size }) }, ctx)),
+		replace: (ctx, { id, item, ...on }) => written(one(at(ctx, on), { op: "replace", id, item }, ctx)),
 		remove: (ctx, { id, ...on }) => {
 			const doc = at(ctx, on);
 			const found = doc.idOf(id);
 			doc.apply([{ op: "delete", id: found }], ctx.caller);
-			return { deleted: id };
+			return written({ deleted: id });
 		},
-		move: (ctx, { id, at: corner, beside, below, parent, index, ...on }) => one(at(ctx, on), { op: "move", id, ...defined({ at: corner, beside, below, parent, index }) }, ctx),
-		copy: (ctx, { id, as, at: corner, parent, ...on }) => one(at(ctx, on), { op: "copy", id, ...defined({ as, at: corner, parent }) }, ctx),
-		batch: (ctx, { ops, for: _for, ...on }) => at(ctx, on).apply(ops, ctx.caller).items,
+		move: (ctx, { id, at: corner, beside, below, parent, index, ...on }) => written(one(at(ctx, on), { op: "move", id, ...defined({ at: corner, beside, below, parent, index }) }, ctx)),
+		copy: (ctx, { id, as, at: corner, parent, ...on }) => written(one(at(ctx, on), { op: "copy", id, ...defined({ as, at: corner, parent }) }, ctx)),
+		batch: (ctx, { ops, for: _for, ...on }) => written(at(ctx, on).apply(ops, ctx.caller).items),
 		clip: (ctx, a) => clips.clip(canvasOf(store, ctx, a.canvas), a.ids, a.id),
-		paste: (ctx, a) => clips.paste(a.clip.id, canvasOf(store, ctx, a.canvas), a.at, ctx.caller),
+		paste: async (ctx, a) => written(await clips.paste(a.clip.id, canvasOf(store, ctx, a.canvas), a.at, ctx.caller)),
 		space: (ctx, a) => {
 			const doc = at(ctx, a);
 			const all = boxes(doc.pen());
@@ -60,7 +61,7 @@ export function itemCalls(store: CanvasStore, clips: Clips) {
 		variables: (ctx, { set, themes, ...on }) => {
 			const name = canvasOf(store, ctx, on.canvas);
 			at(ctx, on).apply([{ op: "variables", set, ...(themes !== undefined ? { themes } : {}) }], ctx.caller);
-			return store.describe(name);
+			return written(store.describe(name));
 		},
 	});
 }

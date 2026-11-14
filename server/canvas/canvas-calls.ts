@@ -51,10 +51,11 @@ export function canvasCalls(store: CanvasStore) {
 			await store.setTitle(name, title ?? `Copy of ${store.title(from)}`, ctx.caller);
 			return store.describe(name);
 		},
-		undo: (ctx, { redo, canvas }) => {
+		undo: async (ctx, { redo, canvas }) => {
 			const name = named(ctx, canvas);
 			if (ctx.caller.kind !== "person" && ctx.caller.kind !== "card") throw new Refused("refused", "Only the person's own edits are undone.", "item.batch");
 			store.doc(name).undo(ctx.caller, redo ?? false);
+			await store.flush();
 			return store.describe(name);
 		},
 	});
