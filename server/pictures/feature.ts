@@ -1,0 +1,28 @@
+import { defineFeature, type Feature, type Kernel } from "../kernel/index.ts";
+import { chromium, type Browser } from "./browser.ts";
+import { pictureCalls } from "./calls.ts";
+import { machine, type Machine } from "./machine.ts";
+import { pictureRoute } from "./picture.ts";
+
+// The pictures feature: card.fit, canvas.screenshot, canvas.export, and a
+// card's picture at /pictures/. The browser is closed when the server stops.
+
+export type PicturesOptions = { browser?: Browser; origin?: () => string | undefined };
+
+export function picturesFeature(options: PicturesOptions = {}): Feature {
+	let kernel: Kernel | undefined;
+	const browser = options.browser ?? chromium();
+	const origin = options.origin ?? (() => kernel?.url());
+	const m: Machine = machine(browser, origin, () => kernel);
+	return defineFeature({
+		name: "pictures",
+		calls: pictureCalls(() => m),
+		routes: [pictureRoute(() => m)],
+		start(given) {
+			kernel = given;
+			return () => void browser.close();
+		},
+	});
+}
+
+export default picturesFeature();
