@@ -34,18 +34,18 @@ model, a login or a transcript.
    `agent.queue` always waits its turn in the inbox.
 10. A host is a socket client that offers kinds of agent and the harness's calls it answers
     (`agent.host`); only those calls may be offered. The kernel relays such a call to the first
-    host offering it. Its offer ends when it disconnects. `agent.create` goes to one host offering that kind (`agent.requested`); with none
+    host offering it. Its offer ends when it disconnects. A host that comes up takes the agents of
+    its kinds with no live host (never attached ones), each told as `agent.requested` with a fresh
+    token and `adopted: true`. `agent.create` goes to one host offering that kind (`agent.requested`); with none
     it is refused `unavailable`, saying a harness must be running.
 11. `agent.news` answers what changed on the caller's canvas since its last ask, leaving out its own
     changes, and its waiting mail; asking moves its mark on, so a second ask brings nothing new.
 12. A screen says which agent it follows with `view.move`. An agent's view call reaches only the
     screens that follow it; with none, the answer says it waits.
+14. Only the socket that hosts an agent sets its `state` and `queued` (`agent.update`). An agent
+    whose state is thinking or tool is not deleted (`conflict`).
 13. Cameras are kept per person or agent, canvas and device. `view.get` answers the newest on the
     canvas, or the origin.
-
-## Not here
-
-`agent.delete` refusing a working agent waits for the host to report states (wave 2).
 
 ## Check
 

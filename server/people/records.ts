@@ -26,6 +26,8 @@ export interface AgentRecord {
 	/** The client that started it and delivers its mail. */
 	host?: string;
 	state?: string;
+	/** What waits in its host's queue, as the host last said. */
+	queued?: number;
 	at: number;
 }
 
@@ -104,7 +106,7 @@ export class Roster {
 		if (change.tags !== undefined) next.tags = cleanTags(change.tags);
 		if (change.workspace !== undefined) setOrDrop(next, "workspace", cleanWorkspace(change.workspace));
 		if (change.host !== undefined) setOrDrop(next, "host", change.host ?? undefined);
-		for (const key of ["canvas", "model", "thinking", "mode", "state"] as const) if (change[key] !== undefined) (next as unknown as Record<string, unknown>)[key] = change[key];
+		for (const key of ["canvas", "model", "thinking", "mode", "state", "queued"] as const) if (change[key] !== undefined) (next as unknown as Record<string, unknown>)[key] = change[key];
 		const changed = JSON.stringify(next) !== JSON.stringify(was);
 		if (changed) await this.save(next);
 		return { record: next, changed };
@@ -140,6 +142,6 @@ function dropUndefined<T extends object>(value: T): Partial<T> {
 
 /** A record as the protocol's Agent; the token is added only by attach. */
 export function asAgent(record: AgentRecord, queued: number): shapes.Agent {
-	const { attached: _a, host: _h, at: _t, ...shown } = record;
-	return { ...shown, queued };
+	const { attached: _a, host: _h, at: _t, queued: told, ...shown } = record;
+	return { ...shown, queued: told ?? queued };
 }

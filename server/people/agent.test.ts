@@ -131,3 +131,37 @@ test("agent.news gives others' changes since the last ask, then nothing new", as
 	assert.deepEqual([second.changes.length, second.mail.length], [0, 0]);
 	await s.close();
 });
+
+test("only the hosting socket reports state and queue; a working agent is not deleted", async () => {
+	const { s, on } = await peopleServer();
+	const host = fakeClient("host-1");
+	await on(host, "agent.host", { kinds: ["pi"] }, person);
+	const rune = await s.value<Agent>("agent.create", { name: "Rune", kind: "pi", canvas: "a" });
+	const told = await on(host, "agent.update", { agent: rune.id, change: { state: "thinking", queued: 3 } }, person);
+	assert.deepEqual([(told as Agent).state, (told as Agent).queued], ["thinking", 3]);
+	assert.ok(s.heard.some((h) => h.name === "agent.changed" && h.payload.state === "thinking"));
+	const elsewhere = await s.call("agent.update", { agent: rune.id, change: { state: "idle" } }, person);
+	assert.equal(elsewhere.ok ? "ok" : elsewhere.error.code, "refused", "not from a socket that does not host it");
+	const busy = await s.call("agent.delete", { agent: "Rune" });
+	assert.equal(busy.ok ? "ok" : busy.error.code, "conflict");
+	await on(host, "agent.update", { agent: rune.id, change: { state: "idle" } }, person);
+	assert.equal((await s.call("agent.delete", { agent: "Rune" })).ok, true);
+	await s.close();
+});
+
+test("a host that comes up takes the agents of its kinds with no host, each told with a token", async () => {
+	const { s, on, listen } = await peopleServer();
+	const first = fakeClient("host-1");
+	await on(first, "agent.host", { kinds: ["pi"] }, person);
+	const rune = await s.value<Agent>("agent.create", { name: "Rune", kind: "pi", canvas: "a" });
+	await s.value("agent.attach", { name: "Term", kind: "pi", canvas: "a" });
+	first.close();
+	const second = fakeClient("host-2");
+	const heard = listen(second.id);
+	await on(second, "agent.host", { kinds: ["pi"] }, person);
+	const asked = heard.filter((h) => h.name === "agent.requested").map((h) => h.payload.spec as { id: string; token: string; adopted: boolean });
+	assert.deepEqual(asked.map((a) => [a.id, a.adopted]), [[rune.id, true]], "attached agents are never adopted");
+	assert.equal(s.callers.resolve(asked[0]!.token)?.id, rune.id);
+	assert.equal((await s.value<Agent>("agent.send", { agent: "Rune", task: "hi" }) as unknown as { state: string }).state, "delivered");
+	await s.close();
+});

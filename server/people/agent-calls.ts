@@ -51,15 +51,30 @@ async function create(people: People, ctx: Context, spec: CreateArgs): Promise<s
 async function update(people: People, ctx: Context, asked: string | undefined, change: AgentChange): Promise<shapes.Agent> {
 	const target = asked === undefined ? people.self(ctx) : people.roster.find(asked);
 	if (ctx.caller.kind === "agent" && target.id !== ctx.caller.id) throw new Refused("refused", "An agent changes only itself; the person may change any agent.", "agent.update");
+	if (change.state !== undefined || change.queued !== undefined) hostOnly(people, ctx, target);
 	if (change.canvas !== undefined) change = { ...change, canvas: canvasName(ctx, change.canvas) };
 	const { record, changed } = await people.roster.update(target.id, change);
-	if (changed) people.tell(ctx, events.agentChanged, { ids: [record.id] });
+	if (changed) people.tell(ctx, events.agentChanged, { ids: [record.id], ...(record.state ? { state: record.state } : {}) });
 	if (change.canvas !== undefined) followHome(people, ctx, record);
 	return people.shown(record);
 }
 
+/** State and queue come only from the socket that hosts the agent. */
+function hostOnly(people: People, ctx: Context, target: AgentRecord): void {
+	const client = ctx.client?.id;
+	if (ctx.caller.kind !== "person" || !client || client !== target.host || !people.hosts.has(client)) {
+		throw new Refused("refused", `Only the harness hosting ${target.name} reports its state and queue.`, "agent.host");
+	}
+}
+
+const WORKING = ["thinking", "tool"];
+
 async function remove(people: People, ctx: Context, asked: string): Promise<{ deleted: string }> {
-	const record = await people.roster.delete(people.roster.find(asked).id);
+	const found = people.roster.find(asked);
+	if (found.state && WORKING.includes(found.state) && people.hosts.has(found.host)) {
+		throw new Refused("conflict", `${found.name} is working (${found.state}); stop it first, then delete it.`, "agent.get");
+	}
+	const record = await people.roster.delete(found.id);
 	people.tokens.revoke(record.id);
 	await Promise.all([people.mail.drop(record.id), people.marks.drop(record.id)]);
 	people.tell(ctx, events.agentDeleted, { ids: [record.id] });
@@ -86,7 +101,8 @@ async function giveHome(people: People, ctx: Context, record: AgentRecord, asked
 	}
 }
 
-/** A socket client offers kinds and harness calls; agents of its kinds with no host become its own. */
+/** A socket client offers kinds and harness calls; agents of its kinds with no host become its own,
+ * each told to it as agent.requested with a fresh token and adopted: true. */
 async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], answers: string[]): Promise<NonNullable<AgentRecord["kind"]>[]> {
 	const client = people.meet(ctx);
 	if (!client) throw new Refused("invalid", "agent.host needs a connection that stays open: call it on the socket.", "agent.host");
@@ -95,7 +111,10 @@ async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], 
 	const offered = people.hosts.offer(client, kinds.filter((k): k is NonNullable<typeof k> => !!k), answers);
 	for (const record of people.roster.all()) {
 		if (record.attached || !record.kind || !offered.includes(record.kind) || people.hosts.has(record.host)) continue;
-		await people.roster.update(record.id, { host: client });
+		const { record: taken } = await people.roster.update(record.id, { host: client });
+		const token = people.tokens.issue(people.roster.callerOf(taken.id)!, "agent.host");
+		const spec = { ...pick(taken, ["id", "name", "kind", "canvas", "model", "thinking", "mode"]), token, adopted: true };
+		people.tell(ctx, events.agentRequested, { ids: [taken.id], spec }, [client]);
 	}
 	return offered;
 }
