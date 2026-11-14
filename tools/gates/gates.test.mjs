@@ -36,6 +36,7 @@ async function plantedFails(gateName, bad, good, needle, git) {
 
 const lines = (n, line = "x;") => `${Array.from({ length: n }, () => line).join("\n")}\n`;
 const fn = (n) => `export function long() {\n${lines(n - 2, "\tcall();")}}\n`;
+const TICK = String.fromCharCode(96);
 const README = "# x\n## Owns\na\n## May import\nb\n## Rules\nc\n## Check\nd\n";
 
 test("size names a file over 400 lines", () => plantedFails("size", { "server/a/big.ts": lines(401) }, { "server/a/big.ts": lines(400) }, "server/a/big.ts"));
@@ -98,10 +99,10 @@ test("lanes refuses a staged path outside the author's lane", () => {
 	assert.match(run("").stderr, /has no lane/);
 });
 test("agents-md names a path that does not exist", () =>
-	plantedFails("agents-md", { "AGENTS.md": "See `server/ghost.ts`.\n", "server/real.ts": "" }, { "AGENTS.md": "See `server/real.ts`.\n", "server/real.ts": "" }, "server/ghost.ts"));
+	plantedFails("agents-md", { "AGENTS.md": `See ${TICK}server/ghost.ts${TICK}.\n`, "server/real.ts": "" }, { "AGENTS.md": `See ${TICK}server/real.ts${TICK}.\n`, "server/real.ts": "" }, "server/ghost.ts"));
 test("agents-md names a map over 150 lines", () => plantedFails("agents-md", { "AGENTS.md": lines(151, "a") }, { "AGENTS.md": lines(150, "a") }, "over 150 lines"));
 test("legacy names what scripts/stale-paths.mjs finds", async () => {
-	const files = { "docs/a.md": "See `ghost.ts`.\n" };
+	const files = { "docs/a.md": `See ${TICK}ghost.ts${TICK}.\n` };
 	const dir = scratch(files, true);
 	mkdirSync(join(dir, "scripts"));
 	copyFileSync(join(ROOT, "scripts/stale-paths.mjs"), join(dir, "scripts/stale-paths.mjs"));
