@@ -28,6 +28,8 @@
 		"server/package.json",
 		"server/tsconfig.json",
 		"harness/package.json",
-		"harness/tsconfig.json"
+		"harness/tsconfig.json",
+		"tools/package.json",
+		"tools/tsconfig.json"
 	]
 }
