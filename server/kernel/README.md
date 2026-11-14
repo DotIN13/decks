@@ -8,7 +8,7 @@ no feature; only `server/main.ts` does. Keel owns it.
 - `types.ts`: the interfaces features build on. They only grow; each addition is announced.
 - `deck.ts` (the deck on a folder), `memory-deck.ts` (in memory), `history.ts` (every write a
   revision), `disk.ts` and `store.ts` (a feature's private store), `callers.ts` (tokens to callers).
-- `router.ts`, `events.ts`, `kernel.ts` (builds it all), `own-calls.ts` (`deck.*`, its one feature).
+- `router.ts`, `events.ts`, `relay.ts`, `kernel.ts` (builds it all), `own-calls.ts` (`deck.*`).
 - `doors/`: `http.ts`, `socket.ts`, `ws.ts`, `mcp.ts`. `lockfile.ts`, `server.ts` (`startServer`).
 - `testing.ts`: `testServer` and `testContext`, for every feature's tests. `index.ts`: the entry.
 
@@ -31,7 +31,11 @@ no feature; only `server/main.ts` does. Keel owns it.
    events go to the person, a card hears only its own canvas.
 7. HTTP: `POST /api/v1/<name>`, the bearer token, 200 for every envelope; 401 with no token; 403 for a
    browser Origin with no token. Socket: hello first. MCP: JSON-RPC at `POST /mcp`.
-8. A running server keeps `<deck>/.decks/server.json`, mode 0600, with the person's token. A second
+8. A declared call no feature handles goes to the host the people feature names (`Kernel.relay`), as an
+   `ask` on its socket; its `reply` comes back. No host, a host gone, or 30 s: `unavailable`.
+9. A feature route needs a token or `?pass=`, unless it is `public` (GET only, a caller that may call
+   nothing). A route may take the raw request (`serve`) or an upgrade under its prefix (`upgrade`).
+10. A running server keeps `<deck>/.decks/server.json`, mode 0600, with the person's token. A second
    server on the same deck, or the same port, fails with a sentence.
 
 ## Not here
