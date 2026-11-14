@@ -1,4 +1,6 @@
-import { handlersFor, layout, Refused, type AnyEvent, type Caller, type Handled, type Payload, type shapes, type Who } from "../../protocol/index.ts";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Duplex } from "node:stream";
+import { handlersFor, layout, Refused, type AnyEvent, type Caller, type Envelope, type Handled, type Payload, type shapes, type Who } from "../../protocol/index.ts";
 
 // The kernel's interfaces, as types, for wave 1 to build against. Keel owns
 // this folder after wave 0 and writes what implements them.
@@ -101,6 +103,8 @@ export interface Kernel {
 	kinds: ItemKind[];
 	/** Say which connected host answers a call no feature handles. At most one feature calls it. */
 	relay(answerer: Answerer): void;
+	/** The server's own address once a door listens, for apps and pictures; undefined before. */
+	url(): string | undefined;
 }
 
 /** The client id of the host that answers this call for this caller, or undefined. */
@@ -116,6 +120,8 @@ export interface Feature {
 	canvases?: (kernel: Kernel) => CanvasSource;
 	/** Pages the feature serves over HTTP, outside /api/v1. */
 	routes?: Route[];
+	/** Brings an old deck up to date, run in feature order before any start. */
+	upgrade?(deck: Deck): Promise<void>;
 }
 
 // Seams added in wave 1. They only grow.
@@ -156,9 +162,36 @@ export type RouteAnswer = { status?: number; type: string; body: Bytes | string;
 
 /** A page served over HTTP. Every request needs a token or ?pass=, which gives ctx.caller. */
 export interface Route {
-	method: "GET" | "POST";
+	method: "GET" | "POST" | "ANY";
 	prefix: string;
-	answer(ctx: Context, path: string, query: URLSearchParams, body: Bytes): Promise<RouteAnswer>;
+	answer?(ctx: Context, path: string, query: URLSearchParams, body: Bytes): Promise<RouteAnswer>;
+	/** GET only, no token needed; ctx.caller is PUBLIC, which may call nothing. For static pages. */
+	public?: true;
+	/** The raw request, unbuffered, called instead of answer: for a proxy. Decks-local only. */
+	serve?(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void>;
+	/** A WebSocket or other upgrade under the prefix; the route resolves its caller itself. */
+	upgrade?(req: IncomingMessage, socket: Duplex, head: Buffer, door: SocketDoor): void;
+}
+
+/** Who a public route's request is: a card of no canvas, so no call lets it in. */
+export const PUBLIC: Caller = { kind: "card", id: "public", name: "public" };
+
+/** One WebSocket connection, JSON or text messages. */
+export interface Peer {
+	send(text: string): void;
+	close(code?: number, reason?: string): void;
+	onText(hear: (text: string) => void): void;
+	onClose(hear: () => void): void;
+}
+
+/** What a route's upgrade gets: the kernel's socket parts, to speak its own line. */
+export interface SocketDoor {
+	accept(): Peer | undefined;
+	resolve(token: string | undefined): Caller | undefined;
+	call(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>>;
+	subscribe(sub: { caller: Caller; client?: string; events?: string[]; canvas?: string }, hear: (heard: { name: string; payload: Record<string, unknown> }) => void): Stop;
+	/** A client for this connection; end() runs whatever waited for it to close. */
+	client(): Client & { end(): void };
 }
 
 /** Declare a feature: its name, its handled calls, its item kinds, its start. */

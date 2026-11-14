@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { API, LOGIN_PATH, PROTOCOL_VERSION, SOCKET_PATH, type Caller, type Envelope, type RefusalCode } from "../../../protocol/index.ts";
 import { LOCAL_PERSON } from "../callers.ts";
 import type { Built } from "../kernel.ts";
 import { SERVER_VERSION } from "../own-calls.ts";
-import type { Route } from "../types.ts";
+import { PUBLIC, type Route, type SocketDoor } from "../types.ts";
+import type { Duplex } from "node:stream";
 import { mcpAnswer, MCP_PATH } from "./mcp.ts";
 import { socketDoor } from "./socket.ts";
 import { accept } from "./ws.ts";
@@ -66,13 +68,16 @@ function login(built: Built, token: string | undefined, args: Record<string, unk
 type RouteOf = { feature: string; route: Route };
 
 function routeFor(routes: RouteOf[], method: string, path: string): RouteOf | undefined {
-	const fits = routes.filter(({ route }) => route.method === method && path.startsWith(route.prefix));
+	const fits = routes.filter(({ route }) => (route.method === method || route.method === "ANY") && path.startsWith(route.prefix));
 	return fits.sort((a, b) => b.route.prefix.length - a.route.prefix.length)[0];
 }
 
-async function serveRoute(built: Built, found: RouteOf, caller: Caller, url: URL, body: Buffer, res: ServerResponse): Promise<void> {
+async function serveRoute(built: Built, found: RouteOf, caller: Caller, req: IncomingMessage, res: ServerResponse): Promise<void> {
 	const ctx = built.router.context(found.feature, caller, []);
-	const answer = await found.route.answer(ctx, url.pathname, url.searchParams, new Uint8Array(body));
+	if (found.route.serve) return found.route.serve(ctx, req, res);
+	const url = new URL(req.url ?? "/", "http://decks.local");
+	if (!found.route.answer) return json(res, 404, refusal("not_found", `Nothing is served at ${url.pathname}.`));
+	const answer = await found.route.answer(ctx, url.pathname, url.searchParams, new Uint8Array(await bodyOf(req)));
 	res.writeHead(answer.status ?? 200, { "content-type": answer.type, ...(answer.headers ?? {}) });
 	res.end(typeof answer.body === "string" ? answer.body : Buffer.from(answer.body));
 }
@@ -81,35 +86,54 @@ export function handler(built: Built) {
 	const routes: RouteOf[] = built.features.flatMap((feature) => (feature.routes ?? []).map((route) => ({ feature: feature.name, route })));
 	return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 		const url = new URL(req.url ?? "/", "http://decks.local");
-		const token = tokenOf(req, url);
-		if (req.headers.origin && !token) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
-		const body = await bodyOf(req);
 		const method = req.method ?? "GET";
-		const path = url.pathname;
-		if (method === "GET" && (path === API || path === `${API}/`)) return json(res, 200, { ok: true, value: { protocol: PROTOCOL_VERSION, server: SERVER_VERSION }, notes: [] });
-		if (method === "POST" && path === LOGIN_PATH) {
-			const args = parsed(body);
-			if (!args) return json(res, 200, refusal("invalid", "The body should be one JSON object."));
-			const done = login(built, token, args);
-			return json(res, done.status, done.body);
-		}
-		const caller = built.callers.resolve(token);
-		if (method === "POST" && path.startsWith(`${API}/`)) {
-			const args = parsed(body);
-			if (!caller) return json(res, 401, NO_TOKEN);
-			if (!args) return json(res, 200, refusal("invalid", "The arguments should be one JSON object, keyed by name."));
-			return json(res, 200, await built.router.call(decodeURIComponent(path.slice(API.length + 1)), args, caller));
-		}
-		if (method === "POST" && path === MCP_PATH) {
-			if (!caller) return json(res, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: WHO } });
-			const answer = await mcpAnswer(built, caller, parsed(body) ?? {});
-			if (!answer) return void res.writeHead(202).end();
-			return json(res, 200, answer);
-		}
-		const found = routeFor(routes, method, path);
-		if (found && !caller) return json(res, 401, NO_TOKEN);
-		if (found && caller) return serveRoute(built, found, caller, url, body, res);
-		return json(res, 404, refusal("not_found", `Nothing is served at ${path}.`, "deck.get"));
+		const token = tokenOf(req, url);
+		const found = url.pathname.startsWith(`${API}/`) || url.pathname === MCP_PATH ? undefined : routeFor(routes, method, url.pathname);
+		const open = found?.route.public === true && method === "GET";
+		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
+		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
+		if (found) return caller ? serveRoute(built, found, caller, req, res) : json(res, 401, NO_TOKEN);
+		return api(built, req, res, url, token, caller);
+	};
+}
+
+async function api(built: Built, req: IncomingMessage, res: ServerResponse, url: URL, token: string | undefined, caller: Caller | undefined): Promise<void> {
+	const body = await bodyOf(req);
+	const method = req.method ?? "GET";
+	const path = url.pathname;
+	if (method === "GET" && (path === API || path === `${API}/`)) return json(res, 200, { ok: true, value: { protocol: PROTOCOL_VERSION, server: SERVER_VERSION }, notes: [] });
+	if (method === "POST" && path === LOGIN_PATH) {
+		const args = parsed(body);
+		if (!args) return json(res, 200, refusal("invalid", "The body should be one JSON object."));
+		const done = login(built, token, args);
+		return json(res, done.status, done.body);
+	}
+	if (method === "POST" && path.startsWith(`${API}/`)) {
+		const args = parsed(body);
+		if (!caller) return json(res, 401, NO_TOKEN);
+		if (!args) return json(res, 200, refusal("invalid", "The arguments should be one JSON object, keyed by name."));
+		return json(res, 200, await built.router.call(decodeURIComponent(path.slice(API.length + 1)), args, caller));
+	}
+	if (method === "POST" && path === MCP_PATH) {
+		if (!caller) return json(res, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: WHO } });
+		const answer = await mcpAnswer(built, caller, parsed(body) ?? {});
+		if (!answer) return void res.writeHead(202).end();
+		return json(res, 200, answer);
+	}
+	return json(res, 404, refusal("not_found", `Nothing is served at ${path}.`, "deck.get"));
+}
+
+/** The kernel's socket parts, for a route that speaks its own line. */
+export function socketParts(built: Built, req: IncomingMessage, socket: Duplex): SocketDoor {
+	return {
+		accept: () => accept(req, socket),
+		resolve: (token) => built.callers.resolve(token),
+		call: (name, args, caller, client) => built.router.call(name, args, caller, client),
+		subscribe: (sub, hear) => built.events.subscribe(sub, hear),
+		client() {
+			const closers = new Set<() => void>();
+			return { id: `line-${randomUUID()}`, closed: (on) => (closers.add(on), () => void closers.delete(on)), end: () => closers.forEach((on) => on()) };
+		},
 	};
 }
 
@@ -122,9 +146,13 @@ export function listen(built: Built, port: number, host = "127.0.0.1"): Promise<
 			else res.destroy();
 		});
 	});
-	server.on("upgrade", (req, socket) => {
-		const peer = new URL(req.url ?? "/", "http://decks.local").pathname === SOCKET_PATH ? accept(req, socket) : undefined;
-		if (peer) socketDoor(built, peer);
+	const upgrades = built.features.flatMap((feature) => (feature.routes ?? []).filter((route) => route.upgrade));
+	server.on("upgrade", (req, socket, head) => {
+		const path = new URL(req.url ?? "/", "http://decks.local").pathname;
+		const peer = path === SOCKET_PATH ? accept(req, socket) : undefined;
+		if (peer) return socketDoor(built, peer);
+		const route = upgrades.filter((one) => path.startsWith(one.prefix)).sort((a, b) => b.prefix.length - a.prefix.length)[0];
+		if (route?.upgrade) route.upgrade(req, socket, head, socketParts(built, req, socket));
 		else socket.destroy();
 	});
 	return new Promise((done, fail) => {
@@ -132,6 +160,7 @@ export function listen(built: Built, port: number, host = "127.0.0.1"): Promise<
 		server.listen(port, host, () => {
 			const at = server.address();
 			const real = typeof at === "object" && at ? at.port : port;
+			built.setUrl(`http://${host}:${real}`);
 			const close = () => new Promise<void>((closed) => (server.closeAllConnections(), server.close(() => closed())));
 			done({ url: `http://${host}:${real}`, port: real, server, close });
 		});

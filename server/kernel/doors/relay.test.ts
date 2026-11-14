@@ -22,7 +22,7 @@ function fakeHost(url: string, token: string, silent = false): Promise<{ ws: Web
 			const message = JSON.parse(String(m.data));
 			if (message.type === "hello") ready({ ws, id: "" });
 			if (message.type === "ask" && !silent) {
-				const value = [{ id: "e1", kind: "text", at: 1, asker: message.caller.id }];
+				const value = [{ kind: "user", id: "e1", text: message.caller.id, at: 1 }];
 				ws.send(JSON.stringify({ type: "reply", id: message.id, envelope: { ok: true, value, notes: ["from the host"] } }));
 			}
 		};
@@ -47,7 +47,7 @@ test("a harness call at the HTTP door is answered by the connected host", async 
 	seen.clients.push([...(server.relay as unknown as { sockets: Map<string, unknown> }).sockets.keys()].at(-1)!);
 	const answer = await post(doors.url, doors.token, "chat.list", { agent: "ann" });
 	assert.equal(answer.ok, true);
-	assert.equal(answer.value[0].asker, "person");
+	assert.equal(answer.value[0].text, "person");
 	assert.deepEqual(answer.notes, ["from the host"]);
 	assert.equal((await post(doors.url, doors.token, "chat.list", { agent: 3 })).error.code, "invalid");
 	host.ws.close();

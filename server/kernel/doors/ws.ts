@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import type { Peer } from "../types.ts";
 
 // A small WebSocket server side (RFC 6455): the handshake, text frames in
 // and out, ping, close. Enough for JSON messages; no extensions. A frame
@@ -9,12 +10,7 @@ import type { Duplex } from "node:stream";
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX = 16 * 1024 * 1024;
 
-export interface Peer {
-	send(text: string): void;
-	close(code?: number, reason?: string): void;
-	onText(hear: (text: string) => void): void;
-	onClose(hear: () => void): void;
-}
+export type { Peer } from "../types.ts";
 
 /** Answer the upgrade; undefined if the request is not a WebSocket one. */
 export function accept(req: IncomingMessage, socket: Duplex): Peer | undefined {

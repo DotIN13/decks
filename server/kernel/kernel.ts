@@ -13,7 +13,7 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop } fr
 // the router, and every feature started in order before the first call.
 
 export type KernelOptions = { deck: Deck & { startAt?(rev: number): void }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number };
-export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void> };
+export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
 function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undefined {
 	const givers = features.filter((one) => one.canvases);
@@ -38,11 +38,13 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const canvas = (name: string): CanvasDoc => source!.doc(nameOf(name));
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const relay = new Relay(options.relayWaitMs);
-	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer) };
+	const address: { url?: string } = {};
+	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), url: () => address.url };
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
 	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });
 	const router: Router = new Router(routesOf(features), makeContext, options.checkAnswers ?? false, (name, args, caller) => relay.forward(name, args, caller));
+	for (const one of features) await one.upgrade?.(history);
 	const stops: Stop[] = [];
 	for (const one of features) {
 		const stop = await one.start?.(kernel);
@@ -52,7 +54,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		for (const one of stops.reverse()) one();
 		await callers.flush();
 	};
-	return { kernel, router, events, callers, history, relay, features, stop };
+	return { kernel, router, events, callers, history, relay, features, stop, setUrl: (url) => void (address.url = url) };
 }
 
 type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string;
