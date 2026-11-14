@@ -178,8 +178,6 @@
 	"harness/page/canvases/CanvasManager.tsx: function StageCard over 80 lines": 1,
 	"harness/page/canvases/CanvasManager.tsx: over 400 lines": 1,
 	"harness/page/canvases/CanvasOps.tsx: function CanvasOps over 80 lines": 1,
-	"harness/page/composer/pill/card.ts: function openPillCard over 80 lines": 1,
-	"harness/page/composer/voice/voice.ts: function startRecording over 80 lines": 1,
 	"harness/page/connections/Switcher.tsx: function Switcher over 80 lines": 1,
 	"harness/page/files/drops.ts: function createFileDrops over 80 lines": 1,
 	"harness/page/files/drops.ts: over 400 lines": 1,

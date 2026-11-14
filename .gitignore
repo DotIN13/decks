@@ -49,3 +49,4 @@ dist-packages/
 # The rewrite: generated tables and scratch
 dist-gen/
 .scratch/
+server/frame/dist/
