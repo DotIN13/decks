@@ -1,7 +1,8 @@
 import type { AgentChat, Identity } from "../state/types/index.ts";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
-import { AgentFace, AgentMenu } from "./AgentPill.tsx";
+import { AgentFace } from "./face/view.tsx";
+import { AgentMenu } from "./menu/view.tsx";
 import { canHover } from "../lib/media.ts";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
 

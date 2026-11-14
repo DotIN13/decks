@@ -10,7 +10,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { Portal } from "solid-js/web";
 import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon, Popover } from "@decks/ui";
-import { AgentFace } from "./AgentPill.tsx";
+import { AgentFace } from "./face/view.tsx";
 import { closeWords, rowWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
 import { carryAgent } from "./agent-drag.ts";

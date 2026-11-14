@@ -4,7 +4,7 @@ import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import Play from "lucide-solid/icons/play";
 import Check from "lucide-solid/icons/check";
 import { For, Show } from "solid-js";
-import { AgentFace } from "../agents/AgentPill.tsx";
+import { AgentFace } from "../agents/face/view.tsx";
 import { ContextRing } from "./ContextRing.tsx";
 import { PictureProgress } from "./PictureProgress.tsx";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";

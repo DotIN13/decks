@@ -4,7 +4,8 @@ import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
 import Plus from "lucide-solid/icons/plus";
 import { Show, untrack, type JSX } from "solid-js";
-import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
+import { AgentFace } from "../agents/face/view.tsx";
+import { AgentMenu } from "../agents/menu/view.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
 import { Icon } from "@decks/ui";
 

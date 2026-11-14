@@ -29,7 +29,7 @@ import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, sav
 import type { AgentChat, Identity } from "../state/types/index.ts";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
 import { AgentRow } from "../agents/AgentRow.tsx";
-import { NewAgentButton } from "../agents/AgentPill.tsx";
+import { NewAgentButton } from "../agents/face/view.tsx";
 import type { AgentKind } from "../state/types/index.ts";
 import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentSection } from "../agents/agent-sections.ts";
 import { DecksLineMark } from "./DecksLineMark.tsx";

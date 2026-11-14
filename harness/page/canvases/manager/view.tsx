@@ -7,7 +7,7 @@ import Trash from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { Icon } from "@decks/ui";
-import { AgentFace } from "../../agents/AgentPill.tsx";
+import { AgentFace } from "../../agents/face/view.tsx";
 import { api } from "../../connections/connection.ts";
 import { AuthedImg } from "../../lib/authed.tsx";
 import type { StageRow } from "../../state/types/index.ts";

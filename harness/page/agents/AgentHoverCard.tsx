@@ -3,7 +3,7 @@ import ArrowRight from "lucide-solid/icons/arrow-right";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Icon } from "@decks/ui";
-import { AgentFace } from "./AgentPill.tsx";
+import { AgentFace } from "./face/view.tsx";
 import { agentStatus, since, statusWords } from "./agent-order.ts";
 import { For } from "solid-js";
 
