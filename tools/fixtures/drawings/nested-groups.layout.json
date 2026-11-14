@@ -1,0 +1,60 @@
+{
+	"warnings": [],
+	"items": {
+		"outer": {
+			"type": "group",
+			"box": {
+				"x": 100,
+				"y": 100,
+				"w": 110.8,
+				"h": 76.8
+			},
+			"parent": null,
+			"order": 0
+		},
+		"r1": {
+			"type": "rectangle",
+			"box": {
+				"x": 100,
+				"y": 100,
+				"w": 50,
+				"h": 50
+			},
+			"parent": "outer",
+			"order": 1
+		},
+		"inner": {
+			"type": "group",
+			"box": {
+				"x": 180,
+				"y": 120,
+				"w": 30.8,
+				"h": 56.8
+			},
+			"parent": "outer",
+			"order": 2
+		},
+		"e1": {
+			"type": "ellipse",
+			"box": {
+				"x": 180,
+				"y": 120,
+				"w": 30,
+				"h": 30
+			},
+			"parent": "inner",
+			"order": 3
+		},
+		"t1": {
+			"type": "text",
+			"box": {
+				"x": 180,
+				"y": 160,
+				"w": 30.8,
+				"h": 16.8
+			},
+			"parent": "inner",
+			"order": 4
+		}
+	}
+}

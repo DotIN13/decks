@@ -1,0 +1,49 @@
+{
+	"version": "2.14",
+	"children": [
+		{
+			"type": "note",
+			"id": "note",
+			"x": 0,
+			"y": 0,
+			"content": "A note wraps its words at its width."
+		},
+		{
+			"type": "text",
+			"id": "title",
+			"x": 0,
+			"y": -80,
+			"content": "A title",
+			"fontSize": 32,
+			"fontWeight": "700"
+		},
+		{
+			"type": "text",
+			"id": "fixed",
+			"x": 320,
+			"y": 0,
+			"width": 200,
+			"textGrowth": "fixed-width",
+			"content": "Text with a fixed width wraps onto more than one line here."
+		},
+		{
+			"type": "rectangle",
+			"id": "box",
+			"x": 0,
+			"y": 200,
+			"width": 160,
+			"height": 90,
+			"fill": "#e8eefc",
+			"cornerRadius": 8
+		},
+		{
+			"type": "ellipse",
+			"id": "dot",
+			"x": 200,
+			"y": 200,
+			"width": 60,
+			"height": 60,
+			"fill": "#14806f"
+		}
+	]
+}

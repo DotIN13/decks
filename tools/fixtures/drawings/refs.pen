@@ -1,0 +1,49 @@
+{
+	"version": "2.14",
+	"children": [
+		{
+			"type": "frame",
+			"id": "chip",
+			"reusable": true,
+			"layout": "horizontal",
+			"gap": 6,
+			"padding": [
+				4,
+				10
+			],
+			"children": [
+				{
+					"type": "ellipse",
+					"id": "swatch",
+					"width": 12,
+					"height": 12,
+					"fill": "#3b6fd8"
+				},
+				{
+					"type": "text",
+					"id": "name",
+					"content": "Agent"
+				}
+			]
+		},
+		{
+			"type": "ref",
+			"id": "chip-1",
+			"ref": "chip",
+			"x": 0,
+			"y": 120
+		},
+		{
+			"type": "ref",
+			"id": "chip-2",
+			"ref": "chip",
+			"x": 0,
+			"y": 180,
+			"descendants": {
+				"name": {
+					"content": "A much longer name"
+				}
+			}
+		}
+	]
+}

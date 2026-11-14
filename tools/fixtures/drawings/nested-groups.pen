@@ -1,0 +1,44 @@
+{
+	"version": "2.14",
+	"children": [
+		{
+			"type": "group",
+			"id": "outer",
+			"x": 100,
+			"y": 100,
+			"children": [
+				{
+					"type": "rectangle",
+					"id": "r1",
+					"x": 0,
+					"y": 0,
+					"width": 50,
+					"height": 50
+				},
+				{
+					"type": "group",
+					"id": "inner",
+					"x": 80,
+					"y": 20,
+					"children": [
+						{
+							"type": "ellipse",
+							"id": "e1",
+							"x": 0,
+							"y": 0,
+							"width": 30,
+							"height": 30
+						},
+						{
+							"type": "text",
+							"id": "t1",
+							"x": 0,
+							"y": 40,
+							"content": "deep"
+						}
+					]
+				}
+			]
+		}
+	]
+}

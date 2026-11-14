@@ -1,0 +1,55 @@
+{
+	"version": "2.14",
+	"children": [
+		{
+			"type": "rectangle",
+			"id": "swatch",
+			"x": 0,
+			"y": 0,
+			"width": 120,
+			"height": 120,
+			"fill": "$brand"
+		},
+		{
+			"type": "frame",
+			"id": "dark-panel",
+			"x": 200,
+			"y": 0,
+			"theme": {
+				"mode": "dark"
+			},
+			"layout": "vertical",
+			"padding": 20,
+			"children": [
+				{
+					"type": "text",
+					"id": "on-dark",
+					"content": "In the dark theme",
+					"fill": "$brand"
+				}
+			]
+		}
+	],
+	"themes": {
+		"mode": [
+			"light",
+			"dark"
+		]
+	},
+	"variables": {
+		"brand": {
+			"type": "color",
+			"value": [
+				{
+					"value": "#4f46e5"
+				},
+				{
+					"value": "#818cf8",
+					"theme": {
+						"mode": "dark"
+					}
+				}
+			]
+		}
+	}
+}

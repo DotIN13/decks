@@ -1,0 +1,38 @@
+{
+	"warnings": [],
+	"items": {
+		"from": {
+			"type": "rectangle",
+			"box": {
+				"x": 0,
+				"y": 0,
+				"w": 160,
+				"h": 80
+			},
+			"parent": null,
+			"order": 0
+		},
+		"to": {
+			"type": "rectangle",
+			"box": {
+				"x": 400,
+				"y": 160,
+				"w": 160,
+				"h": 80
+			},
+			"parent": null,
+			"order": 1
+		},
+		"link": {
+			"type": "path",
+			"box": {
+				"x": 158,
+				"y": 38,
+				"w": 244,
+				"h": 170
+			},
+			"parent": null,
+			"order": 2
+		}
+	}
+}

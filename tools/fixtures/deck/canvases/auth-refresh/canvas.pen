@@ -1,0 +1,75 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "browser",
+      "id": "plan",
+      "name": "Auth refresh \u2014 the plan",
+      "url": "cards/plan/index.html",
+      "width": 1600,
+      "height": 1000,
+      "metadata": {
+        "type": "decks.card",
+        "path": "cards/plan/index.html"
+      },
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "browser",
+      "id": "risks",
+      "name": "Auth refresh \u2014 risks",
+      "url": "cards/risks/index.html",
+      "width": 1400,
+      "height": 900,
+      "metadata": {
+        "type": "decks.card",
+        "path": "cards/risks/index.html"
+      },
+      "x": 200,
+      "y": 1160
+    },
+    {
+      "type": "browser",
+      "id": "notes",
+      "name": "What the survey round found",
+      "url": "cards/notes/index.html",
+      "width": 760,
+      "height": 240,
+      "metadata": {
+        "type": "decks.card",
+        "path": "cards/notes/index.html"
+      },
+      "x": 840,
+      "y": 2220
+    },
+    {
+      "type": "browser",
+      "id": "sources",
+      "name": "Auth refresh \u2014 sources",
+      "url": "cards/sources/index.html",
+      "width": 1600,
+      "height": 1120,
+      "metadata": {
+        "type": "decks.card",
+        "path": "cards/sources/index.html"
+      },
+      "x": 0,
+      "y": 2620
+    },
+    {
+      "type": "browser",
+      "id": "how-deep-is-the-deep-sea",
+      "name": "How deep is the deep sea",
+      "url": "cards/how-deep-is-the-deep-sea/index.html",
+      "width": 1600,
+      "height": 1120,
+      "metadata": {
+        "type": "decks.card",
+        "path": "cards/how-deep-is-the-deep-sea/index.html"
+      },
+      "x": 0,
+      "y": 3900
+    }
+  ]
+}

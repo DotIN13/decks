@@ -1,0 +1,104 @@
+{
+	"warnings": [],
+	"items": {
+		"chip": {
+			"type": "frame",
+			"box": {
+				"x": 0,
+				"y": 0,
+				"w": 76.5,
+				"h": 24.8
+			},
+			"parent": null,
+			"order": 0
+		},
+		"swatch": {
+			"type": "ellipse",
+			"box": {
+				"x": 10,
+				"y": 4,
+				"w": 12,
+				"h": 12
+			},
+			"parent": "chip",
+			"order": 1
+		},
+		"name": {
+			"type": "text",
+			"box": {
+				"x": 28,
+				"y": 4,
+				"w": 38.5,
+				"h": 16.8
+			},
+			"parent": "chip",
+			"order": 2
+		},
+		"chip-1": {
+			"type": "frame",
+			"box": {
+				"x": 0,
+				"y": 120,
+				"w": 76.5,
+				"h": 24.8
+			},
+			"parent": null,
+			"order": 3
+		},
+		"chip-1/swatch": {
+			"type": "ellipse",
+			"box": {
+				"x": 10,
+				"y": 124,
+				"w": 12,
+				"h": 12
+			},
+			"parent": "chip-1",
+			"order": 4
+		},
+		"chip-1/name": {
+			"type": "text",
+			"box": {
+				"x": 28,
+				"y": 124,
+				"w": 38.5,
+				"h": 16.8
+			},
+			"parent": "chip-1",
+			"order": 5
+		},
+		"chip-2": {
+			"type": "frame",
+			"box": {
+				"x": 0,
+				"y": 180,
+				"w": 176.6,
+				"h": 24.8
+			},
+			"parent": null,
+			"order": 6
+		},
+		"chip-2/swatch": {
+			"type": "ellipse",
+			"box": {
+				"x": 10,
+				"y": 184,
+				"w": 12,
+				"h": 12
+			},
+			"parent": "chip-2",
+			"order": 7
+		},
+		"chip-2/name": {
+			"type": "text",
+			"box": {
+				"x": 28,
+				"y": 184,
+				"w": 138.6,
+				"h": 16.8
+			},
+			"parent": "chip-2",
+			"order": 8
+		}
+	}
+}

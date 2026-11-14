@@ -1,0 +1,47 @@
+{
+	"version": "2.14",
+	"children": [
+		{
+			"type": "rectangle",
+			"id": "from",
+			"x": 0,
+			"y": 0,
+			"width": 160,
+			"height": 80
+		},
+		{
+			"type": "rectangle",
+			"id": "to",
+			"x": 400,
+			"y": 160,
+			"width": 160,
+			"height": 80
+		},
+		{
+			"type": "path",
+			"id": "link",
+			"metadata": {
+				"type": "decks.arrow",
+				"from": "from",
+				"to": "to",
+				"route": "elbow",
+				"heads": "end"
+			},
+			"strokeWidth": 2,
+			"x": 158,
+			"y": 38,
+			"width": 244,
+			"height": 170,
+			"viewBox": [
+				0,
+				0,
+				244,
+				170
+			],
+			"geometry": "M2 2 L122 2 L122 162 L242 162 M232 168 L242 162 L232 156",
+			"stroke": "#8a8f98",
+			"strokeLinecap": "round",
+			"strokeLinejoin": "round"
+		}
+	]
+}

@@ -1,0 +1,38 @@
+{
+	"warnings": [],
+	"items": {
+		"swatch": {
+			"type": "rectangle",
+			"box": {
+				"x": 0,
+				"y": 0,
+				"w": 120,
+				"h": 120
+			},
+			"parent": null,
+			"order": 0
+		},
+		"dark-panel": {
+			"type": "frame",
+			"box": {
+				"x": 200,
+				"y": 0,
+				"w": 170.9,
+				"h": 56.8
+			},
+			"parent": null,
+			"order": 1
+		},
+		"on-dark": {
+			"type": "text",
+			"box": {
+				"x": 220,
+				"y": 20,
+				"w": 130.9,
+				"h": 16.8
+			},
+			"parent": "dark-panel",
+			"order": 2
+		}
+	}
+}
