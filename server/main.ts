@@ -6,13 +6,14 @@ import { cards, type CardsOptions } from "./cards/feature.ts";
 import { documents, type DocumentsOptions } from "./documents/feature.ts";
 import { startServer, type Feature } from "./kernel/index.ts";
 import { peopleFeature } from "./people/feature.ts";
+import { picturesFeature } from "./pictures/feature.ts";
 import { sharingFeature } from "./sharing/feature.ts";
 import { tabFeature } from "./tab/feature.ts";
 
 // Decks-local's entry: the only place a feature is named. features() is the
 // list a server runs, also for tests that need every feature at once.
 // Run: node --import tsx server/main.ts --deck <folder> [--port 4620] [--host 127.0.0.1]
-// Not yet here (wave 2): pictures, upgrade, compat.
+// Not yet here (wave 2): upgrade, compat.
 
 export type FeatureOptions = { lib?: CardsOptions["lib"]; google?: DocumentsOptions["google"]; clock?: () => number; appRun?: string };
 
@@ -25,6 +26,7 @@ export function features(options: FeatureOptions = {}): Feature[] {
 		sharingFeature(),
 		appsFeature({ ...(options.appRun ? { workdir: options.appRun } : {}), ...(options.clock ? { clock: options.clock } : {}) }),
 		tabFeature(),
+		picturesFeature(),
 	];
 }
 
