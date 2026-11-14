@@ -10,7 +10,7 @@ import { byCommand, byMcp, byScript } from "./same.ts";
 // same answer, and the same refusal, against Keel's kernel and router. Until
 // Keel's doors run, a few lines here put the router behind HTTP.
 
-const items = { n1: { type: "note", id: "n1", box: { x1: 0, y1: 0, x2: 100, y2: 40 } } } as Record<string, { type: string; id: string; box: object }>;
+const items = { n1: { type: "note", id: "n1", box: { x1: 0, y1: 0, x2: 100, y2: 40 } } } as Record<string, { type: string; id: string; box: { x1: number; y1: number; x2: number; y2: number } }>;
 const probe = defineFeature({
 	name: "probe",
 	calls: handleAll(
