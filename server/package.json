@@ -1,0 +1,15 @@
+{
+	"name": "@decks-next/server",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./main.ts"
+	},
+	"scripts": {
+		"test": "node ../tools/check.mjs server"
+	},
+	"dependencies": {
+		"@decks-next/protocol": "0.0.0"
+	}
+}

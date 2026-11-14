@@ -45,3 +45,7 @@ dist-packages/
 /e2e/fake-agent/*
 !/e2e/fake-agent/models.json
 !/e2e/fake-agent/settings.json
+
+# The rewrite: generated tables and scratch
+dist-gen/
+.scratch/

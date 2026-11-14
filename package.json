@@ -28,7 +28,12 @@
     "runtime",
     "extension",
     "e2e",
-    "examples/*"
+    "examples/*",
+    "protocol",
+    "server",
+    "harness",
+    "clients/*",
+    "tools"
   ],
   "scripts": {
     "dev": "concurrently --raw --kill-others-on-fail \"npm:dev:server\" \"npm:dev:web\"",
@@ -44,6 +49,9 @@
     "build:live-doc": "node scripts/live-doc.mjs",
     "css:order": "node scripts/css-order.mjs",
     "gates": "node scripts/dead-exports.mjs && node scripts/dead-css.mjs && node scripts/stale-paths.mjs && node scripts/surface-gate.mjs",
+    "gates:next": "node tools/gates/run.mjs",
+    "check": "node tools/check.mjs",
+    "heavy": "node tools/heavy.mjs",
     "dev:example": "DECKS_DATA_DIR=\"$PWD/e2e/fixture\" npm run dev --workspace @decks/server",
     "test:e2e": "node e2e/run.mjs",
     "build:packages": "node scripts/build-packages.mjs",
