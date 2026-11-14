@@ -3,12 +3,10 @@ import { Refused, type Caller } from "../../protocol/index.ts";
 import { readJson, writeJson } from "./store.ts";
 import { toDeckPath, type Bytes, type Deck, type DeckPath, type Entry, type FileChange, type Revision, type Stop, type Store } from "./types.ts";
 
-// Every write is recorded as a revision, with its bytes kept once by hash,
-// so any file at any moment can be read and restored. A change made on the
-// disk outside the server (by "disk") is recorded when the deck hears it.
-// A file that was there before history began is recorded at revision 0,
-// on its first read, write, remove or move, so a change made on the disk
-// after it was read can still be undone.
+// Every write is a revision, its bytes kept once by hash: any file at any
+// moment can be read and restored. A change on the disk is recorded as by
+// "disk" when heard. A file there before history began is recorded at
+// revision 0 on its first read, write, remove or move.
 
 type Kept = { path: DeckPath; rev: number; by: string; at: number; kind: "written" | "deleted"; hash?: string };
 
