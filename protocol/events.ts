@@ -8,7 +8,8 @@ import { Box, Camera, ChatItem, Message, Point, Splice } from "./shapes.ts";
 export const deckChanged = defineEvent("deck.changed", "The deck's settings or pairings changed; deck.get reads them.", { part: opt(str()) });
 export const canvasChanged = defineEvent("canvas.changed", "Canvases were made, renamed or deleted; canvas.list reads them.");
 export const itemChanged = defineEvent("item.changed", "Items on a canvas changed. edits carries the ops when they fit in a message.", {
-	from: opt(str("The revision the edits apply to.")),
+	from: opt(str("The revision the edits apply to, as text; read base instead.")),
+	base: opt(int("The revision the edits apply to.")),
 	edits: opt(arr(any())),
 	made: opt(arr(str("A client's own name for an edit this revision is the first to have."))),
 });

@@ -25,6 +25,7 @@ export const ItemOp = named(
 		obj({ op: lit("delete"), id: str() }),
 		obj({ op: lit("move"), id: str(), at: opt(Point), beside: opt(str()), below: opt(str()), parent: opt(Parent), index: opt(int()) }),
 		obj({ op: lit("copy"), id: str(), as: opt(str()), at: opt(Point), parent: opt(Parent) }),
+		obj({ op: lit("variables"), set: rec(any()), themes: opt(union(rec(arr(str())), nul)) }),
 	),
 	"One change in a batch: the item call of that name, with its item or id inside.",
 );
