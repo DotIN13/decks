@@ -37,9 +37,9 @@ who it is and what it is given. A session knows nothing of where its agent sits 
    delta of its text or thinking while it streams. `rev` counts the agent's changes.
 10. The transcript is kept in the harness's own folder, never the deck: the last 500 entries, and an
     archive of older ones that `chat.list` pages back through.
-11. A rewind or fork goes back to a user message by the runtime's own session tree. Restoring cards
-    puts back, through `file.restore`, the version of each card the agent wrote that was current at
-    that message.
+11. A rewind or fork goes back to a user message by the runtime's own session tree. Restoring puts
+    back, through `file.restore`, the version current at that message of each file the agent named
+    in its tool calls or last wrote as a card. A file written on disk counts: its writer is "disk".
 
 ## Check
 

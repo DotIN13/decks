@@ -76,6 +76,10 @@ export class Session {
 		return this.spec.id;
 	}
 
+	get deckPath(): string {
+		return this.deps.deckPath;
+	}
+
 	get dormant(): boolean {
 		return !this.backend;
 	}

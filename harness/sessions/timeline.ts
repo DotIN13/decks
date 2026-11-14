@@ -1,7 +1,7 @@
 import type { Session } from "./session.ts";
 
 // Going back in a conversation: rewind and fork by the runtime's own session
-// tree, and the cards the agent wrote as they were then, from the server's
+// tree, and the files the agent wrote as they were then, from the server's
 // history (file.versions, file.restore). README rule 11.
 
 type UserItem = { id: string; kind: string; entryId?: string; at: number; text?: string };
@@ -36,17 +36,34 @@ export async function forkRef(session: Session, entry: string): Promise<string |
 	return session.backend?.forkFrom(runtimeEntry(session, entry));
 }
 
-/** For each card the agent last wrote, the version that was current when the message was sent. */
+const FILE = /(?:^|[\s"'=(])((?:\/|\.\/)?[\w.@-]+(?:\/[\w.@-]+)*\.(?:html|css|js|mjs|json|md|svg|pen))(?=$|[\s"',)])/g;
+
+/** The deck files the agent's tool calls named: paths in their arguments, made relative to the deck. */
+export function touchedFiles(session: Session, deckPath: string): string[] {
+	const found = new Set<string>();
+	for (const item of session.history() as Array<{ kind: string; args?: unknown; title?: string }>) {
+		if (item.kind !== "tool") continue;
+		const text = `${JSON.stringify(item.args ?? {}).replace(/\\"/g, '"')} ${item.title ?? ""}`;
+		for (const match of text.matchAll(FILE)) {
+			const raw = match[1]!.replace(/^\.\//, "");
+			const path = raw.startsWith("/") ? (raw.startsWith(`${deckPath}/`) ? raw.slice(deckPath.length + 1) : "") : raw;
+			if (path && !path.startsWith("..")) found.add(path);
+		}
+	}
+	return [...found];
+}
+
+/** For each file the agent wrote or named, by its tools or as a card's writer, the version current when the message was sent. */
 export async function cardsAt(session: Session, entry: string): Promise<Record<string, string>> {
 	const at = userEntry(session, entry)?.at;
 	if (at === undefined) return {};
 	const cards = ((await session.client.call("card.list").catch(() => undefined))?.value ?? []) as CardRow[];
-	const mine = cards.filter((one) => one.by === session.id || one.by === session.spec.name);
+	const written = cards.filter((one) => one.by === session.id || one.by === session.spec.name).map((one) => one.path);
 	const out: Record<string, string> = {};
-	for (const card of mine) {
-		const versions = ((await session.client.call("file.versions", { path: card.path }).catch(() => undefined))?.value ?? []) as Version[];
+	for (const path of new Set([...written, ...touchedFiles(session, session.deckPath)])) {
+		const versions = ((await session.client.call("file.versions", { path }).catch(() => undefined))?.value ?? []) as Version[];
 		const then = versions.filter((one) => one.at <= at).sort((a, b) => b.at - a.at)[0];
-		if (then) out[card.path] = then.sha;
+		if (then) out[path] = then.sha;
 	}
 	return out;
 }
