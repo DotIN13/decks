@@ -15,7 +15,7 @@ Keel owns the folder from wave 1 and writes what implements them.
 ## May import
 
 `protocol/` through its entry, and node's own modules. Never a feature: the kernel names no feature;
-only `server/main.ts` does.
+only the server's entry file does.
 
 ## Rules
 
