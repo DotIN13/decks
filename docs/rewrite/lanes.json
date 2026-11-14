@@ -5,11 +5,8 @@
 	"Lexicon": [
 		"protocol/",
 		"tools/gen/",
-		"server/kernel/types.ts",
-		"server/kernel/memory-deck.ts",
-		"server/kernel/memory-deck.test.ts",
 		"docs/rewrite/calls.md",
-		"server/kernel/README.md"
+		"clients/"
 	],
 	"Warden": [
 		"AGENTS.md",
@@ -34,5 +31,20 @@
 		"tools/tsconfig.json",
 		"server/README.md",
 		"harness/README.md"
+	],
+	"Keel": [
+		"server/kernel/",
+		"server/main.ts"
+	],
+	"Easel": [
+		"server/canvas/"
+	],
+	"Folio": [
+		"server/cards/",
+		"server/documents/"
+	],
+	"Roster": [
+		"server/people/",
+		"server/sharing/"
 	]
 }

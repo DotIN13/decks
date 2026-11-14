@@ -81,3 +81,23 @@ lines or fewer, plain words, no em dashes.
 
 Say who you are: `decks agent update --avatar.svg '<svg …>' --workspace decks-rewrite --tags '["…"]'`
 with an avatar you draw. Then read `DESIGN.md`, this file, and your brief.
+
+## Wave 1: five agents in `server/` and `clients/`
+
+- **The kernel's interfaces** (`server/kernel/types.ts`) are Keel's now. They only grow: Keel adds, never
+  changes or removes, and tells Easel, Folio, Roster and Lexicon each time. If you need something from the
+  kernel, ask Keel; do not reach around it.
+- **Testing a feature.** Keel's first job is `server/kernel/testing.ts`: a real router on the in-memory
+  deck, so a feature's calls are tested as calls. Until Keel says it is there, test your modules directly.
+- **A feature never imports another feature.** What crosses goes through the handler's context
+  (`ctx.canvas(name)`, `ctx.deck`, `ctx.events`), an item kind, or a call. If that is not enough, ask Keel
+  for a seam; do not import a neighbour's file.
+- **A declared call you do not handle yet** (it belongs to wave 2) is simply left out of your feature. The
+  router answers it `unavailable`. Say which ones in your README.
+- **Dependencies.** `server/package.json` is Warden's. Ask Warden by `decks agent send Warden` for a
+  package you need, with the reason; Warden installs under the heavy lock.
+- **Commits** need `REWRITE_AGENT=<your name>` in the environment; the hooks are installed in this checkout.
+- **Checks**: `node tools/check.mjs server` (or `clients/<name>`) and `node tools/gates/run.mjs` before
+  each commit. Neither is heavy.
+- **Ports**: Lexicon 4600 to 4609, Keel 4620 to 4629, Easel 4630 to 4639, Folio 4640 to 4649, Roster
+  4650 to 4659.

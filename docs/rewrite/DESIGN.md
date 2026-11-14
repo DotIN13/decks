@@ -284,9 +284,10 @@ switch-over.
 - **Wave 0**: Lexicon (the protocol, the kernel's interfaces as types, the generators) and Warden (the
   map, the gates, the fixtures, a type-check project per folder). **Stop 1**: the person approves the
   table of calls.
-- **Wave 1**: Keel `server/kernel/`, Easel `server/canvas/`, Folio `server/cards/` and `documents/`,
+- **Wave 1**: Keel `server/kernel/` and `server/main.ts`, Easel `server/canvas/`, Folio `server/cards/` and `documents/`,
   Roster `server/people/` and `sharing/`, Lexicon `clients/`. **Stop 2**: Decks-local runs alone, Claude
-  Code attaches and makes a card, a client with no disk builds a card, an app and a document.
+  Code attaches and makes a card, a client with no disk builds a card and a document (an app joins this
+  check at stop 3, when `server/apps/` exists).
 - **Wave 2**: Depot `server/apps/ pictures/ tab/`, Helm `harness/` (not `page/`), Pane `harness/page/`,
   Loft (decks-studio), Slate (decks-ios); then Warden switches over. **Stop 3**: the 87 browser checks
   pass on two processes.
