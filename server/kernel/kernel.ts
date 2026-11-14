@@ -39,7 +39,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const relay = new Relay(options.relayWaitMs);
 	const address: { url?: string } = {};
-	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), url: () => address.url };
+	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), translate: (one) => router.translate(one), url: () => address.url };
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
 	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });

@@ -1,5 +1,5 @@
 import { CALL_BY_NAME, check, Refused, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Feature } from "./types.ts";
+import type { Client, Context, Feature, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -38,7 +38,16 @@ export class Router {
 		private forward?: (name: string, args: unknown, caller: Caller) => Promise<Envelope<unknown>>,
 	) {}
 
+	private translator: Translator | undefined;
+
+	/** Given once, by the feature that knows old names; asked only for an undeclared name. */
+	translate(translator: Translator): void {
+		if (this.translator) throw new Error("Only one feature may translate old call names.");
+		this.translator = translator;
+	}
+
 	async call(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
+		if (!CALL_BY_NAME.has(name) && this.translator) return this.translated(name, args, caller, client);
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
 		if ("relay" in found) return this.relayed(found.relay, args ?? {}, caller, notes);
@@ -50,6 +59,15 @@ export class Router {
 			if (error instanceof Refused) return fail(error.code, error.message, notes, error.hint);
 			return fail("unavailable", `${name} failed on the server: ${(error as Error).message}`, notes);
 		}
+	}
+
+	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
+		const turned = this.translator!(name, args);
+		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
+		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
+		if (!CALL_BY_NAME.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
+		const answer = await this.call(turned.name, turned.args, caller, client);
+		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
 	}
 
 	/** A handler's context for a feature's route. */

@@ -121,3 +121,29 @@ test("a handler makes another feature's call as the same caller, and a refusal t
 	assert.equal(card.ok ? "" : card.error.code, "refused");
 	await server.close();
 });
+
+test("an old name is translated into a declared call, checked as usual, and its answer turned back", async () => {
+	const old = defineFeature({
+		name: "old",
+		calls: [],
+		start: (kernel) =>
+			kernel.translate((name, args) => {
+				if (name === "ports") return { name: "port.list", args: {}, back: (value) => ({ ports: value }) };
+				if (name === "web.open") return { name: "port.open", args: { port: (args as { args: unknown[] }).args[0] as number } };
+				if (name === "gone") return { refusal: { code: "not_found", message: "gone is retired.", hint: "port.list" } };
+				return name === "loop" ? { name: "loop2", args: {} } : undefined;
+			}),
+	});
+	const server = await testServer({ features: [old, probeFeature()] });
+	assert.deepEqual(await server.value("ports"), { ports: [] });
+	assert.equal((await server.value<{ port: number }>("web.open", { args: [5] })).port, 5);
+	const bad = await server.call("web.open", { args: ["x"] });
+	assert.equal(bad.ok ? "" : bad.error.code, "invalid");
+	const gone = await server.call("gone");
+	assert.equal(gone.ok ? "" : gone.error.hint, "port.list");
+	for (const name of ["loop", "nothing"]) {
+		const answer = await server.call(name);
+		assert.equal(answer.ok ? "" : answer.error.code, "not_found");
+	}
+	await server.close();
+});

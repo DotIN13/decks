@@ -84,6 +84,6 @@ test("a feature built on a MemoryDeck starts with the kernel it is handed", asyn
 	const deck = new MemoryDeck({ "a.txt": "x" });
 	let seen = "";
 	const feature = defineFeature({ name: "probe", calls: [], start: async (kernel) => void (seen = new TextDecoder().decode(await kernel.deck.read(p("a.txt")))) });
-	await feature.start?.({ deck, events: { emit() {}, on: () => () => {} }, canvas: () => ({ read: () => [], apply: () => ({ items: [], rev: 0 }), since: () => [] }), callers: { issue: () => "", revoke() {}, describe() {} }, store: () => new MemoryStore(), kinds: [], relay() {}, url: () => undefined });
+	await feature.start?.({ deck, events: { emit() {}, on: () => () => {} }, canvas: () => ({ read: () => [], apply: () => ({ items: [], rev: 0 }), since: () => [] }), callers: { issue: () => "", revoke() {}, describe() {} }, store: () => new MemoryStore(), kinds: [], relay() {}, translate() {}, url: () => undefined });
 	assert.equal(seen, "x");
 });

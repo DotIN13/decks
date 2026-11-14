@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import { handlersFor, layout, Refused, type AnyEvent, type Caller, type Envelope, type Handled, type Payload, type shapes, type Who } from "../../protocol/index.ts";
+import { handlersFor, layout, Refused, type AnyEvent, type Caller, type Envelope, type Handled, type RefusalCode, type Payload, type shapes, type Who } from "../../protocol/index.ts";
 
 // The kernel's interfaces, as types, for wave 1 to build against. Keel owns
 // this folder after wave 0 and writes what implements them.
@@ -103,9 +103,17 @@ export interface Kernel {
 	kinds: ItemKind[];
 	/** Say which connected host answers a call no feature handles. At most one feature calls it. */
 	relay(answerer: Answerer): void;
+	/** Turn a name the protocol does not declare into a declared call. At most one feature calls it. */
+	translate(translator: Translator): void;
 	/** The server's own address once a door listens, for apps and pictures; undefined before. */
 	url(): string | undefined;
 }
+
+/** An old name and its arguments, as a declared call; back turns its value into the old answer. */
+export type Translator = (
+	name: string,
+	args: unknown,
+) => { name: string; args: Record<string, unknown>; back?: (value: unknown) => unknown } | { refusal: { code: RefusalCode; message: string; hint?: string } } | undefined;
 
 /** The client id of the host that answers this call for this caller, or undefined. */
 export type Answerer = (call: string, caller: Caller) => string | undefined;
