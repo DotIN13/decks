@@ -141,7 +141,7 @@ export class Documents {
 		if (!EDITABLE.includes(ext)) throw new Refused("invalid", `${path} is not a document: one of ${EDITABLE.join(" ")} opens as a page.`, "file.read");
 		const entry = (await this.deck.list(parent(path))).find((e) => e.path === path);
 		if (!entry || entry.kind !== "file") throw new Refused("not_found", `There is no document at ${path}.`, "file.list");
-		const doc: Open = { path, text: decoder.decode(await this.deck.read(path)), rev: entry.rev ?? 0, log: [], changes: new Map(), clients: new Set() };
+		const doc: Open = { path, text: decoder.decode(await this.deck.read(path)), rev: (await this.deck.revisions?.(path))?.at(-1)?.rev ?? entry.rev ?? 0, log: [], changes: new Map(), clients: new Set() };
 		for (const waiting of await loadChanges(this.store, path)) doc.changes.set(waiting.change.id, waiting);
 		this.open.set(path, doc);
 		return doc;

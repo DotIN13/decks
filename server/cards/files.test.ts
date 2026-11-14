@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { callers, testServer } from "../kernel/testing.ts";
+import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { cards } from "./feature.ts";
 import { applyEdits, globToRegex } from "./files.ts";
 
@@ -103,5 +104,25 @@ test("rule 8: a file's address, and a card may read but not write", async () => 
 	assert.equal(await s.value("file.url", { path: "assets/a.png" }), "/files/assets/a.png");
 	assert.equal(await code(s, "file.read", { path: "docs/notes.md" }, "card"), "ok");
 	assert.equal(await code(s, "file.write", { path: "docs/notes.md", text: "" }, "card"), "refused");
+	await s.close();
+});
+
+/** A deck like the folder one: it lists files with no revision of their own. */
+class NoRevDeck extends MemoryDeck {
+	override async list(dir: Parameters<MemoryDeck["list"]>[0]) {
+		return (await super.list(dir)).map(({ rev: _rev, ...entry }) => entry);
+	}
+}
+
+test("rule 3: read then edit with the rev read agrees, also for a file written before history", async () => {
+	const s = await testServer({ features: [cards()], deck: new NoRevDeck({ "canvases/a/cards/c/index.html": "<h1>One</h1>\n" }) });
+	const path = "canvases/a/cards/c/index.html";
+	const first = await s.value<{ rev: number }>("file.read", { path });
+	const edited = await s.value<{ rev: number }>("file.edit", { path, rev: first.rev, edits: [{ find: "One", replace: "Two" }] }, ann);
+	const second = await s.value<{ rev: number; text: string }>("file.read", { path });
+	assert.equal(second.rev, edited.rev);
+	assert.equal(second.text, "<h1>Two</h1>\n");
+	await s.value("file.write", { path, rev: second.rev, text: "<h1>Three</h1>\n" }, ann);
+	assert.equal(await code(s, "file.edit", { path, rev: second.rev, edits: [{ find: "Three", replace: "Four" }] }), "conflict");
 	await s.close();
 });

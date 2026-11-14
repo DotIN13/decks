@@ -23,7 +23,9 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
    `.git`), is refused as `refused`, with a sentence naming the part.
 2. Every read and write goes through `ctx.deck`. A write carries its caller, so history names its
    author; the answer is the file as it now is, with its revision and author.
-3. `file.write` and `file.edit` take an optional `rev`: if the file has moved past it, `conflict`.
+3. A file's revision is the last one the deck's history recorded for it; a file history has never
+   seen is at 0. `file.read` answers it, and `file.write` and `file.edit` with `rev` check against
+   the same number: if the file has moved past it, `conflict`.
 4. `file.edit` replaces exact words. Each `find` must occur exactly once, or every time with `all`.
    No match, or more than one without `all`, refuses the whole call: all edits or none.
 5. `file.read` reads text; `from` (1-based) and `lines` read part, and `truncated` says so. A file
