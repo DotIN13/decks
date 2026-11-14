@@ -4,13 +4,12 @@ import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
 import { answerBack, itemOp, keyed, turn } from "./args.ts";
 import { DROPPED, GOES, OLD_CALLS, OLD_EVENTS } from "./table.ts";
-import { compatFeature } from "./feature.ts";
 import { told } from "./events.ts";
 
 // Every old name of calls.md answers: by its new call, or for a dropped one by why.
 
 test("every old call reaches a new call the server knows", async () => {
-	const server = await testServer({ features: [...features(), compatFeature()], relayWaitMs: 5 });
+	const server = await testServer({ features: features(), relayWaitMs: 5 });
 	const missed: string[] = [];
 	for (const [old] of OLD_CALLS) {
 		const turned = turn(old, []);

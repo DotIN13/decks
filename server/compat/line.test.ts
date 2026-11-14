@@ -4,7 +4,6 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
-import { compatFeature } from "./feature.ts";
 
 // Today's line against the fixture deck: hello, watch, an edit in pen.dev's own form,
 // the change told back whole as canvas.changed, and the drawing's file written.
@@ -45,7 +44,7 @@ function openLine(url: string): { send(m: Said): void; next(type: string): Promi
 }
 
 test("today's line draws and edits the fixture canvas through compat", async () => {
-	const server = await testServer({ features: [...features(), compatFeature()], deck: fixtureFiles() });
+	const server = await testServer({ features: features(), deck: fixtureFiles() });
 	const doors = await server.listen(0);
 	const drawing = await fetch(`${doors.url}/compat/stage-pen/auth-refresh`, { headers: { authorization: `Bearer ${doors.token}` } });
 	const first = (await drawing.json()) as { doc: { children: unknown[] }; rev: number; cards: Array<{ path: string }> };

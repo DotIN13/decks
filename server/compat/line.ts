@@ -98,31 +98,14 @@ async function watchOn(w: Watching, canvas: string, since: unknown, whole: unkno
 	const base = filesBase(w.state, canvas);
 	const drawing = (name: string) => readDrawing(w.deck(), name, base);
 	w.state.watched.get(canvas)?.();
-	w.state.watched.set(canvas, afterWrites(w, caller, canvas, drawing));
+	w.state.watched.set(canvas, w.door.subscribe({ caller, client: w.client.id, events: HEARD, canvas }, (event) => {
+		void told(event.name, event.payload, drawing).then((said) => said && w.send(said));
+	}));
 	const rev = (got.value as { rev?: number }).rev ?? 0;
 	if (whole === true || (typeof since === "number" && since !== rev)) {
 		const read = await drawing(canvas);
 		if (read) w.send({ type: "canvas.changed", canvas, rev, doc: read.doc, base: read.base });
 	}
-}
-
-/**
- * Hear a canvas's events. A drawing's change is told once its file is written, since the
- * event comes before the write lands; every other event is told at once.
- */
-function afterWrites(w: Watching, caller: Caller, canvas: string, drawing: (name: string) => ReturnType<typeof readDrawing>): Stop {
-	const file = `canvases/${canvas}/canvas.pen`;
-	const waiting: Record<string, unknown>[] = [];
-	const say = (name: string, payload: Record<string, unknown>) => void told(name, payload, drawing).then((said) => said && w.send(said));
-	const events = w.door.subscribe({ caller, client: w.client.id, events: HEARD, canvas }, (event) => {
-		if (event.name === "item.changed" && event.payload.canvas === canvas) waiting.push(event.payload);
-		else say(event.name, event.payload);
-	});
-	const writes = w.deck().watch((change) => {
-		if (change.path !== file || !waiting.length) return;
-		say("item.changed", waiting.splice(0).pop()!);
-	});
-	return () => (events(), writes());
 }
 
 /** Where a canvas's files are read on this line's pass, as the frame feature serves them. */
