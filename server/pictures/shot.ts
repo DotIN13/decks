@@ -29,7 +29,7 @@ async function drawingText(ctx: Context, canvas: string): Promise<string> {
 	}
 }
 
-type Taken = { bytes: Bytes; size: S.Size; box?: S.Box };
+export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box };
 
 /** One card's own page at its width on the canvas, or 1000 when it is not there. */
 async function cardShot(ctx: Context, m: Machine, card: string, canvas: string, args: ShotArgs): Promise<Taken> {
@@ -51,7 +51,7 @@ async function cardShot(ctx: Context, m: Machine, card: string, canvas: string, 
 }
 
 /** The drawing and its cards, composed in one page. */
-async function canvasShot(ctx: Context, m: Machine, canvas: string, args: ShotArgs): Promise<Taken> {
+export async function canvasShot(ctx: Context, m: Machine, canvas: string, args: ShotArgs): Promise<Taken> {
 	const passes: { done(): void }[] = [];
 	const cardUrl = (path: string) => {
 		const page = m.cardPage(path, canvas);

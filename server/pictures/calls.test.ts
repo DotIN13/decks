@@ -145,3 +145,21 @@ test("rule 11: a card's picture is taken once per version and rung", async () =>
 	await served.close();
 	await s.close();
 });
+
+test("rule 12: a canvas's tile is a JPEG of the whole canvas, taken once per drawing and scheme", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	const served = await s.listen();
+	const get = (canvas: string, scheme = "light") => fetch(`${served.url}/pictures/canvas-tile/${canvas}?v=3&scheme=${scheme}&pass=${served.token}`);
+	const first = await get("work");
+	assert.equal(first.status, 200);
+	assert.equal(first.headers.get("content-type"), "image/jpeg");
+	assert.match(first.headers.get("cache-control") ?? "", /immutable/);
+	await get("work");
+	assert.equal(fake.seen.length, 1, "the second is from the store");
+	await get("work", "dark");
+	assert.equal(fake.seen.length, 2, "dark is a picture of its own");
+	assert.equal((await get("nowhere")).status, 404);
+	await served.close();
+	await s.close();
+});

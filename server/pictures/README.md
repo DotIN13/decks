@@ -38,6 +38,8 @@ HTML; `playwright` for the browser. No other feature.
     A card in it is an iframe of its page, addressed from where the page is written.
 11. A card's picture is kept in the feature's store by the card's bytes, width and scheme, so
     an unchanged card is pictured once.
+12. A canvas's tile picture is `GET /pictures/canvas-tile/<canvas>?scheme=&v=`: the whole canvas,
+   its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
 
 ## Not here
 
