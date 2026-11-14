@@ -8,7 +8,8 @@
 		"server/kernel/types.ts",
 		"server/kernel/memory-deck.ts",
 		"server/kernel/memory-deck.test.ts",
-		"docs/rewrite/calls.md"
+		"docs/rewrite/calls.md",
+		"server/kernel/README.md"
 	],
 	"Warden": [
 		"AGENTS.md",

@@ -136,6 +136,8 @@ Each is one type in one file.
 interface Deck {
   read(path: DeckPath): Promise<Bytes>
   write(path: DeckPath, bytes: Bytes, by: Caller): Promise<Revision>   // recorded and announced
+  remove(path: DeckPath, by: Caller): Promise<Revision>               // file.delete; to the deck's trash
+  move(from: DeckPath, to: DeckPath, by: Caller): Promise<Revision>   // file.move
   list(dir: DeckPath): Promise<Entry[]>
   watch(on: (change: FileChange) => void): Stop
 }
