@@ -54,7 +54,7 @@ test("a streamed conversation folds into a card per speaker, and a tool call ope
 		token: lock.token,
 		answers: {
 			"chat.get": (args) => (asked.push(String(args.item)), { ...tool, result: "x".repeat(5000) }),
-			"chat.preview": (args) => ({ entry: args.entry, cards: { "cards/plan/index.html": "<p>then</p>" } }),
+			"chat.preview": (args) => ({ entry: args.entry, cards: { "cards/plan/index.html": "3" } }),
 		},
 	});
 	const page = clientFor(lock.url, lock.token);
@@ -78,7 +78,7 @@ test("a streamed conversation folds into a card per speaker, and a tool call ope
 		assert.deepEqual(asked, ["t1"], "opened twice, asked once");
 		assert.equal(fullResult("t1")?.length, 5000);
 		const then = await page.decks.chat.preview({ agent: "a1", entry: "e1" });
-		assert.deepEqual(then, { entry: "e1", cards: { "cards/plan/index.html": "<p>then</p>" } });
+		assert.deepEqual(then, { entry: "e1", cards: { "cards/plan/index.html": "3" } }, "each card as the version it was at");
 	} finally {
 		stream.stop();
 		harness.close();
