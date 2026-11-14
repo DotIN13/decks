@@ -13,7 +13,7 @@ const dec = new TextDecoder();
 export function idsOf(op: ItemOp): string[] {
 	if (op.op === "insert") return op.item.id ? [op.item.id] : [];
 	if (op.op === "copy") return op.as ? [op.id, op.as] : [op.id];
-	return [op.id];
+	return "id" in op && typeof op.id === "string" ? [op.id] : [];
 }
 
 /** Others' changes after a mark, each as one line of news. */
