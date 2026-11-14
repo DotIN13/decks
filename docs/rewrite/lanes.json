@@ -31,7 +31,10 @@
 		"tools/package.json",
 		"tools/tsconfig.json",
 		"server/README.md",
-		"harness/README.md"
+		"harness/README.md",
+		"server/frame/",
+		"server/compat/",
+		"server/upgrade/"
 	],
 	"Keel": [
 		"server/kernel/",
@@ -47,5 +50,28 @@
 	"Roster": [
 		"server/people/",
 		"server/sharing/"
+	],
+	"Depot": [
+		"server/apps/",
+		"server/pictures/",
+		"server/tab/"
+	],
+	"Helm": [
+		"harness/main.ts",
+		"harness/host.ts",
+		"harness/calls.ts",
+		"harness/voice.ts",
+		"harness/index.ts",
+		"harness/sessions/",
+		"harness/runtimes/",
+		"harness/accounts/",
+		"harness/prompts/"
+	],
+	"Pane": [
+		"harness/page/"
+	],
+	"Scribe": [
+		"harness/page/chat/",
+		"harness/page/composer/"
 	]
 }

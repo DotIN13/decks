@@ -294,3 +294,29 @@ switch-over.
 - **Wave 3**: Loom `canvas/ pen/ ui/` (on today's TypeScript editor: the person chose on 2026-11-14 to
   leave the `editor-remodel` branch out), Anvil the engine for Metal (the person chose it on 2026-11-14), after which Slate drops
   the iPad app's Swift drawing code.
+
+## 9. Wave 2, as decided by Mason on 2026-11-14
+
+The person said to continue until the rewrite is finished, so the stops are now Mason's checks, not waits.
+
+- **One door for the page.** The harness's own calls (`chat.*`, `account.*`, `runtime.*`) are declared in
+  the protocol like any other. The page calls the server; the server passes each of them to the connected
+  host that said it answers them, and answers `unavailable` when no host is connected. The harness keeps
+  no door of its own. Keel, Roster and Lexicon build that seam: the router's relay, the host's offer, the
+  client's way to answer.
+- **A feature that serves the canvas page**, in a `frame` folder of the server, owned by Warden: it serves
+  the built canvas library as the page clients frame, and issues the pass a frame calls with.
+- **Old names keep working during the wave.** Warden builds the server's `compat` folder now, not at the
+  end: today's canvas library and today's browser checks speak the old names, and they are how we know the
+  new programs behave.
+- **Moved code and rebuilt code.** The server's features were rebuilt from rules and start with no
+  exceptions. The harness's page and its runtimes are large and are **moved, then split**: their markup,
+  class names and behaviour stay, because the browser checks and the styles hold them. A moved file that
+  breaks a rule enters the gate's baseline under its new path, and that list may only shrink. Get it
+  working first; split and scope styles after, part by part.
+- **The page is two lanes**: Pane has the shell, the agent list, the canvas manager, settings and state;
+  Scribe has the chat and the composer.
+- **Stop 3**: today's browser checks, unchanged, pass against the new programs: Decks-local, the harness
+  and the harness's page as separate processes. Warden writes the runner for that under tools. Then the
+  old `apps/` folder and the packages the new folders replace are deleted.
+- **After that**: Loft (decks-studio) and Slate (decks-ios) in their own repos, then wave 3.
