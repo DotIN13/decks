@@ -4,8 +4,9 @@ import { LOCAL_PERSON } from "./callers.ts";
 import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
-import { MemoryStore, memoryStores } from "./store.ts";
-import type { CanvasDoc, Client, Context, Deck, Feature } from "./types.ts";
+import { MemoryStore, memoryStores, memoryVersion } from "./store.ts";
+export { memoryVersion };
+import type { CanvasDoc, Client, Context, Deck, Feature, VersionFile } from "./types.ts";
 
 // For a feature's tests: the real kernel and router on an in-memory deck.
 // Make a call by name as any caller, read every event it emitted, read the
@@ -40,9 +41,9 @@ const asCaller = (as: Caller | Who | undefined): Caller => {
 	return as;
 };
 
-export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number } = {}): Promise<TestServer> {
+export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number; version?: VersionFile } = {}): Promise<TestServer> {
 	const deck = options.deck instanceof Object && "read" in options.deck ? (options.deck as Deck) : new MemoryDeck((options.deck ?? {}) as Record<string, string>);
-	const built = await buildKernel({ deck, stores: memoryStores(), features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}) });
+	const built = await buildKernel({ deck, stores: memoryStores(), features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}), ...(options.version ? { version: options.version } : {}) });
 	const heard: Heard[] = [];
 	const stopHearing = built.events.subscribe({ caller: callers.person }, (one) => void heard.push(one));
 	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who, client?: Client) => built.router.call(name, args, asCaller(as), client);

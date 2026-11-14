@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { Stores } from "./store.ts";
-import type { Bytes, Store } from "./types.ts";
+import type { Bytes, Store, VersionFile } from "./types.ts";
 
 // A feature's private store on a folder: <deck>/.decks/<feature>/, one file
 // per key, each part of the key encoded, so no key can climb out. Hidden from
@@ -41,5 +41,17 @@ export function folderStores(root: string): Stores {
 	return (feature) => {
 		if (!all.has(feature)) all.set(feature, new FolderStore(join(root, ".decks", encodeURIComponent(feature))));
 		return all.get(feature)!;
+	};
+}
+
+/** The deck's version record on a folder: <deck>/.decks/migrations.json. */
+export function folderVersion(root: string): VersionFile {
+	const file = join(root, ".decks", "migrations.json");
+	return {
+		read: () => readFile(file, "utf8").catch(() => undefined),
+		async write(text) {
+			await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+			await writeFile(file, text);
+		},
 	};
 }

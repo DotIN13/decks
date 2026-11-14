@@ -121,10 +121,16 @@ export interface Feature {
 	/** Pages the feature serves over HTTP, outside /api/v1. */
 	routes?: Route[];
 	/** Brings an old deck up to date, run in feature order before any start. */
-	upgrade?(deck: Deck): Promise<void>;
+	upgrade?(deck: Deck, version: VersionFile): Promise<void>;
 }
 
 // Seams added in wave 1. They only grow.
+
+/** The deck's version record: exactly .decks/migrations.json, as text. */
+export interface VersionFile {
+	read(): Promise<string | undefined>;
+	write(text: string): Promise<void>;
+}
 
 /** Where canvases come from: a name or title resolved, then its doc. */
 export interface CanvasSource {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testServer } from "../testing.ts";
-import { defineFeature, type Route } from "../types.ts";
+import { memoryVersion, testServer } from "../testing.ts";
+import { defineFeature, type Route, type VersionFile } from "../types.ts";
 
 // Feature routes: a public GET needs no token even from a module script, a
 // raw route sees the request unbuffered, an upgrade under a prefix gets the
@@ -23,9 +23,15 @@ const routes: Route[] = [
 
 test("public, raw and upgrade routes, the upgrade hook and url()", async () => {
 	const order: string[] = [];
-	const feature = defineFeature({ name: "pages", calls: [], routes, upgrade: async () => void order.push("upgrade"), start: () => void order.push("start") });
-	const server = await testServer({ features: [feature] });
-	assert.deepEqual(order, ["upgrade", "start"]);
+	const upgrade = async (_deck: unknown, version: VersionFile) => {
+		order.push(`upgrade from ${await version.read()}`);
+		await version.write("2");
+	};
+	const feature = defineFeature({ name: "pages", calls: [], routes, upgrade, start: () => void order.push("start") });
+	const version = memoryVersion("1");
+	const server = await testServer({ features: [feature], version });
+	assert.deepEqual(order, ["upgrade from 1", "start"]);
+	assert.equal(await version.read(), "2");
 	assert.equal(server.kernel.url(), undefined);
 	const doors = await server.listen(4620);
 	assert.equal(server.kernel.url(), doors.url);

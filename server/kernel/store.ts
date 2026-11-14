@@ -1,4 +1,4 @@
-import type { Bytes, Store } from "./types.ts";
+import type { Bytes, Store, VersionFile } from "./types.ts";
 
 // A feature's private state. MemoryStore keeps it in a Map, for tests; the
 // folder's store is in disk.ts. A key is any string; prefix filters keys().
@@ -44,4 +44,10 @@ export async function readJson<T>(store: Store, key: string, fallback: T): Promi
 
 export function writeJson(store: Store, key: string, value: unknown): Promise<void> {
 	return store.put(key, encoder.encode(JSON.stringify(value)));
+}
+
+/** A version record kept in memory, for tests. */
+export function memoryVersion(text?: string): VersionFile {
+	const kept = { text };
+	return { read: async () => kept.text, write: async (next) => void (kept.text = next) };
 }
