@@ -69,7 +69,7 @@ export const FileMatch = named("FileMatch", obj({ path: str(), line: int(), text
 export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file.");
 export const Screenshot = named("Screenshot", obj({ file: str(), size: Size, box: opt(Box), how: opt(str()) }), "A saved picture.");
 
-export const AgentKind = named("AgentKind", lit("pi", "claude", "opencode", "opencode2", "antigravity"));
+export const AgentKind = named("AgentKind", lit("pi", "claude", "opencode", "opencode2", "antigravity", "codex"));
 export const AgentMode = named("AgentMode", lit("manual", "acceptEdits", "plan", "auto"));
 export const Avatar = named("Avatar", union(obj({ emoji: str() }), obj({ svg: str() })), "An emoji, or an SVG with a viewBox.");
 export const Agent = named(
