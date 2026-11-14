@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type AnyCall, type Caller, type Node } from "../../../protocol/index.ts";
+import { MCP_PATH as PATH, PROTOCOL_VERSION, type AnyCall, type Caller, type Node } from "../../../protocol/index.ts";
 import type { Built } from "../kernel.ts";
 import { SERVER_VERSION } from "../own-calls.ts";
 
@@ -6,7 +6,7 @@ import { SERVER_VERSION } from "../own-calls.ts";
 // this caller may make here, named as the protocol names them, each with its
 // arguments as JSON Schema. A tool's result carries the envelope.
 
-export const MCP_PATH = "/mcp";
+export const MCP_PATH = PATH;
 const MCP_VERSION = "2025-06-18";
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 
