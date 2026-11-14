@@ -744,6 +744,8 @@
 	"harness/page/shell/PictureProgress.tsx: board": 1,
 	"harness/page/shell/TopBar.tsx: stage": 10,
 	"harness/page/shell/TopRight.tsx: board": 1,
+	"harness/page/shell/view.tsx: board": 1,
+	"harness/page/shell/view.tsx: stage": 36,
 	"harness/page/state/agent.ts: board": 3,
 	"harness/page/state/camera.ts: board": 2,
 	"harness/page/state/camera.ts: stage": 4,
