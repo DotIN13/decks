@@ -87,7 +87,7 @@ with an avatar you draw. Then read `DESIGN.md`, this file, and your brief.
 - **The kernel's interfaces** (`server/kernel/types.ts`) are Keel's now. They only grow: Keel adds, never
   changes or removes, and tells Easel, Folio, Roster and Lexicon each time. If you need something from the
   kernel, ask Keel; do not reach around it.
-- **Testing a feature.** Keel's first job is `server/kernel/testing.ts`: a real router on the in-memory
+- **Testing a feature.** Keel's first job is a testing module in the kernel: a real router on the in-memory
   deck, so a feature's calls are tested as calls. Until Keel says it is there, test your modules directly.
 - **A feature never imports another feature.** What crosses goes through the handler's context
   (`ctx.canvas(name)`, `ctx.deck`, `ctx.events`), an item kind, or a call. If that is not enough, ask Keel
