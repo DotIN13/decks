@@ -48,100 +48,90 @@ export function blocks(text: string): Block[] {
 	const out: Block[] = [];
 	const lines = text.replace(/\r\n?/g, "\n").split("\n");
 	let paragraph: string[] = [];
-
 	const flush = () => {
 		if (paragraph.length === 0) return;
 		out.push({ kind: "paragraph", spans: inline(paragraph.join("\n")) });
 		paragraph = [];
 	};
-
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i] ?? "";
-
-		const fence = FENCE.exec(line);
-		if (fence) {
-			flush();
-			const marker = fence[1]!;
-			const char = marker[0]!;
-			const body: string[] = [];
-			i += 1;
-			while (i < lines.length) {
-				const candidate = (lines[i] ?? "").trim();
-				if (candidate.length >= marker.length && candidate === char.repeat(candidate.length)) break;
-				body.push(lines[i] ?? "");
-				i += 1;
-			}
-			out.push({ kind: "code", text: body.join("\n"), lang: fence[2] ?? "" });
-			continue;
-		}
-
 		if (!line.trim()) {
 			flush();
 			continue;
 		}
-
-		// Before the bullet rule, because `---` and `***` match both and mean this.
-		if (RULE.test(line)) {
-			flush();
-			out.push({ kind: "rule" });
+		const found = blockAt(lines, i);
+		if (!found) {
+			paragraph.push(line);
 			continue;
 		}
-
-		const heading = HEADING.exec(line);
-		if (heading) {
-			flush();
-			out.push({ kind: "heading", level: heading[1]!.length, spans: inline(heading[2] ?? "") });
-			continue;
-		}
-
-		const quote = QUOTE.exec(line);
-		if (quote) {
-			flush();
-			const body = [quote[1] ?? ""];
-			while (i + 1 < lines.length) {
-				const next = QUOTE.exec(lines[i + 1] ?? "");
-				if (!next) break;
-				body.push(next[1] ?? "");
-				i += 1;
-			}
-			out.push({ kind: "quote", spans: inline(body.join("\n")) });
-			continue;
-		}
-
-		const first = BULLET.exec(line) ?? ORDERED.exec(line);
-		if (first) {
-			flush();
-			const ordered = ORDERED.test(line);
-			const items: ListItem[] = [];
-			for (;;) {
-				const current = lines[i] ?? "";
-				const match = (ordered ? ORDERED.exec(current) : BULLET.exec(current)) ?? BULLET.exec(current) ?? ORDERED.exec(current);
-				if (!match) break;
-				items.push({ spans: inline(match[3] ?? ""), depth: depthOf(match[1] ?? "") });
-				if (i + 1 >= lines.length) break;
-				const next = lines[i + 1] ?? "";
-				if (!BULLET.test(next) && !ORDERED.test(next)) break;
-				i += 1;
-			}
-			const start = ordered ? Number(ORDERED.exec(line)?.[2] ?? 1) : 1;
-			out.push({ kind: "list", ordered, start, items });
-			continue;
-		}
-
-		/* A table, and only once its divider has arrived. */
-		const table = tableAt(lines, i);
-		if (table) {
-			flush();
-			out.push(table.block);
-			i = table.end;
-			continue;
-		}
-
-		paragraph.push(line);
+		flush();
+		out.push(found.block);
+		i = found.end;
 	}
-
 	flush();
 	return out;
+}
+
+/** The block that starts at a line, with the index of its last line; nothing for a paragraph's line. */
+function blockAt(lines: string[], i: number): { block: Block; end: number } | undefined {
+	const line = lines[i] ?? "";
+	const fence = FENCE.exec(line);
+	if (fence) return fenceAt(lines, i, fence[1]!, fence[2] ?? "");
+	// Before the bullet rule, because `---` and `***` match both and mean this.
+	if (RULE.test(line)) return { block: { kind: "rule" }, end: i };
+	const heading = HEADING.exec(line);
+	if (heading) return { block: { kind: "heading", level: heading[1]!.length, spans: inline(heading[2] ?? "") }, end: i };
+	if (QUOTE.test(line)) return quoteAt(lines, i);
+	if (BULLET.test(line) || ORDERED.test(line)) return listAt(lines, i);
+	// A table, and only once its divider has arrived.
+	return tableAt(lines, i);
+}
+
+/** A fenced code block, to its closing fence of the same character, or to the end. */
+function fenceAt(lines: string[], at: number, marker: string, lang: string): { block: Block; end: number } {
+	const char = marker[0]!;
+	const body: string[] = [];
+	let i = at + 1;
+	while (i < lines.length) {
+		const candidate = (lines[i] ?? "").trim();
+		if (candidate.length >= marker.length && candidate === char.repeat(candidate.length)) break;
+		body.push(lines[i] ?? "");
+		i += 1;
+	}
+	return { block: { kind: "code", text: body.join("\n"), lang }, end: i };
+}
+
+/** A quote: this line and every quoted line after it. */
+function quoteAt(lines: string[], at: number): { block: Block; end: number } {
+	const body = [QUOTE.exec(lines[at] ?? "")?.[1] ?? ""];
+	let i = at;
+	while (i + 1 < lines.length) {
+		const next = QUOTE.exec(lines[i + 1] ?? "");
+		if (!next) break;
+		body.push(next[1] ?? "");
+		i += 1;
+	}
+	return { block: { kind: "quote", spans: inline(body.join("\n")) }, end: i };
+}
+
+/** A list: bulleted or numbered as its first line is, while the lines after it are list lines. */
+function listAt(lines: string[], at: number): { block: Block; end: number } {
+	const line = lines[at] ?? "";
+	const ordered = ORDERED.test(line);
+	const items: ListItem[] = [];
+	let i = at;
+	for (;;) {
+		const current = lines[i] ?? "";
+		const match = (ordered ? ORDERED.exec(current) : BULLET.exec(current)) ?? BULLET.exec(current) ?? ORDERED.exec(current);
+		if (!match) break;
+		items.push({ spans: inline(match[3] ?? ""), depth: depthOf(match[1] ?? "") });
+		if (i + 1 >= lines.length) break;
+		const next = lines[i + 1] ?? "";
+		if (!BULLET.test(next) && !ORDERED.test(next)) break;
+		i += 1;
+	}
+	const start = ordered ? Number(ORDERED.exec(line)?.[2] ?? 1) : 1;
+	return { block: { kind: "list", ordered, start, items }, end: i };
 }
 
 /** The table starting at `at`, or nothing, with the index of its last line. */
