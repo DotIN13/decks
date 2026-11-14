@@ -108,3 +108,12 @@ test("a window starts where a turn does", () => {
 	assert.equal(all[windowStart(all, "a3", 60)]!.id, "u3", "and so does a row asked for");
 	assert.equal(windowStart(all.slice(1), "a0", 60), 0, "before any message of yours, the start of all");
 });
+
+test("a line divides two cards only across a day, saying Today, Yesterday or the date", async () => {
+	const { divides } = await import("./model.ts");
+	const now = Date.UTC(2026, 10, 14, 20);
+	assert.equal(divides(now - 60_000, now, now), undefined);
+	assert.equal(divides(now - 3 * 86_400_000, now, now), "Today");
+	assert.equal(divides(now - 3 * 86_400_000, now - 86_400_000, now), "Yesterday");
+	assert.equal(divides(undefined, now, now), undefined);
+});

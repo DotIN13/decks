@@ -1,3 +1,4 @@
+import { dayKey, formatDate, yearOf } from "@decks/ui";
 import type { ChatItem } from "@decks-next/protocol";
 
 /** How much of a long conversation is in the DOM, and how it grows (DESIGN §6.2). */
@@ -51,4 +52,15 @@ export function prepend(page: readonly ChatItem[], held: readonly ChatItem[]): C
 	if (page.length === 0) return [...held];
 	const have = new Set(held.map((item) => item.id));
 	return [...page.filter((item) => !have.has(item.id)), ...held];
+}
+
+/** The label for a day boundary between two cards, or nothing if they are from the same day. */
+export function divides(before: number | undefined, at: number | undefined, now: number = Date.now()): string | undefined {
+	if (!at || !before) return undefined;
+	// Days in the deck's timezone: "Yesterday" is the person's yesterday.
+	if (dayKey(before) === dayKey(at)) return undefined;
+	if (dayKey(at) === dayKey(now)) return "Today";
+	if (dayKey(at) === dayKey(now - 86_400_000)) return "Yesterday";
+	const sameYear = yearOf(at) === yearOf(now);
+	return formatDate(at, { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) });
 }
