@@ -689,8 +689,6 @@
 	"harness/page/agents/Dialog.tsx: em dash": 7,
 	"harness/page/agents/NewWorkspace.tsx: comment over 5 lines": 1,
 	"harness/page/agents/ring-sync.ts: comment over 5 lines": 1,
-	"harness/page/App.tsx: comment over 5 lines": 15,
-	"harness/page/App.tsx: em dash": 24,
 	"harness/page/app/apps-panel.ts: comment over 5 lines": 1,
 	"harness/page/app/bar.ts: comment over 5 lines": 1,
 	"harness/page/app/camera-report.ts: comment over 5 lines": 3,

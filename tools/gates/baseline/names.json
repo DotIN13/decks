@@ -665,8 +665,6 @@
 	"harness/page/agents/AgentHoverCard.tsx: board": 3,
 	"harness/page/agents/AgentPill.tsx: board": 7,
 	"harness/page/agents/AgentPill.tsx: stage": 24,
-	"harness/page/App.tsx: board": 36,
-	"harness/page/App.tsx: stage": 79,
 	"harness/page/app/apps-panel.ts: board": 3,
 	"harness/page/app/apps-panel.ts: stage": 2,
 	"harness/page/app/bar.ts: stage": 8,
