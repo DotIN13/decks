@@ -20,8 +20,6 @@ export const decksCommands = (): string => process.env.DECKS_REFERENCE ?? resolv
 export const guidelinesFile = (): string => resolve(HERE, "guidelines.txt");
 /** The base context, with {{DECK_NAME}} and the rest filled in. */
 export const agentsTemplate = (): string => resolve(HERE, "AGENTS.md.tmpl");
-/** The Google Docs tools' words. */
-export const gdocsTools = (): string => resolve(HERE, "gdocs-tools.json");
 /** opencode's config folder: its tools, plugin and skills. */
 export const opencodeConfigDir = (): string => resolve(HERE, "opencode");
 /** OpenCode 2's plugin folder, named to its server by absolute path. */
