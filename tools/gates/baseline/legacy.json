@@ -1,4 +1,3 @@
 {
-	"dead-exports: harness/page/state/sync.ts: identityFor": 1,
 	"stale-paths: harness/page/lib/media.ts: lib/panels.ts": 1
 }
