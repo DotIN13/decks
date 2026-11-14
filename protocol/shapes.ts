@@ -1,4 +1,7 @@
+import { AgentKind, AgentMode, ChatItem } from "./chat.ts";
 import { any, arr, bool, int, lit, named, nul, num, obj, opt, rec, str, union, type Infer } from "./schema.ts";
+
+export { AgentKind, AgentMode, ChatItem };
 
 // The shapes calls take and give. Each is named, so the generators declare it
 // once. One geometry: Box, Size, Point. A path starts at the deck's root.
@@ -69,8 +72,6 @@ export const FileMatch = named("FileMatch", obj({ path: str(), line: int(), text
 export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file.");
 export const Screenshot = named("Screenshot", obj({ file: str(), size: Size, box: opt(Box), how: opt(str()) }), "A saved picture.");
 
-export const AgentKind = named("AgentKind", lit("pi", "claude", "opencode", "opencode2", "antigravity", "codex"));
-export const AgentMode = named("AgentMode", lit("manual", "acceptEdits", "plan", "auto"));
 export const Avatar = named("Avatar", union(obj({ emoji: str() }), obj({ svg: str() })), "An emoji, or an SVG with a viewBox.");
 export const Agent = named(
 	"Agent",
@@ -94,7 +95,18 @@ export const Agent = named(
 );
 export const AgentChange = named(
 	"AgentChange",
-	obj({ name: opt(str()), avatar: opt(Avatar), tags: opt(arr(str())), workspace: opt(union(str(), nul)), canvas: opt(str()), model: opt(str()), thinking: opt(str()), mode: opt(AgentMode) }),
+	obj({
+		name: opt(str()),
+		avatar: opt(Avatar),
+		tags: opt(arr(str())),
+		workspace: opt(union(str(), nul)),
+		canvas: opt(str()),
+		model: opt(str()),
+		thinking: opt(str()),
+		mode: opt(AgentMode),
+		state: opt(str("What the agent is doing: idle, thinking, tool, error. Only its host sets it.")),
+		queued: opt(int("How many items wait in its host's queue. Only its host sets it.")),
+	}),
 	"What agent.update may change.",
 );
 export const Message = named(
@@ -134,7 +146,6 @@ export const Studio = named("Studio", obj({ connected: bool(), url: opt(str()) }
 export const Now = named("Now", obj({ iso: str(), timezone: str(), words: str(), epoch: num() }), "The time where the person is.");
 export const Deck = named("Deck", obj({ version: str(), protocol: str(), timezone: opt(str()), requireCode: opt(bool()), warnings: arr(str()) }), "The deck as its server sees it.");
 
-export const ChatItem = named("ChatItem", obj({ id: str(), kind: str(), at: num() }, true), "One entry of a conversation.");
 export const Account = named("Account", obj({ id: str(), label: str(), active: bool(), spending: opt(str()) }), "A login the harness holds.");
 export const Runtime = named("Runtime", obj({ kind: AgentKind, available: bool(), reason: opt(str()), models: opt(arr(str())) }), "A kind of agent this harness can run.");
 export const Settings = named("Settings", obj({}, true), "A settings page: the harness's, or one agent's.");
