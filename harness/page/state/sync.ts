@@ -7,7 +7,7 @@ import { ensureAgent, nameOf, setState, state } from "./deck.ts";
 import { call, on } from "./line.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
-import { accountsOf, cardsOn, chatOf, identityOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
+import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
 import type { AgentState, ClaudeAccount } from "./types/index.ts";
 import { accountChanged, releasePages } from "./ui.ts";
 import { hearChat } from "./sync-chat.ts";
@@ -170,9 +170,3 @@ function forget(id: string): void {
 	setState("identities", id, undefined as never);
 	setState("contexts", id, undefined as never);
 }
-
-/** The identity of an agent by id, for a caller that has only the record. */
-export const identityFor = (id: string) => {
-	const agent = held.agents.find((one) => one.id === id);
-	return agent ? identityOf(agent) : undefined;
-};

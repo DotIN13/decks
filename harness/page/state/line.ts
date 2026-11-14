@@ -1,4 +1,4 @@
-import { clientFor, DecksError, type Client, type Heard, type Stream, type Typed } from "@decks-next/sdk";
+import { clientFor, DecksError, type Client, type Heard, type Stream, type Typed } from "@decks-next/sdk/browser";
 import { batch } from "solid-js";
 
 // The page's one line to the server: every call through @decks-next/sdk, and

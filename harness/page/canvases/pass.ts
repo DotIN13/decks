@@ -1,10 +1,9 @@
 import { api } from "../connections/connection.ts";
-import { cardCalls } from "@decks/api";
-import { connect } from "@decks/sdk";
 import { authHeaders } from "../lib/session.ts";
 import type { CanvasPass } from "@decks/canvas";
 import { ask } from "../state/confirm.ts";
-import { deckAddress, stageOnScreen } from "../state/decks.ts";
+import { call as callServer } from "../state/line.ts";
+import { cardCall, cardMayCall } from "./card-calls.ts";
 
 /**
  * A canvas pass for the one canvas the frame shows (`server/src/auth/passes.ts`), asked for with this
@@ -50,8 +49,7 @@ async function askPass(canvas: string): Promise<CanvasPass> {
 	};
 }
 
-/** A card's calls the page answers (`@decks/api`, a verb's `card: "page"`; `@decks/canvas`, `frame/card-calls.ts`): the agents, and showing another canvas. */
-const FOR_CARDS = cardCalls("page");
+/** A card's calls the page answers (`card-calls.ts`): the agents, and showing another canvas. */
 /** The ones that put words in front of an agent, or make one: each waits for your OK. */
 const ASKS_FIRST: Record<string, (args: unknown[]) => string> = {
 	"agent.send": (args) => `send ${String(args[0] ?? "an agent")} this message now: “${clip((args[1] as { task?: unknown } | undefined)?.task)}”`,
@@ -70,12 +68,14 @@ const clip = (text: unknown) => {
  * say; reading who the agents are, and showing another canvas, are not.
  */
 export async function cardAgentCall(call: { verb: string; args: unknown[]; card: string }): Promise<unknown> {
-	if (!FOR_CARDS.has(call.verb)) throw new Error(`${call.verb} is not a card's to call.`);
+	if (!cardMayCall(call.verb)) throw new Error(`${call.verb} is not a card's to call.`);
 	const asking = ASKS_FIRST[call.verb];
 	if (asking) {
 		const yes = await ask({ title: "Let this card message an agent?", body: `${call.card} wants to ${asking(call.args)}.`, yes: "Allow", no: "Don't allow" });
 		if (!yes) throw new Error(`You did not let ${call.card} ${call.verb === "agent.create" ? "start an agent" : "message an agent"}.`);
 	}
-	const answer = await connect({ url: deckAddress(), stage: () => stageOnScreen(), notes: () => {}, headers: authHeaders() }).call(call.verb, call.args);
+	const [name, args] = cardCall(call.verb, call.args);
+	const answer = await callServer(name, args);
+	if (!answer.ok) throw new Error(answer.error);
 	return answer.value;
 }
