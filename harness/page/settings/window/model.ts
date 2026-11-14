@@ -1,4 +1,4 @@
-// The Settings window's sections, in the order its left side lists them, and
+// The sections of Settings, in the order its left side lists them, and
 // which opens first: the last one opened, kept in this browser.
 
 export const SECTIONS = [
