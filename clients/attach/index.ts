@@ -26,11 +26,12 @@ export async function attach(words: string[], client?: Client): Promise<string> 
 	const dir = f.dir ?? process.cwd();
 	const decks = client ?? (await connect());
 	const { value } = await decks.call("agent.attach", { kind: tool, ...(f.as ? { name: f.as } : {}), ...(f.canvas ? { canvas: f.canvas } : {}) });
-	const agent = value as { id: string; name: string; token?: string; color?: string };
+	const agent = value as { id: string; name: string; token?: string; color?: string; canvas?: string };
 	if (!agent.token) throw new Error(`agent.attach gave ${agent.name} no token.`);
+	if (!agent.canvas) throw new Error(`agent.attach gave ${agent.name} no home canvas, so its calls would have no here.`);
 	const files = plan(tool, { url: decks.url, token: agent.token, agent: agent.name, cli: CLI, mcp: MCP });
 	const manifest = apply(dir, files, { tool, agent: agent.id, url: decks.url });
-	return `${agent.name} is attached here as a ${tool} agent${agent.color ? ` in ${agent.color}` : ""}: wrote ${[...manifest.made, ...Object.keys(manifest.before)].join(", ")}. decks detach undoes it.`;
+	return `${agent.name} is attached here as a ${tool} agent${agent.color ? ` in ${agent.color}` : ""}, at home on ${agent.canvas}: wrote ${[...manifest.made, ...Object.keys(manifest.before)].join(", ")}. decks detach undoes it.`;
 }
 
 export async function detach(words: string[], client?: Client): Promise<string> {

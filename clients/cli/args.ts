@@ -61,6 +61,20 @@ function split(words: string[]): { flags: [string, string][]; rest: string[] } {
 	return { flags, rest };
 }
 
+/** Whether an object shape (or a union holding one) takes a key. */
+function takes(node: Node | undefined, key: string): boolean {
+	const options: Node[] = node?.k === "union" ? [...node.of] : node ? [node] : [];
+	return options.some((one) => one.k === "obj" && (key in one.props || one.rest !== undefined));
+}
+
+/** A flag's path: its own key, or inside the first object argument that takes it (--type card fills item). */
+function homed(input: Obj, keys: string[]): string[] | undefined {
+	const top = keys[0]!;
+	if (top in input.props) return keys;
+	const home = Object.keys(input.props).find((name) => takes(input.props[name], top));
+	return home ? [home, ...keys] : undefined;
+}
+
 /** The arguments object a command line gives a call. */
 export function argsOf(call: AnyCall, words: string[], stdin: () => string): Record<string, unknown> {
 	const input = call.input as Obj;
@@ -69,14 +83,14 @@ export function argsOf(call: AnyCall, words: string[], stdin: () => string): Rec
 	if (all) return JSON.parse(all[1] === "-" ? stdin() : all[1]) as Record<string, unknown>;
 	const args: Record<string, unknown> = {};
 	for (const [key, raw] of flags) {
-		const keys = key.split(".");
-		const top = keys[0]!;
-		if (!(top in input.props) && input.rest === undefined) throw new Usage(`decks ${call.name.replace(".", " ")} has no flag --${top}.`);
+		const keys = homed(input, key.split("."));
+		if (!keys) throw new Usage(`decks ${call.name.replace(".", " ")} has no flag --${key.split(".")[0]}.`);
 		let target = args;
 		for (const part of keys.slice(0, -1)) target = (target[part] ??= {}) as Record<string, unknown>;
 		target[keys[keys.length - 1]!] = valueOf(raw, shapeAt(input, keys), stdin);
 	}
-	const wordKeys = Object.keys(input.props).filter((key) => !(key in args) && key !== "canvas" && key !== "frame" && plain(input.props[key]!));
+	const isOption = (key: string) => (key === "canvas" || key === "frame") && !input.required.includes(key);
+	const wordKeys = Object.keys(input.props).filter((key) => !(key in args) && !isOption(key) && plain(input.props[key]!));
 	let next = 0;
 	for (const key of wordKeys) {
 		if (next >= rest.length) break;

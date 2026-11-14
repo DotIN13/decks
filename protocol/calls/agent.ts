@@ -53,7 +53,7 @@ export const remove = defineCall({ name: "agent.delete", summary: "Remove an age
 
 export const attach = defineCall({
 	name: "agent.attach",
-	summary: "Trade a person's login for an agent of its own: a name, a colour and a token, kept for a terminal agent.",
+	summary: "Trade a person's login for an agent of its own: a name, a colour, a token, and a home canvas, the one named or a new one titled for it.",
 	who: PERSON,
 	args: { name: opt(str()), kind: opt(AgentKind), workspace: opt(str()), canvas: opt(str()) },
 	answer: Agent,

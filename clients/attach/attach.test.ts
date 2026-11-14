@@ -12,7 +12,7 @@ import { attach, detach } from "./index.ts";
 // exactly as it was, files that were already there included.
 
 let fake: Fake;
-const agent = { id: "a7", name: "Wren", color: "#3b6fd8", tags: [], token: "agent-token" };
+const agent = { id: "a7", name: "Wren", color: "#3b6fd8", tags: [], token: "agent-token", canvas: "wren" };
 before(async () => {
 	fake = await fakeServer(4608, { "agent.attach": (args) => ({ ...agent, kind: args.kind }), "agent.delete": () => ({ deleted: "a7" }) });
 });

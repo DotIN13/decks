@@ -18,8 +18,10 @@ The `decks` command: `decks <noun> <verb>` for every call of the protocol, and `
 ## Rules
 
 1. A plain argument (a string, a number, a list of strings) is a word, in the order the call declares
-   it; `canvas` and `frame` are always flags. Every other key is `--key value`, and `--key.sub value`
-   goes inside it. A value that is not plain is JSON; `-` reads stdin; `--args '<JSON>'` gives all.
+   it; `canvas` and `frame` are flags, except where the canvas is the thing itself (`decks view goto
+   plan`). Every other key is `--key value`, and `--key.sub value` goes inside it; a key the call does not
+   take goes into its first object argument that does (`decks item insert --type card --card p`). A value
+   that is not plain is JSON; `-` reads stdin; `--args '<JSON>'` gives all.
 2. The value goes to stdout, a string as it is and anything else as JSON. Notes go to stderr.
 3. A refusal goes to stderr as `decks: <sentence> (<code>)` and the hint as `try: decks <noun> <verb>`;
    the command exits 1.
