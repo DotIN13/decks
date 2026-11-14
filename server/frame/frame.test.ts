@@ -44,3 +44,13 @@ test("a pass opens its canvas's files, and nothing else", async () => {
 	await doors.close();
 	await server.close();
 });
+
+test("a card asked at a revision is the card's folder", async () => {
+	const server = await testServer({ features: features(), deck: { ...deck, "canvases/plan/cards/one/index.html": "<p>one</p>" } });
+	const doors = await server.listen(0);
+	const got = (await (await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify({ canvas: "plan" }) })).json()) as { pass: string };
+	const raw = await fetch(`${doors.url}/api/t/${got.pass}/card/canvases/plan/cards/one@4/index.html?raw=1`);
+	assert.equal(await raw.text(), "<p>one</p>");
+	await doors.close();
+	await server.close();
+});
