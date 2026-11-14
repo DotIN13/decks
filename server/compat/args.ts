@@ -72,6 +72,11 @@ function shaped(now: string, old: string, args: Args): Args {
 	if (now === "canvas.undo") return { ...(args.canvas ? { canvas: args.canvas } : {}), redo: args.direction === "redo" };
 	if (old === "canvas.edit" && Array.isArray(args.ops)) args.ops = args.ops.map(itemOp);
 	if (now === "file.url" && typeof args.file === "string" && args.path === undefined) args.path = args.file;
+	// An agent was named by id in today's person calls; the new agent and chat calls take agent.
+	if (/^(agent|chat)\./.test(now) && args.id !== undefined && args.agent === undefined) {
+		args.agent = args.id;
+		delete args.id;
+	}
 	return args;
 }
 

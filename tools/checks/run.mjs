@@ -31,11 +31,19 @@ function personToken(deck) {
 /** The page is ready once its dev server answers /page.json. */
 const pageReady = (ports) => fetch(`http://127.0.0.1:${ports.web}/page.json`).then((r) => r.ok, () => false);
 
-/** The harness listens on no port: it is ready once the server relays runtime.list to it. */
+/**
+ * The harness listens on no port: it is ready once the server relays runtime.list to it and the
+ * deck has its first agent, which the harness makes on a deck with none, as today's server did.
+ */
 async function harnessReady(ports, deck) {
+	const post = async (name) => {
+		const answer = await fetch(`http://127.0.0.1:${ports.server}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${personToken(deck)}`, "content-type": "application/json" }, body: "{}" });
+		return (await answer.json()) ?? {};
+	};
 	try {
-		const answer = await fetch(`http://127.0.0.1:${ports.server}/api/v1/runtime.list`, { method: "POST", headers: { authorization: `Bearer ${personToken(deck)}`, "content-type": "application/json" }, body: "{}" });
-		return ((await answer.json()) ?? {}).ok === true;
+		if ((await post("runtime.list")).ok !== true) return false;
+		const agents = await post("agent.list");
+		return agents.ok === true && Array.isArray(agents.value) && agents.value.length > 0;
 	} catch {
 		return false;
 	}
@@ -60,8 +68,19 @@ async function until(ready, child, name) {
 /** This shell's environment without any DECKS_ variable: a check must never reach the person's own Decks. */
 const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("DECKS_")));
 
+/** Every program running now, so an interrupted runner leaves none behind. */
+const LIVE = new Set();
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+	process.on(sig, () => {
+		for (const child of LIVE) signal(child, "SIGKILL");
+		process.exit(130);
+	});
+}
+
 function launch(name, { cmd, args, env = {} }, log) {
 	const child = spawn(cmd, args, { cwd: ROOT, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+	LIVE.add(child);
+	child.once("exit", () => LIVE.delete(child));
 	for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => log.push(`[${name}] ${chunk}`));
 	return child;
 }
