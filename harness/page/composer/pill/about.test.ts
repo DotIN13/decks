@@ -9,7 +9,7 @@ import { aboutAddress, aboutComment, aboutSent, commentName, commentPill, messag
 const mine: WaitingComment = { id: "c1", board: "canvases/md/cards/sdk/index.html", component: "choices", quote: "Corner only", text: "Use this one.", at: 1 };
 const handed: WaitingComment = { id: "c2", board: "canvases/md/cards/sdk/index.html", quote: "SDK; each", text: "test note\nsecond line", at: 2, from: "canvas" };
 const drawn: WaitingComment = { id: "c3", board: "canvases/md/canvas.pen", items: ["note-4", "arrow-7"], quote: "hello", text: "", at: 3 };
-const board: DraftMention = { type: "mention", kind: "card", id: "canvases/x/boards/the-chrome-choice.html", label: "The chrome choice" };
+const card: DraftMention = { type: "mention", kind: "card", id: "canvases/x/cards/the-chrome-choice/index.html", label: "The chrome choice" };
 const item: DraftMention = { type: "mention", kind: "item", id: "rect-9", label: "a square", name: "a square" };
 
 test("a pill's exact text is what the message carries for it", () => {
@@ -17,14 +17,14 @@ test("a pill's exact text is what the message carries for it", () => {
 	const block = commentBlock(comments);
 	comments.forEach((comment, index) => assert.ok(block.includes(aboutComment(comment, index + 1).exact), comment.id));
 	assert.equal(aboutComment(mine, 2).exact, "2. canvases/md/cards/sdk/index.html, in #choices\n   > Corner only\n   Use this one.");
-	assert.equal(aboutAddress(board).exact, "@canvases/x/boards/the-chrome-choice.html");
+	assert.equal(aboutAddress(card).exact, "@canvases/x/cards/the-chrome-choice/index.html");
 	assert.equal(aboutAddress(item).exact, "@item:rect-9");
 	assert.equal(aboutAddress(fileMention("assets/plan.pdf")).exact, "@assets/plan.pdf");
 	assert.equal(aboutAddress(fileMention("assets/plan.pdf")).of, "file");
 	assert.equal(aboutComment(handed, 1).canvas, true);
 	assert.equal(aboutComment(mine, 1).name, "sdk");
 	assert.equal(aboutComment(mine, 1, () => "SDK decisions").name, "SDK decisions");
-	assert.equal(pathName("boards/plan.html"), "plan");
+	assert.equal(pathName("cards/plan/index.html"), "plan");
 });
 
 test("a sent message reads back into the pills it was written with", () => {
@@ -34,7 +34,7 @@ test("a sent message reads back into the pills it was written with", () => {
 		{ type: "text", text: " and look at " },
 		commentPill(handed),
 		{ type: "text", text: " before you move " },
-		board,
+		card,
 		{ type: "text", text: " and " },
 		item,
 		{ type: "text", text: ". The numbers are in " },
@@ -52,7 +52,7 @@ test("a sent message reads back into the pills it was written with", () => {
 		" and look at ",
 		`comment:${commentPill(handed).label}`,
 		" before you move ",
-		`card:${board.id}`,
+		`card:${card.id}`,
 		" and ",
 		"item:rect-9",
 		". The numbers are in ",
@@ -70,12 +70,12 @@ test("a sent message reads back into the pills it was written with", () => {
 	assert.equal(first.canvas, undefined);
 });
 
-test("comments sent with no words, items, whole boards, and plain messages", () => {
+test("comments sent with no words, items, whole cards, and plain messages", () => {
 	const only = readSent(withComments("", [mine, drawn]))!;
 	assert.equal(only.draft.filter((node) => node.type === "mention").length, 2);
 	assert.deepEqual(only.comments.get("sent-2")?.items, ["note-4", "arrow-7"]);
 	assert.equal(only.comments.get("sent-2")?.quote, "hello");
-	const whole = readSent(withComments("Look", [{ id: "w", board: "boards/plan.html", quote: "", text: "all of it", at: 0 }]))!;
+	const whole = readSent(withComments("Look", [{ id: "w", board: "cards/plan/index.html", quote: "", text: "all of it", at: 0 }]))!;
 	assert.equal(whole.comments.get("sent-1")?.text, "all of it");
 	assert.equal(whole.comments.get("sent-1")?.quote, "");
 	// Words with no pills, a name, an email: the text as it is.
@@ -84,14 +84,14 @@ test("comments sent with no words, items, whole boards, and plain messages", () 
 });
 
 const longTitle = "The chrome choice is who owns the canvas's behaviour rules and the frame's";
-const titleOf = (path: string) => (path === board.id ? longTitle : path.endsWith("sdk/index.html") ? "SDK redesign decisions" : undefined);
+const titleOf = (path: string) => (path === card.id ? longTitle : path.endsWith("sdk/index.html") ? "SDK redesign decisions" : undefined);
 const itemName = (id: string) => (id === "note-4" ? "Seventeen gaps remain" : undefined);
 
-test("each kind of pill has a name: a comment's board or card, a board's title, an item's name, a file's name", () => {
+test("each kind of pill has a name: a comment's card, a card's title, an item's name, a file's name", () => {
 	assert.equal(commentName(mine, titleOf), "SDK redesign decisions");
 	assert.equal(commentName({ ...drawn, items: ["note-4"] }, titleOf, itemName), "Seventeen gaps remain");
 	assert.equal(commentName(drawn), "2 items");
-	assert.equal(aboutAddress(board, titleOf).name, longTitle);
+	assert.equal(aboutAddress(card, titleOf).name, longTitle);
 	assert.equal(aboutAddress(item, undefined, itemName).name, "a square");
 	assert.equal(aboutAddress({ ...item, id: "note-4" }, undefined, itemName).name, "Seventeen gaps remain");
 	assert.equal(aboutAddress(fileMention("assets/deep/plan.pdf")).name, "plan.pdf");
@@ -109,7 +109,7 @@ test("a sent message keeps its parts: names, who put each in, what its card show
 		{ type: "text", text: " and " },
 		commentPill(handed, titleOf),
 		{ type: "text", text: " before you move " },
-		{ ...board, name: longTitle },
+		{ ...card, name: longTitle },
 		{ type: "text", text: " and " },
 		item,
 		{ type: "text", text: " in " },
@@ -151,9 +151,6 @@ test("a sent message keeps its parts: names, who put each in, what its card show
 	assert.equal(aboutSent(reading, pills[1]!)!.name, "SDK redesign decisions");
 	assert.equal(aboutSent(reading, pills[3]!)!.name, "a square");
 	assert.equal(aboutSent(reading, pills[2]!)!.name, longTitle);
-	// A message saved before cards says "card" for a card: its pill is a card's.
-	const old = readParts([{ type: "mention", kind: "board" as "card", id: "boards/plan.html", name: "The plan", from: "you" }])!;
-	assert.equal((old.draft[0] as DraftMention).kind, "card");
 	// A comment the message did not carry (its pill was there, its comment was not sent) is left out.
 	assert.equal(messageParts([commentPill(drawn)], notes).length, 0);
 });

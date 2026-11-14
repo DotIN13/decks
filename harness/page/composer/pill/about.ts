@@ -1,5 +1,6 @@
 import { commentLabel, type Draft, type DraftMention, mentionAddress, shortLabel } from "../draft/model.ts";
 import type { PillAbout } from "./card.ts";
+import { cardKind, OLD_HEADS, WHOLE_ENDS } from "./compat/old-words.ts";
 import type { MessageMention, MessagePart } from "@decks-next/protocol";
 import { commentItem } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/index.ts";
@@ -80,7 +81,7 @@ export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: I
 	const name = addressName(node, titleOf, itemName);
 	if (node.kind === "file") return { name, of: "file", source: `File, in the deck as ${node.id}`, exact };
 	if (node.kind === "item") return { name, of: "shape", source: "On the canvas, a drawn item", exact };
-	return { name, of: "card", source: `On the canvas, a board or card: ${node.id}`, exact };
+	return { name, of: "card", source: `On the canvas, a card: ${node.id}`, exact };
 }
 
 // --- a sent message, kept as its parts --------------------------------------------------
@@ -165,8 +166,7 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 			draft.push(commentPill(comment));
 			continue;
 		}
-		// A message saved before cards says "card" for a card.
-		const kind = (part.kind as string) === "board" ? "card" : part.kind;
+		const kind = cardKind(part.kind) as typeof part.kind;
 		draft.push({ type: "mention", kind, id: part.id, label: part.label || shortLabel(name), name });
 	}
 	return draft.some((node) => node.type === "mention") ? { draft, comments, exact } : undefined;
@@ -175,8 +175,7 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 // --- a sent message, read back from its text (one sent before parts were kept) -------------
 
 const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
-	[/^A comment on a (?:card|board)\. The quoted words are what I selected:$/, () => 1],
-	[/^(\d+) comments on (?:cards|boards)\. The quoted words are what I selected:$/, (m) => Number(m[1])],
+	...OLD_HEADS,
 	[/^A comment on items drawn on a canvas:$/, () => 1],
 	[/^(\d+) comments on items drawn on a canvas:$/, (m) => Number(m[1])],
 ];
@@ -193,7 +192,7 @@ function readEntry(lines: string[], n: number): WaitingComment {
 		comment.quote = drawn[3] ?? "";
 	} else {
 		let where = first;
-		const whole = [", the whole card", ", the whole board"].find((end) => where.endsWith(end));
+		const whole = WHOLE_ENDS.find((end) => where.endsWith(end));
 		if (whole) where = where.slice(0, -whole.length);
 		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
 		const inside = /^(.*), in #(\S+)$/.exec(where);
