@@ -89,7 +89,8 @@ export interface Feature {
 	start?(kernel: Kernel): Stop | void | Promise<Stop | void>;
 }
 
-export type DefineFeature = (feature: Feature) => Feature;
+/** Declare a feature: its name, its handled calls, its item kinds, its start. */
+export const defineFeature = (feature: Feature): Feature => feature;
 
 /** handle(call, fn) and handleAll(calls, fns), bound to the handler's context. */
 export const { handle, handleAll } = handlersFor<Context>();

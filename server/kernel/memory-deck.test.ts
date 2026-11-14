@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Caller } from "../../protocol/index.ts";
 import { MemoryDeck } from "./memory-deck.ts";
-import { toDeckPath, type FileChange } from "./types.ts";
+import { defineFeature, toDeckPath, type FileChange } from "./types.ts";
 
 // The in-memory deck keeps the Deck's promises: reads what was written,
 // records who wrote it, lists folders, tells watchers, refuses bad paths.
@@ -77,4 +77,12 @@ test("the deck keeps its own copy of what it was given", async () => {
 	await deck.write(p("f"), bytes, ann);
 	bytes[0] = 9;
 	assert.equal((await deck.read(p("f")))[0], 1);
+});
+
+test("a feature built on a MemoryDeck starts with the kernel it is handed", async () => {
+	const deck = new MemoryDeck({ "a.txt": "x" });
+	let seen = "";
+	const feature = defineFeature({ name: "probe", calls: [], start: async (kernel) => void (seen = new TextDecoder().decode(await kernel.deck.read(p("a.txt")))) });
+	await feature.start?.({ deck, events: { emit() {}, on: () => () => {} }, canvas: () => ({ read: () => [], apply: () => ({ items: [], rev: 0 }), since: () => [] }) });
+	assert.equal(seen, "x");
 });
