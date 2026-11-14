@@ -42,6 +42,7 @@ export class HistoryDeck implements Deck {
 	}
 
 	async write(path: DeckPath, bytes: Bytes, by: Caller): Promise<Revision> {
+		if (!this.latest(path, Infinity)) await this.baseline(path).catch(() => []);
 		const done = await this.inner.write(path, bytes, by);
 		await this.record({ path, rev: done.rev, by: done.by, at: done.at, kind: "written" }, bytes);
 		return done;

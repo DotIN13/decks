@@ -106,6 +106,12 @@ for (const [name, make] of [["memory", memory], ["folder", folder]] as const) {
 		assert.equal(text(await deck.readAt(p("old.md"), gone.rev - 1)), "kept");
 	}, { "old.md": "kept" });
 
+	run("a file there before history began keeps its words after a write", async (deck) => {
+		const done = await deck.write(p("old.md"), enc("new"), ann);
+		assert.equal(text(await deck.readAt(p("old.md"), done.rev - 1)), "kept");
+		assert.equal((await deck.revisions(p("old.md"))).length, 2);
+	}, { "old.md": "kept" });
+
 	run("the whole deck goes back to a revision", async (deck) => {
 		const at = await deck.write(p("a.md"), enc("a1"), ann);
 		await deck.write(p("a.md"), enc("a2"), ann);
