@@ -664,8 +664,6 @@
 	"harness/page/agents/agent-sections.ts: board": 1,
 	"harness/page/agents/AgentEdit.tsx: stage": 1,
 	"harness/page/agents/AgentHoverCard.tsx: board": 3,
-	"harness/page/agents/AgentPill.tsx: board": 7,
-	"harness/page/agents/AgentPill.tsx: stage": 24,
 	"harness/page/app/apps-panel.ts: board": 3,
 	"harness/page/app/apps-panel.ts: stage": 2,
 	"harness/page/app/bar.ts: stage": 8,
