@@ -9,7 +9,7 @@ import { CanvasHost, type CanvasHostInputs } from "../app/canvas-host.tsx";
 import { moreItems } from "../app/more-menu.ts";
 import { destination, destinationLabel } from "../app/send-from-bar.ts";
 import { copyShared, deleteCanvas, moveConversation, newCanvas, openCanvas, renameCanvas, setStagesOpen, stagesOpen } from "../canvases/actions.ts";
-import { CanvasManager } from "../canvases/CanvasManager.tsx";
+import { CanvasManager } from "../canvases/manager/view.tsx";
 import { CanvasOps } from "../canvases/CanvasOps.tsx";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
 import { can } from "../connections/backend.ts";
