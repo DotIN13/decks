@@ -1,13 +1,15 @@
 import { byNoun, CALL_BY_NAME, type AnyCall, type Answer, type Args } from "../../protocol/index.ts";
 import { find, tokensFile } from "./find.ts";
 import { DecksError, post, type Answered } from "./http.ts";
+import { host, type Answerer, type Host, type HostOptions } from "./host.ts";
+import { Line, type Ask } from "./line.ts";
 import { listen, type Heard, type Stream, type Watch } from "./socket.ts";
 
 // @decks-next/sdk: every call, typed from the protocol, over HTTP; the event
 // stream over the socket. decks.item.move({ id, at }) answers the item as it
 // now is; a refusal throws a DecksError with code, message and hint.
 
-export { DecksError, find, tokensFile, type Answered, type Heard, type Stream, type Watch };
+export { DecksError, find, host, Line, tokensFile, type Answered, type Answerer, type Heard, type Host, type HostOptions, type Ask, type Stream, type Watch };
 
 type Nouns = typeof byNoun;
 type VerbOf<C> = C extends { name: `${string}.${infer V}` } ? V : never;
