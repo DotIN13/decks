@@ -123,3 +123,9 @@ test("--shrink lowers a baseline and never adds to it", async () => {
 	assert.deepEqual(state.problems, ["server/a.ts: top-level let y"]);
 	assert.deepEqual(JSON.parse(execFileSync("cat", [join(dir, "tools/gates/baseline/state.json")], { encoding: "utf8" })), {});
 });
+test("--adopt records a moved folder's breaks and nothing else", async () => {
+	const dir = scratch({ "harness/page/a.ts": "let x = 0;\n", "server/b.ts": "let y = 0;\n", "tools/gates/baseline/state.json": "{}\n" });
+	const [state] = await runGates({ root: dir, only: "state", adopt: "harness/page/", quiet: true });
+	assert.deepEqual(state.problems, ["server/b.ts: top-level let y"]);
+	await assert.rejects(runGates({ root: dir, only: "state", adopt: "server/", quiet: true }), /moved folder/);
+});

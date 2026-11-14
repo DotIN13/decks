@@ -9,12 +9,15 @@ import { join, relative, resolve } from "node:path";
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 const SKIP = new Set(["node_modules", "dist", "dist-gen", "fixtures", ".scratch"]);
 
+/** Test files under dir; a folder with its own package.json is another project, checked by itself. */
 export function testFiles(dir) {
 	const out = [];
 	for (const name of readdirSync(dir)) {
 		if (SKIP.has(name) || name.startsWith(".")) continue;
 		const path = join(dir, name);
-		if (statSync(path).isDirectory()) out.push(...testFiles(path));
+		if (statSync(path).isDirectory()) {
+			if (!existsSync(join(path, "package.json"))) out.push(...testFiles(path));
+		}
 		else if (/\.test\.(ts|mts|mjs)$/.test(name)) out.push(path);
 	}
 	return out.sort();

@@ -78,6 +78,19 @@ export function oldKey(key, atCut) {
 	return isOld(path) || isOld(`${path}/`) || (atCut.has(path) && !NEW.some((p) => path.startsWith(p)));
 }
 
+/** Folders moved whole from today's code (DESIGN.md section 9): their breaks may be adopted once, under the new path. */
+export const MOVED = ["harness/page/", "harness/runtimes/", "harness/prompts/", "harness/accounts/", "harness/sessions/"];
+
+/** Records today's counts for keys under one moved folder, leaving every other key as it was. */
+export function adoptBaseline(root, name, counts, prefix) {
+	const next = { ...readBaseline(root, name) };
+	const under = (key) => key.replace(/^(dead-exports|dead-css|stale-paths|surface-gate): /, "").startsWith(prefix);
+	for (const key of Object.keys(next)) if (under(key)) delete next[key];
+	for (const [key, n] of counts) if (under(key)) next[key] = n;
+	const sorted = Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)));
+	writeFileSync(baselinePath(root, name), `${JSON.stringify(sorted, null, "\t")}\n`);
+}
+
 /** Writes a baseline. With shrinkOnly it can lower or drop keys and never add or raise one; a first one holds old code only. */
 export function writeBaseline(root, name, counts, shrinkOnly) {
 	const old = readBaseline(root, name);

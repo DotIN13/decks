@@ -1,5 +1,18 @@
 {
 	"extends": "../tsconfig.folder.json",
-	"compilerOptions": { "types": ["node"], "jsx": "preserve", "jsxImportSource": "solid-js" },
-	"include": ["**/*.ts", "**/*.tsx"]
+	"compilerOptions": {
+		"types": [
+			"node"
+		],
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js"
+	},
+	"include": [
+		"**/*.ts",
+		"**/*.tsx"
+	],
+	"exclude": [
+		"page",
+		"node_modules"
+	]
 }
