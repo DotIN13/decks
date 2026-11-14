@@ -92,10 +92,11 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * Two genuinely different collections, which is what makes a strip defensible here — see the
  * note on the `chats` prop.
  */
-export type PanelTab = "recent" | "canvas" | "agents" | "apps";
+export type { PanelTab } from "./model.ts";
+import { PANEL_TABS, tabBeside, type PanelTab } from "./model.ts";
+import { createPanelTab, createPanelWidth } from "./actions.ts";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
-const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
 const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
@@ -241,31 +242,11 @@ export function LeftPanel(props: {
 	const [pickedApp, setPickedApp] = createSignal<string>();
 	const [logsOf, setLogsOf] = createSignal<PanelApp>();
 	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
-	const [tab, setTabRaw] = createSignal<PanelTab>(readTab());
-	const setTab = (next: PanelTab) => {
-		setTabRaw(next);
-		try {
-			localStorage.setItem(TAB_KEY, next);
-		} catch {
-			// Kept for the session.
-		}
-	};
+	const { tab, setTab, folded, toggleFolder } = createPanelTab();
 	createEffect(() => {
 		if (tab() === "apps" && props.open) props.onAppsOpen?.();
 	});
 	/* Workspace folders folded shut, remembered on this device. */
-	const [folded, setFolded] = createSignal<Set<string>>(readFolded());
-	const toggleFolder = (id: string) => {
-		const next = new Set(folded());
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		setFolded(next);
-		try {
-			localStorage.setItem(FOLDED_KEY, JSON.stringify([...next]));
-		} catch {
-			// Kept for the session.
-		}
-	};
 	const apps = createMemo(() => {
 		const q = query().trim().toLowerCase();
 		return (props.apps ?? []).filter((app) => !q || app.title.toLowerCase().includes(q) || app.name.toLowerCase().includes(q));
@@ -280,73 +261,7 @@ export function LeftPanel(props: {
 	 * Nothing else is told, because everything beside the panel reads `--inset-left`, which
 	 * is measured from this box (`camera/insets.ts`).
 	 */
-	const [width, setWidth] = createSignal(clampPanelWidth(loadPanelWidth(), window.innerWidth));
-	const [resizing, setResizing] = createSignal(false);
-	const resizeTo = (next: number) => setWidth(clampPanelWidth(next, window.innerWidth));
-	onMount(() => {
-		// A window made narrower takes the panel down with it; the saved width is kept.
-		const onResize = () => setWidth(clampPanelWidth(loadPanelWidth(), window.innerWidth));
-		window.addEventListener("resize", onResize);
-		onCleanup(() => window.removeEventListener("resize", onResize));
-	});
-	const onHandleDown = (event: PointerEvent) => {
-		if (event.button !== 0) return;
-		const handle = event.currentTarget as HTMLElement;
-		const from = width();
-		const start = event.clientX;
-		event.preventDefault();
-		try {
-			handle.setPointerCapture(event.pointerId);
-		} catch {
-			// The window listeners below still end the drag.
-		}
-		setResizing(true);
-		// The composer and the pill glide when the sidebar folds; following a drag, a glide
-		// is a lag. Said on the root so their own stylesheets can answer it.
-		document.documentElement.dataset.panelResizing = "true";
-		// The insets go to the panel's siblings while it is dragged, not the root: each step restyled the whole conversation.
-		const shell = handle.closest<HTMLElement>(".panel-shell");
-		const beside = shell?.parentElement ? [...shell.parentElement.children].filter((one): one is HTMLElement => one !== shell && one instanceof HTMLElement) : [];
-		insetsOnly(() => beside);
-		/* However the button comes up, here or anywhere, or a move with no button held: the drag ends. */
-		let done = false;
-		const move = (moved: PointerEvent) => {
-			// A mouse moved with no button held has been let go of somewhere; a finger or a pen ends on its own pointerup.
-			if (moved.pointerType === "mouse" && moved.buttons === 0) return end();
-			resizeTo(from + moved.clientX - start);
-		};
-		const end = () => {
-			if (done) return;
-			done = true;
-			window.removeEventListener("pointermove", move, true);
-			window.removeEventListener("pointerup", end, true);
-			window.removeEventListener("pointercancel", end, true);
-			window.removeEventListener("blur", end);
-			handle.removeEventListener("lostpointercapture", end);
-			try {
-				handle.releasePointerCapture(event.pointerId);
-			} catch {
-				// Already gone.
-			}
-			setResizing(false);
-			delete document.documentElement.dataset.panelResizing;
-			insetsOnly(undefined);
-			savePanelWidth(width());
-		};
-		window.addEventListener("pointermove", move, true);
-		window.addEventListener("pointerup", end, true);
-		window.addEventListener("pointercancel", end, true);
-		window.addEventListener("blur", end);
-		handle.addEventListener("lostpointercapture", end);
-	};
-	const onHandleKey = (event: KeyboardEvent) => {
-		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
-		if (event.key === "Home") resizeTo(PANEL_WIDTH);
-		else if (step !== 0) resizeTo(width() + step);
-		else return;
-		event.preventDefault();
-		savePanelWidth(width());
-	};
+	const { width, resizing, onHandleDown, onHandleKey, reset } = createPanelWidth();
 
 	/*
 	 * Switching tabs clears the query.
@@ -671,10 +586,7 @@ export function LeftPanel(props: {
 					title="Drag to resize. Double-click to reset."
 					onPointerDown={onHandleDown}
 					onKeyDown={onHandleKey}
-					onDblClick={() => {
-						resizeTo(PANEL_WIDTH);
-						savePanelWidth(width());
-					}}
+					onDblClick={reset}
 				/>
 				{/*
 					The deck's mark, where a title bar would have put it, and now the switcher too: it names
@@ -770,7 +682,7 @@ export function LeftPanel(props: {
 									if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
 									event.preventDefault();
 									const step = event.key === "ArrowRight" ? 1 : -1;
-									const next = PANEL_TABS[(PANEL_TABS.indexOf(name) + step + PANEL_TABS.length) % PANEL_TABS.length] ?? name;
+									const next = tabBeside(name, step);
 									goTab(next);
 									document.getElementById(`${ids}-tab-${next}`)?.focus();
 								}}
@@ -1062,29 +974,6 @@ export function LeftPanel(props: {
 	);
 }
 
-
-const FOLDED_KEY = "decks.foldedWorkspaces";
-const TAB_KEY = "decks.panelTab";
-
-/** The panel's tab when it was last left, or Agents. */
-function readTab(): PanelTab {
-	try {
-		const saved = localStorage.getItem(TAB_KEY);
-		return saved === "recent" || saved === "canvas" || saved === "agents" || saved === "apps" ? saved : "recent";
-	} catch {
-		return "agents";
-	}
-}
-
-/** The workspace folders folded shut on this device. */
-function readFolded(): Set<string> {
-	try {
-		const raw = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
-		return new Set(Array.isArray(raw) ? raw.filter((one): one is string => typeof one === "string") : []);
-	} catch {
-		return new Set();
-	}
-}
 
 /** Is a text field taking keys right now? Then this component's chord is not for it. */
 function typing(): boolean {
