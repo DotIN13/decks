@@ -6,7 +6,7 @@ import { foldedOf, tabBeside, tabOf, toggled } from "./model.ts";
 
 test("a kept tab opens; anything else opens Recent", () => {
 	assert.equal(tabOf("apps"), "apps");
-	assert.equal(tabOf("boards"), "recent");
+	assert.equal(tabOf("files"), "recent");
 	assert.equal(tabOf(null), "recent");
 });
 

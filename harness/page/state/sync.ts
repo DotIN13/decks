@@ -8,7 +8,7 @@ import { call, on } from "./line.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
 import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
-import type { AgentState, ClaudeAccount } from "./types/index.ts";
+import type { AgentChat, AgentState, ClaudeAccount } from "./types/index.ts";
 import { accountChanged, releasePages } from "./ui.ts";
 import { hearChat } from "./sync-chat.ts";
 
@@ -30,10 +30,22 @@ type Card = Parameters<typeof pageOf>[0];
 type Canvas = Parameters<typeof stageRowOf>[0];
 
 /** The latest answers the rows are made from; not drawn, so not reactive. */
-const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra> };
+const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[] };
+
+/** Rows told by today's socket messages (state/compat), drawn beside the server's until it has the same id. */
+export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
+	held.told = chats;
+	drawAgents(hooks);
+}
+
+/** Change one row as today's socket said: the told copy too, so the next drawing keeps it. */
+export function amendChat(id: string, patch: Partial<AgentChat>): void {
+	held.told = held.told.map((one) => (one.id === id ? { ...one, ...patch } : one));
+	setState("chats", (chats) => chats.map((one) => (one.id === id ? { ...one, ...patch } : one)));
+}
 
 /** A ring when a face turns green or starts waiting: keyed on the change, so a reload rings nothing. */
-function heardState(id: string, next: AgentState, hooks: SyncHooks): void {
+export function heardState(id: string, next: AgentState, hooks: SyncHooks): void {
 	const mine = scratch.of(id);
 	const was = mine.lastState;
 	mine.lastState = next;
@@ -43,7 +55,8 @@ function heardState(id: string, next: AgentState, hooks: SyncHooks): void {
 
 /** Rebuild the agent rows from what is held, writing only what changed. */
 function drawAgents(hooks: SyncHooks): void {
-	const chats = held.agents.map((agent) => chatOf(agent, held.extras[agent.id], cardsOn(held.cards, agent.canvas)));
+	const served = held.agents.map((agent) => chatOf(agent, held.extras[agent.id], cardsOn(held.cards, agent.canvas)));
+	const chats = [...served, ...held.told.filter((one) => !served.some((row) => row.id === one.id))];
 	setState("chats", reconcile(chats, { key: "id", merge: true }));
 	for (const chat of chats) {
 		ensureAgent(chat.id);

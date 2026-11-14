@@ -32,6 +32,8 @@ import { notice } from "../state/notices.ts";
 import { pens, rewatch, watchCanvas } from "../state/pens.ts";
 import { mode, setMode } from "../state/selection.ts";
 import { listen, readAll } from "../state/sync.ts";
+import { applyOld } from "../state/compat/apply.ts";
+import { hearOld } from "../state/compat/socket.ts";
 import type { ChatItem, Page } from "../state/types/index.ts";
 import { releasePages, setPanelOpen, setPicking } from "../state/ui.ts";
 import { agentViews } from "../state/views.ts";
@@ -47,6 +49,7 @@ function mountLine(raise: ReturnType<typeof createAlerts>["raise"], landed: () =
 	const hooks = { raise, landed, hearCreated };
 	onMount(() => {
 		setFailureSink((text) => notice("warn", text));
+		hearOld((message) => applyOld(message, hooks));
 		const stop = listen(hooks);
 		void start((up) => {
 			if (!up) return;
