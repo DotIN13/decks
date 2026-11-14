@@ -282,5 +282,5 @@ switch-over.
 - **Wave 2**: Depot `server/apps/ pictures/ tab/`, Helm `harness/` (not `page/`), Pane `harness/page/`,
   Loft (decks-studio), Slate (decks-ios); then Warden switches over. **Stop 3**: the 87 browser checks
   pass on two processes.
-- **Wave 3**: Loom `canvas/ pen/ ui/` (after `editor-remodel` merges), Anvil the engine for Metal (only
-  if the person chooses it).
+- **Wave 3**: Loom `canvas/ pen/ ui/` (on today's TypeScript editor: the person chose on 2026-11-14 to
+  leave the `editor-remodel` branch out), Anvil the engine for Metal (only if the person chooses it).
