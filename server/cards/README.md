@@ -10,6 +10,8 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
 - The card as an item kind (item.ts): `{ type: "card", card, title, box }` on a call, a `browser` node
   tagged `decks.card` in canvas.pen.
 - A card's page and its modules (page.ts), and the card runtime in a deck's `lib/` (lib.ts).
+- no-disk.test.ts: a client builds a card and a document by calls alone, with every feature
+  main.ts runs. Any feature may add its own test to it.
 
 ## May import
 
