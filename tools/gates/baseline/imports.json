@@ -42,7 +42,6 @@
 	"harness/page/app/landing.ts: harness may not import pen (packages/pen)": 1,
 	"harness/page/connections/bundle.ts: harness may not import pen (packages/pen)": 1,
 	"harness/page/panel/LeftPanel.tsx: harness may not import pen (packages/pen)": 1,
-	"harness/page/state/pens.ts: harness may not import pen (packages/pen)": 1,
 	"packages/api/src/api.test.ts: reaches past the entry of packages/protocol": 1,
 	"packages/canvas/src/frame/inside/studio-line.ts: canvas may not import server (packages/hub)": 1,
 	"packages/hub/src/layout.ts: server may not import canvas (packages/card-host)": 1,
