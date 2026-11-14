@@ -99,40 +99,48 @@ async function stopAndWait(child) {
 	signal(child, "SIGKILL");
 }
 
-/** One check, start to end: the programs up, the check run, everything stopped and the copy gone. */
-export async function runCheck(file, i, { onlyServer = false } = {}) {
+/** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
+export async function runPrograms(work, { i = 0, onlyServer = false, log = [] } = {}) {
 	const ports = portsFor(i);
-	for (const port of Object.values(ports)) if (await listening(port)) return { file, ok: false, why: `port ${port} is in use` };
+	for (const port of Object.values(ports)) if (await listening(port)) throw new Error(`port ${port} is in use`);
 	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 	const deck = join(scratch, "deck");
 	const home = join(scratch, "home");
 	cpSync(FIXTURE, deck, { recursive: true });
 	mkdirSync(home);
-	const log = [];
 	const started = [];
 	try {
-		const names = onlyServer ? ["server"] : ["server", "harness", "page"];
-		for (const name of names) {
+		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) {
 			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home }), log);
 			started.push(child);
 			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
 			await until(ready, child, name);
 		}
-		const web = onlyServer ? ports.server : ports.web;
-		// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
-		const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
-		const check = launch("check", { cmd: process.execPath, args: [join(ROOT, "e2e/checks", file)], env }, log);
-		started.push(check);
-		const code = await new Promise((done) => {
-			const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
-			check.on("exit", (c) => (clearTimeout(timer), done(c)));
-		});
-		return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
-	} catch (error) {
-		return { file, ok: false, why: error.message, log };
+		return await work({ ports, deck, started, log });
 	} finally {
 		await Promise.all(started.reverse().map(stopAndWait));
 		rmSync(scratch, { recursive: true, force: true });
+	}
+}
+
+/** One check, start to end: the programs up, the check run, everything stopped and the copy gone. */
+export async function runCheck(file, i, { onlyServer = false } = {}) {
+	const log = [];
+	try {
+		return await runPrograms(async ({ ports, started }) => {
+			const web = onlyServer ? ports.server : ports.web;
+			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
+			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
+			const check = launch("check", { cmd: process.execPath, args: [join(ROOT, "e2e/checks", file)], env }, log);
+			started.push(check);
+			const code = await new Promise((done) => {
+				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
+				check.on("exit", (c) => (clearTimeout(timer), done(c)));
+			});
+			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
+		}, { i, onlyServer, log });
+	} catch (error) {
+		return { file, ok: false, why: error.message, log };
 	}
 }
 
