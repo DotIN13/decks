@@ -9,6 +9,8 @@ export * as shapes from "./shapes.ts";
 export * from "./glossary.ts";
 export * as layout from "./layout.ts";
 export * as sync from "./sync.ts";
+export * as wire from "./wire.ts";
+export { API, ENV, LOCK_FILE, LOGIN_PATH, SOCKET_PATH, callPath } from "./wire.ts";
 export { SYNC_ROUTES } from "./sync.ts";
 export { PROTOCOL_VERSION, compatible, major } from "./version.ts";
 export { CALLS, CALL_BY_NAME, byNoun } from "./calls/index.ts";

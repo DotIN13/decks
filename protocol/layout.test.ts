@@ -45,3 +45,10 @@ test("sync checks canvas names, bundle paths and secrets", () => {
 	assert.ok(secretLooking("files/.env"));
 	assert.equal(ownerFolderBase("Ann Lee!"), "ann-lee");
 });
+
+test("the wire: one path per call, the socket and login beside them", async () => {
+	const wire = await import("./wire.ts");
+	assert.equal(wire.callPath("item.move"), "/api/v1/item.move");
+	assert.equal(wire.SOCKET_PATH, "/api/v1/socket");
+	assert.equal(wire.LOCK_FILE, ".decks/server.json");
+});
