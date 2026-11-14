@@ -10,7 +10,6 @@ for (const [old, now] of OLD_EVENTS) if (!OLD_OF.has(now)) OLD_OF.set(now, old);
 /** The new events an old line listens to. */
 export const HEARD = [...OLD_OF.keys()];
 
-export const oldName = (now: string): string | undefined => OLD_OF.get(now);
 
 /** What the line says for one heard event; drawing() reads a canvas's drawing when it changed. */
 export async function told(
