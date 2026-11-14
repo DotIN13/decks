@@ -1,0 +1,82 @@
+import type { Caller, Envelope, Who } from "../../protocol/index.ts";
+import type { Heard } from "./events.ts";
+import { buildKernel, type Built } from "./kernel.ts";
+import { MemoryDeck } from "./memory-deck.ts";
+import { MemoryStore, memoryStores } from "./store.ts";
+import type { CanvasDoc, Context, Deck, Feature } from "./types.ts";
+
+// For a feature's tests: the real kernel and router on an in-memory deck.
+// Make a call by name as any caller, read every event it emitted, read the
+// deck. Answers are checked against their declared shape here.
+
+export const callers = {
+	person: { kind: "person", id: "person", name: "you" } as Caller,
+	agent: (id: string, canvas?: string): Caller => ({ kind: "agent", id, name: id, ...(canvas ? { canvas } : {}) }),
+	card: (path: string, canvas: string): Caller => ({ kind: "card", id: path, name: path, canvas }),
+	app: (name: string): Caller => ({ kind: "app", id: name, name }),
+};
+
+export type TestServer = Built & {
+	deck: Deck;
+	/** Every event emitted since the server started, oldest first. */
+	heard: Heard[];
+	call(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<Envelope<unknown>>;
+	/** The value of a call that must succeed; a refusal throws with its message. */
+	value<T = unknown>(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<T>;
+	/** A token that calls as this caller through the doors. */
+	token(who: Caller): string;
+	close(): Promise<void>;
+};
+
+const asCaller = (as: Caller | Who | undefined): Caller => {
+	if (as === undefined || as === "person") return callers.person;
+	if (as === "agent") return callers.agent("agent-1");
+	if (as === "card") return callers.card("canvases/test/cards/one/index.html", "test");
+	if (as === "app") return callers.app("test-app");
+	return as;
+};
+
+export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number } = {}): Promise<TestServer> {
+	const deck = options.deck instanceof Object && "read" in options.deck ? (options.deck as Deck) : new MemoryDeck((options.deck ?? {}) as Record<string, string>);
+	const built = await buildKernel({ deck, stores: memoryStores(), features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}) });
+	const heard: Heard[] = [];
+	const stopHearing = built.events.subscribe({ caller: callers.person }, (one) => void heard.push(one));
+	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who) => built.router.call(name, args, asCaller(as));
+	return {
+		...built,
+		deck: built.history,
+		heard,
+		call,
+		async value<T>(name: string, args?: Record<string, unknown>, as?: Caller | Who): Promise<T> {
+			const answer = await call(name, args, as);
+			if (!answer.ok) throw Object.assign(new Error(`${name}: ${answer.error.code}: ${answer.error.message}`), { code: answer.error.code });
+			return answer.value as T;
+		},
+		token: (who) => built.callers.issue(who),
+		async close() {
+			stopHearing();
+			await built.stop();
+		},
+	};
+}
+
+const noCanvas: CanvasDoc = {
+	read: () => [],
+	apply: () => ({ items: [], rev: 0 }),
+	since: () => [],
+};
+
+/** A hand-made Context for testing a module alone; override any part. */
+export function testContext(over: Partial<Context> = {}): Context & { notes: string[] } {
+	const notes: string[] = [];
+	return {
+		caller: callers.person,
+		deck: new MemoryDeck(),
+		canvas: () => noCanvas,
+		events: { emit() {}, on: () => () => {} },
+		note: (text) => void notes.push(text),
+		store: new MemoryStore(),
+		notes,
+		...over,
+	};
+}
