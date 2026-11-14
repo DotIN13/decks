@@ -1,0 +1,5 @@
+{
+	"Mason": ["docs/rewrite/"],
+	"Lexicon": ["protocol/", "tools/gen/", "server/kernel/types.ts", "server/kernel/memory-deck.ts", "server/kernel/memory-deck.test.ts", "docs/rewrite/calls.md"],
+	"Warden": ["AGENTS.md", "tools/gates/", "tools/checks/", "tools/fixtures/", "tools/heavy.mjs", "tools/heavy.test.mjs", "tools/check.mjs", "tools/README.md", "package.json", "package-lock.json", "tsconfig.base.json", "tsconfig.folder.json", ".gitignore", ".github/"]
+}
