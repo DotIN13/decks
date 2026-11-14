@@ -1,0 +1,18 @@
+[
+	{
+		"name": "gdocs_read",
+		"description": "Read a Google Doc as markdown: headings, lists, bold, italic, links and tables, with pictures shown as ![…](…). This is the same text its Decks page shows, and what gdocs_edit matches against.",
+		"parameters": {
+			"doc": "The Doc's address (https://docs.google.com/document/d/…) or its id."
+		}
+	},
+	{
+		"name": "gdocs_edit",
+		"description": "Edit a Google Doc by replacing one exact piece of its markdown (as gdocs_read returns it) with new markdown. `old` must appear exactly once; include surrounding words to make it unique. Markdown in `new` becomes real Docs formatting (## for a heading, **bold**, - for a bullet, [text](url) for a link). The edit is made in Google directly, keeps everything else as it is (comments, pictures, others' formatting), and shows on the Doc's Decks page as your change for the person to accept or reject.",
+		"parameters": {
+			"doc": "The Doc's address or id.",
+			"old": "The exact markdown to replace.",
+			"new": "The markdown to put in its place; empty to delete."
+		}
+	}
+]

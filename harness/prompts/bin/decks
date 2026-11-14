@@ -1,0 +1,4 @@
+#!/bin/sh
+# The decks command for an agent the harness runs: DECKS_URL and DECKS_TOKEN say where and who.
+here=$(cd "$(dirname "$0")" && pwd)
+exec "${DECKS_NODE:-node}" "$here/../../../clients/cli/main.ts" "$@"

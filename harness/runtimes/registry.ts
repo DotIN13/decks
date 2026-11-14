@@ -1,0 +1,55 @@
+import { AGENT_KINDS, type AgentKind, type RunKind, type ModelOption, type RuntimeInfo } from "./types/index.ts";
+import { antigravity } from "./antigravity/index.ts";
+import type { AgentRuntime } from "./runtime.ts";
+import { claude } from "./claude/index.ts";
+import { opencode } from "./opencode/index.ts";
+import { opencode2 } from "./opencode2/index.ts";
+import { pi } from "./pi/index.ts";
+
+/**
+ * Every runtime this build knows, and the one place its name is written.
+ *
+ * **A fifth runtime is this file plus a directory.** Before, it was four edits in
+ * `agents/session.ts` — an import, `BACKENDS`, `CAPABILITIES`, `DORMANT_COMMANDS` — the
+ * union and its array in `packages/protocol`, three entries in the browser's mark file, and
+ * a new backend directory. The shell imported every runtime to be able to start one.
+ *
+ * Typed as `Record<AgentKind, AgentRuntime>`, so the union and this table cannot disagree:
+ * adding a kind without a descriptor is a compile error here, and a descriptor for a kind
+ * that does not exist is a compile error in the descriptor.
+ */
+export const RUNTIMES: Record<RunKind, AgentRuntime> = {
+	pi,
+	claude,
+	opencode,
+	opencode2,
+	antigravity,
+};
+
+/** The runtime behind an agent; none for a kind this harness does not run. */
+export function runtimeOf(kind: AgentKind): AgentRuntime | undefined {
+	return kind === "codex" ? undefined : RUNTIMES[kind];
+}
+
+/**
+ * What a browser needs to draw the new-agent menu: every kind, in the protocol's order,
+ * with the answer to "can this run here" beside it.
+ *
+ * This is the other half of the seam. `availability()` existed in every runtime and reached
+ * no client, so the `+` menu offered four runtimes on every machine and the first prompt was
+ * where you learned which ones were installed. The answer is a `PATH` lookup, so it is cheap
+ * enough to send on connect and to recompute whenever somebody asks.
+ */
+export function runtimeList(models: (kind: RunKind) => ModelOption[] = () => []): RuntimeInfo[] {
+	return AGENT_KINDS.map((kind) => {
+		const runtime = RUNTIMES[kind];
+		const answer = runtime.availability();
+		/*
+		 * And the three facts that used to ride on every chat row instead. Modes and slash
+		 * commands are the runtime's own constants; the catalogue is what this deck last saw
+		 * it offer, which the caller reads out of the agent store — a runtime that has never
+		 * run here has none, and this file has nowhere to keep one.
+		 */
+		return { kind, label: runtime.label, ...answer, capabilities: runtime.capabilities, commands: runtime.commands, models: models(kind) };
+	});
+}

@@ -1,0 +1,246 @@
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "./types/index.ts";
+import type { ExtensionUiBridge } from "./shared/extension-ui.ts";
+import type { Translator } from "./shared/translator.ts";
+
+/** What an agent's shell needs to call Decks, built by the session (sessions/tools.ts). */
+export interface DecksAccess {
+	url: string;
+	token?: string;
+	/** The variables for the agent's shell: DECKS_URL, DECKS_TOKEN, DECKS_AGENT, and decks on PATH. */
+	env(path?: string): Record<string, string>;
+}
+
+/** Binds a shared server's sessions to agents, so a session's decks command runs as its agent. */
+export interface SessionTokens {
+	setServerToken(secret: string, kind?: string): void;
+	registerSession(sessionId: string, agentId: string, kind?: string): void;
+	unregisterSession(sessionId: string | undefined): void;
+}
+
+/**
+ * What the shell needs from an agent, and nothing about how it works.
+ *
+ * There are two implementations: Pi and Claude Code. The interface predates the second
+ * one, for the same reason `translator.ts` is separate from `pi/events.ts` — the
+ * transcript, the identity and the chat list are the same for every agent — and the
+ * second one arriving is what tested the claim.
+ *
+ * What differs between runtimes lives in `capabilities` rather than in a method that
+ * throws: a client that can see what an agent cannot do never offers it.
+ */
+export interface AgentBackendContext {
+	cwd: string;
+	translator: Translator;
+	bridge: ExtensionUiBridge;
+	/** For things that are the environment's fault rather than the agent's. */
+	notice(level: "info" | "warn" | "error", text: string): void;
+	/** A turn finished; only a backend whose prompt() returns before the turn does needs this. */
+	turnEnded?(): void;
+	/** Who the agent is: its id, given by the server. */
+	agent: { id: string };
+	/** How its shell reaches Decks: the server's address, its own token, and the variables for both. */
+	decks: DecksAccess;
+	/** What it is told once: the deck's context and the guidelines, ready to append. */
+	briefing(): string;
+	/** For a runtime whose one server serves every agent: which session is which agent, for its decks command. */
+	sessionTokens?: SessionTokens;
+	/** A session file to open instead of starting a new one — see `forkFrom`. */
+	resumeRef?: string;
+	/**
+	 * The model the conversation was last on, for a session being resumed.
+	 *
+	 * Both runtimes take a model at session creation and neither reads one back out of a
+	 * resumed session, so without this a chat continued after a restart answers from
+	 * whatever the runtime's own configuration says — which is not the model the rest of
+	 * the conversation was held in, and not what the row promised (`agents/store.ts`).
+	 *
+	 * Advisory: a model that has since lost its credentials, or been renamed, is not worth
+	 * refusing to start over. A backend that cannot honour it falls back and reports what
+	 * it actually opened on, which is what `model()` is for.
+	 */
+	model?: AgentModel;
+	/** What it last asked before acting, on a runtime that has modes. */
+	mode?: AgentMode;
+	/**
+	 * The Claude subscriptions this install can use (`claude/accounts.ts`).
+	 *
+	 * On the context rather than reached for globally, because it is the *shell's* — one
+	 * store for the install, handed to whichever backends can use it. Pi ignores it: its
+	 * credentials are `pi auth`'s business and it has no equivalent of a plan window.
+	 */
+	accounts?: ClaudeAccountSwitcher;
+	/**
+	 * The transcript changed in a way `chat.item` cannot express — something was removed.
+	 *
+	 * One caller, and it is why this exists rather than being a general facility: a turn
+	 * whose whole reply was a transient auth failure is taken back before it is retried
+	 * (`claude/transient.ts`). The shell re-sends the history, exactly as a rewind does.
+	 */
+	historyChanged?(): void;
+	/** Tell the browser the account list changed, after a login through `/login`. */
+	accountsChanged?(): void;
+	/**
+	 * Which Claude subscription this agent spends.
+	 *
+	 * What to spawn with, and whose usage report the meter is asking for. A window onto the
+	 * session's field rather than a copy, and **read-only**: the value is on the agent's
+	 * record and changes only when somebody picks a row in the picker. It used to carry a
+	 * `set` too, which a rate limit called to move the conversation on by itself.
+	 */
+	account?: { id(): string };
+	/**
+	 * The `/` menu changed: republish the chat row that carries it.
+	 *
+	 * A runtime's command list is not fixed at start — Claude discovers skills as the
+	 * agent moves about, and pushes a replacement when it does — and the browser caches
+	 * the list per chat, so a list that moved has to be pushed rather than waited for.
+	 */
+	commandsChanged?(): void;
+	/**
+	 * Open the usage panel, unasked — `/cost`, typed in the composer.
+	 *
+	 * The backend does not draw it and does not format it: it says the person asked, and the
+	 * shell reads the report and sends it with `show`. Which is the difference between this
+	 * and what was here before, where each backend built its own list of `label: value`
+	 * strings and so each decided how usage looked.
+	 */
+	showUsage?(): void;
+}
+
+/**
+ * What a backend needs from the account store, and nothing more.
+ *
+ * Narrowed to an interface here rather than importing the class, so `agents/` does not
+ * depend on `claude/` — the shell knows there is a thing that holds the subscriptions, and
+ * only `claude/backend.ts` knows what one is.
+ */
+export interface ClaudeAccountSwitcher {
+	/** What `CLAUDE_CONFIG_DIR` should be, or nothing when the link cannot be made. */
+	activeConfigDir(): string | undefined;
+	/**
+	 * The whole environment a session must be spawned with to spend the active account —
+	 * the config directory and, for macOS, which keychain entry that account's token is in.
+	 */
+	activeEnvironment(): NodeJS.ProcessEnv | undefined;
+	/**
+	 * The same, for **one agent spending one account**: its own link, so that repointing it
+	 * switches that agent and nobody else. This is what a session is actually spawned with;
+	 * `activeEnvironment` remains for the machine-wide paths that have no agent.
+	 */
+	environmentFor(agentId: string, accountId: string): NodeJS.ProcessEnv | undefined;
+	/** Which account a new agent starts on, when its record does not name one. */
+	defaultId(): string;
+	/** Repoint one agent's link, so its next request spends a different subscription. */
+	pointAgentAt?(agentId: string, accountId: string): boolean;
+	/** An agent is gone: drop its link. */
+	releaseAgent?(agentId: string): void;
+	/** Whether an id still names an account: a record can outlive the account it names. */
+	has(id: string): boolean;
+	/** Who an id is, for the sentence a switch says. */
+	describe(id: string): { id: string; email?: string } | undefined;
+	/**
+	 * Whether there is another signed-in subscription this conversation could be put on.
+	 *
+	 * One clause of one sentence: a limit says "pick another one in the model picker" when
+	 * there is one and "add another account in settings" when there is not. Deliberately not
+	 * "which one" — nothing switches by itself, so naming a successor would be the deck
+	 * making a choice it no longer makes.
+	 */
+	hasOther?(except: string | undefined): boolean;
+	/** The account's own directory, as opposed to the link. Empty for the CLI's own login. */
+	keychainDir(id: string): string;
+	/**
+	 * The account a conversation with none of its own would spend.
+	 *
+	 * Not "the account in force" — there is no such thing now. Every conversation has its
+	 * own, and this is the answer for one that has not been given one yet.
+	 */
+	active(): { id: string; email?: string } | undefined;
+}
+
+/**
+ * A point in a conversation the server can address: one per user message.
+ *
+ * Server-internal. It used to be a protocol type feeding a timeline widget; the widget
+ * is gone (its actions moved onto the messages themselves) and what remains is the one
+ * use that never was drawing — matching a revision to the moment a message was sent.
+ */
+export interface ConversationPoint {
+	id: string;
+	at?: number;
+}
+
+export interface AgentBackend {
+	readonly capabilities: AgentCapabilities;
+
+	prompt(text: string): Promise<void>;
+	abort(): Promise<void>;
+	readonly isStreaming: boolean;
+
+	/**
+	 * What typing `/` in the composer can do on this runtime. The deck interprets
+	 * some of them itself; the rest pass through to the runtime as prompts.
+	 */
+	commands(): SlashCommand[];
+
+	model(): AgentModel | undefined;
+	setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void>;
+	setThinking(level: ThinkingLevel): void;
+	/** Only meaningful when `capabilities.modes` is non-empty. */
+	setMode?(mode: AgentMode): Promise<void>;
+	mode?(): AgentMode | undefined;
+	models(): Promise<ModelOption[]>;
+	usage(): AgentUsage | null;
+	/**
+	 * The full reading: the plan's windows, what this conversation spent, what drove it.
+	 *
+	 * Optional because it is a round trip to the runtime and not every runtime has one to
+	 * make. A backend without it is not asked, and the panel says which parts a runtime
+	 * cannot answer rather than drawing them empty.
+	 */
+	report?(): Promise<UsageReport>;
+
+	/** The name the agent gave itself, if it has (`decks.agent.update({ name })`). */
+	name(): string | undefined;
+	setName(name: string): void;
+
+	// --- the session tree (§6.7, the time machine) ---------------------------------
+
+	/**
+	 * A handle that reopens *this* conversation — what `resumeRef` will be next time.
+	 *
+	 * Both runtimes already hold it and neither exposed it: pi's is the session file path,
+	 * Claude's is the session id. Read after a turn rather than only at start, because a
+	 * rewind moves it — Claude's rewind is a fork it stays in, so the id changes and a
+	 * stored ref taken at start would point at the abandoned branch.
+	 *
+	 * `undefined` before the session exists, which is why an agent that has never run is
+	 * not worth persisting.
+	 */
+	sessionRef(): string | undefined;
+
+	/** The points in this conversation worth returning to: the user's messages. */
+	timeline(): ConversationPoint[];
+	/**
+	 * Tag the transcript's user messages with the session entries they became.
+	 *
+	 * Async because Claude's message ids come from reading the session file, which Pi
+	 * can do from memory.
+	 */
+	syncEntryIds(): Promise<void>;
+	/** Which revision each board was at, at that point in the conversation. */
+	revisionsAt(entryId: string): Record<string, string>;
+	/** Move the conversation back to just before that message. */
+	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
+	/** A handle a new chat can open, holding everything up to that point. */
+	forkFrom(entryId: string): Promise<string | undefined>;
+	/**
+	 * This agent was moved to another subscription, and its link already points there.
+	 *
+	 * For a runtime that cannot follow the link while it runs: Claude Code on macOS reads its
+	 * token from a keychain entry chosen when the process starts, so it must start again.
+	 */
+	accountChanged?(): void;
+
+	dispose(): void;
+}
