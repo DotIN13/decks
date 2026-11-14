@@ -1,0 +1,16 @@
+{
+	"name": "@decks-next/sdk",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./index.ts",
+		"./testing": "./testing/fake-server.ts"
+	},
+	"scripts": {
+		"test": "node ../../tools/check.mjs clients/sdk"
+	},
+	"dependencies": {
+		"@decks-next/protocol": "0.0.0"
+	}
+}
