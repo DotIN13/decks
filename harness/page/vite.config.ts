@@ -49,12 +49,16 @@ export default defineConfig({
 	plugins: [solid(), tailwind(), pageJson(), decksSounds()],
 	server: {
 		host: HOST,
+		// The canvas frame is sandboxed, so its origin is "null"; its modules are fetched cross-origin.
+		cors: { origin: [/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, "null"] },
 		port: PORT,
 		strictPort: true,
 		proxy: {
 			"/api": pass(true),
 			"/files/": pass(),
 			"/mcp": pass(),
+			"/compat/": pass(true),
+			"/frame-assets/": pass(),
 			"/frame/": pass(true),
 			"/app/": pass(true),
 			"/node/": pass(true),
@@ -67,6 +71,6 @@ export default defineConfig({
 		target: "es2022",
 		sourcemap: true,
 		outDir: "dist",
-		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)) } },
+		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), frame: fileURLToPath(new URL("./canvas-frame.html", import.meta.url)) } },
 	},
 });

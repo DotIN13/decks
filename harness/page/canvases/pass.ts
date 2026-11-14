@@ -40,7 +40,7 @@ async function askPass(canvas: string): Promise<CanvasPass> {
 	if (!answer.pass) throw new Error(`No pass for the canvas ${canvas}: ${answer.error ?? response.status}`);
 	const at = (rest: string) => new URL(api(`/t/${answer.pass}/${rest}`), location.href).href;
 	return {
-		api: new URL(api("/"), location.href).href.replace(/\/$/, ""),
+		api: new URL("/compat", location.href).href,
 		token: answer.pass,
 		files: at("card/"),
 		pictures: at("thumb/"),

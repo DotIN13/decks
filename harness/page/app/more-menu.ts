@@ -5,7 +5,7 @@ import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import { scheme, toggleScheme } from "../lib/theme.ts";
 import { act } from "../state/decks.ts";
-import { call } from "../state/socket.ts";
+import { call } from "../state/line.ts";
 import { setOps, setSettings } from "../state/ui.ts";
 
 /**
@@ -23,7 +23,7 @@ export const moreItems = (stagePages: () => Page[]) => [
 		disabled: stagePages().length === 0,
 		onPick: () => {
 			const paths = stagePages().map((board) => board.path);
-			if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
+			if (paths.length) void act("item.batch", { ops: paths.map((path) => ({ op: "delete", id: path })) });
 		},
 	},
 	{ label: "Dark mode", icon: Moon, rule: true, checked: scheme() === "dark", onPick: () => toggleScheme() },
@@ -33,7 +33,7 @@ export const moreItems = (stagePages: () => Page[]) => [
 		icon: SettingsIcon,
 		onPick: () => {
 			setSettings(true);
-			void call("account.list", [{ limits: true }]);
+			void call("account.list", { limits: true });
 		},
 	},
 ];

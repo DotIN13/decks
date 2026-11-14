@@ -1,5 +1,4 @@
 import { createSignal } from "solid-js";
-import type { ServerMessage } from "./types/index.ts";
 
 /**
  * What you queued for each agent with Ctrl+Enter, as the server holds it (`DeckAgent.queueMine`):
@@ -12,6 +11,6 @@ export function queuedFor(agentId: string | undefined): Queued | undefined {
 	return agentId ? queuedByAgent()[agentId] : undefined;
 }
 
-export function receiveQueued(message: Extract<ServerMessage, { type: "agent.queued" }>): void {
-	setQueuedByAgent((was) => ({ ...was, [message.agentId]: { items: message.items, held: message.held } }));
+export function setQueued(agentId: string, queued: Queued): void {
+	setQueuedByAgent((was) => ({ ...was, [agentId]: { items: queued.items, held: queued.held } }));
 }

@@ -1,11 +1,11 @@
 import { createSignal } from "solid-js";
-import { messageParts } from "../composer/pill-about.ts";
-import type { Draft } from "@decks/agent-ui/composer";
+import { messageParts } from "../composer/index.ts";
+import type { Draft } from "../composer/index.ts";
 import { withComments } from "../markup/comments.ts";
 import { takeComments } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
-import { call, warnIfFailed } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/line.ts";
 import { stageOf } from "../state/canvases.ts";
 import { destination, stripMention, withoutName } from "./send-from-bar.ts";
 
@@ -56,8 +56,8 @@ export function createBar(names: BarNames) {
 				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
 				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
-				if (queue) void call("chat.queue", [dest.id, { action: "add", text: line, ...parts }]).then(warnIfFailed);
-				else void call("chat.send", [dest.id, { text: line, ...parts }]).then(warnIfFailed);
+				if (queue) void call("chat.queue", { agent: dest.id, action: "add", text: line, ...parts }).then(warnIfFailed);
+				else void call("chat.send", { agent: dest.id, text: line, ...parts }).then(warnIfFailed);
 				return;
 			}
 			case "note":

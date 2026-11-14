@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import type { ServerMessage, StageRow } from "./types/index.ts";
+import type { StageRow } from "./types/index.ts";
 
 /**
  * Every stage in the deck, as the server lists them (`app.stagesMessage`).
@@ -9,15 +9,15 @@ import type { ServerMessage, StageRow } from "./types/index.ts";
  * it at once. Kept here rather than in the deck store because a stage is not a board: the deck
  * store is what is *on* the canvas, and this is what other canvases there are.
  */
-const [stages, setStages] = createSignal<StageRow[]>([]);
+const [stages, write] = createSignal<StageRow[]>([]);
 
 export { stages };
 
-export function receiveStages(message: Extract<ServerMessage, { type: "canvas.list" }>): void {
-	setStages(message.stages);
+export function setStages(list: StageRow[]): void {
+	write(list);
 	// A move the server now shows is done; one it shows otherwise stays until its own answer comes back.
 	const going = moving();
-	if (going && message.stages.some((one) => one.name === going.canvas && one.agents.some((agent) => agent.id === going.agent))) setMoving(undefined);
+	if (going && list.some((one) => one.name === going.canvas && one.agents.some((agent) => agent.id === going.agent))) setMoving(undefined);
 }
 
 /**
@@ -75,5 +75,5 @@ export function searchStages(list: StageRow[], query: string): Array<{ stage: St
 
 /** No stages: a switch to another backend (`connections/switch.ts`). */
 export function resetStages(): void {
-	setStages([]);
+	write([]);
 }

@@ -1,4 +1,4 @@
-import type { AgentChat, Page, LineClientMessage, ServerMessage } from "../state/types/index.ts";
+import type { Page } from "../state/types/index.ts";
 import type { PenDocument } from "@decks/pen";
 import { api, connections, newId, saveConnections, type Connection } from "./connection.ts";
 import { readZip } from "./zip.ts";
@@ -7,8 +7,8 @@ import { readZip } from "./zip.ts";
  * A canvas opened from a `.decks` file, and the backend that serves it from this tab.
  *
  * Opening one unpacks it into the browser's Cache Storage under `/c/<id>/`, where the service worker
- * finds its files (`public/sw.js`). The frames a server would send come from `BundleBackend` below,
- * built from the manifest, so the app reads a bundle with the same code it reads a server with.
+ * finds its files (`public/sw.js`). Reading it as a canvas waits for a backend on the new line:
+ * the old socket stand-in went with the old socket.
  *
  * A bundle has no agents, but the app draws a stage as somebody's: the drawing and the boards on
  * screen are an agent's (`state/pens.ts`). So the backend names one reader, `READER`, with the
@@ -96,91 +96,4 @@ async function manifestOf(id: string): Promise<BundleManifest> {
 	const response = await cache.match(`/c/${id}/manifest.json`);
 	if (!response) throw new Error("This canvas's files are gone from this browser. Open the .decks file again.");
 	return (await response.json()) as BundleManifest;
-}
-
-/** The greeting a server would send, for a reader of this bundle. */
-export function greeting(id: string, manifest: BundleManifest): ServerMessage[] {
-	const paths = manifest.boards.map((board) => board.path);
-	const identity = { name: manifest.stage.title, color: "#7a7a7a" };
-	const reader = {
-		id: READER,
-		name: manifest.stage.title,
-		state: "idle",
-		unread: 0,
-		kind: "claude",
-		identity,
-		boards: paths,
-		inPlay: paths,
-	} as unknown as AgentChat;
-	return [
-		{ type: "harness.hello", backend: { name: manifest.stage.title, can: { agents: false, write: false, share: false } } },
-		{ type: "harness.runtimes", list: [] },
-		{ type: "deck.changed", deck: { path: `bundle:${id}`, name: manifest.from, boards: manifest.boards, roots: [] } },
-		{ type: "agent.list", chats: [reader], focused: READER, defaultKind: "claude" },
-		{ type: "canvas.list", stages: [{ name: manifest.stage.name, title: manifest.stage.title, boards: manifest.boards.length, rev: manifest.stage.rev, agents: [], words: "" }] },
-		{ type: "harness.settings", settings: {}, machineZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-		{ type: "harness.paired", paired: [] },
-	];
-}
-
-/**
- * The socket's stand-in for a bundle: answers the greeting and the reader's history, and nothing
- * else. Every other frame is a request to change something, which a file cannot do, and the
- * controls that would send one are not drawn.
- */
-export class BundleBackend {
-	onopen: (() => void) | undefined;
-	onmessage: ((event: { data: string }) => void) | undefined;
-	onclose: (() => void) | undefined;
-	onerror: (() => void) | undefined;
-	readyState = 0;
-
-	private manifest: BundleManifest | undefined;
-
-	constructor(private readonly id: string) {
-		void manifestOf(id).then(
-			(manifest) => {
-				this.manifest = manifest;
-				this.readyState = 1;
-				this.onopen?.();
-			},
-			(error: Error) => {
-				this.readyState = 1;
-				this.onopen?.();
-				this.deliver({ type: "harness.notice", level: "error", text: error.message } as ServerMessage);
-			},
-		);
-	}
-
-	private deliver(frame: ServerMessage): void {
-		queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(frame) }));
-	}
-
-	/** The line's envelope, answered from the file: the greeting on hello, the drawing whole on a watch, the reader's empty history, and a refusal of any change. */
-	send(text: string): void {
-		const message = JSON.parse(text) as LineClientMessage;
-		const manifest = this.manifest;
-		if (!manifest) return;
-		if (message.type === "line.hello") {
-			this.deliver({ type: "line.hello", who: "person" });
-			for (const frame of greeting(this.id, manifest)) this.deliver(frame);
-			return;
-		}
-		if (message.type === "canvas.watch") {
-			this.deliver({ type: "canvas.changed", canvas: manifest.stage.name, rev: manifest.stage.rev, doc: manifest.pen.doc, base: api(`/f/${manifest.pen.base}`) });
-			return;
-		}
-		if (message.type === "line.call") {
-			if (message.verb === "chat.open") {
-				this.deliver({ type: "chat.history", agentId: String(message.args[0] ?? READER), items: [] });
-				this.deliver({ type: "call.answered", id: message.id, ok: true });
-				return;
-			}
-			this.deliver({ type: "call.answered", id: message.id, ok: false, error: "This canvas is a file opened in this browser: it cannot be changed from here." });
-		}
-	}
-
-	close(): void {
-		this.readyState = 3;
-	}
 }

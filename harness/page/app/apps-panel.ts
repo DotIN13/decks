@@ -10,7 +10,7 @@ import { flyToPages } from "./links.ts";
 export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path: string) => void) {
 	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
 	const loadApps = () =>
-		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
+		void act<Array<{ name: string; title?: string; status: string; board: string }>>("app.list").then((list) => {
 			if (list) setApps(list.map((app) => ({ name: app.name, title: app.title || app.name, status: app.status, board: app.board })));
 		});
 	const onApp = async (app: PanelApp, action: AppAction) => {
@@ -23,11 +23,11 @@ export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path
 		 */
 		const show = async () => {
 			type Placed = { id?: string; metadata?: { type?: string; name?: string }; box?: { x1: number; y1: number; x2: number; y2: number } };
-			const read = await act<{ items: Placed[] }>("canvas.read", [{ depth: 0 }]);
+			const read = await act<Placed[]>("item.list", { depth: 0 }).then((items) => items && { items });
 			let item = read?.items.find((one) => one.metadata?.type === "decks.app" && one.metadata.name === app.name);
 			if (!item) {
-				const at = await act<{ x1: number; y1: number }>("canvas.space", [{ w: 1100, h: 760 }]);
-				item = await act<Placed>("canvas.insert", [{ type: "app", app: app.name }, ...(at ? [{ at }] : [])]);
+				const at = await act<{ x: number; y: number }>("item.space", { size: { w: 1100, h: 760 } });
+				item = await act<Placed>("item.insert", { item: { type: "app", app: app.name }, ...(at ? { at } : {}) });
 			}
 			if (!item?.id || !item.box) return;
 			const { x1, y1, x2, y2 } = item.box;
@@ -37,19 +37,19 @@ export function createAppsPanel(stagePages: () => Page[], frameWhenPlaced: (path
 		};
 		if (action === "show") return show();
 		if (action === "run-show") {
-			if (!running) await act("apps.run", [app.name]);
+			if (!running) await act("app.run", { name: app.name });
 			loadApps();
 			return show();
 		}
 		if (action === "delete") {
 			const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and the items showing it leave the canvases.`, yes: "Delete", no: "Cancel" });
 			if (!yes) return;
-			await act("apps.delete", [app.name]);
+			await act("app.delete", { name: app.name });
 			return loadApps();
 		}
-		await act(action === "start" ? "apps.run" : action === "stop" ? "apps.stop" : "apps.restart", [app.name]);
+		await act(action === "start" ? "app.run" : action === "stop" ? "app.stop" : "app.restart", { name: app.name });
 		loadApps();
 	};
-	const onAppLogs = (app: PanelApp) => act<string[]>("apps.logs", [app.name, { tail: 80 }]);
+	const onAppLogs = (app: PanelApp) => act<string[]>("app.logs", { name: app.name, tail: 80 });
 	return { apps, loadApps, onApp, onAppLogs };
 }

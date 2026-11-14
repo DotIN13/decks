@@ -1,13 +1,6 @@
+import type { AgentKind, AgentUsage } from "@decks-next/protocol";
 /** What the usage panel draws: the plan's windows, what a conversation spent, what drove it. */
 
-import type { AgentKind } from "./chat.ts";
-/** What the agent has spent, sampled at the moments that move it. */
-export interface AgentUsage {
-	/** Tokens in the context now, or null before the first reply comes back. */
-	contextTokens: number | null;
-	contextWindow: number;
-	cost: number;
-}
 
 /**
  * Everything the usage panel draws: the plan, the spend, and what has been driving it.

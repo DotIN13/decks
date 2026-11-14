@@ -2,7 +2,7 @@
 // First, before anything else runs: the tab's person token is read and its tag taken out of the page.
 import "../perf/probe-relay.ts";
 import "../lib/session.ts";
-import { App } from "../App.tsx";
+import { Shell } from "../shell/view.tsx";
 import { active, PUBLIC } from "../connections/connection.ts";
 import { Start } from "../connections/Start.tsx";
 import { remount, setMount } from "../connections/switch.ts";
@@ -20,6 +20,6 @@ if (!root) throw new Error("No #root to render into");
 setMount(root, (failed) => {
 	if (failed) return <Start why={failed} />;
 	if (!active()) return <Start why={PUBLIC ? "Open a canvas file someone sent you, or connect to a Decks server you can reach." : "This address names a connection this browser does not have any more."} />;
-	return <App />;
+	return <Shell />;
 });
 void remount();

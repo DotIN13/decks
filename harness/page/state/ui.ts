@@ -1,7 +1,7 @@
 import type { UsageReport } from "./types/index.ts";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { call } from "./socket.ts";
+import { call } from "./line.ts";
 
 /**
  * What the browser is showing that the server has no opinion about.
@@ -141,7 +141,7 @@ function createUi() {
 	const readUsage = (id: string | undefined) => {
 		if (!id) return;
 		setUsageReport((was) => ({ ...was, loading: true }));
-		void call("agent.report", [id]);
+		void readReport(id);
 	};
 
 	/** Open the panel on an agent, on whatever was last read, and ask for its figures. */
@@ -150,7 +150,7 @@ function createUi() {
 		setUsagePanel(id);
 		const kept = seenReports.get(id);
 		setUsageReport({ loading: true, ...(kept ? { report: kept.report, at: kept.at } : {}) });
-		void call("agent.report", [id]);
+		void readReport(id);
 	};
 
 	/**
@@ -167,6 +167,11 @@ function createUi() {
 		const kept = seenReports.get(id);
 		setUsageReport({ loading: false, ...(kept ? { report: kept.report, at: kept.at } : {}), ...(answer.error ? { error: answer.error } : {}) });
 	};
+	/** Read an agent's usage report from the harness: account.report answers it. */
+	const readReport = async (id: string) => {
+		const answer = await call<UsageReport>("account.report", { agent: id });
+		tookReport(id, answer.ok ? { report: answer.value } : { error: answer.error });
+	};
 
 	/**
 	 * The agent now spends another subscription: the figures kept for it are the old one's.
@@ -180,7 +185,7 @@ function createUi() {
 		seenReports.delete(id);
 		if (usagePanel() !== id) return;
 		setUsageReport({ loading: true });
-		void call("agent.report", [id]);
+		void readReport(id);
 	};
 
 	/**

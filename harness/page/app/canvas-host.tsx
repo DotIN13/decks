@@ -13,8 +13,8 @@ import { reportCameraSoon } from "./camera-report.ts";
 import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "./frame-handoffs.ts";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import type { StageComment } from "@decks/canvas";
-import type { createFileDrops } from "./files/drops.ts";
-import { rememberView } from "./socket-messages.ts";
+import type { createFileDrops } from "../files/index.ts";
+import { rememberView } from "./remember-view.ts";
 import { openLinkedPage } from "./links.ts";
 
 /** What the canvas host needs of the page around it. */

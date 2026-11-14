@@ -3,10 +3,16 @@ import { createEffect, createSignal } from "solid-js";
 import { boxOf, canvasBox, fitInto } from "@decks/canvas/camera";
 import { moveCamera } from "../state/camera.ts";
 import { setState, state } from "../state/deck.ts";
-import { act } from "../state/decks.ts";
+import { act, stageOnScreen } from "../state/decks.ts";
+
+/** The canvas on screen, as a call's option. */
+const onScreen = () => {
+	const canvas = stageOnScreen();
+	return canvas ? { canvas } : {};
+};
 import { notice } from "../state/notices.ts";
 import { setSelected } from "../state/selection.ts";
-import { call, warnIfFailed } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/line.ts";
 
 /*
  * Frame these boards, whatever they are: the camera moves to hold them all.
@@ -39,7 +45,7 @@ const move = (path: string, x: number, y: number) => {
 	// row and reload the document that is sitting in it.
 	const index = state.pages.findIndex((board) => board.path === path);
 	if (index >= 0) setState("pages", index, { x, y });
-	void act("canvas.move", [path, { at: { x1: x, y1: y } }]);
+	void act("item.move", { id: path, at: { x, y }, ...onScreen() });
 };
 
 /**
@@ -59,7 +65,7 @@ export function createFraming(stagePages: () => Page[]) {
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
-		void call("card.play", [path]).then(warnIfFailed);
+		void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
 		frameWhenPlaced(path);
 	};
 	createEffect(() => {
@@ -126,7 +132,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 		land(there);
 		return true;
 	}
-	void call("card.play", [path]).then(warnIfFailed);
+	void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
 	// The server copies the board into the canvas; it is landed when the copy arrives.
 	const started = performance.now();
 	const wait = () => {

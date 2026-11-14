@@ -1,5 +1,5 @@
 import { createAlerts as createShared } from "@decks/agent-ui/alerts";
-import { openHistory } from "@decks/agent-ui/edge";
+import { openHistory } from "../chat/index.ts";
 import { state } from "../state/deck.ts";
 import { setUnattended } from "./favicon.ts";
 

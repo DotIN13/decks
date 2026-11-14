@@ -1,6 +1,6 @@
 import { chooseShowFps, showFps } from "../perf/fps.tsx";
 import { STT_MODELS, type ClaudeAccount, type PairedRow, type WebStatus } from "../state/types/index.ts";
-import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../composer/voice.ts";
+import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../composer/index.ts";
 import Bell from "lucide-solid/icons/bell";
 import Cloud from "lucide-solid/icons/cloud";
 import Globe from "lucide-solid/icons/globe";
@@ -16,7 +16,7 @@ import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
 import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
-import { call, warnIfFailed } from "../state/socket.ts";
+import { call, warnIfFailed } from "../state/line.ts";
 import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "./AlertSettings.tsx";
 import type { AlertPrefs } from "@decks/agent-ui/alerts";
@@ -247,7 +247,7 @@ function TimeSettings() {
 	});
 	const known = (zone: string) => zone === "UTC" || zones().includes(zone);
 	const set = (timezone: string | null) => {
-		void call("harness.configure", [{ timezone }]).then(warnIfFailed);
+		void call("deck.update", { timezone }).then(warnIfFailed);
 		setDraft("");
 	};
 	const inForce = () => chosen() ?? state.machineZone;
@@ -386,7 +386,7 @@ function VoiceSettings() {
 				</SetRow>
 				<Show when={recogniser() !== "browser"}>
 					<SetRow title="The server's model" sub={state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key yet: set OPENAI_API_KEY on the server."}>
-						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => void call("harness.configure", [{ sttModel: id === STT_MODELS[0]!.id ? null : id }]).then(warnIfFailed)} />
+						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => void call("runtime.update", { sttModel: id === STT_MODELS[0]!.id ? null : id }).then(warnIfFailed)} />
 					</SetRow>
 				</Show>
 				<Show when={recogniser() !== "server"}>
@@ -459,7 +459,7 @@ function Connections() {
 							sub={<span class="truncate">{`${studio().url} · its browsers are given an hour's token at a time through its key`}</span>}
 						>
 							<Show when={!studio().env}>
-								<Btn tone="danger" title="Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("harness.unpair").then(warnIfFailed)}>
+								<Btn tone="danger" title="Delete Studio's key: the deck stops syncing, and every browser signed in to Studio loses its way here" onClick={() => void call("studio.disconnect").then(warnIfFailed)}>
 									Unpair
 								</Btn>
 							</Show>
@@ -481,7 +481,7 @@ function Connections() {
 								}
 								sub={<span class="truncate">{`${row.origin || "unknown site"} · used ${ago(row.last)}`}</span>}
 							>
-								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => void call("harness.revoke", [id]))}>
+								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => void call("deck.revoke", { id }))}>
 									{row.ids.length > 1 ? "Revoke all" : "Revoke"}
 								</Btn>
 							</SetRow>

@@ -1,72 +1,59 @@
-import { rebase } from "../connections/connection.ts";
 import { createSignal } from "solid-js";
-import type { ServerMessage } from "./types/index.ts";
-import { editDocument, type PenDocument, type PenEdit } from "@decks/pen";
-import { send } from "./socket.ts";
+import { call } from "./line.ts";
+import { on } from "./line.ts";
+import type { canvasItems } from "@decks/canvas/tools";
 
-/**
- * The drawings this page holds, by canvas: what `canvas.changed` says. The page watches the canvas
- * of the agent it is on (`watchCanvas`), gets it whole, and keeps it current from the edits every
- * change carries; an edit that does not follow what is held asks for the whole again.
- */
-type StagePen = {
-	stage: string;
-	rev: number;
-	doc: PenDocument;
-	base: string;
-	error?: string;
-	made?: string[];
-	by?: string;
-	edits?: { from: PenDocument; edits: readonly PenEdit[] };
-};
+// The drawing of the canvas on screen, as the panel's layers and the pills
+// read it: item.list, read again when item.changed names that canvas. The
+// frame keeps its own copy for drawing; this one is only read.
+
+type Node = Record<string, unknown> & { id?: string; type: string; children?: Node[] };
+/** The drawing, as the canvas library reads one. */
+export type PenDoc = NonNullable<Parameters<typeof canvasItems>[0]>;
+type StagePen = { stage: string; rev: number; doc: PenDoc; base: string; by?: string; made?: string[]; edits?: { from: PenDoc; edits: readonly unknown[] } };
 
 const [pens, setPens] = createSignal<Record<string, StagePen>>({});
-
 export { pens };
 
-const KEEP_MADE = 64;
-const madeSince = (known: StagePen | undefined, made: readonly string[] | undefined): string[] | undefined => {
-	const kept = known ? [...(known.made ?? []), ...(made ?? [])].slice(-KEEP_MADE) : made ? [...made] : undefined;
-	return kept?.length ? kept : undefined;
-};
+/** Which canvas is watched, and a read waiting to run. Not drawn. */
+const watching = { canvas: undefined as string | undefined, soon: undefined as number | undefined, stop: undefined as (() => void) | undefined };
 
-let watched: string | undefined;
+/** An item as a pen.dev node: its box as x, y, width and height, inside and out. */
+export function nodeOf(item: Node): Node {
+	const { box, children, ...rest } = item as Node & { box?: { x1: number; y1: number; x2: number; y2: number } };
+	const place = box ? { x: box.x1, y: box.y1, width: box.x2 - box.x1, height: box.y2 - box.y1 } : {};
+	return { ...rest, ...place, ...(children ? { children: children.map(nodeOf) } : {}) };
+}
 
-/** Hear a canvas: whole first, then every change. The one before is let go. */
+async function read(canvas: string): Promise<void> {
+	const [items, about] = await Promise.all([call<Node[]>("item.list", { canvas }), call<{ rev?: number }>("canvas.get", { canvas })]);
+	if (!items.ok || watching.canvas !== canvas) return;
+	const doc = { version: "2.6", children: items.value.map(nodeOf) } as unknown as PenDoc;
+	setPens({ ...pens(), [canvas]: { stage: canvas, rev: about.ok ? (about.value.rev ?? 0) : 0, doc, base: `/api/t/` } });
+}
+
+/** Keep the drawing of this canvas, and stop keeping the last one. */
 export function watchCanvas(canvas: string | undefined): void {
-	if (canvas === watched) return;
-	if (watched) send({ type: "canvas.unwatch", canvas: watched });
-	watched = canvas;
-	if (canvas) send({ type: "canvas.watch", canvas, whole: true });
+	if (canvas === watching.canvas) return;
+	watching.canvas = canvas;
+	watching.stop ??= on("item.changed", (event) => {
+		if (event.canvas === watching.canvas) rewatch();
+	});
+	if (canvas) void read(canvas);
 }
 
-/** Ask for the drawing whole again: after a reconnect, or an edit that did not follow. */
+/** Read the watched drawing again, soon: several changes in a row are one read. */
 export function rewatch(canvas?: string): void {
-	const name = canvas ?? watched;
-	if (name) send({ type: "canvas.watch", canvas: name, whole: true });
-}
-
-export function receiveCanvasChanged(message: Extract<ServerMessage, { type: "canvas.changed" }>): void {
-	const known = pens()[message.canvas];
-	if (message.doc) {
-		if (known && known.rev === message.rev) return;
-		setPens({ ...pens(), [message.canvas]: { stage: message.canvas, rev: message.rev, doc: message.doc, base: rebase(message.base), ...(message.error ? { error: message.error } : {}), ...(madeSince(known, message.made) ? { made: madeSince(known, message.made) } : {}), ...(message.by ? { by: message.by } : {}) } });
-		return;
-	}
-	if (!message.edits) return;
-	if (!known || known.rev !== message.from) {
-		if (known?.rev !== message.rev && message.canvas === watched) rewatch(message.canvas);
-		return;
-	}
-	try {
-		const doc = editDocument(known.doc, message.edits);
-		setPens({ ...pens(), [message.canvas]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: madeSince(known, message.made), by: message.by ?? known.by } });
-	} catch {
-		rewatch(message.canvas);
-	}
+	const name = canvas ?? watching.canvas;
+	if (!name || name !== watching.canvas) return;
+	if (watching.soon !== undefined) clearTimeout(watching.soon);
+	watching.soon = window.setTimeout(() => {
+		watching.soon = undefined;
+		void read(name);
+	}, 120);
 }
 
 export function resetPens(): void {
 	setPens({});
-	watched = undefined;
+	watching.canvas = undefined;
 }

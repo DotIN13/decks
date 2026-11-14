@@ -111,7 +111,7 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 					{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 					    `flex-1` label, and has. */}
 					<span class="menu-tile" aria-hidden="true">
-						<AgentMark class="flex-none" agent={runtime.kind} size={13} />
+						<AgentMark class="flex-none" agent={runtime.kind as Parameters<typeof AgentMark>[0]["agent"]} size={13} />
 					</span>
 					<span class="row-label flex-1">{runtime.label}</span>
 					<Show when={!runtime.available}>
