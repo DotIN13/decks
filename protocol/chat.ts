@@ -72,7 +72,7 @@ export const AgentChat = named(
 		usage: opt(AgentUsage),
 		dormant: opt(lit(true)),
 	}),
-	"An agent as the chat list draws it. cards were called boards before.",
+	"An agent as the chat list draws it, with the cards it wrote and those in play.",
 );
 export const ClaudeAccount = named(
 	"ClaudeAccount",
