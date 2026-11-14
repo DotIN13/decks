@@ -6,6 +6,7 @@ import { Translator, type ChatEvent } from "../runtimes/shared/translator.ts";
 import type { AgentMode, AgentState, AgentUsage, ChatItem, MessagePart, ThinkingLevel } from "../runtimes/types/index.ts";
 import { identityReminder, type Agent, type Spec } from "./identity.ts";
 import { Queues, type Mail } from "./queue.ts";
+import { markFiles, touchedFiles } from "./timeline.ts";
 import { agentClient, brief, briefingText, deckFacts, decksAccess, takeNews } from "./tools.ts";
 import type { Saved, Transcripts } from "./transcript.ts";
 
@@ -99,10 +100,11 @@ export class Session {
 
 	/** A message as a new turn, or into the running one: news and the identity reminder in front. */
 	async prompt(text: string, parts?: MessagePart[]): Promise<void> {
-		this.translator.user(text, parts);
+		const said = this.translator.user(text, parts);
 		await this.start();
 		if (!this.backend) return this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
 		this.translator.setState("thinking");
+		await this.mark(said.id);
 		const sent = (await this.front(text)) ?? text;
 		try {
 			await this.backend.prompt(sent);
@@ -151,6 +153,19 @@ export class Session {
 		await this.client.call("agent.send", { agent: mail.from, task: `${this.spec.name} finished: ${report}` }).catch((error: Error) => {
 			this.translator.notice("warn", `The report to ${mail.from} did not go: ${error.message}`);
 		});
+	}
+
+	/** The versions a message was marked with as it was sent. */
+	marksOf(entry: string): Record<string, string> {
+		return this.saved.marks?.[entry] ?? {};
+	}
+
+	/** Before the runtime hears a message: the settled version of each file the agent has touched. */
+	private async mark(entry: string): Promise<void> {
+		const paths = touchedFiles(this, this.deps.deckPath);
+		if (!paths.length) return;
+		const marks = await markFiles(this, paths);
+		this.saved.marks = { ...this.saved.marks, [entry]: marks };
 	}
 
 	/** Spend from another Claude account: this agent's link is repointed, and its runtime follows. */

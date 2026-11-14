@@ -58,6 +58,16 @@ after(() => {
 });
 
 type Item = { id: string; kind: string; text?: string };
+
+test("a deck with no agent gets one, at home on the deck's first canvas, as a first run does", async () => {
+	const agents = await until("the first agent", async () => {
+		const all = (await person.call("agent.list")).value as Array<{ kind?: string; canvas?: string; state?: string }>;
+		return all.length && all[0]!.state === "idle" ? all : undefined;
+	});
+	assert.equal(agents.length, 1);
+	assert.equal(agents[0]!.kind, "pi");
+	assert.equal(agents[0]!.canvas, "auth-refresh");
+});
 const chat = async (agent: string) => (await person.call("chat.list", { agent })).value as Item[];
 
 test("an agent takes a message, makes a card with the decks command, and reports", async () => {

@@ -14,6 +14,8 @@ export type Saved = {
 	model?: AgentModel;
 	mode?: AgentMode;
 	account?: string;
+	/** For each user message, the settled version of each file the agent had touched when it was sent. */
+	marks?: Record<string, Record<string, string>>;
 	items: ChatItem[];
 };
 

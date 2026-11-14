@@ -8,8 +8,9 @@ import { startHarness } from "./host.ts";
 import type { RunKind } from "./runtimes/types/index.ts";
 
 // The harness's entry: node --import tsx harness/main.ts --deck <folder>
-// [--port 4620] [--kinds pi,claude]. It connects to the server the deck's
-// lock file names, or starts server/main.ts as its own process when none runs.
+// [--port 4620] [--kinds pi,claude] [--canvas c] [--no-first-agent]. It connects
+// to the server the deck's lock file names, or starts server/main.ts when none
+// runs. A deck with no agent gets one, at home on --canvas when named.
 
 const SERVER = fileURLToPath(new URL("../server/main.ts", import.meta.url));
 type Lock = { url: string; token: string; pid: number };
@@ -51,7 +52,9 @@ async function main(argv: string[]): Promise<void> {
 	const started = found ? undefined : await startServer(deck, flag(argv, "port") ?? "4620");
 	const lock = found ?? started!.lock;
 	const kinds = flag(argv, "kinds")?.split(",").filter(Boolean) as RunKind[] | undefined;
-	const harness = await startHarness({ url: lock.url, token: lock.token, deck, ...(kinds ? { kinds } : {}) });
+	const canvas = flag(argv, "canvas");
+	const firstAgent = argv.includes("--no-first-agent") ? (false as const) : canvas ? { canvas } : {};
+	const harness = await startHarness({ url: lock.url, token: lock.token, deck, firstAgent, ...(kinds ? { kinds } : {}) });
 	console.log(`The Decks harness is connected to ${lock.url}${started ? ", a server it started" : ""}.`);
 	const stop = () => void harness.stop().then(() => {
 		started?.child.kill("SIGTERM");

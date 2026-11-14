@@ -53,16 +53,46 @@ export function touchedFiles(session: Session, deckPath: string): string[] {
 	return [...found];
 }
 
-/** For each file the agent wrote or named, by its tools or as a card's writer, the version current when the message was sent. */
+type Text = { text: string };
+
+/** The file's newest version once the server has heard its last write: its text matches the disk's. */
+export async function settledVersion(session: Session, path: string, tries = 20): Promise<string | undefined> {
+	for (let i = 0; i < tries; i++) {
+		const versions = ((await session.client.call("file.versions", { path }).catch(() => undefined))?.value ?? []) as Version[];
+		const newest = versions[0]?.sha;
+		if (newest === undefined) return undefined;
+		const [now, then] = await Promise.all([session.client.call("file.read", { path }), session.client.call("file.read", { path, sha: newest })].map((one) => one.then((a) => (a.value as Text).text).catch(() => undefined)));
+		if (now !== undefined && now === then) return newest;
+		await new Promise((done) => setTimeout(done, 100));
+	}
+	return undefined;
+}
+
+/** What a message is marked with as it is sent: each touched file's settled version. */
+export async function markFiles(session: Session, paths: string[]): Promise<Record<string, string>> {
+	const out: Record<string, string> = {};
+	for (const path of paths) {
+		const sha = await settledVersion(session, path);
+		if (sha !== undefined) out[path] = sha;
+	}
+	return out;
+}
+
+/** For each file the agent named or wrote, its version when the message was sent: the mark, else by time. */
 export async function cardsAt(session: Session, entry: string): Promise<Record<string, string>> {
-	const at = userEntry(session, entry)?.at;
-	if (at === undefined) return {};
+	const user = userEntry(session, entry);
+	if (!user) return {};
+	const marked = session.marksOf(user.id);
 	const cards = ((await session.client.call("card.list").catch(() => undefined))?.value ?? []) as CardRow[];
 	const written = cards.filter((one) => one.by === session.id || one.by === session.spec.name).map((one) => one.path);
 	const out: Record<string, string> = {};
-	for (const path of new Set([...written, ...touchedFiles(session, session.deckPath)])) {
+	for (const path of new Set([...written, ...touchedFiles(session, session.deckPath), ...Object.keys(marked)])) {
+		if (marked[path] !== undefined) {
+			out[path] = marked[path];
+			continue;
+		}
 		const versions = ((await session.client.call("file.versions", { path }).catch(() => undefined))?.value ?? []) as Version[];
-		const then = versions.filter((one) => one.at <= at).sort((a, b) => b.at - a.at)[0];
+		const then = versions.filter((one) => one.at <= user.at).sort((a, b) => b.at - a.at)[0];
 		if (then) out[path] = then.sha;
 	}
 	return out;

@@ -37,9 +37,14 @@ who it is and what it is given. A session knows nothing of where its agent sits 
    delta of its text or thinking while it streams. `rev` counts the agent's changes.
 10. The transcript is kept in the harness's own folder, never the deck: the last 500 entries, and an
     archive of older ones that `chat.list` pages back through.
-11. A rewind or fork goes back to a user message by the runtime's own session tree. Restoring puts
-    back, through `file.restore`, the version current at that message of each file the agent named
-    in its tool calls or last wrote as a card. A file written on disk counts: its writer is "disk".
+11. A rewind or fork goes back to a user message by the runtime's own session tree. Before the
+    runtime hears a message, the session marks it with the settled version (`file.versions`, once
+    its text matches the file's) of each file the agent's tool calls named. Preview and restore
+    (`file.restore`) use that mark, else the version current at the message's time.
+12. On a deck with no agent at all, the harness starts one of the first kind it offers once it is
+    connected, named by the server, at home on the canvas named (`--canvas`), else the deck's first
+    canvas, else a new one, as a first run of Decks does.
+    `--no-first-agent` leaves the deck empty.
 
 ## Check
 

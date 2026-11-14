@@ -18,6 +18,8 @@ export type HarnessOptions = {
 	deck: string;
 	home?: string;
 	kinds?: RunKind[];
+	/** On a deck with no agent at all, start one, as a first run of Decks does; its home canvas when named. */
+	firstAgent?: false | { canvas?: string };
 };
 
 export type Harness = { sessions: Sessions; url: string; connected(): boolean; stop(): Promise<void> };
@@ -63,6 +65,7 @@ export async function startHarness(options: HarnessOptions): Promise<Harness> {
 		});
 	};
 	await connect();
+	if (options.firstAgent !== false) await firstAgent(link, offeredKinds(options.kinds)[0], options.firstAgent?.canvas);
 	return {
 		sessions,
 		url: options.url,
@@ -73,6 +76,15 @@ export async function startHarness(options: HarnessOptions): Promise<Harness> {
 			line?.close();
 		},
 	};
+}
+
+/** A deck with no agent gets one of the first kind offered, named by the server, at home on the canvas named, else the deck's first, else a new one. */
+async function firstAgent(link: HostLink, kind: RunKind | undefined, canvas: string | undefined): Promise<void> {
+	if (!kind) return;
+	const agents = (await link.call("agent.list").catch(() => [undefined])) as unknown[];
+	if (agents.length) return;
+	const first = canvas ?? ((await link.call("canvas.list").catch(() => [])) as Array<{ name: string }>)[0]?.name;
+	await link.call("agent.create", { kind, ...(first ? { canvas: first } : {}) }).catch(() => {});
 }
 
 /** agent.requested: a session, dormant, and the server told it is idle. */
