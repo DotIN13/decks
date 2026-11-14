@@ -1,4 +1,4 @@
-import { layout, Refused } from "../../protocol/index.ts";
+import { FILES_PATH, layout, Refused } from "../../protocol/index.ts";
 import type { Context, Route, RouteAnswer } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { titleOf } from "./cards.ts";
@@ -6,7 +6,7 @@ import { stat } from "./files.ts";
 
 // A card's page and its modules, and every other file, under /files/. Rules 8 and 14.
 
-export const FILES = "/files/";
+export const FILES = FILES_PATH;
 const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
 const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 const decoder = new TextDecoder();
