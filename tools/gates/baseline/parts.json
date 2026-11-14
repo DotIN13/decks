@@ -14,7 +14,6 @@
 	"harness/page/app/canvas-host.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/canvases: part has no model.ts": 1,
 	"harness/page/canvases: part has no view.tsx": 1,
-	"harness/page/canvases/CanvasManager.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/canvases/CanvasOps.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/canvases/CanvasSwitcher.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/connections: part has no actions.ts": 1,

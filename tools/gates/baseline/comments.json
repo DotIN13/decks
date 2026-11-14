@@ -715,8 +715,6 @@
 	"harness/page/app/viewport.ts: em dash": 9,
 	"harness/page/app/watching.ts: comment over 5 lines": 2,
 	"harness/page/app/watching.ts: em dash": 1,
-	"harness/page/canvases/CanvasManager.tsx: comment over 5 lines": 2,
-	"harness/page/canvases/CanvasManager.tsx: em dash": 4,
 	"harness/page/canvases/CanvasOps.tsx: comment over 5 lines": 1,
 	"harness/page/canvases/CanvasOps.tsx: em dash": 2,
 	"harness/page/canvases/CanvasSwitcher.tsx: comment over 5 lines": 1,
