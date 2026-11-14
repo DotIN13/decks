@@ -87,10 +87,9 @@ async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][]):
 	return offered;
 }
 
-/** A canvas named by a call, checked to be there; ctx.canvas refuses one that is not. */
+/** A canvas's name from a name or a title; refused when there is none. */
 export function canvasName(ctx: Context, asked: string): string {
-	ctx.canvas(asked);
-	return asked;
+	return ctx.canvasName(asked);
 }
 
 /** The screens following an agent go to its new home. */

@@ -32,7 +32,8 @@ export function standInCanvas(names: string[]): { feature: Feature; docs: Map<st
 		name: "stand-in",
 		calls: [handle(calls.item.insert, (ctx, { item, canvas }) => ctx.canvas(canvas).apply([{ op: "insert", item }], ctx.caller).items[0]!)],
 		canvases: () => ({
-			name: (n) => {
+			name: (asked) => {
+				const n = asked.startsWith("Title ") ? asked.slice(6).toLowerCase() : asked;
 				if (!docs.has(n)) throw new Refused("not_found", `No canvas ${n}.`, "canvas.list");
 				return n;
 			},
