@@ -1,0 +1,1 @@
+{ "extends": "../../tsconfig.folder.json", "compilerOptions": { "types": ["node"], "lib": ["ES2023", "DOM"] }, "include": ["**/*.ts"] }
