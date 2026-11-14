@@ -13,6 +13,10 @@
 	],
 	"exclude": [
 		"page",
-		"node_modules"
+		"node_modules",
+		"**/node_modules/**",
+		"prompts/opencode/**",
+		"prompts/opencode2/**",
+		"prompts/antigravity/**"
 	]
 }
