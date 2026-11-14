@@ -19,6 +19,9 @@ integrator: questions, blocks and reports go to Mason.
 them. If you need a change in a path that is not yours, ask its owner with
 `decks agent send <name> --task "…"`, or Mason.
 
+Warden also owns each new top folder's `package.json` and `tsconfig.json` in `server/` and `harness/`, so every
+folder's type-check project has one shape. In `clients/`, the folder's owner writes them to that shape.
+
 Only Lexicon edits `protocol/`. If you need a call, an event or a shape, ask Lexicon; do not invent one.
 Only Warden edits the root `package.json`, the lockfile and the root `tsconfig` files. No new npm
 dependency without asking Mason.
@@ -31,6 +34,8 @@ the switch-over.
 
 - Commit only your paths: `git add <your paths>`, then `git commit -m "…" -- <your paths>`. Never
   `git add -A`, `git add .` or `git commit -a`: another agent's half-written files are in the same tree.
+- Once Warden's hooks are installed, set `REWRITE_AGENT=<your name>` in the environment of every commit:
+  the lanes gate reads it to check you touched only your own paths. (`DECKS_AGENT` is the harness's, an id.)
 - If `.git/index.lock` exists, another agent is committing: wait a few seconds and try again.
 - A title of 72 characters at most, saying what changed. A body saying why, and a `Checked:` line with
   the commands you ran. One idea per commit.
