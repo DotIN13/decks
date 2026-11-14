@@ -4,7 +4,9 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./main.ts"
+		".": "./main.ts",
+		"./kernel/testing": "./kernel/testing.ts",
+		"./kernel/types": "./kernel/types.ts"
 	},
 	"scripts": {
 		"test": "node ../tools/check.mjs server"
