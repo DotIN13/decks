@@ -28,6 +28,7 @@ export class People {
 		const people = new People(kernel.store("people"), kernel.callers);
 		await Promise.all([people.roster.load(), people.mail.load(), people.marks.load()]);
 		kernel.callers.describe("agent", (id) => people.roster.callerOf(id));
+		kernel.relay((call) => people.hosts.answerer(call));
 		return people;
 	}
 

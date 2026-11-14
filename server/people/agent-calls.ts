@@ -1,4 +1,4 @@
-import { Refused, calls, events, type Handled, type Args, type shapes } from "../../protocol/index.ts";
+import { CALL_BY_NAME, Refused, calls, events, type Handled, type Args, type shapes } from "../../protocol/index.ts";
 import { handleAll, type Context } from "../kernel/types.ts";
 import { deliver, takeNews } from "./agent-mail.ts";
 import type { AgentChange, AgentRecord } from "./records.ts";
@@ -18,7 +18,7 @@ export function agentCalls(holder: Holder): Handled<Context>[] {
 		update: (ctx, { agent, change }) => update(p(), ctx, agent, change),
 		remove: (ctx, { agent }) => remove(p(), ctx, agent),
 		attach: (ctx, args) => attach(p(), ctx, args),
-		host: (ctx, { kinds }) => host(p(), ctx, kinds),
+		host: (ctx, { kinds, calls: answers }) => host(p(), ctx, kinds, answers ?? []),
 		send: (ctx, { agent, task, cards }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}) }, "send"),
 		queue: (ctx, { agent, task, cards, reply }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}), ...(reply ? { reply } : {}) }, "queue"),
 		inbox: (ctx) => p().mail.inbox(p().self(ctx).id),
@@ -86,11 +86,13 @@ async function giveHome(people: People, ctx: Context, record: AgentRecord, asked
 	}
 }
 
-/** A connected client offers kinds; agents of those kinds with no host are its own. */
-async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][]): Promise<NonNullable<AgentRecord["kind"]>[]> {
+/** A socket client offers kinds and harness calls; agents of its kinds with no host become its own. */
+async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], answers: string[]): Promise<NonNullable<AgentRecord["kind"]>[]> {
 	const client = people.meet(ctx);
 	if (!client) throw new Refused("invalid", "agent.host needs a connection that stays open: call it on the socket.", "agent.host");
-	const offered = people.hosts.offer(client, kinds.filter((k): k is NonNullable<typeof k> => !!k));
+	const odd = answers.filter((name) => CALL_BY_NAME.get(name)?.side !== "harness");
+	if (odd.length) throw new Refused("invalid", `A host answers only the calls the harness answers itself, such as chat.list; ${odd.join(", ")} is not one.`, "agent.host");
+	const offered = people.hosts.offer(client, kinds.filter((k): k is NonNullable<typeof k> => !!k), answers);
 	for (const record of people.roster.all()) {
 		if (record.attached || !record.kind || !offered.includes(record.kind) || people.hosts.has(record.host)) continue;
 		await people.roster.update(record.id, { host: client });

@@ -32,8 +32,9 @@ model, a login or a transcript.
    host is connected is told to that host alone (`agent.mailed`); otherwise it waits in the inbox.
 9. `agent.send` is delivered at once when a host holds the agent, and queued when none does.
    `agent.queue` always waits its turn in the inbox.
-10. A host is a connected client that offers kinds of agent (`agent.host`). Its offer ends when it
-    disconnects. `agent.create` goes to one host offering that kind (`agent.requested`); with none
+10. A host is a socket client that offers kinds of agent and the harness's calls it answers
+    (`agent.host`); only those calls may be offered. The kernel relays such a call to the first
+    host offering it. Its offer ends when it disconnects. `agent.create` goes to one host offering that kind (`agent.requested`); with none
     it is refused `unavailable`, saying a harness must be running.
 11. `agent.news` answers what changed on the caller's canvas since its last ask, leaving out its own
     changes, and its waiting mail; asking moves its mark on, so a second ask brings nothing new.
