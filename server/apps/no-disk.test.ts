@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { callers, testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
-import { appsFeature } from "./feature.ts";
 
 // The no-disk check for apps: a client with no disk writes an app with the
 // file calls alone, builds it, runs it and reads its page over HTTP. The
@@ -20,7 +19,7 @@ test("an app made with file.write is built, run and read, with no disk on the cl
 	const workdir = mkdtempSync(join(tmpdir(), "depot-nodisk-"));
 	const ann = callers.agent("ann", "work");
 	const deck = new MemoryDeck({ "canvases/work/canvas.pen": '{"version":"2.14","children":[]}' });
-	const s = await testServer({ features: [...features(), appsFeature({ workdir })], deck });
+	const s = await testServer({ features: features({ appRun: workdir }), deck });
 	const door = await s.listen(0);
 	await s.value("file.write", { path: "apps/hello/app.json", text: '{ "title": "Hello", "kind": "server", "build": "node -e \\"console.log(1)\\"", "start": "node server.mjs" }\n' }, ann);
 	await s.value("file.write", { path: "apps/hello/server.mjs", text: SERVER }, ann);

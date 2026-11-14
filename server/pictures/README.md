@@ -41,7 +41,7 @@ HTML; `playwright` for the browser. No other feature.
 
 ## Not here
 
-The engine's native screenshot tool (`packages/stage`, a release cargo build) is not used yet:
+The engine's native screenshot tool (the engine's release cargo build) is not used yet:
 every picture is the browser's, and `live` changes nothing. `how` says "chromium".
 
 ## Check

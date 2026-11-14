@@ -38,7 +38,8 @@ check.ts only. No other feature.
 8. `/app/<name>/<path>` serves a static app's file from the deck, a built app's from its `root`
    (`dist`) in the running copy, a path with no file its `index.html`, and proxies a server app,
    the path inside the app unless `prefix`. Each upstream request has its own connection, closed
-   when it ends, with a 60 s limit: a proxy never keeps a socket.
+   when it ends, with a 60 s limit: a proxy never keeps a socket. In a frame the pass rides in the
+   path, `/app/t/<pass>/<name>/`, so the page's relative addresses carry it.
 9. An app's log keeps its last 600 lines, in the feature's store across restarts.
 10. app.create writes a starter (`static`, `node`, `solid`, `react`, `next`) into a new folder, and
    refuses a folder that has files. Every app is a git repository in its running copy:
@@ -50,7 +51,6 @@ check.ts only. No other feature.
 13. A port is forwarded by number, 1 to 65535, kept in the store. `/node/<host>/<port>/x` passes
    `/node/<host>/<port>/x` on; `/rnode/<host>/<port>/x` passes `/x`. A port not forwarded is 404.
 
-Not yet: the kernel's routes are buffered, so the proxy carries GET and POST, not a websocket.
 
 ## Check
 

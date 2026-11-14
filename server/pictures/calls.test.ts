@@ -41,7 +41,7 @@ function fakeBrowser(reading: Reading, views: Views = { controls: 0, opening: re
 	return { browser, seen };
 }
 
-const start = (browser: Browser, origin: string | null = "http://127.0.0.1:4664") => testServer({ features: [...features(), picturesFeature({ browser, origin: () => origin ?? undefined })], deck: DECK });
+const start = (browser: Browser, origin: string | null = "http://127.0.0.1:4664") => testServer({ features: [...features().filter((one) => one.name !== "pictures"), picturesFeature({ browser, origin: () => origin ?? undefined })], deck: DECK });
 const ann = callers.agent("ann", "work");
 
 test("rule 4: fit measures at the card's width there, writes its height, and says one screen", async () => {

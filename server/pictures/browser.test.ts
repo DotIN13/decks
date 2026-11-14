@@ -27,7 +27,7 @@ function fixture(dir = ""): Record<string, Uint8Array> {
 
 test("card.fit and canvas.screenshot in a real browser, on the fixture deck", { skip: HEAVY ? false : "heavy: set DECKS_HEAVY=1 and run under tools/heavy.mjs" }, async () => {
 	const browser = chromium();
-	const s = await testServer({ features: [...features(), picturesFeature({ browser })], deck: fixture() as never });
+	const s = await testServer({ features: [...features().filter((one) => one.name !== "pictures"), picturesFeature({ browser })], deck: fixture() as never });
 	const served = await s.listen();
 	s.setUrl(served.url);
 	const ann = callers.agent("ann", "auth-refresh");

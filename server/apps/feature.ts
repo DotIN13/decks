@@ -6,7 +6,7 @@ import { appKind } from "./item.ts";
 import { portCalls } from "./port-calls.ts";
 import { forwardTarget, serveForward } from "./ports.ts";
 import { upgradeTo } from "./proxy.ts";
-import { parseAppPath, serverTarget, serveApp } from "./serve.ts";
+import { parseAppPath, passInPath, serverTarget, serveApp } from "./serve.ts";
 import { Apps } from "./service.ts";
 import { manifestOf } from "./manifest.ts";
 
@@ -18,11 +18,14 @@ function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 	const app: Route = {
 		method: "ANY",
 		prefix: "/app/",
+		tokenOf: passInPath,
 		serve: (ctx, req, res) => serveApp(ctx, apps(), req, res),
 		upgrade(req, socket, head, door) {
-			const url = new URL(req.url ?? "/", "http://decks.local");
+			const asked = new URL(req.url ?? "/", "http://decks.local");
+			const carried = passInPath(asked);
+			const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
 			const at = parseAppPath(url.pathname);
-			if (!at || !door.resolve(url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+			if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
 			void manifestOf(kernel().deck, at.name)
 				.then((manifest) => (manifest.kind === "server" ? serverTarget(apps(), at.name, manifest, at.inner, url.search) : undefined))
 				.catch(() => undefined)

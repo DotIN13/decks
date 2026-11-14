@@ -105,11 +105,12 @@ async function check(ctx: Context, apps: Apps, kernel: Kernel, name: string): Pr
 	await manifestOf(ctx.deck, name);
 	const base = kernel.url();
 	if (!base) throw new Refused("unavailable", "app.check needs the server's own address, and this server is not listening.", "app.logs");
-	const pass = kernel.callers.issue({ kind: "app", id: name, name }, "app.check");
+	const id = `${name}.check`;
+	const pass = kernel.callers.issue({ kind: "app", id, name }, "app.check");
 	try {
-		return await checkInBrowser(`${base}/app/${name}/?pass=${encodeURIComponent(pass)}`, `/app/${name}/`);
+		return await checkInBrowser(`${base}/app/t/${encodeURIComponent(pass)}/${name}/`, `/app/${name}/`);
 	} finally {
-		kernel.callers.revoke(name);
+		kernel.callers.revoke(id);
 		apps.seen(name);
 	}
 }

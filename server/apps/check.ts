@@ -15,7 +15,7 @@ export function verdict(found: Load): string {
 	return "Loads clean: no errors, no failed requests.";
 }
 
-/** Open url (with its pass) in Chromium, wait for it to settle, and report. */
+/** Open url (its pass in the path) in Chromium, wait for it to settle, and report. */
 export async function checkInBrowser(url: string, shown: string): Promise<Checked> {
 	const playwright = await import("playwright").catch(() => undefined);
 	if (!playwright) throw new Refused("unavailable", "app.check needs Playwright's Chromium, and it is not installed here.", "app.logs");
@@ -26,8 +26,8 @@ export async function checkInBrowser(url: string, shown: string): Promise<Checke
 		const failed: string[] = [];
 		page.on("pageerror", (error) => errors.push(error.message.split("\n")[0]!));
 		page.on("console", (line) => void (line.type() === "error" && errors.push(line.text().slice(0, 300))));
-		page.on("requestfailed", (request) => failed.push(`${request.url().replace(/[?&]pass=[^&]+/, "")} ${request.failure()?.errorText ?? ""}`.trim()));
-		page.on("response", (answer) => void (answer.status() >= 400 && failed.push(`${answer.url().replace(/[?&]pass=[^&]+/, "")} ${answer.status()}`)));
+		page.on("requestfailed", (request) => failed.push(`${request.url().replace(/\/app\/t\/[^/]+\//, "/app/")} ${request.failure()?.errorText ?? ""}`.trim()));
+		page.on("response", (answer) => void (answer.status() >= 400 && failed.push(`${answer.url().replace(/\/app\/t\/[^/]+\//, "/app/")} ${answer.status()}`)));
 		const answer = await page.goto(url, { waitUntil: "load", timeout: 30_000 }).catch((error: Error) => {
 			errors.push(error.message.split("\n")[0]!);
 			return null;

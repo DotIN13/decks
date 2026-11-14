@@ -7,7 +7,6 @@ import { join } from "node:path";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { callers, testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
-import { appsFeature } from "./feature.ts";
 
 // The apps feature as calls and as pages, on the real doors, with real processes.
 
@@ -17,12 +16,14 @@ const ann = callers.agent("ann", "work");
 async function start() {
 	const workdir = mkdtempSync(join(tmpdir(), "depot-apps-"));
 	const deck = new MemoryDeck({ "canvases/work/canvas.pen": '{"version":"2.14","children":[]}' });
-	const s = await testServer({ features: [...features(), appsFeature({ workdir })], deck });
+	const s = await testServer({ features: features({ appRun: workdir }), deck });
 	const door = await s.listen(0);
 	const page = (path: string, init?: RequestInit) => fetch(`${door.url}${path}${path.includes("?") ? "&" : "?"}pass=${door.token}`, init);
 	return {
 		s,
 		page,
+		url: (path: string) => `${door.url}${path}`,
+		carried: (path: string) => fetch(`${door.url}/app/t/${door.token}/${path}`),
 		async close() {
 			await door.close();
 			await s.close();
@@ -41,6 +42,9 @@ test("a static app is made from its starter, served at once, and is a git reposi
 	assert.match(await home.text(), /<title>Counter<\/title>/);
 	assert.equal((await t.page("/app/counter/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
 	assert.equal((await t.page("/app/counter/nope.png")).status, 404);
+	const carried = await t.carried("counter/style.css");
+	assert.equal(carried.status, 200, "a pass in the path lets a page's relative files in");
+	assert.equal((await fetch(t.url("/app/counter/style.css"))).status, 401, "with no pass at all, nothing");
 	const again = await t.s.call("app.create", { name: "counter" }, ann);
 	assert.equal(again.ok ? "" : again.error.code, "conflict");
 	const listed = await t.s.value<App[]>("app.list");

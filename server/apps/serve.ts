@@ -23,6 +23,12 @@ export function parseAppPath(path: string): { name: string; inner: string; slash
 	return { name: match[1]!, inner: match[2] ?? "/", slash: match[2] !== undefined };
 }
 
+/** /app/t/<pass>/<name>/x: the pass rides in the path, so the page's relative addresses carry it too. */
+export function passInPath(url: URL): { token: string; path: string } | undefined {
+	const match = /^\/app\/t\/([A-Za-z0-9_.~-]+)\/(.*)$/.exec(url.pathname);
+	return match ? { token: match[1]!, path: `/app/${match[2]}` } : undefined;
+}
+
 /** The candidates a path names, in order: the file, its folder's index.html, the app's index.html. */
 export function candidates(inner: string): string[] {
 	let path: string;
