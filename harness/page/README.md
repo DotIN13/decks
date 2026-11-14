@@ -6,10 +6,10 @@ holds the canvas page, settings, connections, panels and pages. Pane owns it; `c
 
 ## Owns
 
-- `shell/`: the page's frame. `view.tsx` lays out the slots; each area mounts there.
-- `state/`: every store and the one line to the server (`client.ts`, `events.ts`), entered by
-  `state/index.ts`.
-- `agents/ canvases/ settings/ panel/ connections/ frame/ files/ markup/ lib/ perf/`: the parts.
+- `shell/`: the page's frame. `view.tsx` lays out each area; `actions.ts` wires them once.
+- `state/`: every store and the one line to the server (`line.ts`, `sync.ts`), entered by
+  `state/index.ts`; `state/compat/` hears today's socket messages for today's checks.
+- `agents/ canvases/ settings/ panel/ connections/ frame/ files/ markup/ lib/ perf/ app/`: the parts.
 - `styles/`: the sheets in their cascade order, until each is scoped to its part.
 - `pages/`: the entry of each HTML page. `vite.config.ts`, `index.html`: the build and dev server.
 
@@ -28,8 +28,7 @@ lucide-solid, marked. Never `server/`, `apps/`, nor `@decks/protocol` or `@decks
    page says so in a notice instead of failing.
 3. The page learns its server and token from `/page.json` (served by whatever serves the page),
    else from `?token=` once; the token goes only in a header and the socket's hello.
-4. The shell holds no state and no rule: it mounts each area's view in its slot. Adding an area
-   changes no shared file.
+4. The shell holds no data: stores are in `state/`, and the shell wires them to each area's view.
 5. Moved, not redesigned: markup, class names and behaviour stay as today's `apps/web`, because
    the browser checks and the styles hold them.
 6. A part over the limits splits into `model.ts` (state and rules, no DOM, unit-tested),
