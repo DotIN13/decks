@@ -11,6 +11,7 @@ checks speak them; they are how we know the new programs behave.
 - `events.ts`: a new event told as the old one a watcher expects.
 - `line.ts`: today's line at `/compat/v1/socket` (`line.hello`, `line.call`, `canvas.watch`).
 - `drawing.ts`: today's `/compat/stage-pen/<canvas>`, the drawing as the canvas frame first reads it.
+- `pictures.ts`: today's `/api/stage-thumb/<canvas>`, read from server/pictures' canvas tile.
 - `feature.ts`: its one export.
 
 ## May import

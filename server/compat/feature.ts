@@ -1,11 +1,13 @@
 import { defineFeature, type Deck, type Feature } from "../kernel/index.ts";
 import { drawingRoute } from "./drawing.ts";
 import { lineRoute } from "./line.ts";
+import { stageThumbRoute } from "./pictures.ts";
 
-// Today's names, answered from this one folder: the old line and the old drawing route.
+// Today's names, answered from this one folder: the old line, the old drawing and tile routes.
 
 export function compatFeature(): Feature {
 	let deck: Deck | undefined;
+	let url: () => string | undefined = () => undefined;
 	const deckNow = () => {
 		if (!deck) throw new Error("compat has not started");
 		return deck;
@@ -13,9 +15,10 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow)],
+		routes: [lineRoute(deckNow), drawingRoute(deckNow), stageThumbRoute(() => url())],
 		start(kernel) {
 			deck = kernel.deck;
+			url = () => kernel.url();
 		},
 	});
 }
