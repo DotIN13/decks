@@ -2,16 +2,18 @@ import { calls, Refused } from "../../protocol/index.ts";
 import { defineFeature, handleAll, type Context, type Deck, type Feature, type Kernel, type Store } from "../kernel/types.ts";
 import { forget, readLink, writeLink, type Link } from "./client/link.ts";
 import { DeckSync, type SyncOptions } from "./client/sync.ts";
+import { networkTransport } from "./client/network.ts";
 import { StudioError, type Transport } from "./client/transport.ts";
 
 // The sharing feature: studio.status, connect and disconnect, and the sync
 // client that runs while a key is kept. Only the person connects.
 
-export type SharingOptions = Pick<SyncOptions, "log" | "inventory" | "issueToken" | "unlinked"> & { transport: Transport; settleMs?: number };
+export type SharingOptions = Pick<SyncOptions, "log" | "inventory" | "issueToken" | "unlinked"> & { transport?: Transport; settleMs?: number };
 
 type Running = { sync?: DeckSync; deck?: Deck; store?: Store; stopWatch?: () => void; timer?: ReturnType<typeof setTimeout> };
 
-export function sharingFeature(opts: SharingOptions): Feature {
+export function sharingFeature(given: SharingOptions = {}): Feature {
+	const opts = { ...given, transport: given.transport ?? networkTransport() };
 	const running: Running = {};
 	const begin = async (deck: Deck, store: Store, link: Link) => {
 		await end(running);
@@ -48,7 +50,9 @@ export function sharingFeature(opts: SharingOptions): Feature {
 
 const status = (link: Link | undefined) => (link ? { connected: true, url: link.url } : { connected: false });
 
-async function connect(ctx: Context, opts: SharingOptions, url: string, key: string, begin: (deck: Deck, store: Store, link: Link) => Promise<void>) {
+type Ready = SharingOptions & { transport: Transport };
+
+async function connect(ctx: Context, opts: Ready, url: string, key: string, begin: (deck: Deck, store: Store, link: Link) => Promise<void>) {
 	if (!/^https?:\/\/[^\s/]+/.test(url)) throw new Refused("invalid", `${url} is not a Studio address: it starts with https://.`, "studio.connect");
 	const link = { url: url.replace(/\/+$/, ""), key };
 	try {
