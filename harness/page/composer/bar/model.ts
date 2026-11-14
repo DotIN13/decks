@@ -99,3 +99,50 @@ export function reconcilePills<M extends { type: "mention"; id: string }>(draft:
 	const spaced: Draft = missing.length > 0 && kept.length > 0 ? [...kept, { type: "text", text: " " }] : kept;
 	return normalize([...spaced, ...missing.map(pillFor)]);
 }
+
+/** A draft that is exactly `/` and a command fragment: the fragment, else null (not the same as ""). */
+export function slashFragment(text: string): string | null {
+	const match = /^\/([a-z0-9_:.-]*)$/i.exec(text);
+	return match ? match[1]!.toLowerCase() : null;
+}
+
+/** The `@` word at the caret, when it starts a word: the name typed so far, else null. */
+export function atQuery(text: string, caret: number): string | null {
+	const match = /(^|\s)@([A-Za-z0-9_-]*)$/.exec(text.slice(0, caret));
+	return match ? match[2]! : null;
+}
+
+/** The arrows wrap: one ArrowUp from the top of a list is its bottom row. */
+export const wrapIndex = (at: number, step: number, length: number): number => (at + step + length) % length;
+
+/** The words with the `@` fragment at the caret replaced by the whole name and a space. */
+export function withMentionAt(whole: string, caret: number, query: string, name: string): string | undefined {
+	const at = caret - query.length - 1;
+	if (at < 0) return undefined;
+	const after = whole.slice(caret);
+	return `${whole.slice(0, at)}@${name}${after.startsWith(" ") ? "" : " "}${after}`;
+}
+
+/** How long a recording has run, as m:ss. */
+export function clockText(since: number, now: number): string {
+	const seconds = Math.max(0, Math.floor((now - since) / 1000));
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** Who the line goes to, for the placeholder and the queue's head. */
+export const recipientName = (dest: { kind: string; name?: string } | undefined): string => (dest?.kind === "prompt" && dest.name ? dest.name : "the agent");
+
+/** The field's placeholder: a turn in progress is steered, not interrupted. */
+export const placeholder = (busy: boolean, name: string): string => (busy ? `Steer ${name}'s turn…` : `Ask ${name} to draw, plan or build…`);
+
+/** The note on the queue's head: held, the next line when folded, or how it is sent. */
+export function queueNote(queued: { items: Array<{ text: string }>; held: boolean }, folded: boolean): string {
+	if (queued.held) return "held by Stop";
+	return folded ? `next: ${queued.items[0]?.text ?? ""}` : "sent one per turn";
+}
+
+/** The comments whose pills are no longer in the draft. */
+export function goneComments(inDraft: readonly string[], waiting: ReadonlyArray<{ id: string }>): string[] {
+	const here = new Set(inDraft);
+	return waiting.filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
+}

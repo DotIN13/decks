@@ -82,3 +82,33 @@ test("two tabs typing on different pages do not write over each other", () => {
 	assert.deepEqual(parkedDrafts(store).get("agent:a0"), words("typed in the first tab"));
 	assert.deepEqual(parkedDrafts(store).get("agent:a1"), words("typed in the second"));
 });
+
+test("a bare slash and fragment is a command draft; a space after it is not", async () => {
+	const { slashFragment } = await import("./model.ts");
+	assert.equal(slashFragment("/Lo"), "lo");
+	assert.equal(slashFragment("/"), "");
+	assert.equal(slashFragment("/login now"), null);
+	assert.equal(slashFragment("hello"), null);
+});
+
+test("the @ word at the caret, only where it starts a word", async () => {
+	const { atQuery, withMentionAt } = await import("./model.ts");
+	assert.equal(atQuery("ask @Sa", 7), "Sa");
+	assert.equal(atQuery("mail a@b", 8), null);
+	assert.equal(atQuery("@", 1), "");
+	assert.equal(withMentionAt("ask @Sa please", 7, "Sa", "Sable"), "ask @Sable please");
+	assert.equal(withMentionAt("ask @Sa", 7, "Sa", "Sable"), "ask @Sable ");
+});
+
+test("the arrows wrap, the clock reads m:ss, and the queue says what it will do", async () => {
+	const { wrapIndex, clockText, queueNote, recipientName, placeholder, goneComments } = await import("./model.ts");
+	assert.equal(wrapIndex(0, -1, 5), 4);
+	assert.equal(wrapIndex(4, 1, 5), 0);
+	assert.equal(clockText(0, 75_400), "1:15");
+	assert.equal(queueNote({ items: [{ text: "a" }], held: true }, false), "held by Stop");
+	assert.equal(queueNote({ items: [{ text: "a" }], held: false }, true), "next: a");
+	assert.equal(recipientName({ kind: "prompt", name: "Sable" }), "Sable");
+	assert.equal(recipientName(undefined), "the agent");
+	assert.equal(placeholder(true, "Sable"), "Steer Sable's turn…");
+	assert.deepEqual(goneComments(["c1"], [{ id: "c1" }, { id: "c2" }]), ["c2"]);
+});
