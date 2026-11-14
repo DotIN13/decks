@@ -51,3 +51,19 @@ test("optionFor matches on provider and id together, because a name is not uniqu
 	assert.equal(optionFor(models, { provider: "openai", model: "opus-5" }), undefined);
 	assert.equal(optionFor(models, undefined), undefined);
 });
+
+test("makers are named as people write them, and the search narrows by maker or name", async () => {
+	const { makerName, matchModels, makersOf, modelLabel, isCurrent } = await import("./model.ts");
+	assert.equal(makerName("openai"), "OpenAI");
+	assert.equal(makerName("acme"), "Acme");
+	const models = [
+		{ provider: "anthropic", model: "opus", label: "Opus", reasoning: true },
+		{ provider: "openai", model: "gpt", label: "GPT", reasoning: false },
+	] as ModelOption[];
+	assert.deepEqual(matchModels(models, "anthropic").map((m) => m.model), ["opus"]);
+	assert.deepEqual(matchModels(models, " GPT ").map((m) => m.model), ["gpt"]);
+	assert.deepEqual(makersOf(models), ["anthropic", "openai"]);
+	assert.equal(modelLabel(models, { provider: "anthropic", model: "opus" }), "Opus");
+	assert.equal(modelLabel(models, undefined), "default model");
+	assert.equal(isCurrent({ provider: "openai", model: "gpt" }, models[1]!), true);
+});
