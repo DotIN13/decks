@@ -1,5 +1,5 @@
 import { layout } from "../../protocol/index.ts";
-import type { DeckPath, Item, ItemKind, PenNode } from "../kernel/types.ts";
+import type { DeckPath, Item, ItemKind } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 
 // The card as an item kind. Rules 12 and 13 of the README.
@@ -7,9 +7,6 @@ import { fence } from "./fence.ts";
 const TAG = "decks.card";
 const OWN = new Set(["type", "id", "x", "y", "width", "height", "name", "url"]);
 const num = (value: unknown, fallback = 0) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
-
-/** Whether a pen node is a card. */
-export const isCardNode = (node: PenNode): boolean => node.type === "browser" && (node.metadata as { type?: unknown } | undefined)?.type === TAG;
 
 /** A deck path from what the drawing wrote, read from the canvas's folder. */
 function fromCanvas(written: string, canvas: string | undefined): string {
@@ -28,6 +25,8 @@ function toCanvas(path: string, canvas: string | undefined): string {
 export const cardKind: ItemKind = {
 	type: "card",
 	fromPen(node, at) {
+		// An old markdown frame tagged as a card keeps every field, its own type under pen.
+		if (node.type !== "browser") return { ...node, type: "card", pen: node.type } as Item;
 		const meta = (node.metadata ?? {}) as { path?: unknown };
 		const written = typeof meta.path === "string" ? meta.path : String(node.url ?? "");
 		const rest = Object.fromEntries(Object.entries(node).filter(([key]) => !OWN.has(key)));
@@ -43,6 +42,10 @@ export const cardKind: ItemKind = {
 		} as Item;
 	},
 	toPen(item, at) {
+		if (typeof item.pen === "string") {
+			const { pen, type: _type, ...rest } = item;
+			return { ...rest, type: pen };
+		}
 		const { type: _type, card, title, box, ...rest } = item;
 		const path = toCanvas(String(card ?? ""), at?.canvas);
 		const meta = (rest.metadata ?? {}) as Record<string, unknown>;
@@ -65,5 +68,3 @@ export const cardKind: ItemKind = {
 		return layout.isCardPath(card) ? [fence(card.replace(/\/index\.html$/i, ""))] : [];
 	},
 };
-
-export const CARD_TAG = TAG;

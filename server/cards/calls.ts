@@ -106,9 +106,7 @@ export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] 
 			return placements.length ? { ...found, placements } : found;
 		},
 		create: async (ctx, { title, w, h, canvas }) => {
-			const on = canvas ?? ctx.caller.canvas;
-			if (!on) throw new Refused("invalid", "Name the canvas the card goes in: you have no canvas of your own.", "canvas.list");
-			if (!layout.canvasNameOk(on)) throw new Refused("invalid", `${on} is not a canvas's name.`, "canvas.list");
+			const on = canvasNamed(ctx, canvas);
 			const path = await createCard(ctx.deck, on, title, { w: w ?? 1000, ...(h ? { h } : {}) }, ctx.caller);
 			ctx.note(`The card is on no canvas yet: item.insert { type: "card", card: "${path}" } places it.`);
 			return describe(ctx.deck, ctx.store, path);
@@ -132,6 +130,19 @@ export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] 
 			return FILES + encodeURI(path) + (pass ? `?pass=${encodeURIComponent(pass)}` : "");
 		},
 	});
+}
+
+/** The canvas a card goes in: a name or title, else the caller's here. */
+function canvasNamed(ctx: Context, canvas: string | undefined): string {
+	try {
+		return ctx.canvasName(canvas);
+	} catch (error) {
+		if (!(error instanceof Refused) || error.code !== "unavailable") throw error;
+	}
+	const on = canvas ?? ctx.caller.canvas;
+	if (!on) throw new Refused("invalid", "Name the canvas the card goes in: you have no canvas of your own.", "canvas.list");
+	if (!layout.canvasNameOk(on)) throw new Refused("invalid", `${on} is not a canvas's name.`, "canvas.list");
+	return on;
 }
 
 function placementsOf(ctx: Context, path: string): S.Placement[] {
