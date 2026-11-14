@@ -38,7 +38,7 @@ test("each refusal has its code", async () => {
 	assert.equal(await code("port.open", { port: 1 }), "ok");
 	assert.equal(await code("port.open", { port: 1 }), "conflict");
 	assert.equal(await code("canvas.list", {}), "unavailable");
-	assert.equal(await code("chat.list", {}), "unavailable");
+	assert.equal(await code("chat.list", { agent: "a" }), "unavailable");
 	await server.close();
 });
 

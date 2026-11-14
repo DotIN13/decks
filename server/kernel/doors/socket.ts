@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { compatible, PROTOCOL_VERSION, type Caller } from "../../../protocol/index.ts";
+import { compatible, EVENTS, PROTOCOL_VERSION, type Caller, type Envelope } from "../../../protocol/index.ts";
 import type { Built } from "../kernel.ts";
 import type { Client, Stop } from "../types.ts";
 import type { Peer } from "./ws.ts";
@@ -33,6 +33,8 @@ export function socketDoor(built: Built, peer: Peer): void {
 		const caller = who();
 		if (!caller) return;
 		if (message.type === "call") void built.router.call(String(message.name), message.args ?? {}, caller, client).then((envelope) => send({ type: "answer", id: message.id, envelope }));
+		if (message.type === "reply") return built.relay.reply(client.id, String(message.id), message.envelope as Envelope<unknown>);
+		if (message.type === "tell") return tell(built, caller, message);
 		if (message.type === "watch") {
 			watching?.();
 			const events = Array.isArray(message.events) ? message.events.map(String) : undefined;
@@ -48,6 +50,7 @@ export function socketDoor(built: Built, peer: Peer): void {
 		if (!compatible(String(message.protocol ?? ""), PROTOCOL_VERSION)) return peer.close(4400, `this server speaks protocol ${PROTOCOL_VERSION}`);
 		token = String(message.token);
 		clearTimeout(timer);
+		closers.add(built.relay.connect(client.id, send));
 		send({ type: "hello", protocol: PROTOCOL_VERSION, caller });
 	};
 	peer.onClose(() => {
@@ -55,4 +58,17 @@ export function socketDoor(built: Built, peer: Peer): void {
 		watching?.();
 		for (const on of closers) on();
 	});
+}
+
+const HARNESS_NOUNS = ["chat", "account", "runtime"];
+
+/** A harness's own event, told on its socket: the person's only, of the harness's nouns. */
+function tell(built: Built, caller: Caller, message: Record<string, unknown>): void {
+	const event = EVENTS.find((one) => one.name === message.name);
+	if (!event || caller.kind !== "person" || !HARNESS_NOUNS.includes(event.name.split(".")[0]!)) return;
+	try {
+		built.events.emit(event, message.payload as never);
+	} catch {
+		// A payload that does not fit its event is dropped.
+	}
 }

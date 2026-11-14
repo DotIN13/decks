@@ -99,7 +99,12 @@ export interface Kernel {
 	store(feature: string): Store;
 	/** Every feature's item kinds, collected before any start runs. */
 	kinds: ItemKind[];
+	/** Say which connected host answers a call no feature handles. At most one feature calls it. */
+	relay(answerer: Answerer): void;
 }
+
+/** The client id of the host that answers this call for this caller, or undefined. */
+export type Answerer = (call: string, caller: Caller) => string | undefined;
 
 /** The only way code enters the server. */
 export interface Feature {
