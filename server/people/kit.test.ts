@@ -30,7 +30,14 @@ export function standInCanvas(names: string[]): { feature: Feature; docs: Map<st
 	const docs = new Map(names.map((n) => [n, new FakeDoc()]));
 	const feature = defineFeature({
 		name: "stand-in",
-		calls: [handle(calls.item.insert, (ctx, { item, canvas }) => ctx.canvas(canvas).apply([{ op: "insert", item }], ctx.caller).items[0]!)],
+		calls: [
+			handle(calls.item.insert, (ctx, { item, canvas }) => ctx.canvas(canvas).apply([{ op: "insert", item }], ctx.caller).items[0]!),
+			handle(calls.canvas.create, (_ctx, { title }) => {
+				const name = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+				docs.set(name, new FakeDoc());
+				return { name, title, open: [], cards: 0 };
+			}),
+		],
 		canvases: () => ({
 			name: (asked) => {
 				const n = asked.startsWith("Title ") ? asked.slice(6).toLowerCase() : asked;

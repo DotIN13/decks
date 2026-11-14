@@ -34,17 +34,17 @@ async function create(people: People, ctx: Context, spec: CreateArgs): Promise<s
 	if (!host) throw new Refused("unavailable", spec.kind ? `${NO_HOST} None offers ${spec.kind} agents.` : NO_HOST, "agent.host");
 	const near = spec.near ? people.roster.find(spec.near).workspace : undefined;
 	const workspace = spec.workspace ?? near;
-	const record = await people.roster.create({
-		...pick(spec, ["name", "model", "thinking", "mode", "tags", "canvas"]),
+	const made = await people.roster.create({
+		...pick(spec, ["name", "model", "thinking", "mode", "tags"]),
 		...(workspace ? { workspace } : {}),
 		kind: host.kind,
 		host: host.client,
 		state: "starting",
 	});
+	const record = await giveHome(people, ctx, made, spec.canvas);
 	const token = people.tokens.issue(people.roster.callerOf(record.id)!, "agent.create");
-	people.tell(ctx, events.agentRequested, { ids: [record.id], spec: { ...spec, id: record.id, name: record.name, kind: host.kind, token } }, [host.client]);
+	people.tell(ctx, events.agentRequested, { ids: [record.id], spec: { ...spec, id: record.id, name: record.name, kind: host.kind, canvas: record.canvas, token } }, [host.client]);
 	people.tell(ctx, events.agentChanged, { ids: [record.id], state: "starting" });
-	if (!spec.canvas) ctx.note("The host gives the agent a canvas of its own when it starts.");
 	return people.shown(record);
 }
 
@@ -68,11 +68,22 @@ async function remove(people: People, ctx: Context, asked: string): Promise<{ de
 
 /** The person's call becomes a new agent with its own token, for a terminal client. */
 async function attach(people: People, ctx: Context, args: { name?: string; kind?: AgentRecord["kind"]; workspace?: string; canvas?: string }): Promise<shapes.Agent> {
-	const canvas = args.canvas !== undefined ? canvasName(ctx, args.canvas) : ctx.caller.canvas;
-	const record = await people.roster.create({ ...pick(args, ["name", "kind", "workspace"]), ...(canvas ? { canvas } : {}), attached: true });
+	const made = await people.roster.create({ ...pick(args, ["name", "kind", "workspace"]), attached: true });
+	const record = await giveHome(people, ctx, made, args.canvas);
 	const token = people.tokens.issue(people.roster.callerOf(record.id)!, "agent.attach");
 	people.tell(ctx, events.agentChanged, { ids: [record.id] });
 	return { ...people.shown(record), token };
+}
+
+/** The canvas named, else a new one titled with the agent's name; a failure takes the record back. */
+async function giveHome(people: People, ctx: Context, record: AgentRecord, asked: string | undefined): Promise<AgentRecord> {
+	try {
+		const canvas = asked !== undefined ? canvasName(ctx, asked) : (await ctx.call<{ name: string }>("canvas.create", { title: record.name })).name;
+		return (await people.roster.update(record.id, { canvas })).record;
+	} catch (error) {
+		await people.roster.delete(record.id);
+		throw error;
+	}
 }
 
 /** A connected client offers kinds; agents of those kinds with no host are its own. */

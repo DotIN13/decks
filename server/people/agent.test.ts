@@ -25,6 +25,22 @@ test("after attach, a call with the new token runs as that agent, and its item s
 	await s.close();
 });
 
+test("attach gives a home: the canvas named, else a new one titled for the agent", async () => {
+	const { s, docs } = await peopleServer();
+	const named = await s.value<Agent>("agent.attach", { name: "Ann", canvas: "Title B" });
+	assert.equal(named.canvas, "b");
+	const fresh = await s.value<Agent>("agent.attach", { name: "Cody Two" });
+	assert.equal(fresh.canvas, "cody-two");
+	assert.ok(docs.has("cody-two"), "the new canvas was made through canvas.create");
+	const as = s.callers.resolve(fresh.token)!;
+	assert.equal(as.canvas, "cody-two", "here works on the first call");
+	assert.equal((await s.value<Agent>("agent.me", {}, as)).canvas, "cody-two");
+	const bad = await s.call("agent.attach", { name: "Dee", canvas: "nowhere" });
+	assert.equal(bad.ok ? "ok" : bad.error.code, "not_found");
+	assert.equal((await s.call("agent.get", { agent: "Dee" })).ok, false, "a refused attach leaves no record");
+	await s.close();
+});
+
 test("names are unique however capitalised, and default to the first free number", async () => {
 	const { s } = await peopleServer();
 	const one = await s.value<Agent>("agent.attach", {});
