@@ -62,9 +62,9 @@ export const attach = defineCall({
 
 export const host = defineCall({
 	name: "agent.host",
-	summary: "A client says which kinds of agent it can start; agent.create then reaches it.",
+	summary: "A client, over the socket, says which kinds of agent it can start and which harness calls it answers; agent.create and those calls then reach it.",
 	who: PERSON,
-	args: { kinds: arr(AgentKind) },
+	args: { kinds: arr(AgentKind), calls: opt(arr(str("A harness call this host answers, such as chat.list."))) },
 	answer: arr(AgentKind),
 	effect: "change",
 });
