@@ -44,7 +44,7 @@ Imports go one way. `server/` and `harness/` never import each other; they share
 ```
 AGENTS.md            the map: what is where, the glossary, the commands, the rules (150 lines)
 protocol/            what every program agrees on; touches no disk and no network
-  glossary.ts        the nouns, and the retired words (board, stage, verb, …)
+  glossary.ts        the nouns, and the retired words: board, stage (see section 5, Words)
   schema.ts          the small schema builders (str, obj, arr, opt, …) and the type they infer
   shapes.ts          Box, Size, Point, Item, Card, Canvas, Agent, App, Message, …
   call.ts            defineCall, Caller, the five refusal codes
@@ -204,6 +204,12 @@ a token and cannot tell whether it runs on Decks-local or Studio.
 7. **An event is `noun.verbed`** with `{ canvas?, ids, by, rev }`. A snapshot is a call, never an event.
 8. **One geometry, one kind of path**: `Box { x1, y1, x2, y2 }`, `Size { w, h }`, `Point { x, y }`; a path
    starts at the deck's root.
+
+**Words.** The glossary retires only a word with no meaning left in new code: `board` (it is a card)
+and `stage` (it is a canvas; the Rust engine's own crates are exempt). `verb` is not retired: a call's
+name is a noun and a verb, though the thing itself is always a **call**, never "a verb". `ports` is not
+retired: `port` is a noun, and a list of them is `ports`. A rename of one call (`web.*` to `tab.*`) is a
+row in `calls.md`, not a retired word.
 
 Envelope: `{ ok: true, value, notes }` or `{ ok: false, error: { code, message, hint }, notes }`.
 

@@ -30,6 +30,8 @@
 		"harness/package.json",
 		"harness/tsconfig.json",
 		"tools/package.json",
-		"tools/tsconfig.json"
+		"tools/tsconfig.json",
+		"server/README.md",
+		"harness/README.md"
 	]
 }
