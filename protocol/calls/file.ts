@@ -1,6 +1,6 @@
 import { defineCall } from "../call.ts";
 import { arr, bool, int, opt, str } from "../schema.ts";
-import { Deleted, File, FileMatch, FileText, TextEdit } from "../shapes.ts";
+import { Deleted, DocState, File, FileMatch, FileText, Spliced, Splice, TextEdit, Version } from "../shapes.ts";
 import { ANYONE, NOT_CARD } from "./parts.ts";
 
 // Every file in the deck, fenced to it: no hidden folder, nothing outside.
@@ -28,9 +28,9 @@ export const find = defineCall({
 
 export const read = defineCall({
 	name: "file.read",
-	summary: "A text file's words, with its revision for a later write; from and lines read part of it.",
+	summary: "A text file's words, with its revision for a later write; from and lines read part of it, sha a past version.",
 	who: ANYONE,
-	args: { path: Path, from: opt(int()), lines: opt(int()) },
+	args: { path: Path, from: opt(int()), lines: opt(int()), sha: opt(str()) },
 	answer: FileText,
 	effect: "read",
 });
@@ -88,3 +88,32 @@ export const url = defineCall({
 	answer: str(),
 	effect: "read",
 });
+
+// A document is a file you type into: its page opens it, lands typing as
+// splices, and reviews the edits others made.
+
+const Client = str("The page's own id, so its typing is not echoed back.");
+
+export const open = defineCall({ name: "file.open", summary: "Join a page to a document: its words, revision and the edits waiting for review.", who: ANYONE, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
+export const close = defineCall({ name: "file.close", summary: "The page leaves the document.", who: ANYONE, args: { path: Path, client: Client }, answer: DocState, effect: "read" });
+
+export const splice = defineCall({
+	name: "file.splice",
+	summary: "Land a page's typing at revision rev, one batch at a time. Splices that no longer fit are refused by index.",
+	who: NOT_CARD,
+	args: { path: Path, client: Client, rev: int(), batch: str(), splices: arr(Splice) },
+	answer: Spliced,
+	effect: "change",
+});
+
+export const review = defineCall({
+	name: "file.review",
+	summary: "Accept or reject an edit waiting for review, or all of them with change: *.",
+	who: NOT_CARD,
+	args: { path: Path, change: str(), accept: bool() },
+	answer: DocState,
+	effect: "change",
+});
+
+export const versions = defineCall({ name: "file.versions", summary: "A document's kept versions, newest first.", who: ANYONE, args: { path: Path }, answer: arr(Version), effect: "read" });
+export const restore = defineCall({ name: "file.restore", summary: "Put a document back as it was at a version; the restore is itself a version.", who: NOT_CARD, args: { path: Path, sha: str() }, answer: File, effect: "change" });

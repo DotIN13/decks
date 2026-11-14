@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 118 calls (98 on the server, 20 in the harness) and 21 events, from 120 calls and 52 events today.
+**Counts.** 124 calls (104 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -95,11 +95,17 @@ Any file in the deck, named by its path from the deck's root.
 | new | | `file.grep` | person, agent, app | New. |
 | new | | `file.list` | person, agent, app | New: the deck's files without a disk. |
 | new | | `file.move` | person, agent, app | New. |
-| new | | `file.read` | anyone | New. |
+| new | | `file.read` | anyone | New; `sha` reads a document's past version. |
 | `card.delete` | person | `file.delete` | person, agent, app | A card is a folder: deleting it is deleting the folder. |
 | new | | `file.delete` | person, agent, app | New. |
 | `file.url` | agents | `file.url` | anyone | Its argument is called `path`. |
 | new | | `file.write` | person, agent, app | New: a file written through a call carries its author. |
+| new | | `file.open` | anyone | Added in 0.3.0 for Folio: a page joins a document. These rode the documents' socket messages. |
+| new | | `file.close` | anyone | Added in 0.3.0: the page leaves the document. |
+| new | | `file.splice` | person, agent, app | Added in 0.3.0: a page's typing lands as splices at a revision. |
+| new | | `file.review` | person, agent, app | Added in 0.3.0: accept or reject an edit waiting for review. |
+| new | | `file.versions` | anyone | Added in 0.3.0: a document's kept versions. |
+| new | | `file.restore` | person, agent, app | Added in 0.3.0: put a document back as it was at a version. |
 
 ### frame
 
@@ -290,7 +296,7 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `doc.state` | alias of `file.changed` | canvas | `part: state`. |
 | `doc.changed` | `file.changed` | canvas | `part` says what changed. |
 | `doc.patched` | alias of `file.changed` | canvas | Renamed. |
-| `doc.versions` | alias of `file.changed` | canvas | `part: versions`. The list itself needs a call; see the report. |
+| `doc.versions` | alias of `file.changed` | canvas | `part: versions`; file.versions reads the list. |
 | `doc.version` | alias of `file.changed` | canvas | `part: version`. |
 | `doc.compiled` | alias of `file.changed` | canvas | `part: compiled`. |
 | `doc.repo` | alias of `file.changed` | canvas | `part: repo`. |
@@ -305,6 +311,8 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `agent.model` | alias of `agent.changed` | canvas | Renamed. |
 | `agent.context` | alias of `agent.changed` | canvas | Renamed. |
 | `agent.removed` | `agent.deleted` | canvas | Renamed. |
+| new | `agent.mailed` | person | Added in 0.3.0 for Roster: tells an agent's host there is mail to deliver. |
+| new | `agent.requested` | person | Added in 0.3.0: asks a host to start an agent, as view.requested asks a screen. |
 | `agent.act` | `agent.acted` | canvas | Renamed. |
 | `presence.changed` | `view.changed` | canvas | Where people are on a canvas is the view's. |
 | `view.called` | `view.requested` | canvas | A view call waiting for a screen. |
@@ -342,8 +350,8 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 - `canvas.delete`, `canvas.copy` and `view.goto` take the canvas as the thing itself, so there it is required (rule 4).
 - `item.variables` sits under `item`, as DESIGN.md says, though it changes the canvas; it answers the Canvas.
 - `google` is a sixteenth noun, for the Google sign-in the server edits Google Docs with. A decision for the person.
-- A document's own calls (its versions, review, compile and Google comments) are in neither of today's tables: they
-  ride the documents' socket messages. They are not declared yet; they are needed before Folio starts on `server/documents/`.
+- A document's own calls were in neither of today's tables: they rode the documents' socket messages. Six are declared in
+  0.3.0 (`file.open`, `close`, `splice`, `review`, `versions`, `restore`); compile, git and Google comments wait for wave 2.
 - The socket's own messages (`line.hello`, `line.token`, `line.call`, `canvas.watch`, `canvas.unwatch`, `view.answered`,
   `card.seen`, `card.extent`, `presence.set`) are its envelope, not calls: the greeting with the version, a call and its
   answer, and watching a canvas. `card.extent` becomes what `card.fit` measures, and `presence.set` is `view.move`.

@@ -54,7 +54,16 @@ export const Card = named("Card", obj({ path: str(), title: str(), by: opt(str()
 export const Frame = named("Frame", obj({ path: str(), id: str(), ref: opt(str()) }), "A reusable frame file and its one item.");
 
 export const File = named("File", obj({ path: str(), size: opt(int()), rev: opt(int()), by: opt(str()), at: opt(num()), dir: opt(bool()) }), "A file or folder in the deck.");
-export const FileText = named("FileText", obj({ path: str(), text: str(), rev: int(), truncated: opt(bool()) }), "A file's words.");
+export const FileText = named("FileText", obj({ path: str(), text: str(), rev: int(), sha: opt(str()), truncated: opt(bool()) }), "A file's words; sha when read from a past version.");
+export const Splice = named("Splice", obj({ at: int("In UTF-16 units, after the splices before it in the batch."), before: str(), text: str() }), "Words replaced in a document.");
+export const DocChange = named("DocChange", obj({ id: str(), by: str(), at: num(), from: str(), to: str(), splices: arr(Splice) }), "An edit waiting for review.");
+export const DocState = named(
+	"DocState",
+	obj({ path: str(), rev: int(), format: lit("text", "docx"), text: str(), changes: arr(DocChange), remote: opt(obj({ url: str(), title: opt(str()) })) }),
+	"A document as an open page holds it: its words and the edits waiting for review.",
+);
+export const Spliced = named("Spliced", obj({ path: str(), rev: int(), refused: arr(int()), text: opt(str()) }), "What came of typing: the new revision, the splices refused, the words when they differ.");
+export const Version = named("Version", obj({ sha: str(), at: num() }), "A kept version of a document.");
 export const FileMatch = named("FileMatch", obj({ path: str(), line: int(), text: str() }), "One line that matched a search.");
 export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file.");
 export const Screenshot = named("Screenshot", obj({ file: str(), size: Size, box: opt(Box), how: opt(str()) }), "A saved picture.");

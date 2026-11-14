@@ -1,6 +1,6 @@
 import { defineEvent } from "./event.ts";
-import { any, arr, bool, lit, nul, opt, str, union } from "./schema.ts";
-import { Box, Camera, ChatItem, Point } from "./shapes.ts";
+import { any, arr, bool, int, lit, nul, opt, str, union } from "./schema.ts";
+import { Box, Camera, ChatItem, Message, Point, Splice } from "./shapes.ts";
 
 // Every event, on one stream. Each says which ids changed, who changed them
 // and the revision; a client that wants the whole thing makes a call.
@@ -14,10 +14,20 @@ export const itemChanged = defineEvent("item.changed", "Items on a canvas change
 });
 export const cardChanged = defineEvent("card.changed", "A card's files changed, or it went.", { removed: opt(bool()), sized: opt(bool()) });
 export const fileCreated = defineEvent("file.created", "A file was made, answering a client's request when it named one.", { request: opt(str()) });
-export const fileChanged = defineEvent("file.changed", "A file changed: its words, its versions, its review or its Google copy.", { part: opt(str()) });
+export const fileChanged = defineEvent("file.changed", "A file changed: its words, its versions, its review or its Google copy. With part: words, the splices that made it.", {
+	part: opt(str()),
+	base: opt(int()),
+	splices: opt(arr(Splice)),
+	client: opt(str()),
+	batch: opt(str()),
+	change: opt(str()),
+	settled: opt(bool()),
+});
 export const appChanged = defineEvent("app.changed", "An app's state changed; app.get reads it.", { status: opt(str()) });
 export const agentChanged = defineEvent("agent.changed", "Agents' records or states changed; agent.get reads one.", { state: opt(str()) });
 export const agentDeleted = defineEvent("agent.deleted", "An agent was removed.");
+export const agentMailed = defineEvent("agent.mailed", "Mail for an agent whose host is connected; the host delivers it into a turn.", { message: Message }, "person");
+export const agentRequested = defineEvent("agent.requested", "agent.create asks a host that offers the kind to start the agent.", { spec: any() }, "person");
 export const agentActed = defineEvent("agent.acted", "An agent began or finished an edit, for its cursor and the glow on what it touched.", {
 	phase: lit("start", "done"),
 	what: str(),
@@ -53,6 +63,8 @@ export const EVENTS = [
 	appChanged,
 	agentChanged,
 	agentDeleted,
+	agentMailed,
+	agentRequested,
 	agentActed,
 	viewChanged,
 	viewRequested,

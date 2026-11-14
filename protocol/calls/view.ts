@@ -19,7 +19,7 @@ export const move = defineCall({
 	name: "view.move",
 	summary: "Move the camera outright. From the person's own page, it records where their screen is.",
 	who: ANYONE,
-	args: { x: num(), y: num(), zoom: num(), animate: opt(bool()), device: opt(str()), ...onCanvas },
+	args: { x: num(), y: num(), zoom: num(), animate: opt(bool()), device: opt(str()), agent: opt(str("The agent whose conversation this screen shows: the screen follows it.")), ...onCanvas },
 	answer: View,
 	effect: "change",
 });
