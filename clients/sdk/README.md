@@ -5,8 +5,11 @@ Runs in node 22 and later and in a browser.
 
 ## Owns
 
-- `index.ts`: `connect({ url?, token?, notes? })` and `clientFor(url, token)`, a `Client` with `call(name,
-  args)`, `events(hear, { events?, canvas? })` and `decks.<noun>.<verb>(args)`.
+- `index.ts`: everything, and `connect({ url?, token?, notes? })`, which finds the server.
+- `client.ts`: `clientFor(url, token)`, a `Client` with `call(name, args)`, `events(hear, { events?,
+  canvas? })` and `decks.<noun>.<verb>(args)`.
+- `browser.ts` (export `./browser`): `clientFor`, `DecksError`, `Line` and the types, with no node module
+  behind them, for a page.
 - `http.ts`: one call as `POST /api/v1/<name>`; `DecksError`. `socket.ts`: the event stream.
 - `find.ts`: where the server is and who is calling, when not told.
 - `line.ts`: a socket kept open: calls over it, events, asks answered with one reply, `tell`.

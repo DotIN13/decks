@@ -89,3 +89,10 @@ test("connect finds the server and token in the deck's lock file, and DECKS_URL 
 		rmSync(deck, { recursive: true });
 	}
 });
+
+test("the browser entry bundles for a browser with no node module", async () => {
+	const { build } = await import("esbuild");
+	const result = await build({ entryPoints: [new URL("./browser.ts", import.meta.url).pathname], bundle: true, platform: "browser", format: "esm", write: false, logLevel: "silent" });
+	assert.deepEqual(result.warnings, []);
+	assert.ok(!result.outputFiles[0]!.text.includes("node:"));
+});
