@@ -9,6 +9,15 @@ import { defineFeature, type Route, type VersionFile } from "../types.ts";
 
 const routes: Route[] = [
 	{ method: "GET", prefix: "/frame/", public: true, answer: async (ctx, path) => ({ type: "text/plain", body: `${ctx.caller.id}:${path}` }) },
+	{
+		method: "GET",
+		prefix: "/app/t/",
+		tokenOf: (url) => {
+			const m = /^\/app\/t\/([^/]+)(\/.*)$/.exec(url.pathname);
+			return m ? { token: m[1]!, path: `/app${m[2]}` } : undefined;
+		},
+		serve: async (ctx, req, res) => void res.writeHead(200).end(`${req.url} ${ctx.caller.id}`),
+	},
 	{ method: "ANY", prefix: "/app/", serve: async (ctx, req, res) => void res.writeHead(200, { "content-type": "text/plain" }).end(`${req.method} ${req.headers["x-thing"]} ${ctx.caller.id}`) },
 	{
 		method: "GET",
@@ -40,6 +49,9 @@ test("public, raw and upgrade routes, the upgrade hook and url()", async () => {
 	assert.equal((await fetch(`${doors.url}/app/x`, { method: "PUT" })).status, 401);
 	const raw = await fetch(`${doors.url}/app/x`, { method: "PUT", headers: { authorization: `Bearer ${doors.token}`, "x-thing": "yes" } });
 	assert.equal(await raw.text(), "PUT yes person");
+	const inPath = await fetch(`${doors.url}/app/t/${doors.token}/notes/style.css?v=1`);
+	assert.equal(await inPath.text(), "/app/notes/style.css?v=1 person");
+	assert.equal((await fetch(`${doors.url}/app/t/bad/notes/style.css`)).status, 401);
 	const echoed = await new Promise<string>((done) => {
 		const ws = new WebSocket(`${doors.url.replace("http", "ws")}/line/relay?code=ok`);
 		ws.onopen = () => ws.send("hi");

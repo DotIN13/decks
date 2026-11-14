@@ -175,6 +175,8 @@ export interface Route {
 	public?: true;
 	/** The raw request, unbuffered, called instead of answer: for a proxy. Decks-local only. */
 	serve?(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void>;
+	/** A token carried in the path, as /app/t/<pass>/<name>/: the token, and the path the route then sees. */
+	tokenOf?(url: URL): { token: string; path: string } | undefined;
 	/** A WebSocket or other upgrade under the prefix; the route resolves its caller itself. */
 	upgrade?(req: IncomingMessage, socket: Duplex, head: Buffer, door: SocketDoor): void;
 }

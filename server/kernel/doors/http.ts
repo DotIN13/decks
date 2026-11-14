@@ -87,8 +87,10 @@ export function handler(built: Built) {
 	return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 		const url = new URL(req.url ?? "/", "http://decks.local");
 		const method = req.method ?? "GET";
-		const token = tokenOf(req, url);
 		const found = url.pathname.startsWith(`${API}/`) || url.pathname === MCP_PATH ? undefined : routeFor(routes, method, url.pathname);
+		const inPath = found?.route.tokenOf?.(url);
+		if (inPath) req.url = inPath.path + url.search;
+		const token = inPath?.token ?? tokenOf(req, url);
 		const open = found?.route.public === true && method === "GET";
 		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
 		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
