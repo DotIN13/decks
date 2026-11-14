@@ -1,0 +1,18 @@
+{
+	"packages/card-host/lib/d3.min.js: built file in git": 1,
+	"packages/card-host/lib/katex-auto-render.min.js: built file in git": 1,
+	"packages/card-host/lib/katex.min.css: built file in git": 1,
+	"packages/card-host/lib/katex.min.js: built file in git": 1,
+	"packages/card-host/lib/wasm/jbig2.wasm: built file in git": 1,
+	"packages/card-host/lib/wasm/openjpeg.wasm: built file in git": 1,
+	"packages/card-host/lib/wasm/qcms_bg.wasm: built file in git": 1,
+	"packages/card-host/lib/wasm/quickjs-eval.wasm: built file in git": 1,
+	"packages/stage/pkg-gl/stage_web_bg.wasm: built file in git": 1,
+	"packages/stage/pkg-gl/stage_web_bg.wasm.d.ts: built file in git": 1,
+	"packages/stage/pkg-gl/stage_web.d.ts: built file in git": 1,
+	"packages/stage/pkg-gl/stage_web.js: built file in git": 1,
+	"packages/stage/pkg/stage_web_bg.wasm: built file in git": 1,
+	"packages/stage/pkg/stage_web_bg.wasm.d.ts: built file in git": 1,
+	"packages/stage/pkg/stage_web.d.ts: built file in git": 1,
+	"packages/stage/pkg/stage_web.js: built file in git": 1
+}
