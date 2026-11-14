@@ -1,0 +1,143 @@
+/*
+ * The layers, first, so they rank as named: the canvas surface (`@decks/canvas`, in `decks.surface`) under the
+ * app's own sheets (`components`), so a rule of the app's wins over the surface's whatever their order or weight,
+ * and both under Tailwind's utilities. The surface is themed through its tokens (`styles/tokens.css`), not
+ * overridden: a gate (`scripts/surface-gate.mjs`) keeps the app's sheets off its classes.
+ */
+@layer theme, base, decks.surface, components, utilities;
+@import "tailwindcss";
+/*
+ * The app's stylesheets, in cascade order — and this file is the entry point: the ladder, the
+ * tokens, and the reset. Every region is a sheet of its own now, and this one holds no rule
+ * about a surface.
+ *
+ * The ladder is here rather than as `import "./styles/panel.css"` beside the component that
+ * uses it, which is the tempting arrangement and the wrong one: every file declares inside
+ * `@layer components`, so which of them wins a tie is decided by source order — and a
+ * JavaScript import makes that order depend on which module the bundler reached first.
+ * Stated here it is a property of this file, which is where someone would look for it.
+ *
+ * `chrome.css` is the shared material and comes first, so a region can override it. The last
+ * six were added when this file was split: they are the surfaces that never had a sheet (the
+ * rail, the settings window, the marks an agent leaves, markdown, the composer), and they sit
+ * at the end because that is where the rules they took used to be — the position this file's
+ * own rules had, after every import. That is also why the split moved as little as it
+ * could: a rule that changes sheets still changes its place, and the gate's report on each of
+ * those commits is what says so.
+ *
+ * **The order is hashed, so it is a fact rather than a convention.** `npm run css:order`
+ * flattens these sheets in the order below and hashes every rule with its at-rule chain
+ * and its declarations, against the baseline in `styles/cascade-order.json`. Move a rule past
+ * another and the check fails naming both; move a rule into another sheet and it passes as
+ * long as the flattened order is the same. Comments and whitespace are not part of it, which
+ * is why the prose in this file could be rewritten and the hash did not move.
+ */
+@import "./styles/kit/chrome.css";
+@import "./styles/agents.css";
+@import "./styles/panel.css";
+@import "./styles/forms.css";
+@import "./styles/inspector.css";
+@import "./styles/stream.css";
+@import "./styles/dock.css";
+@import "./styles/usage.css";
+@import "../../../packages/canvas/styles/surface-tokens.css";
+@import "../../../packages/canvas/styles/canvas.css";
+@import "./styles/kit/callout.css";
+@import "./styles/kit/tools.css";
+@import "./styles/canvases.css";
+@import "./styles/shell.css";
+@import "../../../packages/canvas/styles/ink.css";
+@import "./styles/kit/ink-tray.css";
+@import "./styles/kit/comment.css";
+@import "./styles/settings.css";
+@import "../../../packages/canvas/styles/marks.css";
+@import "./styles/markdown.css";
+@import "./styles/composer.css";
+@import "./styles/connections.css";
+@import "./styles/kit/properties.css";
+/* The tokens are the canvas's (`@decks/canvas`), after every sheet, where they always were. */
+@import "./styles/tokens.css";
+/* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
+@import "./styles/v3.css";
+
+
+/*
+ * Everything below is the app's own component layer.
+ *
+ * `@layer components` and not bare CSS, and this is not tidiness — it is the only thing
+ * that makes a utility class work at all. Unlayered CSS beats *every* layer, so while these
+ * rules sat outside one, `class="bg-bg"` on a `.panel-float` lost to `background:
+ * var(--panel)` and the sheet came out translucent when it had asked to be opaque. Tailwind
+ * declares the order `theme, base, components, utilities`, so inside this layer a rule is
+ * still stronger than preflight and always weaker than a utility — which is the mental
+ * model a component author already has: reach for a utility, and it wins.
+ *
+ * What lives here rather than in a class attribute: geometry that reads `env()`,
+ * `--keyboard` and `--dock`; the shape rules built out of `:has()`; `::marker` and
+ * `::placeholder`; the shared vocabulary several components spell the same way
+ * (`.panel-float`, the two icon-button sizes, the conversation's rows); and every paragraph
+ * of reasoning that a `class=` attribute is a bad home for.
+ *
+ * **The corollary is the trap, and it is worth stating plainly: a `@media` block in here
+ * loses to a utility on the same element.** A layer's precedence does not change inside a
+ * media query — it is still the components layer — so `class="top-[58px]"` on the toasts
+ * beat `@media (pointer: coarse) { .notices { top: 74px } }` and the rule silently did
+ * nothing. Anything responsive about a utility-styled element has to be a variant in the
+ * markup (`pointer-coarse:`), which is why those read oddly long in
+ * `App.tsx`. The alternative — leaving the base declaration here too —
+ * is fine, and is what the surfaces above with `env()` corners actually do; what does not
+ * work is one property stated in both places.
+ */
+@layer components {
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+html {
+	/* A phone in landscape enlarges body text by its own factor, which on a canvas
+	   app moves every panel and none of the boards. The canvas has its own zoom. */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	overflow: hidden;
+	/* No rubber band: the whole app is one screen, nothing here scrolls the document,
+	   and a bounce at the edge of a canvas reads as the canvas coming loose. */
+	overscroll-behavior: none;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font-sans);
+	font-size: var(--type-body);
+	-webkit-font-smoothing: antialiased;
+	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
+	   chrome — where a double-tap means nothing and the delay is felt on every button.
+	   The stage sets `none` for itself (`stage/input.ts`). */
+	touch-action: manipulation;
+}
+
+/*
+ * The zoom, as the one number a counter-scaled box is written with.
+ *
+ * A board's title bar and an agent's cursor both stay a constant size on screen, so each
+ * has a scale, and some an offset, that are functions of the zoom. Each
+ * such element is handed the zoom as `--zoom` and the rules below derive the rest — one
+ * inline write per element per frame instead of three.
+ *
+ * **Registered, and not inherited, and that is load-bearing.** An ordinary custom property
+ * inherits, and a changed inherited property makes the browser recompute the style of every
+ * element beneath it: written once on the stage it cost 21ms of style recalculation per step
+ * of a pinch, more than the pinch cost before (measured, 17 boards, 4× CPU throttle). Written
+ * on the box that uses it, and declared non-inherited, a change touches that box alone.
+ */
+@property --zoom {
+	syntax: "<number>";
+	inherits: false;
+	initial-value: 1;
+}
+
+}

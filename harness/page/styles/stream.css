@@ -1,0 +1,1239 @@
+/*
+ * The conversation, floating: the shapes the column and its cards spell the same way.
+ *
+ * What is here rather than in a `class=` attribute, by the same split the rest of the app
+ * uses (see `chrome.css`, and the long note in `index.css`): the geometry that has to read
+ * `--dock`, `--keyboard` and `env()`; the shapes repeated by three or more elements; the
+ * hover-reveal rules that need a parent selector; and the paragraphs of reasoning a class
+ * attribute is a bad home for. Layout — where a thing sits inside its own card, how its
+ * children space out, and everything responsive — is a utility in the markup.
+ *
+ * Inside `@layer components`, like every stylesheet in this app, so a utility on the same
+ * element still wins: a `@media` block in this file loses to a utility. The media blocks that
+ * are here — coarse pointers and reduced motion — set properties no utility touches.
+ */
+@layer components {
+	/*
+	 * A column of cards over the boards, and not a panel.
+	 *
+	 * No background, no border, no pointer events. The cards below take their own, so the
+	 * 10px gaps between turns are still canvas: you can drag a board through one. The trade
+	 * that buys — the wheel over a *gap* scrolls the canvas rather than the history — is the
+	 * one the boards asked for, and the cards are most of the column's area anyway.
+	 *
+	 * `justify-content: flex-end` on the column rather than on the scroller inside it: a
+	 * flex container that both scrolls and justifies to the end clips its own overflow at the
+	 * top in every browser that has shipped. Anchoring the column instead leaves the scroller
+	 * content-sized until there is more than fits, which is also what makes one reply a
+	 * single card above the input bar rather than one card stranded at the top of a
+	 * full-height frame.
+	 *
+	 * The geometry: 320px of card at `right: 12`, from `top: 64` — under the corner cluster —
+	 * down to 8px above the dock. The top and the right are offset by the gutter below, because
+	 * the box is bigger than the cards by exactly that much on those two edges; the bottom is
+	 * not, because what the 8px is measured from there is the *dock's* top edge rather than the
+	 * window, and the gutter is already the gap.
+	 *
+	 * **8px rather than 12, and the reserve above it is gone too.** The bottom card used to
+	 * stand 72px off the input bar: 24px of gutter, 12px here, and 36px of dock held for a
+	 * working sign that cannot appear while this column is up (`StatusLine.tsx`). Two of those
+	 * three were paid for nothing, and the conversation read as a panel parked somewhere near
+	 * the composer rather than the thing you are typing into. 32px is what is left, and the
+	 * 24px of it is shadow room.
+	 */
+	.stream {
+		/*
+		 * The gutter the cards' shadows live in, counted into the column's own box.
+		 *
+		 * A scroll container clips: `overflow-y: auto` forces `overflow-x` to compute to
+		 * `auto` too, so every card's shadow was sliced off in a straight vertical line down
+		 * both edges — which is what makes a column of floating cards read as a box with a
+		 * cut-out. The scroller carries this much padding instead, and the column is wider and
+		 * closer to the edge by the same amount, so the cards land where the board drew them.
+		 *
+		 * **24px, because that is how far the shadow reaches.** `--shadow` is
+		 * `0 8px 24px`, so a 12px gutter clipped the outer two thirds of it and the column
+		 * still read as a box with its corners sliced off — less obviously than before, which
+		 * is worse. The number here has to be the blur radius, not a guess at it.
+		 */
+		--gutter: 24px;
+		position: absolute;
+		z-index: var(--z-conversation);
+		top: calc(64px - var(--gutter));
+		right: calc(12px - var(--gutter));
+		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + max(12px, env(safe-area-inset-bottom)) - 12px);
+		display: flex;
+		box-sizing: border-box;
+		width: calc(320px + 2 * var(--gutter));
+		max-width: 100vw;
+		flex-direction: column;
+		justify-content: flex-end;
+		opacity: 0;
+		pointer-events: none;
+		/* Opacity and an 8px slide, on the cards rather than on a panel — there is no panel
+		   to slide. The column has no paint of its own, so moving it *is* moving them. */
+		translate: 0 8px;
+		transition:
+			opacity 160ms ease,
+			translate 160ms ease;
+	}
+
+	/*
+	 * `none`, not `0 0`, and this one is a trap worth naming.
+	 *
+	 * Any `translate` other than `none` makes the column a containing block for
+	 * `position: fixed` descendants — which the time machine's popover is. With `0 0` here the
+	 * menu was positioned against the column instead of the window, and then clipped by the
+	 * scroller's own overflow. `none` interpolates as zero, so the slide still animates.
+	 */
+	.stream[data-shown="true"] {
+		opacity: 1;
+		translate: none;
+	}
+
+	/* Away, it is not there at all: an invisible surface that ate the wheel would be a canvas
+	   that had stopped working for no visible reason. */
+	.stream:not([data-shown="true"]) {
+		visibility: hidden;
+	}
+
+	/*
+	 * `.stream-head` is gone: the column has no × of its own.
+	 *
+	 * It was a hover-revealed button at the top of the stack, on the argument that a column
+	 * of cards has no title bar to hang one on. The corner's conversation button is the
+	 * answer to that — it opens this and it closes it — and a surface with two dismiss
+	 * controls has one too many. Escape is the other way out, and needs no rule in here.
+	 */
+
+	.stream-roll {
+		position: relative;
+		display: flex;
+		/* Content-sized until there is more than fits, which is what the column above needs. */
+		flex: 0 1 auto;
+		flex-direction: column;
+		/* The only gap in the column, and it is a click-through target for a pointer. */
+		--roll-gap: 10px;
+		gap: var(--roll-gap);
+		padding: var(--gutter);
+		overflow-y: auto;
+		/* The column keeps its own place (`Stream.tsx`): the browser's anchoring moved it under changed content. */
+		overflow-anchor: none;
+		overscroll-behavior: contain;
+		/*
+		 * No scrollbar. The column is a stack of objects over a canvas rather than a pane, and
+		 * a track drawn down the inside of it would be the one straight edge in a surface whose
+		 * whole argument is that it does not have one. The jump pill is the affordance that
+		 * replaces it, and it says something a scrollbar cannot: how many turns you are behind.
+		 */
+		scrollbar-width: none;
+	}
+
+	.stream-roll::-webkit-scrollbar {
+		display: none;
+	}
+
+	/*
+	 * The column overflows by design — that is what scrolling is for — and a flex column
+	 * shrinks its children to try to avoid it. Text-bearing cards resist through their
+	 * min-content height; a tool row has `overflow: hidden` and nothing of its own to push
+	 * back with, so every one of them was squeezed to a line the moment the column filled up.
+	 */
+	.stream-roll > * {
+		flex: 0 0 auto;
+	}
+
+	/*
+	 * The two ends the column's observers watch (`Stream.tsx`): empty rows that take no room, the gap
+	 * beside each given back, so the column is laid out as if they were not there.
+	 */
+	.stream-roll > .stream-edge {
+		height: 1px;
+		pointer-events: none;
+	}
+	.stream-roll > .stream-edge:first-child {
+		margin-bottom: calc(-1 * var(--roll-gap) - 1px);
+	}
+	.stream-roll > .stream-edge:last-child {
+		margin-top: calc(-1 * var(--roll-gap) - 1px);
+	}
+	/* Focusable to scroll by keys; the focus is shown only when keys took it there. */
+	.stream-roll:focus:not(:focus-visible) {
+		outline: none;
+	}
+
+	/*
+	 * Only the painted things take the pointer.
+	 *
+	 * Named one by one rather than as `.stream-roll > *`, because your own turn is a
+	 * full-width *row* with a narrow bubble in it: making the row a target would put an
+	 * invisible 320px-wide plate over the canvas beside every message you have sent.
+	 */
+	.stream-card,
+	.stream-bubble,
+	.stream-rw {
+		pointer-events: auto;
+	}
+
+	/*
+	 * The menu the time machine opens.
+	 *
+	 * `ui/Popover` portals its card to the body now — it had to, because a `position: fixed`
+	 * element inside a transformed ancestor is placed against that ancestor and the dock
+	 * carries a `translateX(-50%)`. So this rule no longer has anything to match: the card is
+	 * not a descendant of the column and does not inherit its `pointer-events: none`.
+	 *
+	 * Kept as a note rather than deleted silently, because the *reason* it existed is still
+	 * true — a menu drawn inside this column would be unclickable — and the next person to
+	 * render one in place rather than through the portal will want to have read this.
+	 */
+
+	/*
+	 * A card: opaque, a hairline, one soft shadow, and the same 12px corner every other float
+	 * in the app has. A bubble rounder than the panels reads as a different program.
+	 *
+	 * **Opaque, and no ladder with age.** `index.css` refuses frosted glass in writing — 40%
+	 * words behind 100% words reads as grime, and it moves when the camera does — and a
+	 * floating transcript is the exact case that argument was about. The `canvas-chat` version
+	 * this idea comes from also steps older turns back in opacity so the board shows through;
+	 * that is the same grime by a gentler name, and it buys nothing, because the newest card
+	 * is at the foot of the column where the eye already is.
+	 */
+	/*
+	 * `9px 11px 11px`, and the extra pixel at the foot is not a typo.
+	 *
+	 * CSS pads from the *line box*, and a line box is not symmetrical around the words in it:
+	 * in this font at 12px the box reaches 11px above the baseline while the letters reach 9,
+	 * and both stop 3px below it. So equal padding paints 14¼px of air above the text and
+	 * 12½ below — measured, by screenshotting a card and counting rows of pixels — and the
+	 * card reads as sitting low in its own box. Every card in the column, every time, which
+	 * is why it was noticeable long before anyone could say what it was.
+	 *
+	 * A pixel and a bit is the whole of the correction, and it goes at the bottom rather than
+	 * coming off the top so that the cards do not shrink. 13¼ above, 13½ below.
+	 */
+	.stream-card {
+		box-sizing: border-box;
+		padding: 9px 11px 11px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--fg);
+		/* The one surface in the chrome read in paragraphs rather than glanced at. */
+		font-size: var(--type-ui);
+		line-height: 1.5;
+		word-break: break-word;
+	}
+
+	/*
+	 * Your own turn: narrower, right-aligned, tinted.
+	 *
+	 * The asymmetry used to be *box or no box* — the agent's replies were flat markdown
+	 * because the panel behind them was the box. Floating, there is nothing behind them, so it
+	 * moves to **width and tint**: yours takes 88% of the column and the accent wash, the
+	 * agent's takes all 320 in the panel's colour.
+	 */
+	.stream-mine {
+		--mine: var(--color-accent-soft);
+		--mine-fg: var(--color-grey-1100);
+		display: flex;
+		align-items: flex-start;
+		justify-content: flex-end;
+		gap: 6px;
+	}
+
+	/* The soft accent is a *light* tint; on the dark scheme it is a bright plate with light
+	   text on it. The dark value is the one the board drew rather than a mix of the light one,
+	   which came out either invisible or violet. */
+	[data-color-scheme="dark"] .stream-mine {
+		--mine: #2b3a63;
+		--mine-fg: var(--color-grey-100);
+	}
+
+	/* Your own turn, and the same asymmetry: see `.stream-card` above for the arithmetic. */
+	.stream-bubble {
+		box-sizing: border-box;
+		max-width: 88%;
+		padding: 8px 11px 10px;
+		/* A tint alone loses its edge over a light board, so the border is not decoration:
+		   it is what keeps the bubble a bubble when the thing behind it is white. */
+		border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--mine);
+		box-shadow: var(--shadow);
+		color: var(--mine-fg);
+		font-size: var(--type-ui);
+		line-height: 1.5;
+		/* Verbatim, so the line breaks you typed are the line breaks the agent was sent. */
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	/*
+	 * The time machine, at the bubble's top-left and outside the tint.
+	 *
+	 * Hidden by opacity rather than by absence, which is the accessible half of the trick: it
+	 * stays in the tab order, so a keyboard reaches it by tabbing rather than by knowing it is
+	 * there. Shown while its own menu is open, because a control that vanishes under the popup
+	 * it opened leaves the popup belonging to nothing.
+	 */
+	.stream-rw {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		margin-top: 4px;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-item);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		transition:
+			opacity 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-mine:hover .stream-rw,
+	.stream-mine:focus-within .stream-rw,
+	.stream-rw[data-open="true"] {
+		opacity: 1;
+	}
+
+	.stream-rw:hover {
+		color: var(--fg);
+	}
+
+	.stream-rw:focus-visible {
+		opacity: 1;
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* No hovering on a touchscreen, and this is the only route to the time machine — so it is
+	   simply there. After the rules above, so it wins. */
+	@media (pointer: coarse) {
+		.stream-rw {
+			opacity: 1;
+		}
+	}
+
+	/* --- what the agent did, inside its card ---------------------------------- */
+
+	/* --- tool calls -------------------------------------------------------------
+	 *
+	 * A **log**, not a list of widgets: a status glyph, the tool, its subject, and nothing
+	 * else until asked. The shape is picone's `ToolCallView`, down to the arithmetic of the
+	 * indents; what differs is the column, which is 320px here rather than 820, so every size
+	 * is a step smaller — and that Decks has a *group* row, which picone has no need for.
+	 *
+	 * One row, three uses: a call, a group of finished calls, and a call nested inside that
+	 * group. They are the same markup and the same rules, which is the point — a group that
+	 * looked like a header had rows of a different species hanging under it the moment you
+	 * opened it.
+	 */
+	.stream-tools {
+		display: flex;
+		flex-direction: column;
+		/* 2px, not 5: these are lines in a log, and a log's lines touch. The row's own 24px
+		   of height is what separates them, and the hover wash is what groups a line's words. */
+		gap: 2px;
+	}
+
+	.tool {
+		align-self: stretch;
+	}
+
+	/*
+	 * No fill, no border, no radius at rest.
+	 *
+	 * A wash with a corner inside a card with a corner is a pill inside a pill, which is what
+	 * "ugly toolcalls" meant. A tool call is a *line in the turn* — the same standing as the
+	 * sentence under it — so what marks it out is the glyph and the mono type. The wash comes
+	 * back on hover and while open, where it means "this one opens".
+	 */
+	.tool > .row {
+		display: flex;
+		width: 100%;
+		min-height: 24px;
+		align-items: center;
+		padding: 0 6px;
+		gap: 8px;
+		border: 0;
+		border-radius: var(--radius-thumb);
+		background: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+		transition: background-color 120ms ease;
+	}
+
+	/* A row with nothing behind it is not a control. It keeps the cursor it had before
+	   anything was clickable, and the chevron is absent rather than dimmed. */
+	.tool > .row:disabled {
+		cursor: default;
+	}
+
+	.tool > .row:hover:not(:disabled),
+	.tool > .row[data-open="true"] {
+		background: var(--line);
+	}
+
+	.tool > .row:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+
+	/*
+	 * The status cell: 12px whatever is in it.
+	 *
+	 * A spinner is 9px, a done dot is 5 and the alert is 11, and a cell that sized itself to
+	 * its glyph would give the column a ragged left edge — the names have to start at the
+	 * same x or the list stops reading as a list.
+	 */
+	.tool > .row > .state {
+		display: inline-flex;
+		width: 12px;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		color: var(--faint);
+	}
+
+	/*
+	 * Done is a 5px dot, and it is deliberately the quietest thing in the row.
+	 *
+	 * `--line-strong`, not green. Most calls succeed, so a saturated disc per row is a column
+	 * of green telling you nothing you did not assume — and it was loud enough that an opened
+	 * group had to *hide* its children's dots to be readable, which meant the rows inside a
+	 * group were a different object from the rows outside it. Quiet here buys that back.
+	 */
+	.tool[data-state="done"] > .row > .state::before {
+		width: 5px;
+		height: 5px;
+		border-radius: var(--radius-pill);
+		background: var(--line-strong);
+		content: "";
+	}
+
+	/*
+	 * Running is a spinner, because the message is "not finished yet" and motion is the only
+	 * way to say that without words. It replaces a dot that pulsed amber — which read as a
+	 * warning, and amber means "waiting for you" everywhere else in this app.
+	 *
+	 * picone's ring, its stroke and its period: 1.5px, 0.67s, the accent over a 30% wash of
+	 * itself. Reduced motion slows it to 2s rather than stopping it, which is the honest
+	 * trade when the motion *is* the content — a still spinner says nothing at all.
+	 */
+	.tool[data-state="running"] > .row > .state::before {
+		width: 9px;
+		height: 9px;
+		box-sizing: border-box;
+		border: 1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+		border-top-color: var(--color-accent);
+		border-radius: var(--radius-pill);
+		animation: tool-spin 0.67s linear infinite;
+		content: "";
+	}
+
+	@keyframes tool-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tool[data-state="running"] > .row > .state::before {
+			animation-duration: 2s;
+		}
+	}
+
+	/*
+	 * Failure gets a *shape*, not a colour — a triangle, drawn by the component.
+	 *
+	 * It is the one state in the row you must not miss, and a 5px disc in red is a 5px disc
+	 * to anyone who cannot tell red from grey. The colour is here and the description takes
+	 * it too, because "read → no such file" is one fact and half of it is in each column.
+	 */
+	.tool[data-state="error"] > .row > .state {
+		color: var(--color-danger);
+	}
+
+	.tool[data-state="error"] > .row .title {
+		color: var(--color-danger);
+	}
+
+	/*
+	 * The name: an identifier, so mono — and uppercase, which is what stops a 10px word from
+	 * reading as the sentence rather than the label on it.
+	 *
+	 * `flex: 0 1 auto` with a 42% ceiling, because an MCP tool is called
+	 * `mcp__decks__stage_eval` and would otherwise take a 320px row on its own. It gives way
+	 * before the description does; the description is the part that says *which* call.
+	 */
+	.tool > .row .name {
+		overflow: hidden;
+		min-width: 0;
+		max-width: 42%;
+		flex: 0 1 auto;
+		color: var(--faint);
+		font-family: var(--font-mono);
+		font-size: var(--type-micro);
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		text-overflow: ellipsis;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	/* The description — the path, the command, the pattern. Arguments are code, so it keeps
+	   the mono face and gives up the weight; it is the widest thing in the row. */
+	.tool > .row .title {
+		overflow: hidden;
+		min-width: 0;
+		flex: 1;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: var(--type-note);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Pictures a call returned, which the output cannot show. Beside the chevron because it
+	   is a fact about the result rather than about the call. */
+	.tool > .row .imgs {
+		flex: none;
+		color: var(--faint);
+		font-size: var(--type-micro);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* At the right end, where a disclosure belongs: a column of them is something the eye can
+	   run down. Turned rather than swapped for a second glyph — this app's convention. */
+	.tool > .row .twisty {
+		flex: none;
+		color: var(--faint);
+		opacity: 0.5;
+		transition: transform 120ms ease;
+	}
+
+	.tool > .row[data-open="true"] .twisty {
+		transform: rotate(90deg);
+	}
+
+	/*
+	 * What hangs off a row: the calls inside a group, and a call's own output.
+	 *
+	 * The left edges are arithmetic rather than a look, and they are picone's. The row is 6px
+	 * of padding, a 12px status cell and an 8px gap, so its name starts 26px in — and
+	 * `12 + 14` puts everything underneath in that same column. The rule lands on 12px, the
+	 * centre of the glyph above it, so a block reads as hanging off that row rather than
+	 * sitting beside it.
+	 */
+	.tool-kids,
+	.tool > pre {
+		margin: 2px 0 4px 12px;
+		padding-left: 14px;
+		box-shadow: inset 1px 0 0 0 var(--line);
+	}
+
+	.tool-kids {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	/*
+	 * The output: the mono face and the indent are what mark it as somebody else's text, so
+	 * it needs no fill and no rule across the top — both of which it used to have, a third
+	 * grey and a fourth edge in a block that has one of each. Capped and scrollable, so a
+	 * stack trace cannot make a turn twice as tall as the reply it belongs to.
+	 */
+	.tool > pre {
+		max-height: 220px;
+		padding-top: 1px;
+		padding-bottom: 2px;
+		overflow: auto;
+		border: 0;
+		background: none;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: var(--type-hint);
+		line-height: 1.55;
+		overflow-wrap: anywhere;
+		/* Reserved whether or not this one scrolls, so an output that does and one that does
+		   not wrap at the same column. */
+		scrollbar-gutter: stable;
+		white-space: pre-wrap;
+	}
+
+	/* Thinking: a disclosure, and quiet. Not addressed to the reader, and a card that showed
+	   it in full would be a card where the reply is the small part. */
+	.stream-thinking {
+		color: var(--faint);
+		font-size: var(--type-label);
+	}
+
+	.stream-thinking > button {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		font: inherit;
+		text-decoration: underline dotted;
+	}
+
+	.stream-thinking > button:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/*
+	 * Bounded, and it scrolls.
+	 *
+	 * Thinking is not the reply, and it is not written to be read in full — a model can spend
+	 * two thousand words getting to a one-line answer. Opened, an unbounded disclosure pushed
+	 * the reply itself off the bottom of the column and made every card above it scroll past
+	 * a page of reasoning to get anywhere. The cap is what makes it a disclosure rather than a
+	 * second transcript.
+	 *
+	 * `min(320px, 38vh)` so it is a fixed, predictable block on a laptop and still a fraction
+	 * of the screen on a phone, where 320px is most of the column. `contain` so reaching its
+	 * end does not carry on and scroll the conversation behind it.
+	 */
+	.stream-thinking > .body {
+		max-height: min(320px, 38vh);
+		margin-top: 4px;
+		padding-left: 8px;
+		overflow-y: auto;
+		border-left: 2px solid var(--line);
+		overscroll-behavior-y: contain;
+		white-space: pre-wrap;
+	}
+
+	/* A fenced block inside a card: a step deeper than the card it sits in, and never wider
+	   than it — a reply that pasted a 200-column log must not stretch the column. */
+	.stream-card .md pre {
+		overflow-x: auto;
+		margin: 0;
+		padding: 8px 10px;
+		border-radius: var(--radius-chip);
+		background: var(--bg-deep);
+		font-family: var(--font-mono);
+		font-size: var(--type-note);
+		white-space: pre;
+	}
+
+	/*
+	 * The caret is gone, and with it its keyframes.
+	 *
+	 * It was a 6px block blinking at the end of a streaming reply, and a good deal of care
+	 * went into it: sized in `em` so it sat on the text's ink rather than near it, after a
+	 * `translate` was found to be painting two pixels outside the line box and making every
+	 * arriving card look short of padding along its bottom edge.
+	 *
+	 * All correct, and beside the point — the complaint was never where it sat but that it
+	 * was there at all, appearing and vanishing twice a second at the one place the eye was
+	 * already resting. `typing…` in the working sign says the same thing in words, in a
+	 * place that does not move. See `chat/working-sign.ts`, which no longer stands the sign
+	 * down mid-reply now that nothing else carries the fact.
+	 */
+
+	/* A notice is a card too — a failure to launch is exactly the thing worth being able to
+	   scroll back to — but it is the quietest one. */
+	.stream-notice {
+		color: var(--muted);
+	}
+
+	.stream-notice[data-level="warn"] {
+		color: color-mix(in srgb, var(--color-warn) 70%, var(--fg));
+	}
+
+	.stream-notice[data-level="error"] {
+		color: var(--color-danger);
+	}
+
+	/*
+	 * The working sign where the column shows it: a card, not a pill.
+	 *
+	 * It sits at the foot of the queue, in the position the arriving turn will take, so the
+	 * reply that replaces it lands where the eye already is — which is the whole argument for
+	 * putting it here rather than floating a second copy of the dock's pill over the column. So
+	 * it takes the turn card's geometry from `.stream-card` and only says what is different:
+	 * the mark and the words on one line, muted, and `max-content` so a two-word sign is not a
+	 * full-width card with an inch of empty panel after it.
+	 *
+	 * **Right-aligned**, which is the one thing about it that is not the turn card's. A
+	 * `max-content` card in a stretch column sits at the left edge, under the agent's replies,
+	 * where it reads as the beginning of one — a stub of a message that never grows. On the
+	 * right it is on the same edge as the thing that caused it: your message, and the input bar
+	 * below the column. So the queue reads as *you asked, and it is working on it*, and the
+	 * agent's edge stays for what the agent actually said.
+	 */
+	.stream-working {
+		display: flex;
+		width: max-content;
+		max-width: 100%;
+		align-self: flex-end;
+		align-items: center;
+		gap: 7px;
+		color: var(--muted);
+		font-size: var(--type-ui);
+	}
+
+	/*
+	 * The day boundary, in sentence case.
+	 *
+	 * This is what replaces the uppercase eyebrow the chat list used ("EARLIER", 10px, tracked
+	 * to 0.08em): ten-pixel caps are wide enough that the eye reads letters rather than words,
+	 * and some screen readers announce a long uppercase run letter by letter.
+	 *
+	 * A chip rather than a label with a rule running off it, which is what that eyebrow was: a
+	 * bare hairline over the canvas lands on top of whatever board is behind the column and
+	 * reads as that board's own rule. Everything else in here is opaque; so is this.
+	 */
+	.stream-day {
+		align-self: center;
+		padding: 2px 9px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-pill);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		font-size: var(--type-note);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+
+	/*
+	 * The way back into the conversation, at the top of what is drawn.
+	 *
+	 * Shaped like the day chip below rather than like a card: it is a marker in the column,
+	 * not a thing that was said, and a full-width card would read as a message from whoever
+	 * writes the software. Centred for the same reason, and it is a button because scrolling
+	 * has no affordance — a reader who cannot see that there is more has no reason to try.
+	 */
+	.stream-earlier {
+		align-self: center;
+		padding: 3px 11px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-pill);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-note);
+		font-weight: 500;
+		pointer-events: auto;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-earlier:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-earlier:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/*
+	 * The way back to the foot, once you have read away from it.
+	 *
+	 * Overlaid on the bottom of the column rather than given a row of its own: a pill that
+	 * appeared *between* the last card and the status line would shorten the scroller at the
+	 * moment you scrolled, which moves the thing you are reading. It sits in the gutter, which
+	 * is empty by construction.
+	 */
+	.stream-jump {
+		position: absolute;
+		bottom: var(--gutter);
+		left: 50%;
+		display: flex;
+		height: 26px;
+		align-items: center;
+		padding: 0 11px;
+		gap: 5px;
+		border: 1px solid var(--line);
+		border-radius: 13px;
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-note);
+		pointer-events: auto;
+		translate: -50% 0;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			opacity 160ms ease;
+	}
+	/* Hidden by opacity alone, never taken out of the page or restyled otherwise (`Stream.tsx`, the momentum of a scroll on iOS). */
+	.stream-jump[data-shown="false"] {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.stream-jump:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-jump:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* --- the status line, over the input bar ---------------------------------- */
+
+	/*
+	 * Painted like a row of the history — the same hairline, the same shadow, a 14px corner —
+	 * because that is what it stands in for while the history is away. And it is a button: the
+	 * one thing to do about "it is working" is go and watch.
+	 */
+	.statusline {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		padding: 0 11px 0 9px;
+		gap: 7px;
+		border: 1px solid var(--line);
+		border-radius: var(--row-radius);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-ui);
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.statusline:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.statusline:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/*
+	 * The mark, nudged a pixel down — which is the difference between centred and *looking*
+	 * centred.
+	 *
+	 * `align-items: center` lines a glyph up with the middle of the text's **font box**, and
+	 * a font box is not symmetrical: at 12px this one runs 11px above the baseline and 3px
+	 * below, so its middle is 4px up while the middle of the *ink* — what your eye reads as
+	 * the centre of the words — is 3px up. One pixel, and it is the pixel that made Claude's
+	 * asterisk look like it was floating above "running tools…".
+	 *
+	 * A paint-only shift, so nothing reflows, and it is on `.mark` rather than on one sign:
+	 * both surfaces draw both runtimes, and the marks themselves are centred in their own
+	 * boxes to within a third of a pixel (measured, by rasterising them) — so this is the
+	 * whole of the correction for all four drawings.
+	 */
+	.statusline .mark,
+	.stream-working .mark {
+		flex: none;
+		translate: 0 1px;
+	}
+
+	/*
+	 * The mark in motion is the runtime's own colour: Claude's orange, Pi's blue.
+	 *
+	 * The one place in this app where a drawing is not simply the colour of the text beside
+	 * it — a thing in motion may as well say whose motion it is (picone §58). It used to read
+	 * `var(--mark, …)`, an *identity* colour set inline by `StatusLine`, so an agent that had
+	 * been given green got a green mark blooming over the input bar. The runtime is the thing
+	 * the drawing is of, and it is the only thing the drawing should be coloured by.
+	 *
+	 * Keyed on `[data-busy]` — the attribute the mark itself carries — rather than on the pill
+	 * around it, because the sign has two homes now: over the composer, and at the foot of the
+	 * conversation. A rule that named one of them would have left the other one grey.
+	 */
+	svg[data-agent="claude"][data-busy] {
+		color: #d97757;
+	}
+
+	/*
+	 * Pi in the accent blue, which is a deliberate divergence: picone leaves its tiles as
+	 * `currentColor`. Here that blue *is* Pi's identity colour — `styles/agents.css` says so
+	 * where it explains why a working Pi's ring needs a transparent gap to read at all — so
+	 * taking the muted text colour instead would be the one mark in the app drawn in
+	 * something that is neither its own colour nor the text's.
+	 */
+	svg[data-agent="pi"][data-busy] {
+		color: var(--color-accent);
+	}
+
+	/* --- the four working marks (Pi's and Claude's ported from picone's own app stylesheet) --- */
+
+	/*
+	 * Pi builds. Ten character cells appear in reading order and fall away again, which is
+	 * what a terminal does while it draws: 55ms of stagger per cell in the markup, one 1.35s
+	 * cycle here. `transform-box: fill-box` is load-bearing — without it an SVG `<rect>`
+	 * scales about the *viewBox* origin, so the grid would swing rather than each cell
+	 * growing in place.
+	 */
+	.pi-tile {
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+
+	svg[data-agent][data-busy] .pi-tile {
+		animation: pi-build 1.35s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+	}
+
+	@keyframes pi-build {
+		0% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+
+		20%,
+		55% {
+			opacity: 1;
+			transform: scale(1);
+		}
+
+		78% {
+			opacity: 0.15;
+			transform: scale(0.55);
+		}
+
+		100% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+	}
+
+	/*
+	 * Claude cycles. Ten glyphs — `· ✢ ✳ ✶ ✻ ✽` and back down — stacked at the same point,
+	 * each shown for a tenth of the cycle by its own delay. `steps(1, end)` because a frame
+	 * either is or is not: interpolating opacity would cross-fade two asterisks into a blur
+	 * that is neither.
+	 */
+	.claude-frame {
+		fill: currentColor;
+		font-family: var(--font-mono);
+		font-size: 20px;
+		dominant-baseline: central;
+		text-anchor: middle;
+		opacity: 0;
+		animation: claude-cycle 1800ms steps(1, end) infinite;
+	}
+
+	@keyframes claude-cycle {
+		0%,
+		9.999% {
+			opacity: 1;
+		}
+
+		10%,
+		100% {
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * opencode builds its own frame: four walls clockwise from the top, each growing out of the
+	 * corner it starts at, and then the block rising into the opening they have just drawn.
+	 *
+	 * It is 1500ms, between Pi's 1350 and Claude's 1800, and that spread is deliberate: two
+	 * agents working side by side drift out of step instead of beating together, which is what
+	 * four marks on one screen would do if they shared a period.
+	 *
+	 * `transform-box: fill-box` again — and here it is what makes a wall grow *along itself*.
+	 * Without it a `<rect>` scales about the viewBox origin and the top wall would sweep across
+	 * the mark instead of drawing out of its corner.
+	 */
+	.oc-wall,
+	.oc-fill {
+		transform-box: fill-box;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-top {
+		transform-origin: left center;
+		transform: scaleX(0);
+		animation: oc-draw-x 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-right {
+		transform-origin: center top;
+		transform: scaleY(0);
+		animation: oc-draw-y 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 180ms infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-bottom {
+		transform-origin: right center;
+		transform: scaleX(0);
+		animation: oc-draw-x 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 360ms infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-left {
+		transform-origin: center bottom;
+		transform: scaleY(0);
+		animation: oc-draw-y 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 540ms infinite;
+	}
+
+	@keyframes oc-draw-x {
+		0% {
+			transform: scaleX(0);
+		}
+
+		22%,
+		100% {
+			transform: scaleX(1);
+		}
+	}
+
+	@keyframes oc-draw-y {
+		0% {
+			transform: scaleY(0);
+		}
+
+		22%,
+		100% {
+			transform: scaleY(1);
+		}
+	}
+
+	/*
+	 * The block, rising out of the bottom of the opening. `translateY(100%)` is its own height,
+	 * which is exactly the distance from where the symbol puts it to out of sight, and the
+	 * component clips it to the opening — so it slides up from behind the bottom wall rather
+	 * than appearing on top of it.
+	 */
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-fill {
+		transform: translateY(100%);
+		animation: oc-fill 1500ms cubic-bezier(0.3, 0.7, 0.2, 1) 560ms infinite;
+	}
+
+	@keyframes oc-fill {
+		0% {
+			transform: translateY(100%);
+		}
+
+		38%,
+		100% {
+			transform: translateY(0);
+		}
+	}
+
+	/* The finished mark holds, then fades to begin again: the reset is one animation on the
+	   group, so every part of it goes at once however late that part arrived. */
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-cycle {
+		animation: oc-cycle 1500ms linear infinite;
+	}
+
+	@keyframes oc-cycle {
+		0% {
+			opacity: 0;
+		}
+
+		8%,
+		88% {
+			opacity: 1;
+		}
+
+		100% {
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * antigravity draws its own arch, along its own centreline, from the left foot to the right
+	 * one — the mask in the component is that line stroked wide, and this is the dash that walks
+	 * it. `pathLength="100"` on the path means the two numbers below are percentages of the
+	 * curve rather than 224 units of it, so retracing the arch cannot leave them behind.
+	 */
+	svg[data-agent="antigravity"][data-busy] .ag-trace {
+		stroke-dasharray: 100;
+		animation: ag-draw 1600ms cubic-bezier(0.35, 0.1, 0.3, 1) infinite;
+	}
+
+	@keyframes ag-draw {
+		0% {
+			stroke-dashoffset: 100;
+		}
+
+		58%,
+		100% {
+			stroke-dashoffset: 0;
+		}
+	}
+
+	/* And then the one movement the name promises: up a unit, and settle. */
+	svg[data-agent="antigravity"][data-busy] .ag-cycle {
+		animation: ag-cycle 1600ms cubic-bezier(0.3, 0.7, 0.2, 1) infinite;
+	}
+
+	@keyframes ag-cycle {
+		0%,
+		58% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+
+		74% {
+			transform: translateY(-1.2px);
+			opacity: 1;
+		}
+
+		88% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+
+		100% {
+			transform: translateY(0);
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * Motion off, and the mark still *visible* — which is the trap picone hit and wrote down:
+	 * `animation: none` on an element whose first keyframe is `opacity: 0.08` leaves a
+	 * ghost, and on one that starts at 0 leaves nothing at all. So a stopped Pi is its whole
+	 * grid at full strength, and a stopped Claude is the one frame it rests on. The column's
+	 * slide goes; its fade stays, because a fade is not travel.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		svg[data-agent][data-busy] .pi-tile {
+			animation: none;
+			opacity: 1;
+			transform: none;
+		}
+
+		.claude-frame {
+			animation: none;
+			opacity: 0;
+		}
+
+		/* The widest of the ten, so a still sign is still a mark rather than a dot. */
+		.claude-frame:nth-child(6) {
+			opacity: 1;
+		}
+
+		/*
+		 * The two new marks stop *finished*: opencode as the whole frame with the block in the
+		 * place the symbol puts it, antigravity as the whole arch. A stopped animation on a
+		 * wall whose first keyframe is `scale(0)`, or on a dash whose offset hides the path,
+		 * would leave a frame with no walls and an arch with no ink.
+		 */
+		svg[data-agent][data-busy] .oc-wall,
+		svg[data-agent][data-busy] .oc-fill {
+			animation: none;
+			transform: none;
+		}
+
+		svg[data-agent][data-busy] .oc-cycle,
+		svg[data-agent][data-busy] .ag-cycle {
+			animation: none;
+			opacity: 1;
+		}
+
+		svg[data-agent][data-busy] .ag-trace {
+			animation: none;
+			stroke-dashoffset: 0;
+		}
+
+		.stream {
+			translate: none;
+		}
+	}
+	.thinking {
+	align-self: flex-end;
+	max-width: 92%;
+	padding: 0 14px;
+	text-align: right;
+	color: var(--faint);
+	font-size: var(--type-ui);
+}
+	.thinking > button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline dotted;
+}
+	.thinking > .body {
+	margin-top: 4px;
+	padding-left: 8px;
+	border-left: 2px solid var(--line);
+	white-space: pre-wrap;
+}
+	/*
+ * The tool row's styles are in `styles/stream.css`, not here.
+ *
+ * They were here, dressing the chat column this app used to have: a 14px radius, a hairline,
+ * a `--bg` fill, a 7px dot that pulsed amber while a call ran. The column is gone and the
+ * conversation that replaced it overrode nearly every line of it, which is two descriptions
+ * of one component in two files and the reason the rows looked like boxes inside boxes. One
+ * home now, next to the rest of the conversation, and it is picone-shaped: a spinner while a
+ * call runs, a quiet dot when it is over, the name in mono, the chevron at the right end.
+ */
+	/*
+ * Under a tool's output when only a preview of it arrived (`ToolChip`): the rest is on its
+ * way, or — if the call is no longer anywhere — this is all there is.
+ */
+.tool > .more {
+	margin: 4px 0 0;
+	font-size: var(--type-note);
+	color: var(--muted, #888);
+}
+	/* Rewind and Fork as icon buttons under your message, for a host that shows them so (Studio). */
+	.stream-mine:has(> .stream-acts) {
+		flex-wrap: wrap;
+	}
+	.stream-acts {
+		display: flex;
+		flex-basis: 100%;
+		justify-content: flex-end;
+		gap: 2px;
+		margin-top: -2px;
+	}
+	.stream-act {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		height: 24px;
+		padding: 0 8px 0 7px;
+		border: 0;
+		border-radius: var(--radius-item);
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: var(--type-note);
+		cursor: pointer;
+		transition: color 120ms ease, background 120ms ease;
+	}
+	.stream-act:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.stream-act:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+	.stream-act:active {
+		background: var(--border-strong, var(--line));
+	}
+}

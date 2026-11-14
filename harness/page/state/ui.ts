@@ -1,0 +1,279 @@
+import type { UsageReport } from "./types/index.ts";
+import { createSignal } from "solid-js";
+import { createStore } from "solid-js/store";
+import { call } from "./socket.ts";
+
+/**
+ * What the browser is showing that the server has no opinion about.
+ *
+ * Layer 2: it imports `socket` (to ask for a usage report), and nothing imports it back. Everything here is *browser* state
+ * — which panel is open, which modal is up, what the composer was handed — as distinct from
+ * `deck`, which is the server's view of the world. A reload is allowed to lose all of it.
+ *
+ * ### Three decisions worth reading before changing anything here
+ *
+ * **The initial width is read through a function, not inline.** `panelOpen` starts from the
+ * window's width, and a module-scope `window.innerWidth` runs at *import* — so importing this
+ * module in Node, which is what a unit test does, would throw before a single assertion ran.
+ * `lib/media.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
+ * try/catch, and this follows it.
+ *
+ * **`usageReport` is not called `report`.** It was, in `App.tsx`, where it was a closure. As
+ * an import it would have been shadowed by the two upload handlers, which each declare a
+ * local `const report = working(…)` and then call `report.update` on it. Shadowing is legal
+ * and silent — neither the compiler nor the tests would have said anything — so the name
+ * changed rather than the trap being left for whoever reads it next.
+ *
+ * **`unread` stays a map, and is not folded into the agent record.** It is a sixteenth thing
+ * keyed by an agent id, so by the argument in `state/agent.ts` it ought to move there. It does
+ * not, for the reason already recorded for `contexts` in `state/deck.ts`: it is handed *whole*
+ * to three components — `AgentPill` declares `unread: Record<string, number>` twice — which
+ * index it themselves. Moving it means changing those signatures, which is its own change.
+ */
+
+/**
+ * Whether the boards panel starts open, from the width of the window.
+ *
+ * **Open where it is a panel, closed where it is a sheet.** Above 1100px it stands beside the
+ * canvas and costs 264px of a wide window, which is a fair trade for knowing what the agent is
+ * holding. Below that it is a sheet *over* the canvas, and a canvas app that opens with
+ * something covering the canvas is answering a question nobody asked — on a 393px screen the
+ * sheet took the left two thirds, and a pinch aimed at a board landed on a list of filenames.
+ */
+const panelOpensWith = (): boolean => {
+	try {
+		return window.innerWidth > 1100;
+	} catch {
+		// No window at all: a test, not a browser. Closed is the safe default, for the reason
+		// above — a canvas that opens covered is worse than one that opens bare.
+		return false;
+	}
+};
+
+function createUi() {
+	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
+	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
+
+	/**
+	 * Whether the boards panel is there. One signal where the module it came from had two, because
+	 * there is one panel now — and a plain signal rather than that module's persisted pair,
+	 * since what it was mostly doing was closing one panel when the other opened.
+	 */
+	const [panelOpen, setPanelOpen] = createSignal(panelOpensWith());
+
+	/** Settings: the Claude subscriptions this install can use (`settings/Settings.tsx`). */
+	const [settings, setSettings] = createSignal(false);
+
+	/**
+	 * Words the server has handed to the input bar: the message a rewind took back.
+	 *
+	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
+	 * composer has already acted on.
+	 */
+	const [draft, setDraft] = createSignal<
+		| {
+				text: string;
+				at: number;
+				agentId?: string;
+				insert?: boolean;
+				/** A kept comment, by id: it arrives as a pill. */
+				comment?: string;
+				/**
+				 * Boards and drawn items dragged onto the bar, each already a pill.
+				 *
+				 * Whole mentions rather than ids, because what is dragged is the only thing that
+				 * knows what to call it — a board its title, an item its name on the stage — and a
+				 * label worked out again at the other end would be a second answer to the same
+				 * question (`composer/draft.ts`).
+				 */
+				pills?: Array<{ kind: "card" | "item"; id: string; label: string }>;
+				/** Files attached or dropped, by their path in the deck: each a pill where the caret is. */
+				files?: string[];
+		  }
+		| undefined
+	>(undefined);
+
+	/**
+	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
+	 *
+	 * Reference material, behind a button. It was a permanent line of grey text under the
+	 * input bar once, and a tip rotating through the composer's placeholder after that —
+	 * both of which put a reference table where a person is working, so it was either always
+	 * in the way or arriving at a moment nobody asked for it.
+	 */
+	const [ops, setOps] = createSignal(false);
+
+	/**
+	 * The usage panel: whose it is open for, and what it has read.
+	 *
+	 * An agent id rather than a boolean, because every figure in it belongs to one agent and
+	 * a panel that survived a switch would be showing the last agent's plan under this one's
+	 * name. `usagePanel` is compared against `state.focused` before it is drawn, so moving
+	 * to another conversation closes it rather than relabelling it.
+	 *
+	 * Two ways in. On a desktop the cheap reading is a popover on the dial under the input
+	 * bar and this is what its last row opens; on a phone there is no room under the box, so
+	 * `⋯` has one row for the reading and it opens this directly. The third way is `/cost`,
+	 * which arrives from the server with `show` — see the `agent.report` case in `App.tsx`.
+	 *
+	 * The reading is always asked for again on opening, because two of its three parts are
+	 * running totals and the third is a countdown. What it is *not* any more is withheld
+	 * until that answer arrives: the last reading for this agent is drawn at once, stamped
+	 * with when it was taken, and replaced in place when the fresh one lands. A read is
+	 * about two seconds of round trip to the CLI, and two seconds of "Reading…" over
+	 * figures that were true a minute ago is a slow panel rather than an honest one.
+	 */
+	const [usagePanel, setUsagePanel] = createSignal<string | undefined>(undefined);
+	const [usageReport, setUsageReport] = createSignal<{ report?: UsageReport; error?: string; loading: boolean; /** When the report on screen was read. */ at?: number }>({
+		loading: false,
+	});
+
+	/**
+	 * The last reading per agent, so reopening the panel is not two seconds of nothing.
+	 *
+	 * Not reactive and not in the store: it is read once when the panel opens, and a
+	 * component that re-ran when a *different* agent's figures came back would be redrawing
+	 * over a reading nobody asked to change.
+	 */
+	const seenReports = new Map<string, { report: UsageReport; at: number }>();
+
+	/** Re-read the figures for an agent without opening or moving the panel. */
+	const readUsage = (id: string | undefined) => {
+		if (!id) return;
+		setUsageReport((was) => ({ ...was, loading: true }));
+		void call("agent.report", [id]);
+	};
+
+	/** Open the panel on an agent, on whatever was last read, and ask for its figures. */
+	const openUsage = (id: string | undefined) => {
+		if (!id) return;
+		setUsagePanel(id);
+		const kept = seenReports.get(id);
+		setUsageReport({ loading: true, ...(kept ? { report: kept.report, at: kept.at } : {}) });
+		void call("agent.report", [id]);
+	};
+
+	/**
+	 * A reading came back: kept for this agent, and drawn if its panel is still open.
+	 *
+	 * A failure keeps the figures rather than clearing them — which is what the panel's own
+	 * "could not read usage" line has always claimed happens, and did not: the answer used
+	 * to be written straight over the state, so an error emptied the panel it was apologising
+	 * in.
+	 */
+	const tookReport = (id: string, answer: { report?: UsageReport; error?: string }) => {
+		if (answer.report) seenReports.set(id, { report: answer.report, at: Date.now() });
+		if (usagePanel() !== id) return;
+		const kept = seenReports.get(id);
+		setUsageReport({ loading: false, ...(kept ? { report: kept.report, at: kept.at } : {}), ...(answer.error ? { error: answer.error } : {}) });
+	};
+
+	/**
+	 * The agent now spends another subscription: the figures kept for it are the old one's.
+	 *
+	 * Dropped rather than shown under a "reading again" line, because they are not an older
+	 * reading of the same thing — they are another account's windows, and drawn beside the new
+	 * account's name they say it is as spent as the one just left. An open panel reads again at
+	 * once, which is the switch showing in the meter as soon as it is made.
+	 */
+	const accountChanged = (id: string) => {
+		seenReports.delete(id);
+		if (usagePanel() !== id) return;
+		setUsageReport({ loading: true });
+		void call("agent.report", [id]);
+	};
+
+	/**
+	 * Unread counts, kept here rather than on the server.
+	 *
+	 * "Have I read this" is a fact about a person in front of a browser, not about the
+	 * agent — a second tab has its own answer, and the server has no business
+	 * guessing. Reset by opening the conversation, which is the only thing that means
+	 * you have seen it.
+	 */
+	const [unread, setUnread] = createStore<Record<string, number>>({});
+
+	/**
+	 * Whether the app has opened, so the rest of the panel's list may be drawn: chat first, then the rest.
+	 *
+	 * Opened means the deck is laid out and the chat you are looking at has its history — the two
+	 * things on screen that are the app's own. Two frames after the history lands so it is painted
+	 * first, or after a few seconds whatever happened, so a history that never comes cannot keep
+	 * the list short.
+	 */
+	const [pagesStarted, setPagesStarted] = createSignal(false);
+
+	/**
+	 * Release the gate above, once.
+	 *
+	 * Called from wherever the first thing worth showing lands — the greeting, or the focused
+	 * conversation's history — and from a timer, because a history that never comes must not
+	 * keep the canvas empty. Idempotent: the first call wins and the rest are a boolean.
+	 *
+	 * It was `appOpened` in `App.tsx`, which is where the *decisions* about when to call it
+	 * still are. The gate it fires is here, beside the signal it sets, so the frame switch can
+	 * reach it without a hook.
+	 */
+	let opened = false;
+	const releasePages = () => {
+		if (opened) return;
+		opened = true;
+		requestAnimationFrame(() => requestAnimationFrame(() => setPagesStarted(true)));
+	};
+
+	return {
+		picking,
+		setPicking,
+		panelOpen,
+		setPanelOpen,
+		settings,
+		setSettings,
+		draft,
+		setDraft,
+		ops,
+		setOps,
+		usagePanel,
+		setUsagePanel,
+		usageReport,
+		setUsageReport,
+		tookReport,
+		accountChanged,
+		readUsage,
+		openUsage,
+		unread,
+		setUnread,
+		pagesStarted,
+		setPagesStarted,
+		releasePages,
+	};
+}
+
+
+/** The app's one set of browser state. Tests build their own with `createUi()`. */
+export const ui = createUi();
+
+export const {
+	picking,
+	setPicking,
+	panelOpen,
+	setPanelOpen,
+	settings,
+	setSettings,
+	draft,
+	setDraft,
+	ops,
+	setOps,
+	usagePanel,
+	setUsagePanel,
+	usageReport,
+	setUsageReport,
+	tookReport,
+	accountChanged,
+	readUsage,
+	openUsage,
+	unread,
+	setUnread,
+	pagesStarted,
+	setPagesStarted,
+	releasePages,
+} = ui;

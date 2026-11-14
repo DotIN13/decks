@@ -1,0 +1,438 @@
+/*
+ * The shell: the stage, two floats over it, a stationary sidebar beside it, and the
+ * segments the two toolbars grow.
+ *
+ * Only new selectors live here, so the import order against `index.css` cannot change
+ * which of two rules for one selector wins (see the note on splitting `index.css`).
+ */
+/*
+ * The colour a float is painted. In light it is white — the toolbars, the composer, the
+ * conversation, the sidebar, every panel and menu — over a ground one step deeper (`--stage`,
+ * `index.css`), so a float reads as a thing on the canvas. White on the old near-white ground
+ * read as holes rather than things, which is why the ground moved and not the floats. In dark it
+ * is one rung above the ground.
+ */
+:root {
+	--layer: var(--color-grey-50);
+	/* The colour a chosen control is raised in: a soft grey card on the white layer; a rung
+	   *lighter* than the layer in dark, where a white card would glare. */
+	--raise: #efeff1;
+}
+[data-color-scheme="dark"] {
+	--layer: var(--color-grey-1000);
+	--raise: var(--color-grey-900);
+}
+
+@layer components {
+	/* ---- the surface: the stage, with the floats over it ------------------------- */
+	.surface {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+	}
+
+	.surface-layer {
+		position: absolute;
+		inset: 0;
+	}
+
+	/* The agent in the top-left pill: face, name and chevron, one button. */
+	.pill-agent {
+		gap: 6px;
+		padding: 0 7px 0 3px;
+		border-color: transparent;
+		color: var(--fg);
+	}
+	.pill-agent[data-on="soft"] {
+		background: var(--line);
+	}
+	.pill-agent-name {
+		max-width: 160px;
+		overflow: hidden;
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ---- the sidebar's mark, and the pill beside it ------------------------------ */
+	.panel-mark {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		height: 32px;
+		flex: none;
+		padding: 0 6px;
+		margin-bottom: 8px;
+	}
+	/* The mark on its tile, the way the app icon is drawn: ink tile, the boards in the
+	   ground colour on it. */
+	.panel-mark-glyph {
+		display: inline-flex;
+		width: 22px;
+		height: 22px;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-chip);
+		background: var(--fg);
+		color: var(--bg);
+	}
+	/* The sidebar beside the canvas: one hairline on its right, no lift. It is the ground's
+	   neighbour, not something floating on it. */
+	.panel-shell {
+		border-right-color: var(--line);
+		box-shadow: none;
+	}
+
+	/* ---- the composer as a float ------------------------------------------------- */
+	.dock-grip {
+		position: absolute;
+		top: 4px;
+		left: 50%;
+		width: 28px;
+		height: 4px;
+		margin-left: -14px;
+		border-radius: 2px;
+		background: var(--line-strong);
+		opacity: 0.8;
+	}
+	.composer-box {
+		position: relative;
+		cursor: grab;
+	}
+	.dock[data-dragging="true"] .composer-box {
+		cursor: grabbing;
+	}
+	.dock[data-dragging="true"] {
+		transition: none;
+	}
+	/* Away from home the inline position wins: no centring transform. The inline `bottom`
+	   `App.tsx` writes is what pins it, so the box does not move when its status row goes. */
+	.dock[data-floating="true"] {
+		transform: none;
+		transition: none;
+	}
+	/*
+	 * Put away: thrown hard at either edge, a float (the composer, the drawing tools) stands
+	 * past it with only this tab showing, on the side still on screen. The rest fades rather
+	 * than being removed, so the float keeps its size and the glide back is the same box
+	 * coming out again. `data-stowed` is the edge (`App.tsx`); each float sets the tab's size.
+	 */
+	.dock {
+		--stowtab-w: 36px;
+		--stowtab-h: 56px;
+	}
+	.stowtab {
+		position: absolute;
+		top: 50%;
+		display: none;
+		width: var(--stowtab-w, 28px);
+		height: var(--stowtab-h, 48px);
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: 1px solid var(--border-strong);
+		background: var(--layer, var(--panel));
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		pointer-events: auto;
+		translate: 0 -50%;
+	}
+	.stowtab:hover,
+	.stowtab:focus-visible {
+		color: var(--fg);
+	}
+	/* It can be dragged along its edge, or pulled back out (`float.ts`), as well as pressed. */
+	.stowtab {
+		touch-action: none;
+	}
+	[data-dragging="true"] > .stowtab {
+		cursor: grabbing;
+	}
+	[data-stowed] > .stowtab {
+		display: flex;
+	}
+	[data-stowed="right"] > .stowtab {
+		left: 0;
+		border-right: 0;
+		border-radius: var(--radius-panel, 12px) 0 0 var(--radius-panel, 12px);
+	}
+	/* Behind the left edge the tab is on the right, and its chevron points back in. */
+	[data-stowed="left"] > .stowtab {
+		right: 0;
+		border-left: 0;
+		border-radius: 0 var(--radius-panel, 12px) var(--radius-panel, 12px) 0;
+	}
+	[data-stowed="left"] > .stowtab > svg {
+		rotate: 180deg;
+	}
+	/* Behind the left edge is the sidebar, and a put-away float has no place there: it is cut
+	   to its tab, so nothing of it lies over the sidebar, seen or not. The negative insets
+	   keep the tab's shadow on the other three sides. */
+	[data-stowed="left"] {
+		clip-path: inset(-32px -32px -32px calc(100% - var(--stowtab-w, 28px)));
+	}
+	.dock > :not(.stowtab),
+	.pen-tools > :not(.stowtab) {
+		transition: opacity 160ms ease;
+	}
+	[data-stowed] > :not(.stowtab) {
+		opacity: 0;
+		pointer-events: none;
+	}
+	/*
+	 * Who gets the line: the word `To` and a chip with the agent's face and name. The chip
+	 * opens the pill's agent menu (`composer/Recipient.tsx`).
+	 */
+	.dock-to {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 0 0 5px 1px;
+		color: var(--faint);
+		font-size: var(--type-note);
+	}
+	.dock-to-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		height: 22px;
+		padding: 0 5px 0 3px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-item);
+		background: var(--panel);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-label);
+		font-weight: 600;
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease;
+	}
+	.dock-to-chip:hover,
+	.dock-to-chip[aria-expanded="true"] {
+		border-color: var(--line-strong);
+		background: var(--line);
+	}
+	.dock-to-chip:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.dock-to-chip > svg {
+		color: var(--muted);
+	}
+
+	/* Under a finger, 22px is a target you miss: the recipient chip grows to 30px on a
+	   touch screen, and stay the quiet size under a mouse. */
+	@media (pointer: coarse) {
+		.dock-to-chip {
+			height: 30px;
+			padding: 0 8px 0 7px;
+		}
+	}
+	.dock-to-name {
+		max-width: 160px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	
+
+	/* ---- the conversation as a float --------------------------------------------- */
+	/*
+	 * The conversation is a panel, at home and away: the layer colour, a strong hairline,
+	 * the shared shadow, and turns drawn as bubbles inside it rather than as cards floating
+	 * over the boards. The gutter the cards' shadows needed goes to zero, because nothing
+	 * inside a clipped panel casts one. The specificity is deliberate: `stream.css` sets the
+	 * same properties on `.stream`, and two attributes beat one whatever the import order.
+	 */
+	.stream[data-shown="true"] {
+		--gutter: 0px;
+		height: 420px;
+		bottom: auto;
+		justify-content: flex-start;
+		overflow: hidden;
+		min-width: 280px;
+		min-height: 200px;
+		pointer-events: auto;
+		background: var(--layer, var(--panel));
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-panel, 12px);
+		box-shadow: var(--shadow);
+		resize: both;
+		/* A size container, so a turn's parts can be capped against the panel's own height
+		   (`cqh` below) rather than the window's: the panel is 420px where the column was the
+		   whole window, and it can be resized by hand. */
+		container-type: size;
+	}
+	/* An opened thinking block takes under half the roll (45% of the panel, and the header
+	   has the rest), so the turn's own words and the next turn are never pushed out of reach. */
+	.stream[data-shown="true"] .stream-thinking > .body {
+		max-height: min(320px, 38vh, 45cqh);
+	}
+	.stream[data-shown="true"] .stream-roll {
+		gap: 8px;
+		padding: 10px;
+		pointer-events: auto;
+		/* A turn's corner follows the panel's, inset by the 10px of padding, so the two curves stay
+		   concentric: 8px on a laptop, 16px on a phone. Not the controls' corner, which a phone
+		   makes a 999px capsule, and a capsule of five lines is an oval. */
+		--control-radius: max(8px, calc(var(--radius-panel, 12px) - 10px));
+	}
+	/* A turn: a bubble on the panel, one hairline, no lift. Yours takes the accent line. */
+	.stream[data-shown="true"] .stream-card,
+	.stream[data-shown="true"] .stream-bubble {
+		border: 1px solid var(--line);
+		border-radius: var(--control-radius);
+		background: var(--bg);
+		box-shadow: none;
+		color: var(--fg);
+	}
+	.stream[data-shown="true"] .stream-bubble {
+		border-color: var(--color-accent);
+	}
+	/* The way back to the latest turn floats over the roll's foot, clear of the panel's edge and its
+	   rounded corners: `--gutter` is 0 in the panel, which set it on the border. */
+	.stream[data-shown="true"] .stream-jump {
+		bottom: 12px;
+	}
+	.stream-head {
+		display: none;
+		align-items: center;
+		gap: 8px;
+		height: 36px;
+		flex: none;
+		padding: 0 6px 0 12px;
+		margin: 0;
+		border-bottom: 1px solid var(--line);
+		font-size: var(--type-ui);
+		pointer-events: auto;
+		cursor: grab;
+	}
+	.stream[data-shown="true"] .stream-head {
+		display: flex;
+	}
+	.stream-head-name {
+		font-weight: 600;
+	}
+	.stream-head-state {
+		color: var(--muted);
+		font-size: var(--type-note);
+	}
+	.stream-head-x {
+		margin-left: auto;
+	}
+	.stream[data-dragging="true"] {
+		transition: none;
+		cursor: grabbing;
+	}
+	/* Away from home only the anchor changes: the inline position wins over `right`. */
+	.stream[data-floating="true"] {
+		right: auto;
+		transition: none;
+	}
+	/* Dropped, it glides to its resting place: on with the throw, to an edge, or home.
+	   `float.ts` sets this for the length of the glide and takes it off after, so a drag is
+	   never fighting a transition. After both floating rules on purpose: they say
+	   `transition: none` at the same specificity, and the later rule wins. */
+	.dock[data-snapping="true"],
+	.stream[data-snapping="true"],
+	.pen-tools[data-snapping="true"] {
+		transition:
+			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			bottom var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+	/* The frame it is handed back to the stylesheet: no transition, so `left` does not
+	   animate from the inline value to the calc while the transform switches at once. */
+	.dock[data-landing="true"],
+	.stream[data-landing="true"],
+	.pen-tools[data-landing="true"] {
+		transition: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.dock[data-snapping="true"],
+		.stream[data-snapping="true"],
+		.pen-tools[data-snapping="true"] {
+			transition-duration: 0s;
+		}
+	}
+
+}
+
+@layer components {
+	/*
+ * One area, full height. There is no title bar to reserve a row for.
+ *
+ * This was a two-row grid, and deleting the header without changing it put `.work` into
+ * the 40px row the bar used to hold — so the canvas was 40px tall and the dock, anchored
+ * to its bottom, hung off the top of the window. The chrome floats over the canvas now,
+ * and floating means there is nothing to lay out around.
+ *
+ * The notch is handled where it is now relevant: each floating cluster pads itself by
+ * `env(safe-area-inset-*)`, which is also what makes them right in landscape, where the
+ * inset is on the side rather than the top.
+ */
+.app {
+	position: relative;
+	height: 100%;
+}
+	/*
+ * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
+ * a title bar this app no longer has. Two elements wear the class now: the collaborator
+ * cursor, which draws its own below, and the panel row's on-canvas mark, which draws a 6px
+ * accent disc in a pseudo-element. The row's slot went 20px wide so a delete button could
+ * stand in exactly its place, and this rule promptly painted that whole slot green.
+ *
+ * Deleted rather than narrowed: a global class name with a colour in it and no owner is a
+ * booby trap for the next component that needs the word "dot".
+ */
+
+/*
+ * The canvas and everything floating over it, filling the window.
+ *
+ * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
+ * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
+ * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
+ * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
+ * off the top of the window with the canvas invisible behind it.
+ *
+ * `clip`, not `hidden`: a hidden box still scrolls when something inside it is brought into view,
+ * and a board's title-bar button past the window's edge, focused or pressed, slid the whole canvas
+ * 12px left under every board after it.
+ */
+.work {
+	position: absolute;
+	inset: 0;
+	overflow: clip;
+}
+
+	/* The same rules, under the same query. */
+	@media (pointer: coarse) {
+	/* A 40px bar cannot hold a 44px target. */
+	.app {
+		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
+	}
+}
+}
+
+/*
+ * While the pencil is the hand in use, the page is not text to select. A pencil presses and drags
+ * everywhere, and Safari took every stroke that began on a label or the canvas as a text selection,
+ * reaching across the bars and the whole canvas. Only then: a finger or a mouse selects as before.
+ * `data-pen` is set on the root by the last press's pointer type (`App.tsx`). Prefixed as well:
+ * Safari 18 ignores the bare property. What is typed into stays selectable.
+ */
+@layer components {
+	:root[data-pen] body {
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+	:root[data-pen] body :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+		-webkit-user-select: text;
+		user-select: text;
+		-webkit-touch-callout: default;
+	}
+}

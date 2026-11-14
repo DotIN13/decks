@@ -1,0 +1,89 @@
+/*
+ * The drawing's tool column (`ui/PenBar.tsx`).
+ * The harness's own kit (`styles/kit/`): moved out of `@decks/canvas`, which keeps only the canvas surface.
+ */
+@layer components {
+	/* The drawing's tools (`pen/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
+	.pen-tools {
+	position: absolute;
+	z-index: var(--z-float);
+	top: 50%;
+	left: calc(var(--inset-left, 0px) + 12px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 5px;
+	transform: translateY(-50%);
+}
+	/* A window too short for the column: it scrolls rather than running off both ends. */
+	.pen-tools {
+	max-height: calc(100% - 2 * (var(--control, 28px) + 32px));
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+	/*
+	 * The column as a float (`App.tsx`, `chrome/float.ts`): the grip at its head is where a drag
+	 * starts, away from home the inline position wins over the centring transform, and thrown
+	 * hard at the left edge it stands behind it with only its tab showing.
+	 */
+	.pen-grip {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 14px;
+	color: var(--faint);
+	cursor: grab;
+	touch-action: none;
+}
+	.pen-grip:hover {
+	color: var(--muted);
+}
+	.pen-tools[data-dragging="true"],
+	.pen-tools[data-dragging="true"] .pen-grip {
+	cursor: grabbing;
+}
+	.pen-tools[data-floating="true"] {
+	transform: none;
+}
+	/* The canvas's left edge is the sidebar's right, not the window's: put away on the left,
+	   the column still stands over the sidebar, so it gives up its own paint and its clicks,
+	   and the tab (`.stowtab`, `shell.css`) is all there is of it. */
+	.pen-tools {
+	--stowtab-w: 20px;
+	--stowtab-h: 48px;
+}
+	.pen-tools[data-stowed] {
+	overflow: hidden;
+	border-color: transparent;
+	background: transparent;
+	box-shadow: none;
+	pointer-events: none;
+}
+	/* Under a finger the grip and the tab are finger-sized, and the tools 36px. */
+	@media (pointer: coarse) {
+		.pen-grip {
+			height: 22px;
+		}
+		.pen-tools {
+			gap: 1px;
+			padding: 4px;
+		}
+		.pen-tools > .icon-button {
+			width: 36px;
+			height: 36px;
+		}
+		.pen-tools {
+			--stowtab-w: 28px;
+			--stowtab-h: 56px;
+		}
+	}
+	.pen-tools > .pen-rule {
+	width: 18px;
+	height: 1px;
+	margin: 3px 0;
+	background: var(--line-strong);
+}
+}
