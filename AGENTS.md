@@ -14,7 +14,7 @@ The map of this repo for agents. Read it first, then the design.
 
 The switch-over at the end of wave 2 is done: the new folders are workspaces named
 `@decks/<folder>`, and the libraries still in packages/ keep their names until Loom moves them;
-the old protocol package is `@decks/protocol-old` until then.
+the old protocol package (packages/protocol) takes a name of its own until then.
 
 New folders, today:
 
