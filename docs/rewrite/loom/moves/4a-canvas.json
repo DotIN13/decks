@@ -51,6 +51,56 @@
 					"to": "\"../../canvas/render/device.ts\""
 				}
 			]
+		},
+		{
+			"file": "apps/web/scripts/gen-font-coverage.mjs",
+			"replace": [
+				{
+					"from": "\"../../../packages/canvas/src/look/font-coverage.ts\"",
+					"to": "\"../../../canvas/look/font-coverage.ts\""
+				}
+			]
+		},
+		{
+			"file": "scripts/build-solid-lib.mjs",
+			"replace": [
+				{
+					"from": "join(dirname(fileURLToPath(import.meta.url)), \"..\", \"packages\", \"canvas\")",
+					"to": "join(dirname(fileURLToPath(import.meta.url)), \"..\", \"canvas\")"
+				}
+			]
+		},
+		{
+			"file": "scripts/stale-paths.mjs",
+			"replace": [
+				{
+					"from": "\"packages/canvas/styles/canvas.css\"",
+					"to": "\"canvas/styles/canvas.css\""
+				}
+			]
+		},
+		{
+			"file": "scripts/surface-gate.mjs",
+			"replace": [
+				{
+					"from": "join(ROOT, \"packages/canvas/styles\", f)",
+					"to": "join(ROOT, \"canvas/styles\", f)"
+				},
+				{
+					"from": "\"packages/canvas/styles/surface-hooks.json\"",
+					"to": "\"canvas/styles/surface-hooks.json\""
+				}
+			]
+		},
+		{
+			"file": "harness/page/styles/cascade-order.json",
+			"replace": [
+				{
+					"from": "\"packages/canvas/styles/",
+					"to": "\"canvas/styles/",
+					"count": 346
+				}
+			]
 		}
 	],
 	"keep": [

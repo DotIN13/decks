@@ -1,6 +1,6 @@
 # Step 4e-12-readmes: Regroup canvas: READMEs for render/, look/, documents/ and the whole folder
 
-Dry run on 74f4a73d, on top of 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome, 4e-11-host. Nothing was moved.
+Dry run on 222ed175, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome, 4e-11-host. Nothing was moved.
 
 - files moved by git mv: 0
 - files taken out of git (moved on disk): 0
@@ -23,6 +23,10 @@ Dry run on 74f4a73d, on top of 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-
 - canvas/README.md
 
 ## Warnings
+
+- none
+
+## Old paths in code lines (review each: list it in paths, keep it, or leave it with a reason)
 
 - none
 

@@ -1,6 +1,6 @@
 # Step 4e-03-view: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx
 
-Dry run on 74f4a73d, on top of 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera. Nothing was moved.
+Dry run on 222ed175, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
@@ -179,6 +179,10 @@ tools/checks/pictures/stage-shot.mjs:6
 - canvas/view/README.md
 
 ## Warnings
+
+- none
+
+## Old paths in code lines (review each: list it in paths, keep it, or leave it with a reason)
 
 - none
 

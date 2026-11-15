@@ -231,18 +231,28 @@ function tableEdits(table, current, write) {
 	for (const c of table.create || []) write(c.file, c.text);
 }
 
-/** Where each old path is still written after the move, by file, for a person to read. */
+/** Where each old path is still written after the move, by file: in code lines (to list or keep) and elsewhere. */
 function leftovers(table, files, current) {
-	const olds = [...new Set(table.moves.filter((m) => m.from.endsWith("/")).map((m) => m.from.split("/").slice(0, 2).join("/")))];
+	const units = [...new Set(table.moves.filter((m) => m.from.endsWith("/")).map((m) => m.from.split("/").slice(0, 2).join("/")))];
+	// A path joined from its parts names the folder too: join(root, "packages", "stage").
+	const olds = units.flatMap((u) => [u, u.split("/").map((part) => `"${part}"`).join(", ")]);
+	const kept = new Set((table.keep || []).map((k) => `${k.file}|${k.string}`));
 	const out = [];
+	const code = [];
 	for (const f of files) {
 		if (!MENTIONS.test(f) || skipped(f, table)) continue;
 		const text = current(f);
 		if (text == null) continue;
-		const n = olds.reduce((sum, o) => sum + (text.split(o).length - 1), 0);
-		if (n) out.push({ file: f, count: n });
+		text.split("\n").forEach((line, i) => {
+			const n = olds.reduce((sum, o) => sum + (line.split(o).length - 1), 0);
+			if (!n) return;
+			const inCode = SCANNED.test(f) && !f.endsWith(".json") ? commentStart(line) !== 0 : false;
+			if (inCode && !(table.keep || []).some((k) => k.file === f && line.includes(k.string)) && !kept.has(`${f}|${line.trim()}`)) code.push({ file: f, line: i + 1, text: line.trim().slice(0, 160) });
+			else out.push(f);
+		});
 	}
-	return out;
+	const counted = [...new Set(out)].map((file) => ({ file, count: out.filter((f) => f === file).length }));
+	return { other: counted, code };
 }
 
 /** The whole plan for one table over one repo ({ files, read }). */
@@ -280,7 +290,7 @@ export function plan(table, repo) {
 	};
 	const write = (f, text) => { if (text !== texts.get(f)) edits.set(f, text); else edits.delete(f); };
 	tableEdits(table, current, write);
-	return { moves, untrack: [...untracked].filter((f) => !removed.has(f)), remove: [...removed], newFiles, oldOf, edits, changes, warnings: base.warnings, leftovers: leftovers(table, [...newFiles], current) };
+	return { moves, untrack: [...untracked].filter((f) => !removed.has(f)), remove: [...removed], newFiles, oldOf, edits, changes, warnings: base.warnings, ...(() => { const l = leftovers(table, [...newFiles], current); return { leftovers: l.other, codeLeftovers: l.code }; })() };
 }
 
 /** The tree as it is after a plan, for planning the next step on top of it without moving anything. */

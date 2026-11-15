@@ -26,6 +26,7 @@ function main() {
 		writeFileSync(join(MOVES, `${step}.renames.json`), `${JSON.stringify(p.moves.map(([from, to]) => ({ from, to })), null, "\t")}\n`);
 		console.log(`${step}: ${p.moves.length} moves, ${p.remove.length} deleted, ${p.changes.length} lines rewritten, ${p.edits.size} files edited, ${p.warnings.length} warnings`);
 		for (const w of p.warnings) console.log(`  warning: ${w}`);
+		if (p.codeLeftovers.length) console.log(`  ${p.codeLeftovers.length} old paths in code lines to review (see ${step}.dry.txt)`);
 		repo = after(repo, p);
 		done.push(step);
 	}

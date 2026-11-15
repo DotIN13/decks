@@ -45,6 +45,8 @@ export function format(table, p, at) {
 	const other = [...p.edits.keys()].filter((f) => !rewritten.has(f));
 	out.push("", "## Files the table edits or creates", "", ...[...p.edits.keys()].filter((f) => other.includes(f)).map((f) => `- ${f}`), "");
 	out.push("## Warnings", "", ...(p.warnings.length ? p.warnings.map((w) => `- ${w}`) : ["- none"]), "");
+	out.push("## Old paths in code lines (review each: list it in paths, keep it, or leave it with a reason)", "");
+	out.push(...(p.codeLeftovers?.length ? p.codeLeftovers.map((c) => `- ${c.file}:${c.line}: ${c.text}`) : ["- none"]), "");
 	out.push("## Old paths still written (not rewritten: comments and docs)", "");
 	out.push(...(p.leftovers.length ? p.leftovers.map((l) => `- ${l.file}: ${l.count}`) : ["- none"]), "");
 	out.push("## Then run", "", ...(table.then || []).map((t) => `- ${t}`), "");

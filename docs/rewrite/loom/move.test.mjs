@@ -124,7 +124,7 @@ test("an import that pointed at nothing before is not warned about; one that bre
 
 test("old paths still written are listed, the README among them", () => {
 	const p = fixturePlan();
-	assert.deepEqual(p.leftovers.find((l) => l.file === "README.md"), { file: "README.md", count: 2 });
+	assert.deepEqual(p.leftovers.find((l) => l.file === "README.md"), { file: "README.md", count: 1 });
 });
 
 test("setJson keeps the file's indent and removes a value set to null", () => {

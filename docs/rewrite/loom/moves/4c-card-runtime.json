@@ -133,6 +133,10 @@
 				{
 					"from": "join(root, \"packages\", \"card-host\", \"lib\", \"live-doc.js\")",
 					"to": "join(root, \"canvas\", \"cards\", \"runtime\", \"lib\", \"live-doc.js\")"
+				},
+				{
+					"from": "console.log(\"[live-doc] packages/card-host/lib/live-doc.js\");",
+					"to": "console.log(\"[live-doc] canvas/cards/runtime/lib/live-doc.js\");"
 				}
 			]
 		},

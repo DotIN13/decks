@@ -1,11 +1,11 @@
 # Step 4a-canvas: canvas/: packages/canvas moved to the top, src/ flattened, nothing regrouped, the name @decks/canvas kept
 
-Dry run on 74f4a73d, on top of 3-engine. Nothing was moved.
+Dry run on 222ed175. Nothing was moved.
 
 - files moved by git mv: 196
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 14
+- files edited or created: 18
 - import lines rewritten: 16
 - warnings: 0
 
@@ -263,10 +263,18 @@ tools/checks/library/tile-pixels.mjs:5
 
 - canvas/styles/surface.css
 - server/pictures/ladder.test.ts
+- apps/web/scripts/gen-font-coverage.mjs
+- scripts/stale-paths.mjs
+- scripts/surface-gate.mjs
+- harness/page/styles/cascade-order.json
 - package.json
 - canvas/README.md
 
 ## Warnings
+
+- none
+
+## Old paths in code lines (review each: list it in paths, keep it, or leave it with a reason)
 
 - none
 
@@ -278,9 +286,6 @@ tools/checks/library/tile-pixels.mjs:5
 - docs/REORGANIZATION.md: 20
 - docs/STYLING.md: 1
 - harness/page/index.html: 1
-- harness/page/styles/cascade-order.json: 346
-- scripts/stale-paths.mjs: 1
-- scripts/surface-gate.mjs: 2
 
 ## Then run
 
