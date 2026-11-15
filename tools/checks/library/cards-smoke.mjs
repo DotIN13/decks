@@ -2,13 +2,13 @@
  * Cards on a real canvas, in the canvas frame: a canvas whose boards were turned into cards opens with
  * each near card in a shadow root, no iframe for them, the card's styles applied, and a card's script running.
  *
- * Run against a server holding the `*-cards` canvases (`~/decks-studio-demo/run-cards-test.sh`):
- * DECKS_E2E_WEB=http://127.0.0.1:4870 DECKS_E2E_API=http://127.0.0.1:4870 node e2e/checks/cards-smoke.mjs <canvas>
+ * By default on the fixture's own canvas of cards, auth-refresh; another canvas by name:
+ * node tools/checks/run.mjs cards-smoke, or node tools/checks/library/cards-smoke.mjs <canvas> against a running server.
  */
 import { chromium } from "playwright";
 import { API, WEB, asPerson, canvasFrame, say, failed } from "../harness.mjs";
 
-const canvas = process.argv[2] ?? "ep3-cards";
+const canvas = process.argv[2] ?? "auth-refresh";
 const call = async (verb, args = [], headers = {}) => {
 	const response = await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
 	return response.json();
