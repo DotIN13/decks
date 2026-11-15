@@ -16,8 +16,9 @@ holds the canvas page, settings, connections, panels and pages. Pane owns it; `c
 ## May import
 
 `@decks-next/protocol` and `@decks-next/sdk` by name; `@decks/ui`, `@decks/canvas`,
-`@decks/pen`, `@decks/ink`, `@decks/agent-ui` as libraries by name until they move; solid-js,
-lucide-solid, marked. Never `server/`, `apps/`, nor `@decks/protocol` or `@decks/api`.
+`@decks/pen`, `@decks/ink` as libraries by name until they move; solid-js, lucide-solid, marked.
+Never `server/`, `apps/`, nor the old `packages/protocol`, `packages/api`, `packages/sdk` or
+`packages/agent-ui`, whatever names they go by.
 
 ## Rules
 
