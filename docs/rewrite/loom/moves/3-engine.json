@@ -103,6 +103,16 @@
 					"to": "join(web, \"../../engine\")"
 				}
 			]
+		},
+		{
+			"file": "engine/crates/apple/tests/common/mod.rs",
+			"replace": [
+				{
+					"from": "\"{}/../../../../tools/fixtures/drawings/{name}.{ext}\"",
+					"to": "\"{}/../../../tools/fixtures/drawings/{name}.{ext}\""
+				}
+			],
+			"why": "the crate's own path to the repo's fixtures: one folder less to climb from engine/ than from packages/stage/"
 		}
 	],
 	"set": [
