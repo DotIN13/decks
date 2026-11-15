@@ -1,5 +1,6 @@
 import { any, arr, bool, int, lit, named, nul, num, obj, opt, rec, str, union } from "./schema.ts";
 import { Camera, Point } from "./shapes.ts";
+import { Envelope } from "./wire.ts";
 
 // What a server and Studio exchange. Neither trusts the other to name places
 // on its disk: canvas names and file paths are checked here, the same way.
@@ -48,7 +49,7 @@ export const Hello = named("Hello", obj({ user: obj({ id: str(), email: str(), n
 export const PresenceBy = named("PresenceBy", obj({ kind: lit("person", "agent"), id: str(), name: opt(str()), color: str(), harness: opt(str()) }));
 const presence = { canvas: str(), pointer: opt(union(Point, nul)), selection: opt(arr(str())), camera: opt(union(Camera, nul)), gone: opt(lit(true)) };
 
-/** What Studio's live socket sends, to browsers and servers alike. */
+/** What Studio's live socket sends, to browsers and servers alike; an ask relays a call to a machine. */
 export const LiveEvent = named(
 	"LiveEvent",
 	union(
@@ -60,11 +61,12 @@ export const LiveEvent = named(
 		obj({ type: lit("harnesses") }),
 		obj({ type: lit("presence"), by: PresenceBy, ...presence }),
 		obj({ type: lit("token.ask"), id: str(), user: obj({ id: str(), name: str() }), origin: str() }),
+		obj({ type: lit("ask"), id: str(), name: str(), args: rec(any()), caller: obj({ kind: lit("person"), id: str(), name: str() }) }),
 	),
 );
 export const TokenGiven = named("TokenGiven", obj({ type: lit("token"), id: str(), token: opt(str()), expires: opt(num()), error: opt(str()) }));
-/** What a server may send on its live socket. */
-export const ServerSend = named("ServerSend", union(TokenGiven, obj({ type: lit("presence"), by: PresenceBy, ...presence })));
+/** What a server may send on its live socket, a reply to Studio's ask included. */
+export const ServerSend = named("ServerSend", union(TokenGiven, obj({ type: lit("presence"), by: PresenceBy, ...presence }), obj({ type: lit("reply"), id: str(), envelope: Envelope })));
 
 /** The routes Studio offers a server, under /sync/v1, each on the server's key. */
 export const SYNC_ROUTES = {
