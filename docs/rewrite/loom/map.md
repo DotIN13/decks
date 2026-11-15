@@ -52,20 +52,20 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 |---|---|---|
 | `index.ts`, `types.ts`, `theme.ts`, `debug.ts` | the entry and shared types | `src/index.ts`, `src/types.ts`, `src/theme.ts`, `src/debug.ts` |
 | `entries/` | the package's other doors: camera, comments, tools, host | `src/public/*` |
-| `view/` | the canvas element: its layers and the selection | `src/stage/Stage.tsx` → `view/CanvasView.tsx`, `src/stage/items-layer.tsx`, `src/stage/selection.tsx` |
+| `view/` | the canvas element: its layers and the selection | `src/stage/Stage.tsx` → *view/CanvasView.tsx*, `src/stage/items-layer.tsx`, `src/stage/selection.tsx` |
 | `camera/` | where the canvas looks, glides, insets, landing, agents' views | `src/camera/*`; `stage-ops.ts` → `view-calls.ts` (and its test) |
-| `input/` | pointer, wheel, touch and keys, before they mean an edit | `src/stage/input.ts`, `src/edit/dom/pointer.ts`, `src/edit/dom/keys.ts`, `src/edit/dom/touch-rules.ts` (+test), `src/items/input.ts` → `input/item-keys.ts` |
+| `input/` | pointer, wheel, touch and keys, before they mean an edit | `src/stage/input.ts`, `src/edit/dom/pointer.ts`, `src/edit/dom/keys.ts`, `src/edit/dom/touch-rules.ts` (+test), `src/items/input.ts` → *input/item-keys.ts* |
 | `editor/` | the TypeScript editor: gestures, ops, overlays, text | `src/editor.tsx` → `editor/editor.tsx`; `src/edit/index.ts`, `held.ts`, `pen-tools.ts`, `snap.ts`, `scene-ts.ts` and tests → `editor/`; `src/edit/core/*` → `editor/core/*`; `src/edit/dom/{controller,effects,OverlayLayer,TextEditing,colours}` → `editor/dom/` |
 | `drawing/` | the drawing as the page holds it | `src/model/{drawing,boxes,bounds,layers,doc-index,comment-text}` (+tests) |
 | `items/` | what sits on the canvas and when it wakes | `src/items/{awake,item-slot,item-surfaces,MediaPlayer,missing,natural-size,news}` (+tests), `src/model/{file-drop,file-kinds}` (+test) |
 | `cards/` | cards: mounting, reading, pictures, the card editor | `src/items/{card,card-load,card-reading,card-snapshot,card-surface}` (+tests), `src/cards/CardEditor.tsx`, `src/model/{card-frame,card-syntax,markdown}` (+tests) |
 | `cards/runtime/` | what a card needs to run anywhere | `packages/card-host/src/*` → `cards/runtime/*`, its test; `lib/` (112 files) built, section 5 |
 | `documents/` | files you type into, drawn as pages | `packages/docs/src/page/*` → `documents/*`; `docs/src/client.ts`, `merge.ts` (+tests) → `documents/`; `docs/src/index.ts` → `documents/model.ts`; `docs/src/gdoc/{types,units}.ts` → `documents/google/` |
-| `ink/` | Pencil strokes: shaping, the ink layer, the tray keys | `packages/ink/src/ink.ts` (+test) → `ink/shaper.ts`; `src/ink/StageInk.tsx` → `ink/InkLayer.tsx`; `src/ink/{ink,ink-keys}.ts`; `src/model/ink.ts` → `ink/model.ts` |
+| `ink/` | Pencil strokes: shaping, the ink layer, the tray keys | `packages/ink/src/ink.ts` (+test) → *ink/shaper.ts*; `src/ink/StageInk.tsx` → *ink/InkLayer.tsx*; `src/ink/{ink,ink-keys}.ts`; `src/model/ink.ts` → `ink/model.ts` |
 | `render/` | the engine's page side and its worker | `src/render/*` (`engine.ts` keeps its role, split in section 2) |
 | `look/` | fonts, icons, code colours, maths, media | `src/look/*` |
 | `chrome/` | the canvas's own controls: properties, insert, pen bar | `src/ui/*` (Pane's lane today) |
-| `host/` | the canvas inside a frame, and the page that holds the frame | `src/host.ts`, `src/host-pass.test.ts`, `src/frame/protocol.ts` → `host/messages.ts`, `src/frame/chrome.ts`, `src/frame/inside/*` → `host/inside/`, `src/frame/outside/host.tsx` → `host/outside/framed-editor.tsx` |
+| `host/` | the canvas inside a frame, and the page that holds the frame | `src/host.ts`, `src/host-pass.test.ts`, `src/frame/protocol.ts` → *host/messages.ts*, `src/frame/chrome.ts`, `src/frame/inside/*` → `host/inside/`, `src/frame/outside/host.tsx` → *host/outside/framed-editor.tsx* |
 | `styles/` | the canvas surface sheets | `styles/*` (+ `ink.css`), `canvas.css` split by part (section 2) |
 | `scripts/` | `build-css.mjs` | `scripts/build-css.mjs` |
 
@@ -109,58 +109,58 @@ Where a file is a part of the page (a Solid component or a `create…` closure w
 
 | today (lines) | becomes |
 |---|---|
-| `render/engine.ts` (2480; one class `StageEngine` 2263) | `render/engine.ts` (the class, under 400: open, draw, dispose, delegating), `render/engine-doc.ts` (setDoc, laidOut, laidOutWhole, layout diffs), `render/engine-camera.ts` (setCamera, beginGlide, carry), `render/engine-tiles.ts` (takeTiles, drawUnguarded, withOutlines), `render/engine-cards.ts` (setCards, wantCardPictures, fitPictures, fetchPicture, showPreview), `render/engine-fonts.ts` (fetchFonts, font needs), `render/engine-hits.ts` (writeHits, pick), `render/engine-worker.ts` (receive, startWorker, readCompressed). The class becomes `CanvasEngine`. Not model/view/actions: no DOM of its own. |
-| `cards/CardEditor.tsx` (1469; `CardEditor` 1384) | `cards/editor/model.ts` (the block model: block, inline, outList, outBlock, splitAround, restyle, style, setBlock), `cards/editor/markup.ts` (out: blocks to HTML), `cards/editor/view.tsx` (the component and its bar: showBar, lineSlot), `cards/editor/actions.ts` (onInput, onPaste, onKeyDown, onPointerMove, endDrag) |
-| `chrome/Properties.tsx` (1248; `Properties` 891) | `chrome/properties/model.ts` (what the selection's fields read and set: setBox, align, distribute), `chrome/properties/view.tsx` (the panel, sections as small components: Layout, Fill, Stroke, Text, Effects), `chrome/properties/fields.tsx` (NumField, ColorField, Swatches), `chrome/properties/actions.ts` (each field's change into ops) |
-| `view/CanvasView.tsx` (937; `Stage` 758) | `view/model.ts` (StageProps → `CanvasViewProps`, derived state, coloursFor), `view/CanvasView.tsx` (markup and layers), `view/actions.ts` (the camera controller wiring `ctl`, input wiring), `view/editor-wiring.ts` (the 121-line `editor` block) |
+| `render/engine.ts` (2480; one class `StageEngine` 2263) | `render/engine.ts` (the class, under 400: open, draw, dispose, delegating), *render/engine-doc.ts* (setDoc, laidOut, laidOutWhole, layout diffs), *render/engine-camera.ts* (setCamera, beginGlide, carry), *render/engine-tiles.ts* (takeTiles, drawUnguarded, withOutlines), *render/engine-cards.ts* (setCards, wantCardPictures, fitPictures, fetchPicture, showPreview), *render/engine-fonts.ts* (fetchFonts, font needs), *render/engine-hits.ts* (writeHits, pick), *render/engine-worker.ts* (receive, startWorker, readCompressed). The class becomes `CanvasEngine`. Not model/view/actions: no DOM of its own. |
+| `cards/CardEditor.tsx` (1469; `CardEditor` 1384) | `cards/editor/model.ts` (the block model: block, inline, outList, outBlock, splitAround, restyle, style, setBlock), *cards/editor/markup.ts* (out: blocks to HTML), `cards/editor/view.tsx` (the component and its bar: showBar, lineSlot), `cards/editor/actions.ts` (onInput, onPaste, onKeyDown, onPointerMove, endDrag) |
+| `chrome/Properties.tsx` (1248; `Properties` 891) | `chrome/properties/model.ts` (what the selection's fields read and set: setBox, align, distribute), `chrome/properties/view.tsx` (the panel, sections as small components: Layout, Fill, Stroke, Text, Effects), *chrome/properties/fields.tsx* (NumField, ColorField, Swatches), `chrome/properties/actions.ts` (each field's change into ops) |
+| *view/CanvasView.tsx* (937; `Stage` 758) | `view/model.ts` (StageProps → `CanvasViewProps`, derived state, coloursFor), *view/CanvasView.tsx* (markup and layers), `view/actions.ts` (the camera controller wiring `ctl`, input wiring), *view/editor-wiring.ts* (the 121-line `editor` block) |
 | `input/pointer.ts` (899; `createPointer` 766) | `input/pointer/model.ts` (PageView, hit rules, tap-to-deselect rules), `input/pointer/actions.ts` (onPointerDown, follow, onHover, onDblClick), `input/pointer/touch.ts` (touchOnDrawing 120, split into its press, hold and drag), `input/pointer/index.ts` (`createPointer` assembling them) |
-| `cards/card.ts` (759; `mountCard` 152) | `cards/mount.ts` (mountCard, in three: load, run scripts, wire), `cards/sheet.ts` (cardSheet, clean, asDocument), `cards/parts.ts` (cardMath, cardMermaid, drawParts), `cards/imports.ts` (deckImports, giveDeckImports), `cards/context.ts` (CardContext, wordsSelectedInCards) |
+| `cards/card.ts` (759; `mountCard` 152) | *cards/mount.ts* (mountCard, in three: load, run scripts, wire), *cards/sheet.ts* (cardSheet, clean, asDocument), `cards/parts.ts` (cardMath, cardMermaid, drawParts), *cards/imports.ts* (deckImports, giveDeckImports), `cards/context.ts` (CardContext, wordsSelectedInCards) |
 | `view/items-layer.tsx` (753; `createItemsLayer` 704) | `items/layer/model.ts` (slots, rendered, liveFiles, playingBox), `items/layer/view.tsx` (pageNode, fileNodes, player), `items/layer/actions.ts` (mount and unmount on awake changes) |
-| `ink/InkLayer.tsx` (703; `StageInk` 668) | `ink/layer/model.ts` (the stroke in progress, paintInk's maths), `ink/layer/view.tsx`, `ink/layer/actions.ts` (onDown, onMove, onUp) |
-| `editor/core/gesture.ts` (693) | `editor/core/gesture.ts` (types, `step` under 80), `editor/core/gesture-carry.ts` (carry, moveCarry, releaseCarry), `editor/core/gesture-handle.ts` (pressHandle, move, release), `editor/core/gesture-press.ts` (pressCanvas) |
-| `input/canvas-input.ts` (from `stage/input.ts`, 686; `createStageInput` 619) | `input/keys-shortcuts.ts` (keydown, shortcut), `input/wheel.ts` (onWheel), `input/touch.ts` (touch, beginTouch, panFrom, KeptTouches), `input/index.ts` (`createCanvasInput` assembling them) |
-| `host/outside/framed-editor.tsx` (659; `createFramedEditor` 494) | `host/outside/model.ts` (FrameHostOptions, the handle's state), `host/outside/frame-life.ts` (startFrame, renew), `host/outside/wire.ts` (wire), `host/outside/in-step.ts` (keepInStep 108, in two), `host/outside/view.tsx` (surface) |
-| `drawing/drawing.ts` (575; `createDrawing` 358) | `drawing/drawing.ts` (Drawing, createDrawing assembling), `drawing/pages.ts` (pagesOf, pagesAhead, together, onTop), `drawing/edits.ts` (edit, step, flush), `drawing/receive.ts` (receive, follow) |
-| `editor/core/overlay.ts` (546) | `editor/core/overlay.ts` (Overlay, deriveOverlay), `editor/core/outlines.ts` (selectionOutlines, kinOutlines, hover), `editor/core/measure.ts` (measure) |
-| `camera/controller.ts` (489; `createCameraController` 450) | `camera/controller.ts` (assembling), `camera/controller-write.ts` (write, settled), `camera/controller-motion.ts` (coast, glideTo, wheel, scrolled) |
+| *ink/InkLayer.tsx* (703; `StageInk` 668) | `ink/layer/model.ts` (the stroke in progress, paintInk's maths), `ink/layer/view.tsx`, `ink/layer/actions.ts` (onDown, onMove, onUp) |
+| `editor/core/gesture.ts` (693) | `editor/core/gesture.ts` (types, `step` under 80), *editor/core/gesture-carry.ts* (carry, moveCarry, releaseCarry), *editor/core/gesture-handle.ts* (pressHandle, move, release), *editor/core/gesture-press.ts* (pressCanvas) |
+| *input/canvas-input.ts* (from `stage/input.ts`, 686; `createStageInput` 619) | *input/keys-shortcuts.ts* (keydown, shortcut), *input/wheel.ts* (onWheel), `input/touch.ts` (touch, beginTouch, panFrom, KeptTouches), `input/index.ts` (`createCanvasInput` assembling them) |
+| *host/outside/framed-editor.tsx* (659; `createFramedEditor` 494) | `host/outside/model.ts` (FrameHostOptions, the handle's state), *host/outside/frame-life.ts* (startFrame, renew), `host/outside/wire.ts` (wire), *host/outside/in-step.ts* (keepInStep 108, in two), `host/outside/view.tsx` (surface) |
+| `drawing/drawing.ts` (575; `createDrawing` 358) | `drawing/drawing.ts` (Drawing, createDrawing assembling), *drawing/pages.ts* (pagesOf, pagesAhead, together, onTop), *drawing/edits.ts* (edit, step, flush), *drawing/receive.ts* (receive, follow) |
+| `editor/core/overlay.ts` (546) | `editor/core/overlay.ts` (Overlay, deriveOverlay), *editor/core/outlines.ts* (selectionOutlines, kinOutlines, hover), `editor/core/measure.ts` (measure) |
+| `camera/controller.ts` (489; `createCameraController` 450) | `camera/controller.ts` (assembling), *camera/controller-write.ts* (write, settled), *camera/controller-motion.ts* (coast, glideTo, wheel, scrolled) |
 | `editor/dom/TextEditing.tsx` (482) | `editor/dom/text/model.ts` (createTextEditing's state), `editor/dom/text/view.tsx` (TextEditor), `editor/dom/text/actions.ts` |
 | `view/selection.tsx` (451; `createSelection` 389) | `view/selection/model.ts`, `view/selection/view.tsx` (pills 135, in two), `view/selection/actions.ts` |
-| `editor/dom/OverlayLayer.tsx` (430; one component 396) | `editor/dom/overlay/view.tsx` (markup), `editor/dom/overlay/model.ts` (what each outline, handle and guide draws), `editor/dom/overlay/handles.tsx` |
-| `styles/canvas.css` (1699) | one sheet per part, beside the part: `view/canvas.css`, `editor/dom/overlay.css`, `chrome/properties.css`, `chrome/menus.css`, `cards/card.css`, `items/items.css`, `host/frame.css`, kept under 400 each, same selectors, same `@layer decks.surface`; the layer order decides, not file order (rule 10). `cascade-order.json` is regenerated, not edited. |
+| `editor/dom/OverlayLayer.tsx` (430; one component 396) | `editor/dom/overlay/view.tsx` (markup), `editor/dom/overlay/model.ts` (what each outline, handle and guide draws), *editor/dom/overlay/handles.tsx* |
+| `styles/canvas.css` (1699) | one sheet per part, beside the part: `view/canvas.css`, *editor/dom/overlay.css*, `chrome/properties.css`, *chrome/menus.css*, `cards/card.css`, *items/items.css*, *host/frame.css*, kept under 400 each, same selectors, same `@layer decks.surface`; the layer order decides, not file order (rule 10). `cascade-order.json` is regenerated, not edited. |
 
 ### docs' page half
 
 | today (lines) | becomes |
 |---|---|
-| `documents/page.ts` (1750; `mountDocPage` 1270, `STYLE` 348) | `documents/page/model.ts` (state, updated, refresh), `documents/page/view.ts` (drawPages, drawChanges, drawComments, drawHistory, showPill), `documents/page/tools.ts` (buildTools, buildGoogleTools, gpressed), `documents/page/actions.ts` (openVersion, compiled, drawGit, drawGoogle, signInParts, stop), `documents/page/page.css` (the 348-line `STYLE` string, as a scoped sheet), `documents/page/icons.ts` (ICON) |
-| `documents/live.ts` (2052; `Builder` 792, `LiveEditor` 1078) | `documents/live/builder-inline.ts` (inlineMd, emphasis, inlineTex), `documents/live/builder-block.ts` (line, texLine, block, float, table), `documents/live/editor.ts` (LiveEditor's state and render), `documents/live/editor-input.ts` (beforeInput, enter, keydown, pressed, toggle, link), `documents/live/editor-blocks.ts` (setBlock, codeBlock, apply), `documents/live/editor-view.ts` (drawWidgets, highlight, offsetAt, pointAt, reveal) |
-| `documents/gview.ts` (2090; `GoogleView` 1694) | `documents/google/view.ts` (load, render, paginate, splitAt), `documents/google/paragraph.ts` (paragraph 87 in two, object, runsOf), `documents/google/geometry.ts` (indexAt, pointAt), `documents/google/edit.ts` (replace, join, input, copy, key, shortcut), `documents/google/history.ts` (apply, applyLocal, inverseOf, perform), `documents/google/units.ts` (Unit, buildUnits, applyText, cellStyle, numeral, shiftStep) |
+| `documents/page.ts` (1750; `mountDocPage` 1270, `STYLE` 348) | `documents/page/model.ts` (state, updated, refresh), `documents/page/view.ts` (drawPages, drawChanges, drawComments, drawHistory, showPill), `documents/page/tools.ts` (buildTools, buildGoogleTools, gpressed), `documents/page/actions.ts` (openVersion, compiled, drawGit, drawGoogle, signInParts, stop), *documents/page/page.css* (the 348-line `STYLE` string, as a scoped sheet), `documents/page/icons.ts` (ICON) |
+| `documents/live.ts` (2052; `Builder` 792, `LiveEditor` 1078) | *documents/live/builder-inline.ts* (inlineMd, emphasis, inlineTex), *documents/live/builder-block.ts* (line, texLine, block, float, table), *documents/live/editor.ts* (LiveEditor's state and render), *documents/live/editor-input.ts* (beforeInput, enter, keydown, pressed, toggle, link), *documents/live/editor-blocks.ts* (setBlock, codeBlock, apply), *documents/live/editor-view.ts* (drawWidgets, highlight, offsetAt, pointAt, reveal) |
+| `documents/gview.ts` (2090; `GoogleView` 1694) | `documents/google/view.ts` (load, render, paginate, splitAt), *documents/google/paragraph.ts* (paragraph 87 in two, object, runsOf), `documents/google/geometry.ts` (indexAt, pointAt), *documents/google/edit.ts* (replace, join, input, copy, key, shortcut), `documents/google/history.ts` (apply, applyLocal, inverseOf, perform), `documents/google/units.ts` (Unit, buildUnits, applyText, cellStyle, numeral, shiftStep) |
 
 ### pen, ui, ink
 
 | today (lines) | becomes |
 |---|---|
-| `pen/html.ts` (704; `Writer` 494) | `pen/html.ts` (toHtml, HtmlOptions), `pen/html-writer.ts` (Writer: element, place, layer), `pen/html-paint.ts` (outline, svgPaint, conic, gradients), `pen/html-tailwind.ts` (tailwindClass) |
-| `pen/layout.ts` (418; `layout` 212) | `pen/layout.ts` (layout, under 80, calling), `pen/layout-frame.ts` (frameContent and flex placement), `pen/layout-text.ts` (estimateText, text sizes) |
-| `ui/float/float.ts` (585; `makeFloat` 462) | `ui/float/float.ts` (makeFloat assembling), `ui/float/drag.ts` (onPointerDown, endDrag, onTabMove), `ui/float/place.ts` (settle, restore) |
-| `ui/float/float-math.ts` (402) | `ui/float/float-math.ts` (settle, avoid, toFraction), `ui/float/stowed.ts` (loadFloats, loadStowed) |
-| `ink/shaper.ts` (420; `inkShaper` 112) | `ink/shaper.ts` (inkShaper in two: grow, finish), `ink/outline.ts` (outline, simplify, inkBounds) |
+| `pen/html.ts` (704; `Writer` 494) | `pen/html.ts` (toHtml, HtmlOptions), *pen/html-writer.ts* (Writer: element, place, layer), *pen/html-paint.ts* (outline, svgPaint, conic, gradients), *pen/html-tailwind.ts* (tailwindClass) |
+| `pen/layout.ts` (418; `layout` 212) | `pen/layout.ts` (layout, under 80, calling), *pen/layout-frame.ts* (frameContent and flex placement), *pen/layout-text.ts* (estimateText, text sizes) |
+| `ui/float/float.ts` (585; `makeFloat` 462) | `ui/float/float.ts` (makeFloat assembling), *ui/float/drag.ts* (onPointerDown, endDrag, onTabMove), `ui/float/place.ts` (settle, restore) |
+| `ui/float/float-math.ts` (402) | `ui/float/float-math.ts` (settle, avoid, toFraction), *ui/float/stowed.ts* (loadFloats, loadStowed) |
+| *ink/shaper.ts* (420; `inkShaper` 112) | *ink/shaper.ts* (inkShaper in two: grow, finish), `ink/outline.ts` (outline, simplify, inkBounds) |
 
 ### engine (Rust; functions are not measured in Rust)
 
 | today (lines) | becomes |
 |---|---|
-| `crates/web/src/engine.rs` (2484, 97 fns) | `engine.rs` (Page, Camera), `page_edits.rs` (apply, undo, redo, apply_edits, reroute_after), `page_layout.rs` (lay_out, layout_json, layout_changes, root_json, card_json), `page_fonts.rs` (font_needs*), `page_pick.rs` (pick, pick_all, within, carried_frame), `pictures.rs` (Pictures), the rest by topic, each under 400 |
-| `crates/paint/src/painter.rs` (1173) | `painter.rs` (Context, paint_area, open, close), `paint_fill.rs` (fills_of, paint_of, color, fade), `paint_effects.rs` (shadows, inner_shadows, layer_blur, opacity), `paint_stroke.rs` (Stroke, stroke_of, dash_of, shape_stroke, path_ops), `paint_ink.rs` (LiveInk, paint_ink), `paint_marks.rs` (placeholder_mark, arrow_label, card_paper) |
-| `crates/web/src/bind.rs` (1136, 120 fns) | `bind.rs` (start, GpuHandle), `bind_page.rs` (PageEngine), `bind_render.rs` (the render worker's engine), `bind_io.rs` (copy_in*, reader, typesetter, parse_edits, ids, key) |
-| `crates/gpu/src/tests.rs` (650) | `tests/effects.rs`, `tests/words.rs`, `tests/goldens.rs`, `tests/bench.rs` |
-| `crates/doc/src/lib.rs` (599) | `lib.rs` (Document core), `node.rs` (Node, Handle), `json.rs` (from_json, to_json, node_json), `change.rs` (Change, Applied, DocError) |
-| `crates/shot/src/lib.rs` (578) | `lib.rs` (Request, Needs, Picture), `shooter.rs` (Shooter), `encode.rs` (unpremultiply, encode, request_of) |
-| `crates/text/src/card.rs` (544) | `card.rs` (layout, Card), `card_setter.rs` (Setter: para, place, stack, one), `card_table.rs` (table), `card_marks.rs` (Palette, ink, mark, alert, roman, marker) |
-| `crates/scene/src/lib.rs` (516) | `lib.rs` (Scene), `rect.rs` (Rect), `root.rs` (Root, Updated, Hit), `blur.rs` |
-| `crates/scene/src/layout.rs` (432) | `layout.rs` (Ctx, place, layout), `layout_size.rs` (sizing, size_of, text_size, Estimate) |
-| `crates/text/src/lib.rs` (431) | `lib.rs` (Text, Font, Span), `lay.rs` (lay, chain, style_key) |
-| `crates/gpu/src/lib.rs` (401) | `lib.rs` (Gpu, Api), `spares.rs` (warm, forget_to_spare, texture_from_spare, make_spares) |
+| `crates/web/src/engine.rs` (2484, 97 fns) | `engine.rs` (Page, Camera), *page_edits.rs* (apply, undo, redo, apply_edits, reroute_after), *page_layout.rs* (lay_out, layout_json, layout_changes, root_json, card_json), *page_fonts.rs* (font_needs*), *page_pick.rs* (pick, pick_all, within, carried_frame), *pictures.rs* (Pictures), the rest by topic, each under 400 |
+| `crates/paint/src/painter.rs` (1173) | `painter.rs` (Context, paint_area, open, close), *paint_fill.rs* (fills_of, paint_of, color, fade), *paint_effects.rs* (shadows, inner_shadows, layer_blur, opacity), *paint_stroke.rs* (Stroke, stroke_of, dash_of, shape_stroke, path_ops), *paint_ink.rs* (LiveInk, paint_ink), *paint_marks.rs* (placeholder_mark, arrow_label, card_paper) |
+| `crates/web/src/bind.rs` (1136, 120 fns) | `bind.rs` (start, GpuHandle), *bind_page.rs* (PageEngine), *bind_render.rs* (the render worker's engine), *bind_io.rs* (copy_in*, reader, typesetter, parse_edits, ids, key) |
+| `crates/gpu/src/tests.rs` (650) | *tests/effects.rs*, *tests/words.rs*, *tests/goldens.rs*, *tests/bench.rs* |
+| `crates/doc/src/lib.rs` (599) | `lib.rs` (Document core), *node.rs* (Node, Handle), *json.rs* (from_json, to_json, node_json), *change.rs* (Change, Applied, DocError) |
+| `crates/shot/src/lib.rs` (578) | `lib.rs` (Request, Needs, Picture), *shooter.rs* (Shooter), *encode.rs* (unpremultiply, encode, request_of) |
+| `crates/text/src/card.rs` (544) | `card.rs` (layout, Card), *card_setter.rs* (Setter: para, place, stack, one), *card_table.rs* (table), *card_marks.rs* (Palette, ink, mark, alert, roman, marker) |
+| `crates/scene/src/lib.rs` (516) | `lib.rs` (Scene), *rect.rs* (Rect), *root.rs* (Root, Updated, Hit), *blur.rs* |
+| `crates/scene/src/layout.rs` (432) | `layout.rs` (Ctx, place, layout), *layout_size.rs* (sizing, size_of, text_size, Estimate) |
+| `crates/text/src/lib.rs` (431) | `lib.rs` (Text, Font, Span), *lay.rs* (lay, chain, style_key) |
+| `crates/gpu/src/lib.rs` (401) | `lib.rs` (Gpu, Api), *spares.rs* (warm, forget_to_spare, texture_from_spare, make_spares) |
 
 `crates/apple` is Anvil's and not split by Loom. Rust splits are behaviour-neutral by construction
 (`cargo test` for the crate under the heavy lock, then the goldens check).
@@ -274,7 +274,7 @@ browser checks run through `node tools/checks/run.mjs <check>` under the lock, o
 | **Anvil** | works in `packages/stage/crates/apple`, `Cargo.toml`, `Cargo.lock` now | step 3 waits for Anvil to be between commits; its lane moves to `engine/crates/apple` with it |
 | **Pane** | owns `packages/canvas/src/ui/` in `lanes.json` today | the canvas chrome becomes `canvas/chrome/`, Loom's from step 4a; Pane told first |
 | e2e / browser checks | 10 checks read engine or canvas files by path (`backends-kit.mjs` copies `render/backends/notice.ts` word for word); 469 selectors use `.stage*` classes | the paths are rewritten where Warden moved the checks; **class names do not change** |
-| **built files in git** (rule 10) | `packages/stage/pkg/*`, `pkg-gl/*` (8, the wasm the canvas imports); `packages/card-host/lib/*` (112 tracked, 8 baselined today: d3, three katex files, four wasm; the gate does not yet see the others: `marked.umd.js`, `pdf*.mjs`, the bundles `hljs.bundle.mjs`, `mermaid.bundle.mjs`, `live-doc.js` (built by `scripts/live-doc.mjs`), pdf.js fonts and type files) | `engine/pkg*` built by `npm run build -w @decks/engine` (cargo and wasm-pack, heavy) and ignored; the vendored libraries in `lib/` copied from their npm packages at install by `canvas/cards/runtime/lib.mjs`, ignored; the bundles and `live-doc.js` built by a script under the lock; the runtime's own hand-written files (`card.js`, `card.css`, `theme.css`, `live-app.js`, `live-web.js`) are source and move to `canvas/cards/runtime/`, out of `lib/`. New npm dependencies (d3, katex, pdfjs-dist) need Mason's yes. |
+| **built files in git** (rule 10) | `packages/stage/pkg/*`, `pkg-gl/*` (8, the wasm the canvas imports); `packages/card-host/lib/*` (112 tracked, 8 baselined today: d3, three katex files, four wasm; the gate does not yet see the others: `marked.umd.js`, `pdf*.mjs`, the bundles *hljs.bundle.mjs*, *mermaid.bundle.mjs*, `live-doc.js` (built by `scripts/live-doc.mjs`), pdf.js fonts and type files) | `engine/pkg*` built by `npm run build -w @decks/engine` (cargo and wasm-pack, heavy) and ignored; the vendored libraries in `lib/` copied from their npm packages at install by `canvas/cards/runtime/lib.mjs`, ignored; the bundles and `live-doc.js` built by a script under the lock; the runtime's own hand-written files (`card.js`, `card.css`, `theme.css`, `live-app.js`, `live-web.js`) are source and move to `canvas/cards/runtime/`, out of `lib/`. New npm dependencies (d3, katex, pdfjs-dist) need Mason's yes. |
 | **names gate** | 2,953 baselined uses of `board` (1,860) and `stage` (1,093) in these packages, many in DOM class names (`.stage`, `.stage-fixed`, `.stage-ink`, 8 classes in 94 CSS lines) that the browser checks, Studio and cards select by | identifiers, file names and comments renamed in step 6; the eight class names stay, so the gate needs a rule for them (below) |
 | comments gate | 822 baselined: 556 comments over 5 lines, 266 em dashes | step 6: each long comment cut to its rule; the story to `docs/decisions/` only where it holds a reason not in the code |
 | state gate | 50 baselined top-level `let`s (canvas 33, stage's JS 13, ui 4) | step 6: each into a store owned by its part |
@@ -385,3 +385,26 @@ of docs excluded:
 
 Scripts used: `.scratch/Loom/{fns,imports,outline,inner}.mjs` (scratch, not committed): long functions,
 imports by package and folder, top-level outlines and inner function sizes of each long file.
+
+## 10. Ready for phase 2 (2026-11-14, after Mason's decisions in DESIGN.md section 11)
+
+- **The script**: `move.mjs` (the command), `plan.mjs` (the plan, pure), `apply.mjs` (git mv, carrying
+  untracked built files, writing and staging edits; never commits). Tests: `node --test
+  docs/rewrite/loom/move.test.mjs`, on the fixture tree in `moves/fixtures/`. A URL is rewritten only
+  when made from `import.meta.url`; a card's own address is left alone.
+- **The tables**: `moves/1-pen.json`, `2-ui.json`, `3-engine.json`, `4a-canvas.json`, each with its dry
+  run (`<step>.dry.md`) and the old-to-new list for Warden's re-key command (`<step>.renames.json`),
+  made on today's tree. At go time each is planned again on the tree as it then is (the switch-over
+  moves the checks), dry first, then `--go`.
+- **The tables' own fields**: `moves`, `skip` (folders the switch-over deletes, and Warden's and
+  Mason's own files), `specifiers` (package names), `mentions` (a folder's old path in strings and
+  comments of code), `untrack`, `ignore`, `paths` (a literal that must match a set number of times),
+  `set` (top-level JSON values), `workspaces`, `create` (READMEs from `moves/readmes/`), `then`.
+- **Step 4a also rewires the old types**, by hand, not by the table: Lexicon's protocol 0.19.0 names
+  them (`docs/rewrite/calls.md`, "The canvas library's old types"). `Page` takes a `box` and renamed
+  fields, `StageCall` becomes `ViewRequest`, `LineClientMessage` becomes `ClientMessage`,
+  `cardCalls(route)` becomes `callsFor("card")`, and the follower moves into the canvas's host. This
+  changes code in 37 files, so it is its own commit after the move, with the frame's browser checks.
+- **A clash for the switch-over**: `switch-plan.md` keeps `packages/protocol` (named
+  `@decks/protocol`) and also renames `@decks-next/protocol` to `@decks/protocol`. Two workspaces
+  cannot share a name; the kept one needs another name until step 4a (Warden's call).

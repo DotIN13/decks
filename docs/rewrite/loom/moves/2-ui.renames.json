@@ -1,0 +1,70 @@
+[
+	{
+		"from": "packages/ui/package.json",
+		"to": "ui/package.json"
+	},
+	{
+		"from": "packages/ui/src/Popover.tsx",
+		"to": "ui/Popover.tsx"
+	},
+	{
+		"from": "packages/ui/src/agent-marks.tsx",
+		"to": "ui/agent-marks.tsx"
+	},
+	{
+		"from": "packages/ui/src/css.ts",
+		"to": "ui/css.ts"
+	},
+	{
+		"from": "packages/ui/src/dismiss.ts",
+		"to": "ui/dismiss.ts"
+	},
+	{
+		"from": "packages/ui/src/float/float-math.test.ts",
+		"to": "ui/float/float-math.test.ts"
+	},
+	{
+		"from": "packages/ui/src/float/float-math.ts",
+		"to": "ui/float/float-math.ts"
+	},
+	{
+		"from": "packages/ui/src/float/float.ts",
+		"to": "ui/float/float.ts"
+	},
+	{
+		"from": "packages/ui/src/icons.tsx",
+		"to": "ui/icons.tsx"
+	},
+	{
+		"from": "packages/ui/src/index.ts",
+		"to": "ui/index.ts"
+	},
+	{
+		"from": "packages/ui/src/labels.ts",
+		"to": "ui/labels.ts"
+	},
+	{
+		"from": "packages/ui/src/portal.ts",
+		"to": "ui/portal.ts"
+	},
+	{
+		"from": "packages/ui/src/scribble.tsx",
+		"to": "ui/scribble.tsx"
+	},
+	{
+		"from": "packages/ui/src/time.test.ts",
+		"to": "ui/time.test.ts"
+	},
+	{
+		"from": "packages/ui/src/time.ts",
+		"to": "ui/time.ts"
+	},
+	{
+		"from": "packages/ui/src/velocity.ts",
+		"to": "ui/velocity.ts"
+	},
+	{
+		"from": "packages/ui/tsconfig.json",
+		"to": "ui/tsconfig.json"
+	}
+]

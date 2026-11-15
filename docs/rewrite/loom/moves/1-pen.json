@@ -1,0 +1,74 @@
+{
+	"step": "1-pen",
+	"title": "pen/: packages/pen moved to the top, src/ flattened, the name @decks/pen kept",
+	"moves": [
+		{
+			"from": "packages/pen/src/",
+			"to": "pen/"
+		},
+		{
+			"from": "packages/pen/",
+			"to": "pen/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/"
+	],
+	"mentions": [
+		[
+			"packages/pen/src/",
+			"pen/"
+		],
+		[
+			"packages/pen",
+			"pen"
+		]
+	],
+	"set": [
+		{
+			"file": "pen/tsconfig.json",
+			"values": {
+				"include": [
+					"**/*.ts"
+				]
+			}
+		},
+		{
+			"file": "pen/package.json",
+			"values": {
+				"scripts": {
+					"typecheck": "tsc -p tsconfig.json --noEmit",
+					"test": "node --import tsx --test \"*.test.ts\""
+				}
+			}
+		}
+	],
+	"workspaces": {
+		"add": [
+			"pen"
+		]
+	},
+	"create": [
+		{
+			"file": "pen/README.md",
+			"from": "readmes/pen.md"
+		}
+	],
+	"then": [
+		"node tools/heavy.mjs --wait -- npm install",
+		"Warden's adopt command for pen/ (its breaks under their new paths), with --renames 1-pen.renames.json",
+		"node tools/check.mjs pen && node tools/check.mjs server && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs stage-goldens, then stage-shot, then placeholder (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Move pen to the top folder pen/"
+	]
+}

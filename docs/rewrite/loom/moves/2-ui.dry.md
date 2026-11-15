@@ -1,0 +1,69 @@
+# Step 2-ui: ui/: packages/ui moved to the top, src/ flattened, the name @decks/ui kept
+
+Dry run on 111525a5. Nothing was moved.
+
+- files moved by git mv: 17
+- files taken out of git (moved on disk): 0
+- files edited or created: 5
+- import lines rewritten: 4
+- warnings: 0
+
+## Moved
+
+- packages/ui/package.json -> ui/package.json
+- packages/ui/src/Popover.tsx -> ui/Popover.tsx
+- packages/ui/src/agent-marks.tsx -> ui/agent-marks.tsx
+- packages/ui/src/css.ts -> ui/css.ts
+- packages/ui/src/dismiss.ts -> ui/dismiss.ts
+- packages/ui/src/float/float-math.test.ts -> ui/float/float-math.test.ts
+- packages/ui/src/float/float-math.ts -> ui/float/float-math.ts
+- packages/ui/src/float/float.ts -> ui/float/float.ts
+- packages/ui/src/icons.tsx -> ui/icons.tsx
+- packages/ui/src/index.ts -> ui/index.ts
+- packages/ui/src/labels.ts -> ui/labels.ts
+- packages/ui/src/portal.ts -> ui/portal.ts
+- packages/ui/src/scribble.tsx -> ui/scribble.tsx
+- packages/ui/src/time.test.ts -> ui/time.test.ts
+- packages/ui/src/time.ts -> ui/time.ts
+- packages/ui/src/velocity.ts -> ui/velocity.ts
+- packages/ui/tsconfig.json -> ui/tsconfig.json
+
+## Lines rewritten
+
+ui/package.json:8
+  - ".": "./src/index.ts",
+  + ".": "./index.ts",
+ui/package.json:9
+  - "./float": "./src/float/float.ts",
+  + "./float": "./float/float.ts",
+ui/package.json:10
+  - "./agent-marks": "./src/agent-marks.tsx"
+  + "./agent-marks": "./agent-marks.tsx"
+ui/tsconfig.json:2
+  - "extends": "../../tsconfig.base.json",
+  + "extends": "../tsconfig.base.json",
+
+## Files the table edits or creates
+
+- package.json
+- ui/README.md
+- ui/float/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- AGENTS.md: 1
+- docs/REORGANIZATION.md: 1
+- docs/STUDIO-MIGRATION.md: 1
+
+## Then run
+
+- node tools/heavy.mjs --wait -- npm install
+- Warden's adopt command for ui/, with --renames 2-ui.renames.json
+- node tools/check.mjs ui && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs chrome, then agent-rows, then walkthrough (one slot each)
+- commit with REWRITE_AGENT=Loom: Move ui to the top folder ui/

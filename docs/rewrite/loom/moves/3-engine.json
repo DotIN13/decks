@@ -1,0 +1,91 @@
+{
+	"step": "3-engine",
+	"title": "engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git",
+	"moves": [
+		{
+			"from": "packages/stage/",
+			"to": "engine/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/"
+	],
+	"specifiers": {
+		"@decks/stage": "@decks/engine"
+	},
+	"mentions": [
+		[
+			"packages/stage/",
+			"engine/"
+		],
+		[
+			"packages/stage",
+			"engine"
+		]
+	],
+	"untrack": [
+		"packages/stage/pkg/",
+		"packages/stage/pkg-gl/"
+	],
+	"ignore": [
+		{
+			"file": "engine/.gitignore",
+			"add": [
+				"pkg/",
+				"pkg-gl/"
+			]
+		}
+	],
+	"set": [
+		{
+			"file": "engine/package.json",
+			"values": {
+				"name": "@decks/engine"
+			}
+		}
+	],
+	"workspaces": {
+		"add": [
+			"engine"
+		]
+	},
+	"create": [
+		{
+			"file": "engine/README.md",
+			"from": "readmes/engine.md"
+		},
+		{
+			"file": "engine/crates/README.md",
+			"from": "readmes/engine-crates.md"
+		},
+		{
+			"file": "engine/demo/README.md",
+			"from": "readmes/engine-demo.md"
+		},
+		{
+			"file": "engine/fonts/README.md",
+			"from": "readmes/engine-fonts.md"
+		}
+	],
+	"then": [
+		"before: Anvil between commits, told its lane is now engine/crates/apple/, engine/Cargo.toml, engine/Cargo.lock",
+		"node tools/heavy.mjs --wait -- npm install",
+		"node tools/heavy.mjs --wait -- npm run build:wasm -w @decks/engine (pkg/ and pkg-gl/ from source, as a fresh checkout must)",
+		"Warden's adopt command for engine/, with --renames 3-engine.renames.json",
+		"node tools/check.mjs canvas (still packages/canvas) && node tools/check.mjs server",
+		"node tools/gates/run.mjs",
+		"node tools/heavy.mjs --wait -- cargo test --manifest-path engine/Cargo.toml",
+		"node tools/checks/run.mjs backends, tile-pixels, stage-goldens, layers-webkit (one slot each)",
+		"tell Slate (decks-ios: scripts/build-engine.sh, scripts/fetch-fonts.sh, DrawTests.swift) and Loft (decks-studio: page/package.json) the new path and name",
+		"commit with REWRITE_AGENT=Loom: Move the engine to engine/ as @decks/engine, built not kept"
+	]
+}

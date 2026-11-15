@@ -1,0 +1,80 @@
+{
+	"step": "fixture",
+	"title": "the fixture: lib flattened to lib/, eng renamed to engine/",
+	"moves": [
+		{
+			"from": "packages/lib/src/",
+			"to": "lib/"
+		},
+		{
+			"from": "packages/lib/",
+			"to": "lib/"
+		},
+		{
+			"from": "packages/eng/",
+			"to": "engine/"
+		}
+	],
+	"specifiers": {
+		"@x/eng": "@x/engine"
+	},
+	"untrack": [
+		"packages/eng/made/"
+	],
+	"paths": [
+		{
+			"file": "server/main.ts",
+			"replace": [
+				{
+					"from": "\"../engine/target/bin\"",
+					"to": "\"../engine/target/bin\""
+				}
+			]
+		}
+	],
+	"set": [
+		{
+			"file": "lib/tsconfig.json",
+			"values": {
+				"include": [
+					"**/*.ts"
+				]
+			}
+		},
+		{
+			"file": "engine/package.json",
+			"values": {
+				"name": "@x/engine"
+			}
+		}
+	],
+	"workspaces": {
+		"add": [
+			"lib",
+			"engine"
+		]
+	},
+	"ignore": [
+		{
+			"file": "engine/.gitignore",
+			"add": [
+				"made/"
+			]
+		}
+	],
+	"create": [
+		{
+			"file": "lib/README.md",
+			"from": "readme.md"
+		}
+	],
+	"then": [
+		"node --test"
+	],
+	"mentions": [
+		[
+			"packages/eng/",
+			"engine/"
+		]
+	]
+}

@@ -1,0 +1,118 @@
+[
+	{
+		"from": "packages/pen/package.json",
+		"to": "pen/package.json"
+	},
+	{
+		"from": "packages/pen/src/arrow-fixtures.test.ts",
+		"to": "pen/arrow-fixtures.test.ts"
+	},
+	{
+		"from": "packages/pen/src/arrows.ts",
+		"to": "pen/arrows.ts"
+	},
+	{
+		"from": "packages/pen/src/calls.test.ts",
+		"to": "pen/calls.test.ts"
+	},
+	{
+		"from": "packages/pen/src/clip.test.ts",
+		"to": "pen/clip.test.ts"
+	},
+	{
+		"from": "packages/pen/src/clip.ts",
+		"to": "pen/clip.ts"
+	},
+	{
+		"from": "packages/pen/src/colors.test.ts",
+		"to": "pen/colors.test.ts"
+	},
+	{
+		"from": "packages/pen/src/colors.ts",
+		"to": "pen/colors.ts"
+	},
+	{
+		"from": "packages/pen/src/diff.test.ts",
+		"to": "pen/diff.test.ts"
+	},
+	{
+		"from": "packages/pen/src/diff.ts",
+		"to": "pen/diff.ts"
+	},
+	{
+		"from": "packages/pen/src/doc.ts",
+		"to": "pen/doc.ts"
+	},
+	{
+		"from": "packages/pen/src/fields.test.ts",
+		"to": "pen/fields.test.ts"
+	},
+	{
+		"from": "packages/pen/src/fields.ts",
+		"to": "pen/fields.ts"
+	},
+	{
+		"from": "packages/pen/src/geometry.ts",
+		"to": "pen/geometry.ts"
+	},
+	{
+		"from": "packages/pen/src/html.test.ts",
+		"to": "pen/html.test.ts"
+	},
+	{
+		"from": "packages/pen/src/html.ts",
+		"to": "pen/html.ts"
+	},
+	{
+		"from": "packages/pen/src/index.ts",
+		"to": "pen/index.ts"
+	},
+	{
+		"from": "packages/pen/src/layout.ts",
+		"to": "pen/layout.ts"
+	},
+	{
+		"from": "packages/pen/src/ops.ts",
+		"to": "pen/ops.ts"
+	},
+	{
+		"from": "packages/pen/src/outline.ts",
+		"to": "pen/outline.ts"
+	},
+	{
+		"from": "packages/pen/src/pen.test.ts",
+		"to": "pen/pen.test.ts"
+	},
+	{
+		"from": "packages/pen/src/read.ts",
+		"to": "pen/read.ts"
+	},
+	{
+		"from": "packages/pen/src/refs.ts",
+		"to": "pen/refs.ts"
+	},
+	{
+		"from": "packages/pen/src/schema.test.ts",
+		"to": "pen/schema.test.ts"
+	},
+	{
+		"from": "packages/pen/src/shapes.test.ts",
+		"to": "pen/shapes.test.ts"
+	},
+	{
+		"from": "packages/pen/src/shapes.ts",
+		"to": "pen/shapes.ts"
+	},
+	{
+		"from": "packages/pen/src/types.ts",
+		"to": "pen/types.ts"
+	},
+	{
+		"from": "packages/pen/src/values.ts",
+		"to": "pen/values.ts"
+	},
+	{
+		"from": "packages/pen/tsconfig.json",
+		"to": "pen/tsconfig.json"
+	}
+]

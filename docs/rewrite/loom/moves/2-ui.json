@@ -1,0 +1,79 @@
+{
+	"step": "2-ui",
+	"title": "ui/: packages/ui moved to the top, src/ flattened, the name @decks/ui kept",
+	"moves": [
+		{
+			"from": "packages/ui/src/",
+			"to": "ui/"
+		},
+		{
+			"from": "packages/ui/",
+			"to": "ui/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/"
+	],
+	"mentions": [
+		[
+			"packages/ui/src/",
+			"ui/"
+		],
+		[
+			"packages/ui",
+			"ui"
+		]
+	],
+	"set": [
+		{
+			"file": "ui/tsconfig.json",
+			"values": {
+				"include": [
+					"**/*.ts",
+					"**/*.tsx"
+				]
+			}
+		},
+		{
+			"file": "ui/package.json",
+			"values": {
+				"scripts": {
+					"typecheck": "tsc -p tsconfig.json --noEmit",
+					"test": "node --import tsx --test \"*.test.ts\" \"float/*.test.ts\""
+				}
+			}
+		}
+	],
+	"workspaces": {
+		"add": [
+			"ui"
+		]
+	},
+	"create": [
+		{
+			"file": "ui/README.md",
+			"from": "readmes/ui.md"
+		},
+		{
+			"file": "ui/float/README.md",
+			"from": "readmes/ui-float.md"
+		}
+	],
+	"then": [
+		"node tools/heavy.mjs --wait -- npm install",
+		"Warden's adopt command for ui/, with --renames 2-ui.renames.json",
+		"node tools/check.mjs ui && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs chrome, then agent-rows, then walkthrough (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Move ui to the top folder ui/"
+	]
+}

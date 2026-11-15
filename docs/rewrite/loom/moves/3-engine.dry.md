@@ -1,0 +1,266 @@
+# Step 3-engine: engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git
+
+Dry run on 111525a5. Nothing was moved.
+
+- files moved by git mv: 112
+- files taken out of git (moved on disk): 8
+- files edited or created: 26
+- import lines rewritten: 31
+- warnings: 0
+
+## Taken out of git
+
+- packages/stage/pkg-gl/stage_web.d.ts
+- packages/stage/pkg-gl/stage_web.js
+- packages/stage/pkg-gl/stage_web_bg.wasm
+- packages/stage/pkg-gl/stage_web_bg.wasm.d.ts
+- packages/stage/pkg/stage_web.d.ts
+- packages/stage/pkg/stage_web.js
+- packages/stage/pkg/stage_web_bg.wasm
+- packages/stage/pkg/stage_web_bg.wasm.d.ts
+
+## Moved
+
+- packages/stage/.gitignore -> engine/.gitignore
+- packages/stage/Cargo.lock -> engine/Cargo.lock
+- packages/stage/Cargo.toml -> engine/Cargo.toml
+- packages/stage/build-web.sh -> engine/build-web.sh
+- packages/stage/crates/apple/Cargo.toml -> engine/crates/apple/Cargo.toml
+- packages/stage/crates/apple/README.md -> engine/crates/apple/README.md
+- packages/stage/crates/apple/goldens/arrows.png -> engine/crates/apple/goldens/arrows.png
+- packages/stage/crates/apple/goldens/arrows.view.json -> engine/crates/apple/goldens/arrows.view.json
+- packages/stage/crates/apple/goldens/flex-frames.png -> engine/crates/apple/goldens/flex-frames.png
+- packages/stage/crates/apple/goldens/flex-frames.view.json -> engine/crates/apple/goldens/flex-frames.view.json
+- packages/stage/crates/apple/goldens/nested-groups.png -> engine/crates/apple/goldens/nested-groups.png
+- packages/stage/crates/apple/goldens/nested-groups.view.json -> engine/crates/apple/goldens/nested-groups.view.json
+- packages/stage/crates/apple/goldens/notes-and-text.png -> engine/crates/apple/goldens/notes-and-text.png
+- packages/stage/crates/apple/goldens/notes-and-text.view.json -> engine/crates/apple/goldens/notes-and-text.view.json
+- packages/stage/crates/apple/goldens/refs.png -> engine/crates/apple/goldens/refs.png
+- packages/stage/crates/apple/goldens/refs.view.json -> engine/crates/apple/goldens/refs.view.json
+- packages/stage/crates/apple/goldens/themed.png -> engine/crates/apple/goldens/themed.png
+- packages/stage/crates/apple/goldens/themed.view.json -> engine/crates/apple/goldens/themed.view.json
+- packages/stage/crates/apple/include/decks_engine.h -> engine/crates/apple/include/decks_engine.h
+- packages/stage/crates/apple/src/device.rs -> engine/crates/apple/src/device.rs
+- packages/stage/crates/apple/src/engine.rs -> engine/crates/apple/src/engine.rs
+- packages/stage/crates/apple/src/ffi.rs -> engine/crates/apple/src/ffi.rs
+- packages/stage/crates/apple/src/frame.rs -> engine/crates/apple/src/frame.rs
+- packages/stage/crates/apple/src/gesture.rs -> engine/crates/apple/src/gesture.rs
+- packages/stage/crates/apple/src/lib.rs -> engine/crates/apple/src/lib.rs
+- packages/stage/crates/apple/tests/common/mod.rs -> engine/crates/apple/tests/common/mod.rs
+- packages/stage/crates/apple/tests/engine.rs -> engine/crates/apple/tests/engine.rs
+- packages/stage/crates/apple/tests/fixtures.rs -> engine/crates/apple/tests/fixtures.rs
+- packages/stage/crates/apple/tools/web-goldens.mjs -> engine/crates/apple/tools/web-goldens.mjs
+- packages/stage/crates/doc/Cargo.toml -> engine/crates/doc/Cargo.toml
+- packages/stage/crates/doc/src/edits.rs -> engine/crates/doc/src/edits.rs
+- packages/stage/crates/doc/src/frac.rs -> engine/crates/doc/src/frac.rs
+- packages/stage/crates/doc/src/lib.rs -> engine/crates/doc/src/lib.rs
+- packages/stage/crates/doc/src/tests.rs -> engine/crates/doc/src/tests.rs
+- packages/stage/crates/gpu/Cargo.toml -> engine/crates/gpu/Cargo.toml
+- packages/stage/crates/gpu/fixtures/herobrine.pen -> engine/crates/gpu/fixtures/herobrine.pen
+- packages/stage/crates/gpu/fixtures/rotary.pen -> engine/crates/gpu/fixtures/rotary.pen
+- packages/stage/crates/gpu/goldens/angular.png -> engine/crates/gpu/goldens/angular.png
+- packages/stage/crates/gpu/goldens/blur.png -> engine/crates/gpu/goldens/blur.png
+- packages/stage/crates/gpu/goldens/card.png -> engine/crates/gpu/goldens/card.png
+- packages/stage/crates/gpu/goldens/effects.png -> engine/crates/gpu/goldens/effects.png
+- packages/stage/crates/gpu/goldens/inner.png -> engine/crates/gpu/goldens/inner.png
+- packages/stage/crates/gpu/goldens/placeholder.png -> engine/crates/gpu/goldens/placeholder.png
+- packages/stage/crates/gpu/goldens/shapes.png -> engine/crates/gpu/goldens/shapes.png
+- packages/stage/crates/gpu/goldens/shot-herobrine.png -> engine/crates/gpu/goldens/shot-herobrine.png
+- packages/stage/crates/gpu/goldens/shot-rotary.png -> engine/crates/gpu/goldens/shot-rotary.png
+- packages/stage/crates/gpu/goldens/stage-herobrine.png -> engine/crates/gpu/goldens/stage-herobrine.png
+- packages/stage/crates/gpu/goldens/stage-rotary.png -> engine/crates/gpu/goldens/stage-rotary.png
+- packages/stage/crates/gpu/goldens/words.png -> engine/crates/gpu/goldens/words.png
+- packages/stage/crates/gpu/src/exec/draw.rs -> engine/crates/gpu/src/exec/draw.rs
+- packages/stage/crates/gpu/src/exec/mips.rs -> engine/crates/gpu/src/exec/mips.rs
+- packages/stage/crates/gpu/src/exec/mod.rs -> engine/crates/gpu/src/exec/mod.rs
+- packages/stage/crates/gpu/src/exec/pipelines.rs -> engine/crates/gpu/src/exec/pipelines.rs
+- packages/stage/crates/gpu/src/exec/resources.rs -> engine/crates/gpu/src/exec/resources.rs
+- packages/stage/crates/gpu/src/lib.rs -> engine/crates/gpu/src/lib.rs
+- packages/stage/crates/gpu/src/targets/mod.rs -> engine/crates/gpu/src/targets/mod.rs
+- packages/stage/crates/gpu/src/targets/native.rs -> engine/crates/gpu/src/targets/native.rs
+- packages/stage/crates/gpu/src/targets/webgl.rs -> engine/crates/gpu/src/targets/webgl.rs
+- packages/stage/crates/gpu/src/targets/webgpu.rs -> engine/crates/gpu/src/targets/webgpu.rs
+- packages/stage/crates/gpu/src/tests.rs -> engine/crates/gpu/src/tests.rs
+- packages/stage/crates/paint/Cargo.toml -> engine/crates/paint/Cargo.toml
+- packages/stage/crates/paint/src/backend.rs -> engine/crates/paint/src/backend.rs
+- packages/stage/crates/paint/src/fixtures.rs -> engine/crates/paint/src/fixtures.rs
+- packages/stage/crates/paint/src/lib.rs -> engine/crates/paint/src/lib.rs
+- packages/stage/crates/paint/src/list.rs -> engine/crates/paint/src/list.rs
+- packages/stage/crates/paint/src/mesh.rs -> engine/crates/paint/src/mesh.rs
+- packages/stage/crates/paint/src/overlay.rs -> engine/crates/paint/src/overlay.rs
+- packages/stage/crates/paint/src/painter.rs -> engine/crates/paint/src/painter.rs
+- packages/stage/crates/paint/src/tests.rs -> engine/crates/paint/src/tests.rs
+- packages/stage/crates/paint/src/tiles.rs -> engine/crates/paint/src/tiles.rs
+- packages/stage/crates/render/Cargo.toml -> engine/crates/render/Cargo.toml
+- packages/stage/crates/render/src/batch.rs -> engine/crates/render/src/batch.rs
+- packages/stage/crates/render/src/lib.rs -> engine/crates/render/src/lib.rs
+- packages/stage/crates/render/src/limits.rs -> engine/crates/render/src/limits.rs
+- packages/stage/crates/render/src/shaders.rs -> engine/crates/render/src/shaders.rs
+- packages/stage/crates/render/src/shaders/stage.wgsl -> engine/crates/render/src/shaders/stage.wgsl
+- packages/stage/crates/render/src/table.rs -> engine/crates/render/src/table.rs
+- packages/stage/crates/scene/Cargo.toml -> engine/crates/scene/Cargo.toml
+- packages/stage/crates/scene/fixtures/arrows.json -> engine/crates/scene/fixtures/arrows.json
+- packages/stage/crates/scene/src/arrows.rs -> engine/crates/scene/src/arrows.rs
+- packages/stage/crates/scene/src/geometry.rs -> engine/crates/scene/src/geometry.rs
+- packages/stage/crates/scene/src/index.rs -> engine/crates/scene/src/index.rs
+- packages/stage/crates/scene/src/layout.rs -> engine/crates/scene/src/layout.rs
+- packages/stage/crates/scene/src/lib.rs -> engine/crates/scene/src/lib.rs
+- packages/stage/crates/scene/src/tests.rs -> engine/crates/scene/src/tests.rs
+- packages/stage/crates/scene/src/tree.rs -> engine/crates/scene/src/tree.rs
+- packages/stage/crates/scene/src/values.rs -> engine/crates/scene/src/values.rs
+- packages/stage/crates/shot/Cargo.toml -> engine/crates/shot/Cargo.toml
+- packages/stage/crates/shot/src/lib.rs -> engine/crates/shot/src/lib.rs
+- packages/stage/crates/shot/src/main.rs -> engine/crates/shot/src/main.rs
+- packages/stage/crates/shot/src/tests.rs -> engine/crates/shot/src/tests.rs
+- packages/stage/crates/text/Cargo.toml -> engine/crates/text/Cargo.toml
+- packages/stage/crates/text/src/atlas.rs -> engine/crates/text/src/atlas.rs
+- packages/stage/crates/text/src/card.rs -> engine/crates/text/src/card.rs
+- packages/stage/crates/text/src/lib.rs -> engine/crates/text/src/lib.rs
+- packages/stage/crates/text/src/markdown.rs -> engine/crates/text/src/markdown.rs
+- packages/stage/crates/text/src/math.rs -> engine/crates/text/src/math.rs
+- packages/stage/crates/text/src/tests.rs -> engine/crates/text/src/tests.rs
+- packages/stage/crates/web/Cargo.toml -> engine/crates/web/Cargo.toml
+- packages/stage/crates/web/src/bind.rs -> engine/crates/web/src/bind.rs
+- packages/stage/crates/web/src/engine.rs -> engine/crates/web/src/engine.rs
+- packages/stage/crates/web/src/lib.rs -> engine/crates/web/src/lib.rs
+- packages/stage/crates/web/src/select.rs -> engine/crates/web/src/select.rs
+- packages/stage/crates/web/src/wire.rs -> engine/crates/web/src/wire.rs
+- packages/stage/demo/.gitignore -> engine/demo/.gitignore
+- packages/stage/demo/index.html -> engine/demo/index.html
+- packages/stage/demo/main.js -> engine/demo/main.js
+- packages/stage/demo/serve.mjs -> engine/demo/serve.mjs
+- packages/stage/demo/worker.js -> engine/demo/worker.js
+- packages/stage/fetch-fonts.mjs -> engine/fetch-fonts.mjs
+- packages/stage/fonts/.gitignore -> engine/fonts/.gitignore
+- packages/stage/package.json -> engine/package.json
+
+## Lines rewritten
+
+e2e/checks/placeholder.mjs:5
+  - * `packages/stage/crates/paint/src/painter.rs`).
+  + * `engine/crates/paint/src/painter.rs`).
+e2e/checks/stage-goldens.mjs:5
+  - * `packages/stage/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
+  + * `engine/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
+e2e/checks/stage-goldens.mjs:14
+  - // The fonts the fixtures set words in, fetched when missing (`packages/stage/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
+  + // The fonts the fixtures set words in, fetched when missing (`engine/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
+e2e/checks/stage-goldens.mjs:15
+  - const fonts = spawnSync(process.execPath, ["fetch-fonts.mjs"], { cwd: join(web, "../../packages/stage"), encoding: "utf8", timeout: 120000 });
+  + const fonts = spawnSync(process.execPath, ["fetch-fonts.mjs"], { cwd: join(web, "../../engine"), encoding: "utf8", timeout: 120000 });
+e2e/checks/stage-shot.mjs:231
+  - const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
+  + const nativeBuilt = existsSync(new URL("../../engine/target/release/stage-shot", import.meta.url));
+examples/share-site/vite.config.ts:9
+  - optimizeDeps: { exclude: ["@decks/stage", "@decks/canvas"] },
+  + optimizeDeps: { exclude: ["@decks/engine", "@decks/canvas"] },
+packages/canvas/package.json:30
+  - "@decks/stage": "*",
+  + "@decks/engine": "*",
+packages/canvas/src/edit/core/text.ts:66
+  - * How the engine sets an item's words (`packages/stage/crates/text`), for the editor that types
+  + * How the engine sets an item's words (`engine/crates/text`), for the editor that types
+packages/canvas/src/items/MediaPlayer.tsx:7
+  - * It draws exactly what the still drew (the engine's painter, `packages/stage/crates/paint`), from the same layout, and adds
+  + * It draws exactly what the still drew (the engine's painter, `engine/crates/paint`), from the same layout, and adds
+packages/canvas/src/look/look.ts:7
+  - * The engine draws the same (`packages/stage/crates/text/src/card.rs`).
+  + * The engine draws the same (`engine/crates/text/src/card.rs`).
+packages/canvas/src/look/math.ts:6
+  - * The engine finds the formulas in words itself (`packages/stage/crates/text/src/math.rs`, the same
+  + * The engine finds the formulas in words itself (`engine/crates/text/src/math.rs`, the same
+packages/canvas/src/look/media-look.ts:4
+  - * A media item is drawn twice: by the engine's worker as a still (`packages/stage/crates/paint`), and,
+  + * A media item is drawn twice: by the engine's worker as a still (`engine/crates/paint`), and,
+packages/canvas/src/model/markdown.ts:14
+  - * blocks and styled runs the engine lays out (`packages/stage/crates/text/src/card.rs`). Obsidian's own inline syntax
+  + * blocks and styled runs the engine lays out (`engine/crates/text/src/card.rs`). Obsidian's own inline syntax
+packages/canvas/src/render/backends/detect.ts:6
+  - * The answer also says which build to load: `@decks/stage` (`pkg/`) draws with WebGPU only, and
+  + * The answer also says which build to load: `@decks/engine` (`pkg/`) draws with WebGPU only, and
+packages/canvas/src/render/backends/detect.ts:7
+  - * `@decks/stage/gl` (`pkg-gl/`) with WebGL 2 as well, at about 680 KB more brotli wasm, so a
+  + * `@decks/engine/gl` (`pkg-gl/`) with WebGL 2 as well, at about 680 KB more brotli wasm, so a
+packages/canvas/src/render/backends/detect.ts:21
+  - export type StageModule = typeof import("@decks/stage");
+  + export type StageModule = typeof import("@decks/engine");
+packages/canvas/src/render/backends/detect.ts:50
+  - webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled)), watch: webgpu.watch },
+  + webgpu: { name: "webgpu", load: (compiled) => import("@decks/engine").then((module) => started(module, compiled)), watch: webgpu.watch },
+packages/canvas/src/render/backends/detect.ts:52
+  - webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
+  + webgl2: { name: "webgl2", load: (compiled) => import("@decks/engine/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
+packages/canvas/src/render/engine.ts:4
+  - * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
+  + * The stage's engine, on the page: the Rust page engine (`@decks/engine`) and its render worker.
+packages/canvas/src/render/engine.ts:15
+  - import type { PageEngine } from "@decks/stage";
+  + import type { PageEngine } from "@decks/engine";
+packages/canvas/src/render/render.worker.ts:2
+  - * The render worker: the Rust worker engine (`@decks/stage`), holding the same drawing as the page
+  + * The render worker: the Rust worker engine (`@decks/engine`), holding the same drawing as the page
+packages/canvas/src/render/render.worker.ts:7
+  - import type { WorkerEngine } from "@decks/stage";
+  + import type { WorkerEngine } from "@decks/engine";
+packages/canvas/styles/canvas.css:1052
+  - * (`packages/stage/crates/text/src/card.rs`) in CSS, so the words barely move when it opens. Sizes are in ems of the
+  + * (`engine/crates/text/src/card.rs`) in CSS, so the words barely move when it opens. Sizes are in ems of the
+packages/canvas/styles/canvas.css:1189
+  - /* A span's size and face, `[words]{.large .serif}`, as the engine draws them (`packages/stage/crates/text/src/card.rs`). */
+  + /* A span's size and face, `[words]{.large .serif}`, as the engine draws them (`engine/crates/text/src/card.rs`). */
+packages/canvas/styles/canvas.css:1199
+  - /* The same colours as the engine draws them in the dark (`packages/stage/crates/text/src/card.rs`). */
+  + /* The same colours as the engine draws them in the dark (`engine/crates/text/src/card.rs`). */
+packages/pen/src/arrow-fixtures.test.ts:9
+  - * The cases the stage engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
+  + * The cases the stage engine's Rust router is held to (`engine/crates/scene/src/arrows.rs`,
+packages/pen/src/arrow-fixtures.test.ts:14
+  - const FILE = fileURLToPath(new URL("../../stage/crates/scene/fixtures/arrows.json", import.meta.url));
+  + const FILE = fileURLToPath(new URL("../../../engine/crates/scene/fixtures/arrows.json", import.meta.url));
+engine/fetch-fonts.mjs:4
+  - * `fonts/`, from Fontsource's CDN: `npm run fonts -w packages/stage`.
+  + * `fonts/`, from Fontsource's CDN: `npm run fonts -w engine`.
+engine/package.json:2
+  - "name": "@decks/stage",
+  + "name": "@decks/engine",
+scripts/build-solid-lib.mjs:7
+  - * the engine still `import("@decks/stage")`, so a host's bundler sees what it would see in the
+  + * the engine still `import("@decks/engine")`, so a host's bundler sees what it would see in the
+server/pictures/native.ts:19
+  - const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/stage/target/release/stage-shot");
+  + const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../engine/target/release/stage-shot");
+
+## Files the table edits or creates
+
+- package.json
+- engine/.gitignore
+- engine/README.md
+- engine/crates/README.md
+- engine/demo/README.md
+- engine/fonts/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- AGENTS.md: 1
+- docs/DEPLOYMENT.md: 4
+- docs/DESIGN.md: 1
+- docs/REORGANIZATION.md: 2
+- e2e/KNOWN-FAILURES.md: 2
+- engine/crates/apple/README.md: 2
+
+## Then run
+
+- before: Anvil between commits, told its lane is now engine/crates/apple/, engine/Cargo.toml, engine/Cargo.lock
+- node tools/heavy.mjs --wait -- npm install
+- node tools/heavy.mjs --wait -- npm run build:wasm -w @decks/engine (pkg/ and pkg-gl/ from source, as a fresh checkout must)
+- Warden's adopt command for engine/, with --renames 3-engine.renames.json
+- node tools/check.mjs canvas (still packages/canvas) && node tools/check.mjs server
+- node tools/gates/run.mjs
+- node tools/heavy.mjs --wait -- cargo test --manifest-path engine/Cargo.toml
+- node tools/checks/run.mjs backends, tile-pixels, stage-goldens, layers-webkit (one slot each)
+- tell Slate (decks-ios: scripts/build-engine.sh, scripts/fetch-fonts.sh, DrawTests.swift) and Loft (decks-studio: page/package.json) the new path and name
+- commit with REWRITE_AGENT=Loom: Move the engine to engine/ as @decks/engine, built not kept

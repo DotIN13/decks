@@ -1,0 +1,4 @@
+{
+	"name": "@x/eng",
+	"exports": { ".": "./made/out.js", "./gl": "./made/out.js" }
+}

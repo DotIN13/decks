@@ -1,0 +1,450 @@
+[
+	{
+		"from": "packages/stage/.gitignore",
+		"to": "engine/.gitignore"
+	},
+	{
+		"from": "packages/stage/Cargo.lock",
+		"to": "engine/Cargo.lock"
+	},
+	{
+		"from": "packages/stage/Cargo.toml",
+		"to": "engine/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/build-web.sh",
+		"to": "engine/build-web.sh"
+	},
+	{
+		"from": "packages/stage/crates/apple/Cargo.toml",
+		"to": "engine/crates/apple/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/apple/README.md",
+		"to": "engine/crates/apple/README.md"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/arrows.png",
+		"to": "engine/crates/apple/goldens/arrows.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/arrows.view.json",
+		"to": "engine/crates/apple/goldens/arrows.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/flex-frames.png",
+		"to": "engine/crates/apple/goldens/flex-frames.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/flex-frames.view.json",
+		"to": "engine/crates/apple/goldens/flex-frames.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/nested-groups.png",
+		"to": "engine/crates/apple/goldens/nested-groups.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/nested-groups.view.json",
+		"to": "engine/crates/apple/goldens/nested-groups.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/notes-and-text.png",
+		"to": "engine/crates/apple/goldens/notes-and-text.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/notes-and-text.view.json",
+		"to": "engine/crates/apple/goldens/notes-and-text.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/refs.png",
+		"to": "engine/crates/apple/goldens/refs.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/refs.view.json",
+		"to": "engine/crates/apple/goldens/refs.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/themed.png",
+		"to": "engine/crates/apple/goldens/themed.png"
+	},
+	{
+		"from": "packages/stage/crates/apple/goldens/themed.view.json",
+		"to": "engine/crates/apple/goldens/themed.view.json"
+	},
+	{
+		"from": "packages/stage/crates/apple/include/decks_engine.h",
+		"to": "engine/crates/apple/include/decks_engine.h"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/device.rs",
+		"to": "engine/crates/apple/src/device.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/engine.rs",
+		"to": "engine/crates/apple/src/engine.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/ffi.rs",
+		"to": "engine/crates/apple/src/ffi.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/frame.rs",
+		"to": "engine/crates/apple/src/frame.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/gesture.rs",
+		"to": "engine/crates/apple/src/gesture.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/src/lib.rs",
+		"to": "engine/crates/apple/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/tests/common/mod.rs",
+		"to": "engine/crates/apple/tests/common/mod.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/tests/engine.rs",
+		"to": "engine/crates/apple/tests/engine.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/tests/fixtures.rs",
+		"to": "engine/crates/apple/tests/fixtures.rs"
+	},
+	{
+		"from": "packages/stage/crates/apple/tools/web-goldens.mjs",
+		"to": "engine/crates/apple/tools/web-goldens.mjs"
+	},
+	{
+		"from": "packages/stage/crates/doc/Cargo.toml",
+		"to": "engine/crates/doc/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/doc/src/edits.rs",
+		"to": "engine/crates/doc/src/edits.rs"
+	},
+	{
+		"from": "packages/stage/crates/doc/src/frac.rs",
+		"to": "engine/crates/doc/src/frac.rs"
+	},
+	{
+		"from": "packages/stage/crates/doc/src/lib.rs",
+		"to": "engine/crates/doc/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/doc/src/tests.rs",
+		"to": "engine/crates/doc/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/Cargo.toml",
+		"to": "engine/crates/gpu/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/gpu/fixtures/herobrine.pen",
+		"to": "engine/crates/gpu/fixtures/herobrine.pen"
+	},
+	{
+		"from": "packages/stage/crates/gpu/fixtures/rotary.pen",
+		"to": "engine/crates/gpu/fixtures/rotary.pen"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/angular.png",
+		"to": "engine/crates/gpu/goldens/angular.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/blur.png",
+		"to": "engine/crates/gpu/goldens/blur.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/card.png",
+		"to": "engine/crates/gpu/goldens/card.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/effects.png",
+		"to": "engine/crates/gpu/goldens/effects.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/inner.png",
+		"to": "engine/crates/gpu/goldens/inner.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/placeholder.png",
+		"to": "engine/crates/gpu/goldens/placeholder.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/shapes.png",
+		"to": "engine/crates/gpu/goldens/shapes.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/shot-herobrine.png",
+		"to": "engine/crates/gpu/goldens/shot-herobrine.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/shot-rotary.png",
+		"to": "engine/crates/gpu/goldens/shot-rotary.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/stage-herobrine.png",
+		"to": "engine/crates/gpu/goldens/stage-herobrine.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/stage-rotary.png",
+		"to": "engine/crates/gpu/goldens/stage-rotary.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/goldens/words.png",
+		"to": "engine/crates/gpu/goldens/words.png"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/exec/draw.rs",
+		"to": "engine/crates/gpu/src/exec/draw.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/exec/mips.rs",
+		"to": "engine/crates/gpu/src/exec/mips.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/exec/mod.rs",
+		"to": "engine/crates/gpu/src/exec/mod.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/exec/pipelines.rs",
+		"to": "engine/crates/gpu/src/exec/pipelines.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/exec/resources.rs",
+		"to": "engine/crates/gpu/src/exec/resources.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/lib.rs",
+		"to": "engine/crates/gpu/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/targets/mod.rs",
+		"to": "engine/crates/gpu/src/targets/mod.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/targets/native.rs",
+		"to": "engine/crates/gpu/src/targets/native.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/targets/webgl.rs",
+		"to": "engine/crates/gpu/src/targets/webgl.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/targets/webgpu.rs",
+		"to": "engine/crates/gpu/src/targets/webgpu.rs"
+	},
+	{
+		"from": "packages/stage/crates/gpu/src/tests.rs",
+		"to": "engine/crates/gpu/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/Cargo.toml",
+		"to": "engine/crates/paint/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/backend.rs",
+		"to": "engine/crates/paint/src/backend.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/fixtures.rs",
+		"to": "engine/crates/paint/src/fixtures.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/lib.rs",
+		"to": "engine/crates/paint/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/list.rs",
+		"to": "engine/crates/paint/src/list.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/mesh.rs",
+		"to": "engine/crates/paint/src/mesh.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/overlay.rs",
+		"to": "engine/crates/paint/src/overlay.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/painter.rs",
+		"to": "engine/crates/paint/src/painter.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/tests.rs",
+		"to": "engine/crates/paint/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/paint/src/tiles.rs",
+		"to": "engine/crates/paint/src/tiles.rs"
+	},
+	{
+		"from": "packages/stage/crates/render/Cargo.toml",
+		"to": "engine/crates/render/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/render/src/batch.rs",
+		"to": "engine/crates/render/src/batch.rs"
+	},
+	{
+		"from": "packages/stage/crates/render/src/lib.rs",
+		"to": "engine/crates/render/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/render/src/limits.rs",
+		"to": "engine/crates/render/src/limits.rs"
+	},
+	{
+		"from": "packages/stage/crates/render/src/shaders.rs",
+		"to": "engine/crates/render/src/shaders.rs"
+	},
+	{
+		"from": "packages/stage/crates/render/src/shaders/stage.wgsl",
+		"to": "engine/crates/render/src/shaders/stage.wgsl"
+	},
+	{
+		"from": "packages/stage/crates/render/src/table.rs",
+		"to": "engine/crates/render/src/table.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/Cargo.toml",
+		"to": "engine/crates/scene/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/scene/fixtures/arrows.json",
+		"to": "engine/crates/scene/fixtures/arrows.json"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/arrows.rs",
+		"to": "engine/crates/scene/src/arrows.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/geometry.rs",
+		"to": "engine/crates/scene/src/geometry.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/index.rs",
+		"to": "engine/crates/scene/src/index.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/layout.rs",
+		"to": "engine/crates/scene/src/layout.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/lib.rs",
+		"to": "engine/crates/scene/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/tests.rs",
+		"to": "engine/crates/scene/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/tree.rs",
+		"to": "engine/crates/scene/src/tree.rs"
+	},
+	{
+		"from": "packages/stage/crates/scene/src/values.rs",
+		"to": "engine/crates/scene/src/values.rs"
+	},
+	{
+		"from": "packages/stage/crates/shot/Cargo.toml",
+		"to": "engine/crates/shot/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/shot/src/lib.rs",
+		"to": "engine/crates/shot/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/shot/src/main.rs",
+		"to": "engine/crates/shot/src/main.rs"
+	},
+	{
+		"from": "packages/stage/crates/shot/src/tests.rs",
+		"to": "engine/crates/shot/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/Cargo.toml",
+		"to": "engine/crates/text/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/text/src/atlas.rs",
+		"to": "engine/crates/text/src/atlas.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/src/card.rs",
+		"to": "engine/crates/text/src/card.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/src/lib.rs",
+		"to": "engine/crates/text/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/src/markdown.rs",
+		"to": "engine/crates/text/src/markdown.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/src/math.rs",
+		"to": "engine/crates/text/src/math.rs"
+	},
+	{
+		"from": "packages/stage/crates/text/src/tests.rs",
+		"to": "engine/crates/text/src/tests.rs"
+	},
+	{
+		"from": "packages/stage/crates/web/Cargo.toml",
+		"to": "engine/crates/web/Cargo.toml"
+	},
+	{
+		"from": "packages/stage/crates/web/src/bind.rs",
+		"to": "engine/crates/web/src/bind.rs"
+	},
+	{
+		"from": "packages/stage/crates/web/src/engine.rs",
+		"to": "engine/crates/web/src/engine.rs"
+	},
+	{
+		"from": "packages/stage/crates/web/src/lib.rs",
+		"to": "engine/crates/web/src/lib.rs"
+	},
+	{
+		"from": "packages/stage/crates/web/src/select.rs",
+		"to": "engine/crates/web/src/select.rs"
+	},
+	{
+		"from": "packages/stage/crates/web/src/wire.rs",
+		"to": "engine/crates/web/src/wire.rs"
+	},
+	{
+		"from": "packages/stage/demo/.gitignore",
+		"to": "engine/demo/.gitignore"
+	},
+	{
+		"from": "packages/stage/demo/index.html",
+		"to": "engine/demo/index.html"
+	},
+	{
+		"from": "packages/stage/demo/main.js",
+		"to": "engine/demo/main.js"
+	},
+	{
+		"from": "packages/stage/demo/serve.mjs",
+		"to": "engine/demo/serve.mjs"
+	},
+	{
+		"from": "packages/stage/demo/worker.js",
+		"to": "engine/demo/worker.js"
+	},
+	{
+		"from": "packages/stage/fetch-fonts.mjs",
+		"to": "engine/fetch-fonts.mjs"
+	},
+	{
+		"from": "packages/stage/fonts/.gitignore",
+		"to": "engine/fonts/.gitignore"
+	},
+	{
+		"from": "packages/stage/package.json",
+		"to": "engine/package.json"
+	}
+]

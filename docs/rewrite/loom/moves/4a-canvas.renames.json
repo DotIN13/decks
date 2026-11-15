@@ -1,0 +1,782 @@
+[
+	{
+		"from": "packages/canvas/package.json",
+		"to": "canvas/package.json"
+	},
+	{
+		"from": "packages/canvas/scripts/build-css.mjs",
+		"to": "canvas/scripts/build-css.mjs"
+	},
+	{
+		"from": "packages/canvas/src/camera/agent-view.test.ts",
+		"to": "canvas/camera/agent-view.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/agent-view.ts",
+		"to": "canvas/camera/agent-view.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/agent-views.test.ts",
+		"to": "canvas/camera/agent-views.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/agent-views.ts",
+		"to": "canvas/camera/agent-views.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/camera.test.ts",
+		"to": "canvas/camera/camera.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/camera.ts",
+		"to": "canvas/camera/camera.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/controller.ts",
+		"to": "canvas/camera/controller.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/coords.ts",
+		"to": "canvas/camera/coords.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/glide.test.ts",
+		"to": "canvas/camera/glide.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/glide.ts",
+		"to": "canvas/camera/glide.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/insets.ts",
+		"to": "canvas/camera/insets.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/land.test.ts",
+		"to": "canvas/camera/land.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/land.ts",
+		"to": "canvas/camera/land.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/landing.test.ts",
+		"to": "canvas/camera/landing.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/landing.ts",
+		"to": "canvas/camera/landing.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/scroll-area.test.ts",
+		"to": "canvas/camera/scroll-area.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/scroll-area.ts",
+		"to": "canvas/camera/scroll-area.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/spring.ts",
+		"to": "canvas/camera/spring.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/stage-ops.test.ts",
+		"to": "canvas/camera/stage-ops.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/stage-ops.ts",
+		"to": "canvas/camera/stage-ops.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/touch.test.ts",
+		"to": "canvas/camera/touch.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/touch.ts",
+		"to": "canvas/camera/touch.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/touched.ts",
+		"to": "canvas/camera/touched.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/zoom-keys.test.ts",
+		"to": "canvas/camera/zoom-keys.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/camera/zoom-keys.ts",
+		"to": "canvas/camera/zoom-keys.ts"
+	},
+	{
+		"from": "packages/canvas/src/cards/CardEditor.tsx",
+		"to": "canvas/cards/CardEditor.tsx"
+	},
+	{
+		"from": "packages/canvas/src/debug.ts",
+		"to": "canvas/debug.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/arrows.test.ts",
+		"to": "canvas/edit/core/arrows.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/arrows.ts",
+		"to": "canvas/edit/core/arrows.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/dispatch.test.ts",
+		"to": "canvas/edit/core/dispatch.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/dispatch.ts",
+		"to": "canvas/edit/core/dispatch.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/drop.test.ts",
+		"to": "canvas/edit/core/drop.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/drop.ts",
+		"to": "canvas/edit/core/drop.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/fake-scene.test-helper.ts",
+		"to": "canvas/edit/core/fake-scene.test-helper.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/gesture.test.ts",
+		"to": "canvas/edit/core/gesture.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/gesture.ts",
+		"to": "canvas/edit/core/gesture.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/imports.test.ts",
+		"to": "canvas/edit/core/imports.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/insert.test.ts",
+		"to": "canvas/edit/core/insert.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/insert.ts",
+		"to": "canvas/edit/core/insert.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/keys.test.ts",
+		"to": "canvas/edit/core/keys.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/keys.ts",
+		"to": "canvas/edit/core/keys.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/model.ts",
+		"to": "canvas/edit/core/model.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/ops.test.ts",
+		"to": "canvas/edit/core/ops.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/ops.ts",
+		"to": "canvas/edit/core/ops.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/overlay-json.ts",
+		"to": "canvas/edit/core/overlay-json.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/overlay.test.ts",
+		"to": "canvas/edit/core/overlay.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/overlay.ts",
+		"to": "canvas/edit/core/overlay.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/pick.test.ts",
+		"to": "canvas/edit/core/pick.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/pick.ts",
+		"to": "canvas/edit/core/pick.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/resize.test.ts",
+		"to": "canvas/edit/core/resize.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/resize.ts",
+		"to": "canvas/edit/core/resize.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/scene.ts",
+		"to": "canvas/edit/core/scene.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/snapping.test.ts",
+		"to": "canvas/edit/core/snapping.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/snapping.ts",
+		"to": "canvas/edit/core/snapping.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/text.test.ts",
+		"to": "canvas/edit/core/text.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/core/text.ts",
+		"to": "canvas/edit/core/text.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/OverlayLayer.tsx",
+		"to": "canvas/edit/dom/OverlayLayer.tsx"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/TextEditing.tsx",
+		"to": "canvas/edit/dom/TextEditing.tsx"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/colours.ts",
+		"to": "canvas/edit/dom/colours.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/controller.ts",
+		"to": "canvas/edit/dom/controller.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/effects.ts",
+		"to": "canvas/edit/dom/effects.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/keys.ts",
+		"to": "canvas/edit/dom/keys.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/pointer.ts",
+		"to": "canvas/edit/dom/pointer.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/touch-rules.test.ts",
+		"to": "canvas/edit/dom/touch-rules.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/dom/touch-rules.ts",
+		"to": "canvas/edit/dom/touch-rules.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/held.ts",
+		"to": "canvas/edit/held.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/index.ts",
+		"to": "canvas/edit/index.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/ops-constants.test.ts",
+		"to": "canvas/edit/ops-constants.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/pen-tools.test.ts",
+		"to": "canvas/edit/pen-tools.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/pen-tools.ts",
+		"to": "canvas/edit/pen-tools.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/scene-ts.ts",
+		"to": "canvas/edit/scene-ts.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/snap.test.ts",
+		"to": "canvas/edit/snap.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/edit/snap.ts",
+		"to": "canvas/edit/snap.ts"
+	},
+	{
+		"from": "packages/canvas/src/editor.tsx",
+		"to": "canvas/editor.tsx"
+	},
+	{
+		"from": "packages/canvas/src/frame/chrome.ts",
+		"to": "canvas/frame/chrome.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/backend.ts",
+		"to": "canvas/frame/inside/backend.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/boot.ts",
+		"to": "canvas/frame/inside/boot.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/card-calls.ts",
+		"to": "canvas/frame/inside/card-calls.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/clipboard.ts",
+		"to": "canvas/frame/inside/clipboard.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/events.ts",
+		"to": "canvas/frame/inside/events.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/frame.tsx",
+		"to": "canvas/frame/inside/frame.tsx"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/life.ts",
+		"to": "canvas/frame/inside/life.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/line.ts",
+		"to": "canvas/frame/inside/line.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/marks.test.ts",
+		"to": "canvas/frame/inside/marks.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/marks.ts",
+		"to": "canvas/frame/inside/marks.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/options.ts",
+		"to": "canvas/frame/inside/options.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/presence.ts",
+		"to": "canvas/frame/inside/presence.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/inside/studio-line.ts",
+		"to": "canvas/frame/inside/studio-line.ts"
+	},
+	{
+		"from": "packages/canvas/src/frame/outside/host.tsx",
+		"to": "canvas/frame/outside/host.tsx"
+	},
+	{
+		"from": "packages/canvas/src/frame/protocol.ts",
+		"to": "canvas/frame/protocol.ts"
+	},
+	{
+		"from": "packages/canvas/src/host-pass.test.ts",
+		"to": "canvas/host-pass.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/host.ts",
+		"to": "canvas/host.ts"
+	},
+	{
+		"from": "packages/canvas/src/index.ts",
+		"to": "canvas/index.ts"
+	},
+	{
+		"from": "packages/canvas/src/ink/StageInk.tsx",
+		"to": "canvas/ink/StageInk.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ink/ink-keys.test.ts",
+		"to": "canvas/ink/ink-keys.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/ink/ink-keys.ts",
+		"to": "canvas/ink/ink-keys.ts"
+	},
+	{
+		"from": "packages/canvas/src/ink/ink.ts",
+		"to": "canvas/ink/ink.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/MediaPlayer.tsx",
+		"to": "canvas/items/MediaPlayer.tsx"
+	},
+	{
+		"from": "packages/canvas/src/items/awake.test.ts",
+		"to": "canvas/items/awake.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/awake.ts",
+		"to": "canvas/items/awake.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-load.test.ts",
+		"to": "canvas/items/card-load.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-load.ts",
+		"to": "canvas/items/card-load.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-reading.ts",
+		"to": "canvas/items/card-reading.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-snapshot.test.ts",
+		"to": "canvas/items/card-snapshot.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-snapshot.ts",
+		"to": "canvas/items/card-snapshot.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/card-surface.tsx",
+		"to": "canvas/items/card-surface.tsx"
+	},
+	{
+		"from": "packages/canvas/src/items/card.ts",
+		"to": "canvas/items/card.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/input.ts",
+		"to": "canvas/items/input.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/item-slot.tsx",
+		"to": "canvas/items/item-slot.tsx"
+	},
+	{
+		"from": "packages/canvas/src/items/item-surfaces.tsx",
+		"to": "canvas/items/item-surfaces.tsx"
+	},
+	{
+		"from": "packages/canvas/src/items/missing.ts",
+		"to": "canvas/items/missing.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/natural-size.ts",
+		"to": "canvas/items/natural-size.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/news.test.ts",
+		"to": "canvas/items/news.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/items/news.ts",
+		"to": "canvas/items/news.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/font-coverage.ts",
+		"to": "canvas/look/font-coverage.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/font-files.ts",
+		"to": "canvas/look/font-files.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/highlight.ts",
+		"to": "canvas/look/highlight.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/icon-index.test.ts",
+		"to": "canvas/look/icon-index.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/icon-index.ts",
+		"to": "canvas/look/icon-index.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/icons.ts",
+		"to": "canvas/look/icons.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/look.ts",
+		"to": "canvas/look/look.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/math.test.ts",
+		"to": "canvas/look/math.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/math.ts",
+		"to": "canvas/look/math.ts"
+	},
+	{
+		"from": "packages/canvas/src/look/media-look.ts",
+		"to": "canvas/look/media-look.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/bounds.test.ts",
+		"to": "canvas/model/bounds.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/bounds.ts",
+		"to": "canvas/model/bounds.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/boxes.ts",
+		"to": "canvas/model/boxes.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/card-frame.test.ts",
+		"to": "canvas/model/card-frame.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/card-frame.ts",
+		"to": "canvas/model/card-frame.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/card-syntax.ts",
+		"to": "canvas/model/card-syntax.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/comment-text.ts",
+		"to": "canvas/model/comment-text.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/doc-index.ts",
+		"to": "canvas/model/doc-index.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/drawing.test.ts",
+		"to": "canvas/model/drawing.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/drawing.ts",
+		"to": "canvas/model/drawing.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/file-drop.test.ts",
+		"to": "canvas/model/file-drop.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/file-drop.ts",
+		"to": "canvas/model/file-drop.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/file-kinds.ts",
+		"to": "canvas/model/file-kinds.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/ink.test.ts",
+		"to": "canvas/model/ink.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/ink.ts",
+		"to": "canvas/model/ink.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/layers.test.ts",
+		"to": "canvas/model/layers.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/layers.ts",
+		"to": "canvas/model/layers.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/markdown.test.ts",
+		"to": "canvas/model/markdown.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/model/markdown.ts",
+		"to": "canvas/model/markdown.ts"
+	},
+	{
+		"from": "packages/canvas/src/public/camera.ts",
+		"to": "canvas/public/camera.ts"
+	},
+	{
+		"from": "packages/canvas/src/public/comments.ts",
+		"to": "canvas/public/comments.ts"
+	},
+	{
+		"from": "packages/canvas/src/public/host.ts",
+		"to": "canvas/public/host.ts"
+	},
+	{
+		"from": "packages/canvas/src/public/tools.ts",
+		"to": "canvas/public/tools.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/backends/detect.ts",
+		"to": "canvas/render/backends/detect.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/backends/notice.ts",
+		"to": "canvas/render/backends/notice.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/backends/webgl.ts",
+		"to": "canvas/render/backends/webgl.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/backends/webgpu.ts",
+		"to": "canvas/render/backends/webgpu.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/device.test.ts",
+		"to": "canvas/render/device.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/device.ts",
+		"to": "canvas/render/device.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/engine.ts",
+		"to": "canvas/render/engine.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/measure.ts",
+		"to": "canvas/render/measure.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/picture-ladder.test.ts",
+		"to": "canvas/render/picture-ladder.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/picture-ladder.ts",
+		"to": "canvas/render/picture-ladder.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/reader.ts",
+		"to": "canvas/render/reader.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/recovery.test.ts",
+		"to": "canvas/render/recovery.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/recovery.ts",
+		"to": "canvas/render/recovery.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/render.worker.ts",
+		"to": "canvas/render/render.worker.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/spatial.test.ts",
+		"to": "canvas/render/spatial.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/spatial.ts",
+		"to": "canvas/render/spatial.ts"
+	},
+	{
+		"from": "packages/canvas/src/render/types.ts",
+		"to": "canvas/render/types.ts"
+	},
+	{
+		"from": "packages/canvas/src/stage/Stage.tsx",
+		"to": "canvas/stage/Stage.tsx"
+	},
+	{
+		"from": "packages/canvas/src/stage/input.ts",
+		"to": "canvas/stage/input.ts"
+	},
+	{
+		"from": "packages/canvas/src/stage/items-layer.tsx",
+		"to": "canvas/stage/items-layer.tsx"
+	},
+	{
+		"from": "packages/canvas/src/stage/selection.tsx",
+		"to": "canvas/stage/selection.tsx"
+	},
+	{
+		"from": "packages/canvas/src/theme.ts",
+		"to": "canvas/theme.ts"
+	},
+	{
+		"from": "packages/canvas/src/types.ts",
+		"to": "canvas/types.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/AgentCursor.tsx",
+		"to": "canvas/ui/AgentCursor.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/Callout.tsx",
+		"to": "canvas/ui/Callout.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/ColorPicker.tsx",
+		"to": "canvas/ui/ColorPicker.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/HoldMenu.tsx",
+		"to": "canvas/ui/HoldMenu.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/InkBar.tsx",
+		"to": "canvas/ui/InkBar.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/Insert.tsx",
+		"to": "canvas/ui/Insert.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/InsertMenu.tsx",
+		"to": "canvas/ui/InsertMenu.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/PenBar.tsx",
+		"to": "canvas/ui/PenBar.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/Properties.tsx",
+		"to": "canvas/ui/Properties.tsx"
+	},
+	{
+		"from": "packages/canvas/src/ui/adaptive.test.ts",
+		"to": "canvas/ui/adaptive.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/adaptive.ts",
+		"to": "canvas/ui/adaptive.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/keycaps.test.ts",
+		"to": "canvas/ui/keycaps.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/keycaps.ts",
+		"to": "canvas/ui/keycaps.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/menu-place.test.ts",
+		"to": "canvas/ui/menu-place.test.ts"
+	},
+	{
+		"from": "packages/canvas/src/ui/menu-place.ts",
+		"to": "canvas/ui/menu-place.ts"
+	},
+	{
+		"from": "packages/canvas/styles/canvas.css",
+		"to": "canvas/styles/canvas.css"
+	},
+	{
+		"from": "packages/canvas/styles/host.css",
+		"to": "canvas/styles/host.css"
+	},
+	{
+		"from": "packages/canvas/styles/ink.css",
+		"to": "canvas/styles/ink.css"
+	},
+	{
+		"from": "packages/canvas/styles/marks.css",
+		"to": "canvas/styles/marks.css"
+	},
+	{
+		"from": "packages/canvas/styles/surface-hooks.json",
+		"to": "canvas/styles/surface-hooks.json"
+	},
+	{
+		"from": "packages/canvas/styles/surface-tokens.css",
+		"to": "canvas/styles/surface-tokens.css"
+	},
+	{
+		"from": "packages/canvas/styles/surface.css",
+		"to": "canvas/styles/surface.css"
+	},
+	{
+		"from": "packages/canvas/tsconfig.json",
+		"to": "canvas/tsconfig.json"
+	}
+]

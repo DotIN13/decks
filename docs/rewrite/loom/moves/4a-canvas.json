@@ -1,0 +1,87 @@
+{
+	"step": "4a-canvas",
+	"title": "canvas/: packages/canvas moved to the top, src/ flattened, nothing regrouped, the name @decks/canvas kept",
+	"moves": [
+		{
+			"from": "packages/canvas/src/",
+			"to": "canvas/"
+		},
+		{
+			"from": "packages/canvas/",
+			"to": "canvas/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/"
+	],
+	"mentions": [
+		[
+			"packages/canvas/src/",
+			"canvas/"
+		],
+		[
+			"packages/canvas",
+			"canvas"
+		]
+	],
+	"set": [
+		{
+			"file": "canvas/tsconfig.json",
+			"values": {
+				"include": [
+					"**/*.ts",
+					"**/*.tsx"
+				],
+				"exclude": [
+					"node_modules",
+					"dist"
+				]
+			}
+		},
+		{
+			"file": "canvas/package.json",
+			"values": {
+				"scripts": {
+					"typecheck": "tsc -p tsconfig.json --noEmit",
+					"test": "node --import tsx --test \"*.test.ts\" \"camera/**/*.test.ts\" \"edit/**/*.test.ts\" \"frame/**/*.test.ts\" \"ink/**/*.test.ts\" \"items/**/*.test.ts\" \"look/**/*.test.ts\" \"model/**/*.test.ts\" \"render/**/*.test.ts\" \"ui/**/*.test.ts\"",
+					"build:css": "node scripts/build-css.mjs",
+					"build:lib": "node ../scripts/build-solid-lib.mjs ."
+				},
+				"files": null
+			}
+		}
+	],
+	"workspaces": {
+		"add": [
+			"canvas"
+		]
+	},
+	"create": [
+		{
+			"file": "canvas/README.md",
+			"from": "readmes/canvas.md"
+		}
+	],
+	"then": [
+		"before: the last four browser checks fixed and committed by the three agents in packages/canvas; Pane told canvas/ui/ is Loom's now",
+		"node tools/heavy.mjs --wait -- npm install",
+		"npm run css:order (or Warden's successor in tools/): regenerates harness/page/styles/cascade-order.json, whose keys name the sheets by path",
+		"build:lib's ../scripts/build-solid-lib.mjs: point at its home in tools/ if Warden moved it",
+		"Warden's adopt command for canvas/ (subfolder READMEs come at step 4e), with --renames 4a-canvas.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness && node tools/check.mjs server",
+		"node tools/gates/run.mjs",
+		"node tools/heavy.mjs --wait -- node server/frame/build.mjs (the frame page is built from the canvas library)",
+		"all 76 browser checks once, through node tools/checks/run.mjs, one slot per run",
+		"tell Loft: decks-studio's page/package.json file: path is now ../../decks-dev/canvas",
+		"commit with REWRITE_AGENT=Loom: Move the canvas library to the top folder canvas/"
+	]
+}

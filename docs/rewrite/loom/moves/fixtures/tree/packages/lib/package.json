@@ -1,0 +1,6 @@
+{
+	"name": "@x/lib",
+	"exports": { ".": "./src/index.ts", "./extra": "./src/extra.ts", "./src/index.ts": "./keep.ts" },
+	"scripts": { "test": "node --test ./src/x.test.ts" },
+	"dependencies": { "@x/eng": "*" }
+}
