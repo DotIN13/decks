@@ -17,6 +17,7 @@ test("the dev server's paths go to Decks-local; the page's own are served", () =
 function upstream() {
 	const server = createServer((req, res) => res.end(`up ${req.method} ${req.url}`));
 	server.on("upgrade", (req, socket) => {
+		server.sockets = [...(server.sockets ?? []), socket];
 		const accept = createHash("sha1").update(`${req.headers["sec-websocket-key"]}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest("base64");
 		socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
 		socket.write(Buffer.from([0x81, 2, 0x68, 0x69])); // "hi"
@@ -45,6 +46,10 @@ test("the built page is served with the token, and HTTP and sockets reach Decks-
 		ws.onerror = fail;
 	});
 	assert.equal(said, "hi");
+	// Keep-alive connections would hold both servers open after close: end them too.
+	page.closeAllConnections();
 	page.close();
+	up.closeAllConnections();
+	for (const socket of up.sockets ?? []) socket.destroy();
 	up.close();
 });
