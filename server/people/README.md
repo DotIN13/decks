@@ -18,7 +18,7 @@ model, a login or a transcript.
 
 1. An agent's record is its id, name, avatar, colour, kind, workspace, tags and home canvas.
 2. A name is unique however it is capitalised, at most 40 characters, never empty. Left out, it is
-   the kind's word and the first free number: Agent 1, Agent 2.
+   Agent and the first free number, whatever the kind: Agent 1, Agent 2.
 3. Tags are slugged, empties and repeats dropped, at most four of 24 characters. A workspace is one
    slug of 24 characters; empty means none.
 4. An avatar is an emoji or an SVG with an xmlns and a viewBox; anything else is refused `invalid`.
