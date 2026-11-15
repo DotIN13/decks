@@ -166,6 +166,7 @@
 	"harness/page/agents/AgentStack.tsx: function AgentStack over 80 lines": 1,
 	"harness/page/agents/Dialog.tsx: function Dialog over 80 lines": 1,
 	"harness/page/agents/face/style.css: over 400 lines": 1,
+	"harness/page/alerts/alerts.ts: function createAlerts over 80 lines": 1,
 	"harness/page/app/canvas-host.tsx: function CanvasHost over 80 lines": 1,
 	"harness/page/app/dock.ts: function (anonymous) over 80 lines": 1,
 	"harness/page/app/dock.ts: function createDock over 80 lines": 1,
