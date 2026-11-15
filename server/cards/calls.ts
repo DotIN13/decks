@@ -1,7 +1,8 @@
 import { calls, events, layout, Refused, type Handled } from "../../protocol/index.ts";
 import type * as S from "./shapes.ts";
 import { handleAll, type Context, type Kernel } from "../kernel/types.ts";
-import { canvasOf, cardPath, claim, createCard, describe, listCards } from "./cards.ts";
+import { canvasOf, cardPath, createCard, describe, listCards } from "./cards.ts";
+import { claim, markSeen } from "./news.ts";
 import { fence, fenceDir } from "./fence.ts";
 import { applyEdits, checkRev, fileOf, globToRegex, LIMIT, matchesGlob, readText, slice, stat, walk, writeText } from "./files.ts";
 import { FILES } from "./page.ts";
@@ -94,7 +95,7 @@ async function grep(ctx: Context, pattern: string, under: ReturnType<typeof fenc
 }
 
 /** The card calls. url issues a card's pass, so it needs the kernel's tokens. */
-const CARD = { list: card.list, get: card.get, create: card.create, claim: card.claim, url: card.url };
+const CARD = { list: card.list, get: card.get, create: card.create, claim: card.claim, url: card.url, seen: card.seen };
 
 export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] {
 	return handleAll(CARD, {
@@ -133,6 +134,12 @@ export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] 
 				out.push(await describe(ctx.deck, ctx.store, path));
 			}
 			return out;
+		},
+		seen: async (ctx, { card: name }) => {
+			const path = cardPath(name);
+			if (!(await stat(ctx.deck, path))) throw new Refused("not_found", `There is no card at ${path}.`, "card.list");
+			await markSeen(ctx.deck, ctx.store, path);
+			return describe(ctx.deck, ctx.store, path);
 		},
 		url: async (ctx, { card: name }) => {
 			const path = cardPath(name);

@@ -3,12 +3,12 @@ import type * as S from "./shapes.ts";
 import type { Deck, DeckPath, Store } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { stat } from "./files.ts";
+import { newsOf } from "./news.ts";
 
 // Cards: rules 9 to 11 of the README.
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const CLAIMS = "claims/";
 
 /** A card named by its folder or its index.html, as its index.html. Rule 9. */
 export function cardPath(raw: unknown): DeckPath {
@@ -97,23 +97,9 @@ async function names(deck: Deck, dir: string): Promise<string[]> {
 	}
 }
 
-/** A card as a call answers it: path, title, writer. */
+/** A card as a call answers it: path, title, its writer and when, its last change, when the person read it. */
 export async function describe(deck: Deck, store: Store, path: DeckPath): Promise<S.Card> {
 	if (!(await stat(deck, path))) throw new Refused("not_found", `There is no card at ${path}.`, "card.list");
-	const by = await writerOf(deck, store, path);
-	return { path, title: titleOf(path, decoder.decode(await deck.read(path))), ...(by ? { by } : {}) };
-}
-
-/** Who last wrote a card's index.html, or claimed it since. */
-async function writerOf(deck: Deck, store: Store, path: DeckPath): Promise<string | undefined> {
-	const wrote = (await deck.revisions?.(path))?.at(-1);
-	const kept = await store.get(CLAIMS + path);
-	const claimed = kept ? (JSON.parse(decoder.decode(kept)) as { by: string; rev: number }) : undefined;
-	if (claimed && (!wrote || claimed.rev >= wrote.rev)) return claimed.by;
-	return wrote?.by;
-}
-
-/** A claim holds until the card's index.html is written again. */
-export async function claim(store: Store, path: DeckPath, by: Caller, rev: number): Promise<void> {
-	await store.put(CLAIMS + path, encoder.encode(JSON.stringify({ by: by.id, rev })));
+	const news = await newsOf(deck, store, path);
+	return { path, title: titleOf(path, decoder.decode(await deck.read(path))), ...news };
 }

@@ -18,8 +18,9 @@ const start = () => testServer({ features: [cards()], deck: seed });
 
 test("rules 9 to 11: create, name, title, list, get, writer", async () => {
 	const s = await start();
-	const made = await s.value<{ path: string; title: string; by: string }>("card.create", { title: "Sales rose 12% & held" }, ann);
-	assert.deepEqual(made, { path: "canvases/a/cards/sales-rose-12-held/index.html", title: "Sales rose 12% & held", by: "ann" });
+	const made = await s.value<{ path: string; title: string; by: string; named?: number; changed?: number }>("card.create", { title: "Sales rose 12% & held" }, ann);
+	assert.deepEqual([made.path, made.title, made.by], ["canvases/a/cards/sales-rose-12-held/index.html", "Sales rose 12% & held", "ann"]);
+	assert.ok(made.named && made.changed);
 	const again = await s.value<{ path: string }>("card.create", { title: "Sales rose 12% & held" }, ann);
 	assert.equal(again.path, "canvases/a/cards/sales-rose-12-held-2/index.html");
 	const got = await s.value<{ path: string }>("card.get", { card: "canvases/a/cards/sales-rose-12-held" });
@@ -38,7 +39,8 @@ test("rule 10: a claim makes the claimer the writer, until someone writes", asyn
 	assert.equal(claimed!.by, "cy");
 	assert.ok(s.heard.some((e) => e.name === "card.changed"));
 	await s.value("file.write", { path, text: "<title>New</title>" }, ann);
-	assert.deepEqual(await s.value("card.get", { card: path }), { path, title: "New", by: "ann" });
+	const now = await s.value<{ title: string; by: string }>("card.get", { card: path });
+	assert.deepEqual([now.title, now.by], ["New", "ann"]);
 	await s.close();
 });
 
@@ -113,4 +115,26 @@ test("the real card runtime syncs into an empty deck", async () => {
 	const got = await syncLib(new MemoryDeck(files), deck);
 	assert.equal(got.written.length, Object.keys(files).length);
 	assert.ok(got.written.includes("lib/card.css"));
+});
+
+test("rules 18 and 19: a resize names its resizer the writer; a change after a read is news", async () => {
+	const { features } = await import("../main.ts");
+	const s = await testServer({ features: features(), deck: { "canvases/a/canvas.pen": '{"version":"2.14","children":[]}', "canvases/a/cards/n/index.html": "<title>N</title>\n<meta name=\"card\" content='{\"w\":400,\"h\":300}' />\n" } });
+	const path = "canvases/a/cards/n/index.html";
+	const placed = await s.value<{ id: string }>("item.insert", { item: { type: "card", card: path } }, ann);
+	await s.value("item.update", { id: placed.id, size: { w: 424, h: 300 }, canvas: "a" }, "person");
+	let got = await s.value<{ by?: string; named?: number; changed?: number; seen?: number }>("card.get", { card: path });
+	for (let i = 0; i < 20 && got.by !== "person"; i++) {
+		await new Promise((r) => setTimeout(r, 10));
+		got = await s.value("card.get", { card: path });
+	}
+	assert.equal(got.by, "person");
+	const read = await s.value<{ seen?: number; changed?: number }>("card.seen", { card: path }, "person");
+	assert.ok((read.seen ?? 0) >= (read.changed ?? 0));
+	assert.equal((await s.call("card.seen", { card: path }, ann)).ok, false);
+	await new Promise((r) => setTimeout(r, 5));
+	await s.value("file.write", { path: "canvases/a/cards/n/data.json", text: "{}" }, ann);
+	const after = await s.value<{ seen?: number; changed?: number }>("card.get", { card: path });
+	assert.ok((after.changed ?? 0) > (after.seen ?? 0), JSON.stringify(after));
+	await s.close();
 });

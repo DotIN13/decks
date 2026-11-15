@@ -50,7 +50,9 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
    its bytes differ, and one this build no longer ships is removed.
 16. A card item given as html is written into a new folder of the canvas before it is placed.
 17. A card placed with no box takes the size its file declares (`<meta name="card">`), else 1000 by 600.
-18. A card resized on its canvas writes its new size into its file's meta tag.
+18. A card resized on its canvas writes its new size into its file's meta tag, and its resizer is
+   its writer.
+19. A card is news when a file in its folder changed (`changed`) after the person read it (`seen`).
 
 ## Check
 
