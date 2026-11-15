@@ -4,7 +4,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BY_NAME, KEEP_IN_WEB, KEPT } from "./compat/old.mjs";
+import { BY_NAME, BY_SUBJECT, KEEP_IN_WEB, KEPT } from "./compat/old.mjs";
 
 export { KEPT };
 
@@ -29,8 +29,13 @@ export const REPLACED = [
 
 const NEW = ["protocol", "server", "harness", "clients", "tools"];
 
-/** Where each owner's checks go: the feature folder of that owner's lane. */
-const HOME_OF = { Easel: "server/canvas/checks", Depot: "server/pictures/checks", Folio: "server/cards/checks", Roster: "server/people/checks", Pane: "harness/page/checks", Scribe: "harness/page/chat/checks", Helm: "harness/checks", Keel: "server/kernel/checks", Warden: "tools/checks/e2e", Loom: "tools/checks/canvas" };
+/**
+ * Every browser check lives under tools/checks/<feature>/: it drives three programs from outside, so it
+ * is a tool, never code inside server/ or harness/. The folder's name says the feature; lanes.json gives
+ * each owner its folder after the switch. Features' own tests (no browser) stay beside their code.
+ */
+const FEATURE_OF = { Easel: "canvas", Depot: "pictures", Folio: "cards", Roster: "people", Pane: "page", Scribe: "page", Loom: "library" };
+const home = (check, owner, traits) => `tools/checks/${traits.agent ? "agent" : traits.bench ? "bench" : BY_SUBJECT[check] ?? FEATURE_OF[owner] ?? "library"}`;
 
 const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
 const tracked = () => git("ls-files").split("\n").filter(Boolean);
@@ -78,10 +83,9 @@ function checkMoves() {
 	const owners = existsSync(RUNS) ? JSON.parse(readFileSync(RUNS, "utf8")).owners ?? {} : {};
 	const all = git("ls-files", "e2e/checks").split("\n").filter(Boolean).map((f) => f.slice("e2e/checks/".length).replace(/\.mjs$/, ""));
 	const t = traits();
-	const home = (c) => (t[c]?.agent ? "tools/checks/agent" : t[c]?.bench ? "tools/checks/bench" : undefined);
 	const moved = [...stop3, ...all.filter((c) => !stop3.includes(c))].map((c) => {
 		const owner = ownerFor(c, owners);
-		return { check: c, owner, to: `${home(c) ?? HOME_OF[owner] ?? HOME_OF.Warden}/${c}.mjs`, owned: c in owners, stop3: stop3.includes(c), traits: t[c] ?? {} };
+		return { check: c, owner, to: `${home(c, owner, t[c] ?? {})}/${c}.mjs`, owned: c in owners, stop3: stop3.includes(c), traits: t[c] ?? {} };
 	});
 	return { moved, left: [] };
 }

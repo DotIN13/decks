@@ -21,6 +21,12 @@ export function moved(path, pairs) {
 	return path;
 }
 
+/** One key with its path moved by the pairs. */
+export function rekeyed(key, pairs) {
+	const [, legacy = "", path, rest = ""] = PREFIX.exec(key) ?? [];
+	return path === undefined ? key : `${legacy}${moved(path, pairs)}${rest}`;
+}
+
 /** Every baseline re-keyed by pairs; a key landing on one already there adds its count. Answers the keys moved. */
 export function rekey(root, pairs) {
 	const dir = join(root, "tools/gates/baseline");
@@ -29,8 +35,7 @@ export function rekey(root, pairs) {
 		const name = file.replace(/\.json$/, "");
 		const next = {};
 		for (const [key, n] of Object.entries(readBaseline(root, name))) {
-			const [, legacy = "", path, rest = ""] = PREFIX.exec(key) ?? [];
-			const to = path === undefined ? key : `${legacy}${moved(path, pairs)}${rest}`;
+			const to = rekeyed(key, pairs);
 			if (to !== key) count++;
 			next[to] = (next[to] ?? 0) + n;
 		}

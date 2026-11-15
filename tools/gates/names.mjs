@@ -45,9 +45,10 @@ export default {
 		const forms = new Map(plain.flatMap((w) => (w.endsWith("s") ? [[w, w]] : [[w, w], [`${w}s`, w]])));
 		const dotted = words.filter((w) => w.endsWith(".")).map((w) => ({ w, re: new RegExp(`(?<![\\w.])${w.replace(".", "\\.")}[a-z]`, "g") }));
 		const counts = new Map();
-		// tools/checks/checks.json names checks by their file names: the file's own words are counted in the file.
-		const checkNames = new Set(ctx.files.filter((f) => /(^|\/)checks\/[^/]+\.mjs$/.test(f)).map((f) => f.replace(/^.*\//, "").replace(/\.mjs$/, "")));
-		const named = (f, text) => (f === "tools/checks/checks.json" ? text.replace(/"([a-z0-9-]+)"\s*:/g, (all, k) => (checkNames.has(k) ? ":" : all)) : text);
+		// tools/checks/checks.json names checks by their file names and paths: the file's own words are counted in the file.
+		const checkNames = new Set(ctx.files.filter((f) => /(^|\/)checks\/(?:[^/]+\/)?[^/]+\.mjs$/.test(f)).map((f) => f.replace(/^.*\//, "").replace(/\.mjs$/, "")));
+		const checkPaths = new Set(ctx.files.filter((f) => /(^|\/)checks\/(?:[^/]+\/)?[^/]+\.mjs$/.test(f)));
+		const named = (f, text) => (f === "tools/checks/checks.json" ? text.replace(/"([a-z0-9-]+)"\s*:/g, (all, k) => (checkNames.has(k) ? ":" : all)).replace(/"([\w./-]+\.mjs)"/g, (all, path) => (checkPaths.has(path) ? '""' : all)) : text);
 		for (const f of ctx.files.filter((f) => isSource(f) && TEXT.test(f) && !EXEMPT.test(f))) {
 			const text = withoutMarkup(named(f, ctx.read(f)));
 			for (const t of tokens(text)) if (forms.has(t) && !KEEPS[forms.get(t)]?.test(f)) bump(counts, `${f}: ${forms.get(t)}`);

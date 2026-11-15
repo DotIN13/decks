@@ -12,3 +12,9 @@ export const KEEP_IN_WEB = {
 	"apps/web/scripts/stage-backends.ts": "the engine's goldens on three backends, which the stage-goldens check runs; it goes with packages/stage (Loom's step 3)",
 	"apps/web/scripts/gen-font-coverage.mjs": "writes packages/canvas/src/look/font-coverage.ts; it goes with the canvas library (Loom's step 4a)",
 };
+
+/** The checks Warden fixed in stop 3, by what they exercise, by today's names. */
+export const BY_SUBJECT = { placeholder: "pictures", "stage-shot": "pictures", "items-made": "canvas", "smooth-edits": "library", "ink-long-stroke": "library" };
+
+/** A check's file name carrying a retired word (protocol/glossary.ts), for the plan's follow-ups. */
+export const RETIRED_IN_NAME = /(^|-)(boards?|stages?)(-|$)/;

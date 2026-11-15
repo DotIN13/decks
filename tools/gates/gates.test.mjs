@@ -48,6 +48,8 @@ test("names reads its words from protocol/glossary.ts", () =>
 		{ "protocol/glossary.ts": 'export const retired = [{ word: "widget", now: "card" }];\n', "server/x.ts": "// cards\n" }, "server/x.ts: widget"));
 test("names passes the markup names by rule, only as markup", () =>
 	plantedFails("names", { "server/a/x.ts": 'el.querySelector(".stage-ink"); const stageSize = 1;\n' }, { "server/a/x.ts": 'el.querySelector(".stage-ink"); el.classList.add("stage-fixed"); const s = `<i class="stage x">`;\n' }, "server/a/x.ts: stage"));
+test("names reads a check's name and path in checks.json as its file's", async () =>
+	assert.deepEqual(await breaks("names", { "tools/checks/library/stage-scroll.mjs": "// a check\n", "tools/checks/checks.json": '{ "checks": { "stage-scroll": { "path": "tools/checks/library/stage-scroll.mjs" } } }\n' }), []));
 test("names lets compat/ keep retired words", async () => assert.deepEqual(await breaks("names", { "server/compat/old.ts": "// board\n" }), []));
 test("imports names a folder importing against the table", () =>
 	plantedFails("imports", { "protocol/a.ts": 'import x from "node:fs";\n' }, { "protocol/a.ts": 'import x from "./b.ts";\n' }, "protocol may not import node:fs"));
