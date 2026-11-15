@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { PICTURE_LADDER } from "../../protocol/index.ts";
 import { exactWidth, LADDER, rungFor } from "./picture.ts";
 
-// Rule 11: the picture route keeps exactly the canvas's ladder, read here from the canvas
-// library's own list so the two cannot drift; a rung asked is answered at that width.
+// Rule 11: the picture route keeps exactly the protocol's ladder, and the canvas library's own
+// list is held to it here so the two cannot drift; a rung asked is answered at that width.
 
 const DEVICE = new URL("../../packages/canvas/src/render/device.ts", import.meta.url);
 
@@ -13,7 +14,8 @@ test("rule 11: every rung any device's ladder asks is a rung the route keeps, an
 	const block = text.slice(text.indexOf("export const PICTURES"));
 	const rungs = [...block.slice(0, block.indexOf("};")).matchAll(/ladder:\s*\[([^\]]*)\]/g)].flatMap((m) => m[1]!.split(",").map(Number));
 	assert.ok(rungs.length > 0, "the canvas library's PICTURES ladders were found");
-	assert.deepEqual([...new Set(rungs)].sort((a, b) => a - b), [...LADDER]);
+	assert.deepEqual([...new Set(rungs)].sort((a, b) => a - b), [...PICTURE_LADDER]);
+	assert.deepEqual([...LADDER], [...PICTURE_LADDER]);
 });
 
 test("rule 11: a rung asked is that width; between rungs the next one up; never past the top", () => {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { layout, Refused } from "../../protocol/index.ts";
+import { layout, PICTURE_LADDER, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
 import { cardPath, type Machine } from "./machine.ts";
@@ -8,8 +8,8 @@ import { cardPath, type Machine } from "./machine.ts";
 // shrunk to w, kept in the store by the card's bytes, width and scheme.
 
 export const PICTURES = "/pictures/";
-/** The canvas's ladder: the widths it asks a card's picture at (PICTURES.big.ladder in the canvas library). */
-export const LADDER: readonly number[] = [192, 480, 800];
+/** The canvas's ladder: the widths it asks a card's picture at, from the protocol. */
+export const LADDER: readonly number[] = PICTURE_LADDER;
 /** The widest picture an export or a screenshot draws a card from. */
 const WIDEST = 2000;
 
