@@ -120,11 +120,23 @@ async function heard(tab: Tab, m: Said): Promise<void> {
 		case "card.resize": return void (await call(tab, "item.update", { id: m.path, size: { ...(m.w !== undefined ? { w: m.w } : {}), ...(m.h !== undefined ? { h: m.h } : {}) }, ...(await canvas()) }));
 		case "card.play": return void (await call(tab, "item.insert", { item: { type: "card", card: m.path }, ...(await canvas()) }));
 		case "card.hide": return void (await call(tab, "item.delete", { id: m.path, ...(await canvas()) }));
-		case "agent.create": return void (await call(tab, "agent.create", { ...(m.kind ? { kind: m.kind } : {}), ...(m.workspace ? { workspace: m.workspace } : {}), ...(m.near ? { near: m.near } : {}) }));
+		case "agent.create": return agentCreate(tab, m);
 		case "agent.remove": return void (await call(tab, "agent.delete", { agent: m.id }));
-		case "agent.rename": return void (await call(tab, "agent.update", { agent: m.id, change: { name: m.name } }));
+		case "agent.rename": return identity(tab, await call<AgentRow>(tab, "agent.update", { agent: m.id, change: { name: m.name } }));
 		case "document.create": return documentCreate(tab, m, (await canvas()).canvas);
 	}
+}
+
+/** A new agent, and this socket on it, as today: the browser that asked is focused on what it made. */
+async function agentCreate(tab: Tab, m: Said): Promise<void> {
+	const made = await call<AgentRow>(tab, "agent.create", { ...(m.kind ? { kind: m.kind } : {}), ...(m.workspace ? { workspace: m.workspace } : {}), ...(m.near ? { near: m.near } : {}) });
+	tab.focused = made.id;
+	await roster(tab);
+}
+
+/** A rename is answered with the agent's identity, as today. */
+function identity(tab: Tab, agent: AgentRow): void {
+	tab.send({ type: "agent.identity", id: agent.id, identity: { name: agent.name, color: agent.color, tags: agent.tags ?? [] } });
 }
 
 async function documentCreate(tab: Tab, m: Said, canvas: string | undefined): Promise<void> {

@@ -25,7 +25,7 @@ export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = fal
 	return (doc.children ?? [])
 		.filter((node) => kinds.includes(node.metadata?.type ?? "") && typeof node.metadata?.path === "string")
 		.map((node) => ({
-			path: `${folderOf(canvas)}/${node.metadata!.path!}`,
+			path: /^(canvases|shared)\//.test(node.metadata!.path!) ? node.metadata!.path! : `${folderOf(canvas)}/${node.metadata!.path!}`,
 			title: node.name ?? node.metadata!.path!,
 			card: true,
 			x: node.x ?? 0,
