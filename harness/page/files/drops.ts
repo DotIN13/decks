@@ -17,6 +17,8 @@ import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/canvases.ts";
 import { authedSrc } from "../lib/authed.tsx";
+import { DOCUMENTS, fromCanvas, isPlayable, isRaster, isWords, onStage, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
+
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -29,54 +31,9 @@ async function openDroppedBundle(file: File): Promise<void> {
 }
 
 
-/** Pictures the stage's painter decodes itself: these go on the canvas as they are. SVG does not, so it goes on a board. */
-const RASTER = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico"]);
-/** Words the stage can show as a card: markdown, and plain text, which reads as markdown well enough. */
-const WORDS = new Set(["md", "markdown", "mdx", "txt", "text"]);
-/** A card holds a note's worth of words, not a book: past this a text file goes on a board. */
-const CARD_BYTES = 256 * 1024;
 
-/**
- * Films and sounds the server could read (`files/media.ts`).
- *
- * By extension and by what the browser claimed, as a picture is: a file dragged from some
- * desktops arrives with an empty `type`, and a name is only a claim. Whether it really is one is
- * the server's answer — the upload comes back with `media` or it does not, and a file that turns
- * out not to be media is placed as an ordinary dropped file would be.
- */
-/** What opens as a document page, edited where it is: the docs server's `EDITABLE`. */
-const DOCUMENTS = new Set(["md", "markdown", "txt", "tex", "bib", "sty", "cls", "ltx", "rst", "org", "docx"]);
-const PLAYABLE = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv", "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
-const isPlayable = (file: File) => PLAYABLE.has(extensionOf(file)) || file.type.startsWith("video/") || file.type.startsWith("audio/");
+const fromStage = (asset: string) => fromCanvas(asset, stageOnScreen());
 
-const extensionOf = (file: File) => (file.name.split(".").pop() ?? "").toLowerCase();
-const isRaster = (file: File) => RASTER.has(extensionOf(file)) || (file.type.startsWith("image/") && file.type !== "image/svg+xml");
-const isWords = (file: File) => file.size <= CARD_BYTES && (WORDS.has(extensionOf(file)) || file.type === "text/markdown" || file.type === "text/plain");
-/** Whether a file can be an item on the stage itself rather than something on a board. */
-export const onStage = (file: File) => isRaster(file) || isWords(file) || isPlayable(file);
-
-/** A canvas's folder, deck-relative, by its name: `canvases/<name>`, or `shared/canvases/<owner>/<canvas>` for a friend's (`deck/layout.ts`). */
-const folderOf = (name: string) => {
-	const friend = /^shared\/([^/]+)\/([^/]+)$/.exec(name);
-	return friend ? `shared/canvases/${friend[1]}/${friend[2]}` : `canvases/${name}`;
-};
-/**
- * A deck path as the canvas on screen's drawing writes it: a file in the canvas's own folder by its
- * path there (`files/a.png`), anything else climbing out of the folder to the deck (`../../assets/a.png`),
- * which the server copies into the canvas's `files/` as it writes the drawing.
- */
-const fromStage = (asset: string) => {
-	const name = stageOnScreen();
-	if (!name) return `../../${asset}`;
-	const folder = folderOf(name);
-	if (asset.startsWith(`${folder}/`)) return asset.slice(folder.length + 1);
-	return `${"../".repeat(folder.split("/").length)}${asset}`;
-};
-
-/**
- * Why nothing may be dropped on the canvas on screen, or on the canvas a board is in: a friend's,
- * shared with you to view. Said as a notice, with the way to change it, before anything is sent.
- */
 const refusedOn = (canvas: string | undefined): boolean => {
 	const row = viewOnly(canvas);
 	if (!row) return false;
@@ -84,12 +41,6 @@ const refusedOn = (canvas: string | undefined): boolean => {
 	return true;
 };
 
-/** A byte count as a sentence a person reads while waiting. */
-function sizeLabel(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /**
  * Files arriving from outside: dropped on the canvas (empty or over a board), on the input bar,
