@@ -113,6 +113,13 @@ async function stopAndWait(child) {
 }
 
 /** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
+/** Where a check is: its new place after the switch-over (where.json), else today's e2e/checks. */
+export function checkPath(file) {
+	const where = join(ROOT, "tools/checks/where.json");
+	const moved = existsSync(where) ? JSON.parse(readFileSync(where, "utf8"))[file.replace(/\.mjs$/, "")] : undefined;
+	return join(ROOT, moved ?? `e2e/checks/${file}`);
+}
+
 /** The page built once for a run, into a scratch folder: vite build of harness/page. */
 export function buildPage() {
 	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
@@ -154,7 +161,7 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 			const web = onlyServer ? ports.server : ports.web;
 			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
 			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
-			const check = launch("check", { cmd: process.execPath, args: [join(ROOT, "e2e/checks", file)], env }, log);
+			const check = launch("check", { cmd: process.execPath, args: [checkPath(file)], env }, log);
 			started.push(check);
 			const code = await new Promise((done) => {
 				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
@@ -178,7 +185,7 @@ async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
 	const files = argv.filter((a) => !a.startsWith("--")).map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
 	if (!files.length) return console.error("usage: node tools/checks/run.mjs [--only-server] <check> ..."), 2;
-	const missing = files.filter((f) => !existsSync(join(ROOT, "e2e/checks", f)));
+	const missing = files.filter((f) => !existsSync(checkPath(f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
 	// A slot per run, never for the loop: a build alone, each check in a check slot (alone if it times).
 	// A caller already holding one (heavy.mjs -- run.mjs, HEAVY_HELD) has the run's lock: take nothing more.
