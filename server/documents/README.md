@@ -40,7 +40,8 @@ and Google Docs.
    open it syncs every two seconds: the Doc's edits arrive as a change to review, typing goes out.
 
 12. A document item names its file from the deck's root. A name from the canvas's folder is taken
-   for the file it means, with a note; a file named nowhere is made empty in the canvas's files/.
+   for the file it means, with a note. A file named nowhere is refused for the person (the picker
+   names files that exist) and made empty in the canvas's files/ for an agent.
 
 Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
 

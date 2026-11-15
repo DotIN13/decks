@@ -5,8 +5,8 @@ import { documentKind } from "./item.ts";
 import { fence } from "./path.ts";
 
 // Rule 12: a document item names its file from the deck's root. A name given
-// from the canvas's folder is taken for the file it means, with a note; a file
-// named nowhere is made empty in the canvas's files/ so it can be typed in.
+// from the canvas's folder is taken for the file it means, with a note. A file
+// named nowhere is refused for the person, and made empty for anyone else.
 
 type At = { canvas: string; caller: Caller; note?: (text: string) => void; deck?: Deck };
 
@@ -26,6 +26,7 @@ export async function documentPath(deck: Deck, given: string, at: At): Promise<{
 		const path = fence(one);
 		if (await exists(deck, path)) return { path, note: `${given} was taken as ${path}: a document names its file from the deck's root.` };
 	}
+	if (at.caller.kind === "person") throw new Refused("not_found", `There is no file ${given} in the deck to open as a document.`, "file.find");
 	const made = asked.startsWith("canvases/") || asked.startsWith("docs/") ? asked : fence(`${folder}/files/${name}`);
 	await deck.write(made, new Uint8Array(), at.caller);
 	const note = made === asked ? `There was no file ${given}, so it was made empty for the document to open.` : `There was no file ${given}, so ${made} was made empty for the document to open: a document names its file from the deck's root, as ${folder}/files/<name>.md.`;
