@@ -26,6 +26,8 @@ export interface SessionDeps {
 	transcripts: Transcripts;
 	host: HostLink;
 	accounts?: ClaudeAccountSwitcher;
+	/** Opens the runtime instead of the registry: a test's fake backend. */
+	open?: (context: AgentBackendContext) => Promise<AgentBackend>;
 }
 
 /** Runtimes that take a message in the middle of a turn. */
@@ -236,6 +238,10 @@ export class Session {
 	}
 
 	private async open(): Promise<void> {
+		if (this.deps.open) {
+			this.backend = await this.deps.open(this.context());
+			return;
+		}
 		const runtime = runtimeOf(this.spec.kind);
 		if (!runtime) throw new Error(`This harness does not run ${this.spec.kind} agents.`);
 		const can = runtime.availability();
@@ -252,7 +258,12 @@ export class Session {
 			translator: this.translator,
 			bridge: this.bridge,
 			notice: (level, text) => this.tellChat("runtime.noticed", [this.id], { level, text }),
-			turnEnded: () => this.translator.setState("idle"),
+			// A late end of the last turn says nothing once the next has begun.
+			turnEnded: () => {
+				if (this.backend?.isStreaming) return;
+				this.usage = this.backend?.usage() ?? this.usage;
+				this.translator.setState("idle");
+			},
 			agent: { id: this.id },
 			decks: decksAccess(this.deps.url, this.id, saved.token),
 			briefing: () => this.briefing,
