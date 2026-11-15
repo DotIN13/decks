@@ -1069,10 +1069,11 @@ export async function freshAgent(page, workspace) {
 export async function lagCanvasLine(page) {
 	const state = { ms: 0, queued: 0 };
 	/*
-	 * The frame's line is one WebSocket (`/api/v1/socket`): every message from the harness (the answer to an
+	 * The frame's line is one WebSocket (`/api/v1/socket`, or compat's `/compat/v1/socket` the page's compat mode
+	 * gives the frame): every message from the harness (the answer to an
 	 * edit, the canvas's changes) is held back `ms`, in order; what the frame sends goes through at once.
 	 */
-	await page.routeWebSocket(/\/api\/v1\/socket/, (ws) => {
+	await page.routeWebSocket(/\/(api|compat)\/v1\/socket/, (ws) => {
 		const server = ws.connectToServer();
 		let last = 0;
 		server.onMessage((message) => {
