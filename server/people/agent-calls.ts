@@ -50,7 +50,7 @@ async function create(people: People, ctx: Context, spec: CreateArgs): Promise<s
 }
 
 async function update(people: People, ctx: Context, asked: string | undefined, change: AgentChange): Promise<shapes.Agent> {
-	const target = asked === undefined ? people.self(ctx) : people.roster.find(asked);
+	const target = asked === undefined ? people.actor(ctx) : people.roster.find(asked);
 	if (ctx.caller.kind === "agent" && target.id !== ctx.caller.id) throw new Refused("refused", "An agent changes only itself; the person may change any agent.", "agent.update");
 	if (change.state !== undefined || change.queued !== undefined) hostOnly(people, ctx, target);
 	if (change.canvas !== undefined) change = { ...change, canvas: canvasName(ctx, change.canvas) };
