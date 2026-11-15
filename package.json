@@ -24,8 +24,6 @@
   ],
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "runtime",
     "examples/*",
     "protocol",
     "server",
