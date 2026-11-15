@@ -12,7 +12,7 @@ import { handPans } from "../edit/core/dispatch.ts";
 import { untilReleased } from "../edit/held.ts";
 import type { StageEditor } from "../edit/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
-import type { StageProps } from "./Stage.tsx";
+import type { StageProps } from "../view/CanvasView.tsx";
 
 
 /**
@@ -28,11 +28,11 @@ type StageInputDeps = {
 	element: () => HTMLDivElement;
 	ctl: CameraController;
 	view: () => Viewport;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
 	/** The editor, made after the input: read only once the stage is running. */
 	editor: () => StageEditor;
-	/** The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`). */
+	/** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
 	scrolled: () => void;
 	/** The stage's size, measured on mount and whenever it changes. */
 	measured: (viewport: Viewport) => void;
@@ -111,7 +111,7 @@ export function createStageInput(deps: StageInputDeps) {
 		};
 		window.addEventListener("wheel", pinchOver, { capture: true, passive: false });
 		onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
-		// The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
+		// The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
 		const onScroll = () => {
 			lastScroll = performance.now();
 			deps.scrolled();

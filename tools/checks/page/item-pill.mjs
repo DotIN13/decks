@@ -87,7 +87,7 @@ const boards = await canvas.evaluate(() => window.__decksProbes.cards().map(({ p
 boards.sort((a, b) => Number(a.rect.y < 140) - Number(b.rect.y < 140));
 for (const one of boards) {
 	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
-	// The stage says which board's picture is under a point (`Stage.tsx`).
+	// The stage says which board's picture is under a point (`CanvasView.tsx`).
 	const points = await canvas.evaluate(({ path, rect: r }) => {
 		const out = [];
 		const stage = document.querySelector(".stage");

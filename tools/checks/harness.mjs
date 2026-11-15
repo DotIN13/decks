@@ -369,7 +369,7 @@ export async function highlightMode(page) {
  */
 export async function liveZoom(page, { tries = 12 } = {}) {
 	const canvas = await canvasFrame(page);
-	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
+	// Below the live zoom a board has no node, only its picture (`CanvasView.tsx`): the stage lists them.
 	const boards = () => canvas.evaluate(() => window.__decksProbes?.cards?.().length ?? document.querySelectorAll(".card-node").length);
 	await canvas.waitForFunction(() => (window.__decksProbes?.cards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
@@ -652,10 +652,14 @@ export async function resetStage(at) {
 	const deadline = Date.now() + 25000;
 	let landed = [];
 	let agent;
+	let passes = 0;
 	while (Date.now() < deadline) {
 		agent = link.last("agents")?.focused ?? agent;
 		if (agent) {
 			link.send({ type: "agent.stage", id: agent, stage: CANVAS });
+			// A card an earlier round took off the canvas comes back by card.play: card.move only remembers a place for
+			// a card that is not on it. From the second pass, once the canvas has said what it holds, so none is doubled.
+			if (passes++ > 0) for (const one of FIXTURE_PLACES) if (!landed.includes(one.path)) link.send({ type: "card.play", stage: CANVAS, path: one.path });
 			for (const one of FIXTURE_PLACES) link.send({ type: "card.move", stage: CANVAS, path: one.path, x: one.x, y: one.y });
 		}
 		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.

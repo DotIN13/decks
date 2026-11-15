@@ -13,7 +13,7 @@
  *
  * The pinch is two real fingers in Chromium (CDP `Input.dispatchTouchEvent`, which reaches the stage as
  * touch and pointer events, so the canvas's own two-finger pinch moves the camera), and Safari's gesture
- * events in WebKit, which has no CDP (`stage/input.ts`, the same events a trackpad pinch sends there).
+ * events in WebKit, which has no CDP (`input/canvas-input.ts`, the same events a trackpad pinch sends there).
  *
  * For each pinch: frames drawn and dropped (an animation frame more than 20 ms after the one before, in
  * the canvas frame), cards mounted and unmounted while the fingers were down (a `.card-host` is made

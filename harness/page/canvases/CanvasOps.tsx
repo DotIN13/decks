@@ -22,7 +22,7 @@ import { tokens } from "@decks/canvas/host";
  * has a goal ("how do I move a thing?") and not a keystroke, so the headings are the goals
  * and the gestures sit under them.
  *
- * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
+ * Every row is checked against the code that implements it, in `@decks/canvas`: `input/canvas-input.ts`
  * and `PEN_TOOL_KEYS` for the camera and the tools, `edit/` for selection and editing,
  * `model/file-drop.ts` for the drop, `items/card-surface.tsx` for a card's own chrome,
  * `ink/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet

@@ -32,7 +32,7 @@ import {
 	type StageEditor,
 	type tsScene,
 } from "../edit/index.ts";
-import type { StageProps } from "./Stage.tsx";
+import type { StageProps } from "./CanvasView.tsx";
 
 /** What the selection's drawing needs of the stage around it. */
 type SelectionDeps = {
@@ -44,14 +44,14 @@ type SelectionDeps = {
 	penLayer: StageEngine;
 	/** Counted up each time the engine lays the drawing out. */
 	penDrawn: Accessor<number>;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
-	/** Send the person's edits to the drawing (`Stage.tsx`, `penEdit`). */
+	/** Send the person's edits to the drawing (`CanvasView.tsx`, `penEdit`). */
 	penEdit: (ops: unknown[]) => void;
 	freshIds: (...also: string[]) => () => string;
-	/** An item as the file has it (`Stage.tsx`, `penNode`). */
+	/** An item as the file has it (`CanvasView.tsx`, `penNode`). */
 	penNode: (id: string) => PenNode | undefined;
-	/** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
+	/** A press is held on the canvas (`canvas-input.ts`): the drawn items' pill steps aside. */
 	pressHeld: Accessor<boolean>;
 };
 

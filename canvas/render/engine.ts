@@ -168,7 +168,7 @@ type RootCard = Omit<CardGeometry, "order"> & { i: number };
 type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[] };
 
 /**
- * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet it replaced had
+ * The stage's drawing for `CanvasView.tsx`, with the same calls the CanvasKit sheet it replaced had
  * so the stage chooses between the two by one setting while this one is proved.
  */
 /** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
@@ -776,7 +776,7 @@ export class StageEngine {
 	}
 
 	/**
-	 * A gesture was let go and its edit sent (`Stage.tsx`, `settleGesture`). When the drawing that
+	 * A gesture was let go and its edit sent (`CanvasView.tsx`, `settleGesture`). When the drawing that
 	 * answers it arrives, what it lifted is put down: painted back into the worker's tiles, and drawn
 	 * here until they come (`landed`). Without this an item stayed lifted after its drop, drawn by
 	 * the page every frame and holding the worker to the screen's tiles. A new gesture first cancels it.
@@ -1003,7 +1003,7 @@ export class StageEngine {
 	}
 
 	/**
-	 * The canvas sits in the world (`Stage.tsx`), after the board pages, so it is placed in stage
+	 * The canvas sits in the world (`CanvasView.tsx`), after the board pages, so it is placed in stage
 	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
 	 * undone, so it covers exactly the window.
 	 */
@@ -2152,7 +2152,7 @@ export class StageEngine {
 	}
 
 	/**
-	 * A picture of what a drag carries, for the ghost a drag over a card shows (`Stage.tsx`): the lifted
+	 * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
 	 * items drawn alone for one frame and copied off the canvas in the same task, then the stage drawn
 	 * whole again. `rect` is where they lay on screen before the drag; they are now the drag's offset on.
 	 */

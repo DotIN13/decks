@@ -640,7 +640,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const body = document.createElement("div");
 	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
 	body.className = "card-body board";
-	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`items/input.ts`).
+	// Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`input/item-keys.ts`).
 	body.tabIndex = -1;
 	body.style.outline = "none";
 	body.append(fragment);

@@ -19,7 +19,7 @@ import { mediaOf, type PenNode } from "@decks/pen";
 import { isLiveFile } from "../model/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { StageEditor } from "../edit/index.ts";
-import type { StageProps } from "./Stage.tsx";
+import type { StageProps } from "./CanvasView.tsx";
 
 /** What the items layer needs of the stage around it. */
 type ItemsLayerDeps = {
@@ -34,11 +34,11 @@ type ItemsLayerDeps = {
 	penLayer: StageEngine;
 	/** Counted up each time the engine lays the drawing out. */
 	penDrawn: Accessor<number>;
-	/** A writer's colour as the sheet can paint it (`Stage.tsx`). */
+	/** A writer's colour as the sheet can paint it (`CanvasView.tsx`). */
 	resolveColour: (colour: string) => string;
-	/** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+	/** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
 	frame: (boxes: Array<{ x: number; y: number; w: number; h: number }>) => Camera;
-	/** What an item's slot asks of the stage's fingers (`input.ts`). */
+	/** What an item's slot asks of the stage's fingers (`canvas-input.ts`). */
 	gestures: ItemSlotProps["gestures"];
 };
 

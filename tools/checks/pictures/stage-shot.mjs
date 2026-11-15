@@ -3,7 +3,7 @@
  * every drawn item in it, where the canvas itself draws it.
  *
  * The server takes the picture on `shot.html`, a page of its own that has to place the engine's
- * canvas exactly as the canvas does (`StageEngine.place`, `Stage.tsx`). When the two disagreed the
+ * canvas exactly as the canvas does (`StageEngine.place`, `CanvasView.tsx`). When the two disagreed the
  * drawing came out shifted and scaled by 1/zoom, and blank at zoom 1 (any item alone, any short
  * list): the boards were right, so nothing else noticed.
  *

@@ -174,7 +174,7 @@ const helpers = () =>
 			camera: () => ({ ...globalThis.__decksProbes.rust.camera }),
 			wheel,
 			raf,
-			/** Pinch to `zoom` exactly: 64 scroll units per e-fold (`Stage.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
+			/** Pinch to `zoom` exactly: 64 scroll units per e-fold (`CanvasView.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
 			async zoomTo(zoom) {
 				for (let i = 0; i < 200; i++) {
 					const now = globalThis.__decksProbes.rust.camera.zoom;

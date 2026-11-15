@@ -10,7 +10,7 @@ export interface HoldAction {
 }
 
 /**
- * The menu a hold opens on a touch screen (`edit/dom/pointer.ts`, `touch-rules.ts` HOLD_MS), as iOS
+ * The menu a hold opens on a touch screen (`input/pointer.ts`, `touch-rules.ts` HOLD_MS), as iOS
  * opens one: at the finger, with a preview of what was held on top, and the item's actions as rows a
  * finger's height. Below the finger when there is room, else above it; gone at a press anywhere
  * else, at Escape, or when the view scrolls.

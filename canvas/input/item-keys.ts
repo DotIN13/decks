@@ -1,5 +1,5 @@
 import { zoomKey } from "../camera/zoom-keys.ts";
-import { INTERACTIVE, scrollsInside } from "./card.ts";
+import { INTERACTIVE, scrollsInside } from "../items/card.ts";
 
 /**
  * What a press, a wheel or a key inside an awake item is: the item's own, or the stage's. One rule
@@ -57,7 +57,7 @@ export function ownInput(target: EventTarget, host: HTMLElement, input: OwnInput
 	for (const type of ["keydown", "keyup", "keypress"])
 		target.addEventListener(type, (event) => {
 			const key = event as KeyboardEvent;
-			// The canvas's zoom, wherever the focus is (`stage/input.ts`).
+			// The canvas's zoom, wherever the focus is (`input/canvas-input.ts`).
 			if (zoomKey(key)) return;
 			event.stopPropagation();
 			if (type === "keydown" && key.key === "Escape") {

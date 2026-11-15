@@ -1,7 +1,7 @@
 import { probes } from "../debug.ts";
 import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
-import { ownInput } from "./input.ts";
+import { ownInput } from "../input/item-keys.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { cardLoader } from "./card-load.ts";
 import { scheme } from "../theme.ts";
@@ -19,7 +19,7 @@ export function cardShot(path: string): CardShot | undefined {
 /**
  * A card's surface in its slot on the stage (`item-slot.tsx`): a host element whose shadow root holds the
  * card (`card.ts`). A card's events reach the stage as they are; which of them are the card's own is
- * the one rule every awake item follows (`input.ts`, `ownInput`), decided on the card's root, not its
+ * the one rule every awake item follows (`item-keys.ts`, `ownInput`), decided on the card's root, not its
  * host: from outside a closed root an event's path stops at the host, so nothing there can tell a
  * press on the card's button from one on its background.
  *

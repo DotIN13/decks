@@ -45,7 +45,7 @@ export function feedSelection(source: SelectionSource): () => void {
 }
 /** The selection a stage starts with: the one up now, else what the last one left, unless something cleared it since. */
 export const keptSelection = (): readonly string[] => untrack(penSelection);
-/** Whether a card is open for typing (`Stage.tsx`): the properties panel stands aside. */
+/** Whether a card is open for typing (`CanvasView.tsx`): the properties panel stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
 
 /**
@@ -81,14 +81,14 @@ const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
  * A change the properties panel is making with a drag, as the update it will save when the hand
  * lifts: the colour under the pointer in the colour picker.
  *
- * The stage draws it without saving it (`canvas/Stage.tsx`, `penLayer.preview`), so the colour
+ * The stage draws it without saving it (`canvas/view/CanvasView.tsx`, `penLayer.preview`), so the colour
  * changes under the pointer while the drag is still one edit to the file and not sixty. Cleared by
  * the stage when the drawing comes back with the change in it.
  */
 const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
 
 /**
- * The hand: while it is on, a press on the canvas pans it, as holding Space does (`Stage.tsx`).
+ * The hand: while it is on, a press on the canvas pans it, as holding Space does (`CanvasView.tsx`).
  * A host's tool column turns it on; nothing in the stage turns it off.
  */
 const [handTool, setHandTool] = createSignal(false);

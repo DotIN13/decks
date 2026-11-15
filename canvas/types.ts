@@ -8,7 +8,7 @@ import type { PenTool } from "./edit/pen-tools.ts";
 
 /*
  * The editor's types, apart from the code that makes it: what a host gives it and gets back
- * (`editor.tsx`, `createEditor`), and what the stage reports (`stage/Stage.tsx`).
+ * (`editor.tsx`, `createEditor`), and what the stage reports (`view/CanvasView.tsx`).
  * The frame's protocol and an app's chrome read these without importing either.
  */
 

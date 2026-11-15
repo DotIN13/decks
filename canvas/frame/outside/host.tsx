@@ -10,7 +10,7 @@ import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type C
 /**
  * The frame's address, with the page's measuring parameters passed on: the frame probe (`?probe=<collector>`,
  * the app's `perf/probe.ts`) and its companions, and the device, engine, picture and card-picture overrides (`render/device.ts`,
- * `stage/items-layer.tsx`), run in the frame, where the stage is.
+ * `view/items-layer.tsx`), run in the frame, where the stage is.
  */
 const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "picture-mb", "skip-levels", "device", "pictures", "card-pictures", "engine", "tiles"];
 const frameAddress = (): string => {

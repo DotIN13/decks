@@ -2,7 +2,7 @@
  * Keys pressed in a card are the card's, until Escape.
  *
  * A press inside a card puts the focus in it (its body takes the focus), and the keys typed then stay
- * in it (`items/input.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
+ * in it (`input/item-keys.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
  * the focus went to the canvas behind the card, so the arrows nudged the card and Backspace deleted it.
  * Here: a press on a card's words; the arrows, a letter, Space and Backspace leave the card where it is
  * and on the canvas, and reach the card's own root; ⌘0 still fits the canvas; Escape leaves the card,

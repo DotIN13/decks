@@ -16,7 +16,7 @@ import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen,
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
 import { overlayJson } from "../edit/core/overlay-json.ts";
 import { rgbOf } from "../edit/dom/colours.ts";
-import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
+import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
 import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
 import { scheme } from "../theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
@@ -34,7 +34,7 @@ import {
 	tsScene,
 	tsSeam,
 } from "../edit/index.ts";
-import { createStageInput } from "./input.ts";
+import { createStageInput } from "../input/canvas-input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
 
@@ -174,7 +174,7 @@ export type StageProps = {
 };
 
 /*
- * The stage is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
+ * The stage is four files: this one, which wires the pieces together and draws the tree; `canvas-input.ts`,
  * what the stage hears from the person; `items-layer.tsx`, the placed items; and `selection.tsx`, what
  * is drawn over the selection and under the pointer.
  */
@@ -346,7 +346,7 @@ export function Stage(props: StageProps) {
 	/** An item as the file has it, not as a preview has drawn it. */
 	const penNode = (id: string) => (props.pen ? docIndex(props.pen.doc).get(id)?.node : undefined);
 
-	/* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
+	/* What the stage hears from the person (`canvas-input.ts`): made where its listeners were, before the engine. */
 	const input = createStageInput({
 		props,
 		element: () => element,

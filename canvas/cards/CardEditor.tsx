@@ -25,7 +25,7 @@ import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type
 import { pictureAddress } from "../host.ts";
 
 /**
- * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
+ * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back
  * as the card's markdown (`card-syntax.ts`).
  *
  * Words style themselves as they are typed (`**bold**`, `==mark==`, `# ` at the start of a line), a

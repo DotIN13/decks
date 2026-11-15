@@ -1,6 +1,6 @@
 import { mountDocPage } from "../documents/page.ts";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { ownInput } from "./input.ts";
+import { ownInput } from "../input/item-keys.ts";
 import { APP_BAR } from "../render/types.ts";
 import { canvasHost } from "../host.ts";
 import { scheme } from "../theme.ts";
@@ -46,7 +46,7 @@ export function DocumentSurface(props: { file: string; selected: boolean; onSele
 	});
 	onMount(() => {
 		props.ref?.();
-		// A press, a wheel or a key inside the document: the one rule every awake item follows (`input.ts`).
+		// A press, a wheel or a key inside the document: the one rule every awake item follows (`item-keys.ts`).
 		ownInput(host, host, { selected: () => props.selected, onSelect: props.onSelect });
 		const line = canvasHost().documents;
 		if (!line) {
@@ -122,7 +122,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 		props.ref?.();
 		unwatch = canvasHost().apps?.watch?.(props.app, (state) => setAbout((was) => ({ ...was, ...state })));
 		/*
-		 * The same rule on the window's bar and body (`input.ts`); the app's own page inside the iframe is the
+		 * The same rule on the window's bar and body (`item-keys.ts`); the app's own page inside the iframe is the
 		 * exception, by choice: it takes the pointer only once the item is selected (`pointer-events` below),
 		 * so a press on an unselected app selects it first, and the next one is the app's.
 		 */
@@ -190,7 +190,7 @@ type ForwardedWheel = { dx: number; dy: number; mode?: number; x: number; y: num
 
 /**
  * A wheel from inside an app's iframe, replayed on the stage where the pointer is: the canvas pans or
- * zooms with it as it does over a card whose insides cannot scroll (`input.ts`, `ownInput`). The point
+ * zooms with it as it does over a card whose insides cannot scroll (`item-keys.ts`, `ownInput`). The point
  * is the app page's, turned into the frame's through the iframe's box on the screen, which is scaled by
  * the camera's zoom.
  */

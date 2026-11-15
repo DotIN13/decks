@@ -13,16 +13,16 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
+import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../edit/core/dispatch.ts";
 import { HOLD_MS, slopFor } from "./touch-rules.ts";
-import type { ArrowHandles } from "../core/arrows.ts";
-import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
-import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
-import { glideShift } from "../core/overlay.ts";
-import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
-import type { Handle } from "../core/resize.ts";
-import type { SceneQuery } from "../core/scene.ts";
-import { pointerInput, type Editor } from "./controller.ts";
+import type { ArrowHandles } from "../edit/core/arrows.ts";
+import type { PageBox, Offset, PenTool, Pt, Rect } from "../edit/core/model.ts";
+import type { PageHandles, Outline, RadiusHandle } from "../edit/core/overlay.ts";
+import { glideShift } from "../edit/core/overlay.ts";
+import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../edit/core/pick.ts";
+import type { Handle } from "../edit/core/resize.ts";
+import type { SceneQuery } from "../edit/core/scene.ts";
+import { pointerInput, type Editor } from "../edit/dom/controller.ts";
 
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
@@ -47,7 +47,7 @@ export type PageView = {
 	select: () => void;
 };
 
-/** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
+/** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
 export type Openers = {
 	/** A file shown live: a web page taken into, an SVG opened in a tab. */
 	liveFile: (id: string) => boolean;
@@ -221,7 +221,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		};
 		/*
 		 * A second finger landing while one follows a press is a pinch, which the stage's pool takes
-		 * from here (`input.ts`): the press is abandoned, not released where it was, so a resize or a
+		 * from here (`canvas-input.ts`): the press is abandoned, not released where it was, so a resize or a
 		 * carry that had begun is put back rather than landed half done.
 		 */
 		const other = (e: PointerEvent) => {

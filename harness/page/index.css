@@ -127,7 +127,7 @@ body {
 	-webkit-font-smoothing: antialiased;
 	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
 	   chrome — where a double-tap means nothing and the delay is felt on every button.
-	   The stage sets `none` for itself (`stage/input.ts`). */
+	   The stage sets `none` for itself (`input/canvas-input.ts`). */
 	touch-action: manipulation;
 }
 

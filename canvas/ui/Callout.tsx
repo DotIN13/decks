@@ -2,7 +2,7 @@ import type { Page, Camera } from "@decks/protocol-old";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
-import { COARSE } from "../edit/dom/touch-rules.ts";
+import { COARSE } from "../input/touch-rules.ts";
 import { setPropsOpen } from "../edit/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import { menuLeft } from "./menu-place.ts";

@@ -11,7 +11,7 @@ import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
 import { anchorAt, pageHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
 import { HANDLES, type Handle } from "../core/resize.ts";
-import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "./touch-rules.ts";
+import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "../../input/touch-rules.ts";
 
 export { COARSE };
 /** Where an arrow anchor sits, in screen pixels: its centre this far out from the item's side, and this wide. */

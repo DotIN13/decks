@@ -1,5 +1,5 @@
 /**
- * The editor, as the stage (`canvas/Stage.tsx`) uses it: the one way in. `createStageEditor` puts
+ * The editor, as the stage (`canvas/view/CanvasView.tsx`) uses it: the one way in. `createStageEditor` puts
  * the state (`dom/controller.ts`), the pointer (`dom/pointer.ts`), the keys (`dom/keys.ts`), the
  * typing (`dom/TextEditing.tsx`) and the adding (`dom/InsertMenu.tsx`) together as one object; the
  * rest is what the stage still does with the editor's pieces itself (the overlay's parts, the ops
@@ -7,8 +7,8 @@
  */
 import { createEditor, type EditorHost } from "./dom/controller.ts";
 import { createInsertMenu, type InsertHost } from "../ui/InsertMenu.tsx";
-import { createKeys, type KeysHost } from "./dom/keys.ts";
-import { createPointer, type Pointer, type PointerHost } from "./dom/pointer.ts";
+import { createKeys, type KeysHost } from "../input/keys.ts";
+import { createPointer, type Pointer, type PointerHost } from "../input/pointer.ts";
 import { createTextEditing, type TextHost } from "./dom/TextEditing.tsx";
 
 export type StageEditorHost = Omit<EditorHost, "effects"> & {
@@ -49,7 +49,7 @@ export function createStageEditor(host: StageEditorHost) {
 }
 export type StageEditor = ReturnType<typeof createStageEditor>;
 
-export type { PageView, Openers } from "./dom/pointer.ts";
+export type { PageView, Openers } from "../input/pointer.ts";
 export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";
 export { TextEditor } from "./dom/TextEditing.tsx";
 export { InsertMenu } from "../ui/InsertMenu.tsx";
