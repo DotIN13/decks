@@ -1,7 +1,7 @@
 import { apply as penApply, baseTheme, expandVariables, indexOf, isArrow, reroute, boxOf as penBox, placements, walk, withDecksColors, type Op as PenOp, type PenDocument, type PenNode } from "@decks/pen";
 import { Refused } from "../../protocol/index.ts";
 import type { ItemOp } from "../kernel/types.ts";
-import type { Kinds } from "./kinds.ts";
+import { sizedOnly, type Kinds } from "./kinds.ts";
 import { cornerOf, joinCorner, type Box, type Corner } from "./place.ts";
 
 // One protocol op on a working copy of a drawing: found, placed, turned into
@@ -133,7 +133,7 @@ function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where
 	if (op.item.id && findId(doc, op.item.id, where)) throw new Refused("conflict", `An item called ${op.item.id} is already on this canvas.`, "item.update");
 	let corner: Corner | undefined = cornerOf(op, boxOf);
 	const given = op.item.box;
-	if (!corner && given) corner = { x: given.x1, y: given.y1 };
+	if (!corner && given && !sizedOnly.has(op.item)) corner = { x: given.x1, y: given.y1 };
 	const ownXY = typeof op.item.x === "number" && typeof op.item.y === "number";
 	const node0 = where.kinds.toNode(op.item, where.canvas);
 	if (!corner && !ownXY && op.parent == null && !isArrow(node0 as PenNode)) corner = joinCorner(sizeOf(node0, given), newestPage(doc, where), tops(doc));

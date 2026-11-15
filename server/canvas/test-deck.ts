@@ -18,6 +18,7 @@ export const DECK = {
 export function stickerFeature(): Feature {
 	let deck: Kernel["deck"] | undefined;
 	const prepare = async (item: Item, at: { canvas: string; caller: Caller }): Promise<Item> => {
+		if (item.title === "sized") return { ...item, path: "canvases/plan/stickers/s1/index.html", box: { x1: 0, y1: 0, x2: 300, y2: 200 } };
 		if (item.path || !item.title) return item;
 		const path = `canvases/${at.canvas}/stickers/${item.title.replace(/ /g, "-")}/index.html`;
 		await deck!.write(toDeckPath(path), new TextEncoder().encode(`<p>${item.title}</p>`), at.caller);

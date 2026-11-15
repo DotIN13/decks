@@ -38,7 +38,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
    back what undo took, only while that undo is the latest change. Both are changes too.
 10. A node whose `metadata.type` is `decks.<type>` belongs to the item kind with that type, which
     another feature registers; this folder never names those kinds. Before an insert or replace
-    of such an item, its kind's `prepare` (if it has one) is awaited. Every other node is drawn:
+    of such an item, its kind's `prepare` (if it has one) is awaited; a box it adds is a size only.
+    Every other node is drawn:
     notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
 11. After every change each joined arrow is routed again between its ends, in the same revision,
     so the file holds the path the page draws. Any other item you did not touch keeps its bytes.

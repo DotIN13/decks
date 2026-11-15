@@ -202,3 +202,11 @@ test("an item given no place joins right of the newest page, in the nearest open
 	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
 	await s.close();
 });
+
+test("a box a kind's prepare adds is a size: the item is still placed beside the newest page", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const made = await s.value<Item>("item.insert", { item: { type: "sticker", title: "sized" } }, ann);
+	assert.deepEqual(made.box, { x1: 460, y1: 600, x2: 760, y2: 800 });
+	await s.close();
+});

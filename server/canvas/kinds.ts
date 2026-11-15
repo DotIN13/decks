@@ -6,6 +6,9 @@ import type { Item, ItemKind, ItemOp, PenNode } from "../kernel/types.ts";
 /** The drawn kinds, said once: what pen.dev itself draws. */
 export const DRAWN = ["note", "text", "rectangle", "ellipse", "polygon", "path", "line", "frame", "group", "icon", "icon_font", "ref", "prompt", "context", "script", "browser"] as const;
 
+/** Items whose box a kind's prepare added: a size only, placed like any item given no place. */
+export const sizedOnly = new WeakSet<Item>();
+
 export class Kinds {
 	private byType = new Map<string, ItemKind>();
 
@@ -53,7 +56,10 @@ export class Kinds {
 		const out: ItemOp[] = [];
 		for (const op of ops) {
 			const prepare = (op.op === "insert" || op.op === "replace") ? this.named(op.item.type)?.prepare : undefined;
-			out.push(prepare && (op.op === "insert" || op.op === "replace") ? { ...op, item: await prepare(op.item, at) } : op);
+			if (!prepare || (op.op !== "insert" && op.op !== "replace")) { out.push(op); continue; }
+			const item = await prepare(op.item, at);
+			if (op.op === "insert" && !op.item.box && item.box) sizedOnly.add(item);
+			out.push({ ...op, item });
 		}
 		return out;
 	}
