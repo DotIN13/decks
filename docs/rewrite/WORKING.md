@@ -60,7 +60,7 @@ One Mac, 16 GB of memory, shared with the person's own work.
 
 Write the folder's rules in its `README.md`, write tests from those sentences, then the code. Do not port
 line by line and do not build a harness that compares with the old code. New folders start with no
-exceptions to the ten rules in `DESIGN.md` section 6: 400 lines a file, 80 a function, comments of 5
+exceptions to the ten rules in `DESIGN.md` section 6: 1,000 lines a file, 80 a function, comments of 5
 lines or fewer, plain words, no em dashes.
 
 ## Progress, decisions, reports

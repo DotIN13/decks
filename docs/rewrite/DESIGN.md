@@ -92,7 +92,7 @@ server/canvas/
   README.md     60 lines: what it owns, what it may import, its rules, how to check it
   feature.ts    its one export: defineFeature({ name, calls, items, start })
   calls.ts      one short handler per call; a long one moves to a file of its own beside it
-  doc.ts ops.ts place.ts …   its modules, each under 400 lines, each with its test beside it
+  doc.ts ops.ts place.ts …   its modules, each well under the file limit, each with its test beside it
   checks/       its browser checks, in TypeScript
 ```
 
@@ -257,7 +257,8 @@ added. A gate compares the table with the last released one. The other two repos
 
 Each gate starts from a list of what breaks its rule today; a change may shorten the list, never add to it.
 
-1. A file holds 400 lines at most, a function 80.
+1. A file holds 1,000 lines at most, a function 80. (The limit was 400 until 2026-11-15, when the person
+   said 1,000 is tolerable; files already split to 400 stay split.)
 2. One name per thing: one glossary; a retired word lives only in `compat/` and `upgrade/`.
 3. Imports go one way (the table in section 3), through a folder's entry file only.
 4. A call is declared once in the protocol and handled once; everything else is generated.
@@ -410,3 +411,7 @@ the 16 other TypeScript files of the canvas. The canvas's TypeScript has one typ
 shared, so two agents mid-split there would break each other's checks: that part stays one at a time.
 Only Loom edits the gates' baselines during the splits; the others leave fixed keys for one shrink at
 the end.
+
+**The file limit is 1,000 lines (the person, 2026-11-15).** Rule 1 now reads 1,000 lines a file, 80 a
+function. Ten files of the canvas libraries are over it; only those are split now. What was already split
+to 400 stays as it is, and new code still aims small: the limit is a ceiling, not a target.
