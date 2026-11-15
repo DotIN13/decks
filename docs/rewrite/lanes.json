@@ -73,5 +73,10 @@
 	"Scribe": [
 		"harness/page/chat/",
 		"harness/page/composer/"
+	],
+	"Anvil": [
+		"packages/stage/crates/apple/",
+		"packages/stage/Cargo.toml",
+		"packages/stage/Cargo.lock"
 	]
 }
