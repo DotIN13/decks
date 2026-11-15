@@ -73,6 +73,11 @@ function shaped(now: string, old: string, args: Args): Args {
 	if (now === "canvas.undo") return { ...(args.canvas ? { canvas: args.canvas } : {}), redo: args.direction === "redo" };
 	if (old === "canvas.edit" && Array.isArray(args.ops)) args.ops = args.ops.map(itemOp);
 	if (now === "file.url" && typeof args.file === "string" && args.path === undefined) args.path = args.file;
+	// Today's view.move took the camera as one object; the new call takes x, y and zoom.
+	if (now === "view.move" && isObject(args.camera)) {
+		const { camera, ...rest } = args;
+		args = { ...rest, ...camera };
+	}
 	// Today's canvas.update took the change as one object; item.update takes its parts.
 	if (now === "item.update" && isObject(args.change)) {
 		const { change, ...rest } = args;
