@@ -259,6 +259,10 @@ Each gate starts from a list of what breaks its rule today; a change may shorten
 
 1. A file holds 1,000 lines at most, a function 80. (The limit was 400 until 2026-11-15, when the person
    said 1,000 is tolerable; files already split to 400 stay split.)
+   **A file is one story.** Its name says its subject and everything in it belongs to that subject. It
+   opens with a sentence saying what it is. Its parts come in the order a reader needs them: the main
+   thing first, then what that calls, with the functions that work together sitting together. Split
+   where the stories divide, not where a count runs out; never leave a file that is a bag of leftovers.
 2. One name per thing: one glossary; a retired word lives only in `compat/` and `upgrade/`.
 3. Imports go one way (the table in section 3), through a folder's entry file only.
 4. A call is declared once in the protocol and handled once; everything else is generated.
@@ -415,3 +419,10 @@ the end.
 **The file limit is 1,000 lines (the person, 2026-11-15).** Rule 1 now reads 1,000 lines a file, 80 a
 function. Ten files of the canvas libraries are over it; only those are split now. What was already split
 to 400 stays as it is, and new code still aims small: the limit is a ceiling, not a target.
+
+**A file is one story, in reading order (the person, 2026-11-15).** With the limit raised came the
+condition: each code file is a full story, and its functions are ordered and clustered by meaning. The
+ten long files are split along their stories. Every other code file gets one pass by its folder's owner:
+one subject, an opening sentence, the main thing first, clusters together, no change of behaviour. The
+brief is the card "The story pass" on the build canvas; each owner counts its files in its progress file.
+No gate can read meaning, so a second agent reads a sample of each folder afterwards.
