@@ -1,3 +1,5 @@
+// Whether a runtime's copy of a user message is the message the person sent,
+// so a runtime's entry can be paired with the transcript's.
 /**
  * Whether a message in a runtime's session is the one the transcript shows.
  *

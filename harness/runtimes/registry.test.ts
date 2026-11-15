@@ -1,3 +1,4 @@
+// The registry: every kind has a runtime, and the menu's list says which can run here.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AGENT_KINDS } from "./types/index.ts";

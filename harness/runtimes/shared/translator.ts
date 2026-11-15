@@ -1,3 +1,5 @@
+// One agent's transcript, the same for every runtime: entries kept and told
+// as they change, replies streamed as deltas, tools named for a person to read.
 import type { AgentState, ChatItem, MessagePart } from "../types/index.ts";
 
 /** What a transcript says as it changes; the session turns each into a harness event. */

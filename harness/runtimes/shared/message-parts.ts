@@ -1,3 +1,5 @@
+// A message's parts as the page sent them (words and pills), made safe to keep
+// beside the message. They are drawn, never read by the agent.
 import type { MessageMention, MessagePart } from "../types/index.ts";
 
 /**

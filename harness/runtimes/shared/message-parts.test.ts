@@ -1,3 +1,4 @@
+// A message's parts: what is kept, what is dropped, and that they come back with the history.
 import type { ChatEvent } from "./translator.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

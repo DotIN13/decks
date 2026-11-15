@@ -1,3 +1,5 @@
+// Every runtime this harness runs, the one place a kind is named, and the
+// list the page's new-agent menu draws from.
 import { AGENT_KINDS, type AgentKind, type RunKind, type ModelOption, type RuntimeInfo } from "./types/index.ts";
 import { antigravity } from "./antigravity/index.ts";
 import type { AgentRuntime } from "./runtime.ts";

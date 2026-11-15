@@ -1,3 +1,4 @@
+// Pi's events as transcript entries: replies, thinking, tools and the end of a turn.
 import type { ChatEvent } from "../shared/translator.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

@@ -1,3 +1,4 @@
+// Pi's session events turned into transcript entries, one event at a time.
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { readToolResult, titleFor, type Translator } from "../shared/translator.ts";
 

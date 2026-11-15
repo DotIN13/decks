@@ -1,3 +1,4 @@
+// Slash commands: parsing, merging the lists, and the help text.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { helpText, mergeCommands, parseSlash, sameCommands } from "./slash.ts";

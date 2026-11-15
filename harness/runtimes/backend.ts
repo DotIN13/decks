@@ -1,20 +1,94 @@
+// What a session needs from a runtime (AgentBackend), and what it hands each
+// one (AgentBackendContext): an agent's id, its decks access, its briefing.
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "./types/index.ts";
 import type { ExtensionUiBridge } from "./shared/extension-ui.ts";
 import type { Translator } from "./shared/translator.ts";
 
-/** What an agent's shell needs to call Decks, built by the session (sessions/tools.ts). */
-export interface DecksAccess {
-	url: string;
-	token?: string;
-	/** The variables for the agent's shell: DECKS_URL, DECKS_TOKEN, DECKS_AGENT, and decks on PATH. */
-	env(path?: string): Record<string, string>;
+export interface AgentBackend {
+	readonly capabilities: AgentCapabilities;
+
+	prompt(text: string): Promise<void>;
+	abort(): Promise<void>;
+	readonly isStreaming: boolean;
+
+	/**
+	 * What typing `/` in the composer can do on this runtime. The deck interprets
+	 * some of them itself; the rest pass through to the runtime as prompts.
+	 */
+	commands(): SlashCommand[];
+
+	model(): AgentModel | undefined;
+	setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void>;
+	setThinking(level: ThinkingLevel): void;
+	/** Only meaningful when `capabilities.modes` is non-empty. */
+	setMode?(mode: AgentMode): Promise<void>;
+	mode?(): AgentMode | undefined;
+	models(): Promise<ModelOption[]>;
+	usage(): AgentUsage | null;
+	/**
+	 * The full reading: the plan's windows, what this conversation spent, what drove it.
+	 *
+	 * Optional because it is a round trip to the runtime and not every runtime has one to
+	 * make. A backend without it is not asked, and the panel says which parts a runtime
+	 * cannot answer rather than drawing them empty.
+	 */
+	report?(): Promise<UsageReport>;
+
+	/** The name the agent gave itself, if it has (`decks.agent.update({ name })`). */
+	name(): string | undefined;
+	setName(name: string): void;
+
+	// --- the session tree (§6.7, the time machine) ---------------------------------
+
+	/**
+	 * A handle that reopens *this* conversation — what `resumeRef` will be next time.
+	 *
+	 * Both runtimes already hold it and neither exposed it: pi's is the session file path,
+	 * Claude's is the session id. Read after a turn rather than only at start, because a
+	 * rewind moves it — Claude's rewind is a fork it stays in, so the id changes and a
+	 * stored ref taken at start would point at the abandoned branch.
+	 *
+	 * `undefined` before the session exists, which is why an agent that has never run is
+	 * not worth persisting.
+	 */
+	sessionRef(): string | undefined;
+
+	/** The points in this conversation worth returning to: the user's messages. */
+	timeline(): ConversationPoint[];
+	/**
+	 * Tag the transcript's user messages with the session entries they became.
+	 *
+	 * Async because Claude's message ids come from reading the session file, which Pi
+	 * can do from memory.
+	 */
+	syncEntryIds(): Promise<void>;
+	/** Which revision each board was at, at that point in the conversation. */
+	revisionsAt(entryId: string): Record<string, string>;
+	/** Move the conversation back to just before that message. */
+	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
+	/** A handle a new chat can open, holding everything up to that point. */
+	forkFrom(entryId: string): Promise<string | undefined>;
+	/**
+	 * This agent was moved to another subscription, and its link already points there.
+	 *
+	 * For a runtime that cannot follow the link while it runs: Claude Code on macOS reads its
+	 * token from a keychain entry chosen when the process starts, so it must start again.
+	 */
+	accountChanged?(): void;
+
+	dispose(): void;
 }
 
-/** Binds a shared server's sessions to agents, so a session's decks command runs as its agent. */
-export interface SessionTokens {
-	setServerToken(secret: string, kind?: string): void;
-	registerSession(sessionId: string, agentId: string, kind?: string): void;
-	unregisterSession(sessionId: string | undefined): void;
+/**
+ * A point in a conversation the server can address: one per user message.
+ *
+ * Server-internal. It used to be a protocol type feeding a timeline widget; the widget
+ * is gone (its actions moved onto the messages themselves) and what remains is the one
+ * use that never was drawing — matching a revision to the moment a message was sent.
+ */
+export interface ConversationPoint {
+	id: string;
+	at?: number;
 }
 
 /**
@@ -107,6 +181,21 @@ export interface AgentBackendContext {
 	showUsage?(): void;
 }
 
+/** What an agent's shell needs to call Decks, built by the session (sessions/tools.ts). */
+export interface DecksAccess {
+	url: string;
+	token?: string;
+	/** The variables for the agent's shell: DECKS_URL, DECKS_TOKEN, DECKS_AGENT, and decks on PATH. */
+	env(path?: string): Record<string, string>;
+}
+
+/** Binds a shared server's sessions to agents, so a session's decks command runs as its agent. */
+export interface SessionTokens {
+	setServerToken(secret: string, kind?: string): void;
+	registerSession(sessionId: string, agentId: string, kind?: string): void;
+	unregisterSession(sessionId: string | undefined): void;
+}
+
 /**
  * What a backend needs from the account store, and nothing more.
  *
@@ -156,91 +245,4 @@ export interface ClaudeAccountSwitcher {
 	 * own, and this is the answer for one that has not been given one yet.
 	 */
 	active(): { id: string; email?: string } | undefined;
-}
-
-/**
- * A point in a conversation the server can address: one per user message.
- *
- * Server-internal. It used to be a protocol type feeding a timeline widget; the widget
- * is gone (its actions moved onto the messages themselves) and what remains is the one
- * use that never was drawing — matching a revision to the moment a message was sent.
- */
-export interface ConversationPoint {
-	id: string;
-	at?: number;
-}
-
-export interface AgentBackend {
-	readonly capabilities: AgentCapabilities;
-
-	prompt(text: string): Promise<void>;
-	abort(): Promise<void>;
-	readonly isStreaming: boolean;
-
-	/**
-	 * What typing `/` in the composer can do on this runtime. The deck interprets
-	 * some of them itself; the rest pass through to the runtime as prompts.
-	 */
-	commands(): SlashCommand[];
-
-	model(): AgentModel | undefined;
-	setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void>;
-	setThinking(level: ThinkingLevel): void;
-	/** Only meaningful when `capabilities.modes` is non-empty. */
-	setMode?(mode: AgentMode): Promise<void>;
-	mode?(): AgentMode | undefined;
-	models(): Promise<ModelOption[]>;
-	usage(): AgentUsage | null;
-	/**
-	 * The full reading: the plan's windows, what this conversation spent, what drove it.
-	 *
-	 * Optional because it is a round trip to the runtime and not every runtime has one to
-	 * make. A backend without it is not asked, and the panel says which parts a runtime
-	 * cannot answer rather than drawing them empty.
-	 */
-	report?(): Promise<UsageReport>;
-
-	/** The name the agent gave itself, if it has (`decks.agent.update({ name })`). */
-	name(): string | undefined;
-	setName(name: string): void;
-
-	// --- the session tree (§6.7, the time machine) ---------------------------------
-
-	/**
-	 * A handle that reopens *this* conversation — what `resumeRef` will be next time.
-	 *
-	 * Both runtimes already hold it and neither exposed it: pi's is the session file path,
-	 * Claude's is the session id. Read after a turn rather than only at start, because a
-	 * rewind moves it — Claude's rewind is a fork it stays in, so the id changes and a
-	 * stored ref taken at start would point at the abandoned branch.
-	 *
-	 * `undefined` before the session exists, which is why an agent that has never run is
-	 * not worth persisting.
-	 */
-	sessionRef(): string | undefined;
-
-	/** The points in this conversation worth returning to: the user's messages. */
-	timeline(): ConversationPoint[];
-	/**
-	 * Tag the transcript's user messages with the session entries they became.
-	 *
-	 * Async because Claude's message ids come from reading the session file, which Pi
-	 * can do from memory.
-	 */
-	syncEntryIds(): Promise<void>;
-	/** Which revision each board was at, at that point in the conversation. */
-	revisionsAt(entryId: string): Record<string, string>;
-	/** Move the conversation back to just before that message. */
-	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
-	/** A handle a new chat can open, holding everything up to that point. */
-	forkFrom(entryId: string): Promise<string | undefined>;
-	/**
-	 * This agent was moved to another subscription, and its link already points there.
-	 *
-	 * For a runtime that cannot follow the link while it runs: Claude Code on macOS reads its
-	 * token from a keychain entry chosen when the process starts, so it must start again.
-	 */
-	accountChanged?(): void;
-
-	dispose(): void;
 }

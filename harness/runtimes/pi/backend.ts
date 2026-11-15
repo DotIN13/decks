@@ -1,3 +1,5 @@
+// Pi behind one Decks agent: its session runs in this process, with the deck
+// as its folder, the briefing as a context file and Decks' skills.
 import { sentAs } from "../shared/sent-as.ts";
 import { gdocsCaller } from "../shared/gdocs.ts";
 import { existsSync } from "node:fs";

@@ -1,3 +1,4 @@
+// The briefing: the tab's calls only when a tab is shared, and every placeholder filled.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";

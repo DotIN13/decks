@@ -1,3 +1,5 @@
+// Slash commands: reading one out of a prompt, merging the runtime's list
+// with the deck's own, and the help text that lists them.
 import type { SlashCommand } from "../types/index.ts";
 
 /**

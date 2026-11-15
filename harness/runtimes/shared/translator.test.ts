@@ -1,3 +1,5 @@
+// The transcript: when a reply becomes a bubble, how tools are named, and what
+// falls out of the window.
 import type { ChatEvent } from "./translator.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

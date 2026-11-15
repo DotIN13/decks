@@ -1,3 +1,5 @@
+// The runtimes' own shapes about a kind of agent: which kinds run here, what
+// each can do, and the thinking levels a model is moved between.
 import { THINKING_LEVELS, type AgentKind, type AgentMode, type ModelOption, type SlashCommand, type ThinkingLevel } from "@decks/protocol";
 /** An agent as the chat list draws it: its runtime, its identity, and what it can do. */
 

@@ -1,3 +1,4 @@
+// The dialogs a runtime puts to the person, as they travel to the page and back.
 /** A runtime's dialog surface, serialised — Pi's widget API, and Claude's questions. */
 export interface WidgetSpan {
 	text: string;

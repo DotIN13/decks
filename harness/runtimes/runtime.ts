@@ -1,3 +1,5 @@
+// What a runtime is, declared once beside the runtime it describes: its
+// label, capabilities, commands, whether it can run here, and how to start one.
 import type { AgentCapabilities, AgentKind, SlashCommand } from "./types/index.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 

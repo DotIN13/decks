@@ -1,3 +1,5 @@
+// What Pi gets from Decks besides the briefing: its bash again with the agent's
+// decks command in it, and the Google Docs tools when there are any.
 import { createBashTool, type ExtensionAPI, type InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";

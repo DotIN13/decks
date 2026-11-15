@@ -1,3 +1,4 @@
+// Pairing a runtime's copy of a message with the message sent.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { sentAs } from "./sent-as.ts";

@@ -1,3 +1,5 @@
+// The dialogs a runtime puts to the person (a choice, a confirm, a login),
+// held until the page answers them or they time out.
 import { randomUUID } from "node:crypto";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "../types/index.ts";
 

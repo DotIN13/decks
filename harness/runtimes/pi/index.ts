@@ -1,3 +1,4 @@
+// The Pi runtime, as the registry lists it.
 import { PI_CAPABILITIES, PI_COMMANDS, PiBackend } from "./backend.ts";
 import type { AgentRuntime } from "../runtime.ts";
 

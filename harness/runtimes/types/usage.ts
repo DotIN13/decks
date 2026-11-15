@@ -1,3 +1,5 @@
+// A usage report as the page's usage panel draws it: the plan's windows, what
+// a conversation spent, and what drove the spending.
 import type { AgentKind } from "@decks/protocol";
 /** What the usage panel draws: the plan's windows, what a conversation spent, what drove it. */
 
