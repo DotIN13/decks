@@ -104,10 +104,11 @@ export function insetsOnly(targets: (() => readonly HTMLElement[]) | undefined):
 	for (const element of was) for (const name of Object.keys(published)) element.style.removeProperty(name);
 }
 
-export function watchInsets(root: HTMLElement = document.body): void {
-	let sizes = new ResizeObserver(() => soon(false));
-	const tracked = new Set<Element>();
-
+/** What `watchInsets` holds while it watches. */
+interface Watch {
+	root: HTMLElement;
+	sizes: ResizeObserver;
+	tracked: Set<Element>;
 	/*
 	 * The clear span of the top band: to the right of the left cluster, and to the left of
 	 * the right one.
@@ -118,138 +119,148 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	 * pill the moment the pill grew a canvas switcher, and a press aimed at it landed on the
 	 * text tool. Measured, like everything else here, rather than stated beside a stylesheet.
 	 */
-	let band = { left: 0, right: 0 };
+	band: { left: number; right: number };
+	frame: number;
+	resync: boolean;
+}
 
-	const measure = () => {
-		const view = { width: window.innerWidth, height: window.innerHeight };
-		const next: Insets = { ...ZERO };
-		let bandLeft = 0;
-		let bandRight = view.width;
-		for (const el of tracked) {
-			const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
-			if (!edge) continue;
-			/*
-			 * The *layout* box, not the painted one — `offsetLeft`/`offsetTop` ignore
-			 * transforms where `getBoundingClientRect` does not.
-			 *
-			 * That distinction is the whole of a bug. The panel is slid out with a `translate`
-			 * rather than unmounted, so it animates; measured by its painted rect, a panel
-			 * that had just been asked to open was still off-screen at the moment its
-			 * `data-inset` came back, so the camera recorded nothing — and the ResizeObserver
-			 * never fired again, because a transform is not a resize. The canvas kept the
-			 * whole window for the rest of the session.
-			 *
-			 * Layout coordinates say where a surface *is* rather than where it is currently
-			 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
-			 * the boards should already be making room for.
-			 *
-			 * These elements are all `position: fixed` with no positioned ancestor, so their
-			 * offsets are viewport coordinates.
-			 */
-			const box = el as HTMLElement;
-			const width = box.offsetWidth;
-			const height = box.offsetHeight;
-			// A surface that is `display: none` measures nothing, so nothing has to
-			// deregister it — but one that is merely slid away still counts, which is the
-			// point of reading the layout box.
-			if (width === 0 || height === 0) continue;
-			// Its own edge to the far side of it, gutter included: a panel inset 12px from the
-			// window is 12px the canvas cannot use either.
-			if (edge === "left") next.left = Math.max(next.left, box.offsetLeft + width);
-			if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
-			if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
-			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
-			/*
-			 * And where the top band is taken. Which side a cluster belongs to is decided by
-			 * its own middle: the pill grows rightwards from the sidebar and the corner grows
-			 * leftwards from the window's edge, so nothing has to name them.
-			 */
-			if (edge === "top") {
-				const middle = box.offsetLeft + width / 2;
-				if (middle < view.width / 2) bandLeft = Math.max(bandLeft, box.offsetLeft + width);
-				else bandRight = Math.min(bandRight, box.offsetLeft);
-			}
-		}
-		bandLeft = Math.max(bandLeft, next.left);
-		bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
-		const now = insets();
-		const sameBand = band.left === bandLeft && band.right === bandRight;
-		if (sameBand && now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
-		band = { left: bandLeft, right: bandRight };
-		setInsets(next);
+/** Where the chrome stands: the four insets, and the clear span of the top band between its clusters. */
+function edgesOf(tracked: Set<Element>): { next: Insets; bandLeft: number; bandRight: number } {
+	const view = { width: window.innerWidth, height: window.innerHeight };
+	const next: Insets = { ...ZERO };
+	let bandLeft = 0;
+	let bandRight = view.width;
+	for (const el of tracked) {
+		const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
+		if (!edge) continue;
 		/*
-		 * Published as custom properties as well as a signal, so that the parts of the
-		 * layout which are genuinely CSS can stay CSS.
+		 * The *layout* box, not the painted one — `offsetLeft`/`offsetTop` ignore
+		 * transforms where `getBoundingClientRect` does not.
 		 *
-		 * The dock is the reason: it centres on the canvas column, and expressing that as
-		 * `calc()` over these four numbers means the browser animates the slide and reflows
-		 * it on resize without a single line of JavaScript in the path. A component that
-		 * needs to *decide* something reads the signal; a rule that needs to *measure*
-		 * something reads these.
+		 * That distinction is the whole of a bug. The panel is slid out with a `translate`
+		 * rather than unmounted, so it animates; measured by its painted rect, a panel
+		 * that had just been asked to open was still off-screen at the moment its
+		 * `data-inset` came back, so the camera recorded nothing — and the ResizeObserver
+		 * never fired again, because a transform is not a resize. The canvas kept the
+		 * whole window for the rest of the session.
+		 *
+		 * Layout coordinates say where a surface *is* rather than where it is currently
+		 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
+		 * the boards should already be making room for.
+		 *
+		 * These elements are all `position: fixed` with no positioned ancestor, so their
+		 * offsets are viewport coordinates.
 		 */
-		publishInsets({
-			"--inset-left": `${next.left}px`,
-			"--inset-right": `${next.right}px`,
-			"--inset-top": `${next.top}px`,
-			"--inset-bottom": `${next.bottom}px`,
-			/* A gutter inside each cluster, so what centres here never touches one. */
-			"--band-left": `${bandLeft + 12}px`,
-			"--band-right": `${Math.max(bandLeft + 12, bandRight - 12)}px`,
-		});
-	};
-
-	const sync = () => {
-		const found = new Set(root.querySelectorAll("[data-inset]"));
-		for (const el of tracked) {
-			if (!found.has(el)) {
-				sizes.unobserve(el);
-				tracked.delete(el);
-			}
+		const box = el as HTMLElement;
+		const width = box.offsetWidth;
+		const height = box.offsetHeight;
+		// A surface that is `display: none` measures nothing, so nothing has to
+		// deregister it — but one that is merely slid away still counts, which is the
+		// point of reading the layout box.
+		if (width === 0 || height === 0) continue;
+		// Its own edge to the far side of it, gutter included: a panel inset 12px from the
+		// window is 12px the canvas cannot use either.
+		if (edge === "left") next.left = Math.max(next.left, box.offsetLeft + width);
+		if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
+		if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
+		if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
+		/*
+		 * And where the top band is taken. Which side a cluster belongs to is decided by
+		 * its own middle: the pill grows rightwards from the sidebar and the corner grows
+		 * leftwards from the window's edge, so nothing has to name them.
+		 */
+		if (edge === "top") {
+			const middle = box.offsetLeft + width / 2;
+			if (middle < view.width / 2) bandLeft = Math.max(bandLeft, box.offsetLeft + width);
+			else bandRight = Math.min(bandRight, box.offsetLeft);
 		}
-		for (const el of found) {
-			if (!tracked.has(el)) {
-				sizes.observe(el);
-				tracked.add(el);
-			}
-		}
-		measure();
-	};
+	}
+	bandLeft = Math.max(bandLeft, next.left);
+	bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
+	return { next, bandLeft, bandRight };
+}
 
+function measure(w: Watch): void {
+	const { next, bandLeft, bandRight } = edgesOf(w.tracked);
+	const now = insets();
+	const sameBand = w.band.left === bandLeft && w.band.right === bandRight;
+	if (sameBand && now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
+	w.band = { left: bandLeft, right: bandRight };
+	setInsets(next);
 	/*
-	 * Once a frame, however many times it is asked.
+	 * Published as custom properties as well as a signal, so that the parts of the
+	 * layout which are genuinely CSS can stay CSS.
 	 *
-	 * The tree observer watches the whole body, so every change anywhere in the app — each
-	 * card of a transcript arriving, each row of the rail — asked for a measurement, and a
-	 * measurement reads layout. During an open that was a synchronous layout per batch of
-	 * mutations: 212 ms of one profile. Deferred to the next frame it is one read per frame,
-	 * taken where the browser was about to lay out anyway. `withSync` remembers that the tree
-	 * changed, since only then are there surfaces to add or drop before measuring.
+	 * The dock is the reason: it centres on the canvas column, and expressing that as
+	 * `calc()` over these four numbers means the browser animates the slide and reflows
+	 * it on resize without a single line of JavaScript in the path. A component that
+	 * needs to *decide* something reads the signal; a rule that needs to *measure*
+	 * something reads these.
 	 */
-	let frame = 0;
-	let resync = false;
-	const soon = (withSync: boolean) => {
-		resync ||= withSync;
-		if (frame) return;
-		frame = requestAnimationFrame(() => {
-			frame = 0;
-			const tree = resync;
-			resync = false;
-			if (tree) sync();
-			else measure();
-		});
-	};
-	const resized = () => soon(false);
+	publishInsets({
+		"--inset-left": `${next.left}px`,
+		"--inset-right": `${next.right}px`,
+		"--inset-top": `${next.top}px`,
+		"--inset-bottom": `${next.bottom}px`,
+		/* A gutter inside each cluster, so what centres here never touches one. */
+		"--band-left": `${bandLeft + 12}px`,
+		"--band-right": `${Math.max(bandLeft + 12, bandRight - 12)}px`,
+	});
+}
 
-	/*
-	 * Only a change that adds or drops chrome: the tree observer sees every node the app adds, and
-	 * measuring reads layout, which during a board drag (guides, handles, a board's move) was a
-	 * forced layout on every frame, 10 ms each.
-	 */
-	const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
+function sync(w: Watch): void {
+	const found = new Set(w.root.querySelectorAll("[data-inset]"));
+	for (const el of w.tracked) {
+		if (!found.has(el)) {
+			w.sizes.unobserve(el);
+			w.tracked.delete(el);
+		}
+	}
+	for (const el of found) {
+		if (!w.tracked.has(el)) {
+			w.sizes.observe(el);
+			w.tracked.add(el);
+		}
+	}
+	measure(w);
+}
+
+/*
+ * Once a frame, however many times it is asked.
+ *
+ * The tree observer watches the whole body, so every change anywhere in the app — each
+ * card of a transcript arriving, each row of the rail — asked for a measurement, and a
+ * measurement reads layout. During an open that was a synchronous layout per batch of
+ * mutations: 212 ms of one profile. Deferred to the next frame it is one read per frame,
+ * taken where the browser was about to lay out anyway. `withSync` remembers that the tree
+ * changed, since only then are there surfaces to add or drop before measuring.
+ */
+function soon(w: Watch, withSync: boolean): void {
+	w.resync ||= withSync;
+	if (w.frame) return;
+	w.frame = requestAnimationFrame(() => {
+		w.frame = 0;
+		const tree = w.resync;
+		w.resync = false;
+		if (tree) sync(w);
+		else measure(w);
+	});
+}
+
+/*
+ * Only a change that adds or drops chrome: the tree observer sees every node the app adds, and
+ * measuring reads layout, which during a board drag (guides, handles, a board's move) was a
+ * forced layout on every frame, 10 ms each.
+ */
+const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
+
+export function watchInsets(root: HTMLElement = document.body): void {
+	const w: Watch = { root, sizes: new ResizeObserver(() => soon(w, false)), tracked: new Set(), band: { left: 0, right: 0 }, frame: 0, resync: false };
+	const resized = () => soon(w, false);
 	const tree = new MutationObserver((records) => {
 		for (const record of records) {
 			if (record.type === "attributes" || [...record.addedNodes].some(isChrome) || [...record.removedNodes].some(isChrome)) {
-				soon(true);
+				soon(w, true);
 				return;
 			}
 		}
@@ -257,13 +268,13 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
 	window.addEventListener("resize", resized);
 	// The first reading is taken at once: the camera's first fit is waiting on it.
-	sync();
+	sync(w);
 
 	onCleanup(() => {
-		if (frame) cancelAnimationFrame(frame);
+		if (w.frame) cancelAnimationFrame(w.frame);
 		tree.disconnect();
-		sizes.disconnect();
-		sizes = new ResizeObserver(() => {});
+		w.sizes.disconnect();
+		w.sizes = new ResizeObserver(() => {});
 		window.removeEventListener("resize", resized);
 	});
 }
