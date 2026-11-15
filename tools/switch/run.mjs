@@ -58,7 +58,12 @@ function moveChecks(p) {
 
 function deleteOld(p) {
 	const gone = p.deletions.filter((d) => d.delete).map((d) => d.old);
-	for (const dir of gone) git("rm", "-r", "-q", dir);
+	// A folder goes whole but for the files it keeps for Loom (runtime/live-doc.ts).
+	for (const d of p.deletions.filter((x) => x.delete)) {
+		const keep = Object.keys(d.keep ?? {});
+		const files = git("ls-files", d.old).split("\n").filter((f) => f && !keep.includes(f));
+		for (let i = 0; i < files.length; i += 200) git("rm", "-q", "--", ...files.slice(i, i + 200));
+	}
 	gates();
 	commit(gone, "Delete the code the new folders replaced", `Gone, each with its new home and proof in ${PLAN_FILE}: ${gone.join(", ")}.`);
 	return gone;

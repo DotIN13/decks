@@ -1,17 +1,20 @@
 // The switch-over plan as Markdown: what run.mjs --dry prints and writes to docs/rewrite/switch-plan.md.
 
+import { KEPT_FILES } from "./plan.mjs";
+
 const list = (rows) => rows.map((r) => `- ${r}`).join("\n");
 
 function deleted(p) {
-	const go = p.deletions.filter((d) => d.delete).map((d) => `\`${d.old}\` (${d.name ?? "no package"}): now ${d.home}. Proof: ${d.proof}.`);
+	const go = p.deletions.filter((d) => d.delete).map((d) => `\`${d.old}\` (${d.name ?? "no package"}): now ${d.home}. Proof: ${d.proof}.${Object.entries(d.keep ?? {}).map(([f, why]) => ` **Except \`${f}\`, kept where it is:** ${why}.`).join("")}`);
 	const moved = p.deletions.filter((d) => d.why === "already gone").map((d) => `\`${d.old}\`: already moved to ${d.home}.`);
 	const stay = p.deletions.filter((d) => !d.delete && d.why !== "already gone").map((d) => `\`${d.old}\`: **not deleted**, ${d.why}. Its new home: ${d.home}.`);
 	return `## Deleted\n\n${list([...go, ...moved])}\n\n### Not deleted, and why\n\n${list(stay)}\n- \`packages/docs\`: its server half lives in server/documents, its page half is Loom's; the package goes whole with Loom.`;
 }
 
 function kept(p) {
+	const files = Object.entries(KEPT_FILES).map(([f, why]) => `\`${f}\`: ${why}`);
 	const why = { "packages/protocol": "the canvas library reads its old shapes (Page, Presence and the old call and author types)", "packages/api": "the canvas library's card calls (cardCalls)", "packages/hub": "the canvas library's follower (studio-line.ts)" };
-	return `## Kept until Loom moves them (wave 3)\n\nDecided in DESIGN.md section 11; they go at the map's step 4a.\n\n${list(p.kept.map((k) => `\`${k}\`${why[k] ? `: ${why[k]}` : ""}`))}`;
+	return `## Kept until Loom moves them (wave 3)\n\nDecided in DESIGN.md section 11; they go at the map's step 4a.\n\n${list([...p.kept.map((k) => `\`${k}\`${why[k] ? `: ${why[k]}` : ""}`), ...files, "`runtime/live-doc.ts`: see Deleted"])}`;
 }
 
 function renamed(p) {

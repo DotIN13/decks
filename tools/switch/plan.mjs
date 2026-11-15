@@ -22,7 +22,7 @@ export const REPLACED = [
 	{ old: "packages/sync-client", home: "server/sharing/client", proof: "server/sharing/client tests" },
 	{ old: "packages/agent-ui", home: "harness/page (chat/, composer/)", proof: "chat-content, slash, voice, working-marks checks" },
 	{ old: "packages/sdk", home: "clients/sdk, clients/cli", proof: "node tools/check.mjs clients/sdk, tools/clients/same.test.ts" },
-	{ old: "runtime", home: "harness/prompts, harness/runtimes", proof: "node tools/check.mjs harness; running, time-machine checks" },
+	{ old: "runtime", home: "harness/prompts, harness/runtimes", proof: "node tools/check.mjs harness; running, time-machine checks", keep: { "runtime/live-doc.ts": "the source of packages/card-host/lib/live-doc.js, built by scripts/live-doc.mjs; Loom's step 4d moves it into canvas/" } },
 	{ old: "extension", home: "clients/extension", proof: "a clients/extension folder" },
 	{ old: "e2e", home: "tools/checks (the runner, the harness, the fake model and agent) and the features' checks/ folders", proof: "every check moved first and started by node tools/checks/run.mjs" },
 ];
@@ -125,6 +125,9 @@ export function compatNames() {
 }
 
 /** Root scripts the kept packages still need, each with what uses it. */
+/** Files under scripts/ the kept packages build with; scripts/ itself is not deleted by the switch. */
+export const KEPT_FILES = { "scripts/vendor.mjs": "fills packages/card-host/lib (Loom's step 4c moves it)", "scripts/live-doc.mjs": "builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)" };
+
 export const KEPT_SCRIPTS = {
 	vendor: "copies d3, KaTeX, pdf.js and the bundles into packages/card-host/lib",
 	"build:live-doc": "builds packages/card-host/lib/live-doc.js",
