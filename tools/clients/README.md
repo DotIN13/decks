@@ -12,6 +12,9 @@ Lexicon owns it.
   feature: calls, refusals, a token never given, an event on the socket, and `decks login`.
 - `attach.test.ts`: `decks attach` against Decks-local's real features; the agent calls as itself, makes
   a card, and `decks detach` leaves the folder as it was.
+- `extension-pairs.ts`: the real Chrome extension (`clients/extension`, loaded unpacked in Chromium) pairs
+  with `server/tab` and shares a tab that `tab.status` and `tab.read` see. A browser job, not a unit test:
+  `node tools/heavy.mjs --wait --class check -- node --import tsx tools/clients/extension-pairs.ts`.
 - `try.ts`: stop 2 in one command, `node tools/clients/try.ts [--tool claude] [--deck d]`: Decks-local on
   a copy of the fixture deck, the tool attached in `.scratch/Lexicon/try/`; Ctrl-C detaches and stops.
 
