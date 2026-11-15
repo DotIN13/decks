@@ -52,6 +52,9 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	const drawn = !!host;
 	if (host) {
 		const box = await (await frame.frameElement()).boundingBox();
+		// The first press selects the card and wakes it; the second puts the focus in its words.
+		await page.mouse.click(box.x + host.x + host.w * 0.5, box.y + host.y + host.h * 0.6);
+		await page.waitForTimeout(1000);
 		await page.mouse.click(box.x + host.x + host.w * 0.5, box.y + host.y + host.h * 0.6);
 		await page.waitForTimeout(400);
 		await page.keyboard.press("Escape");
