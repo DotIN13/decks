@@ -5,8 +5,21 @@
 	"type": "module",
 	"exports": {
 		".": "./main.ts",
+		"./kernel": "./kernel/index.ts",
 		"./kernel/testing": "./kernel/testing.ts",
-		"./kernel/types": "./kernel/types.ts"
+		"./kernel/types": "./kernel/types.ts",
+		"./canvas": "./canvas/feature.ts",
+		"./cards": "./cards/feature.ts",
+		"./documents": "./documents/feature.ts",
+		"./people": "./people/feature.ts",
+		"./sharing": "./sharing/feature.ts",
+		"./apps": "./apps/feature.ts",
+		"./pictures": "./pictures/feature.ts",
+		"./tab": "./tab/feature.ts",
+		"./frame": "./frame/feature.ts",
+		"./compat": "./compat/feature.ts",
+		"./upgrade": "./upgrade/feature.ts",
+		"./sharing/hub/*": "./sharing/hub/*.ts"
 	},
 	"scripts": {
 		"test": "node ../tools/check.mjs server"
