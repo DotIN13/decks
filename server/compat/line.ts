@@ -8,7 +8,7 @@ import { pagesOf, readDrawing, type News } from "./drawing.ts";
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
 
 export const LINE_PATH = "/compat/v1/socket";
-const QUIET = new Set(["card.extent", "canvas.unwatch"]);
+const QUIET = new Set(["canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
 type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
@@ -16,19 +16,19 @@ type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
 /** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
 export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
 
-export function lineRoute(deck: () => Deck): Route {
+export function lineRoute(deck: () => Deck, url: () => string | undefined = () => undefined): Route {
 	return {
 		method: "GET",
 		prefix: LINE_PATH,
 		upgrade(_req, socket, _head, door) {
 			const peer = door.accept();
 			if (!peer) return void socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
-			openLine(peer, door, deck);
+			openLine(peer, door, deck, url);
 		},
 	};
 }
 
-function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
+function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => string | undefined): void {
 	const client = door.client();
 	const state: State = { watched: new Map() };
 	const send = (message: Said) => peer.send(JSON.stringify(message));
@@ -47,7 +47,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		}
 		void heard(message).catch((error: Error) => send({ type: "harness.error", text: error.message }));
 	});
-	const parts: LineParts = { state, door, deck, send, client };
+	const parts: LineParts = { state, door, deck, send, client, url };
 	const watch = (canvas: string, since?: unknown, whole?: unknown) => watchOn(parts, canvas, since, whole);
 
 	async function heard(message: Said): Promise<void> {
@@ -57,6 +57,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		if (message.type === "canvas.unwatch") state.watched.get(String(message.canvas))?.();
 		if (message.type === "presence.set") return screen(parts, message);
 		if (message.type === "card.seen") return seen(parts, String(message.path ?? ""));
+		if (message.type === "card.extent") return extent(parts, message);
 		if (message.type === "view.answered") return answered(parts, message);
 		if (QUIET.has(String(message.type)) || message.type === "line.token") return;
 		send({ type: "harness.notice", level: "warn", text: `The line does not know ${String(message.type)}.` });
@@ -90,8 +91,16 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 }
 
 type Watching = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: { id: string } };
+/** A card's measured height, kept by server/pictures (card.fit answers from it), as the line's caller. */
+async function extent(L: LineParts, message: Said): Promise<void> {
+	const base = L.url();
+	if (!base || !L.state.token) return;
+	const { type: _type, ...body } = message;
+	await fetch(`${base}/pictures/extent`, { method: "POST", headers: { authorization: `Bearer ${L.state.token}`, "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => undefined);
+}
+
 /** What a line's helpers share: its state, the kernel's socket parts, the deck, its sender and its client. */
-type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: ReturnType<SocketDoor["client"]> };
+type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: ReturnType<SocketDoor["client"]>; url: () => string | undefined };
 
 /** The frame said where it points, what it picked or where it looks: view.update; a camera also makes it a screen that can shoot. */
 async function screen(L: LineParts, message: Said): Promise<void> {

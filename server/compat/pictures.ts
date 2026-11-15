@@ -11,6 +11,8 @@ const FORWARDS = [
 	{ old: "/api/stage-shot", now: "/pictures/shot" },
 	{ old: "/api/snapshot", now: "/pictures/snapshot", method: "POST" as const },
 	{ old: "/compat/snapshot", now: "/pictures/snapshot", method: "POST" as const },
+	{ old: "/compat/card-extent", now: "/pictures/extent", method: "POST" as const },
+	{ old: "/api/card-extent", now: "/pictures/extent", method: "POST" as const },
 ];
 
 export const pictureRoutes = (url: () => string | undefined): Route[] => FORWARDS.map((f) => forward(f.old, f.now, url, ("method" in f && f.method) || "GET"));

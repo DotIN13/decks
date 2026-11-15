@@ -21,7 +21,7 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow, () => folder()), uploadRoute, whereRoute, ...appOpenRoutes(() => url())],
+		routes: [lineRoute(deckNow, () => url()), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow, () => folder()), uploadRoute, whereRoute, ...appOpenRoutes(() => url())],
 		start(kernel) {
 			deck = kernel.deck;
 			url = () => kernel.url();
