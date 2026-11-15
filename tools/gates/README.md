@@ -30,3 +30,5 @@ Node's own modules, `typescript` (for its parser), and `lib.mjs` beside them. No
 - `npm run gates:next`, or `node tools/gates/run.mjs` (`--only <gate>` for one).
 - After fixing old code: `node tools/gates/run.mjs --shrink`, then commit the smaller baseline.
 - Tests: `node tools/check.mjs tools`.
+- After moving a file or folder: `node tools/gates/rekey.mjs <old> <new>` (or `--staged` for every
+  `git mv` staged), then commit the baselines with the move: its exceptions keep their counts.
