@@ -720,7 +720,7 @@
 	"ui/agent-marks.tsx: em dash": 12,
 	"ui/dismiss.ts: comment over 5 lines": 1,
 	"ui/float/float-math.ts: comment over 5 lines": 4,
-	"ui/float/float.ts: comment over 5 lines": 7,
+	"ui/float/float.ts: comment over 5 lines": 3,
 	"ui/icons.tsx: comment over 5 lines": 4,
 	"ui/icons.tsx: em dash": 6,
 	"ui/Popover.tsx: comment over 5 lines": 4,

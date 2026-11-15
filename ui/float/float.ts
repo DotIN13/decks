@@ -1,31 +1,8 @@
-import {
-	type Box,
-	type Pin,
-	type Point,
-	type Sample,
-	type Saved,
-	type Side,
-	type Size,
-	clamp,
-	fling,
-	fromSaved,
-	glideMs,
-	loadFloats,
-	loadStowed,
-	saveFloat,
-	saveStowed,
-	settle as restingPlace,
-	snapHome,
-	stowedAt,
-	stowSide,
-	avoid,
-	within,
-	stowY,
-	clearUpward,
-	toFraction,
-	velocityFrom,
-	verticalShare,
-} from "./float-math.ts";
+import type { Box, Pin, Point, Saved, Side, Size } from "./float-math.ts";
+import { listen, onDoubleClick, onPointerDown, onWindowBlur, onWindowMove, onWindowUp } from "./float-drag.ts";
+import { cancelSettle, follow, placeAt, restore, sendHome, unstow, type FloatState } from "./float-place.ts";
+import { listenTab, onTabBlur, onTabDown, onTabWindowMove, onTabWindowUp } from "./float-tab.ts";
+
 
 /**
  * The DOM half of a draggable float. All the numbers come from `float-math.ts`; this file
@@ -109,441 +86,33 @@ export interface FloatOptions {
 	pin?: Pin;
 }
 
-/** How far a tucked float's tab keeps from every other float: the throw bends up until it is this clear. */
-const TAB_SAFE_ZONE = 80;
-
-/** Fewer pixels than this and a press was a click, not a drag; nothing is saved. */
-const DRAG_THRESHOLD = 3;
-
-/** How far a tucked float's tab must be pulled in off its edge before the float comes out with it. */
-const PULL_OUT = 48;
-
-/** How many recent pointer positions to keep for the velocity at release. */
-const SAMPLES = 8;
-
 export function makeFloat(
 	el: HTMLElement,
 	options: FloatOptions,
 ): { restore: () => void; follow: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; dispose: () => void } {
 	const { key, handle, ignore, home, bounds, size, apply, onChange, storage } = options;
-	const pin: Pin = options.pin ?? "top";
-	const disabled = (): boolean => options.disabled?.() === true;
-
-	/** Where the float is now, or `undefined` when the CSS places it at home. */
-	let current: Point | undefined;
-	let drag: { pointerId: number; startPointer: Point; startPos: Point; moved: boolean; samples: Sample[] } | undefined;
-
-	const tabWidth = (): number => {
-		const tab = options.stow?.tab ?? 0;
-		return typeof tab === "function" ? tab() : tab;
+	const f: FloatState = {
+		el, options, key, handle, ignore, home, bounds, size, apply, onChange, storage,
+		pin: options.pin ?? "top",
+		disabled: () => options.disabled?.() === true,
+		current: undefined, drag: undefined, stowed: undefined, settling: undefined, following: undefined, tabDrag: undefined,
+		h: undefined as unknown as FloatState["h"],
 	};
-
-	/** The edge it is put away behind, or nothing. Where it comes back to is whatever `key` has saved. */
-	let stowed: Side | undefined;
-
-	const place = (p: Point | undefined): void => {
-		current = p;
-		apply(p, p === undefined, p !== undefined ? stowed : undefined);
+	f.h = {
+		onWindowMove: (event) => onWindowMove(f, event),
+		onWindowUp: (event) => onWindowUp(f, event),
+		onWindowBlur: () => onWindowBlur(f),
+		onTabWindowMove: (event) => onTabWindowMove(f, event),
+		onTabWindowUp: (event) => onTabWindowUp(f, event),
+		onTabBlur: () => onTabBlur(f),
+		onPointerDown: (event) => onPointerDown(f, event),
+		onDoubleClick: (event) => onDoubleClick(f, event),
+		onTabDown: (event) => onTabDown(f, event),
 	};
-
-	/**
-	 * Clear of the other floats: floating, the nearest clear place; put away, the throw bent
-	 * up along the edge until its tab is clear (`clearUpward`).
-	 */
-	const clear = (p: Point): Point => {
-		if (!options.others) return p;
-		const box = bounds();
-		const others = options.others().flatMap((other) => within(other, box) ?? []);
-		const tab = options.stow?.tabHeight?.();
-		return stowed ? clearUpward(p, size(), others, box, { gap: TAB_SAFE_ZONE, ...(tab ? { tab } : {}) }) : avoid(p, size(), others, box);
-	};
-
-	/**
-	 * A drop does not land; it glides. `[data-snapping]` turns the CSS transition on, with
-	 * `--snap-ms` saying how long (longer for a longer way), the element is placed at where
-	 * it is going, and when the transition ends (or a timer says it must have) the attribute
-	 * comes off. A glide *home* ends one step later: the element is handed back to the
-	 * stylesheet only once it is already standing where the stylesheet would put it, so
-	 * nothing jumps.
-	 */
-	let settling: { timer: ReturnType<typeof setTimeout>; finish: (event?: Event) => void } | undefined;
-	const cancelSettle = (): void => {
-		if (!settling) return;
-		clearTimeout(settling.timer);
-		el.removeEventListener("transitionend", settling.finish);
-		settling = undefined;
-		delete el.dataset.snapping;
-	};
-	const settle = (p: Point, thenHome: boolean, byHand = false): void => {
-		cancelSettle();
-		const ms = glideMs(current ?? home(), p);
-		el.style.setProperty("--snap-ms", `${ms}ms`);
-		el.dataset.snapping = "true";
-		place(p);
-		const finish = (event?: Event): void => {
-			// A child's own transition (a border colour, say) ends too, and is not this one.
-			if (event && event.target !== el) return;
-			cancelSettle();
-			if (byHand) options.onSettled?.();
-			if (!thenHome) return;
-			// The stylesheet's own `left` transition (the dock slides when the sidebar folds)
-			// would animate the handoff too, and half the width of a transform is a visible
-			// jump. Off for a frame, then back.
-			el.dataset.landing = "true";
-			place(undefined);
-			try {
-				requestAnimationFrame(() => requestAnimationFrame(() => delete el.dataset.landing));
-			} catch {
-				delete el.dataset.landing;
-			}
-		};
-		settling = { timer: setTimeout(finish, ms + 80), finish };
-		el.addEventListener("transitionend", finish);
-	};
-
-	const remember = (saved: Saved): void => {
-		saveFloat(key, saved, storage);
-		onChange?.(saved);
-	};
-
-	const onIgnored = (target: EventTarget | null): boolean =>
-		ignore !== undefined && target instanceof Element && target.closest(ignore) !== null;
-
-	/*
-	 * Following bounds that move step by step (a side panel being dragged wider): what `restore`
-	 * measures (the float's size, its home, its tab) and reads from storage (where it was put)
-	 * is read once, at the first step, and each step is only arithmetic on the new bounds. No
-	 * glide, no keeping clear of the others and no snapping home: `restore` does those once the
-	 * bounds stop, which also takes this away.
-	 */
-	let following: { size: Size; home: Point; tab: number; saved: Saved | undefined } | undefined;
-	const follow = (): void => {
-		if (drag || disabled()) return;
-		// At home the stylesheet places it, and follows the bounds by itself.
-		if (current === undefined) return;
-		cancelSettle();
-		following ??= { size: size(), home: home(), tab: tabWidth(), saved: loadFloats(storage)[key] };
-		const box = bounds();
-		const { size: sized, home: at, tab, saved } = following;
-		if (stowed) return place(stowedAt(current.y, sized, box, tab, 12, stowed));
-		if (saved === undefined || saved === "home") return;
-		place(clamp(fromSaved(saved, sized, box, at, 6, pin), sized, box));
-	};
-
-	const restore = (): void => {
-		following = undefined;
-		if (drag) return;
-		cancelSettle();
-		if (disabled()) {
-			// Nothing is thrown where nothing is dragged; it is not forgotten, only not drawn.
-			stowed = undefined;
-			place(undefined);
-			return;
-		}
-		const away = options.stow ? loadStowed(storage)[key] : undefined;
-		if (options.stow && away !== undefined) {
-			stowed = away.side;
-			const y = fromSaved({ fx: 1, fy: away.fy }, size(), bounds(), home(), 6, pin).y;
-			const p = clear(stowedAt(y, size(), bounds(), tabWidth(), 12, away.side));
-			if (current !== undefined && (current.x !== p.x || current.y !== p.y)) settle(p, false);
-			else place(p);
-			return;
-		}
-		stowed = undefined;
-		const saved = loadFloats(storage)[key];
-		const first = options.stow?.initially;
-		if (first && saved === undefined) {
-			// Never moved: it starts put away, level with its home.
-			stowed = first;
-			place(clear(stowedAt(home().y, size(), bounds(), tabWidth(), 12, first)));
-			return;
-		}
-		if (saved === undefined || saved === "home") {
-			place(undefined);
-			return;
-		}
-		const p = clamp(fromSaved(saved, size(), bounds(), home(), 6, pin), size(), bounds());
-		const snapped = snapHome(p, home());
-		if (snapped.home) {
-			place(undefined);
-			return;
-		}
-		snapped.p = clear(snapped.p);
-		// Already floating and the bounds moved under it (the sidebar folded): glide to where
-		// the same share of the column now puts it, rather than jumping there.
-		if (current !== undefined && (current.x !== snapped.p.x || current.y !== snapped.p.y)) {
-			settle(snapped.p, false);
-			return;
-		}
-		place(snapped.p);
-	};
-
-	const unstow = (): void => {
-		if (!stowed) return;
-		stowed = undefined;
-		saveStowed(key, undefined, storage);
-		// One that started put away has nothing saved, and taken out it is at home from now on.
-		if (options.stow?.initially && loadFloats(storage)[key] === undefined) remember("home");
-		const saved = loadFloats(storage)[key];
-		const back = saved === undefined || saved === "home" ? undefined : clamp(fromSaved(saved, size(), bounds(), home(), 6, pin), size(), bounds());
-		if (back === undefined || snapHome(back, home()).home) settle(home(), true, true);
-		else settle(clear(back), false, true);
-	};
-
-	const sendHome = (): void => {
-		if (stowed) return;
-		remember("home");
-		if (current === undefined) {
-			place(undefined);
-			return;
-		}
-		settle(home(), true, true);
-	};
-
-	/*
-	 * A drag is followed on the window, not only on the handle: its capture can be lost (the handle
-	 * drawn again under the pointer, the window losing focus), and a release the handle never hears
-	 * left the float stuck to the pointer. So it ends on any release or cancel of its pointer, on the
-	 * window losing focus, and on a move with no button held, wherever those happen.
-	 */
-	const onWindowMove = (event: PointerEvent): void => {
-		if (!drag || event.pointerId !== drag.pointerId) return;
-		if (event.pointerType === "mouse" && (event.buttons & 1) === 0) return endDrag(event);
-		onPointerMove(event);
-	};
-	const onWindowUp = (event: PointerEvent): void => endDrag(event);
-	const onWindowBlur = (): void => {
-		if (drag) endDrag({ pointerId: drag.pointerId, timeStamp: performance.now() });
-	};
-	const listen = (on: boolean): void => {
-		const method = on ? "addEventListener" : "removeEventListener";
-		window[method]("pointermove", onWindowMove as EventListener, true);
-		window[method]("pointerup", onWindowUp as EventListener, true);
-		window[method]("pointercancel", onWindowUp as EventListener, true);
-		window[method]("blur", onWindowBlur);
-	};
-
-	const endDrag = (event: Pick<PointerEvent, "pointerId" | "timeStamp">): void => {
-		if (!drag || event.pointerId !== drag.pointerId) return;
-		const { moved, samples } = drag;
-		drag = undefined;
-		listen(false);
-		delete el.dataset.dragging;
-		try {
-			handle.releasePointerCapture(event.pointerId);
-		} catch {
-			// Capture may already be gone, as after a pointercancel.
-		}
-		// A press that did not move is a click, and a click must not turn "home" into a
-		// stored position.
-		if (!moved || current === undefined) {
-			if (current === undefined) place(undefined);
-			return;
-		}
-		// A throw carries on: the velocity at release is projected forward, then the
-		// resting place is home if that lands near it, an edge if it lands near one, and
-		// inside the bounds whatever else. A placement (the pointer paused before letting
-		// go) has no velocity and rests where it was put, edges and home still applying.
-		const velocity = velocityFrom(samples, event.timeStamp);
-		// Thrown hard at its edge, it is put away. The position it had before this drag
-		// stays saved, because that is where the tab brings it back to.
-		const side = options.stow ? stowSide(current, velocity, size(), bounds()) : undefined;
-		if (options.stow && side) {
-			stowed = side;
-			// Down the edge as far as the throw was heading, bent up only if that is taken.
-			const at = clear(stowedAt(stowY(current, velocity, size(), bounds(), side), size(), bounds(), tabWidth(), 12, side));
-			saveStowed(key, { fy: verticalShare(at, size(), bounds(), 6, pin), side }, storage);
-			settle(at, false, true);
-			return;
-		}
-		const thrown = fling(current, velocity);
-		const rest = restingPlace(thrown, size(), bounds(), home());
-		if (rest.home) {
-			remember("home");
-			settle(rest.p, true, true);
-			return;
-		}
-		const clearOf = clear(rest.p);
-		remember(toFraction(clearOf, size(), bounds(), 6, pin));
-		settle(clearOf, false, true);
-	};
-
-	const onPointerDown = (event: PointerEvent): void => {
-		if (disabled() || stowed || event.button !== 0 || drag || onIgnored(event.target)) return;
-		// Taken mid-glide, it stops where it is and the drag starts from there.
-		cancelSettle();
-		if (current !== undefined && options.read) current = options.read();
-		drag = {
-			pointerId: event.pointerId,
-			startPointer: { x: event.clientX, y: event.clientY },
-			startPos: current ?? home(),
-			moved: false,
-			samples: [{ x: event.clientX, y: event.clientY, t: event.timeStamp }],
-		};
-		try {
-			handle.setPointerCapture(event.pointerId);
-		} catch {
-			// Some engines refuse capture for synthetic pointers; the window's listeners follow it.
-		}
-		listen(true);
-		el.dataset.dragging = "true";
-		event.preventDefault();
-	};
-
-	const onPointerMove = (event: PointerEvent): void => {
-		if (!drag || event.pointerId !== drag.pointerId) return;
-		const dx = event.clientX - drag.startPointer.x;
-		const dy = event.clientY - drag.startPointer.y;
-		if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-		drag.moved = true;
-		drag.samples.push({ x: event.clientX, y: event.clientY, t: event.timeStamp });
-		if (drag.samples.length > SAMPLES) drag.samples.shift();
-		// Clamped while moving too, so the float never disappears past an edge mid-drag.
-		place(clamp({ x: drag.startPos.x + dx, y: drag.startPos.y + dy }, size(), bounds()));
-	};
-
-	const onDoubleClick = (event: MouseEvent): void => {
-		if (disabled() || stowed || onIgnored(event.target)) return;
-		event.preventDefault();
-		sendHome();
-	};
-
-	/*
-	 * The tab of a tucked float is a handle too. Pressed and let go, it is a click, and the
-	 * tab's own button brings the float back. Dragged along the edge, the tab goes where it
-	 * is put (bent up clear of the others, as a throw is). Pulled in off the edge by
-	 * `PULL_OUT`, the float comes out and the rest is an ordinary drag of it.
-	 */
-	let tabDrag: { pointerId: number; tab: Element; startPointer: Point; startY: number; moved: boolean } | undefined;
-	/** A drag of the tab ends in a click on it; that click must not also bring the float back. */
-	const swallowClick = (): void => {
-		const swallow = (event: Event): void => {
-			event.stopPropagation();
-			event.preventDefault();
-		};
-		el.addEventListener("click", swallow, { capture: true, once: true });
-		setTimeout(() => el.removeEventListener("click", swallow, { capture: true }), 0);
-	};
-	const onTabDown = (event: PointerEvent): void => {
-		const tab = event.target instanceof Element ? event.target.closest("[data-stowtab]") : null;
-		if (!tab || !stowed || current === undefined || disabled() || event.button !== 0 || drag || tabDrag) return;
-		cancelSettle();
-		tabDrag = { pointerId: event.pointerId, tab, startPointer: { x: event.clientX, y: event.clientY }, startY: current.y, moved: false };
-		try {
-			tab.setPointerCapture(event.pointerId);
-		} catch {
-			// The window's listeners follow it.
-		}
-		listenTab(true);
-	};
-	/* The tab's drag is followed on the window too, for the same reason as the float's (`listen`). */
-	const onTabWindowMove = (event: PointerEvent): void => {
-		if (!tabDrag || event.pointerId !== tabDrag.pointerId) return;
-		if (event.pointerType === "mouse" && (event.buttons & 1) === 0) return onTabUp(event);
-		onTabMove(event);
-	};
-	const onTabWindowUp = (event: PointerEvent): void => onTabUp(event);
-	const onTabBlur = (): void => {
-		if (tabDrag) onTabUp({ pointerId: tabDrag.pointerId });
-	};
-	const listenTab = (on: boolean): void => {
-		const method = on ? "addEventListener" : "removeEventListener";
-		window[method]("pointermove", onTabWindowMove as EventListener, true);
-		window[method]("pointerup", onTabWindowUp as EventListener, true);
-		window[method]("pointercancel", onTabWindowUp as EventListener, true);
-		window[method]("blur", onTabBlur);
-	};
-	const onTabMove = (event: PointerEvent): void => {
-		if (!tabDrag || event.pointerId !== tabDrag.pointerId || current === undefined || !stowed) return;
-		const dx = event.clientX - tabDrag.startPointer.x;
-		const dy = event.clientY - tabDrag.startPointer.y;
-		if (!tabDrag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-		if (!tabDrag.moved) {
-			tabDrag.moved = true;
-			el.dataset.dragging = "true";
-		}
-		const inward = stowed === "right" ? -dx : dx;
-		if (inward > PULL_OUT) {
-			// Out it comes, held by its own handle: the float jumps so the top middle of the
-			// handle (the grip, or the strip along the composer's top) is under the pointer,
-			// as if it had been taken there. From here it is an ordinary drag, captured by the
-			// handle so the drag's own listeners take it.
-			const { pointerId } = tabDrag;
-			const box = el.getBoundingClientRect();
-			const grip = handle.getBoundingClientRect();
-			const held = { x: grip.left - box.left + grip.width / 2, y: grip.top - box.top + Math.min(7, grip.height / 2) };
-			try {
-				tabDrag.tab.releasePointerCapture(pointerId);
-			} catch {
-				// Already released.
-			}
-			swallowClick();
-			tabDrag = undefined;
-			listenTab(false);
-			stowed = undefined;
-			saveStowed(key, undefined, storage);
-			// Where the handle would be under the pointer; placed inside the bounds, but the drag
-			// starts from the unclamped spot, so a wide float that cannot fit there yet catches up
-			// with the pointer as soon as it has room, instead of lagging by the difference.
-			const grabbed = { x: current.x + event.clientX - (box.left + held.x), y: current.y + event.clientY - (box.top + held.y) };
-			const out = clamp(grabbed, size(), bounds());
-			place(out);
-			drag = {
-				pointerId,
-				startPointer: { x: event.clientX, y: event.clientY },
-				startPos: grabbed,
-				moved: true,
-				samples: [{ x: event.clientX, y: event.clientY, t: event.timeStamp }],
-			};
-			try {
-				handle.setPointerCapture(pointerId);
-			} catch {
-				// The window's listeners follow it.
-			}
-			listen(true);
-			return;
-		}
-		const y = clamp({ x: bounds().x, y: tabDrag.startY + dy }, size(), bounds(), 12).y;
-		place({ x: current.x, y });
-	};
-	const onTabUp = (event: Pick<PointerEvent, "pointerId">): void => {
-		if (!tabDrag || event.pointerId !== tabDrag.pointerId) return;
-		const { moved, tab } = tabDrag;
-		tabDrag = undefined;
-		listenTab(false);
-		delete el.dataset.dragging;
-		try {
-			tab.releasePointerCapture(event.pointerId);
-		} catch {
-			// Capture may already be gone.
-		}
-		if (!moved || current === undefined || !stowed) return;
-		swallowClick();
-		const at = clear(current);
-		saveStowed(key, { fy: verticalShare(at, size(), bounds(), 6, pin), side: stowed }, storage);
-		settle(at, false, true);
-	};
-
-	/**
-	 * Stand here, now, and remember it: for a host that moves the float itself, as a resize by its
-	 * left edge moves its left side. Kept inside the bounds; nothing glides, and a tucked float stays put.
-	 */
-	const placeAt = (p: Point): void => {
-		if (stowed || drag) return;
-		cancelSettle();
-		const at = clamp(p, size(), bounds());
-		place(at);
-		remember(toFraction(at, size(), bounds(), 6, pin));
-	};
-
-	const onResize = (): void => restore();
-
-	handle.addEventListener("pointerdown", onPointerDown);
-	handle.addEventListener("dblclick", onDoubleClick);
-	if (options.stow) {
-		el.addEventListener("pointerdown", onTabDown);
-	}
-
+	const onResize = (): void => restore(f);
+	handle.addEventListener("pointerdown", f.h.onPointerDown);
+	handle.addEventListener("dblclick", f.h.onDoubleClick);
+	if (options.stow) el.addEventListener("pointerdown", f.h.onTabDown);
 	let observer: ResizeObserver | undefined;
 	try {
 		window.addEventListener("resize", onResize);
@@ -554,31 +123,29 @@ export function makeFloat(
 	} catch {
 		// No window to watch; the caller can still call `restore` itself.
 	}
-
-	restore();
-
+	restore(f);
 	return {
-		restore,
-		follow,
-		sendHome,
-		unstow,
-		stowed: () => stowed !== undefined,
-		placeAt,
+		restore: () => restore(f),
+		follow: () => follow(f),
+		sendHome: () => sendHome(f),
+		unstow: () => unstow(f),
+		stowed: () => f.stowed !== undefined,
+		placeAt: (p) => placeAt(f, p),
 		dispose() {
-			handle.removeEventListener("pointerdown", onPointerDown);
-			listen(false);
-			handle.removeEventListener("dblclick", onDoubleClick);
-			el.removeEventListener("pointerdown", onTabDown);
-			listenTab(false);
+			handle.removeEventListener("pointerdown", f.h.onPointerDown);
+			listen(f, false);
+			handle.removeEventListener("dblclick", f.h.onDoubleClick);
+			el.removeEventListener("pointerdown", f.h.onTabDown);
+			listenTab(f, false);
 			try {
 				window.removeEventListener("resize", onResize);
 			} catch {
 				// Never attached.
 			}
 			observer?.disconnect();
-			cancelSettle();
-			drag = undefined;
-			tabDrag = undefined;
+			cancelSettle(f);
+			f.drag = undefined;
+			f.tabDrag = undefined;
 			delete el.dataset.dragging;
 		},
 	};
