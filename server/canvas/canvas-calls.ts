@@ -3,10 +3,12 @@ import { handleAll, toDeckPath, type Context, type Deck, type DeckPath } from ".
 import { canvasOf } from "./item-calls.ts";
 import { emptyDrawing, type CanvasStore } from "./store.ts";
 
-// The canvas calls, but screenshot and export (a browser's; wave 2). A
-// canvas's name is its folder and never changes; its title can.
+// The canvas calls this feature answers, named one by one so a call added to
+// the protocol (screenshot, export, versions) is another feature's until
+// named here. A canvas's name is its folder and never changes; its title can.
 
-const { screenshot: _screenshot, exportPage: _export, ...mine } = calls.canvas;
+const { list, get, here, create, update, remove, copy, undo } = calls.canvas;
+const mine = { list, get, here, create, update, remove, copy, undo };
 
 /** A folder name from a title: lower case words joined by dashes, made unique. */
 export function nameFor(title: string, taken: (name: string) => boolean): string {

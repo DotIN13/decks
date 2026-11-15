@@ -9,7 +9,8 @@ It answers `item.*` (13 calls), `canvas.*` (8 of 10) and `frame.*` (4).
 - `ops.ts` (ops into pen's edits), `place.ts` (at, beside, below, space), `kinds.ts` (who owns a node).
 - `spans.ts`: writes a file back so untouched items keep their bytes.
 - `store.ts`: every canvas in the deck, its title, its file; `clips.ts` for clip and paste.
-- `calls.ts` and `feature.ts`. Left out, for wave 2 (Depot): `canvas.screenshot`, `canvas.export`.
+- `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`. Not answered here:
+  `canvas.screenshot` and `export` (pictures), `versions`, `version`, `restore` (Studio's history).
 
 ## May import
 
