@@ -9,6 +9,6 @@
 		"noEmit": true,
 		"types": ["vite/client", "@webgpu/types"]
 	},
-	"include": ["**/*.ts", "**/*.tsx", "../../packages/canvas/src/**/*.d.ts"],
+	"include": ["**/*.ts", "**/*.tsx", "../../canvas/**/*.d.ts"],
 	"exclude": ["node_modules", "dist", "public", "**/*.test.ts"]
 }

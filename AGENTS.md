@@ -30,16 +30,15 @@ New folders, today:
 | `pen/` | the drawing's file format, the package @decks/pen (moved from packages/pen) |
 | `ui/` | controls that know nothing of Decks, the package @decks/ui (moved from packages/ui) |
 | `engine/` | the Rust drawing engine, the package @decks/engine (moved from packages/stage); its wasm is built, not kept |
+| `canvas/` | the canvas page library, the package @decks/canvas (moved from packages/canvas; regrouped in wave 3) |
 
-Still to come, as DESIGN.md section 3 says: canvas (a library that moves from
-today's packages), clients (sdk, cli, mcp, attach, extension), and docs/decisions.
+Still to come, as DESIGN.md section 3 says: clients (sdk, cli, mcp, attach, extension), and docs/decisions.
 
 Today's code, read only:
 
 | path | what | moves to |
 |---|---|---|
 | `packages/api` | the two tables of calls | protocol |
-| `packages/canvas` | the canvas page library | canvas |
 | `scripts` | measures and old gates | tools |
 
 ## Words

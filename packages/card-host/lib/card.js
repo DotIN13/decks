@@ -392,7 +392,7 @@
 	/*
 	 * A board's own code once called the stage with a token of its own, which the page around it asked
 	 * the harness for. Boards are cards on a canvas now, and a card's buttons call through the canvas
-	 * frame (`packages/canvas/src/items/card.ts`); a board on its own has no stage and no token.
+	 * frame (`canvas/items/card.ts`); a board on its own has no stage and no token.
 	 */
 	function boardStage() {
 		return Promise.reject(new Error("A board on its own has no stage: its buttons work as a card on a canvas, in Decks."));

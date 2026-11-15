@@ -13,7 +13,7 @@
  * it was before the edit and is not as it is once everything has landed.
  *
  * The person's edits are shown at once and kept on top of the server's drawings until the one that
- * has them arrives (`packages/canvas/src/model/drawing.ts`), so every case asks for no frame of the old
+ * has them arrives (`canvas/model/drawing.ts`), so every case asks for no frame of the old
  * state. A document put on the canvas from the picker is the server's to make (`document.create`) and is not driven here.
  *
  *   node e2e/run.mjs edits-wait                       # Chromium, then WebKit for a few

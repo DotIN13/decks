@@ -5,22 +5,22 @@
 	"type": "module",
 	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and the canvas frame that holds them",
 	"exports": {
-		".": "./src/index.ts",
-		"./comments": "./src/public/comments.ts",
-		"./tools": "./src/public/tools.ts",
-		"./camera": "./src/public/camera.ts",
-		"./host": "./src/public/host.ts",
-		"./card-reading": "./src/items/card-reading.ts",
-		"./card": "./src/items/card.ts",
+		".": "./index.ts",
+		"./comments": "./public/comments.ts",
+		"./tools": "./public/tools.ts",
+		"./camera": "./public/camera.ts",
+		"./host": "./public/host.ts",
+		"./card-reading": "./items/card-reading.ts",
+		"./card": "./items/card.ts",
 		"./styles.css": "./styles/surface.css",
 		"./surface.css": "./dist/surface.css",
 		"./styles/*": "./styles/*"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"test": "node --import tsx --test \"src/**/*.test.ts\"",
+		"test": "node --import tsx --test \"**/*.test.ts\"",
 		"build:css": "node scripts/build-css.mjs",
-		"build:lib": "node ../../scripts/build-solid-lib.mjs ."
+		"build:lib": "node ../scripts/build-solid-lib.mjs ."
 	},
 	"dependencies": {
 		"@decks/api": "*",
@@ -44,11 +44,5 @@
 		"tsx": "^4.20.7",
 		"typescript": "^5.9.3",
 		"vite": "^7.1.9"
-	},
-	"files": [
-		"dist",
-		"scripts",
-		"src",
-		"styles"
-	]
+	}
 }

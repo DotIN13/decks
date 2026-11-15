@@ -1,7 +1,7 @@
 /**
  * In WebKit the camera puts nothing on layers of its own, while it zooms or while it pans.
  *
- * `LAYERS` in `packages/canvas/src/render/device.ts`: measured on an iPad and in WebKit on a Mac, a zoom
+ * `LAYERS` in `canvas/render/device.ts`: measured on an iPad and in WebKit on a Mac, a zoom
  * held 17 ms a frame with no layers, while building and dropping them cost a frame of 100 to 230 ms at
  * each end. So the stage never sets `data-scaling` or `data-sliding` in WebKit, and no card, document,
  * app or the world gets `will-change: transform`. Chromium keeps both, which `camera.mjs` checks.

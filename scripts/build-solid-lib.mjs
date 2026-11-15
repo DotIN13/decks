@@ -1,5 +1,5 @@
 /**
- * Build a Solid package's `dist/lib/` (`node scripts/build-solid-lib.mjs packages/canvas`): the package as
+ * Build a Solid package's `dist/lib/` (`node scripts/build-solid-lib.mjs canvas`): the package as
  * JavaScript for npm, one file per source file at the same path. Used for canvas, ui and agent-ui.
  *
  * TypeScript is stripped (`.ts` imports become `.js`) and JSX compiled to Solid's DOM calls, and
@@ -19,7 +19,7 @@ const tscPath = require.resolve("typescript/bin/tsc");
 const babel = require("@babel/core");
 const solid = require("babel-preset-solid");
 
-const pkg = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "packages", "canvas"));
+const pkg = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "canvas"));
 const src = join(pkg, "src");
 const out = join(pkg, "dist", "lib");
 rmSync(out, { recursive: true, force: true });

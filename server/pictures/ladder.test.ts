@@ -7,7 +7,7 @@ import { exactWidth, LADDER, rungFor } from "./picture.ts";
 // Rule 11: the picture route keeps exactly the protocol's ladder, and the canvas library's own
 // list is held to it here so the two cannot drift; a rung asked is answered at that width.
 
-const DEVICE = new URL("../../packages/canvas/src/render/device.ts", import.meta.url);
+const DEVICE = new URL("../../canvas/render/device.ts", import.meta.url);
 
 test("rule 11: every rung any device's ladder asks is a rung the route keeps, and no other", () => {
 	const text = readFileSync(DEVICE, "utf8");

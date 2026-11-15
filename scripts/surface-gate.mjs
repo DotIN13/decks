@@ -16,11 +16,11 @@ import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SURFACE = ["surface-tokens.css", "canvas.css", "ink.css", "marks.css", "host.css"].map((f) => join(ROOT, "packages/canvas/styles", f));
+const SURFACE = ["surface-tokens.css", "canvas.css", "ink.css", "marks.css", "host.css"].map((f) => join(ROOT, "canvas/styles", f));
 const APP_ENTRY = join(ROOT, "harness/page/index.css");
 /** Set on elements by the canvas's scripts (`style.setProperty`, inline `--x`): the surface reads them, nobody themes them. */
 const RUNTIME = new Set(["--u", "--act", "--zoom", "--read-ms", "--card-size", "--hit", "--cursor-color", "--inset-left", "--dock", "--frame-dock"]);
-const hooks = JSON.parse(readFileSync(join(ROOT, "packages/canvas/styles/surface-hooks.json"), "utf8"));
+const hooks = JSON.parse(readFileSync(join(ROOT, "canvas/styles/surface-hooks.json"), "utf8"));
 const HOOKS = new Set(hooks.hooks.map((h) => h.class));
 
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ");

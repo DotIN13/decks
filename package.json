@@ -33,7 +33,8 @@
     "tools",
     "pen",
     "ui",
-    "engine"
+    "engine",
+    "canvas"
   ],
   "scripts": {
     "dev": "node --import tsx server/main.ts --deck \"${DECKS_DECK:-$PWD/data}\" & node --import tsx harness/main.ts --deck \"${DECKS_DECK:-$PWD/data}\"",
