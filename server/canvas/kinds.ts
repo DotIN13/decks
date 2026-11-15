@@ -1,4 +1,4 @@
-import type { Item, ItemKind, PenNode } from "../kernel/types.ts";
+import type { Item, ItemKind, ItemOp, PenNode } from "../kernel/types.ts";
 
 // Who owns a node: a kind another feature registers, claimed by the node's
 // metadata.type "decks.<type>", or else the drawing itself, kept as written.
@@ -46,6 +46,16 @@ export class Kinds {
 		if (!kind) return rest as PenNode;
 		const node = kind.toPen(item, { canvas });
 		return item.id && !node.id ? { ...node, id: item.id } : node;
+	}
+
+	/** Each insert's and replace's item, as its kind prepares it (writing what it needs first). */
+	async prepare(ops: ItemOp[], at: Parameters<NonNullable<ItemKind["prepare"]>>[1]): Promise<ItemOp[]> {
+		const out: ItemOp[] = [];
+		for (const op of ops) {
+			const prepare = (op.op === "insert" || op.op === "replace") ? this.named(op.item.type)?.prepare : undefined;
+			out.push(prepare && (op.op === "insert" || op.op === "replace") ? { ...op, item: await prepare(op.item, at) } : op);
+		}
+		return out;
 	}
 
 	/** The deck files an item needs, as its kind says. */

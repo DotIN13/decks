@@ -3,7 +3,7 @@ import { Refused, type Caller } from "../../protocol/index.ts";
 import type { CanvasDoc, Change, Item, ItemOp, ItemQuery } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
 import { Log, opsBetween } from "./log.ts";
-import { findId as findIn, step } from "./ops.ts";
+import { findId as findIn, routeArrows, step } from "./ops.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
 
 // One drawing in memory: read, changed only by apply (all or none), and
@@ -62,6 +62,7 @@ export class PenCanvas implements CanvasDoc {
 				throw failed(error, i, op);
 			}
 		});
+		ids.push(...routeArrows(work, this.name));
 		const before = this.doc;
 		this.commit(work, written, by, ids);
 		if (by.kind === "person") this.log.edited(before, work);
@@ -87,14 +88,16 @@ export class PenCanvas implements CanvasDoc {
 	}
 
 	/** The file changed from outside: take it in as one change by whoever wrote it. */
-	reload(text: string, by: string): void {
-		if (this.source?.text === text) return;
+	reload(text: string, by: string): Change | undefined {
+		if (this.source?.text === text) return undefined;
 		const next = parseOrRefuse(text, this.name);
 		const ops = opsBetween(this.doc, next);
 		this.source = sourceOf(text);
 		this.doc = next;
 		this.rev++;
-		this.log.add({ rev: this.rev, ops, by, at: this.clock() }, false);
+		const change = { rev: this.rev, ops, by, at: this.clock() };
+		this.log.add(change, false);
+		return change;
 	}
 
 	private commit(next: PenDocument, ops: ItemOp[], by: Caller, ids: string[], own = by.kind === "person"): void {

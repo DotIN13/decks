@@ -144,6 +144,7 @@ test("a write from outside the server is read in as one change by its writer", a
 	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(JSON.stringify({ version: "2.14", children: [NOTE("a", 0, 0, "outside")] })), writer);
 	await waitFor(async () => s.kernel.canvas("plan").since(0).length, (n) => n > 0);
 	assert.deepEqual(s.kernel.canvas("plan").since(0).map((c) => c.by), ["pen.dev"]);
+	assert.deepEqual(s.heard.filter((e) => e.name === "item.changed").map((e) => [e.payload.by, [...(e.payload.ids as string[])].sort()]), [["pen.dev", ["a", "b"]]]);
 	await s.close();
 });
 
@@ -165,5 +166,30 @@ test("item.changed comes after the file is written, so a listener reads the new 
 	await s.value("item.update", { id: "a", set: { content: "fresh" } }, ann);
 	await new Promise((r) => setTimeout(r, 5));
 	assert.match(seen, /"fresh"/);
+	await s.close();
+});
+
+test("a size with only a width leaves the height to the item", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "frame", id: "f", layout: "vertical", width: 200, height: "fit_content(48)" }, at: { x: 0, y: 600 } }, ann);
+	await s.value("item.update", { id: "f", size: { w: 320 } }, ann);
+	const node = JSON.parse(await text(s, "canvases/plan/canvas.pen")).children.find((n: { id: string }) => n.id === "f");
+	assert.deepEqual([node.width, node.height], [320, "fit_content(48)"]);
+	await s.close();
+});
+
+test("an arrow whose end names a card by its deck path is routed to it", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const arrow = await s.value<Item>("item.insert", { item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "canvases/plan/stickers/s1/index.html" } } }, ann);
+	assert.ok(arrow.box && arrow.box.y2 > 550, JSON.stringify(arrow.box));
+	await s.close();
+});
+
+test("before a kind's item is inserted, the kind may prepare it", async () => {
+	const s = await start();
+	const st = await s.value<Item>("item.insert", { item: { type: "sticker", title: "new one" }, at: { x: 0, y: 600 } }, ann);
+	assert.equal(st.path, "canvases/plan/stickers/new-one/index.html");
+	assert.equal(await text(s, "canvases/plan/stickers/new-one/index.html"), "<p>new one</p>");
 	await s.close();
 });

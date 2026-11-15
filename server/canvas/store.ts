@@ -158,8 +158,15 @@ export class CanvasStore {
 		const text = await this.text(path);
 		const kept = this.drawings.get(path);
 		if (text === undefined || kept?.mine.includes(text)) return;
-		if (kept) kept.doc.reload(text, by);
-		else if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
+		let change: Change | undefined;
+		try {
+			change = kept?.doc.reload(text, by);
+		} catch {
+			return;
+		}
+		if (change) this.kernel.events.emit(events.itemChanged, { canvas: kept!.canvas, ids: idsOf(change.ops), by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+		if (kept) return;
+		if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
 			if (!this.titles.has(at.name)) this.titles.set(at.name, at.name);
 			this.keep(path, at.name, text);
 		}
@@ -214,3 +221,5 @@ function readTitle(meta: string | undefined): string | undefined {
 		return undefined;
 	}
 }
+
+const idsOf = (ops: Change["ops"]): string[] => ops.flatMap((o) => (o.op === "insert" ? [String(o.item.id)] : o.op === "variables" ? [] : [o.id]));

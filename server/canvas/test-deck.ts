@@ -1,4 +1,5 @@
-import { defineFeature, type Feature, type Item, type PenNode } from "../kernel/types.ts";
+import type { Caller } from "../../protocol/index.ts";
+import { defineFeature, type Feature, type Item, type Kernel, type PenNode } from "../kernel/types.ts";
 import { toDeckPath } from "../kernel/types.ts";
 
 // What the call tests share: a small deck, and a kind another feature might
@@ -15,10 +16,19 @@ export const DECK = {
 };
 
 export function stickerFeature(): Feature {
+	let deck: Kernel["deck"] | undefined;
+	const prepare = async (item: Item, at: { canvas: string; caller: Caller }): Promise<Item> => {
+		if (item.path || !item.title) return item;
+		const path = `canvases/${at.canvas}/stickers/${item.title.replace(/ /g, "-")}/index.html`;
+		await deck!.write(toDeckPath(path), new TextEncoder().encode(`<p>${item.title}</p>`), at.caller);
+		return { ...item, path };
+	};
 	return defineFeature({
 		name: "stickers",
 		calls: [],
+		start: (kernel) => void (deck = kernel.deck),
 		items: [{
+			prepare,
 			type: "sticker",
 			fromPen: (node: PenNode, at) => ({ type: "sticker", id: node.id, path: `canvases/${at?.canvas}/${(node.metadata as { path: string }).path}` }) as Item,
 			toPen: (item: Item, at) => ({ type: "browser", ...(item.id ? { id: item.id } : {}), width: 300, height: 200, metadata: { type: "decks.sticker", path: item.path!.replace(`canvases/${at?.canvas}/`, "") } }),

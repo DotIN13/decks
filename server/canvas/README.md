@@ -30,16 +30,18 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 7. A place is one of `at` (the top-left corner), `beside` (160 px right of an item, tops aligned)
    or `below` (160 px under it, lefts aligned). Two at once is refused. A later op may be beside
    an item an earlier op made. An insert given no place keeps its own x and y, or else goes
-   beside the last top-level item.
+   beside the last top-level item. An item moved to another parent keeps the size it was drawn at.
 8. `item.space` finds the free corner nearest the middle, or on one side of `near`, with `margin`
    (160) clear of every top-level item but arrows. Nothing is placed.
 9. Undo takes back the person's last change, only while it is the drawing's latest change.
    If anyone else changed the drawing since, it is refused as a conflict naming who. Redo puts
    back what undo took, only while that undo is the latest change. Both are changes too.
 10. A node whose `metadata.type` is `decks.<type>` belongs to the item kind with that type, which
-    another feature registers; this folder never names those kinds. Every other node is drawn:
+    another feature registers; this folder never names those kinds. Before an insert or replace
+    of such an item, its kind's `prepare` (if it has one) is awaited. Every other node is drawn:
     notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
-11. An item you did not touch keeps its bytes in the file after an edit.
+11. After every change each joined arrow is routed again between its ends, in the same revision,
+    so the file holds the path the page draws. Any other item you did not touch keeps its bytes.
 12. `item.clip` keeps a copy of items and the files their kinds name, for a day. `item.paste`
     puts them in with new ids as one change; arrows stay joined to the copies.
 13. A canvas's `name` is its folder and never changes; its `title` is in `canvas.json`. A call

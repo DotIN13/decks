@@ -1,4 +1,4 @@
-import { apply as penApply, baseTheme, expandVariables, boxOf as penBox, placements, walk, withDecksColors, type Op as PenOp, type PenDocument, type PenNode } from "@decks/pen";
+import { apply as penApply, baseTheme, expandVariables, indexOf, isArrow, reroute, boxOf as penBox, placements, walk, withDecksColors, type Op as PenOp, type PenDocument, type PenNode } from "@decks/pen";
 import { Refused } from "../../protocol/index.ts";
 import type { ItemOp } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
@@ -67,7 +67,7 @@ function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>
 			if (op.at) Object.assign(box, { x1: op.at.x, y1: op.at.y });
 			if (op.size && now) {
 				const x1 = box.x1 ?? now.x1, y1 = box.y1 ?? now.y1;
-				Object.assign(box, { x1, y1, x2: x1 + (op.size.w ?? now.x2 - now.x1), y2: y1 + (op.size.h ?? now.y2 - now.y1) });
+				Object.assign(box, { x1, y1, ...(op.size.w !== undefined ? { x2: x1 + op.size.w } : {}), ...(op.size.h !== undefined ? { y2: y1 + op.size.h } : {}) });
 			}
 			const pen: PenOp = { op: "update", id, ...(op.set ? { set: op.set } : {}), ...(Object.keys(box).length ? { box } : {}) };
 			return { pen, written: { ...op, id } };
@@ -84,7 +84,7 @@ function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>
 		case "move": {
 			const id = must(doc, op.id, where);
 			const corner = cornerOf(op, boxOf);
-			const pen: PenOp = { op: "move", id, ...inside(op), ...(corner ? { box: { x1: corner.x, y1: corner.y } } : {}) };
+			const pen: PenOp = { op: "move", id, ...inside(op), ...movedBox(doc, id, op.parent, corner, all.get(id)) };
 			return { pen, written: { op: "move", id, ...inside(op), ...(corner ? { at: corner } : {}) } };
 		}
 		case "copy": {
@@ -100,6 +100,15 @@ function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>
 		}
 	}
 	throw new Refused("invalid", `${(op as { op?: unknown }).op} is not an op: insert, update, replace, delete, move or copy.`, "item.batch");
+}
+
+/** A move's box: its corner, and its drawn size too when it changes parent, so it keeps that size. */
+function movedBox(doc: PenDocument, id: string, parent: string | null | undefined, corner: Corner | undefined, now: Box | undefined): { box?: Partial<Box> } {
+	const was = indexOf(doc).get(id)?.parent?.id ?? null;
+	const leaves = parent !== undefined && parent !== was && now;
+	if (!leaves) return corner ? { box: { x1: corner.x, y1: corner.y } } : {};
+	const x1 = corner?.x ?? now.x1, y1 = corner?.y ?? now.y1;
+	return { box: { x1, y1, x2: x1 + now.x2 - now.x1, y2: y1 + now.y2 - now.y1 } };
 }
 
 const inside = (op: { parent?: string | null; index?: number }) => ({ ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}) });
@@ -121,4 +130,19 @@ function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where
 	const { box: _drop, ...item } = op.item;
 	const pen: PenOp = { op: "insert", node, ...inside(op), ...(box ? { box } : {}) };
 	return { pen, written: { op: "insert", item: given ? { ...item, box: given } : item, ...inside(op), ...(corner ? { at: corner } : {}) } };
+}
+
+/** Route every joined arrow again between its ends, in place; the ids of those that moved. */
+export function routeArrows(doc: PenDocument, canvas: string): string[] {
+	const arrows = [...walk(doc.children)].filter(isArrow);
+	if (!arrows.length) return [];
+	const was = new Map(arrows.map((a) => [a.id, JSON.stringify(a)] as const));
+	const placed = placements(doc, { theme: baseTheme(doc, "light") });
+	const byPath = (name: string) => {
+		const local = name.startsWith(`canvases/${canvas}/`) ? name.slice(`canvases/${canvas}/`.length) : name;
+		const node = [...walk(doc.children)].find((n) => (n.metadata as { path?: unknown } | undefined)?.path === local);
+		return node ? placed.get(node.id)?.box : undefined;
+	};
+	reroute(doc, placed, byPath);
+	return arrows.filter((a) => was.get(a.id) !== JSON.stringify(a)).map((a) => a.id);
 }

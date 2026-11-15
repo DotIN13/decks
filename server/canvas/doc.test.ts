@@ -79,3 +79,24 @@ test("a change from outside the server is one change by whoever wrote it", () =>
 	assert.equal(doc.read()[0]!.content, "Outside");
 	assert.deepEqual(doc.since(0).map((c) => [c.by, c.ops[0]!.op]), [["pen.dev", "replace"]]);
 });
+
+test("after a change, a joined arrow is routed again between its ends, in the same revision", () => {
+	const { doc, files } = make();
+	const arrow = { type: "path", id: "ar", geometry: "M2 2 L100 50", width: 102, height: 52, metadata: { type: "decks.arrow", from: { item: "n1" }, to: { item: "n2" } } };
+	doc.apply([{ op: "insert", item: { type: "note", id: "n2", content: "Two", width: 200, height: 100 }, at: { x: 600, y: 0 } }, { op: "insert", item: arrow, at: { x: 0, y: 0 } }], agent);
+	const routed = doc.read({ ids: ["ar"] })[0]!;
+	assert.ok(routed.box!.x1 >= 190 && routed.box!.x2 <= 610 && routed.box!.y2 < 100, JSON.stringify(routed.box));
+	const { rev } = doc.apply([{ op: "move", id: "n2", at: { x: 600, y: 600 } }], agent);
+	const bent = doc.read({ ids: ["ar"] })[0]!;
+	assert.ok(bent.box!.y2 > 500, JSON.stringify(bent.box));
+	assert.deepEqual(doc.since(rev - 1).map((c) => c.rev), [rev]);
+	assert.match(files.at(-1)!, /"ar"/);
+});
+
+test("an item moved out of a frame that lays it out keeps the width it was drawn at", () => {
+	const col = { type: "frame", id: "col", layout: "vertical", width: 300, children: [{ type: "text", id: "w", content: "Words", width: "fill_container", textGrowth: "fixed-width" }] };
+	const doc = new PenCanvas("plan", JSON.stringify({ version: "2.14", children: [col] }), new Kinds(), () => undefined);
+	doc.apply([{ op: "move", id: "w", parent: null, at: { x: 600, y: 0 } }], agent);
+	const moved = doc.pen().children.find((n) => n.id === "w")!;
+	assert.equal(moved.width, 300);
+});
