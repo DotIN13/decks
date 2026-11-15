@@ -320,3 +320,25 @@ The person said to continue until the rewrite is finished, so the stops are now 
   and the harness's page as separate processes. Warden writes the runner for that under tools. Then the
   old `apps/` folder and the packages the new folders replace are deleted.
 - **After that**: Loft (decks-studio) and Slate (decks-ios) in their own repos, then wave 3.
+
+## 10. Where an app lives (the person, 2026-11-14)
+
+An app's source may live outside the deck, as long as the deck knows where it is.
+
+- **The deck keeps a record of each app**: its `app.json` under the deck's apps folder, with the title,
+  the kind and the commands. The record may carry `source: { path, repo? }`: a folder on this machine,
+  and the git address it can be cloned from. With no `source`, the source is the folder the record sits
+  in, as today, so every existing deck keeps working.
+- **The file calls reach an app's source wherever it is.** A path under the app's name in the deck's
+  apps folder resolves to the source folder: the kernel's deck takes a mount for it. So the calls stay
+  complete without the disk, and an agent on the iPad edits an app the same way.
+- **Only the person may point the deck at a folder outside it.** An agent, an app or a card cannot set or
+  change `source.path`: that would let a call reach any folder on the machine. A path into the deck's
+  own hidden folders, a home folder itself or a system folder is refused.
+- **An outside app builds and runs where it is**, like any project: its `node_modules`, its build and its
+  data sit beside its source, and its own git is its history. An app whose source is in the deck builds
+  and runs in a copy under the machine's own folder, never in the deck, and its data folder stays in the
+  deck, linked into that copy.
+- **On a machine where the path does not exist**, the app is `missing`: its item draws as its last
+  picture, and `app.clone` takes it from `repo` to a folder the person names.
+- Studio runs no app; a call that needs one goes to a machine through the relay, as before.
