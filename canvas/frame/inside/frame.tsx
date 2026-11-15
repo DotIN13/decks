@@ -4,7 +4,7 @@ import { render } from "solid-js/web";
 import { createEditor } from "../../editor/editor.tsx";
 import type { Editor } from "../../types.ts";
 import type { FrameChromeView } from "../chrome.ts";
-import { AgentCursor } from "../../ui/AgentCursor.tsx";
+import { AgentCursor } from "../../chrome/AgentCursor.tsx";
 import { openFrame } from "./boot.ts";
 import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";

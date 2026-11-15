@@ -10,10 +10,10 @@ import { stagePoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../drawing/doc-index.ts";
-import { StageInk } from "../ink/StageInk.tsx";
-import { strokeOf } from "../model/ink.ts";
+import { StageInk } from "../ink/InkLayer.tsx";
+import { strokeOf } from "../ink/model.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../editor/pen-tools.ts";
-import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
+import { HoldMenu, type HoldAction } from "../chrome/HoldMenu.tsx";
 import { overlayJson } from "../editor/core/overlay-json.ts";
 import { rgbOf } from "../editor/dom/colours.ts";
 import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
@@ -96,7 +96,7 @@ export type StageProps = {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
-	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/InkLayer.tsx`). */
 	drawing?: boolean;
 	/** A Pencil pressed bare canvas with the select tool: turn the pen on (and leave edit mode), so the press can start a stroke. */
 	onPencil?: () => void;

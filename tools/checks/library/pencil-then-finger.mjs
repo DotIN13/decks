@@ -1,7 +1,7 @@
 /**
  * With the draw tool on, once a pencil has drawn, a finger pans the canvas and presses what is under it.
  *
- * The glass a stroke is drawn on (`StageInk.tsx`) had `touch-action: none` and lay over the whole
+ * The glass a stroke is drawn on (`InkLayer.tsx`) had `touch-action: none` and lay over the whole
  * stage, so after drawing with a pencil a finger could neither pan (a pan is the stage's own scroll
  * now) nor reach a card. Once a pencil has been seen the glass lets fingers through and catches the
  * pencil on the stage instead. In Chromium's touch iPad, with CDP's pen (`pointerType: "pen"`) and
@@ -63,7 +63,7 @@ say("after a pencil stroke, the glass lets fingers through", await canvas.evalua
 const glass = await canvas.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".stage-ink"), { x: box.width * 0.3, y: box.height * 0.4 });
 say("a finger over the canvas finds the stage, not the glass", !glass);
 
-// A touch within half a second of the pencil's lift is taken for a palm (`StageInk.tsx`, `PALM_AFTER_MS`): the finger comes after it.
+// A touch within half a second of the pencil's lift is taken for a palm (`InkLayer.tsx`, `PALM_AFTER_MS`): the finger comes after it.
 await page.waitForTimeout(700);
 const before = await scroll();
 const from = { x: box.x + box.width * 0.4, y: box.y + box.height * 0.5 };

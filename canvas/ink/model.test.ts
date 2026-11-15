@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { apply, baseTheme, layout, resolve, withDecksColors, type PenDocument } from "@decks/pen";
-import { inkHex, inkItem, strokeOf } from "./ink.ts";
+import { inkHex, inkItem, strokeOf } from "./model.ts";
 
 test("a stroke becomes a pen path in its own box, and reads back as the same stroke where it is drawn", () => {
 	const node = inkItem({ tool: "pen", color: "red", size: 4, points: [100, 200, 0.5, 140, 230, 0.15000000596] }, "s1");

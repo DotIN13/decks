@@ -6,7 +6,7 @@
  * the pill and the ink write), until those move in too.
  */
 import { createEditor, type EditorHost } from "./dom/controller.ts";
-import { createInsertMenu, type InsertHost } from "../ui/InsertMenu.tsx";
+import { createInsertMenu, type InsertHost } from "../chrome/InsertMenu.tsx";
 import { createKeys, type KeysHost } from "../input/keys.ts";
 import { createPointer, type Pointer, type PointerHost } from "../input/pointer.ts";
 import { createTextEditing, type TextHost } from "./dom/TextEditing.tsx";
@@ -52,7 +52,7 @@ export type StageEditor = ReturnType<typeof createStageEditor>;
 export type { PageView, Openers } from "../input/pointer.ts";
 export { OverlayLayer, ANCHOR_OUT, ANCHOR_PX } from "./dom/OverlayLayer.tsx";
 export { TextEditor } from "./dom/TextEditing.tsx";
-export { InsertMenu } from "../ui/InsertMenu.tsx";
+export { InsertMenu } from "../chrome/InsertMenu.tsx";
 export { tsScene, tsSeam } from "./scene-ts.ts";
 export { dropSlot, frameUnder } from "./core/drop.ts";
 export { deleteOps, duplicateOps, idMaker, moveOps } from "./core/ops.ts";

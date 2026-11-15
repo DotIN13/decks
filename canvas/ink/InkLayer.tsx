@@ -2,7 +2,7 @@ import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type
 import type { Camera } from "@decks/protocol-old";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "./ink.ts";
-import { inkHex, inkItem } from "../model/ink.ts";
+import { inkHex, inkItem } from "./model.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { LiveInk, PenPreview } from "../render/types.ts";
 import { knobs } from "../debug.ts";

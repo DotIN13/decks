@@ -3,12 +3,12 @@
  * drawing's tool bar and ink bar, what the canvas asks its host, the scheme, how a card reads, the
  * agents' stage calls and keys, the engine, and the knobs and probes the checks reach.
  */
-export { PenBar } from "../ui/PenBar.tsx";
-export { InkBar } from "../ui/InkBar.tsx";
+export { PenBar } from "../chrome/PenBar.tsx";
+export { InkBar } from "../chrome/InkBar.tsx";
 export * from "../host.ts";
 export * from "../camera/view-calls.ts";
 export * from "../cards/card-reading.ts";
-export * from "../ui/keycaps.ts";
+export * from "../chrome/keycaps.ts";
 export * from "../theme.ts";
 // The engine itself, for a host that draws a stage with no editor round it (the Decks app's shot page).
 export { StageEngine } from "../render/engine.ts";
