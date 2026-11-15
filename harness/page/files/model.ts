@@ -14,7 +14,7 @@ export const extensionOf = (file: { name: string }) => (file.name.split(".").pop
 export const isRaster = (file: Named) => RASTER.has(extensionOf(file)) || (file.type.startsWith("image/") && file.type !== "image/svg+xml");
 export const isWords = (file: Named) => file.size <= CARD_BYTES && (WORDS.has(extensionOf(file)) || file.type === "text/markdown" || file.type === "text/plain");
 export const isPlayable = (file: Named) => PLAYABLE.has(extensionOf(file)) || file.type.startsWith("video/") || file.type.startsWith("audio/");
-export const onStage = (file: Named) => isRaster(file) || isWords(file) || isPlayable(file);
+export const showsAsItself = (file: Named) => isRaster(file) || isWords(file) || isPlayable(file);
 
 /** A canvas's folder: a friend's under shared/canvases/<owner>/, yours under canvases/. */
 export function folderOf(name: string): string {

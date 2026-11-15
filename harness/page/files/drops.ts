@@ -17,7 +17,7 @@ import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/canvases.ts";
 import { authedSrc } from "../lib/authed.tsx";
-import { DOCUMENTS, fromCanvas, isPlayable, isRaster, isWords, onStage, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
+import { DOCUMENTS, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
 
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
@@ -128,8 +128,8 @@ export function createFileDrops() {
 		// Over a card, every file goes into it, between the blocks where it lands: the canvas frame says which.
 		const card = over ?? probes.cardAt?.(at.x, at.y);
 		if (card) return intoCard(files, card);
-		const direct = files.filter(onStage);
-		const rest = files.filter((file) => !onStage(file));
+		const direct = files.filter(showsAsItself);
+		const rest = files.filter((file) => !showsAsItself(file));
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		if (direct.length > 0) await ontoStage(direct, middle);
 		if (rest.length > 0) await asFileCards(rest, { x: middle.x, y: middle.y + (direct.length ? 260 : 0) });

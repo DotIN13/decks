@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { folderOf, fromCanvas, isPlayable, isRaster, isWords, onStage, sizeLabel } from "./model.ts";
+import { folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
 
 // A dropped file shows on the canvas as itself when it is a picture, short words or a player.
 
@@ -12,7 +12,7 @@ test("pictures, short words and players show as themselves; an SVG and long word
 	assert.ok(isWords(file("n.md")));
 	assert.ok(!isWords(file("n.md", "", 300 * 1024)));
 	assert.ok(isPlayable(file("v.bin", "video/mp4")));
-	assert.ok(!onStage(file("x.zip")));
+	assert.ok(!showsAsItself(file("x.zip")));
 });
 
 test("a deck path is reached from the canvas's folder", () => {
