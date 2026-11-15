@@ -1,6 +1,7 @@
 /**
- * What the browser checks share: where the deck is, when the app is ready, and how a
- * result is reported.
+ * What the browser checks share, in seven parts: how a result is reported, the fixture deck and the
+ * person's token, the page and its canvas frame, waiting for it to settle, the conversation and the
+ * panel, the server's socket, and the cards on the canvas.
  *
  * Two rules hold the suite together.
  *
@@ -27,7 +28,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright";
 import { applyEdits } from "../../pen/diff.ts";
 
+// Where the programs are, and how a check says what it found.
+
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
+
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
 
 /**
@@ -60,12 +64,15 @@ export function failed() {
 	return failures;
 }
 
+// The fixture deck and the person: the token, the canvas, its cards and their files.
+
 /**
  * A person token for the checks' own calls, as a Decks tab gets one: the harness writes it into its
  * page loaded as a tab of its own (`server/src/auth/issue.ts`). Every request to the harness carries a
  * token, from this machine too. Made once per harness address.
  */
 const tokens = new Map();
+
 export function personToken(api) {
 	api = typeof api === "string" ? api : API;
 	if (!tokens.has(api)) {
@@ -110,6 +117,7 @@ export const card = (name) => `canvases/${CANVAS}/cards/${name}/index.html`;
  * only), whose board is drawn as a picture and never runs. For the checks of an old board's drawing.
  */
 export const SHARED_CANVAS = "shared/ada/old-notes";
+
 export const SHARED_BOARD = "shared/canvases/ada/old-notes/boards/notes.html";
 
 /** What a check calls a card or a board by: a card's folder (`plan` for `…/cards/plan/index.html`), else its file's name. */
@@ -183,6 +191,8 @@ export function read(file) {
 export function write(file, text) {
 	writeFileSync(file, text);
 }
+
+// The page and its canvas frame: opened, focused, zoomed, fitted.
 
 /**
  * Open the app.
@@ -407,6 +417,45 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 }
 
 /**
+ * How close the camera is, as a number.
+ *
+ * The zoom used to be a `.level` span in a bar in the bottom-right corner; it is a menu
+ * chip in the top-right cluster now. Eleven checks read it, which is eleven reasons for
+ * this to be a function rather than a selector copied eleven times.
+ */
+export async function zoom(page) {
+	const text = await (await canvasFrame(page)).locator(".v3-zoom-value").first().textContent();
+	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
+}
+
+/** The same reading, from inside the canvas frame, for its `waitForFunction`. */
+export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
+
+/** Fit everything on the canvas, as the zoom bar's button in the frame does, and wait for the camera to rest. */
+export async function fitCanvas(page) {
+	const canvas = await canvasFrame(page);
+	await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
+	await rest(page);
+}
+
+/**
+ * Wait for the canvas to be empty.
+ *
+ * The counterpart of `ready`, and needed as often: an agent holding nothing puts nothing in
+ * play, so a check that has just created one is waiting for boards to *go* rather than to
+ * arrive. Asserting on an empty canvas without waiting is how you assert on the moment
+ * before it emptied.
+ */
+export async function emptyCanvas(page, { timeout = 15000 } = {}) {
+	// A conversation with no canvas yet has no frame at all, which is as empty as a canvas gets.
+	const canvas = await canvasFrame(page, { timeout: Math.min(timeout, 5000) }).catch(() => undefined);
+	if (!canvas) return;
+	await canvas.waitForFunction(() => document.querySelectorAll(".card-node").length === 0 && (window.__decksProbes?.cards?.().length ?? 0) === 0, null, { timeout });
+}
+
+// Waiting for the canvas to settle, and for a file or the drawing to change.
+
+/**
  * Wait until the canvas has drawn: the stage's sheet shown, or the Rust engine's first frame; then,
  * for a moment, for the items awake near the window (cards, documents, apps) to show their surfaces
  * (`item-slot.tsx`, `data-inert` until then). A board is only ever its picture.
@@ -453,19 +502,56 @@ export async function rest(page, { start = 300, timeout = 6000 } = {}) {
 	await canvas.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
+/** A short settle for things with no observable signal — a CSS transition, mostly. */
+export function settle(page, ms = 350) {
+	return page.waitForTimeout(ms);
+}
+
 /**
- * Wait for the canvas to be empty.
+ * Where two versions of a file differ, as a **byte range** rather than a line count.
  *
- * The counterpart of `ready`, and needed as often: an agent holding nothing puts nothing in
- * play, so a check that has just created one is waiting for boards to *go* rather than to
- * arrive. Asserting on an empty canvas without waiting is how you assert on the moment
- * before it emptied.
+ * This replaces two assertions that counted lines:
+ *
+ *     after.split("\n").filter((line, index) => line !== before[index])
+ *
+ * and called the result "moves one line of the file". It does not measure that, and the reason is
+ * worth writing down because the shape of the mistake is easy to repeat. Measured on `boards/notes.html`,
+ * one retyped paragraph reported **24** — and 24 is `42 - 18`: the file had 44 lines before and 42 after,
+ * so from the deletion at line 18 **every line after it differs at its own index**. The count is the
+ * *position* of an edit in the file, not its size, and it moves when the file's length moves.
+ *
+ * That made a real fix look like a failure. The editor collapses a run's wrapping when it opens it, so
+ * that the words being typed are the words in the file rather than the file's indentation — which turns a
+ * five-line paragraph into one line, deliberately. A line count can only report that as "the rest of the
+ * file changed".
+ *
+ * What is worth asserting is a region: which bytes differ, and whether they lie inside the node the editor
+ * says it is editing. This finds that region the only way it can be found without a diff library — the
+ * longest common prefix and the longest common suffix — and returns offsets into the *old* file, which is
+ * the version the node's byte range comes from.
  */
-export async function emptyCanvas(page, { timeout = 15000 } = {}) {
-	// A conversation with no canvas yet has no frame at all, which is as empty as a canvas gets.
-	const canvas = await canvasFrame(page, { timeout: Math.min(timeout, 5000) }).catch(() => undefined);
-	if (!canvas) return;
-	await canvas.waitForFunction(() => document.querySelectorAll(".card-node").length === 0 && (window.__decksProbes?.cards?.().length ?? 0) === 0, null, { timeout });
+export function differ(before, after) {
+	let start = 0;
+	while (start < before.length && start < after.length && before[start] === after[start]) start++;
+	let tail = 0;
+	while (
+		tail < before.length - start &&
+		tail < after.length - start &&
+		before[before.length - 1 - tail] === after[after.length - 1 - tail]
+	)
+		tail++;
+	return {
+		start,
+		/** One past the last changed byte, in the old file and in the new one. */
+		endBefore: before.length - tail,
+		endAfter: after.length - tail,
+		/** The changed text on each side, so a detail line can show it. */
+		before: before.slice(start, before.length - tail),
+		after: after.slice(start, after.length - tail),
+		lines: { before: before.split("\n").length, after: after.split("\n").length },
+		/** Open tags on each side: a bound on markup the edit added or removed. */
+		tags: { before: (before.match(/<[a-zA-Z]/g) ?? []).length, after: (after.match(/<[a-zA-Z]/g) ?? []).length },
+	};
 }
 
 /**
@@ -483,6 +569,8 @@ export async function changed(file, was, { timeout = 15000 } = {}) {
 	}
 	throw new Error(`${file} did not change within ${timeout}ms`);
 }
+
+// The conversation and the panel: a turn asked and waited for, the agent list, a new agent.
 
 /**
  * Wait for the focused agent to go idle — i.e. the turn finished.
@@ -562,6 +650,162 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 	});
 	await idle(page, { timeout });
 }
+
+/**
+ * Bring out the boards panel.
+ *
+ * There is one panel now where there were two, and one *list* in it where there were two
+ * tabs: on the canvas, held, and the rest of the deck, in one scroller. So `"context"` and
+ * `"deck"` are the same thing and both are accepted and ignored — the callers that pass them
+ * are asking for the panel, which is what they get. `"agents"` is the selector in the pill
+ * and still goes to `openAgents`.
+ *
+ * Written here rather than in each check for the reason it always was: it lived in seven
+ * files as `mouse.move(6, 480)` plus a wait, which is seven places to change when the way in
+ * changes — and it has now changed three times.
+ */
+export async function openPanel(page, tab = "context") {
+	if (tab === "agents") return openAgents(page);
+	/*
+	 * By `data-open`, which is the panel's own answer to the question.
+	 *
+	 * This has moved twice, and both moves were the panel changing what "open" *is*. It
+	 * started as `data-inset="left"` — wrong, because below 1100px the panel is a sheet and
+	 * deliberately declares no inset, so this timed out on every phone. Then it was the
+	 * element's presence — wrong too, once the panel stayed mounted in order to animate out.
+	 *
+	 * `data-open` is the attribute the component sets for exactly this, and it is true in
+	 * both arrangements. The lesson worth keeping: a test should ask a surface what state it
+	 * is in, not infer it from a side effect of that state.
+	 */
+	const open = () => page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open === "true");
+	if (!(await open())) {
+		/*
+		 * Matched on the end of the label, because the whole of it says what pressing the
+		 * button *does* — "Show the boards panel" or "Hide the boards panel" — which is right
+		 * for a screen reader and means an exact match would only ever find one of the two
+		 * states. An earlier version asked for `aria-label="Boards"`, matched nothing, and
+		 * fell through to a tool button, which failed with a story about a sticky note.
+		 */
+		await page.locator('button[aria-label="Show the side panel"]').first().click();
+		await page.waitForFunction(() => document.querySelector(".panel-shell")?.dataset.open === "true", null, { timeout: 6000 });
+		// It slides; a click landing mid-slide misses the row it was aimed at.
+		await page.waitForTimeout(220);
+	}
+}
+
+/**
+ * Open the agent selector: the composer's recipient chip.
+ *
+ * The pill has no agent segment any more, so the one list you switch agents with hangs off the
+ * chip that says who the line is going to — picking a row there focuses that agent, the same
+ * as pressing its row in the panel. A popover rather than a panel, so what a check waits for
+ * is the menu rather than a `data-open` on a surface that no longer exists.
+ */
+export async function openAgents(page) {
+	if (await page.locator(".popover").count()) return;
+	await page.locator(".dock-to-chip").first().click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+}
+
+/**
+ * Summon the conversation, and wait until it is actually up.
+ *
+ * `data-shown` rather than a class, because the column is mounted whether or not it has the
+ * right edge — `state/edge.ts` decides who does, and "mounted" and "shown" are different
+ * questions now that the inspector can borrow the edge from it.
+ *
+ * `time-machine` and `chrome` call this now. They used to click a block on the *spine* to
+ * open the history at a turn, and the spine went with the title bar — so they were clicking
+ * nothing and timing out before their first assertion.
+ */
+export async function openHistory(page) {
+	if ((await page.locator("[data-shown='true']").count()) > 0) return;
+	/* v3: the conversation is the `.v3-chat` section, folded or not; its title unfolds it. */
+	if ((await page.locator(".v3-chat").count()) > 0) {
+		if ((await page.locator(".v3-chat[data-folded='true']").count()) === 0) return;
+		await page.locator(".v3-chat .v3-chat-title").first().click();
+		await page.waitForSelector(".v3-chat:not([data-folded='true'])", { timeout: 6000 });
+		return;
+	}
+	await page.locator('.pill button[title^="Conversation"]').first().click();
+	await page.waitForSelector("[data-shown='true']", { timeout: 6000 });
+}
+
+/**
+ * Start another agent from the panel's `+`.
+ *
+ * The `+` opens a menu of the two runtimes rather than making one on the default — new agent
+ * and which runtime are the same question, since a live session cannot swap the process
+ * behind it. Seven checks pressed the `+` and expected a row; they get a menu, so the two
+ * steps live here rather than in seven places.
+ *
+ * Returns once the row exists, because every caller's next line assumes it does.
+ */
+export async function newAgent(page, kind = "pi") {
+	/*
+	 * From the panel's `+` ("New agent"), which opens the runtimes — the same `+` and list the
+	 * composer carries. The runtime cannot change afterwards, so picking one is
+	 * what makes the agent. The count is of the agent list's rows, which only lists agents now.
+	 */
+	await openAgents(page);
+	const agentsBefore = await page.evaluate(
+		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
+	);
+	await page.keyboard.press("Escape");
+	/*
+	 * v3 has no top-left pill: the `+` is the "New agent" button at the foot of the side panel's
+	 * Agents tab (`.v3-new-agent`). The panel is opened and put on that tab first.
+	 */
+	await openPanel(page);
+	const agentsTab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Agents\s*$/i }).first();
+	if ((await agentsTab.count()) > 0 && (await agentsTab.getAttribute("aria-selected")) !== "true") {
+		await agentsTab.click();
+		await page.waitForTimeout(250);
+	}
+	await page.locator(".v3-new-agent, .pill .new-agent").first().click();
+	// The runtimes' rows say each runtime's name (`AgentChoices`): "Pi", "Claude Code", …
+	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: new RegExp(`^\\s*${kind}`, "i") }) }).first().click();
+	/*
+	 * Counted with the menu re-opened, because picking closes it — and counted as agent
+	 * *rows* rather than every `[data-row]`.
+	 */
+	await page.waitForTimeout(500);
+	await openAgents(page);
+	await page.waitForFunction(
+		(was) => document.querySelectorAll('.popover [data-row][data-flat="true"]').length > was,
+		agentsBefore,
+		{ timeout: 15000 },
+	);
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(300);
+}
+
+/**
+ * An agent of its own on an empty canvas: made over a socket in a workspace nothing else uses, so
+ * it gets a fresh canvas rather than joining its workspace's latest one, and then picked from the
+ * composer's agent list, which goes to its stage. Returns the chat, `{ id, name }`; a check that
+ * makes one removes it at the end (`agent.remove`) so the checks after it see the deck they expect.
+ */
+export async function freshAgent(page, workspace) {
+	const link = await socket();
+	await page.waitForTimeout(300);
+	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	link.send({ type: "agent.create", workspace });
+	let made;
+	for (let i = 0; i < 60 && !made; i += 1) {
+		made = (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id));
+		if (!made) await page.waitForTimeout(150);
+	}
+	link.close();
+	if (!made) throw new Error(`no agent was made in ${workspace}`);
+	await openAgents(page);
+	await page.locator('.popover [data-agent="true"]').filter({ hasText: made.name }).first().click();
+	await page.waitForTimeout(800);
+	return made;
+}
+
+// The server's socket: today's tab socket, the reset to the fixture's canvas, a held-back line.
 
 /** Talk to the server the way the client does. */
 export async function socket(api) {
@@ -680,208 +924,51 @@ export async function resetStage(at) {
 }
 
 /**
- * Bring out the boards panel.
+ * The canvas frame's line to the harness held back, as a far network holds it: the answer to each edit
+ * the frame sends (`canvas.batch`) and every change on the stream it follows the drawing on
+ * (`/api/v1/events`), each `ms` late and in order. The page's own socket is the check's to route.
  *
- * There is one panel now where there were two, and one *list* in it where there were two
- * tabs: on the canvas, held, and the rest of the deck, in one scroller. So `"context"` and
- * `"deck"` are the same thing and both are accepted and ignored — the callers that pass them
- * are asking for the panel, which is what they get. `"agents"` is the selector in the pill
- * and still goes to `openAgents`.
- *
- * Written here rather than in each check for the reason it always was: it lived in seven
- * files as `mouse.move(6, 480)` plus a wait, which is seven places to change when the way in
- * changes — and it has now changed three times.
+ * Call it before the page loads (it installs a script in every frame, and the frame made after it
+ * is what it reaches), then `set(ms)` around what is measured; `queued()` is what is still held back.
  */
-export async function openPanel(page, tab = "context") {
-	if (tab === "agents") return openAgents(page);
+export async function lagCanvasLine(page) {
+	const state = { ms: 0, queued: 0 };
 	/*
-	 * By `data-open`, which is the panel's own answer to the question.
-	 *
-	 * This has moved twice, and both moves were the panel changing what "open" *is*. It
-	 * started as `data-inset="left"` — wrong, because below 1100px the panel is a sheet and
-	 * deliberately declares no inset, so this timed out on every phone. Then it was the
-	 * element's presence — wrong too, once the panel stayed mounted in order to animate out.
-	 *
-	 * `data-open` is the attribute the component sets for exactly this, and it is true in
-	 * both arrangements. The lesson worth keeping: a test should ask a surface what state it
-	 * is in, not infer it from a side effect of that state.
+	 * The frame's line is one WebSocket (`/api/v1/socket`, or compat's `/compat/v1/socket` the page's compat mode
+	 * gives the frame): every message from the harness (the answer to an
+	 * edit, the canvas's changes) is held back `ms`, in order; what the frame sends goes through at once.
 	 */
-	const open = () => page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open === "true");
-	if (!(await open())) {
-		/*
-		 * Matched on the end of the label, because the whole of it says what pressing the
-		 * button *does* — "Show the boards panel" or "Hide the boards panel" — which is right
-		 * for a screen reader and means an exact match would only ever find one of the two
-		 * states. An earlier version asked for `aria-label="Boards"`, matched nothing, and
-		 * fell through to a tool button, which failed with a story about a sticky note.
-		 */
-		await page.locator('button[aria-label="Show the side panel"]').first().click();
-		await page.waitForFunction(() => document.querySelector(".panel-shell")?.dataset.open === "true", null, { timeout: 6000 });
-		// It slides; a click landing mid-slide misses the row it was aimed at.
-		await page.waitForTimeout(220);
-	}
-}
-
-/**
- * Open the agent selector: the composer's recipient chip.
- *
- * The pill has no agent segment any more, so the one list you switch agents with hangs off the
- * chip that says who the line is going to — picking a row there focuses that agent, the same
- * as pressing its row in the panel. A popover rather than a panel, so what a check waits for
- * is the menu rather than a `data-open` on a surface that no longer exists.
- */
-export async function openAgents(page) {
-	if (await page.locator(".popover").count()) return;
-	await page.locator(".dock-to-chip").first().click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-}
-
-/**
- * How close the camera is, as a number.
- *
- * The zoom used to be a `.level` span in a bar in the bottom-right corner; it is a menu
- * chip in the top-right cluster now. Eleven checks read it, which is eleven reasons for
- * this to be a function rather than a selector copied eleven times.
- */
-export async function zoom(page) {
-	const text = await (await canvasFrame(page)).locator(".v3-zoom-value").first().textContent();
-	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
-}
-
-/** The same reading, from inside the canvas frame, for its `waitForFunction`. */
-export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
-
-/**
- * Summon the conversation, and wait until it is actually up.
- *
- * `data-shown` rather than a class, because the column is mounted whether or not it has the
- * right edge — `state/edge.ts` decides who does, and "mounted" and "shown" are different
- * questions now that the inspector can borrow the edge from it.
- *
- * `time-machine` and `chrome` call this now. They used to click a block on the *spine* to
- * open the history at a turn, and the spine went with the title bar — so they were clicking
- * nothing and timing out before their first assertion.
- */
-export async function openHistory(page) {
-	if ((await page.locator("[data-shown='true']").count()) > 0) return;
-	/* v3: the conversation is the `.v3-chat` section, folded or not; its title unfolds it. */
-	if ((await page.locator(".v3-chat").count()) > 0) {
-		if ((await page.locator(".v3-chat[data-folded='true']").count()) === 0) return;
-		await page.locator(".v3-chat .v3-chat-title").first().click();
-		await page.waitForSelector(".v3-chat:not([data-folded='true'])", { timeout: 6000 });
-		return;
-	}
-	await page.locator('.pill button[title^="Conversation"]').first().click();
-	await page.waitForSelector("[data-shown='true']", { timeout: 6000 });
-}
-
-/**
- * Start another agent from the panel's `+`.
- *
- * The `+` opens a menu of the two runtimes rather than making one on the default — new agent
- * and which runtime are the same question, since a live session cannot swap the process
- * behind it. Seven checks pressed the `+` and expected a row; they get a menu, so the two
- * steps live here rather than in seven places.
- *
- * Returns once the row exists, because every caller's next line assumes it does.
- */
-export async function newAgent(page, kind = "pi") {
-	/*
-	 * From the panel's `+` ("New agent"), which opens the runtimes — the same `+` and list the
-	 * composer carries. The runtime cannot change afterwards, so picking one is
-	 * what makes the agent. The count is of the agent list's rows, which only lists agents now.
-	 */
-	await openAgents(page);
-	const agentsBefore = await page.evaluate(
-		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
-	);
-	await page.keyboard.press("Escape");
-	/*
-	 * v3 has no top-left pill: the `+` is the "New agent" button at the foot of the side panel's
-	 * Agents tab (`.v3-new-agent`). The panel is opened and put on that tab first.
-	 */
-	await openPanel(page);
-	const agentsTab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Agents\s*$/i }).first();
-	if ((await agentsTab.count()) > 0 && (await agentsTab.getAttribute("aria-selected")) !== "true") {
-		await agentsTab.click();
-		await page.waitForTimeout(250);
-	}
-	await page.locator(".v3-new-agent, .pill .new-agent").first().click();
-	// The runtimes' rows say each runtime's name (`AgentChoices`): "Pi", "Claude Code", …
-	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: new RegExp(`^\\s*${kind}`, "i") }) }).first().click();
-	/*
-	 * Counted with the menu re-opened, because picking closes it — and counted as agent
-	 * *rows* rather than every `[data-row]`.
-	 */
-	await page.waitForTimeout(500);
-	await openAgents(page);
-	await page.waitForFunction(
-		(was) => document.querySelectorAll('.popover [data-row][data-flat="true"]').length > was,
-		agentsBefore,
-		{ timeout: 15000 },
-	);
-	await page.keyboard.press("Escape");
-	await page.waitForTimeout(300);
-}
-
-/** A short settle for things with no observable signal — a CSS transition, mostly. */
-export function settle(page, ms = 350) {
-	return page.waitForTimeout(ms);
-}
-
-/**
- * Where two versions of a file differ, as a **byte range** rather than a line count.
- *
- * This replaces two assertions that counted lines:
- *
- *     after.split("\n").filter((line, index) => line !== before[index])
- *
- * and called the result "moves one line of the file". It does not measure that, and the reason is
- * worth writing down because the shape of the mistake is easy to repeat. Measured on `boards/notes.html`,
- * one retyped paragraph reported **24** — and 24 is `42 - 18`: the file had 44 lines before and 42 after,
- * so from the deletion at line 18 **every line after it differs at its own index**. The count is the
- * *position* of an edit in the file, not its size, and it moves when the file's length moves.
- *
- * That made a real fix look like a failure. The editor collapses a run's wrapping when it opens it, so
- * that the words being typed are the words in the file rather than the file's indentation — which turns a
- * five-line paragraph into one line, deliberately. A line count can only report that as "the rest of the
- * file changed".
- *
- * What is worth asserting is a region: which bytes differ, and whether they lie inside the node the editor
- * says it is editing. This finds that region the only way it can be found without a diff library — the
- * longest common prefix and the longest common suffix — and returns offsets into the *old* file, which is
- * the version the node's byte range comes from.
- */
-export function differ(before, after) {
-	let start = 0;
-	while (start < before.length && start < after.length && before[start] === after[start]) start++;
-	let tail = 0;
-	while (
-		tail < before.length - start &&
-		tail < after.length - start &&
-		before[before.length - 1 - tail] === after[after.length - 1 - tail]
-	)
-		tail++;
+	await page.routeWebSocket(/\/(api|compat)\/v1\/socket/, (ws) => {
+		const server = ws.connectToServer();
+		let last = 0;
+		server.onMessage((message) => {
+			const at = Math.max(Date.now() + state.ms, last);
+			last = at;
+			state.queued++;
+			setTimeout(() => {
+				state.queued--;
+				try {
+					ws.send(message);
+				} catch {
+					/* the frame went away */
+				}
+			}, at - Date.now());
+		});
+		server.onClose(() => ws.close().catch(() => {}));
+		ws.onMessage((message) => server.send(message));
+		ws.onClose(() => server.close().catch(() => {}));
+	});
 	return {
-		start,
-		/** One past the last changed byte, in the old file and in the new one. */
-		endBefore: before.length - tail,
-		endAfter: after.length - tail,
-		/** The changed text on each side, so a detail line can show it. */
-		before: before.slice(start, before.length - tail),
-		after: after.slice(start, after.length - tail),
-		lines: { before: before.split("\n").length, after: after.split("\n").length },
-		/** Open tags on each side: a bound on markup the edit added or removed. */
-		tags: { before: (before.match(/<[a-zA-Z]/g) ?? []).length, after: (after.match(/<[a-zA-Z]/g) ?? []).length },
+		async set(ms) {
+			state.ms = ms;
+		},
+		async queued() {
+			return state.queued;
+		},
 	};
 }
 
-/**
- * Select a board the way a person does now that boards have no title bars: click it. The point is
- * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
- * then the card's pill (`ui/Callout.tsx`) is waited for.
- */
-const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
+// Cards on the canvas: selected, flown to, their pill's buttons, their edges.
 
 export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	const canvas = await canvasFrame(page);
@@ -948,6 +1035,13 @@ export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	await canvas.waitForSelector(".card-callout:not([data-hidden])", { timeout });
 	await page.waitForTimeout(150);
 }
+
+/**
+ * Select a board the way a person does now that boards have no title bars: click it. The point is
+ * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
+ * then the card's pill (`ui/Callout.tsx`) is waited for.
+ */
+const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
 /** Select a board and fly the camera to it with the pill's Fit — what a double-click on its bar used to do. */
 export async function flyToCard(page, path) {
@@ -1036,80 +1130,4 @@ export async function cardEdge(page, path) {
 	}, path);
 	for (const at of points) if (await onCanvasAt(page, at.x, at.y)) return at;
 	return null;
-}
-
-/**
- * An agent of its own on an empty canvas: made over a socket in a workspace nothing else uses, so
- * it gets a fresh canvas rather than joining its workspace's latest one, and then picked from the
- * composer's agent list, which goes to its stage. Returns the chat, `{ id, name }`; a check that
- * makes one removes it at the end (`agent.remove`) so the checks after it see the deck they expect.
- */
-export async function freshAgent(page, workspace) {
-	const link = await socket();
-	await page.waitForTimeout(300);
-	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
-	link.send({ type: "agent.create", workspace });
-	let made;
-	for (let i = 0; i < 60 && !made; i += 1) {
-		made = (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id));
-		if (!made) await page.waitForTimeout(150);
-	}
-	link.close();
-	if (!made) throw new Error(`no agent was made in ${workspace}`);
-	await openAgents(page);
-	await page.locator('.popover [data-agent="true"]').filter({ hasText: made.name }).first().click();
-	await page.waitForTimeout(800);
-	return made;
-}
-
-/**
- * The canvas frame's line to the harness held back, as a far network holds it: the answer to each edit
- * the frame sends (`canvas.batch`) and every change on the stream it follows the drawing on
- * (`/api/v1/events`), each `ms` late and in order. The page's own socket is the check's to route.
- *
- * Call it before the page loads (it installs a script in every frame, and the frame made after it
- * is what it reaches), then `set(ms)` around what is measured; `queued()` is what is still held back.
- */
-export async function lagCanvasLine(page) {
-	const state = { ms: 0, queued: 0 };
-	/*
-	 * The frame's line is one WebSocket (`/api/v1/socket`, or compat's `/compat/v1/socket` the page's compat mode
-	 * gives the frame): every message from the harness (the answer to an
-	 * edit, the canvas's changes) is held back `ms`, in order; what the frame sends goes through at once.
-	 */
-	await page.routeWebSocket(/\/(api|compat)\/v1\/socket/, (ws) => {
-		const server = ws.connectToServer();
-		let last = 0;
-		server.onMessage((message) => {
-			const at = Math.max(Date.now() + state.ms, last);
-			last = at;
-			state.queued++;
-			setTimeout(() => {
-				state.queued--;
-				try {
-					ws.send(message);
-				} catch {
-					/* the frame went away */
-				}
-			}, at - Date.now());
-		});
-		server.onClose(() => ws.close().catch(() => {}));
-		ws.onMessage((message) => server.send(message));
-		ws.onClose(() => server.close().catch(() => {}));
-	});
-	return {
-		async set(ms) {
-			state.ms = ms;
-		},
-		async queued() {
-			return state.queued;
-		},
-	};
-}
-
-/** Fit everything on the canvas, as the zoom bar's button in the frame does, and wait for the camera to rest. */
-export async function fitCanvas(page) {
-	const canvas = await canvasFrame(page);
-	await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
-	await rest(page);
 }
