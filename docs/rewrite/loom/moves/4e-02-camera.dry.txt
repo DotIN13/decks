@@ -1,6 +1,6 @@
 # Step 4e-02-camera: Regroup canvas: camera/stage-ops.ts becomes camera/view-calls.ts
 
-Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries. Nothing was moved.
 
 - files moved by git mv: 2
 - files taken out of git (moved on disk): 0
@@ -49,7 +49,7 @@ harness/page/state/notices.ts:45
 
 ## Then run
 
-- Warden's adopt command for the moved paths, with --renames 4e-02-camera.renames.json
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - node tools/check.mjs canvas && node tools/check.mjs harness
 - node tools/gates/run.mjs
 - node tools/checks/run.mjs: camera, camera-roundtrip, glide, opening-lands (one slot each)

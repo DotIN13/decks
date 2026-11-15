@@ -51,7 +51,7 @@ export function format(table, p, at) {
 	return out.join("\n");
 }
 
-function main(argv) {
+async function main(argv) {
 	const [tablePath, ...flags] = argv;
 	const opt = (name) => { const i = flags.indexOf(name); return i < 0 ? null : flags[i + 1]; };
 	if (!tablePath || (!flags.includes("--dry") && !flags.includes("--go"))) {
@@ -66,7 +66,7 @@ function main(argv) {
 	for (const b of befores) repo = after(repo, plan(loadTable(b), repo));
 	const p = plan(table, repo);
 	if (flags.includes("--go")) {
-		for (const n of apply(root, table, p)) console.log(n);
+		for (const n of await apply(root, table, p)) console.log(n);
 		console.log(`moved ${p.moves.length} files, edited ${p.edits.size}; staged, not committed. Then run:`);
 		for (const t of table.then || []) console.log(`  ${t}`);
 		return;
@@ -78,4 +78,4 @@ function main(argv) {
 	console.error(`${p.moves.length} moves, ${p.changes.length} lines rewritten, ${p.edits.size} files edited, ${p.warnings.length} warnings`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2));
+if (import.meta.url === `file://${process.argv[1]}`) await main(process.argv.slice(2));

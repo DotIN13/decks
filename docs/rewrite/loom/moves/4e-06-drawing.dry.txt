@@ -1,6 +1,6 @@
 # Step 4e-06-drawing: Regroup canvas: the drawing's model files become drawing/
 
-Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor. Nothing was moved.
 
 - files moved by git mv: 9
 - files taken out of git (moved on disk): 0
@@ -92,7 +92,7 @@ harness/page/state/types/deck.ts:100
 
 ## Then run
 
-- Warden's adopt command for the moved paths, with --renames 4e-06-drawing.renames.json
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - node tools/check.mjs canvas && node tools/check.mjs harness
 - node tools/gates/run.mjs
 - node tools/checks/run.mjs: edits-wait, selection (one slot each)

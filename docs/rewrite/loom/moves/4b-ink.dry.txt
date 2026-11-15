@@ -1,6 +1,6 @@
 # Step 4b-ink: canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes
 
-Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
@@ -67,4 +67,5 @@ canvas/ink/shaper.test.ts:16
 - node tools/gates/run.mjs
 - node tools/heavy.mjs --wait -- node server/frame/build.mjs
 - node tools/checks/run.mjs ink-long-stroke, then pencil-then-finger (one slot each)
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - commit with REWRITE_AGENT=Loom: Fold the ink package into canvas/ink/

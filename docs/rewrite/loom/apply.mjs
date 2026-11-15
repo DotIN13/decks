@@ -38,8 +38,17 @@ function removeEmptyParents(root, rel) {
 	for (let d = dirname(rel); d !== "." && existsSync(join(root, d)) && !readdirSync(join(root, d)).length; d = dirname(d)) rmSync(join(root, d), { recursive: true });
 }
 
+/** Moves the gate baselines' keys with the files (Warden's tools/gates/rekey.mjs), staged with the move. */
+async function rekeyBaselines(root, moves, notes) {
+	const tool = join(root, "tools/gates/rekey.mjs");
+	if (!existsSync(tool) || !moves.length) return;
+	const { rekey } = await import(tool);
+	notes.push(`re-keyed ${rekey(root, moves)} baseline keys`);
+	git(root, ["add", "--", "tools/gates/baseline"]);
+}
+
 /** Runs the plan. Returns notes on what it carried or left, for the caller to read. */
-export function apply(root, table, p) {
+export async function apply(root, table, p) {
 	const notes = [];
 	if (p.untrack.length) git(root, ["rm", "-r", "-q", "--cached", "--", ...(table.untrack || [])]);
 	if (p.remove.length) git(root, ["rm", "-r", "-q", "--", ...(table.remove || [])]);
@@ -56,5 +65,6 @@ export function apply(root, table, p) {
 	}
 	if (p.edits.size) git(root, ["add", "--", ...p.edits.keys()]);
 	for (const f of folders) { removeEmpty(root, f); removeEmptyParents(root, f); }
+	await rekeyBaselines(root, p.moves, notes);
 	return notes;
 }

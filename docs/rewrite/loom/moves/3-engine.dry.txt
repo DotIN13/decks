@@ -1,6 +1,6 @@
 # Step 3-engine: engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git
 
-Dry run on e19152f7, on top of 1-pen, 2-ui. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui. Nothing was moved.
 
 - files moved by git mv: 112
 - files taken out of git (moved on disk): 8
@@ -258,7 +258,7 @@ server/pictures/native.ts:19
 - before: Anvil between commits, told its lane is now engine/crates/apple/, engine/Cargo.toml, engine/Cargo.lock
 - node tools/heavy.mjs --wait -- npm install
 - node tools/heavy.mjs --wait -- npm run build:wasm -w @decks/engine (pkg/ and pkg-gl/ from source, as a fresh checkout must)
-- Warden's adopt command for engine/, with --renames 3-engine.renames.json
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - node tools/check.mjs canvas (still packages/canvas) && node tools/check.mjs server
 - node tools/gates/run.mjs
 - node tools/heavy.mjs --wait -- cargo test --manifest-path engine/Cargo.toml

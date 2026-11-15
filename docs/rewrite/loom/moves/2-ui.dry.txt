@@ -1,6 +1,6 @@
 # Step 2-ui: ui/: packages/ui moved to the top, src/ flattened, the name @decks/ui kept
 
-Dry run on e19152f7, on top of 1-pen. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen. Nothing was moved.
 
 - files moved by git mv: 17
 - files taken out of git (moved on disk): 0
@@ -63,7 +63,7 @@ ui/tsconfig.json:2
 ## Then run
 
 - node tools/heavy.mjs --wait -- npm install
-- Warden's adopt command for ui/, with --renames 2-ui.renames.json
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - node tools/check.mjs ui && node tools/check.mjs harness
 - node tools/gates/run.mjs
 - node tools/checks/run.mjs chrome, then agent-rows, then walkthrough (one slot each)

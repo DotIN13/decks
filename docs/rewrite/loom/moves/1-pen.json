@@ -65,7 +65,7 @@
 	],
 	"then": [
 		"node tools/heavy.mjs --wait -- npm install",
-		"Warden's adopt command for pen/ (its breaks under their new paths), with --renames 1-pen.renames.json",
+		"--go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move",
 		"node tools/check.mjs pen && node tools/check.mjs server && node tools/check.mjs harness",
 		"node tools/gates/run.mjs",
 		"node tools/checks/run.mjs stage-goldens, then stage-shot, then placeholder (one slot each)",

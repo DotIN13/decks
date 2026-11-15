@@ -137,7 +137,7 @@ test("the dry run text names every move and changed line", () => {
 	assert.match(text, /server\/main\.ts:2\n {2}- import \{ extra \} from "\.\.\/packages\/lib\/src\/extra\.ts";\n {2}\+ import \{ extra \} from "\.\.\/lib\/extra\.ts";/);
 });
 
-test("--go on a git copy of the fixture moves, carries built files, writes and stages", () => {
+test("--go on a git copy of the fixture moves, carries built files, writes and stages", async () => {
 	const root = mkdtempSync(join(tmpdir(), "loom-move-"));
 	try {
 		cpSync(TREE, root, { recursive: true });
@@ -149,7 +149,7 @@ test("--go on a git copy of the fixture moves, carries built files, writes and s
 		writeFileSync(join(root, "packages/eng/target/bin"), "built");
 		mkdirSync(join(root, "packages/lib/node_modules"));
 		const table = loadTable(TABLE);
-		apply(root, table, plan(table, checkout(root)));
+		await apply(root, table, plan(table, checkout(root)));
 		assert.equal(existsSync(join(root, "packages")), false);
 		assert.equal(readFileSync(join(root, "engine/target/bin"), "utf8"), "built");
 		assert.equal(readFileSync(join(root, "engine/made/out.js"), "utf8").trim(), "export const draw = 1, gl = 2;");
@@ -226,4 +226,20 @@ test("a mention can be limited to the files of one folder", () => {
 	const p = plan(table, tree());
 	assert.equal(p.edits.get("shared/util.ts").trim(), "export const tool = 1;");
 	assert.equal(p.edits.has("packages/lib/src/index.ts"), false);
+});
+
+test("--go re-keys the gate baselines with the files when the checkout has the re-key tool", async () => {
+	const root = mkdtempSync(join(tmpdir(), "loom-rekey-"));
+	try {
+		cpSync(TREE, root, { recursive: true });
+		mkdirSync(join(root, "tools/gates/baseline"), { recursive: true });
+		writeFileSync(join(root, "tools/gates/rekey.mjs"), 'export function rekey(root, pairs) { globalThis.loomPairs = pairs; return pairs.length; }\n');
+		writeFileSync(join(root, "tools/gates/baseline/size.json"), "{}\n");
+		const git = (...a) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "core.hooksPath=/dev/null", ...a], { cwd: root, encoding: "utf8" });
+		git("init", "-q"); git("add", "."); git("commit", "-q", "-m", "fixture");
+		const table = loadTable(TABLE);
+		const notes = await apply(root, table, plan(table, checkout(root)));
+		assert.ok(notes.includes("re-keyed 7 baseline keys"), notes.join("; "));
+		assert.deepEqual(globalThis.loomPairs.find(([a]) => a === "packages/lib/src/extra.ts"), ["packages/lib/src/extra.ts", "lib/extra.ts"]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });

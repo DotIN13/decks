@@ -431,3 +431,8 @@ imports by package and folder, top-level outlines and inner function sizes of ea
 - **Step 5's sheets**: `sheets.md`, made by `node docs/rewrite/loom/sheets.mjs` from `splits/*.json`
   through `split.mjs` (which measures TypeScript by the compiler, Rust and CSS by braces). It fails when
   a new file would pass 400 lines.
+- **Baselines move with the files**: `--go` calls Warden's `rekey` (`tools/gates/rekey.mjs`, 8cefb040)
+  with the table's own old-to-new pairs (not git's rename guesses) and stages `tools/gates/baseline/`,
+  so the move's commit carries them. Keys of deleted or untracked files fall with
+  `node tools/gates/run.mjs --shrink`. The eight `stage` class names pass by rule
+  (`tools/gates/markup-names.json`, 476a73c0).

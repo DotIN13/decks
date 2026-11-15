@@ -74,6 +74,7 @@
 		"node tools/gates/run.mjs",
 		"node tools/heavy.mjs --wait -- node server/frame/build.mjs",
 		"node tools/checks/run.mjs ink-long-stroke, then pencil-then-finger (one slot each)",
+		"--go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move",
 		"commit with REWRITE_AGENT=Loom: Fold the ink package into canvas/ink/"
 	]
 }

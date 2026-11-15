@@ -1,6 +1,6 @@
 # Step 4e-12-readmes: Regroup canvas: READMEs for render/, look/, documents/ and the whole folder
 
-Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome, 4e-11-host. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome, 4e-11-host. Nothing was moved.
 
 - files moved by git mv: 0
 - files taken out of git (moved on disk): 0
@@ -32,7 +32,7 @@ Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card
 
 ## Then run
 
-- Warden's adopt command for the moved paths, with --renames 4e-12-readmes.renames.json
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - node tools/check.mjs canvas && node tools/check.mjs harness
 - node tools/gates/run.mjs
 - node tools/checks/run.mjs: none (READMEs only) (one slot each)

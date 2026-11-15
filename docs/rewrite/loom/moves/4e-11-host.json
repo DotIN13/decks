@@ -73,7 +73,7 @@
 		}
 	],
 	"then": [
-		"Warden's adopt command for the moved paths, with --renames 4e-11-host.renames.json",
+		"--go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move",
 		"node tools/check.mjs canvas && node tools/check.mjs harness",
 		"node tools/gates/run.mjs",
 		"node tools/checks/run.mjs: canvas-frame, context-loss (one slot each)",

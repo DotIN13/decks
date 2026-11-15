@@ -1,6 +1,6 @@
 # Step 4d-documents: canvas/documents/: the page half of docs folds into the canvas library; the server half is already server/documents
 
-Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime. Nothing was moved.
+Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime. Nothing was moved.
 
 - files moved by git mv: 19
 - files taken out of git (moved on disk): 1
@@ -159,4 +159,5 @@ canvas/documents/live-doc.ts:6
 - node tools/check.mjs canvas && node tools/check.mjs server
 - node tools/gates/run.mjs
 - node tools/checks/run.mjs: the document checks (documents, doc-edit, gdoc) one slot each
+- --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/
