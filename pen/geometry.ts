@@ -30,31 +30,26 @@ function tokens(d: string): Array<string | number> {
 
 const ARITY: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
 
+/** Where a path's pen is, where its subpath started, the box seen so far, and the last curve's control point. */
+type Walk = { x: number; y: number; startX: number; startY: number; minX: number; minY: number; maxX: number; maxY: number; control?: { x: number; y: number; of: "c" | "q" } };
+
+const seeX = (w: Walk, px: number) => {
+	if (px < w.minX) w.minX = px;
+	if (px > w.maxX) w.maxX = px;
+};
+const seeY = (w: Walk, py: number) => {
+	if (py < w.minY) w.minY = py;
+	if (py > w.maxY) w.maxY = py;
+};
+const see = (w: Walk, px: number, py: number) => {
+	seeX(w, px);
+	seeY(w, py);
+};
+
 export function pathBounds(d: string | undefined): Rect | undefined {
 	if (!d) return undefined;
 	const list = tokens(d);
-	let x = 0;
-	let y = 0;
-	let startX = 0;
-	let startY = 0;
-	let minX = Infinity;
-	let minY = Infinity;
-	let maxX = -Infinity;
-	let maxY = -Infinity;
-	const seeX = (px: number) => {
-		if (px < minX) minX = px;
-		if (px > maxX) maxX = px;
-	};
-	const seeY = (py: number) => {
-		if (py < minY) minY = py;
-		if (py > maxY) maxY = py;
-	};
-	const see = (px: number, py: number) => {
-		seeX(px);
-		seeY(py);
-	};
-	// The last curve's own control point, which S and T mirror to get their first one.
-	let control: { x: number; y: number; of: "c" | "q" } | undefined;
+	const w: Walk = { x: 0, y: 0, startX: 0, startY: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
 	let i = 0;
 	let command = "";
 	while (i < list.length) {
@@ -63,8 +58,8 @@ export function pathBounds(d: string | undefined): Rect | undefined {
 			command = token;
 			i++;
 			if (command === "z" || command === "Z") {
-				x = startX;
-				y = startY;
+				w.x = w.startX;
+				w.y = w.startY;
 				continue;
 			}
 		}
@@ -75,77 +70,80 @@ export function pathBounds(d: string | undefined): Rect | undefined {
 		const args = list.slice(i, i + arity);
 		if (args.length < arity || args.some((a) => typeof a !== "number")) break;
 		i += arity;
-		const n = args as number[];
 		const rel = command === lower;
-		const ox = rel ? x : 0;
-		const oy = rel ? y : 0;
-		switch (lower) {
-			case "m":
-				x = ox + n[0]!;
-				y = oy + n[1]!;
-				startX = x;
-				startY = y;
-				see(x, y);
-				// Further pairs after a moveto are linetos.
-				command = rel ? "l" : "L";
-				break;
-			case "l":
-				x = ox + n[0]!;
-				y = oy + n[1]!;
-				see(x, y);
-				break;
-			case "h":
-				x = (rel ? x : 0) + n[0]!;
-				see(x, y);
-				break;
-			case "v":
-				y = (rel ? y : 0) + n[0]!;
-				see(x, y);
-				break;
-			case "c":
-			case "s": {
-				// S's first control point is the mirror of the last cubic's second, or the pen itself.
-				const mirrored = command.toLowerCase() === "s";
-				const c1 = mirrored ? (control?.of === "c" ? { x: 2 * x - control.x, y: 2 * y - control.y } : { x, y }) : { x: ox + n[0]!, y: oy + n[1]! };
-				const c2 = mirrored ? { x: ox + n[0]!, y: oy + n[1]! } : { x: ox + n[2]!, y: oy + n[3]! };
-				const ex = mirrored ? ox + n[2]! : ox + n[4]!;
-				const ey = mirrored ? oy + n[3]! : oy + n[5]!;
-				for (const v of cubicRange(x, c1.x, c2.x, ex)) seeX(v);
-				for (const v of cubicRange(y, c1.y, c2.y, ey)) seeY(v);
-				control = { ...c2, of: "c" };
-				x = ex;
-				y = ey;
-				break;
-			}
-			case "q":
-			case "t": {
-				// And T's control point is the mirror of the last quadratic's.
-				const mirrored = command.toLowerCase() === "t";
-				const c1 = mirrored ? (control?.of === "q" ? { x: 2 * x - control.x, y: 2 * y - control.y } : { x, y }) : { x: ox + n[0]!, y: oy + n[1]! };
-				const ex = mirrored ? ox + n[0]! : ox + n[2]!;
-				const ey = mirrored ? oy + n[1]! : oy + n[3]!;
-				for (const v of quadRange(x, c1.x, ex)) seeX(v);
-				for (const v of quadRange(y, c1.y, ey)) seeY(v);
-				control = { ...c1, of: "q" };
-				x = ex;
-				y = ey;
-				break;
-			}
-			case "a": {
-				const ex = ox + n[5]!;
-				const ey = oy + n[6]!;
-				const arc = arcBounds(x, y, n[0]!, n[1]!, n[2]!, n[3]! !== 0, n[4]! !== 0, ex, ey);
-				see(arc.x, arc.y);
-				see(arc.x + arc.w, arc.y + arc.h);
-				x = ex;
-				y = ey;
-				see(x, y);
-				break;
-			}
-		}
+		if ("mlhv".includes(lower)) command = lineStep(w, lower, args as number[], rel) ?? command;
+		else curveStep(w, lower, args as number[], rel);
 	}
-	if (!Number.isFinite(minX)) return undefined;
-	return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+	if (!Number.isFinite(w.minX)) return undefined;
+	return { x: w.minX, y: w.minY, w: w.maxX - w.minX, h: w.maxY - w.minY };
+}
+
+/** A moveto or a line; answers the command that further pairs mean, after a moveto. */
+function lineStep(w: Walk, lower: string, n: number[], rel: boolean): string | undefined {
+	const ox = rel ? w.x : 0;
+	const oy = rel ? w.y : 0;
+	switch (lower) {
+		case "m":
+			w.x = ox + n[0]!;
+			w.y = oy + n[1]!;
+			w.startX = w.x;
+			w.startY = w.y;
+			see(w, w.x, w.y);
+			// Further pairs after a moveto are linetos.
+			return rel ? "l" : "L";
+		case "l":
+			w.x = ox + n[0]!;
+			w.y = oy + n[1]!;
+			break;
+		case "h":
+			w.x = (rel ? w.x : 0) + n[0]!;
+			break;
+		case "v":
+			w.y = (rel ? w.y : 0) + n[0]!;
+			break;
+	}
+	see(w, w.x, w.y);
+	return undefined;
+}
+
+/** A cubic, a quadratic or an arc: its whole extent, wherever it turns back. */
+function curveStep(w: Walk, lower: string, n: number[], rel: boolean): void {
+	const ox = rel ? w.x : 0;
+	const oy = rel ? w.y : 0;
+	const { x, y, control } = w;
+	if (lower === "c" || lower === "s") {
+		// S's first control point is the mirror of the last cubic's second, or the pen itself.
+		const mirrored = lower === "s";
+		const c1 = mirrored ? (control?.of === "c" ? { x: 2 * x - control.x, y: 2 * y - control.y } : { x, y }) : { x: ox + n[0]!, y: oy + n[1]! };
+		const c2 = mirrored ? { x: ox + n[0]!, y: oy + n[1]! } : { x: ox + n[2]!, y: oy + n[3]! };
+		const ex = mirrored ? ox + n[2]! : ox + n[4]!;
+		const ey = mirrored ? oy + n[3]! : oy + n[5]!;
+		for (const v of cubicRange(x, c1.x, c2.x, ex)) seeX(w, v);
+		for (const v of cubicRange(y, c1.y, c2.y, ey)) seeY(w, v);
+		w.control = { ...c2, of: "c" };
+		w.x = ex;
+		w.y = ey;
+	} else if (lower === "q" || lower === "t") {
+		// And T's control point is the mirror of the last quadratic's.
+		const mirrored = lower === "t";
+		const c1 = mirrored ? (control?.of === "q" ? { x: 2 * x - control.x, y: 2 * y - control.y } : { x, y }) : { x: ox + n[0]!, y: oy + n[1]! };
+		const ex = mirrored ? ox + n[0]! : ox + n[2]!;
+		const ey = mirrored ? oy + n[1]! : oy + n[3]!;
+		for (const v of quadRange(x, c1.x, ex)) seeX(w, v);
+		for (const v of quadRange(y, c1.y, ey)) seeY(w, v);
+		w.control = { ...c1, of: "q" };
+		w.x = ex;
+		w.y = ey;
+	} else if (lower === "a") {
+		const ex = ox + n[5]!;
+		const ey = oy + n[6]!;
+		const arc = arcBounds(x, y, n[0]!, n[1]!, n[2]!, n[3]! !== 0, n[4]! !== 0, ex, ey);
+		see(w, arc.x, arc.y);
+		see(w, arc.x + arc.w, arc.y + arc.h);
+		w.x = ex;
+		w.y = ey;
+		see(w, w.x, w.y);
+	}
 }
 
 
