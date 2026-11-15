@@ -2,6 +2,7 @@ import { calls, Refused } from "../../protocol/index.ts";
 import { defineFeature, handleAll, type Context, type Deck, type Feature, type Kernel, type Store } from "../kernel/types.ts";
 import { forget, readLink, writeLink, type Link } from "./client/link.ts";
 import { DeckSync, type SyncOptions } from "./client/sync.ts";
+import { bundleRoute } from "./bundle/bundle.ts";
 import { networkTransport } from "./client/network.ts";
 import { StudioError, type Transport } from "./client/transport.ts";
 
@@ -30,6 +31,7 @@ export function sharingFeature(given: SharingOptions = {}): Feature {
 	};
 	return defineFeature({
 		name: "sharing",
+		routes: [bundleRoute],
 		calls: handleAll(calls.studio, {
 			status: async (ctx) => status(await readLink(ctx.store)),
 			connect: async (ctx, { url, key }) => connect(ctx, opts, url, key, begin),

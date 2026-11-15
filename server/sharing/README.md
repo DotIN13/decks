@@ -42,6 +42,8 @@ own modules. Never another feature.
 12. Studio closing the live socket for a revoked key (4001) unlinks the deck; a token asked on the
     socket is answered on that socket.
 13. On the hub, who may read and edit is the store's role: a viewer may read, never write.
+14. `GET /api/bundle/<canvas>` (`bundle/`) gives the person the canvas as one `.decks` zip: a
+    manifest, its folder, `lib/`, and the files its cards name. Pictures wait for `pictures/`.
 
 Left out for now: presence through Studio, card pictures, deck files a canvas mirrors (`assets/`,
 `docs/`), the multi-process live bus (Studio's), and the canvas follower (the page's, in `canvas/`).
