@@ -1,12 +1,12 @@
 # Step 4d-documents: canvas/documents/: the page half of docs folds into the canvas library; the server half is already server/documents
 
-Dry run on 9c162972, on top of 4c-card-runtime. Nothing was moved.
+Dry run on db94b341. Nothing was moved.
 
 - files moved by git mv: 19
 - files taken out of git (moved on disk): 1
 - files deleted: 17
-- files edited or created: 15
-- import lines rewritten: 24
+- files edited or created: 18
+- import lines rewritten: 26
 - warnings: 0
 
 ## Taken out of git
@@ -129,12 +129,19 @@ canvas/documents/reading.ts:1
 canvas/documents/reading.ts:2
   - import type { DocSync } from "../client.ts";
   + import type { DocSync } from "./client.ts";
+packages/protocol/src/index.ts:32
+  - export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/docs";
+  + export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/canvas/documents";
+packages/protocol/src/wire.ts:3
+  - import type { DocClientMessage, DocServerMessage } from "@decks/docs";
+  + import type { DocClientMessage, DocServerMessage } from "@decks/canvas/documents";
 
 ## Files the table edits or creates
 
 - canvas/documents/build-live-doc.mjs
 - canvas/package.json
 - package.json
+- packages/protocol/package.json
 - canvas/cards/runtime/lib/.gitignore
 
 ## Warnings
@@ -159,3 +166,4 @@ canvas/documents/reading.ts:2
 - node tools/checks/run.mjs: the document checks (documents, doc-edit, gdoc) one slot each
 - --go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move
 - commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/
+- the imports gate reads packages/protocol (the old protocol, kept until the rewire) importing @decks/canvas/documents as one new exception: into its baseline, until the rewire deletes the old package

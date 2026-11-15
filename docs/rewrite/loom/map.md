@@ -70,7 +70,7 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 | `scripts/` | `build-css.mjs` | `scripts/build-css.mjs` |
 
 Not moved, deleted by the switch-over (the server half, replaced by `server/documents`):
-`packages/docs/src/server/*`, `gdoc/{plan,markdown,fake,gdoc.test,index}.ts`, `converge.test.ts`.
+`packages/docs/src/server/*`, `gdoc/{plan,markdown,fake,gdoc.test,index}.ts`, *converge.test.ts*.
 `documents/` must not need them: today the page imports only `client`, `merge`, `index`,
 `gdoc/types`, `gdoc/units`. Confirmed by grep.
 
@@ -274,7 +274,7 @@ browser checks run through `node tools/checks/run.mjs <check>` under the lock, o
 | **Anvil** | works in `packages/stage/crates/apple`, `Cargo.toml`, `Cargo.lock` now | step 3 waits for Anvil to be between commits; its lane moves to `engine/crates/apple` with it |
 | **Pane** | owns `packages/canvas/src/ui/` in `lanes.json` today | the canvas chrome becomes `canvas/chrome/`, Loom's from step 4a; Pane told first |
 | e2e / browser checks | 10 checks read engine or canvas files by path (`backends-kit.mjs` copies `render/backends/notice.ts` word for word); 469 selectors use `.stage*` classes | the paths are rewritten where Warden moved the checks; **class names do not change** |
-| **built files in git** (rule 10) | `packages/stage/pkg/*`, `pkg-gl/*` (8, the wasm the canvas imports); `packages/card-host/lib/*` (112 tracked, 8 baselined today: d3, three katex files, four wasm; the gate does not yet see the others: `marked.umd.js`, `pdf*.mjs`, the bundles *hljs.bundle.mjs*, *mermaid.bundle.mjs*, `live-doc.js` (built by `scripts/live-doc.mjs`), pdf.js fonts and type files) | `engine/pkg*` built by `npm run build -w @decks/engine` (cargo and wasm-pack, heavy) and ignored; the vendored libraries in `lib/` copied from their npm packages at install by `canvas/cards/runtime/lib.mjs`, ignored; the bundles and `live-doc.js` built by a script under the lock; the runtime's own hand-written files (`card.js`, `card.css`, `theme.css`, `live-app.js`, `live-web.js`) are source and move to `canvas/cards/runtime/`, out of `lib/`. New npm dependencies (d3, katex, pdfjs-dist) need Mason's yes. |
+| **built files in git** (rule 10) | `packages/stage/pkg/*`, `pkg-gl/*` (8, the wasm the canvas imports); `packages/card-host/lib/*` (112 tracked, 8 baselined today: d3, three katex files, four wasm; the gate does not yet see the others: `marked.umd.js`, `pdf*.mjs`, the bundles *hljs.bundle.mjs*, *mermaid.bundle.mjs*, `live-doc.js` (built by *scripts/live-doc.mjs*), pdf.js fonts and type files) | `engine/pkg*` built by `npm run build -w @decks/engine` (cargo and wasm-pack, heavy) and ignored; the vendored libraries in `lib/` copied from their npm packages at install by `canvas/cards/runtime/lib.mjs`, ignored; the bundles and `live-doc.js` built by a script under the lock; the runtime's own hand-written files (`card.js`, `card.css`, `theme.css`, `live-app.js`, `live-web.js`) are source and move to `canvas/cards/runtime/`, out of `lib/`. New npm dependencies (d3, katex, pdfjs-dist) need Mason's yes. |
 | **names gate** | 2,953 baselined uses of `board` (1,860) and `stage` (1,093) in these packages, many in DOM class names (`.stage`, `.stage-fixed`, `.stage-ink`, 8 classes in 94 CSS lines) that the browser checks, Studio and cards select by | identifiers, file names and comments renamed in step 6; the eight class names stay, so the gate needs a rule for them (below) |
 | comments gate | 822 baselined: 556 comments over 5 lines, 266 em dashes | step 6: each long comment cut to its rule; the story to `docs/decisions/` only where it holds a reason not in the code |
 | state gate | 50 baselined top-level `let`s (canvas 33, stage's JS 13, ui 4) | step 6: each into a store owned by its part |
@@ -426,7 +426,7 @@ imports by package and folder, top-level outlines and inner function sizes of ea
   `scripts/vendor.mjs`) as the canvas package's `postinstall`, from the six packages pinned to the
   versions in today's `VENDORED.md`. 4d adds `live-doc.js` to that build.
 - **The switch-over must keep three files** it would otherwise delete or move: `scripts/vendor.mjs`,
-  `scripts/live-doc.mjs` and `runtime/live-doc.ts` (the source of `lib/live-doc.js`). 4c and 4d move them
+  *scripts/live-doc.mjs* and *runtime/live-doc.ts* (the source of `lib/live-doc.js`). 4c and 4d move them
   into the canvas library. If they move to `tools/` instead, only the tables' `from` paths change.
 - **Step 5's sheets**: `sheets.md`, made by `node docs/rewrite/loom/sheets.mjs` from `splits/*.json`
   through `split.mjs` (which measures TypeScript by the compiler, Rust and CSS by braces). It fails when

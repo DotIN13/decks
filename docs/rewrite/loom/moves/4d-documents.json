@@ -46,11 +46,9 @@
 		"packages/agent-ui/",
 		"packages/sdk/",
 		"packages/docs/src/server/",
-		"runtime/",
 		"tools/gates/",
 		"tools/switch/",
 		"docs/rewrite/",
-		"packages/protocol/",
 		"packages/api/",
 		"packages/hub/",
 		"canvas/cards/runtime/lib/"
@@ -100,6 +98,26 @@
 					"to": "join(root, \"canvas\", \"documents\", \"live-doc.ts\")"
 				}
 			]
+		},
+		{
+			"file": "scripts/README.md",
+			"replace": [
+				{
+					"from": "| `vendor.mjs` | `npm run vendor` | copies the card primitives (d3, KaTeX, marked, highlight.js, mermaid, pdf.js) from `node_modules` into `packages/card-host/lib` |\n| `live-doc.mjs` | `npm run build:live-doc` | bundles `runtime/live-doc.ts` into `packages/card-host/lib/live-doc.js` |\n",
+					"to": ""
+				}
+			],
+			"why": "vendor.mjs and live-doc.mjs moved into the canvas library (canvas/cards/runtime/vendor.mjs, canvas/documents/build-live-doc.mjs), run by the root postinstall"
+		},
+		{
+			"file": "docs/rewrite/switch-plan.md",
+			"replace": [
+				{
+					"from": "- `scripts/live-doc.mjs`: builds",
+					"to": "- scripts/live-doc.mjs (now `canvas/documents/build-live-doc.mjs`): builds"
+				}
+			],
+			"why": "the file the plan names moved in step 4d"
 		}
 	],
 	"set": [
@@ -110,7 +128,8 @@
 				"dependencies.diff": "^8.0.4",
 				"dependencies.docx-preview": "^0.4.1",
 				"dependencies.jszip": "^3.10.1",
-				"scripts.build:live-doc": "node documents/build-live-doc.mjs"
+				"scripts.build:live-doc": "node documents/build-live-doc.mjs",
+				"[\"exports\",\"./documents\"]": "./documents/model.ts"
 			}
 		},
 		{
@@ -118,6 +137,13 @@
 			"values": {
 				"scripts.build:live-doc": "npm run build:live-doc -w @decks/canvas",
 				"scripts.postinstall": "npm run vendor -w @decks/canvas && npm run build:live-doc -w @decks/canvas"
+			}
+		},
+		{
+			"file": "packages/protocol/package.json",
+			"values": {
+				"dependencies.@decks/docs": null,
+				"dependencies.@decks/canvas": "*"
 			}
 		}
 	],
@@ -128,6 +154,16 @@
 		"node tools/gates/run.mjs",
 		"node tools/checks/run.mjs: the document checks (documents, doc-edit, gdoc) one slot each",
 		"--go re-keys the gate baselines with the files (tools/gates/rekey.mjs) and stages them; node tools/gates/run.mjs --shrink for the keys of deleted or untracked files; commit the baselines with the move",
-		"commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/"
+		"commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/",
+		"the imports gate reads packages/protocol (the old protocol, kept until the rewire) importing @decks/canvas/documents as one new exception: into its baseline, until the rewire deletes the old package"
+	],
+	"specifiers": {
+		"@decks/docs": "@decks/canvas/documents"
+	},
+	"create": [
+		{
+			"file": "canvas/documents/README.md",
+			"from": "readmes/canvas-documents.txt"
+		}
 	]
 }
