@@ -1,0 +1,28 @@
+[package]
+name = "stage-apple"
+description = "The drawing engine for Apple platforms: the browser engine's Page and Worker on Metal, behind a small C interface."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+stage-doc = { path = "../doc" }
+stage-scene = { path = "../scene" }
+stage-paint = { path = "../paint" }
+stage-gpu = { path = "../gpu" }
+stage-text = { path = "../text" }
+stage-web = { path = "../web" }
+serde_json.workspace = true
+
+# Only on Apple platforms: the Metal device, the host's layer and textures.
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wgpu = { version = "30", default-features = false, features = ["wgsl", "metal", "std"] }
+objc2 = "0.6"
+objc2-metal = { version = "0.3", default-features = false, features = ["std", "MTLTexture", "MTLResource", "MTLDevice", "MTLTypes", "MTLPixelFormat"] }
+pollster = "1"
+
+[dev-dependencies]
+png = "0.18"
