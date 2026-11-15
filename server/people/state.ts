@@ -9,8 +9,8 @@ import { Marks } from "./news.ts";
 import { Roster, asAgent, type AgentRecord } from "./records.ts";
 import { Screens } from "./screens.ts";
 
-// Everything the feature keeps, made once when the server starts. Records,
-// mail and marks are stored; hosts and screens live with their connections.
+// Everything the feature keeps, made once when the server starts, and who a call
+// is about. Records, mail and marks are stored; hosts and screens live with their connections.
 
 export class People {
 	readonly hosts = new Hosts();
@@ -44,6 +44,12 @@ export class People {
 		return people;
 	}
 
+	/** The deck's canvases, first first, kept for a person with no screen yet. */
+	async learnCanvases(kernel: Kernel): Promise<void> {
+		const listed = await kernel.call("canvas.list", {}, LOCAL_PERSON).catch(() => undefined);
+		if (listed?.ok && Array.isArray(listed.value)) this.canvases = (listed.value as { name: string }[]).map((c) => c.name);
+	}
+
 	/** Learn of the call's connection once, so its offer and screen end with it. */
 	meet(ctx: Context): string | undefined {
 		const client = ctx.client;
@@ -61,10 +67,12 @@ export class People {
 		return client.id;
 	}
 
-	/** The deck's canvases, first first, kept for a person with no screen yet. */
-	async learnCanvases(kernel: Kernel): Promise<void> {
-		const listed = await kernel.call("canvas.list", {}, LOCAL_PERSON).catch(() => undefined);
-		if (listed?.ok && Array.isArray(listed.value)) this.canvases = (listed.value as { name: string }[]).map((c) => c.name);
+	/** A line that spoke on a canvas has gone: the others there hear it leave. */
+	private left(client: string, who: Caller): void {
+		const canvas = this.presence.leave(client);
+		if (!canvas || !this.events) return;
+		const others = this.screens.drawing(canvas).map((s) => s.client).filter((c) => c !== client);
+		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true }, { clients: others });
 	}
 
 	/** A person's here: the home of the agent on their screen, else that screen's canvas, else the first. */
@@ -81,14 +89,6 @@ export class People {
 		const record = (follows ? this.roster.byIdOrUndefined(follows) : undefined) ?? this.roster.all().at(-1);
 		if (!record) throw new Refused("not_found", "There is no agent yet to answer for.", "agent.list");
 		return record;
-	}
-
-	/** A line that spoke on a canvas has gone: the others there hear it leave. */
-	private left(client: string, who: Caller): void {
-		const canvas = this.presence.leave(client);
-		if (!canvas || !this.events) return;
-		const others = this.screens.drawing(canvas).map((s) => s.client).filter((c) => c !== client);
-		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true }, { clients: others });
 	}
 
 	/** The record of the agent calling; refused for anyone else. */

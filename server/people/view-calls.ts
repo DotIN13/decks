@@ -3,12 +3,12 @@ import { handleAll, type Context } from "../kernel/types.ts";
 import { canvasName, followHome } from "./agent-calls.ts";
 import type { Holder, People } from "./state.ts";
 
-/** The calls this feature handles, named, so a call added to the noun for another feature stays unhandled. */
-const VIEW_CALLS = (({ get, move, focus, goto, cursor, screenshot, answer, update, reload }: typeof calls.view) => ({ get, move, focus, goto, cursor, screenshot, answer, update, reload }))(calls.view);
-
 // What screens show. An agent's request reaches only the screens that follow
 // it; the person's, only their own screens; a card's or app's, the screens
 // showing its canvas. A screen says whom it follows with view.move.
+
+/** The calls handled here, named, so a call added to the noun for another feature stays unhandled. */
+const VIEW_CALLS = (({ get, move, focus, goto, cursor, screenshot, answer, update, reload }: typeof calls.view) => ({ get, move, focus, goto, cursor, screenshot, answer, update, reload }))(calls.view);
 
 type View = Infer<typeof shapes.View>;
 const ORIGIN = { x: 0, y: 0, zoom: 1 };
@@ -62,18 +62,7 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 	});
 }
 
-/** The agent acted for moves its home to the canvas, with the screens following it; false for no agent. */
-async function goHome(people: People, ctx: Context, canvas: string): Promise<boolean> {
-	const follows = ctx.caller.kind === "person" ? people.screens.newestOf(ctx.caller.id)?.follows : undefined;
-	if (ctx.caller.kind !== "agent" && !follows) return false;
-	const actor = people.actor(ctx);
-	if (actor.canvas === canvas) return true;
-	const { record } = await people.roster.update(actor.id, { canvas });
-	people.tell(ctx, events.agentChanged, { ids: [record.id] });
-	followHome(people, ctx, record);
-	return true;
-}
-
+// Which canvas a call means, and what its screen shows
 /** The canvas a call means: the one named, else the caller's here, else its home. */
 function here(people: People, ctx: Context, asked: string | undefined): string {
 	if (asked) return canvasName(ctx, asked);
@@ -94,6 +83,7 @@ function look(people: People, ctx: Context, canvas: string): View {
 	return { canvas, camera, ...(screen ? { screen } : {}) };
 }
 
+// Moving screens: reports, homes, and requests to the screens a caller may reach
 /** The person's page reports its screen; anyone else asks the screens to move. */
 function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.input>): View {
 	const name = here(people, ctx, args.canvas);
@@ -111,19 +101,16 @@ function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.i
 	return request(people, ctx, name, "view.move", { ...camera, canvas: name, ...(args.animate ? { animate: true } : {}) });
 }
 
-/** A line says where it points and what it selected; the canvas's other lines hear it, in its colour.
- * A person's line goes unnamed: to them it is another window of their own. */
-function say(people: People, ctx: Context, args: Infer<typeof calls.view.update.input>): View {
-	const name = here(people, ctx, args.canvas);
-	const client = people.meet(ctx);
-	const line = client ?? ctx.caller.id;
-	if (client && !people.screens.has(client)) people.screens.report(client, ctx.caller.id, { canvas: name, frame: true });
-	const color = people.presence.colorOf(line, name);
-	const { canvas: _c, ...said } = args;
-	const others = people.screens.drawing(name).map((s) => s.client).filter((c) => c !== client);
-	const kind = ctx.caller.kind === "agent" ? "agent" : "person";
-	if (others.length) people.tell(ctx, events.viewChanged, { canvas: name, ids: args.selection ?? [], ...said, ...(kind === "agent" ? { name: ctx.caller.name } : {}), kind, color }, others);
-	return look(people, ctx, name);
+/** The agent acted for moves its home to the canvas, with the screens following it; false for no agent. */
+async function goHome(people: People, ctx: Context, canvas: string): Promise<boolean> {
+	const follows = ctx.caller.kind === "person" ? people.screens.newestOf(ctx.caller.id)?.follows : undefined;
+	if (ctx.caller.kind !== "agent" && !follows) return false;
+	const actor = people.actor(ctx);
+	if (actor.canvas === canvas) return true;
+	const { record } = await people.roster.update(actor.id, { canvas });
+	people.tell(ctx, events.agentChanged, { ids: [record.id] });
+	followHome(people, ctx, record);
+	return true;
 }
 
 /** Which screens a caller's view call reaches. */
@@ -146,4 +133,20 @@ function answer(people: People, ctx: Context, canvas: string, screens: string[])
 	const waiting = ctx.caller.kind === "agent" ? "no screen follows this agent; the person sees it when they open its conversation" : "no screen is showing this canvas";
 	ctx.note(`The view did not move: ${waiting}.`);
 	return { ...view, moved: false, waiting };
+}
+
+// Presence: where a line points and what it selected
+/** A line says where it points and what it selected; the canvas's other lines hear it, in its colour.
+ * A person's line goes unnamed: to them it is another window of their own. */
+function say(people: People, ctx: Context, args: Infer<typeof calls.view.update.input>): View {
+	const name = here(people, ctx, args.canvas);
+	const client = people.meet(ctx);
+	const line = client ?? ctx.caller.id;
+	if (client && !people.screens.has(client)) people.screens.report(client, ctx.caller.id, { canvas: name, frame: true });
+	const color = people.presence.colorOf(line, name);
+	const { canvas: _c, ...said } = args;
+	const others = people.screens.drawing(name).map((s) => s.client).filter((c) => c !== client);
+	const kind = ctx.caller.kind === "agent" ? "agent" : "person";
+	if (others.length) people.tell(ctx, events.viewChanged, { canvas: name, ids: args.selection ?? [], ...said, ...(kind === "agent" ? { name: ctx.caller.name } : {}), kind, color }, others);
+	return look(people, ctx, name);
 }

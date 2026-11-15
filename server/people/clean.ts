@@ -9,6 +9,7 @@ export const MAX_WORKSPACE = 24;
 export const MAX_NAME = 40;
 export const PALETTE = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"] as const;
 
+// Tags and workspaces: one slug rule, each with its own cap
 /** Letters and digits of any script kept, the rest one dash, cut at a word when long. */
 export function slug(raw: string, max: number): string {
 	const slugged = raw.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
@@ -34,6 +35,7 @@ export function cleanWorkspace(raw: string | null | undefined): string | undefin
 	return typeof raw === "string" ? slug(raw, MAX_WORKSPACE) || undefined : undefined;
 }
 
+// Names and colours
 /** A name trimmed and capped; an empty one is refused. */
 export function cleanName(raw: string): string {
 	const name = raw.trim().slice(0, MAX_NAME).trim();
@@ -53,9 +55,7 @@ export function nextColour(worn: readonly string[]): string {
 	return PALETTE.reduce((best, c) => (count(c) < count(best) ? c : best), PALETTE[0]);
 }
 
-const escapeXml = (s: string) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const dataUrl = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
-
+// Avatars
 /** An avatar as a picture's address: an emoji drawn as text, or an SVG checked. */
 export function avatarUrl(avatar: { emoji: string } | { svg: string }): string {
 	if ("emoji" in avatar) {
@@ -72,3 +72,6 @@ export function avatarUrl(avatar: { emoji: string } | { svg: string }): string {
 	if (svg.length > 20000) throw new Refused("invalid", "An avatar's SVG is at most 20,000 characters.", "agent.update");
 	return dataUrl(svg);
 }
+
+const escapeXml = (s: string) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const dataUrl = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;

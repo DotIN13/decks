@@ -25,6 +25,7 @@ export class Screens {
 	private readings = new Map<string, Reading>();
 	private tick = 0;
 
+	// What each screen reports, and its going
 	/** A screen says what it shows; what it leaves out it keeps. */
 	report(client: string, person: string, said: { follows?: string; canvas?: string; screen?: Size; frame?: boolean }): Screen {
 		const was = this.all.get(client);
@@ -36,22 +37,18 @@ export class Screens {
 		return next;
 	}
 
-	/** The screens a person looks at: every reporter but the canvas frames' own lines. */
-	private screens(): Screen[] {
-		return [...this.all.values()].filter((s) => !s.frame);
-	}
-
-	/** Every line that can draw a card of the canvas: its frames, then its screens. */
-	drawing(canvas: string): Screen[] {
-		return [...this.all.values()].filter((s) => s.canvas === canvas).sort((a, b) => Number(!!b.frame) - Number(!!a.frame) || b.at - a.at);
-	}
-
 	drop(client: string): void {
 		this.all.delete(client);
 	}
 
 	has(client: string): boolean {
 		return this.all.has(client);
+	}
+
+	// Which screens: a person's, an agent's followers, a canvas's
+	/** The screens a person looks at: every reporter but the canvas frames' own lines. */
+	private screens(): Screen[] {
+		return [...this.all.values()].filter((s) => !s.frame);
 	}
 
 	/** The screens following an agent. */
@@ -74,6 +71,12 @@ export class Screens {
 		return this.screens().filter((s) => s.canvas === canvas);
 	}
 
+	/** Every line that can draw a card of the canvas: its frames, then its screens. */
+	drawing(canvas: string): Screen[] {
+		return [...this.all.values()].filter((s) => s.canvas === canvas).sort((a, b) => Number(!!b.frame) - Number(!!a.frame) || b.at - a.at);
+	}
+
+	// Cameras and screen sizes
 	/** A camera reading, kept per person or agent, canvas and device. */
 	record(who: string, canvas: string, device: string | undefined, camera: Camera): void {
 		this.readings.set(`${who}\u0000${canvas}\u0000${(device ?? "").slice(0, 64)}`, { camera, when: ++this.tick });

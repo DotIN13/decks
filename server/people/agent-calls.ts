@@ -4,12 +4,15 @@ import { deliver, takeNews } from "./agent-mail.ts";
 import type { AgentChange, AgentRecord } from "./records.ts";
 import type { Holder, People } from "./state.ts";
 
-/** The calls this feature handles, named, so a call added to the noun for another feature stays unhandled. */
+// The agent calls: records, homes and hosts here, mail and news in agent-mail.ts.
+// One short handler each, then what the longer ones call, by cluster.
+
+/** The calls handled here, named, so a call added to the noun for another feature stays unhandled. */
 const AGENT_CALLS = (({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }: typeof calls.agent) => ({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }))(calls.agent);
 
-// The agent calls: records, attach, hosts, mail and news. One short handler each.
-
 const NO_HOST = "No harness is running to start an agent: start the Decks harness on this machine, then try again.";
+
+type CreateArgs = Args<typeof calls.agent.create>;
 
 export function agentCalls(holder: Holder): Handled<Context>[] {
 	const p = () => holder.get();
@@ -29,8 +32,7 @@ export function agentCalls(holder: Holder): Handled<Context>[] {
 	});
 }
 
-type CreateArgs = Args<typeof calls.agent.create>;
-
+// Records: make, change, remove and attach agents
 /** A host that offers the kind is asked to start the agent; with none, refused. */
 async function create(people: People, ctx: Context, spec: CreateArgs): Promise<shapes.Agent> {
 	const host = people.hosts.pick(spec.kind);
@@ -94,6 +96,18 @@ async function attach(people: People, ctx: Context, args: { name?: string; kind?
 	return { ...people.shown(record), token };
 }
 
+// Homes: the canvas an agent starts on, and the screens that follow it there
+/** The canvas named, else a new one titled with the agent's name; a failure takes the record back. */
+async function giveHome(people: People, ctx: Context, record: AgentRecord, asked: string | undefined): Promise<AgentRecord> {
+	try {
+		const canvas = asked !== undefined ? canvasName(ctx, asked) : (await ctx.call<{ name: string }>("canvas.create", { title: record.name })).name;
+		return (await people.roster.update(record.id, { canvas })).record;
+	} catch (error) {
+		await people.roster.delete(record.id);
+		throw error;
+	}
+}
+
 /** The person's new agent joins the canvas of its workspace changed last; no workspace is a group too. */
 function latestCanvas(people: People, ctx: Context, made: AgentRecord): string | undefined {
 	let best: { name: string; at: number; order: number } | undefined;
@@ -115,17 +129,18 @@ function safeSince(ctx: Context, canvas: string) {
 	}
 }
 
-/** The canvas named, else a new one titled with the agent's name; a failure takes the record back. */
-async function giveHome(people: People, ctx: Context, record: AgentRecord, asked: string | undefined): Promise<AgentRecord> {
-	try {
-		const canvas = asked !== undefined ? canvasName(ctx, asked) : (await ctx.call<{ name: string }>("canvas.create", { title: record.name })).name;
-		return (await people.roster.update(record.id, { canvas })).record;
-	} catch (error) {
-		await people.roster.delete(record.id);
-		throw error;
-	}
+/** A canvas's name from a name or a title; refused when there is none. */
+export function canvasName(ctx: Context, asked: string): string {
+	return ctx.canvasName(asked);
 }
 
+/** The screens following an agent go to its new home. */
+export function followHome(people: People, ctx: Context, record: AgentRecord): void {
+	const screens = people.screens.following(record.id).map((s) => s.client);
+	if (screens.length && record.canvas) people.tell(ctx, events.viewRequested, { ids: [record.id], canvas: record.canvas, call: "view.goto", args: { canvas: record.canvas } }, screens);
+}
+
+// Hosts: the clients that start agents and answer the harness calls
 /** A socket client offers kinds and harness calls; agents of its kinds with no host become its own,
  * each told to it as agent.requested with a fresh token and adopted: true. */
 async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], answers: string[]): Promise<NonNullable<AgentRecord["kind"]>[]> {
@@ -142,17 +157,6 @@ async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], 
 		people.tell(ctx, events.agentRequested, { ids: [taken.id], spec }, [client]);
 	}
 	return offered;
-}
-
-/** A canvas's name from a name or a title; refused when there is none. */
-export function canvasName(ctx: Context, asked: string): string {
-	return ctx.canvasName(asked);
-}
-
-/** The screens following an agent go to its new home. */
-export function followHome(people: People, ctx: Context, record: AgentRecord): void {
-	const screens = people.screens.following(record.id).map((s) => s.client);
-	if (screens.length && record.canvas) people.tell(ctx, events.viewRequested, { ids: [record.id], canvas: record.canvas, call: "view.goto", args: { canvas: record.canvas } }, screens);
 }
 
 function pick<T extends object, K extends keyof T>(from: T, keys: readonly K[]): Partial<Pick<T, K>> {
