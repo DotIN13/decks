@@ -126,3 +126,14 @@ test("rule 3: read then edit with the rev read agrees, also for a file written b
 	assert.equal(await code(s, "file.edit", { path, rev: second.rev, edits: [{ find: "Three", replace: "Four" }] }), "conflict");
 	await s.close();
 });
+
+test("rule 1: an app's record naming a source outside the deck reaches nothing outside", async () => {
+	const s = await testServer({ features: [cards()], deck: { "apps/x/app.json": JSON.stringify({ title: "X", source: { path: "/etc" } }) } });
+	assert.deepEqual((await s.value<{ path: string }[]>("file.list", { path: "apps/x" })).map((f) => f.path), ["apps/x/app.json"]);
+	assert.equal(await code(s, "file.read", { path: "apps/x/passwd" }), "not_found");
+	for (const path of ["/etc/passwd", "apps/x/../../../etc/passwd", "apps/x/../../.decks/server.json", "file:///etc/passwd"]) {
+		assert.equal(await code(s, "file.read", { path }), "refused", path);
+		assert.equal(await code(s, "file.write", { path, text: "x" }), "refused", path);
+	}
+	await s.close();
+});
