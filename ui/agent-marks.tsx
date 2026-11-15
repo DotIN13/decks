@@ -192,88 +192,108 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 			data-busy={props.busy ? "" : undefined}
 			aria-hidden="true"
 		>
-			{/*
-				Only a working mark needs either of these, and a still mark is drawn in every row of
-				a panel: two definitions per row that nothing references is a mask and a clip the
-				browser parses for nothing.
-			*/}
-			<Show when={props.busy && (opencodeMark(props.agent) || props.agent === "antigravity")}>
-				<defs>
-				{/* Where opencode's block is allowed to be: the opening it rises into. */}
-				<clipPath id={`${ids}-opening`}>
-					<rect x="192" y="160" width="128" height="192" />
-				</clipPath>
-				{/*
-					antigravity's reveal: a fat stroke along the arch's own centreline, drawn from the
-					left foot to the right foot, and used as a mask over the filled arch. `pathLength`
-					normalises the dash arithmetic to 100, so the keyframes do not carry a number that
-					would have to be remeasured if the curve were ever retraced.
-				*/}
-				<mask id={`${ids}-arch`} maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
-					<path
-						class="ag-trace"
-						d={ARCH_CENTRELINE}
-						fill="none"
-						stroke="#fff"
-						stroke-width="96"
-						stroke-linecap="round"
-						pathLength="100"
-					/>
-				</mask>
-				</defs>
-			</Show>
+			<MarkDefs agent={props.agent} busy={props.busy} ids={ids} />
 			<g transform={`translate(${left()} ${top()}) scale(${scale()}) translate(${-ink().x} ${-ink().y})`}>
-				<Switch fallback={<Still agent={props.agent} />}>
-					<Match when={props.busy && claude()}>
-						<For each={FRAMES}>
-							{(frame, index) => (
-								<text
-									class="claude-frame"
-									x={GLYPH_INK.w / 2}
-									y={GLYPH_INK.h / 2}
-									style={{ "animation-delay": `${index() * FRAME_MS}ms` }}
-								>
-									{frame}
-								</text>
-							)}
-						</For>
-					</Match>
-					<Match when={props.busy && pi()}>
-						<For each={TILES}>
-							{([x, y], index) => (
-								<rect class="pi-tile" x={x} y={y} width={5} height={5} style={{ "animation-delay": `${index() * 55}ms` }} />
-							)}
-						</For>
-					</Match>
-					{/*
-						opencode working: the frame's four walls drawn clockwise from their own corners,
-						and then the block rising into the opening from below it. The walls are the
-						symbol's own rectangles, taken apart so each can grow on its own.
-					*/}
-					<Match when={props.busy && opencodeMark(props.agent)}>
-						<g class="oc-cycle">
-							<rect class="oc-wall oc-top" x="128" y="96" width="256" height="64" />
-							<rect class="oc-wall oc-right" x="320" y="160" width="64" height="192" />
-							<rect class="oc-wall oc-bottom" x="128" y="352" width="256" height="64" />
-							<rect class="oc-wall oc-left" x="128" y="160" width="64" height="192" />
-							<g clip-path={`url(#${ids}-opening)`}>
-								<rect class="oc-fill" x="192" y="224" width="128" height="128" />
-							</g>
-						</g>
-					</Match>
-					{/*
-						antigravity working: the same arch, revealed along its own centreline and then
-						lifted a unit. One path, one mask, and no second drawing to keep in step with the
-						first.
-					*/}
-					<Match when={props.busy && props.agent === "antigravity"}>
-						<g class="ag-cycle">
-							<path d={ANTIGRAVITY_ARCH} mask={`url(#${ids}-arch)`} />
-						</g>
-					</Match>
-				</Switch>
+				<Working agent={props.agent} busy={props.busy} ids={ids} />
 			</g>
 		</svg>
+	);
+}
+
+/** The clip and the mask only a working opencode or antigravity mark uses, kept out of every still row. */
+function MarkDefs(props: { agent: AgentKind; busy?: boolean; ids: string }) {
+	const ids = props.ids;
+	return (
+		<>
+		{/*
+			Only a working mark needs either of these, and a still mark is drawn in every row of
+			a panel: two definitions per row that nothing references is a mask and a clip the
+			browser parses for nothing.
+		*/}
+		<Show when={props.busy && (opencodeMark(props.agent) || props.agent === "antigravity")}>
+			<defs>
+			{/* Where opencode's block is allowed to be: the opening it rises into. */}
+			<clipPath id={`${ids}-opening`}>
+				<rect x="192" y="160" width="128" height="192" />
+			</clipPath>
+			{/*
+				antigravity's reveal: a fat stroke along the arch's own centreline, drawn from the
+				left foot to the right foot, and used as a mask over the filled arch. `pathLength`
+				normalises the dash arithmetic to 100, so the keyframes do not carry a number that
+				would have to be remeasured if the curve were ever retraced.
+			*/}
+			<mask id={`${ids}-arch`} maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
+				<path
+					class="ag-trace"
+					d={ARCH_CENTRELINE}
+					fill="none"
+					stroke="#fff"
+					stroke-width="96"
+					stroke-linecap="round"
+					pathLength="100"
+				/>
+			</mask>
+			</defs>
+		</Show>
+		</>
+	);
+}
+
+/** A working mark's drawing, by runtime; the still drawing when not busy. */
+function Working(props: { agent: AgentKind; busy?: boolean; ids: string }) {
+	const claude = () => props.agent === "claude";
+	const pi = () => props.agent === "pi";
+	const ids = props.ids;
+	return (
+		<Switch fallback={<Still agent={props.agent} />}>
+			<Match when={props.busy && claude()}>
+				<For each={FRAMES}>
+					{(frame, index) => (
+						<text
+							class="claude-frame"
+							x={GLYPH_INK.w / 2}
+							y={GLYPH_INK.h / 2}
+							style={{ "animation-delay": `${index() * FRAME_MS}ms` }}
+						>
+							{frame}
+						</text>
+					)}
+				</For>
+			</Match>
+			<Match when={props.busy && pi()}>
+				<For each={TILES}>
+					{([x, y], index) => (
+						<rect class="pi-tile" x={x} y={y} width={5} height={5} style={{ "animation-delay": `${index() * 55}ms` }} />
+					)}
+				</For>
+			</Match>
+			{/*
+				opencode working: the frame's four walls drawn clockwise from their own corners,
+				and then the block rising into the opening from below it. The walls are the
+				symbol's own rectangles, taken apart so each can grow on its own.
+			*/}
+			<Match when={props.busy && opencodeMark(props.agent)}>
+				<g class="oc-cycle">
+					<rect class="oc-wall oc-top" x="128" y="96" width="256" height="64" />
+					<rect class="oc-wall oc-right" x="320" y="160" width="64" height="192" />
+					<rect class="oc-wall oc-bottom" x="128" y="352" width="256" height="64" />
+					<rect class="oc-wall oc-left" x="128" y="160" width="64" height="192" />
+					<g clip-path={`url(#${ids}-opening)`}>
+						<rect class="oc-fill" x="192" y="224" width="128" height="128" />
+					</g>
+				</g>
+			</Match>
+			{/*
+				antigravity working: the same arch, revealed along its own centreline and then
+				lifted a unit. One path, one mask, and no second drawing to keep in step with the
+				first.
+			*/}
+			<Match when={props.busy && props.agent === "antigravity"}>
+				<g class="ag-cycle">
+					<path d={ANTIGRAVITY_ARCH} mask={`url(#${ids}-arch)`} />
+				</g>
+			</Match>
+		</Switch>
 	);
 }
 
