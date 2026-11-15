@@ -33,7 +33,7 @@ HTML; `playwright` for the browser. No other feature.
    One unit is one pixel, shrunk until the long side is at most 1,600 px; `scale` multiplies.
 8. `of` is an id, a list of ids, a card's path, or a box. A box shows what touches it, cut to it;
    items (or the whole canvas) are framed with 24 px of paper, out to whole units.
-   A card's path alone is that card's own page, without the drawing round it.
+   A card's path alone is that card as a screen showing it has it now (view.screenshot), else its file.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
     A card in it is an iframe of its page, addressed from where the page is written.

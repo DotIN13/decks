@@ -220,3 +220,14 @@ test("rule 14: posted markup is drawn at the card's own address, with a pass for
 	await served.close();
 	await s.close();
 });
+
+test("rule 8: a card's picture comes from a screen showing it when one answers, else from its file", async () => {
+	const { testContext } = await import("../kernel/testing.ts");
+	const { seenCard } = await import("./shot.ts");
+	const png = Buffer.from("89504e470d0a1a0a0000000d49484452000000100000000801", "hex").toString("base64");
+	const answered = testContext({ call: (async (name: string) => (name === "view.screenshot" ? { how: "canvas", data: png, mime: "image/png" } : undefined)) as never });
+	const seen = await seenCard(answered, CARD, "work");
+	assert.equal(seen?.how, "the person's browser: canvas");
+	assert.equal(seen?.bytes[0], 0x89);
+	assert.equal(await seenCard(testContext(), CARD, "work"), undefined, "no screen: the file is used");
+});
