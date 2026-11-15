@@ -67,7 +67,7 @@ rmSync(join(deck.path, "assets", "importmap.json"), { force: true });
 // --- a map: a card imports the deck's library by its name ---
 mkdirSync(join(deck.path, "assets", "libs", "greet"), { recursive: true });
 writeFileSync(join(deck.path, "assets", "libs", "greet", "words.js"), 'export const hello = "hello";');
-writeFileSync(join(deck.path, "assets", "libs", "greet", "index.js"), 'import { hello } from "../../../e2e/checks/words.js";\nexport const greet = (who) => `${hello} from the ${who}`;');
+writeFileSync(join(deck.path, "assets", "libs", "greet", "index.js"), 'import { hello } from "./words.js";\nexport const greet = (who) => `${hello} from the ${who}`;');
 writeFileSync(join(deck.path, "assets", "importmap.json"), JSON.stringify({ imports: { greet: "./libs/greet/index.js" } }));
 {
 	const { browser, page, errors } = await open({ width: 1400, height: 900 });

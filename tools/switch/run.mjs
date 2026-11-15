@@ -44,7 +44,9 @@ export function relocate(text, from, to, moves) {
 	};
 	const quoted = (q, rel) => `${q}${fix(rel)}${q}`;
 	return text
-		.replace(/(\bfrom\s*|\bimport\s*\(\s*|^import\s*)(["'])(\.\.?\/[^"']*)\2/gm, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
+		// Only the file's own imports: a line that starts with import or export, or import(…) in code; never a path inside a string it writes.
+		.replace(/^(\s*(?:import|export)\b[^\n'"`]*?(?:\bfrom\s*)?)(["'])(\.\.?\/[^"']*)\2/gm, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
+		.replace(/((?<![\w'"])import\s*\(\s*)(["'])(\.\.?\/[^"']*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
 		.replace(/(new URL\(\s*)(["'`])(\.\.?\/[^"'`]*)\2(\s*,\s*import\.meta\.url)/g, (all, lead, q, rel, tail) => `${lead}${quoted(q, rel)}${tail}`)
 		.replace(/((?:join|resolve)\(\s*dirname\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)\s*,\s*)(["'`])(\.\.?\/[^"'`]*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`);
 }
