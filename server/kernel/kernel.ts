@@ -1,18 +1,21 @@
 import { Refused, type Caller, type Envelope } from "../../protocol/index.ts";
+import { randomUUID } from "node:crypto";
 import { Callers } from "./callers.ts";
+import { machineFolder } from "./disk.ts";
+import { checkMount } from "./fence.ts";
 import { EventBus } from "./events.ts";
 import { HistoryDeck } from "./history.ts";
 import { ownFeature } from "./own-calls.ts";
 import { Relay } from "./relay.ts";
 import { declaredOf, Router, routesOf, type MakeContext } from "./router.ts";
-import { memoryVersion, type Stores } from "./store.ts";
-import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, VersionFile } from "./types.ts";
+import { memoryVersion, readJson, writeJson, type Stores } from "./store.ts";
+import { toDeckPath, type CanvasDoc, type CanvasSource, type Context, type Deck, type Feature, type Kernel, type Stop, type Store, type VersionFile } from "./types.ts";
 
 // Builds the kernel from a deck, a store per feature and the features: the
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
 
-export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile };
+export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string };
 export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
 function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undefined {
@@ -26,6 +29,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const history = new HistoryDeck(options.deck, options.stores("history"));
 	await history.load();
 	options.deck.startAt?.(history.lastRev());
+	const machine = await machineFolder(options.machine);
+	const deckId = await idOf(options.stores("kernel"));
 	const callers = new Callers(options.stores("kernel"), clock);
 	await callers.load();
 	const events = new EventBus();
@@ -39,7 +44,21 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const relay = new Relay(options.relayWaitMs);
 	const address: { url?: string } = {};
-	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), translate: (one) => router.translate(one), guard: (one) => router.guard(one), filter: (one) => router.filter(one), call: (name, args, caller) => router.call(name, args, caller), sees: (one) => void events.sees.push(one), url: () => address.url, folder: () => options.deck.root };
+	const mount = (prefix: string, folder: string) => {
+		const checked = checkMount(prefix, folder, options.deck.root);
+		history.mount(checked.prefix, checked.folder);
+	};
+	const kernel: Kernel = {
+		...{ deck: history, events, canvas, callers, store: options.stores, kinds },
+		relay: (answerer) => relay.answer(answerer),
+		translate: (one) => router.translate(one),
+		guard: (one) => router.guard(one),
+		filter: (one) => router.filter(one),
+		call: (name, args, caller) => router.call(name, args, caller),
+		sees: (one) => void events.sees.push(one),
+		...{ url: () => address.url, folder: () => options.deck.root, machine: () => machine, deckId: () => deckId },
+		...{ mount, unmount: (prefix: string) => history.unmount(toDeckPath(prefix)) },
+	};
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
 	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });
@@ -86,4 +105,13 @@ function asked(caller: Caller, name: string | undefined): string {
 	const named = name ?? caller.canvas;
 	if (!named) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
 	return named;
+}
+
+/** The deck's id: read from the kernel's store, made once. */
+async function idOf(store: Store): Promise<string> {
+	const kept = await readJson<{ id?: string }>(store, "deck.json", {});
+	if (kept.id) return kept.id;
+	const id = randomUUID();
+	await writeJson(store, "deck.json", { id });
+	return id;
 }

@@ -1,6 +1,7 @@
 import { Refused, type Caller, type Envelope, type Who } from "../../protocol/index.ts";
 import type { Heard } from "./events.ts";
 import { LOCAL_PERSON } from "./callers.ts";
+import { tempFolder } from "./disk.ts";
 import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
@@ -43,7 +44,8 @@ const asCaller = (as: Caller | Who | undefined): Caller => {
 
 export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number; version?: VersionFile } = {}): Promise<TestServer> {
 	const deck = options.deck instanceof Object && "read" in options.deck ? (options.deck as Deck) : new MemoryDeck((options.deck ?? {}) as Record<string, string>);
-	const built = await buildKernel({ deck, stores: memoryStores(), features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}), ...(options.version ? { version: options.version } : {}) });
+	const machine = await tempFolder("keel-machine");
+	const built = await buildKernel({ deck, stores: memoryStores(), machine: machine.folder, features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}), ...(options.version ? { version: options.version } : {}) });
 	const heard: Heard[] = [];
 	const stopHearing = built.events.subscribe({ caller: callers.person }, (one) => void heard.push(one));
 	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who, client?: Client) => built.router.call(name, args, asCaller(as), client);
@@ -65,6 +67,7 @@ export async function testServer(options: { features?: Feature[]; deck?: Deck | 
 		async close() {
 			stopHearing();
 			await built.stop();
+			await machine.remove();
 		},
 	};
 }

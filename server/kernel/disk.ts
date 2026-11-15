@@ -1,4 +1,5 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import type { Stores } from "./store.ts";
 import type { Bytes, Store, VersionFile } from "./types.ts";
@@ -54,4 +55,18 @@ export function folderVersion(root: string): VersionFile {
 			await writeFile(file, text);
 		},
 	};
+}
+
+/** The machine's own folder: the given one, else $DECKS_HOME, else ~/.decks; made user-only. */
+export async function machineFolder(given?: string): Promise<string> {
+	const folder = given ?? process.env.DECKS_HOME ?? join(homedir(), ".decks");
+	await mkdir(folder, { recursive: true, mode: 0o700 });
+	await chmod(folder, 0o700);
+	return folder;
+}
+
+/** A fresh temporary folder, and a way to remove it: for tests and a machine folder in memory. */
+export async function tempFolder(name: string): Promise<{ folder: string; remove(): Promise<void> }> {
+	const folder = await mkdtemp(join(tmpdir(), `${name}-`));
+	return { folder, remove: () => rm(folder, { recursive: true, force: true }) };
 }

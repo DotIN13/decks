@@ -31,6 +31,15 @@ export class HistoryDeck implements Deck {
 		this.seq = keys.length;
 	}
 
+	mount(prefix: DeckPath, folder: string): void {
+		if (!this.inner.mount) throw new Refused("unavailable", "This deck cannot reach a folder outside it.", "app.get");
+		this.inner.mount(prefix, folder);
+	}
+
+	unmount(prefix: DeckPath): void {
+		this.inner.unmount?.(prefix);
+	}
+
 	/** The last revision recorded, to start the deck's counter from. */
 	lastRev(): number {
 		return this.log.reduce((top, one) => Math.max(top, one.rev), 0);
