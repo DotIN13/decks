@@ -22,13 +22,13 @@ export const timed = (file) => traitsOf(file).timed === true;
 const helper = (name) => (existsSync(join(ROOT, "tools/checks", name)) ? join(ROOT, "tools/checks", name) : join(ROOT, "e2e", name));
 const WAIT_MS = 60_000;
 /** What one run shares: the page built once. */
-const RUN = { dist: undefined };
+const RUN = { dist: undefined, kinds: "pi" };
 const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 
 /** How each program starts, given its ports and the deck. Edit here when an owner changes theirs. */
 export const PROGRAMS = {
 	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
-	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: helper("fake-agent"), DECKS_DATA_DIR: home } }),
+	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", RUN.kinds], env: { PI_CODING_AGENT_DIR: helper("fake-agent"), DECKS_DATA_DIR: home } }),
 	// The built page on a plain static server with the dev server's proxy rules (page-server.mjs);
 	// CHECKS_PAGE=dev runs vite's dev server instead, directly, not through npm.
 	page: ({ deck, web, dist }) =>
@@ -186,12 +186,14 @@ function firstFailure(log, code) {
 
 async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
-	const named = argv.filter((a) => !a.startsWith("--")).map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
+	const named = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--kinds").map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
 	// A check that starts an agent's turn runs only with --agent: it needs a model and may cost tokens.
 	const withAgent = argv.includes("--agent");
+	// --kinds claude starts the harness with a signed-in Claude instead of Pi on the fake model, for a check marked model.
+	if (argv.includes("--kinds")) RUN.kinds = argv[argv.indexOf("--kinds") + 1];
 	const files = named.filter((f) => withAgent || !traitsOf(f).agent);
 	for (const f of named.filter((f) => !files.includes(f))) console.log(`skip  ${f}  starts an agent's turn: pass --agent`);
-	if (!named.length) return console.error("usage: node tools/checks/run.mjs [--only-server] [--agent] <check> ..."), 2;
+	if (!named.length) return console.error("usage: node tools/checks/run.mjs [--only-server] [--agent] [--kinds claude] <check> ..."), 2;
 	const missing = files.filter((f) => !existsSync(checkPath(f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
 	// A slot per run, never for the loop: a build alone, each check in a check slot (alone if it times).
