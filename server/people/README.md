@@ -42,7 +42,7 @@ model, a login or a transcript.
     changes, and its waiting mail; asking moves its mark on, so a second ask brings nothing new.
 12. A screen says which agent it follows with `view.move`. An agent's view call reaches only the
     screens that follow it; with none, the answer says it waits. The person acts for the agent
-    their newest screen follows (`agent.me`, `view.goto`); their here is that agent's home, else
+    their newest screen follows, else the newest agent (`agent.me`, `view.goto`); their here is that agent's home, else
     the canvas that screen shows, else the deck's first canvas.
 13. Cameras are kept per person or agent, canvas and device. `view.get` answers the newest on the
     canvas, or the origin.

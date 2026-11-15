@@ -66,12 +66,12 @@ export class People {
 		return canvas && !person.canvas ? { ...person, canvas } : person;
 	}
 
-	/** The agent a call is about: the agent calling, or the one the person's screen follows. */
+	/** The agent a call is about: the agent calling, or the one the person's screen follows, else the newest. */
 	actor(ctx: Context): AgentRecord {
 		if (ctx.caller.kind !== "person") return this.self(ctx);
 		const follows = this.screens.newestOf(ctx.caller.id)?.follows;
-		const record = follows ? this.roster.byIdOrUndefined(follows) : undefined;
-		if (!record) throw new Refused("not_found", "No conversation is on your screen, so there is no agent to answer for.", "agent.list");
+		const record = (follows ? this.roster.byIdOrUndefined(follows) : undefined) ?? this.roster.all().at(-1);
+		if (!record) throw new Refused("not_found", "There is no agent yet to answer for.", "agent.list");
 		return record;
 	}
 
