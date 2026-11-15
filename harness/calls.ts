@@ -24,7 +24,7 @@ export const HARNESS_CALLS: readonly string[] = CALLS.filter((call) => call.side
 export function harnessAnswers(parts: Parts): Record<string, Answerer> {
 	const tell = (name: string, payload: unknown) => parts.host.tell(name, payload);
 	return {
-		...chatAnswers({ sessions: parts.sessions, host: parts.host, forks: parts.forks }),
+		...chatAnswers({ sessions: parts.sessions, host: parts.host, forks: parts.forks, focus: (agent) => parts.settings.setFocused(agent) }),
 		...accountAnswers(parts.accounts, parts.sessions, tell),
 		...runtimeAnswers(parts.sessions, parts.settings, tell),
 	};

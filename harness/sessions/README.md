@@ -46,6 +46,8 @@ who it is and what it is given. A session knows nothing of where its agent sits 
     connected, named by the server, at home on the canvas named (`--canvas`), else the deck's first
     canvas, else a new one, as a first run of Decks does.
     `--no-first-agent` leaves the deck empty.
+13. `chat.focus` is remembered in the harness's folder, and `runtime.get` with no agent answers it
+    as `focused`, so every new page starts on the same agent.
 
 ## Check
 

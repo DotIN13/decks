@@ -45,6 +45,15 @@ test("the person's queue answers as the README says, and the transcript lists ne
 	done();
 });
 
+test("chat.focus is remembered, and runtime.get answers it for every new page", async () => {
+	const { sessions, answers, done } = parts();
+	sessions.start({ id: "a1", name: "Ada", kind: "pi" });
+	await answers["chat.focus"]!({ agent: "a1" }, who);
+	assert.equal(((await answers["runtime.get"]!({}, who)) as { focused?: string }).focused, "a1");
+	sessions.dispose();
+	done();
+});
+
 test("runtime.update refuses a speech model it does not know", () => {
 	const { answers, done } = parts();
 	assert.throws(() => answers["runtime.update"]!({ sttModel: "nope" }, who), (e: { code?: string }) => e.code === "invalid");

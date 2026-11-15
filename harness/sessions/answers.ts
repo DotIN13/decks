@@ -13,6 +13,8 @@ export interface ChatDeps {
 	host: HostLink;
 	/** A fork's runtime handle, waiting for its agent.requested. */
 	forks: Map<string, string>;
+	/** Remember the agent every new page starts on. */
+	focus(agent: string): void;
 }
 
 type A = Record<string, unknown>;
@@ -23,7 +25,11 @@ export function chatAnswers(deps: ChatDeps): Record<string, Answerer> {
 	const one = (args: A): Session => deps.sessions.require(text(args.agent));
 	const agent = (id: string) => deps.host.call("agent.get", { agent: id });
 	return {
-		"chat.focus": (args) => agent(one(args).id),
+		"chat.focus": (args) => {
+			const id = one(args).id;
+			deps.focus(id);
+			return agent(id);
+		},
 		"chat.send": (args) => send(one(args), text(args.text), cleanParts(args.parts)),
 		"chat.abort": async (args) => {
 			const session = one(args);

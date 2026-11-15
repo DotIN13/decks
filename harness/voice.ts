@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 
 // Speech to text for the composer's mic: one recording in, its words out.
 // OpenAI's transcriber, its key in OPENAI_API_KEY on this machine only. The
-// model is the harness's setting (runtime.update), kept in its own folder.
+// model is the harness's setting (runtime.update), kept in its own folder
+// with the agent new pages start on (chat.focus).
 
 export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string }> = [
 	{ id: "gpt-4o-mini-transcribe", label: "GPT-4o mini Transcribe", note: "$0.003 a minute; mixes languages well." },
@@ -14,7 +15,7 @@ export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string
 const DEFAULT_MODEL = process.env.DECKS_STT_MODEL ?? "gpt-4o-mini-transcribe";
 const endpoint = (): string => process.env.DECKS_STT_URL ?? "https://api.openai.com/v1/audio/transcriptions";
 
-export type VoiceSettings = { sttModel?: string };
+export type VoiceSettings = { sttModel?: string; focused?: string };
 
 /** The harness's own settings, in <home>/harness/settings.json. */
 export class Settings {
@@ -30,6 +31,12 @@ export class Settings {
 		return { ...this.value, sttReady: sttReady(), sttModels: STT_MODELS };
 	}
 
+	/** The agent every new page starts on (chat.focus). */
+	setFocused(agent: string): void {
+		this.value.focused = agent;
+		this.save();
+	}
+
 	/** A model this harness knows, or null for the default; anything else is refused. */
 	setSttModel(model: string | null): void {
 		if (model !== null && !STT_MODELS.some((one) => one.id === model)) {
@@ -37,6 +44,10 @@ export class Settings {
 		}
 		if (model === null) delete this.value.sttModel;
 		else this.value.sttModel = model;
+		this.save();
+	}
+
+	private save(): void {
 		mkdirSync(dirname(this.file), { recursive: true });
 		writeFileSync(this.file, JSON.stringify(this.value));
 	}
