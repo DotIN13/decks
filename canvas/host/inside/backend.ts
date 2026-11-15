@@ -54,6 +54,22 @@ export type Heard =
 	| { type: "reconnected" };
 
 /** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
+/** A card written out as a page, drawn by the harness's Chrome at `url`: the picture as base64, or why not. */
+async function snapshotOf(url: string, headers: Record<string, string>, path: string, shot: CardShot): Promise<{ mime: string; data: string } | { why: string }> {
+	try {
+		const query = new URLSearchParams({ path, w: String(shot.w), h: String(shot.h), scheme: shot.scheme });
+		const response = await fetch(`${url}?${query}`, { method: "POST", headers, body: shot.html });
+		if (!response.ok) return { why: `the harness could not draw it (${response.status} ${(await response.text().catch(() => "")).slice(0, 200)})`.trim() };
+		const blob = await response.blob();
+		const bytes = new Uint8Array(await blob.arrayBuffer());
+		let binary = "";
+		for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+		return { mime: blob.type || "image/png", data: btoa(binary) };
+	} catch (error) {
+		return { why: error instanceof Error ? error.message : String(error) };
+	}
+}
+
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {
 	let token = firstToken;
 	/** This frame's name on its stream: what the harness says to it alone (a document's answers) carries it. */
@@ -123,20 +139,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 			if (opened?.open()) opened.send({ type: "presence.set", canvas, ...presence });
 		},
 
-		async snapshot(path, shot) {
-			try {
-				const query = new URLSearchParams({ path, w: String(shot.w), h: String(shot.h), scheme: shot.scheme });
-				const response = await fetch(`${base}/snapshot?${query}`, { method: "POST", headers: headers({ "content-type": "text/html" }), body: shot.html });
-				if (!response.ok) return { why: `the harness could not draw it (${response.status} ${(await response.text().catch(() => "")).slice(0, 200)})`.trim() };
-				const blob = await response.blob();
-				const bytes = new Uint8Array(await blob.arrayBuffer());
-				let binary = "";
-				for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-				return { mime: blob.type || "image/png", data: btoa(binary) };
-			} catch (error) {
-				return { why: error instanceof Error ? error.message : String(error) };
-			}
-		},
+		snapshot: (path, shot) => snapshotOf(`${base}/snapshot`, headers({ "content-type": "text/html" }), path, shot),
 
 		setToken(next) {
 			token = next;
