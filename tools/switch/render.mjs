@@ -10,7 +10,7 @@ function deleted(p) {
 }
 
 function kept(p) {
-	const why = { "packages/protocol": "the canvas library reads its old shapes (Page, Presence, StageCall, ...)", "packages/api": "the canvas library's card calls (cardCalls)", "packages/hub": "the canvas library's follower (studio-line.ts)" };
+	const why = { "packages/protocol": "the canvas library reads its old shapes (Page, Presence and the old call and author types)", "packages/api": "the canvas library's card calls (cardCalls)", "packages/hub": "the canvas library's follower (studio-line.ts)" };
 	return `## Kept until Loom moves them (wave 3)\n\nDecided in DESIGN.md section 11; they go at the map's step 4a.\n\n${list(p.kept.map((k) => `\`${k}\`${why[k] ? `: ${why[k]}` : ""}`))}`;
 }
 
