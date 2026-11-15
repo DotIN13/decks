@@ -1,6 +1,6 @@
 # Step 4e-12-readmes: Regroup canvas: READMEs for render/, look/, documents/, canvas/
 
-Dry run on e5be9c96, on top of 4e-11-host. Nothing was moved.
+Dry run on c1a214de. Nothing was moved.
 
 - files moved by git mv: 0
 - files taken out of git (moved on disk): 0
