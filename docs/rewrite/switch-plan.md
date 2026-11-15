@@ -35,7 +35,7 @@ Decided in DESIGN.md section 11; they go at the map's step 4a.
 
 ## Renamed
 
-After the deletions, so no new name meets an old package's:
+After the deletions, so no new name meets a deleted package's:
 
 - `@decks-next/attach` to `@decks/attach` (clients/attach): 1 file(s) name it
 - `@decks-next/cli` to `@decks/cli` (clients/cli): 1 file(s) name it
@@ -47,6 +47,10 @@ After the deletions, so no new name meets an old package's:
 - `@decks-next/protocol` to `@decks/protocol` (protocol): 62 file(s) name it
 - `@decks-next/server` to `@decks/server` (server): 1 file(s) name it
 - `@decks-next/tools` to `@decks/tools` (tools): 1 file(s) name it
+
+Two workspaces cannot share a name:
+
+- `packages/protocol` (`@decks/protocol`) is a kept package whose name a new one takes: first it becomes `@decks/protocol-old` until Loom moves it (map step 4a), and its 42 importers get that specifier, nothing else in them changed: packages/canvas/package.json, packages/canvas/src/camera/agent-view.test.ts, packages/canvas/src/camera/agent-view.ts, packages/canvas/src/camera/agent-views.ts, packages/canvas/src/camera/camera.ts, packages/canvas/src/camera/controller.ts, packages/canvas/src/camera/land.ts, packages/canvas/src/camera/landing.test.ts, packages/canvas/src/camera/landing.ts, packages/canvas/src/camera/scroll-area.ts, packages/canvas/src/camera/stage-ops.test.ts, packages/canvas/src/camera/stage-ops.ts, packages/canvas/src/editor.tsx, packages/canvas/src/frame/chrome.ts, packages/canvas/src/frame/inside/backend.ts, packages/canvas/src/frame/inside/boot.ts, packages/canvas/src/frame/inside/card-calls.ts, packages/canvas/src/frame/inside/events.ts, packages/canvas/src/frame/inside/line.ts, packages/canvas/src/frame/inside/options.ts, packages/canvas/src/frame/inside/presence.ts, packages/canvas/src/frame/inside/studio-line.ts, packages/canvas/src/frame/outside/host.tsx, packages/canvas/src/frame/protocol.ts, packages/canvas/src/ink/StageInk.tsx, packages/canvas/src/items/awake.ts, packages/canvas/src/items/item-slot.tsx, packages/canvas/src/items/news.test.ts, packages/canvas/src/items/news.ts, packages/canvas/src/model/drawing.ts, packages/canvas/src/public/camera.ts, packages/canvas/src/render/engine.ts, packages/canvas/src/stage/Stage.tsx, packages/canvas/src/stage/input.ts, packages/canvas/src/stage/items-layer.tsx, packages/canvas/src/stage/selection.tsx, packages/canvas/src/types.ts, packages/canvas/src/ui/Callout.tsx, packages/protocol/package.json, packages/ui/package.json, packages/ui/src/agent-marks.tsx, scripts/public-entries.test.mjs
 
 Then one install under the heavy lock, so node_modules links the new names.
 
