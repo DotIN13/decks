@@ -79,5 +79,18 @@
 		"node tools/gates/run.mjs",
 		"node tools/checks/run.mjs: canvas-frame, context-loss (one slot each)",
 		"commit with REWRITE_AGENT=Loom: Regroup canvas: frame/ and host.ts become host/"
+	],
+	"paths": [
+		{
+			"file": "docs/DESIGN.md",
+			"replace": [
+				{
+					"from": "`frame/protocol.ts`",
+					"to": "`host/messages.ts`",
+					"count": 1
+				}
+			],
+			"why": "the old design doc names the frame's message file"
+		}
 	]
 }

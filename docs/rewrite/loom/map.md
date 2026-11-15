@@ -65,7 +65,7 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 | `render/` | the engine's page side and its worker | `src/render/*` (`engine.ts` keeps its role, split in section 2) |
 | `look/` | fonts, icons, code colours, maths, media | `src/look/*` |
 | `chrome/` | the canvas's own controls: properties, insert, pen bar | `src/ui/*` (Pane's lane today) |
-| `host/` | the canvas inside a frame, and the page that holds the frame | `src/host.ts`, `src/host-pass.test.ts`, `src/frame/protocol.ts` → *host/messages.ts*, `src/frame/chrome.ts`, `src/frame/inside/*` → `host/inside/`, `src/frame/outside/host.tsx` → *host/outside/framed-editor.tsx* |
+| `host/` | the canvas inside a frame, and the page that holds the frame | `src/host.ts`, `src/host-pass.test.ts`, *src/frame/protocol.ts* → *host/messages.ts*, `src/frame/chrome.ts`, `src/frame/inside/*` → `host/inside/`, *src/frame/outside/host.tsx* → *host/outside/framed-editor.tsx* |
 | `styles/` | the canvas surface sheets | `styles/*` (+ `ink.css`), `canvas.css` split by part (section 2) |
 | `scripts/` | `build-css.mjs` | `scripts/build-css.mjs` |
 
@@ -346,7 +346,7 @@ of docs excluded:
 | `canvas/src/frame/inside/options.ts` | `installHost` 123, `editorOptions` 131 |
 | `canvas/src/frame/inside/presence.ts` | `installPresence` 127 |
 | `canvas/src/frame/inside/studio-line.ts` | `createStudioLine` 87 |
-| `canvas/src/frame/outside/host.tsx` | `createFramedEditor` 494, `wire` 83, `keepInStep` 108 |
+| *canvas/src/frame/outside/host.tsx* | `createFramedEditor` 494, `wire` 83, `keepInStep` 108 |
 | *canvas/src/ink/StageInk.tsx* | `StageInk` 668 |
 | `canvas/src/items/MediaPlayer.tsx` | `MediaPlayer` 243 |
 | `canvas/src/items/card-surface.tsx` | `CardSurface` 229 |
