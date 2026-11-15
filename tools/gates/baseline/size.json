@@ -68,8 +68,6 @@
 	"canvas/host/outside/framed-editor.tsx: over 400 lines": 1,
 	"canvas/ink/InkLayer.tsx: function StageInk over 80 lines": 1,
 	"canvas/ink/InkLayer.tsx: over 400 lines": 1,
-	"canvas/ink/shaper.ts: function inkShaper over 80 lines": 1,
-	"canvas/ink/shaper.ts: over 400 lines": 1,
 	"canvas/input/canvas-input.ts: function (anonymous) over 80 lines": 1,
 	"canvas/input/canvas-input.ts: function createStageInput over 80 lines": 1,
 	"canvas/input/canvas-input.ts: over 400 lines": 1,

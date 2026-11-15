@@ -141,7 +141,7 @@
 	"canvas/ink/InkLayer.tsx: em dash": 3,
 	"canvas/ink/model.ts: comment over 5 lines": 1,
 	"canvas/ink/model.ts: em dash": 2,
-	"canvas/ink/shaper.ts: comment over 5 lines": 6,
+	"canvas/ink/shaper.ts: comment over 5 lines": 2,
 	"canvas/ink/shaper.ts: em dash": 1,
 	"canvas/input/canvas-input.ts: comment over 5 lines": 15,
 	"canvas/input/canvas-input.ts: em dash": 13,
