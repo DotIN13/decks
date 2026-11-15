@@ -20,6 +20,10 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	page.on("pageerror", (e) => said.push(`pageerror: ${e.message.slice(0, 200)}`));
 	page.on("requestfailed", (r) => said.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText ?? ""}`));
 	page.on("response", (r) => r.status() >= 400 && said.push(`${r.status()}: ${r.url().slice(0, 160)}`));
+	page.on("websocket", (ws) => {
+		ws.on("framesent", (f) => String(f.payload).includes("line.call") && said.push(`sent: ${String(f.payload).slice(0, 220)}`));
+		ws.on("framereceived", (f) => String(f.payload).includes("call.answered") && said.push(`got: ${String(f.payload).slice(0, 220)}`));
+	});
 	// The page's own /canvas-frame.html is replaced by the one server/frame serves.
 	// Sent on to Decks-local rather than fulfilled here: a fulfilled answer has no address, and
 	// the browser then treats the frame as a public page that may not reach loopback.
@@ -36,27 +40,22 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	}
 	if (!frame) throw new Error(`the frame never showed its stage (frame page asked ${served.length} times)\n${said.slice(0, 30).join("\n")}`);
 	const before = xOf(deck);
-	const host = await frame.evaluate((path) => {
-		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === path);
-		const r = node?.getBoundingClientRect();
-		return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null;
-	}, card);
-	const drawn = !!host;
-	// Press the card, leave its body with Escape (it stays selected), and nudge it right.
-	if (host) {
-		const box = await (await frame.frameElement()).boundingBox();
-		await page.mouse.click(box.x + host.x + host.w * 0.5, box.y + host.y + host.h * 0.6);
-		await page.waitForTimeout(400);
-		await page.keyboard.press("Escape");
-		for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
-	}
+	// Selected as today's checks select a card (e2e/harness.mjs selectCard: a spot on it, clear of the
+	// page's chrome), left with Escape, then nudged with the arrows.
+	process.env.DECKS_E2E_WEB = `http://127.0.0.1:${ports.web}`;
+	const { selectCard } = await import("../../../e2e/harness.mjs");
+	const drawn = await selectCard(page, card).then(() => true, () => false);
+	await page.waitForTimeout(400);
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(300);
+	for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
 	let after = before;
 	for (let i = 0; i < 40 && after === before; i++) {
 		await page.waitForTimeout(150);
 		after = xOf(deck);
 	}
 	await browser.close();
-	return { frame: served, drawn, before, after, moved: after !== before };
+	return { frame: served, drawn, before, after, moved: after !== before, said: said.filter((l) => !l.startsWith("warning")).slice(-12) };
 });
 console.log(JSON.stringify(result));
 process.exitCode = result.moved ? 0 : 1;
