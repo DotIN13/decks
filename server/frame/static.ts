@@ -13,8 +13,9 @@ const TYPES: Record<string, string> = {
 const NOT_BUILT = "The canvas page is not built. Run: node tools/heavy.mjs --wait -- node server/frame/build.mjs";
 
 async function fileAnswer(dist: string, rel: string): Promise<RouteAnswer> {
-	const file = normalize(join(dist, rel));
-	if (!file.startsWith(normalize(dist) + sep) && file !== normalize(dist)) return { status: 404, type: "text/plain", body: "Not found." };
+	const root = normalize(dist).replace(/[\\/]+$/, "");
+	const file = normalize(join(root, rel));
+	if (!file.startsWith(root + sep)) return { status: 404, type: "text/plain", body: "Not found." };
 	try {
 		const body = await readFile(file);
 		const cache = rel.startsWith("assets/") ? "public, max-age=31536000, immutable" : "no-cache";

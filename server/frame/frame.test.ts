@@ -18,7 +18,7 @@ const deck = {
 };
 
 test("the built page is public, and says how to build it when it is not", async () => {
-	const dist = mkdtempSync(join(tmpdir(), "frame-"));
+	const dist = `${mkdtempSync(join(tmpdir(), "frame-"))}/`;
 	const server = await testServer({ features: [frameFeature({ dist })] });
 	const doors = await server.listen(0);
 	assert.equal((await fetch(`${doors.url}/canvas-frame.html`)).status, 503);
