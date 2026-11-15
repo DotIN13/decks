@@ -103,12 +103,19 @@ export function turn(old: string, raw: unknown, now = Date.now()): Turned {
 	const row = BY_OLD.get(old);
 	if (!row) return { refusal: { code: "not_found", message: `There is no call ${old}, old or new.` } };
 	if (now > Date.parse(GOES)) return { refusal: { code: "refused", message: `${old} stopped answering on ${GOES}. Call ${row[2]}.`, hint: row[2] } };
-	return { name: row[2], args: shaped(row[2], old, keyed(row[3], raw)), old: row };
+	const args = shaped(row[2], old, keyed(row[3], raw));
+	// canvas.read with of read one item and what is in it: item.get now.
+	if (old === "canvas.read" && typeof args.of === "string") {
+		const { of, ...rest } = args;
+		return { name: "item.get", args: { ...rest, id: of }, old: row };
+	}
+	return { name: row[2], args, old: row };
 }
 
 /** A new answer as the old call expected it, where its shape changed. */
 export function answerBack(old: string, value: unknown): unknown {
 	if (old === "canvas.read" && Array.isArray(value)) return { items: value };
+	if (old === "canvas.read" && isObject(value)) return { items: [value] };
 	if (old === "canvas.space" && isObject(value) && typeof value.x === "number") return { x1: value.x, y1: value.y };
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
 	// view.reload answered { reloaded }; view.camera the Camera itself; view.viewport the screen's { width, height }.

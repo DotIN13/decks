@@ -42,6 +42,9 @@ test("old arguments in order become the new call's, options spread", () => {
 	assert.ok(!("refusal" in insert) && (insert.args.at as { x: number }).x === 1);
 	const upd = turn("canvas.update", ["n", { set: { fill: "#fff" }, at: { x1: 1, y1: 2 } }]);
 	assert.ok(!("refusal" in upd) && (upd.args.set as { fill: string }).fill === "#fff" && (upd.args.at as { x: number }).x === 1 && upd.args.change === undefined);
+	const one = turn("canvas.read", [{ canvas: "c", of: "n", depth: 0 }]);
+	assert.ok(!("refusal" in one) && one.name === "item.get" && one.args.id === "n" && one.args.of === undefined);
+	assert.deepEqual(answerBack("canvas.read", { id: "n" }), { items: [{ id: "n" }] });
 	const move = turn("view.move", [{ x: 1, y: 2, zoom: 0.5, animate: true }]);
 	assert.ok(!("refusal" in move) && move.args.zoom === 0.5 && move.args.camera === undefined);
 	const set = turn("agent.update", [{ canvas: "plan" }]);
