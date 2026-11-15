@@ -45,3 +45,9 @@ test("pages carry a card's news as today's Page did", async () => {
 	const [page] = pagesOf("plan", doc, false, news);
 	assert.deepEqual([page!.lastWrittenBy, page!.namedAt, page!.modifiedAt, page!.seenAt], ["you", 1, 2, 3]);
 });
+
+test("a host can leave a compat route to itself", async () => {
+	const { compatFeature } = await import("./feature.ts");
+	const prefixes = (compatFeature({ leave: ["/api/upload"] }).routes ?? []).map((r) => r.prefix);
+	assert.ok(!prefixes.includes("/api/upload") && prefixes.includes("/api/where"));
+});

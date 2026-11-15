@@ -35,7 +35,9 @@ No feature imports compat, and compat imports no feature.
 4. An old line hears its watched canvases only. A change on one is told as today's
    `canvas.changed` with the whole drawing and its revision, which today's frame reads whole.
 5. A line opened with a canvas pass calls and watches that canvas alone.
-6. Each alias carries `GOES`. After that day it answers `refused` naming the new call.
+6. A host may leave a route to itself: `compatFeature({ leave: ["/api/upload"] })` (Studio checks
+   an edit role on its own upload).
+7. Each alias carries `GOES`. After that day it answers `refused` naming the new call.
 
 ## Check
 
