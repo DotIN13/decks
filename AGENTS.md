@@ -35,16 +35,12 @@ Today's code, read only:
 
 | path | what | moves to |
 |---|---|---|
-| `apps/server` | the server and the agents in one process | server, harness |
-| `apps/web` | the person's page | harness/page |
 | `packages/api` | the two tables of calls | protocol |
 | `packages/canvas` | the canvas page library | canvas |
 | `packages/stage` | the Rust drawing engine | engine |
 | `packages/pen` | the drawing's file format | pen |
 | `packages/ui` | controls that know nothing of Decks | ui |
-| `packages/sdk` | the decks command and its SDK | clients |
-| `runtime` | prompts, skills and runtime plugins | harness/prompts |
-| `scripts`, `e2e` | measures, old gates, browser checks | tools |
+| `scripts` | measures and old gates | tools |
 
 ## Words
 
