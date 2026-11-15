@@ -130,6 +130,7 @@ test("rule 10: export writes pen's page, a card as an iframe from where the page
 	const page = await s.value<{ text: string }>("file.read", { path: file.path });
 	assert.match(page.text, /<iframe[^>]+src="\.\.\/canvases\/work\/cards\/sales\/index\.html"/);
 	assert.match(page.text, /Look here/);
+	for (const id of ["sales", "n1"]) assert.match(page.text, new RegExp(`data-pen-id="${id}"`), `${id} is marked by its own id`);
 	const tw = await s.value<{ text: string }>("file.read", { path: (await s.value<{ path: string }>("canvas.export", { of: "n1", format: "tailwind", to: "exports/n.html" }, ann)).path });
 	assert.match(tw.text, /tailwindcss/);
 	await s.close();
