@@ -1,6 +1,6 @@
 import { reconcile } from "solid-js/store";
 import { setTimeZone } from "@decks/ui";
-import { finished, startedAsking } from "@decks/agent-ui/alerts";
+import { finished, startedAsking } from "../alerts/index.ts";
 import { scratch } from "./agent.ts";
 import { setStages } from "./canvases.ts";
 import { ensureAgent, nameOf, setState, state } from "./deck.ts";

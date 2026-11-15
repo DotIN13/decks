@@ -1,12 +1,12 @@
-import { createAlerts as createShared } from "@decks/agent-ui/alerts";
+import { createAlerts as createShared } from "../alerts/index.ts";
 import { openHistory } from "../chat/index.ts";
 import { state } from "../state/deck.ts";
 import { setUnattended } from "./favicon.ts";
 
-export type { AlertBanner } from "@decks/agent-ui/alerts";
+export type { AlertBanner } from "../alerts/index.ts";
 
 /**
- * The app's alerts: `@decks/agent-ui/alerts`' cue, banner and tab badge, where a clicked banner opens
+ * The app's alerts: `alerts/`'s cue, banner and tab badge, where a clicked banner opens
  * the conversation it is about and its history.
  */
 export function createAlerts(deps: {

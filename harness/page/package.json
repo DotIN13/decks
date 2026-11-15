@@ -15,7 +15,6 @@
 	"dependencies": {
 		"@decks-next/protocol": "0.0.0",
 		"@decks-next/sdk": "0.0.0",
-		"@decks/agent-ui": "*",
 		"@decks/canvas": "*",
 		"@decks/ink": "*",
 		"@decks/pen": "*",

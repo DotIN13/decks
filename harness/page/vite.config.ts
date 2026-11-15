@@ -1,10 +1,9 @@
 import tailwind from "@tailwindcss/vite";
-import { existsSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
-import { decksSounds } from "@decks/agent-ui/vite";
 
 // The page's build and dev server. The dev server proxies the server's door,
 // so the page calls from its own origin (the server answers no CORS), and it
@@ -53,13 +52,32 @@ function sessionMeta(): Plugin {
 }
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
+/** The alerts' cues at /sounds/, from alerts/sounds: served while Vite runs, and written into the build. */
+function sounds(): Plugin {
+	const folder = fileURLToPath(new URL("./alerts/sounds/", import.meta.url));
+	return {
+		name: "decks-page-sounds",
+		configureServer(dev) {
+			dev.middlewares.use("/sounds", (req, res, next) => {
+				const name = decodeURIComponent((req.url ?? "/").split("?")[0]?.slice(1) ?? "");
+				if (!readdirSync(folder).includes(name)) return next();
+				res.setHeader("Content-Type", name.endsWith(".mp3") ? "audio/mpeg" : "text/plain; charset=utf-8");
+				createReadStream(join(folder, name)).pipe(res);
+			});
+		},
+		generateBundle() {
+			for (const name of readdirSync(folder)) this.emitFile({ type: "asset", fileName: `sounds/${name}`, source: readFileSync(join(folder, name)) });
+		},
+	};
+}
+
 const target = () => server().url;
 /** A path that is a file of the page's own (app/, files/) is served here, not passed on. */
 const own = (url = "") => (existsSync(join(ROOT, decodeURIComponent(url.split("?")[0] ?? ""))) ? url : undefined);
 const pass = (ws = false) => ({ target: target(), changeOrigin: false, ws, xfwd: true, bypass: (req: { url?: string }) => own(req.url) });
 
 export default defineConfig({
-	plugins: [solid(), tailwind(), pageJson(), sessionMeta(), decksSounds()],
+	plugins: [solid(), tailwind(), pageJson(), sessionMeta(), sounds()],
 	server: {
 		host: HOST,
 		// The canvas frame is sandboxed, so its origin is "null"; its modules are fetched cross-origin.

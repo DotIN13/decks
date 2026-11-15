@@ -6,7 +6,7 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
 import { For, Match, Show, Switch, type JSX } from "solid-js";
-import type { AlertPrefs } from "@decks/agent-ui/alerts";
+import type { AlertPrefs } from "../../alerts/index.ts";
 import { Icon } from "@decks/ui";
 import type { ClaudeAccount, WebStatus } from "../../state/types/index.ts";
 import { AlertSettings } from "../AlertSettings.tsx";

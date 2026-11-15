@@ -1,7 +1,7 @@
-import { createTabBadge } from "@decks/agent-ui/alerts";
+import { createTabBadge } from "../alerts/index.ts";
 
 /**
  * The tab's badge: `/favicon-badge.svg` and `(n) Decks` while something happened that you have
- * not looked at, `/favicon.svg` and `Decks` again once you have (`@decks/agent-ui/alerts`).
+ * not looked at, `/favicon.svg` and `Decks` again once you have (`alerts/`).
  */
 export const setUnattended = createTabBadge({ title: "Decks", plain: "/favicon.svg", badged: "/favicon-badge.svg" });
