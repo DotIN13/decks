@@ -8,7 +8,7 @@ import { call, on } from "./line.ts";
 import { reread } from "./history.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
-import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
+import { accountsOf, cardsOn, chatOf, pageOf, withPlacements, type Placed, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
 import type { AgentChat, AgentState, ClaudeAccount } from "./types/index.ts";
 import { accountChanged, releasePages } from "./ui.ts";
 import { hearChat } from "./sync-chat.ts";
@@ -31,7 +31,7 @@ type Card = Parameters<typeof pageOf>[0];
 type Canvas = Parameters<typeof stageRowOf>[0];
 
 /** The latest answers the rows are made from; not drawn, so not reactive. */
-const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[] };
+const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[], soon: undefined as ReturnType<typeof setTimeout> | undefined };
 
 /** Rows told by today's socket messages (state/compat): an old agent list was the whole list, so it is drawn alone. */
 export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
@@ -100,10 +100,16 @@ async function readCanvases(hooks: SyncHooks): Promise<void> {
 	drawAgents(hooks);
 }
 
+/** Each canvas's cards and their boxes, from its items: card.list does not say where a card sits. */
+async function placedCards(): Promise<Placed[]> {
+	const lists = await Promise.all(held.canvases.map(async (canvas) => ({ canvas: canvas.name, items: await call<Array<{ type: string; card?: string; box?: Placed["box"] }>>("item.list", { canvas: canvas.name, depth: 0 }) })));
+	return lists.flatMap(({ canvas, items }) => (items.ok ? items.value.filter((item) => item.type === "card" && item.card && item.box).map((item) => ({ card: item.card!, canvas, box: item.box! })) : []));
+}
+
 async function readCards(hooks: SyncHooks): Promise<void> {
 	const answer = await call<Card[]>("card.list", {});
 	if (!answer.ok) return;
-	held.cards = answer.value;
+	held.cards = withPlacements(answer.value, await placedCards());
 	setState("pages", reconcile(held.cards.map(pageOf), { key: "path", merge: true }));
 	drawAgents(hooks);
 	hooks.landed();
@@ -134,6 +140,12 @@ async function readTab(): Promise<void> {
 	if (answer.ok) setState("web", (was) => ({ status: answer.value as never, ...(was?.code ? { code: was.code } : {}) }));
 }
 
+/** Read the cards again soon: a run of edits is one read. */
+function cardsSoon(hooks: SyncHooks): void {
+	clearTimeout(held.soon);
+	held.soon = setTimeout(() => void readCards(hooks), 150);
+}
+
 /** Everything, read again: what the line coming up means. */
 export async function readAll(hooks: SyncHooks): Promise<void> {
 	await Promise.all([readDeck(), readRuntimes(), readAccounts(), readTab(), readCanvases(hooks)]);
@@ -153,8 +165,8 @@ export function listen(hooks: SyncHooks): () => void {
 			void readAgents(hooks);
 		}),
 		on("canvas.changed", () => void readCanvases(hooks)),
-		on("card.changed", () => void readCards(hooks)),
-		on("item.changed", () => void readCards(hooks)),
+		on("card.changed", () => cardsSoon(hooks)),
+		on("item.changed", () => cardsSoon(hooks)),
 		on("deck.changed", () => void readDeck()),
 		on("runtime.changed", () => void readRuntimes()),
 		on("account.changed", (event) => {

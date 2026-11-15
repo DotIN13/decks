@@ -95,6 +95,13 @@ export function pageOf(card: Card): Page {
 	return { path: card.path, title: card.title, card: true, x: at?.x1 ?? 0, y: at?.y1 ?? 0, w: at ? at.x2 - at.x1 : 0, h: at ? at.y2 - at.y1 : 0 } as Page;
 }
 
+export type Placed = { card: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number } };
+
+/** Cards with where they sit, from the canvases' items, when the list did not say. */
+export function withPlacements<C extends Card>(cards: readonly C[], placed: readonly Placed[]): C[] {
+	return cards.map((card) => (card.placements?.length ? card : { ...card, placements: placed.filter((one) => one.card === card.path) }));
+}
+
 /** The cards placed on a canvas, by path: an agent's boards are those on its home canvas. */
 export function cardsOn(cards: readonly Card[], canvas: string | undefined): string[] {
 	if (!canvas) return [];

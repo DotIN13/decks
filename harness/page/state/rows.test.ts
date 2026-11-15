@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountsOf, cardsOn, chatOf, identityOf, modelOf, pageOf, stageRowOf, stateOf } from "./rows.ts";
+import { accountsOf, withPlacements, cardsOn, chatOf, identityOf, modelOf, pageOf, stageRowOf, stateOf } from "./rows.ts";
 
 // The rows the page draws, from what the server and the harness answer.
 
@@ -49,4 +49,10 @@ test("a card's page takes its box on its canvas; cardsOn lists a canvas's cards"
 test("the active account is the one a new agent starts on", () => {
 	assert.equal(accountsOf([{ id: "default", label: "me", active: false }, { id: "w", label: "work", active: true }]).active, "w");
 	assert.equal(accountsOf([]).active, "default");
+});
+
+test("a card the list placed nowhere takes its places from the canvases' items", () => {
+	const placed = [{ card: "canvases/a/cards/x/index.html", canvas: "a", box: { x1: 0, y1: 0, x2: 10, y2: 10 } }];
+	const [card] = withPlacements([{ path: "canvases/a/cards/x/index.html", title: "X" }], placed);
+	assert.deepEqual(cardsOn([card!], "a"), ["canvases/a/cards/x/index.html"]);
 });
