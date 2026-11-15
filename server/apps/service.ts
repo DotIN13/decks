@@ -174,6 +174,7 @@ export class Apps {
 		this.keepData(name, live, manifest.data ?? "data");
 		child.on("exit", (code, signal) => {
 			gone = true;
+			live.unwatch?.();
 			if (this.running.get(name) !== live) return;
 			this.running.delete(name);
 			this.failed(name, `the server exited (${signal ?? `code ${code}`})`);
