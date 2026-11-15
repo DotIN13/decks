@@ -29,6 +29,7 @@ export class TabHub {
 
 	constructor(private readonly options: HubOptions = {}) {}
 
+	// The extension's line
 	/** Given by the feature's start. */
 	async start(store: Store, heard: Events): Promise<void> {
 		this.store = store;
@@ -74,66 +75,10 @@ export class TabHub {
 		return true;
 	}
 
-	state(): TabState {
-		const shown = this.tab?.ready ? this.tab : undefined;
-		return {
-			paired: this.code !== undefined,
-			connected: this.line?.open === true && shown !== undefined,
-			...(shown ? { url: shown.url, title: shown.title } : {}),
-			...(this.pending ? { pending: { id: this.pending.id, text: this.pending.text } } : {}),
-			...(this.closed ? { closed: this.closed } : {}),
-		};
-	}
-
-	/** The driver of the shared tab, or a sentence saying why there is none. */
-	driver(): Driver {
-		if (this.line?.open && this.tab?.ready) return this.tab.driver;
-		if (!this.code) throw new Refused("unavailable", "No Chrome has been paired. Ask for a code with tab.pair and put it in the Decks extension.", "tab.pair");
-		if (!this.line?.open) throw new Refused("unavailable", "Your Chrome is not connected. Open the Decks extension in it and share a tab.", "tab.status");
-		throw new Refused("unavailable", "Chrome is connected but no tab is shared yet. Share one from the Decks extension.", "tab.status");
-	}
-
-	/** After a navigation or an action, read the tab's address and title again. */
-	async refresh(): Promise<void> {
-		if (!this.tab) return;
-		const here = await this.tab.driver.where().catch(() => undefined);
-		if (here) Object.assign(this.tab, { url: here.url, title: here.title });
-		this.changed();
-	}
-
-	/** Park a question for the person; yes runs the submit. */
-	ask(text: string, run: () => Promise<void>): void {
-		this.settle();
-		const id = randomUUID();
-		const timer = setTimeout(() => this.pending?.id === id && this.settle(), this.options.answerMs ?? ANSWER_MS);
-		timer.unref?.();
-		this.pending = { id, text, run, timer };
-		this.changed();
-	}
-
-	/** The person's answer: yes runs what waited, no drops it. */
-	async answer(id: string, ok: boolean): Promise<void> {
-		const waiting = this.pending;
-		if (!waiting || waiting.id !== id) throw new Refused("not_found", "That question is no longer waiting: it was answered, replaced or timed out.", "tab.status");
-		this.settle();
-		if (ok) await waiting.run();
-	}
-
 	/** Stop sharing: the extension reads "stopped" as the person's own stop. */
 	end(): void {
 		this.settle();
 		this.line?.close("stopped from the deck");
-	}
-
-	changed(): void {
-		this.events?.emit(events.tabChanged, { ids: [], by: "tab", rev: ++this.rev });
-	}
-
-	private settle(): void {
-		if (!this.pending) return;
-		clearTimeout(this.pending.timer);
-		this.pending = undefined;
-		this.changed();
 	}
 
 	private async heard(line: ExtensionLine, method: string, params: unknown[]): Promise<void> {
@@ -178,6 +123,64 @@ export class TabHub {
 		if (line !== this.line) return;
 		this.line = undefined;
 		this.lost(reason);
+	}
+
+	// The tab
+	state(): TabState {
+		const shown = this.tab?.ready ? this.tab : undefined;
+		return {
+			paired: this.code !== undefined,
+			connected: this.line?.open === true && shown !== undefined,
+			...(shown ? { url: shown.url, title: shown.title } : {}),
+			...(this.pending ? { pending: { id: this.pending.id, text: this.pending.text } } : {}),
+			...(this.closed ? { closed: this.closed } : {}),
+		};
+	}
+
+	/** The driver of the shared tab, or a sentence saying why there is none. */
+	driver(): Driver {
+		if (this.line?.open && this.tab?.ready) return this.tab.driver;
+		if (!this.code) throw new Refused("unavailable", "No Chrome has been paired. Ask for a code with tab.pair and put it in the Decks extension.", "tab.pair");
+		if (!this.line?.open) throw new Refused("unavailable", "Your Chrome is not connected. Open the Decks extension in it and share a tab.", "tab.status");
+		throw new Refused("unavailable", "Chrome is connected but no tab is shared yet. Share one from the Decks extension.", "tab.status");
+	}
+
+	/** After a navigation or an action, read the tab's address and title again. */
+	async refresh(): Promise<void> {
+		if (!this.tab) return;
+		const here = await this.tab.driver.where().catch(() => undefined);
+		if (here) Object.assign(this.tab, { url: here.url, title: here.title });
+		this.changed();
+	}
+
+	changed(): void {
+		this.events?.emit(events.tabChanged, { ids: [], by: "tab", rev: ++this.rev });
+	}
+
+	// The person's question
+	/** Park a question for the person; yes runs the submit. */
+	ask(text: string, run: () => Promise<void>): void {
+		this.settle();
+		const id = randomUUID();
+		const timer = setTimeout(() => this.pending?.id === id && this.settle(), this.options.answerMs ?? ANSWER_MS);
+		timer.unref?.();
+		this.pending = { id, text, run, timer };
+		this.changed();
+	}
+
+	/** The person's answer: yes runs what waited, no drops it. */
+	async answer(id: string, ok: boolean): Promise<void> {
+		const waiting = this.pending;
+		if (!waiting || waiting.id !== id) throw new Refused("not_found", "That question is no longer waiting: it was answered, replaced or timed out.", "tab.status");
+		this.settle();
+		if (ok) await waiting.run();
+	}
+
+	private settle(): void {
+		if (!this.pending) return;
+		clearTimeout(this.pending.timer);
+		this.pending = undefined;
+		this.changed();
 	}
 }
 

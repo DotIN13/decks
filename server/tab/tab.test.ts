@@ -38,15 +38,6 @@ async function shared(options: { answerMs?: number } = {}) {
 	return { s, hub, ext };
 }
 
-test("rule 4: with nothing paired a call is unavailable, with a sentence", async () => {
-	const { s } = await start();
-	const got = await s.call("tab.read", {}, "agent");
-	assert.equal(got.ok, false);
-	if (!got.ok) assert.deepEqual([got.error.code, /tab\.pair/.test(got.error.message)], ["unavailable", true]);
-	assert.deepEqual(await s.value("tab.status"), { paired: false, connected: false });
-	await s.close();
-});
-
 test("rule 2: the code is kept, a wrong code is refused, fresh drops the line", async () => {
 	const { s, hub } = await start();
 	const first = await s.value<{ code: string; expires: number }>("tab.pair", {});
@@ -79,6 +70,15 @@ test("rule 3: the first tab named is attached, and a new line replaces the old",
 	await settle();
 	assert.equal((await s.value<{ connected: boolean }>("tab.status")).connected, true);
 	assert.ok(s.heard.some((one) => one.name === "tab.changed"));
+	await s.close();
+});
+
+test("rule 4: with nothing paired a call is unavailable, with a sentence", async () => {
+	const { s } = await start();
+	const got = await s.call("tab.read", {}, "agent");
+	assert.equal(got.ok, false);
+	if (!got.ok) assert.deepEqual([got.error.code, /tab\.pair/.test(got.error.message)], ["unavailable", true]);
+	assert.deepEqual(await s.value("tab.status"), { paired: false, connected: false });
 	await s.close();
 });
 

@@ -10,11 +10,6 @@ const TAB = { status: tab.status, pair: tab.pair, open: tab.open, read: tab.read
 
 const shotPath = (at: number) => toDeckPath(`exports/tab/${new Date(at).toISOString().replace(/[:.]/g, "-")}.png`);
 
-function need(text: string | undefined, why: string): string {
-	if (!text?.trim()) throw new Refused("invalid", why, "tab.read");
-	return text.trim();
-}
-
 /** The tab's calls, against one hub. */
 export function tabCalls(hub: TabHub): Handled<Context>[] {
 	const after = async () => {
@@ -79,4 +74,9 @@ export function tabCalls(hub: TabHub): Handled<Context>[] {
 			return hub.state();
 		},
 	});
+}
+
+function need(text: string | undefined, why: string): string {
+	if (!text?.trim()) throw new Refused("invalid", why, "tab.read");
+	return text.trim();
 }

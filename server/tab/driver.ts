@@ -38,11 +38,6 @@ export class Driver {
 		readonly tabId: number,
 	) {}
 
-	/** A DevTools command in the tab. */
-	command(method: string, params: Record<string, unknown> = {}, waitMs?: number): Promise<unknown> {
-		return this.line.send("chrome.debugger.sendCommand", [{ tabId: this.tabId }, method, params], waitMs);
-	}
-
 	/** Run a script in the page and answer its value; a thrown script is a sentence. */
 	async evaluate<T>(expression: string): Promise<T> {
 		const got = (await this.command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })) as {
@@ -54,6 +49,11 @@ export class Driver {
 			throw new Refused("conflict", `The page threw while it was read: ${why.split("\n")[0]}.`, "tab.read");
 		}
 		return got?.result?.value as T;
+	}
+
+	/** A DevTools command in the tab. */
+	command(method: string, params: Record<string, unknown> = {}, waitMs?: number): Promise<unknown> {
+		return this.line.send("chrome.debugger.sendCommand", [{ tabId: this.tabId }, method, params], waitMs);
 	}
 
 	where(): Promise<Where & { ready?: string }> {
@@ -88,6 +88,22 @@ export class Driver {
 		return done.label ?? "";
 	}
 
+	/** A reference holds only on the address it was read at. */
+	private async refsHold(): Promise<void> {
+		if (!this.refsAt) throw new Refused("invalid", "References come from the page itself: read it with tab.read first, then pass one of the [ref=...] ids it shows.", "tab.read");
+		const now = (await this.where()).url;
+		if (now !== this.refsAt) {
+			throw new Refused("conflict", `That reference was read from ${this.refsAt} and the tab is now on ${now}. Read the page again: every page numbers its references from e1.`, "tab.read");
+		}
+	}
+
+	private async mouseClick(x: number, y: number): Promise<void> {
+		const at = { x, y, button: "left", clickCount: 1 };
+		await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+		await this.command("Input.dispatchMouseEvent", { type: "mousePressed", ...at });
+		await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", ...at });
+	}
+
 	async press(key: string): Promise<void> {
 		const known = KEYS[key];
 		const one = known ?? { code: key.length === 1 ? `Key${key.toUpperCase()}` : key, keyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0, text: key.length === 1 ? key : undefined };
@@ -111,22 +127,6 @@ export class Driver {
 			const late = /did not answer/.test((error as Error).message);
 			if (late) throw new Refused("unavailable", "The tab did not paint in time. Chrome only draws a tab it is showing: bring the shared tab to the front of its window and try again.", "tab.status");
 			throw error;
-		}
-	}
-
-	private async mouseClick(x: number, y: number): Promise<void> {
-		const at = { x, y, button: "left", clickCount: 1 };
-		await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-		await this.command("Input.dispatchMouseEvent", { type: "mousePressed", ...at });
-		await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", ...at });
-	}
-
-	/** A reference holds only on the address it was read at. */
-	private async refsHold(): Promise<void> {
-		if (!this.refsAt) throw new Refused("invalid", "References come from the page itself: read it with tab.read first, then pass one of the [ref=...] ids it shows.", "tab.read");
-		const now = (await this.where()).url;
-		if (now !== this.refsAt) {
-			throw new Refused("conflict", `That reference was read from ${this.refsAt} and the tab is now on ${now}. Read the page again: every page numbers its references from e1.`, "tab.read");
 		}
 	}
 }
