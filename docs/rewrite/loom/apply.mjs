@@ -71,3 +71,10 @@ export async function apply(root, table, p) {
 	await rekeyBaselines(root, p.moves, notes);
 	return notes;
 }
+
+/** Every file the plan touched, for git commit --pathspec-from-file: a commit takes this step's files and no one else's. */
+export function touched(p) {
+	const files = new Set([...p.moves.flat(), ...p.remove, ...p.untrack, ...p.edits.keys()]);
+	if (p.moves.length) files.add("tools/gates/baseline");
+	return [...files].sort();
+}

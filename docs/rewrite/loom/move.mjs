@@ -3,9 +3,9 @@
 // --dry prints the plan (--out <file> writes it, --renames <file> writes the old-to-new list).
 // --go applies it, and only when Mason has said go. Nothing else is written, and nothing is committed.
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { apply } from "./apply.mjs";
+import { apply, touched } from "./apply.mjs";
 import { after, plan } from "./plan.mjs";
 
 const MAX_BYTES = 2_000_000;
@@ -69,6 +69,10 @@ async function main(argv) {
 	const p = plan(table, repo);
 	if (flags.includes("--go")) {
 		for (const n of await apply(root, table, p)) console.log(n);
+		const list = join(root, ".scratch", "Loom", `${table.step}.paths`);
+		mkdirSync(dirname(list), { recursive: true });
+		writeFileSync(list, `${touched(p).join("\n")}\n`);
+		console.log(`commit with: git commit --pathspec-from-file=${list}`);
 		console.log(`moved ${p.moves.length} files, edited ${p.edits.size}; staged, not committed. Then run:`);
 		for (const t of table.then || []) console.log(`  ${t}`);
 		return;

@@ -295,3 +295,18 @@ test("--go moves the files a table takes out of a folder it removes, and deletes
 test("removing a value through a path that is not there makes nothing", () => {
 	assert.equal(setJson('{\n\t"d": { "a": "1" }\n}\n', { "d.highlight.js": null }), '{\n\t"d": {\n\t\t"a": "1"\n\t}\n}\n');
 });
+
+test("a line inside a block comment is a comment, whatever it starts with", () => {
+	const r = tree();
+	const text = "/*\n   the old place (`packages/eng/x`)\n*/\nconst y = 1;\n";
+	const read = (f) => (f === "shared/util.ts" ? text : r.read(f));
+	const p = plan({ step: "t", title: "t", moves: [], mentions: [["packages/eng/", "engine/"]] }, { files: r.files, read });
+	assert.equal(p.edits.get("shared/util.ts").split("\n")[1], "   the old place (`engine/x`)");
+});
+
+test("touched lists the moves' both ends, the edits and the baselines, for a commit by path", async () => {
+	const { touched } = await import("./apply.mjs");
+	const p = plan(loadTable(TABLE), tree());
+	const list = touched(p);
+	assert.ok(list.includes("packages/lib/src/extra.ts") && list.includes("lib/extra.ts") && list.includes("server/main.ts") && list.includes("tools/gates/baseline"));
+});

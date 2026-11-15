@@ -136,14 +136,14 @@ function warnOther(line, ctx, n) {
 }
 
 /** One line of one file: its import paths, its package names, and the comments' mentions. */
-function rewriteLine(line, ctx, inScripts, n) {
+function rewriteLine(line, ctx, inScripts, n, inBlock = false) {
 	const fix = (_m, head, q, spec) => `${head}${q}${rewriteRelative(spec, ctx)}${q}`;
 	let out = line;
 	if (ctx.from.endsWith(".json")) {
 		if (CONFIG.test(ctx.from) && !inScripts) out = out.replace(JSON_PATH, (_m, head, spec) => `${head}"${rewriteRelative(spec, ctx)}"`);
 		return renameBare(out, ctx, false);
 	}
-	const at = commentStart(line);
+	const at = inBlock ? 0 : commentStart(line);
 	const code = at < 0 ? line : line.slice(0, at);
 	let rest = at < 0 ? "" : line.slice(at);
 	const isImport = at !== 0 && IMPORT_LINE.test(code);
@@ -164,11 +164,16 @@ function rewriteLine(line, ctx, inScripts, n) {
 export function rewriteFile(text, ctx) {
 	const lines = text.split("\n");
 	let inScripts = false;
+	let inBlock = false;
 	const changes = [];
 	const out = lines.map((line, i) => {
+		const blockLine = inBlock;
+		// A block comment's lines are comment lines, whatever they start with, until it closes.
+		const opened = blockLine ? line.indexOf("*/") < 0 : commentStart(line) >= 0 && line.slice(commentStart(line)).startsWith("/*") && line.lastIndexOf("*/") < line.lastIndexOf("/*");
+		inBlock = opened;
 		const opens = ctx.from.endsWith("package.json") && /"scripts"\s*:\s*\{/.test(line);
 		if (opens) inScripts = true;
-		const next = rewriteLine(line, ctx, inScripts, i + 1);
+		const next = rewriteLine(line, ctx, inScripts, i + 1, blockLine);
 		if (inScripts && line.includes("}")) inScripts = false;
 		if (next !== line) changes.push({ file: ctx.to, line: i + 1, before: line, after: next });
 		return next;
