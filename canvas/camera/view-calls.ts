@@ -82,37 +82,8 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 	const args = (call.args ?? {}) as Record<string, unknown>;
 
 	switch (call.op) {
-		case "show": {
-			// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
-			if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) {
-				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
-			}
-			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
-			const boards = host.boards().filter((board) => paths.includes(board.path));
-			/*
-			 * Drawn items arrive as boxes the server measured off the stage's layout, because an
-			 * item's id means nothing to this file: the drawing is painted on a canvas, not
-			 * mounted, so there is no node to look up. They frame like a board and are not
-			 * selected — selection here means a *board*, and an item has its own on the stage.
-			 */
-			const items = (Array.isArray(args.items) ? args.items : []).filter(
-				(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
-					Boolean(item) && typeof (item as { id?: unknown }).id === "string" && typeof (item as { box?: { w?: unknown } }).box?.w === "number",
-			);
-			if (boards.length === 0 && items.length === 0) return { error: "none of those cards are on the canvas" };
-
-			const shown = [...boards.map((board) => board.path), ...items.map((item) => item.id)];
-			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
-			const fitAll = args.fit === "all" || boxes.length > 1;
-			const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
-			const waiting = defer(call, host, wanted, boards[0]?.path, "card");
-			if (waiting) return { shown, ...waiting };
-			host.setCamera(wanted, { animate: args.animate === true });
-			if (boards[0]) host.select(boards[0].path);
-
-			if (typeof args.highlight === "string" && boards[0]) highlight(boards[0].path, args.highlight);
-			return { shown };
-		}
+		case "show":
+			return showCall(call, host, args);
 
 		case "camera": {
 			const { x, y, zoom } = args as { x?: number; y?: number; zoom?: number };
@@ -159,28 +130,69 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			return { apply: true, onScreen: true };
 		}
 
-		case "cursor": {
-			if (typeof args.path !== "string") return { error: "cursor needs a path" };
-			const at = args.at as { x?: number; y?: number } | null;
-			const found = host.cursor(
-				at && typeof at.x === "number" && typeof at.y === "number"
-					? {
-							path: args.path,
-							x: at.x,
-							y: at.y,
-							label: typeof args.label === "string" ? args.label : "agent",
-							color: typeof args.color === "string" ? args.color : "var(--canvas-accent)",
-						}
-					: null,
-			);
-			// A path no card on this canvas has would put the cursor nowhere, silently: the agent is told instead.
-			if (at && !found) return { error: `No card at ${args.path} is on this canvas: decks canvas read lists the ones that are.` };
-			return { cursor: at ? "shown" : "cleared" };
-		}
+		case "cursor":
+			return cursorCall(host, args);
 
 		default:
 			return { error: `unknown stage operation: ${call.op}` };
 	}
+}
+
+/** A call to this screen, and the screen it runs on, as `defer` takes them. */
+type Call = Parameters<typeof defer>[0];
+type Host = Parameters<typeof defer>[1];
+
+/** `show` (`view.focus`): the camera framed on the cards and items named, the first card selected. */
+function showCall(call: Call, host: Host, args: Record<string, unknown>): unknown {
+	// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
+	if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) {
+		return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
+	}
+	const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
+	const boards = host.boards().filter((board) => paths.includes(board.path));
+	/*
+	 * Drawn items arrive as boxes the server measured off the stage's layout, because an
+	 * item's id means nothing to this file: the drawing is painted on a canvas, not
+	 * mounted, so there is no node to look up. They frame like a board and are not
+	 * selected — selection here means a *board*, and an item has its own on the stage.
+	 */
+	const items = (Array.isArray(args.items) ? args.items : []).filter(
+		(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
+			Boolean(item) && typeof (item as { id?: unknown }).id === "string" && typeof (item as { box?: { w?: unknown } }).box?.w === "number",
+	);
+	if (boards.length === 0 && items.length === 0) return { error: "none of those cards are on the canvas" };
+
+	const shown = [...boards.map((board) => board.path), ...items.map((item) => item.id)];
+	const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
+	const fitAll = args.fit === "all" || boxes.length > 1;
+	const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
+	const waiting = defer(call, host, wanted, boards[0]?.path, "card");
+	if (waiting) return { shown, ...waiting };
+	host.setCamera(wanted, { animate: args.animate === true });
+	if (boards[0]) host.select(boards[0].path);
+
+	if (typeof args.highlight === "string" && boards[0]) highlight(boards[0].path, args.highlight);
+	return { shown };
+}
+
+/** `cursor` (`view.cursor`): a labelled dot on a card, or none. */
+function cursorCall(host: Host, args: Record<string, unknown>): unknown {
+	if (typeof args.path !== "string") return { error: "cursor needs a path" };
+	const at = args.at as { x?: number; y?: number } | null;
+	const found = host.cursor(
+		at && typeof at.x === "number" && typeof at.y === "number"
+			? {
+					path: args.path,
+					x: at.x,
+					y: at.y,
+					label: typeof args.label === "string" ? args.label : "agent",
+					color: typeof args.color === "string" ? args.color : "var(--canvas-accent)",
+				}
+			: null,
+	);
+	// A path no card on this canvas has would put the cursor nowhere, silently: the agent is told instead.
+	if (at && !found) return { error: `No card at ${args.path} is on this canvas: decks canvas read lists the ones that are.` };
+	return { cursor: at ? "shown" : "cleared" };
 }
 
 /** Outline one component inside a board, and take it off again on its own. */
