@@ -5,7 +5,7 @@ import { state } from "../state/deck.ts";
 import { callOnLine } from "../state/line.ts";
 import { oldCall, oldLineOpen } from "../state/compat/line.ts";
 import { deviceId } from "../state/device.ts";
-import { stageOf } from "../state/canvases.ts";
+import { canvasOf } from "../state/canvases.ts";
 
 /**
  * Telling the server where the user is looking — which is not every frame.
@@ -41,10 +41,11 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
 	if (!agentId) return;
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
-	const stage = stageOf(agentId)?.name;
-	void callOnLine("view.move", { x: sized.x, y: sized.y, zoom: sized.zoom, agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId });
+	const name = canvasOf(agentId)?.name;
+	const where = { agent: agentId, ...(name ? { canvas: name } : {}), device: deviceId };
+	void callOnLine("view.move", { x: sized.x, y: sized.y, zoom: sized.zoom, ...where });
 	// In compat mode, today's frame as well, on today's line (state/compat): the same camera said twice.
-	if (oldLineOpen()) void oldCall("view.remember", [sized, { agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId }]);
+	if (oldLineOpen()) void oldCall("view.remember", [sized, where]);
 }
 
 /**

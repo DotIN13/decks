@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { browsed, folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
+import { browsed, canvasInPath, folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
 
 // A dropped file shows on the canvas as itself when it is a picture, short words or a player.
 
@@ -33,4 +33,10 @@ test("a folder lists its entries by name, and the folder above it", () => {
 	assert.equal(at.parent, "assets");
 	assert.deepEqual(at.entries.map((one) => `${one.name}:${one.kind}`), ["a.mp4:file", "old:dir"]);
 	assert.equal(browsed("", []).parent, null);
+});
+
+test("a deck path names its canvas, a friend's as shared/<owner>/<name>", () => {
+	assert.equal(canvasInPath("canvases/plan/cards/a/index.html"), "plan");
+	assert.equal(canvasInPath("shared/canvases/ada/notes/cards/x/index.html"), "shared/ada/notes");
+	assert.equal(canvasInPath("note-1"), undefined);
 });

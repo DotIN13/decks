@@ -10,6 +10,7 @@ import { call } from "../state/line.ts";
 import { stageOf } from "../state/canvases.ts";
 import { setDraft } from "../state/ui.ts";
 import { inkAsked } from "./ink-prompts.ts";
+import { canvasInPath } from "../files/model.ts";
 
 /*
  * What the canvas frame hands the composer (`@decks/canvas`, `frame/`): a comment, a sketch. Drafts,
@@ -72,9 +73,9 @@ export const frameRefer = (pills: Parameters<typeof cleanFramePills>[0]) =>
 
 /** A picture of these drawn items to download, taken by the server. */
 export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
-	const agentId = state.focused;
-	const canvas = stageOf(agentId)?.name;
-	if (!agentId || !canvas) return;
+	// The canvas on screen, else the one the first card's path names: an export needs no agent.
+	const canvas = stageOf(state.focused)?.name ?? canvasInPath(ids[0]);
+	if (!canvas) return void notice("warn", "The picture could not be taken: no canvas is on screen.");
 	// Taken on the server by canvas.screenshot, as decks canvas screenshot takes it, which can take a moment; fetched with this tab's token (a plain link carries none, and was refused), then saved.
 	notice("info", "Taking the picture…");
 	// A card's picture is named after its folder; drawn items after the canvas, as the server names it.

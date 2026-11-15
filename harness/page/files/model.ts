@@ -47,3 +47,10 @@ export function browsed(path: string, files: ReadonlyArray<{ path: string; size?
 
 /** A deck file's address through the server's files door. */
 export const fileAddress = (path: string): string => `/files/${path.split("/").map(encodeURIComponent).join("/")}`;
+
+/** The canvas a deck path is in: canvases/<name>/…, or a friend's shared/canvases/<owner>/<name>/…. */
+export function canvasInPath(path: string | undefined): string | undefined {
+	const friend = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path ?? "");
+	if (friend) return `shared/${friend[1]}/${friend[2]}`;
+	return /^canvases\/([^/]+)\//.exec(path ?? "")?.[1];
+}
