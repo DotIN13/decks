@@ -3,7 +3,6 @@
 		"docs/rewrite/"
 	],
 	"Lexicon": [
-		"protocol/",
 		"tools/gen/",
 		"docs/rewrite/calls.md",
 		"clients/",
@@ -95,8 +94,7 @@
 	],
 	"Pane": [
 		"harness/page/",
-		"packages/canvas/src/ui/",
-		"packages/agent-ui/"
+		"packages/canvas/src/ui/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
