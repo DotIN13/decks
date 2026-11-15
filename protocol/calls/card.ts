@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
 import { arr, num, opt, str, union } from "../schema.ts";
 import { Card, Placement } from "../shapes.ts";
-import { AGENT, ANYONE, NOT_CARD, onCanvas } from "./parts.ts";
+import { AGENT, ANYONE, NOT_CARD, PERSON, onCanvas } from "./parts.ts";
 
 // Cards: folders of HTML in a canvas's cards/. Their files are file.* calls.
 
@@ -57,4 +57,13 @@ export const url = defineCall({
 	args: { card: str() },
 	answer: str(),
 	effect: "read",
+});
+
+export const seen = defineCall({
+	name: "card.seen",
+	summary: "The person read the card now; it is no longer news to them. Answers the card with seen set.",
+	who: PERSON,
+	args: { card: str() },
+	answer: Card,
+	effect: "change",
 });

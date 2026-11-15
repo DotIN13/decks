@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 130 calls (110 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 131 calls (111 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -83,6 +83,7 @@ A piece of HTML drawn on a canvas, kept as a folder: cards/<name>/index.html and
 | `card.canvases` | agents | alias of `card.get` | anyone | card.get's `placements` say it. |
 | `card.list` | agents | `card.list` | person, agent, app | Unchanged. |
 | `card.url` | agents | `card.url` | anyone | Unchanged. |
+| new | | `card.seen` | person | Added in 0.17.0 for Folio: the person read a card, so it is no longer news; today's socket message card.seen. Card gains named, changed and seen. |
 
 ### file
 
@@ -360,4 +361,5 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
   0.3.0 (`file.open`, `close`, `splice`, `review`, `versions`, `restore`); compile, git and Google comments wait for wave 2.
 - The socket's own messages (`line.hello`, `line.token`, `line.call`, `canvas.watch`, `canvas.unwatch`, `view.answered`,
   `card.seen`, `card.extent`, `presence.set`) are its envelope, not calls: the greeting with the version, a call and its
-  answer, and watching a canvas. `card.extent` becomes what `card.fit` measures, and `presence.set` is `view.move`.
+  answer, and watching a canvas. `card.extent` becomes what `card.fit` measures; `card.seen` became the call
+  `card.seen` (0.17.0) and `presence.set` the call `view.update` (0.16.0).

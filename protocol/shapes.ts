@@ -54,7 +54,19 @@ export const Canvas = named(
 );
 
 export const Placement = named("Placement", obj({ card: str(), canvas: str(), box: Box, clipped: opt(bool()) }), "A card on one canvas: where it sits and how big.");
-export const Card = named("Card", obj({ path: str(), title: str(), by: opt(str()), placements: opt(arr(Placement)) }), "A card: its index.html's path, the finding it states, who last wrote it.");
+export const Card = named(
+	"Card",
+	obj({
+		path: str(),
+		title: str(),
+		by: opt(str()),
+		placements: opt(arr(Placement)),
+		named: opt(num("When by was set: a write through a call, or a claim.")),
+		changed: opt(num("The last write to any file in the card's folder.")),
+		seen: opt(num("When the person last read it.")),
+	}),
+	"A card: its index.html's path, the finding it states, who last wrote it, and whether it is news to the person.",
+);
 export const Frame = named("Frame", obj({ path: str(), id: str(), ref: opt(str()) }), "A reusable frame file and its one item.");
 
 export const File = named("File", obj({ path: str(), size: opt(int()), rev: opt(int()), by: opt(str()), at: opt(num()), dir: opt(bool()) }), "A file or folder in the deck.");
