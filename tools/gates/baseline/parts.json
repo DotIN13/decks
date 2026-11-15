@@ -21,7 +21,6 @@
 	"harness/page/connections/Start.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/connections/Switcher.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/files: part has no actions.ts": 1,
-	"harness/page/files: part has no model.ts": 1,
 	"harness/page/files: part has no view.tsx": 1,
 	"harness/page/files/FilePicker.tsx: a .tsx in the page must be a part's view.tsx": 1,
 	"harness/page/frame: part has no actions.ts": 1,
