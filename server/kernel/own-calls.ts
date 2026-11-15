@@ -8,6 +8,8 @@ import { defineFeature, handleAll, type Feature, type Store } from "./types.ts";
 // Only the person on this machine may make a pairing code.
 
 export const SERVER_VERSION = "0.1.0";
+/** The deck calls this feature answers, named, so a call added to the noun later is unhandled, not a start error. */
+const MINE = { get: calls.deck.get, update: calls.deck.update, now: calls.deck.now, pair: calls.deck.pair, revoke: calls.deck.revoke };
 type Settings = { timezone?: string; requireCode?: boolean; rev: number };
 
 export function zoneOf(settings: { timezone?: string }): string {
@@ -37,7 +39,7 @@ export function ownFeature(callers: Callers, clock: () => number = Date.now): Fe
 			store = kernel.store("deck");
 			settings = await readJson<Settings>(store, "settings.json", { rev: 0 });
 		},
-		calls: handleAll(calls.deck, {
+		calls: handleAll(MINE, {
 			get: () => deck(),
 			now: () => nowIn(zoneOf(settings), clock()),
 			async update(ctx, change) {
