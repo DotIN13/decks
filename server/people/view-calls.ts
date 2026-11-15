@@ -27,8 +27,9 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 		},
 		goto: async (ctx, { canvas }) => {
 			const name = canvasName(ctx, canvas);
-			if (ctx.caller.kind !== "agent") return request(p(), ctx, name, "view.goto", { canvas: name });
-			const { record } = await p().roster.update(p().self(ctx).id, { canvas: name });
+			const follows = ctx.caller.kind === "person" ? p().screens.newestOf(ctx.caller.id)?.follows : undefined;
+			if (ctx.caller.kind !== "agent" && !follows) return request(p(), ctx, name, "view.goto", { canvas: name });
+			const { record } = await p().roster.update(p().actor(ctx).id, { canvas: name });
 			p().tell(ctx, events.agentChanged, { ids: [record.id] });
 			followHome(p(), ctx, record);
 			return answer(p(), ctx, name, recipients(p(), ctx, name));

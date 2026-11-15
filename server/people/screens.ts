@@ -8,6 +8,8 @@ export type Size = Infer<typeof shapes.Size>;
 
 export interface Screen {
 	client: string;
+	/** When it last reported, for the newest of a person's screens. */
+	at: number;
 	person: string;
 	follows?: string;
 	canvas?: string;
@@ -24,7 +26,7 @@ export class Screens {
 	/** A screen says what it shows; what it leaves out it keeps. */
 	report(client: string, person: string, said: { follows?: string; canvas?: string; screen?: Size }): Screen {
 		const was = this.byClient.get(client);
-		const next: Screen = { ...was, client, person };
+		const next: Screen = { ...was, client, person, at: ++this.tick };
 		if (said.follows !== undefined) next.follows = said.follows;
 		if (said.canvas !== undefined) next.canvas = said.canvas;
 		if (said.screen !== undefined) next.screen = said.screen;
@@ -48,6 +50,11 @@ export class Screens {
 	/** One person's own screens. */
 	ofPerson(person: string): Screen[] {
 		return [...this.byClient.values()].filter((s) => s.person === person);
+	}
+
+	/** The person's screen that reported last: the one they are looking at. */
+	newestOf(person: string): Screen | undefined {
+		return this.ofPerson(person).sort((a, b) => b.at - a.at)[0];
 	}
 
 	/** Every screen showing a canvas. */

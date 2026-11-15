@@ -73,3 +73,19 @@ test("view.reload answers how many screens on the canvas were asked", async () =
 	assert.equal(await s.value<number>("view.reload", { canvas: "a", card: "canvases/a/cards/x/index.html" }, person), 1);
 	await s.close();
 });
+
+test("the person's here is the canvas on their screen, and they act for the agent it follows", async () => {
+	const { s, on } = await peopleServer();
+	const token = s.token(person);
+	assert.equal(s.callers.resolve(token)?.canvas, undefined, "no screen yet, no here");
+	await s.value<shapes.Agent>("agent.attach", { name: "Ann", canvas: "a" });
+	const screen = fakeClient("screen-1");
+	await on(screen, "view.move", { x: 0, y: 0, zoom: 1, canvas: "a", agent: "Ann" }, person);
+	assert.equal(s.callers.resolve(token)?.canvas, "a", "here is the canvas on screen");
+	const me = await on(screen, "agent.me", {}, person);
+	assert.equal((me as shapes.Agent).name, "Ann", "agent.me answers the agent on screen");
+	await s.value<View>("view.goto", { canvas: "b" }, person);
+	assert.equal((await s.value<shapes.Agent>("agent.get", { agent: "Ann" })).canvas, "b", "goto moves that conversation");
+	assert.equal(s.callers.resolve(token)?.canvas, "b", "and here goes with it at once");
+	await s.close();
+});

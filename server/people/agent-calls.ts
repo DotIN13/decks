@@ -11,7 +11,7 @@ const NO_HOST = "No harness is running to start an agent: start the Decks harnes
 export function agentCalls(holder: Holder): Handled<Context>[] {
 	const p = () => holder.get();
 	return handleAll(calls.agent, {
-		me: (ctx) => p().shown(p().self(ctx)),
+		me: (ctx) => p().shown(p().actor(ctx)),
 		list: (_ctx, { workspace }) => p().roster.all().filter((a) => workspace === undefined || (a.workspace ?? "") === workspace).map((a) => p().shown(a)),
 		get: (_ctx, { agent }) => p().shown(p().roster.find(agent)),
 		create: (ctx, spec) => create(p(), ctx, spec),

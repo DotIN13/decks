@@ -1,4 +1,4 @@
-import { Refused, type AnyEvent, type Payload } from "../../protocol/index.ts";
+import { Refused, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
 import type { Context, Kernel, Store, Tokens } from "../kernel/types.ts";
 import { Hosts } from "./hosts.ts";
 import { Mailboxes } from "./mail.ts";
@@ -29,6 +29,7 @@ export class People {
 		await Promise.all([people.roster.load(), people.mail.load(), people.marks.load()]);
 		kernel.callers.describe("agent", (id) => people.roster.callerOf(id));
 		kernel.relay((call) => people.hosts.answerer(call));
+		kernel.callers.describe("person", (_id, issued) => people.withHere(issued));
 		return people;
 	}
 
@@ -45,6 +46,22 @@ export class People {
 			});
 		}
 		return client.id;
+	}
+
+	/** A person's here: the home of the agent on their screen, else the canvas that screen shows. */
+	withHere(person: Caller): Caller {
+		const screen = this.screens.newestOf(person.id);
+		const canvas = (screen?.follows ? this.roster.byIdOrUndefined(screen.follows)?.canvas : undefined) ?? screen?.canvas;
+		return canvas && !person.canvas ? { ...person, canvas } : person;
+	}
+
+	/** The agent a call is about: the agent calling, or the one the person's screen follows. */
+	actor(ctx: Context): AgentRecord {
+		if (ctx.caller.kind !== "person") return this.self(ctx);
+		const follows = this.screens.newestOf(ctx.caller.id)?.follows;
+		const record = follows ? this.roster.byIdOrUndefined(follows) : undefined;
+		if (!record) throw new Refused("not_found", "No conversation is on your screen, so there is no agent to answer for.", "agent.list");
+		return record;
 	}
 
 	/** The record of the agent calling; refused for anyone else. */
