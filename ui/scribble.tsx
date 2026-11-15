@@ -60,7 +60,7 @@ function appendTo(el: HTMLElement, text: string): void {
  * `onEnd` runs, for a field that finishes on blur (a text item on the canvas commits there) and so
  * held back while the catcher had the cursor (`isScribbleCatch`).
  */
-export function ScribbleCatch(props: {
+export type ScribbleCatchProps = {
 	/** The field being written into: a textarea, an input or a contenteditable. */
 	target: () => HTMLElement | undefined;
 	/** Add words at its end; a textarea, an input or a plain contenteditable is done without it. */
@@ -73,12 +73,14 @@ export function ScribbleCatch(props: {
 	mount?: () => Element | null | undefined;
 	/** Its stacking inside `mount`: over the boards, under the floating bars. */
 	z?: number;
-}) {
+};
+
+export function ScribbleCatch(props: ScribbleCatchProps) {
 	watchPencil();
 	const [targetFocused, setTargetFocused] = createSignal(false);
 	const [catching, setCatching] = createSignal(false);
-	let catcher: HTMLTextAreaElement | undefined;
-	let sent = "";
+	/** The catcher, and what it held when Scribble last wrote into it. */
+	const st: CatchState = { catcher: undefined, sent: "" };
 	/** The catcher has had the cursor since it last ended: only then is there writing to end. */
 	let writing = false;
 
@@ -92,81 +94,27 @@ export function ScribbleCatch(props: {
 		props.onEnd?.();
 	};
 
-	onMount(() => {
-		const read = () => {
-			const at = document.activeElement;
-			const target = props.target();
-			// Together: set one at a time, the catcher is unwanted for an instant between them and is taken away.
-			batch(() => {
-				setTargetFocused(!!target && !!at && target.contains(at));
-				setCatching(!!catcher && at === catcher);
-			});
-		};
-		// Read after the whole move: between one field's focusout and the next one's focusin nothing has focus.
-		const later = () => setTimeout(read, 0);
-		document.addEventListener("focusin", read);
-		document.addEventListener("focusout", later);
-		read();
-		onCleanup(() => {
-			document.removeEventListener("focusin", read);
-			document.removeEventListener("focusout", later);
-		});
-	});
+	onMount(() => trackFocus(props.target, () => st.catcher, (target, catching) => batch(() => {
+		setTargetFocused(target);
+		setCatching(catching);
+	})));
 
-	/** The target's words as they are when the pencil starts, not when the catcher first appeared. */
-	const seed = () => {
-		if (!catcher) return;
-		const target = props.target();
-		sent = props.context?.() ?? (target ? wordsOf(target) : "");
-		catcher.value = sent;
-	};
-	/** What Scribble added after what the catcher already held, added to the target. */
-	const pass = () => {
-		if (!catcher) return;
-		const now = catcher.value;
-		// An edit to earlier words (a scratch-out) is the catcher's only: the target keeps its own.
-		if (now.startsWith(sent) && now.length > sent.length) {
-			const text = now.slice(sent.length);
-			const target = props.target();
-			if (props.append) props.append(text);
-			else if (target) appendTo(target, text);
-		}
-		sent = now;
-	};
+	const seed = () => seedCatch(st, props);
+	const pass = () => passCatch(st, props);
 
 	return (
 		<Show when={pencil() && (targetFocused() || catching())}>
 			<Portal mount={props.mount?.() ?? document.querySelector(".work") ?? document.body}>
 				<textarea
 					ref={(el) => {
-						catcher = el;
+						st.catcher = el;
 						seed();
 					}}
 					{...{ [CATCH]: "" }}
 					aria-label="Write here with the pencil; the words go into the field being edited"
 					autocapitalize="sentences"
 					spellcheck={false}
-					style={{
-						position: "absolute",
-						"z-index": String(props.z ?? 8),
-						inset: "0",
-						width: "100%",
-						height: "100%",
-						margin: "0",
-						padding: "0",
-						border: "0",
-						outline: "0",
-						resize: "none",
-						background: "transparent",
-						color: "transparent",
-						"caret-color": "transparent",
-						// 16px so Safari does not zoom on focus; 1px lines keep the context in a strip along the top.
-						"font-size": "16px",
-						"line-height": "1px",
-						"user-select": "text",
-						"-webkit-user-select": "text",
-						"touch-action": "none",
-					}}
+					style={catcherStyle(props.z)}
 					onInput={(event) => {
 						if (!(event as InputEvent).isComposing) pass();
 					}}
@@ -176,7 +124,7 @@ export function ScribbleCatch(props: {
 						// A finger is the canvas's: the next touch reaches it.
 						event.preventDefault();
 						pass();
-						catcher?.blur();
+						st.catcher?.blur();
 						end();
 					}}
 					onFocus={() => {
@@ -202,4 +150,74 @@ export function ScribbleCatch(props: {
 			</Portal>
 		</Show>
 	);
+}
+
+/** The catcher's style: over the whole of `mount`, invisible, its words in a 1px strip along its top. */
+function catcherStyle(z: number | undefined): Record<string, string> {
+	return {
+		position: "absolute",
+		"z-index": String(z ?? 8),
+		inset: "0",
+		width: "100%",
+		height: "100%",
+		margin: "0",
+		padding: "0",
+		border: "0",
+		outline: "0",
+		resize: "none",
+		background: "transparent",
+		color: "transparent",
+		"caret-color": "transparent",
+		// 16px so Safari does not zoom on focus; 1px lines keep the context in a strip along the top.
+		"font-size": "16px",
+		"line-height": "1px",
+		"user-select": "text",
+		"-webkit-user-select": "text",
+		"touch-action": "none",
+	};
+}
+
+/**
+ * Whether the target or the catcher has the cursor, read on every focus move; both together, since
+ * set one at a time the catcher is unwanted for an instant and is taken away. A focusout is read
+ * after the whole move, when the next field has the cursor.
+ */
+function trackFocus(target: () => HTMLElement | undefined, catcher: () => HTMLTextAreaElement | undefined, set: (target: boolean, catching: boolean) => void): void {
+	const read = () => {
+		const at = document.activeElement;
+		const t = target();
+		const c = catcher();
+		set(!!t && !!at && t.contains(at), !!c && at === c);
+	};
+	const later = () => setTimeout(read, 0);
+	document.addEventListener("focusin", read);
+	document.addEventListener("focusout", later);
+	read();
+	onCleanup(() => {
+		document.removeEventListener("focusin", read);
+		document.removeEventListener("focusout", later);
+	});
+}
+
+type CatchState = { catcher: HTMLTextAreaElement | undefined; sent: string };
+
+/** The target's words as they are when the pencil starts, not when the catcher first appeared. */
+function seedCatch(st: CatchState, props: ScribbleCatchProps): void {
+	if (!st.catcher) return;
+	const target = props.target();
+	st.sent = props.context?.() ?? (target ? wordsOf(target) : "");
+	st.catcher.value = st.sent;
+}
+
+/** What Scribble added after what the catcher already held, added to the target; an edit to earlier words stays the catcher's. */
+function passCatch(st: CatchState, props: ScribbleCatchProps): void {
+	if (!st.catcher) return;
+	const now = st.catcher.value;
+	if (now.startsWith(st.sent) && now.length > st.sent.length) {
+		const text = now.slice(st.sent.length);
+		const target = props.target();
+		if (props.append) props.append(text);
+		else if (target) appendTo(target, text);
+	}
+	st.sent = now;
 }

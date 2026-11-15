@@ -182,6 +182,5 @@
 	"tools/checks/library/nudge.mjs: function run over 80 lines": 1,
 	"tools/checks/page/agents-tab.mjs: over 400 lines": 1,
 	"tools/checks/perf-canvas.mjs: function perfCanvas over 80 lines": 1,
-	"tools/checks/pictures/awake.mjs: over 400 lines": 1,
-	"ui/scribble.tsx: function ScribbleCatch over 80 lines": 1
+	"tools/checks/pictures/awake.mjs: over 400 lines": 1
 }
