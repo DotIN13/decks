@@ -1,11 +1,11 @@
 # Step 3-engine: engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git
 
-Dry run on 8830a5d5, on top of 2-ui. Nothing was moved.
+Dry run on b976a1a7. Nothing was moved.
 
 - files moved by git mv: 112
 - files taken out of git (moved on disk): 8
 - files deleted: 0
-- files edited or created: 25
+- files edited or created: 26
 - import lines rewritten: 21
 - warnings: 0
 
@@ -206,6 +206,7 @@ tools/checks/pictures/placeholder.mjs:5
 - server/pictures/native.ts
 - tools/checks/pictures/stage-shot.mjs
 - engine/demo/serve.mjs
+- apps/web/scripts/stage-backends.ts
 - package.json
 - engine/.gitignore
 - engine/README.md
@@ -224,7 +225,6 @@ tools/checks/pictures/placeholder.mjs:5
 - docs/DESIGN.md: 1
 - docs/REORGANIZATION.md: 2
 - engine/crates/apple/README.md: 2
-- tools/checks/library/stage-goldens.mjs: 1
 
 ## Then run
 

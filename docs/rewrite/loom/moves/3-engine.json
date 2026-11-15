@@ -81,6 +81,28 @@
 					"to": "\"../../data/decks\""
 				}
 			]
+		},
+		{
+			"file": "apps/web/scripts/stage-backends.ts",
+			"replace": [
+				{
+					"from": "\"../../../packages/stage\"",
+					"to": "\"../../../engine\""
+				},
+				{
+					"from": "no fonts in packages/stage/fonts:",
+					"to": "no fonts in engine/fonts:"
+				}
+			]
+		},
+		{
+			"file": "tools/checks/library/stage-goldens.mjs",
+			"replace": [
+				{
+					"from": "join(web, \"../../packages/stage\")",
+					"to": "join(web, \"../../engine\")"
+				}
+			]
 		}
 	],
 	"set": [
