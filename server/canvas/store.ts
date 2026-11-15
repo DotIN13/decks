@@ -12,6 +12,7 @@ const EMPTY = `${JSON.stringify({ version: "2.14", children: [] }, null, 2)}\n`;
 const SERVER: Caller = { kind: "person", id: "server", name: "Decks" };
 const enc = new TextEncoder(), dec = new TextDecoder();
 
+/** mine: what this server wrote and has not yet heard back, oldest first. */
 type Kept = { doc: PenCanvas; canvas: string; file: DeckPath; mine: string[]; queue: Promise<unknown> };
 
 export class CanvasStore {
@@ -157,7 +158,9 @@ export class CanvasStore {
 		if (!at || kind === "deleted" || !path.endsWith(".pen")) return;
 		const text = await this.text(path);
 		const kept = this.drawings.get(path);
-		if (text === undefined || kept?.mine.includes(text)) return;
+		if (text === undefined) return;
+		const echo = kept ? kept.mine.indexOf(text) : -1;
+		if (kept && echo >= 0) return void kept.mine.splice(0, echo + 1);
 		let change: Change | undefined;
 		try {
 			change = kept?.doc.reload(text, by);

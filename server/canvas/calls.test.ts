@@ -210,3 +210,16 @@ test("a box a kind's prepare adds is a size: the item is still placed beside the
 	assert.deepEqual(made.box, { x1: 460, y1: 600, x2: 760, y2: 800 });
 	await s.close();
 });
+
+test("a drawing written back to an earlier text of its own is read in, not taken for an echo", async () => {
+	const s = await start();
+	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
+	await new Promise((r) => setTimeout(r, 10));
+	const old = await text(s, "canvases/plan/canvas.pen");
+	await s.value("item.update", { id: "a", set: { content: "two" } }, ann);
+	await new Promise((r) => setTimeout(r, 10));
+	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(old), callers.agent("studio"));
+	await waitFor(async () => (await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, (c) => c === "one");
+	assert.equal((await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, "one");
+	await s.close();
+});
