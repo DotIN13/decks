@@ -140,3 +140,22 @@ test("decks login trades the person's token for a terminal's own, kept by addres
 		rmSync(home, { recursive: true });
 	}
 });
+
+test("the server's own MCP door writes the same text as the stdio relay", async () => {
+	const { MCP_PATH } = await import("../../protocol/index.ts");
+	const viaDoor = async (name: string, args: object) => {
+		const response = await fetch(`${url}${MCP_PATH}`, {
+			method: "POST",
+			headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+			body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
+		});
+		return ((await response.json()) as { result: { content: { text: string }[]; isError: boolean } }).result;
+	};
+	const { callTool } = await import("../../clients/mcp/index.ts");
+	for (const [name, args] of [["item.move", { id: "n1", canvas: "plan" }], ["item.get", { id: "zz" }]] as const) {
+		const relay = await callTool(clientFor(url, token), name, args, "");
+		const door = await viaDoor(name, args);
+		assert.equal(door.isError, relay.isError, name);
+		assert.equal(door.content[0]!.text, relay.content[0]!.text, name);
+	}
+});
