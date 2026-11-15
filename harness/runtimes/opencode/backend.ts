@@ -1,3 +1,5 @@
+// The OpenCode backend: one Decks agent as a session and an event subscription
+// on the shared opencode server.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
@@ -121,6 +123,8 @@ export class OpencodeBackend implements AgentBackend {
 
 	private constructor(private readonly context: AgentBackendContext) {}
 
+	// --- starting, and the shared server -------------------------------------------------
+
 	static async create(context: AgentBackendContext): Promise<OpencodeBackend> {
 		const backend = new OpencodeBackend(context);
 		await backend.start();
@@ -178,35 +182,6 @@ export class OpencodeBackend implements AgentBackend {
 	}
 
 	/**
-	 * The session this chat talks in: the one it names, or a new one.
-	 *
-	 * A chat that was resting, or a fork opened as a new chat, carries on in the session it
-	 * names (`resumeRef`), on the shared server that keeps every session in its own database. A
-	 * new session is opened on the mode the chat was left in. The permission rides on the
-	 * session either way (see the module comment for why that is not a fiction), and the model
-	 * does not: it rides on every prompt.
-	 */
-	private async openSession(): Promise<string> {
-		const resume = this.context.resumeRef;
-		if (resume) {
-			const found = await this.client.session.get({ path: { id: resume } }).catch(() => undefined);
-			if (found?.data?.id) {
-				await this.client.session.update({ path: { id: found.data.id }, body: { permission: rulesetOf(this.currentMode) } as never }).catch(() => undefined);
-				return found.data.id;
-			}
-			this.context.notice("warn", "opencode no longer has this conversation, so the chat starts a new one.");
-		}
-		const session = await this.client.session.create({
-			body: {
-				title: "Decks",
-				permission: rulesetOf(this.currentMode),
-			} as never,
-		});
-		if (!session.data?.id) throw new Error("opencode started but would not open a session.");
-		return session.data.id;
-	}
-
-	/**
 	 * The deck's description, written where opencode can read it.
 	 *
 	 * opencode's `instructions` are file paths, not prose, so the briefing every other
@@ -252,6 +227,35 @@ export class OpencodeBackend implements AgentBackend {
 		this.sessionId = undefined;
 		this.context.translator.setState("idle");
 		this.context.notice("error", "opencode exited. This chat needs restarting.");
+	}
+
+	/**
+	 * The session this chat talks in: the one it names, or a new one.
+	 *
+	 * A chat that was resting, or a fork opened as a new chat, carries on in the session it
+	 * names (`resumeRef`), on the shared server that keeps every session in its own database. A
+	 * new session is opened on the mode the chat was left in. The permission rides on the
+	 * session either way (see the module comment for why that is not a fiction), and the model
+	 * does not: it rides on every prompt.
+	 */
+	private async openSession(): Promise<string> {
+		const resume = this.context.resumeRef;
+		if (resume) {
+			const found = await this.client.session.get({ path: { id: resume } }).catch(() => undefined);
+			if (found?.data?.id) {
+				await this.client.session.update({ path: { id: found.data.id }, body: { permission: rulesetOf(this.currentMode) } as never }).catch(() => undefined);
+				return found.data.id;
+			}
+			this.context.notice("warn", "opencode no longer has this conversation, so the chat starts a new one.");
+		}
+		const session = await this.client.session.create({
+			body: {
+				title: "Decks",
+				permission: rulesetOf(this.currentMode),
+			} as never,
+		});
+		if (!session.data?.id) throw new Error("opencode started but would not open a session.");
+		return session.data.id;
 	}
 
 	private async pump(): Promise<void> {

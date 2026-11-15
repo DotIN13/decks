@@ -1,3 +1,4 @@
+// Tests for reading opencode's event stream into the transcript.
 import type { ChatEvent } from "../shared/translator.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

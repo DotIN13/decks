@@ -1,3 +1,4 @@
+// Tests for mapping Decks' thinking levels onto a model's opencode variants.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { rankedVariants, variantFor } from "./variants.ts";

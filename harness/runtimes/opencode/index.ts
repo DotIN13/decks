@@ -1,3 +1,5 @@
+// The OpenCode runtime descriptor: its name, what it can do, whether it can run here,
+// and how to start a backend for it.
 import { OPENCODE_CAPABILITIES, OPENCODE_COMMANDS, OpencodeBackend } from "./backend.ts";
 import { opencodeExecutable } from "./install.ts";
 import type { AgentRuntime } from "../runtime.ts";

@@ -1,3 +1,5 @@
+// Finds the opencode binary on this machine.
+// Kept apart from the backend so asking "can it run" starts nothing.
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 

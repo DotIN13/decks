@@ -1,3 +1,5 @@
+// Maps opencode's model variants onto Decks' thinking levels.
+// It picks the variant to send for the level a person asked for.
 import { nearestLevel, THINKING_LEVELS, type ThinkingLevel } from "../types/index.ts";
 
 /**

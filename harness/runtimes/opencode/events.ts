@@ -1,3 +1,5 @@
+// Reads the opencode server's event stream into the transcript's terms, for one session.
+// The only file that knows opencode's event shapes.
 import type { AgentUsage } from "../types/index.ts";
 import type { Translator } from "../shared/translator.ts";
 
@@ -91,17 +93,6 @@ export class OpencodeStream {
 		}
 	}
 
-	/**
-	 * A permission request, handed on only when it names something to answer.
-	 *
-	 * A frame with no id cannot be replied to — opencode would be left waiting on a request
-	 * that names nothing — so it is dropped rather than passed on as an unanswerable ask.
-	 */
-	private asked(id: string | undefined, kind: string | undefined, title: string | undefined): void {
-		if (!id || !kind) return;
-		this.hooks.permission(id, kind, title);
-	}
-
 	private delta(properties: { partID?: string; field?: string; delta?: string; messageID?: string }): void {
 		const text = properties.delta;
 		if (!text) return;
@@ -190,6 +181,17 @@ export class OpencodeStream {
 		this.t.endAssistant();
 		this.replying = false;
 		this.t.notice("error", message);
+	}
+
+	/**
+	 * A permission request, handed on only when it names something to answer.
+	 *
+	 * A frame with no id cannot be replied to — opencode would be left waiting on a request
+	 * that names nothing — so it is dropped rather than passed on as an unanswerable ask.
+	 */
+	private asked(id: string | undefined, kind: string | undefined, title: string | undefined): void {
+		if (!id || !kind) return;
+		this.hooks.permission(id, kind, title);
 	}
 
 	private finish(): void {

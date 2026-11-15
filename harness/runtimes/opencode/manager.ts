@@ -1,3 +1,5 @@
+// Runs one shared `opencode serve` for every opencode agent on the deck,
+// counted by claims so the last agent out stops it.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { opencodeConfigDir } from "../../prompts/paths.ts";
