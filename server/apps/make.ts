@@ -66,9 +66,23 @@ export function guessManifest(title: string, pkg: string | undefined): string {
 	return `${JSON.stringify({ title, kind: scripts.start ? "server" : scripts.build ? "build" : "static" }, null, "\t")}\n`;
 }
 
+/** A missing app (rule 16) taken again from its repository into a folder the person names. */
+async function cloneMissing(ctx: Context, apps: Apps, describe: Describe, name: string, url: string, to: string): Promise<App> {
+	const path = await freeFolder(apps, to);
+	await clone(url, dirname(path), basename(path));
+	const record = toDeckPath(`${folderOf(name)}/app.json`);
+	await ctx.deck.write(record, withSource(decode(await ctx.deck.read(record)), { path, repo: url }), ctx.caller);
+	return describe(ctx, apps, name, true);
+}
+
 export async function cloneApp(ctx: Context, apps: Apps, describe: Describe, args: { url: string; name?: string; title?: string; to?: string }): Promise<App> {
 	const name = args.name ?? nameFromUrl(args.url);
 	folderOf(name);
+	const had = (await hasRecord(ctx, name)) ? await apps.manifest(name).catch(() => undefined) : undefined;
+	if (had?.source && args.to && !(await apps.machine.look(had.source.path)).exists) {
+		personOnly(ctx.caller, "the folder an app is cloned into", "app.clone");
+		return cloneMissing(ctx, apps, describe, name, args.url, args.to);
+	}
 	if (await hasRecord(ctx, name)) throw new Refused("conflict", `An app called ${name} is here already; give another name.`, "app.list");
 	if (args.to) personOnly(ctx.caller, "the folder an app is cloned into", "app.clone");
 	const outside = args.to ? await freeFolder(apps, args.to) : undefined;

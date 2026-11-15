@@ -54,3 +54,17 @@ test("rules 16 and 17: app.move takes an in-deck app out; a folder that is gone 
 	assert.equal((await t.s.value<App>("app.build", { name: "notes" }, ann)).status, "missing", "a build of a missing app says so");
 	await t.close();
 });
+
+test("rule 16: a missing app is taken again by app.clone with to, which only the person may name", async () => {
+	const t = await start();
+	const origin = join(t.scratch, "origin");
+	await t.s.value("app.create", { name: "far", title: "Far", source: { path: origin, repo: "https://example.invalid/far.git" } }, "person");
+	rmSync(origin, { recursive: true, force: true });
+	assert.equal((await t.s.value<App>("app.get", { name: "far" })).status, "missing");
+	const args = { url: "file:///nowhere", name: "far", to: join(t.scratch, "again") };
+	const byAgent = await t.s.call("app.clone", args, ann);
+	assert.equal(byAgent.ok ? "" : byAgent.error.code, "refused");
+	const byPerson = await t.s.call("app.clone", args, "person");
+	assert.equal(byPerson.ok ? "" : byPerson.error.code, "invalid", "it reaches the clone, which takes only https and git addresses, rather than refusing a name that is taken");
+	await t.close();
+});
