@@ -71,11 +71,14 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		for (const one of Array.isArray(message.watch) ? (message.watch as Said[]) : []) await watch(String(one.canvas ?? ""), one.since, one.whole);
 	}
 
-	/** The frame said its camera: this line is a screen of that canvas, which can shoot its cards. */
+	/** The frame said where it points, what it picked or where it looks: view.update; a camera also makes it a screen that can shoot. */
 	async function screen(message: Said): Promise<void> {
+		const canvas = String(message.canvas ?? "");
+		const fields = Object.fromEntries(["pointer", "selection", "camera"].filter((k) => k in message).map((k) => [k, message[k]]));
+		if (Object.keys(fields).length) await door.call("view.update", { ...fields, canvas }, state.caller!, client);
 		const camera = message.camera as { x?: number; y?: number; zoom?: number } | null | undefined;
 		if (!camera || typeof camera.x !== "number" || typeof camera.y !== "number" || typeof camera.zoom !== "number") return;
-		await door.call("view.move", { x: camera.x, y: camera.y, zoom: camera.zoom, canvas: String(message.canvas ?? ""), device: "frame" }, state.caller!, client);
+		await door.call("view.move", { x: camera.x, y: camera.y, zoom: camera.zoom, canvas, device: "frame" }, state.caller!, client);
 	}
 
 	/** The frame's answer to a picture: a shot as the value, or why it could not as the error. */

@@ -114,3 +114,8 @@ test("a screen's request for a card's picture is told as today's view.called sho
 	assert.deepEqual([cursor.call.op, cursor.call.agentId, cursor.call.args], ["cursor", "a1", { path: "p", at: { x: 1, y: 2 }, label: "Ada" }]);
 	assert.equal(await told("view.requested", { canvas: "c", ids: [], call: "view.reload", args: {} }, async () => undefined), undefined);
 });
+
+test("view.changed is told as today's presence.changed", async () => {
+	const said = await told("view.changed", { canvas: "c", ids: [], by: "l2", kind: "person", name: "you", color: "#123", pointer: { x: 1, y: 2 }, rev: 0 }, async () => undefined);
+	assert.deepEqual(said, { type: "presence.changed", canvas: "c", by: { kind: "person", id: "l2", name: "you", color: "#123" }, pointer: { x: 1, y: 2 } });
+});

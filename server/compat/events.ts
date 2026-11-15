@@ -24,7 +24,7 @@ export async function told(
 		const made = Array.isArray(payload.made) ? { made: payload.made } : {};
 		return { type: "canvas.changed", canvas, rev: payload.rev, doc: read.doc, base: read.base, by: payload.by, ...made };
 	}
-	if (name === "view.changed") return { type: "presence.changed", ...payload };
+	if (name === "view.changed") return presence(payload);
 	// A view call for the frame's canvas, told as today's view.called: a card's picture, an agent's cursor, a reload.
 	if (name === "view.requested") return viewCalled(payload);
 	const old = OLD_OF.get(name);
@@ -41,4 +41,11 @@ function viewCalled(payload: Record<string, unknown>): Record<string, unknown> |
 	if (payload.call === "view.cursor") return call("cursor", { path: args.card, at: args.at, label: args.label, ...(args.color ? { color: args.color } : {}) });
 	if (payload.call === "view.reload" && typeof args.card === "string") return call("reload", { path: args.card });
 	return undefined;
+}
+
+/** view.changed as today's presence.changed: who, and only what they said. */
+function presence(payload: Record<string, unknown>): Record<string, unknown> {
+	const by = { kind: payload.kind ?? "person", id: String(payload.by ?? ""), ...(payload.name ? { name: payload.name } : {}), ...(payload.color ? { color: payload.color } : {}) };
+	const said = Object.fromEntries(["pointer", "selection", "camera", "gone"].filter((k) => k in payload).map((k) => [k, payload[k]]));
+	return { type: "presence.changed", canvas: payload.canvas, by, ...said };
 }
