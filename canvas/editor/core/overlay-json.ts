@@ -57,7 +57,34 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 			dots.push({ x: at.x, y: at.y, px: style.anchorPx, kind: "anchor" });
 		}
 	}
-	for (const g of o.guides) {
+	guideLines(o.guides, z, lines);
+	if (o.distances) {
+		for (const b of [o.distances.from, o.distances.to]) boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: 0, kind: "measure" });
+		for (const l of o.distances.lines) lines.push({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, kind: l.dashed ? "measure-dashed" : "measure" });
+	}
+	if (o.arrow) {
+		const px = style.coarse ? 18 : 11;
+		dots.push({ x: o.arrow.from.x, y: o.arrow.from.y, px, kind: o.arrow.fromJoin ? "diamond" : "end" });
+		dots.push({ x: o.arrow.to.x, y: o.arrow.to.y, px, kind: o.arrow.toJoin ? "diamond" : "end" });
+		if (o.arrow.middle) dots.push({ x: o.arrow.middle.x, y: o.arrow.middle.y, px: style.coarse ? 18 : 12, kind: o.arrow.bent ? "bend-bent" : "bend" });
+	}
+	if (o.route) paths.push({ x: o.route.x, y: o.route.y, d: o.route.d, kind: "route" });
+	if (o.endDraft) lines.push({ x1: o.endDraft.x1, y1: o.endDraft.y1, x2: o.endDraft.x2, y2: o.endDraft.y2, kind: "draft" });
+	handleDots(o, style, z, dots);
+	if (o.draft) {
+		if (o.draft.tool === "arrow") paths.push({ x: 0, y: 0, d: draftCurve(o.draft), kind: "route" });
+		else {
+			const b = draftBox(o.draft);
+			boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: 0, kind: o.draft.tool === "ellipse" ? "draft-ellipse" : "draft" });
+		}
+	}
+	if (!boxes.length && !lines.length && !paths.length && !dots.length) return "";
+	return JSON.stringify({ accent: style.accent, guide: style.guide, panel: style.panel, boxes, lines, paths, dots });
+}
+
+/** The snap guides, a gap's ticks at its ends, and a cross at each point a guide lines up with. */
+function guideLines(guides: Overlay["guides"], z: number, lines: Line[]): void {
+	for (const g of guides) {
 		lines.push({ x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, kind: "guide" });
 		if (g.kind === "gap") {
 			const tick = 4 / z;
@@ -71,19 +98,11 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 			lines.push({ x1: p.x - arm, y1: p.y - arm, x2: p.x + arm, y2: p.y + arm, kind: "guide" }, { x1: p.x + arm, y1: p.y - arm, x2: p.x - arm, y2: p.y + arm, kind: "guide" });
 		}
 	}
-	if (o.distances) {
-		for (const b of [o.distances.from, o.distances.to]) boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: 0, kind: "measure" });
-		for (const l of o.distances.lines) lines.push({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, kind: l.dashed ? "measure-dashed" : "measure" });
-	}
-	if (o.arrow) {
-		const px = style.coarse ? 18 : 11;
-		dots.push({ x: o.arrow.from.x, y: o.arrow.from.y, px, kind: o.arrow.fromJoin ? "diamond" : "end" });
-		dots.push({ x: o.arrow.to.x, y: o.arrow.to.y, px, kind: o.arrow.toJoin ? "diamond" : "end" });
-		if (o.arrow.middle) dots.push({ x: o.arrow.middle.x, y: o.arrow.middle.y, px: style.coarse ? 18 : 12, kind: o.arrow.bent ? "bend-bent" : "bend" });
-	}
-	if (o.route) paths.push({ x: o.route.x, y: o.route.y, d: o.route.d, kind: "route" });
-	if (o.endDraft) lines.push({ x1: o.endDraft.x1, y1: o.endDraft.y1, x2: o.endDraft.x2, y2: o.endDraft.y2, kind: "draft" });
-	const handleDots = (box: { x: number; y: number; w: number; h: number }) => {
+}
+
+/** The resize handles of the selection or a page (a finger gets the corners only), and the radius handle. */
+function handleDots(o: Overlay, style: OverlayStyle, z: number, dots: Dot[]): void {
+	const each = (box: { x: number; y: number; w: number; h: number }) => {
 		const size = style.handlePx / z;
 		for (const handle of HANDLES) {
 			// A finger gets the four corners only (`canvas.css`, `pointer: coarse`): the edges still answer, unseen.
@@ -92,7 +111,7 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 			dots.push({ x: at.x + size / 2, y: at.y + size / 2, px: style.handlePx, kind: style.coarse ? "handle-round" : "handle" });
 		}
 	};
-	if (o.handles) handleDots(o.handles);
+	if (o.handles) each(o.handles);
 	if (o.pageHandles) {
 		const size = style.handlePx / z;
 		for (const handle of pageHandleList()) {
@@ -106,13 +125,4 @@ export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): stri
 		const inset = radiusInset(radiusShown(o.radius, o.radiusDrag), size, o.radius.most);
 		dots.push({ x: o.radius.x + inset, y: o.radius.y + inset, px: style.handlePx, kind: "radius" });
 	}
-	if (o.draft) {
-		if (o.draft.tool === "arrow") paths.push({ x: 0, y: 0, d: draftCurve(o.draft), kind: "route" });
-		else {
-			const b = draftBox(o.draft);
-			boxes.push({ x: b.x, y: b.y, w: b.w, h: b.h, r: 0, kind: o.draft.tool === "ellipse" ? "draft-ellipse" : "draft" });
-		}
-	}
-	if (!boxes.length && !lines.length && !paths.length && !dots.length) return "";
-	return JSON.stringify({ accent: style.accent, guide: style.guide, panel: style.panel, boxes, lines, paths, dots });
 }
