@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ROOT, compare, context } from "./lib.mjs";
 import { runGates } from "./run.mjs";
+import { outsideLane, overlaps } from "./lanes.mjs";
 
 function scratch(files, git = false) {
 	const dir = mkdtempSync(join(tmpdir(), "gates-"));
@@ -93,6 +94,14 @@ test("state names a top-level let", () => plantedFails("state", { "server/a.ts":
 test("built names an engine binary", () => plantedFails("built", { "engine/out.wasm": "" }, { "engine/out.rs": "" }, "engine/out.wasm"));
 test("lanes names a lane given twice", () =>
 	plantedFails("lanes", { "docs/rewrite/lanes.json": '{"A":["x/"],"B":["x/"]}' }, { "docs/rewrite/lanes.json": '{"A":["x/"],"B":["x/y.ts"]}' }, "x/ is in the lanes of A and B"));
+test("lanes lets any agent with a lane commit the shared lane's paths, and checks them for no overlap", () => {
+	const lanes = { Ann: ["mine/"], Bob: ["tools/gates/baseline/size.json"], "*": ["tools/gates/baseline/"] };
+	assert.deepEqual(outsideLane(lanes, "Ann", ["mine/a.ts", "tools/gates/baseline/size.json"]), []);
+	assert.deepEqual(outsideLane(lanes, "Ann", ["theirs/b.ts"]), ["theirs/b.ts: outside Ann's lane"]);
+	assert.equal(outsideLane(lanes, "*", ["tools/gates/baseline/size.json"]).length, 1, "the shared lane is nobody's name");
+	assert.equal(outsideLane(lanes, "Eve", ["tools/gates/baseline/size.json"]).length, 1, "an agent with no lane gets none of it");
+	assert.deepEqual(overlaps({ ...lanes, Cy: ["tools/gates/baseline/"] }), []);
+});
 test("lanes refuses a staged path outside the author's lane", () => {
 	const dir = scratch({ "docs/rewrite/lanes.json": '{"Ann":["mine/"]}', "mine/a.ts": "", "theirs/b.ts": "" }, true);
 	const run = (agent) => spawnSync(process.execPath, [join(ROOT, "tools/gates/lanes.mjs"), "--staged"], { cwd: dir, encoding: "utf8", env: { ...process.env, REWRITE_AGENT: agent } });
