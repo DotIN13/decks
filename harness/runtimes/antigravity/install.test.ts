@@ -1,3 +1,4 @@
+// Tests for the sandbox HOME Decks hands agy, and for reading `agy models`.
 import assert from "node:assert/strict";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

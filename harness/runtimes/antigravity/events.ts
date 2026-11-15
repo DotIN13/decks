@@ -1,3 +1,5 @@
+// Reads the agy CLI's NDJSON stream into the transcript's terms.
+// The only file that knows agy's event shapes.
 import type { AgentUsage } from "../types/index.ts";
 import type { Translator } from "../shared/translator.ts";
 

@@ -1,3 +1,4 @@
+// Tests for the Google Docs MCP server, driven over stdio the way the agy CLI drives it.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";

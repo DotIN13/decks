@@ -1,3 +1,5 @@
+// The OpenCode 2 plugin that gives a Decks agent its Google Docs tools
+// and gives its shell commands the agent's token and environment.
 import { Plugin } from "@opencode/plugin"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
@@ -28,51 +30,6 @@ const gdocs = JSON.parse(readFileSync(resolve(runtime, "gdocs-tools.json"), "utf
   description: string
   parameters: Record<string, string>
 }>
-
-/** One call back to Decks; a failed answer is thrown, so it reads as a failed tool call. */
-async function callDecks(path: string, body: Record<string, unknown>, what: string): Promise<string> {
-  const url = process.env.DECKS_STAGE_URL
-  const token = process.env.DECKS_OPENCODE_SECRET
-  if (!url || !token) throw new Error(`This OpenCode session was not started by Decks, so there is no ${what} to reach.`)
-  const response = await fetch(url.replace(/\/stage\/eval$/, path), {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error(`Decks answered ${response.status}.`)
-  const outcome = (await response.json()) as { text: string; isError?: boolean }
-  if (outcome.isError) throw new Error(outcome.text)
-  return outcome.text
-}
-
-/**
- * The agent token for a session, asked of Decks once per session with the server's secret
- * (`POST /api/tokens/session`): what the `decks` command in that session's shell carries as
- * `DECKS_TOKEN`. Asked again after a refusal, for a session registered a moment after its first command.
- */
-const agentTokens = new Map<string, Promise<string | undefined>>()
-function agentToken(session: string): Promise<string | undefined> {
-  let held = agentTokens.get(session)
-  if (!held) {
-    held = (async () => {
-      const url = process.env.DECKS_URL
-      const secret = process.env.DECKS_OPENCODE_SECRET
-      if (!url || !secret) return undefined
-      const response = await fetch(`${url}/api/tokens/session`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ sessionID: session }),
-      }).catch(() => undefined)
-      if (!response?.ok) return undefined
-      return ((await response.json()) as { token?: string }).token
-    })()
-    agentTokens.set(session, held)
-    void held.then((token) => {
-      if (!token) agentTokens.delete(session)
-    })
-  }
-  return held
-}
 
 /**
  * The environment an agent's commands should have: the values the Decks server started
@@ -125,3 +82,48 @@ export default Plugin.define({
     })
   },
 })
+
+/** One call back to Decks; a failed answer is thrown, so it reads as a failed tool call. */
+async function callDecks(path: string, body: Record<string, unknown>, what: string): Promise<string> {
+  const url = process.env.DECKS_STAGE_URL
+  const token = process.env.DECKS_OPENCODE_SECRET
+  if (!url || !token) throw new Error(`This OpenCode session was not started by Decks, so there is no ${what} to reach.`)
+  const response = await fetch(url.replace(/\/stage\/eval$/, path), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new Error(`Decks answered ${response.status}.`)
+  const outcome = (await response.json()) as { text: string; isError?: boolean }
+  if (outcome.isError) throw new Error(outcome.text)
+  return outcome.text
+}
+
+/**
+ * The agent token for a session, asked of Decks once per session with the server's secret
+ * (`POST /api/tokens/session`): what the `decks` command in that session's shell carries as
+ * `DECKS_TOKEN`. Asked again after a refusal, for a session registered a moment after its first command.
+ */
+const agentTokens = new Map<string, Promise<string | undefined>>()
+function agentToken(session: string): Promise<string | undefined> {
+  let held = agentTokens.get(session)
+  if (!held) {
+    held = (async () => {
+      const url = process.env.DECKS_URL
+      const secret = process.env.DECKS_OPENCODE_SECRET
+      if (!url || !secret) return undefined
+      const response = await fetch(`${url}/api/tokens/session`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ sessionID: session }),
+      }).catch(() => undefined)
+      if (!response?.ok) return undefined
+      return ((await response.json()) as { token?: string }).token
+    })()
+    agentTokens.set(session, held)
+    void held.then((token) => {
+      if (!token) agentTokens.delete(session)
+    })
+  }
+  return held
+}

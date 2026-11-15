@@ -1,3 +1,5 @@
+// The Antigravity backend: one agy CLI process behind one Decks agent,
+// spoken to as NDJSON over its stdin and stdout.
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "../types/index.ts";
@@ -75,6 +77,8 @@ export class AntigravityBackend implements AgentBackend {
 	private swapping = false;
 
 	private constructor(private readonly context: AgentBackendContext) {}
+
+	// --- the process ------------------------------------------------------------------
 
 	static async create(context: AgentBackendContext): Promise<AntigravityBackend> {
 		const availability = antigravityAvailability();
@@ -190,6 +194,34 @@ export class AntigravityBackend implements AgentBackend {
 
 	private say(message: Record<string, unknown>): void {
 		this.child?.stdin?.write(`${JSON.stringify(message)}\n`);
+	}
+
+	/**
+	 * Replace the process, keeping the conversation.
+	 *
+	 * The model change and abort both land here: kill the old `agy` — silently, because
+	 * this exit is ours — and start another with `--conversation` so the next prompt
+	 * answers with everything before it still in hand. The briefing is *not* resent: the
+	 * conversation already has it.
+	 */
+	private respawn(): void {
+		const child = this.child;
+		if (!child) return;
+		this.swapping = true;
+		this.child = undefined;
+		this.stream = undefined;
+		// A turn in flight ends where it is; the transcript keeps what it had.
+		if (this.streamingNow) {
+			this.streamingNow = false;
+			this.context.translator.setState("idle");
+		}
+		try {
+			child.stdin?.end();
+		} catch {
+			/* already gone */
+		}
+		setTimeout(() => child.kill(), 500).unref?.();
+		this.spawn(this.conversationId);
 	}
 
 	// --- the conversation -------------------------------------------------------------
@@ -355,33 +387,5 @@ export class AntigravityBackend implements AgentBackend {
 			}
 			setTimeout(() => child.kill(), 1_000).unref?.();
 		}
-	}
-
-	/**
-	 * Replace the process, keeping the conversation.
-	 *
-	 * The model change and abort both land here: kill the old `agy` — silently, because
-	 * this exit is ours — and start another with `--conversation` so the next prompt
-	 * answers with everything before it still in hand. The briefing is *not* resent: the
-	 * conversation already has it.
-	 */
-	private respawn(): void {
-		const child = this.child;
-		if (!child) return;
-		this.swapping = true;
-		this.child = undefined;
-		this.stream = undefined;
-		// A turn in flight ends where it is; the transcript keeps what it had.
-		if (this.streamingNow) {
-			this.streamingNow = false;
-			this.context.translator.setState("idle");
-		}
-		try {
-			child.stdin?.end();
-		} catch {
-			/* already gone */
-		}
-		setTimeout(() => child.kill(), 500).unref?.();
-		this.spawn(this.conversationId);
 	}
 }

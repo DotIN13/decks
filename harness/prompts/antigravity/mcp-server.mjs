@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// The MCP server antigravity spawns to give its agent Decks' Google Docs tools.
+// It speaks JSON-RPC over stdio and passes each call back to the Decks server.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,11 +42,6 @@ const TOOLS = [
 	})),
 ];
 
-async function callTool(name, args) {
-	if (GDOCS.some((t) => t.name === name)) return callGdocs(name, args);
-	throw new Error(`Unknown tool: ${name}`);
-}
-
 // --- stdio JSON-RPC ----------------------------------------------------------
 
 let buffer = "";
@@ -67,20 +64,6 @@ process.stdin.on("data", (chunk) => {
 		});
 	}
 });
-
-/** A Google Docs tool: the same server, the same token, its own route. */
-async function callGdocs(name, args) {
-	if (!STAGE_URL || !STAGE_TOKEN) throw new Error("This antigravity session was not started by Decks, so there is no Google Docs to reach.");
-	const response = await fetch(STAGE_URL.replace(/\/stage\/eval$/, "/gdocs/call"), {
-		method: "POST",
-		headers: { "content-type": "application/json", authorization: `Bearer ${STAGE_TOKEN}` },
-		body: JSON.stringify({ tool: name, args: args ?? {} }),
-	});
-	if (!response.ok) throw new Error(`Decks answered ${response.status}.`);
-	const outcome = await response.json();
-	if (outcome && outcome.isError) throw new Error(String(outcome.text));
-	return String(outcome.text);
-}
 
 async function handle(message) {
 	if (message.method === "initialize") {
@@ -119,4 +102,25 @@ async function handle(message) {
 
 function send(result, id) {
 	process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
+}
+
+// --- tool calls ----------------------------------------------------------------
+
+async function callTool(name, args) {
+	if (GDOCS.some((t) => t.name === name)) return callGdocs(name, args);
+	throw new Error(`Unknown tool: ${name}`);
+}
+
+/** A Google Docs tool: the same server, the same token, its own route. */
+async function callGdocs(name, args) {
+	if (!STAGE_URL || !STAGE_TOKEN) throw new Error("This antigravity session was not started by Decks, so there is no Google Docs to reach.");
+	const response = await fetch(STAGE_URL.replace(/\/stage\/eval$/, "/gdocs/call"), {
+		method: "POST",
+		headers: { "content-type": "application/json", authorization: `Bearer ${STAGE_TOKEN}` },
+		body: JSON.stringify({ tool: name, args: args ?? {} }),
+	});
+	if (!response.ok) throw new Error(`Decks answered ${response.status}.`);
+	const outcome = await response.json();
+	if (outcome && outcome.isError) throw new Error(String(outcome.text));
+	return String(outcome.text);
 }

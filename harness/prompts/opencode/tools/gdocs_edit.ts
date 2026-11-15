@@ -1,3 +1,5 @@
+// The gdocs_edit tool for opencode.
+// It passes the call back to the Decks server that started this process.
 import { tool } from "@opencode-ai/plugin"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"

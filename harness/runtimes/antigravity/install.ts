@@ -1,3 +1,5 @@
+// Finds the agy CLI, says whether it can run here, builds the sandbox HOME it runs in,
+// and lists the models it can answer on.
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
@@ -29,6 +31,8 @@ import { harnessHome } from "../shared/home.ts";
  *   the tool server, and one shared config serves every agent.
  */
 
+// --- the binary and whether it can run
+
 /** The `agy` binary: `DECKS_AGY_BIN`, then the usual install location, then PATH. */
 export function agyExecutable(): string | undefined {
 	const named = process.env.DECKS_AGY_BIN;
@@ -47,6 +51,22 @@ export function agyExecutable(): string | undefined {
 	}
 	return undefined;
 }
+
+export function antigravityAvailability(): { available: boolean; reason: string } {
+	if (!agyExecutable()) {
+		return {
+			available: false,
+			reason: "The antigravity CLI is not installed. Put `agy` on PATH, or set DECKS_AGY_BIN to the binary.",
+		};
+	}
+	const home = prepareAntigravityHome();
+	if (!home.ok) {
+		return { available: false, reason: "Nothing signed in: the antigravity CLI has no ~/.gemini/antigravity-cli to reuse. Run `agy` once in a terminal to sign in with Google." };
+	}
+	return { available: true, reason: "" };
+}
+
+// --- the sandbox HOME
 
 /** The canvas-tool MCP server `mcp_config.json` names. Node runs it; agy spawns it. */
 export function mcpServerPath(): string {
@@ -156,19 +176,7 @@ function link(at: string, target: string, type: "dir" | "file"): void {
 	}
 }
 
-export function antigravityAvailability(): { available: boolean; reason: string } {
-	if (!agyExecutable()) {
-		return {
-			available: false,
-			reason: "The antigravity CLI is not installed. Put `agy` on PATH, or set DECKS_AGY_BIN to the binary.",
-		};
-	}
-	const home = prepareAntigravityHome();
-	if (!home.ok) {
-		return { available: false, reason: "Nothing signed in: the antigravity CLI has no ~/.gemini/antigravity-cli to reuse. Run `agy` once in a terminal to sign in with Google." };
-	}
-	return { available: true, reason: "" };
-}
+// --- the models
 
 /**
  * The models the CLI can answer on, asked of the CLI itself.
@@ -180,15 +188,6 @@ export function antigravityAvailability(): { available: boolean; reason: string 
  * in it; a name the CLI does not know fails on the first turn with the CLI's own message,
  * which is the failure mode the old written-down list had too.
  */
-/** Split `agy models` stdout into rows; a line that is not `slug<TAB>label` is noise (e.g. the fetching notice). */
-export function parseModelsOutput(out: string): Array<{ model: string; label: string }> {
-	return out
-		.split("\n")
-		.map((line) => /^(\S+)\t(.+)$/.exec(line.trim()))
-		.filter((match): match is RegExpExecArray => Boolean(match))
-		.map((match) => ({ model: match[1]!, label: match[2]! }));
-}
-
 let models: Array<{ model: string; label: string }> | undefined;
 
 export function agyModels(homeDir = antigravityHomeDir()): Array<{ model: string; label: string }> {
@@ -214,6 +213,15 @@ export function agyModels(homeDir = antigravityHomeDir()): Array<{ model: string
 	const fallback = ANTIGRAVITY_MODELS;
 	models = [...fallback];
 	return [...fallback];
+}
+
+/** Split `agy models` stdout into rows; a line that is not `slug<TAB>label` is noise (e.g. the fetching notice). */
+export function parseModelsOutput(out: string): Array<{ model: string; label: string }> {
+	return out
+		.split("\n")
+		.map((line) => /^(\S+)\t(.+)$/.exec(line.trim()))
+		.filter((match): match is RegExpExecArray => Boolean(match))
+		.map((match) => ({ model: match[1]!, label: match[2]! }));
 }
 
 /**

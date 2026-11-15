@@ -1,3 +1,5 @@
+// The opencode plugin that gives each shell command its agent's Decks token.
+// It trades the server's secret and the session id for that token, once per session.
 import type { Plugin } from "@opencode-ai/plugin"
 
 /**
@@ -11,21 +13,6 @@ import type { Plugin } from "@opencode-ai/plugin"
  * secret: a command holding the secret could ask for any session's token. Where Decks is and the
  * command itself are already in the server's environment (the harness's agent environment).
  */
-const tokens = new Map<string, Promise<string | undefined>>()
-
-async function tokenFor(session: string): Promise<string | undefined> {
-  const url = process.env.DECKS_URL
-  const secret = process.env.DECKS_OPENCODE_SECRET
-  if (!url || !secret) return undefined
-  const response = await fetch(`${url}/api/tokens/session`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
-    body: JSON.stringify({ sessionID: session }),
-  }).catch(() => undefined)
-  if (!response?.ok) return undefined
-  return ((await response.json()) as { token?: string }).token
-}
-
 export const DecksSession: Plugin = async () => ({
   "shell.env": async (input, output) => {
     // The secret is the server's, never a command's.
@@ -43,3 +30,18 @@ export const DecksSession: Plugin = async () => ({
     output.env.DECKS_SESSION = input.sessionID
   },
 })
+
+const tokens = new Map<string, Promise<string | undefined>>()
+
+async function tokenFor(session: string): Promise<string | undefined> {
+  const url = process.env.DECKS_URL
+  const secret = process.env.DECKS_OPENCODE_SECRET
+  if (!url || !secret) return undefined
+  const response = await fetch(`${url}/api/tokens/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ sessionID: session }),
+  }).catch(() => undefined)
+  if (!response?.ok) return undefined
+  return ((await response.json()) as { token?: string }).token
+}

@@ -1,3 +1,5 @@
+// The Antigravity runtime descriptor: its name, what it can do, whether it can run here,
+// and how to start a backend for it.
 import { ANTIGRAVITY_CAPABILITIES, ANTIGRAVITY_COMMANDS, AntigravityBackend } from "./backend.ts";
 import { antigravityAvailability } from "./install.ts";
 import type { AgentRuntime } from "../runtime.ts";
