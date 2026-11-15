@@ -41,6 +41,9 @@ export const viewChanged = defineEvent("view.changed", "Someone on a canvas move
 	selection: opt(arr(str())),
 	camera: opt(union(Camera, nul)),
 	gone: opt(bool()),
+	name: opt(str()),
+	kind: opt(lit("person", "agent")),
+	color: opt(str()),
 });
 export const viewRequested = defineEvent("view.requested", "A view call waits for a screen to act on it: move, focus, go to, reload, a picture. With id, the screen answers with view.answer.", { call: str(), args: any(), id: opt(str()) });
 export const tabChanged = defineEvent("tab.changed", "The shared tab changed; tab.status reads it.", { code: opt(str()) });

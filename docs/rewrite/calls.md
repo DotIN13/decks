@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 129 calls (109 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 130 calls (110 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -186,6 +186,7 @@ What a screen shows of a canvas: its camera, its size, and where people point.
 | `view.reload` | agents | `view.reload` | anyone | Answers how many reloaded, as a number. |
 | new | | `view.screenshot` | person, agent, app | Added in 0.15.0 for Depot: a card as the person's screen draws it, for canvas.screenshot of one card; today's stage.call op shot. |
 | new | | `view.answer` | person | Added in 0.15.0: a screen answers a view.requested that carried an id; today's view.answered. |
+| new | | `view.update` | person | Added in 0.16.0 for Roster: a screen's pointer, selection and camera, for the others' cursors; today's presence.set. |
 
 ### tab
 

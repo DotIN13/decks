@@ -1,6 +1,6 @@
 import { defineCall } from "../call.ts";
 import { any, arr, bool, int, lit, named, nul, num, obj, opt, str, union } from "../schema.ts";
-import { Point, View } from "../shapes.ts";
+import { Camera, Point, View } from "../shapes.ts";
 import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
 // What a screen shows. Only these calls move the person's screen, and only
@@ -77,5 +77,14 @@ export const answer = defineCall({
 	who: PERSON,
 	args: { id: str(), value: opt(any()), error: opt(str()) },
 	answer: obj({ ok: bool() }),
+	effect: "change",
+});
+
+export const update = defineCall({
+	name: "view.update",
+	summary: "A screen says where it points, what it selected and where it looks; the others on the canvas hear view.changed.",
+	who: PERSON,
+	args: { pointer: opt(union(Point, nul)), selection: opt(arr(str())), camera: opt(Camera), gone: opt(bool()), ...onCanvas },
+	answer: View,
 	effect: "change",
 });
