@@ -80,10 +80,10 @@ test("the app list goes up once a connection, then only when a name, title or ki
 	const ada = harness("ada", { inventory: () => apps });
 	await ada.sync.sync();
 	await ada.sync.sync();
-	assert.deepEqual(studio.hub.inventory.get("h-ada"), [{ name: "trip", title: "Trip", kind: "server" }]);
-	const puts = () => (studio.hub.inventory.get("h-ada") ?? []).length;
+	assert.deepEqual(studio.hub.inventory("h-ada"), [{ name: "trip", title: "Trip", kind: "server" }]);
+	const puts = () => (studio.hub.inventory("h-ada") ?? []).length;
 	apps[0]!.status = "asleep";
-	studio.hub.inventory.clear();
+	studio.hub.setInventory("h-ada", []);
 	await ada.sync.sync();
 	assert.equal(puts(), 0, "a change of status is not a change of the list");
 	apps.push({ name: "notes", title: "Notes", kind: "static", status: "running" });

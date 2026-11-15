@@ -2,12 +2,12 @@ import type { PenDocument, PenEdit } from "@decks/pen";
 import { sync } from "../../../protocol/index.ts";
 import { commitEdits } from "./commit.ts";
 import type { Live } from "./live.ts";
-import type { MemoryHub, Role, Who } from "./store.ts";
+import type { HubStore, Role, Who } from "./store.ts";
 
 // The /sync/v1 routes, as one fetch handler: a Request in, a Response out, or
 // undefined for a path that is not one of them. Only a harness's key gets in.
 
-export type HubOptions = { hub: MemoryHub; live?: Live; who: (req: Request) => Who | undefined; maxBytes?: number };
+export type HubOptions = { hub: HubStore; live?: Live; who: (req: Request) => Who | undefined; maxBytes?: number };
 type Ctx = { who: Who; params: Record<string, string>; url: URL; req: Request };
 type Handler = (c: Ctx) => Response | Promise<Response>;
 

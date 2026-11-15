@@ -1,7 +1,7 @@
 import { diff, type PenDocument, type PenEdit } from "@decks/pen";
 import type { Live } from "./live.ts";
 import { changesNothing, merge } from "./merge.ts";
-import { Stale, type MemoryHub } from "./store.ts";
+import { Stale, type HubStore } from "./store.ts";
 
 // Edits made against an older revision, onto the canvas as it is now. The log
 // keeps what happened: the edits as merged, or the diff when some had to change.
@@ -15,7 +15,7 @@ function happened(pen: PenDocument, edits: readonly PenEdit[]) {
 }
 
 /** Merge, keep as one revision, tell everyone. A caller that names itself (client) is not sent the drawing. */
-export function commitEdits(hub: MemoryHub, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): EditsAnswer {
+export function commitEdits(hub: HubStore, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): EditsAnswer {
 	for (let attempt = 0; ; attempt++) {
 		const current = hub.canvas(id);
 		if (!current) throw new Error(`No canvas ${id}.`);

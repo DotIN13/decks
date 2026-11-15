@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { MemoryHub, Who } from "./store.ts";
+import type { HubStore, Who } from "./store.ts";
 
 // The live socket: each socket hears about the canvases its person may see.
 // Pages say where they point and the others on that canvas see it; a harness
@@ -26,7 +26,7 @@ export class Live {
 	private readonly asks = new Map<string, Ask>();
 	private opened = 0;
 
-	constructor(private readonly store: MemoryHub) {}
+	constructor(private readonly store: HubStore) {}
 
 	add(ws: LiveSocket, who: Who): void {
 		const entry = { ws, who };

@@ -24,11 +24,31 @@ type Kept = { canvas: SyncCanvas; pen: PenDocument; log: Logged[]; files: Map<st
 /** The most revisions the log keeps; older ones come whole. */
 export const LOG_MAX = 1000;
 
-export class MemoryHub {
+/** What the hub's routes, commits and live socket need of a store. Studio implements it on a database. */
+export interface HubStore {
+	name(user: string, name: string): void;
+	share(canvas: string, user: string, role: Exclude<Role, "owner">): void;
+	role(user: string, canvas: string): Role | undefined;
+	canvases(user: string): SyncCanvas[];
+	createCanvas(owner: string, title: string, name: string, pen?: PenDocument): SyncCanvas;
+	canvas(id: string): (SyncCanvas & { pen: PenDocument }) | undefined;
+	/** The revisions after since, or undefined when the log no longer reaches back. */
+	changesSince(id: string, since: number): Logged[] | undefined;
+	/** Throws Stale when the canvas is not at onto. */
+	commitCanvas(id: string, pen: PenDocument, edits: PenEdit[], onto: number): number;
+	canvasFiles(id: string): SyncFile[];
+	putCanvasFile(id: string, path: string, bytes: Uint8Array, base: number | undefined): Stored;
+	removeCanvasFile(id: string, path: string, base?: number): boolean;
+	blob(user: string, hash: string): Uint8Array | undefined;
+	setInventory(harness: string, apps: App[]): void;
+	inventory(harness: string): App[] | undefined;
+}
+
+export class MemoryHub implements HubStore {
 	private readonly kept = new Map<string, Kept>();
 	private readonly blobs = new Map<string, Uint8Array>();
 	private readonly names = new Map<string, string>();
-	readonly inventory = new Map<string, App[]>();
+	private readonly apps = new Map<string, App[]>();
 	private next = 1;
 
 	name(user: string, name: string): void {
@@ -112,6 +132,10 @@ export class MemoryHub {
 	}
 
 	setInventory(harness: string, apps: App[]): void {
-		this.inventory.set(harness, apps);
+		this.apps.set(harness, apps);
+	}
+
+	inventory(harness: string): App[] | undefined {
+		return this.apps.get(harness);
 	}
 }
