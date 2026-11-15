@@ -1,8 +1,8 @@
 {
 	"examples/share-site/src/page.ts: reaches past the entry of packages/canvas": 1,
-	"harness/page/app/landing.ts: harness may not import pen (packages/pen)": 1,
-	"harness/page/connections/bundle.ts: harness may not import pen (packages/pen)": 1,
-	"harness/page/panel/LeftPanel.tsx: harness may not import pen (packages/pen)": 1,
+	"harness/page/app/landing.ts: harness may not import pen (pen)": 1,
+	"harness/page/connections/bundle.ts: harness may not import pen (pen)": 1,
+	"harness/page/panel/LeftPanel.tsx: harness may not import pen (pen)": 1,
 	"packages/api/src/api.test.ts: reaches past the entry of packages/protocol": 1,
 	"packages/canvas/src/frame/inside/studio-line.ts: canvas may not import server (packages/hub)": 1,
 	"packages/hub/src/layout.ts: server may not import canvas (packages/card-host)": 1,
@@ -12,7 +12,7 @@
 	"packages/sync-protocol/src/routes.ts: protocol may not import zod": 1,
 	"packages/sync-protocol/src/schemas.ts: protocol may not import zod": 1,
 	"scripts/card-zoom.mjs: reaches past the entry of e2e": 1,
-	"scripts/gen-pen-schema.mjs: reaches past the entry of packages/pen": 1,
+	"scripts/gen-pen-schema.mjs: reaches past the entry of pen": 1,
 	"scripts/opencode2-live.mts: reaches past the entry of apps/server": 3,
-	"tools/checks/harness.mjs: reaches past the entry of packages/pen": 1
+	"tools/checks/harness.mjs: reaches past the entry of pen": 1
 }

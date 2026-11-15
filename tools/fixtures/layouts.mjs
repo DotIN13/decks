@@ -1,9 +1,9 @@
-// Expected layouts of the fixture drawings, as today's packages/pen lays them out.
+// Expected layouts of the fixture drawings, as today's pen lays them out.
 // node --import tsx tools/fixtures/layouts.mjs --write writes drawings/<name>.layout.json; without it, it compares.
 // Text is measured by pen's estimateText, so any client can match it without a font.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { baseTheme, parse, placements, warnings } from "../../packages/pen/src/index.ts";
+import { baseTheme, parse, placements, warnings } from "../../pen/index.ts";
 
 const DIR = new URL("./drawings/", import.meta.url).pathname;
 const round = (n) => Math.round(n * 100) / 100;

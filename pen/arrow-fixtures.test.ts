@@ -11,7 +11,7 @@ import type { Frame, Placed } from "./layout.ts";
  * the points and the path pen makes of them. A change to `arrows.ts` fails here until the file is
  * written again (`UPDATE_ARROW_FIXTURES=1`), and then fails the Rust test until the port follows.
  */
-const FILE = fileURLToPath(new URL("../../stage/crates/scene/fixtures/arrows.json", import.meta.url));
+const FILE = fileURLToPath(new URL("../packages/stage/crates/scene/fixtures/arrows.json", import.meta.url));
 
 function cases() {
 	let seed = 7;

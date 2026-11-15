@@ -63,15 +63,15 @@ test("an arrow given no colour is drawn in the drawing's $decks-line when it has
 });
 
 test("the canvas skills point at the Decks colours, and their reference gives every one with its light and dark values", () => {
-	const guide = readFileSync(new URL("../../../runtime/skills/canvas-authoring/SKILL.md", import.meta.url), "utf8");
+	const guide = readFileSync(new URL("../harness/prompts/skills/canvas-authoring/SKILL.md", import.meta.url), "utf8");
 	assert.match(guide, /\[colors\.md\]\(colors\.md\)/, "canvas-authoring links its colour reference");
-	const skill = readFileSync(new URL("../../../runtime/skills/canvas-authoring/colors.md", import.meta.url), "utf8");
+	const skill = readFileSync(new URL("../harness/prompts/skills/canvas-authoring/colors.md", import.meta.url), "utf8");
 	for (const [name, color] of Object.entries(DECKS_COLORS)) {
 		const line = skill.split("\n").find((one) => one.includes(`\`$${name}\``));
 		assert.ok(line, `colors.md names $${name}`);
 		assert.ok(line.includes(color.light) && line.includes(color.dark), `$${name}'s line gives ${color.light} and ${color.dark}`);
 	}
-	const design = readFileSync(new URL("../../../runtime/skills/canvas-design/SKILL.md", import.meta.url), "utf8");
+	const design = readFileSync(new URL("../harness/prompts/skills/canvas-design/SKILL.md", import.meta.url), "utf8");
 	assert.match(design, /\$decks-/, "canvas-design points at the Decks colours");
 });
 

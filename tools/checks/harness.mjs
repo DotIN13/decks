@@ -25,7 +25,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright";
-import { applyEdits } from "../../packages/pen/src/diff.ts";
+import { applyEdits } from "../../pen/diff.ts";
 
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
