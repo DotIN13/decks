@@ -102,3 +102,9 @@ test("an app to open is named from today's path", async () => {
 	assert.equal(appToOpen("/compat/apps/e2e-notes/open", "/compat/apps/"), "e2e-notes");
 	assert.equal(appToOpen("/compat/apps/e2e-notes", "/compat/apps/"), undefined);
 });
+
+test("a screen's request for a card's picture is told as today's view.called shot", async () => {
+	const said = await told("view.requested", { canvas: "c", ids: ["p"], call: "view.screenshot", id: "q1", args: { card: "canvases/c/cards/p/index.html" } }, async () => undefined);
+	assert.deepEqual(said, { type: "view.called", call: { op: "shot", id: "q1", args: { path: "canvases/c/cards/p/index.html" } } });
+	assert.equal(await told("view.requested", { canvas: "c", ids: [], call: "view.reload", args: {} }, async () => undefined), undefined);
+});

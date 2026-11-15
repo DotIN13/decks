@@ -25,6 +25,12 @@ export async function told(
 		return { type: "canvas.changed", canvas, rev: payload.rev, doc: read.doc, base: read.base, by: payload.by, ...made };
 	}
 	if (name === "view.changed") return { type: "presence.changed", ...payload };
+	// A screen asked for a card's picture: today's frame shoots it on view.called "shot".
+	if (name === "view.requested") {
+		if (payload.call !== "view.screenshot" || typeof payload.id !== "string") return undefined;
+		const card = (payload.args as { card?: unknown } | undefined)?.card;
+		return { type: "view.called", call: { op: "shot", id: payload.id, args: { path: card } } };
+	}
 	const old = OLD_OF.get(name);
 	return old ? { type: old, ...payload } : undefined;
 }

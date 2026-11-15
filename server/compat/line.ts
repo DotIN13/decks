@@ -8,7 +8,7 @@ import { readDrawing } from "./drawing.ts";
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
 
 export const LINE_PATH = "/compat/v1/socket";
-const QUIET = new Set(["card.seen", "card.extent", "presence.set", "view.answered", "canvas.unwatch"]);
+const QUIET = new Set(["card.seen", "card.extent", "canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
 type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
@@ -54,6 +54,8 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		if (message.type === "line.call") return call(message);
 		if (message.type === "canvas.watch") return watch(String(message.canvas ?? ""), message.since, message.whole);
 		if (message.type === "canvas.unwatch") state.watched.get(String(message.canvas))?.();
+		if (message.type === "presence.set") return screen(message);
+		if (message.type === "view.answered") return answered(message);
 		if (QUIET.has(String(message.type)) || message.type === "line.token") return;
 		send({ type: "harness.notice", level: "warn", text: `The line does not know ${String(message.type)}.` });
 	}
@@ -67,6 +69,20 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		const canvas = boundTo(caller);
 		send({ type: "line.hello", who: canvas ? "canvas" : caller.kind, ...(canvas ? { canvas, role: "edit" } : {}) });
 		for (const one of Array.isArray(message.watch) ? (message.watch as Said[]) : []) await watch(String(one.canvas ?? ""), one.since, one.whole);
+	}
+
+	/** The frame said its camera: this line is a screen of that canvas, which can shoot its cards. */
+	async function screen(message: Said): Promise<void> {
+		const camera = message.camera as { x?: number; y?: number; zoom?: number } | null | undefined;
+		if (!camera || typeof camera.x !== "number" || typeof camera.y !== "number" || typeof camera.zoom !== "number") return;
+		await door.call("view.move", { x: camera.x, y: camera.y, zoom: camera.zoom, canvas: String(message.canvas ?? ""), device: "frame" }, state.caller!, client);
+	}
+
+	/** The frame's answer to a picture: a shot as the value, or why it could not as the error. */
+	async function answered(message: Said): Promise<void> {
+		const value = message.value as { how?: string; why?: string } | undefined;
+		const error = typeof message.error === "string" ? message.error : value?.how === "none" ? (value.why ?? "the frame could not draw the card") : undefined;
+		await door.call("view.answer", { id: String(message.id), ...(error ? { error } : { value }) }, state.caller!, client);
 	}
 
 	async function call(message: Said): Promise<void> {
