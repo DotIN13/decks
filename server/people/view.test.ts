@@ -99,3 +99,21 @@ test("focus on another canvas's card goes there first, as goto does", async () =
 	assert.equal((await s.value<shapes.Agent>("agent.get", { agent: "Ann" })).canvas, "b");
 	await s.close();
 });
+
+test("view.screenshot asks the screen showing the canvas and gives back its answer", async () => {
+	const { s, on, listen } = await peopleServer();
+	const card = "canvases/a/cards/x/index.html";
+	const none = await s.call("view.screenshot", { card }, person);
+	assert.equal(none.ok ? "ok" : none.error.code, "unavailable", "no screen shows it");
+	const screen = fakeClient("screen-1");
+	const heard = listen(screen.id);
+	await on(screen, "view.move", { x: 0, y: 0, zoom: 1, canvas: "a" }, person);
+	const shot = s.call("view.screenshot", { card }, person);
+	await new Promise((ok) => setTimeout(ok, 10));
+	const asked = heard.find((h) => h.name === "view.requested" && h.payload.call === "view.screenshot");
+	assert.ok(asked?.payload.id, "the screen is asked, with an id");
+	const picture = { how: "canvas", data: "aGk=", mime: "image/png" };
+	assert.deepEqual(await on(screen, "view.answer", { id: asked.payload.id, value: picture }, person), { ok: true });
+	assert.deepEqual(((await shot) as { value: unknown }).value, picture);
+	await s.close();
+});

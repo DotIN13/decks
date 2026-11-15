@@ -1,6 +1,7 @@
 import { Refused, events, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
 import { LOCAL_PERSON } from "../kernel/index.ts";
 import type { Context, Kernel, Store, Tokens } from "../kernel/types.ts";
+import { Answers } from "./answers.ts";
 import { Hosts } from "./hosts.ts";
 import { Mailboxes } from "./mail.ts";
 import { Marks } from "./news.ts";
@@ -13,6 +14,7 @@ import { Screens } from "./screens.ts";
 export class People {
 	readonly hosts = new Hosts();
 	readonly screens = new Screens();
+	readonly answers = new Answers();
 	readonly roster: Roster;
 	readonly mail: Mailboxes;
 	readonly marks: Marks;
@@ -48,6 +50,7 @@ export class People {
 				this.seen.delete(client.id);
 				this.hosts.drop(client.id);
 				this.screens.drop(client.id);
+				this.answers.drop(client.id);
 			});
 		}
 		return client.id;

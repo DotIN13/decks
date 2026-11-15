@@ -38,6 +38,15 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 			if (screens.length) p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.cursor", args: { card, at, label: ctx.caller.name, ...(color ? { color } : {}) } }, screens);
 			return { ...look(p(), ctx, name), moved: screens.length > 0 };
 		},
+		screenshot: async (ctx, { card, canvas }) => {
+			const name = here(p(), ctx, canvas ?? canvasOfTarget(card));
+			const screen = p().screens.showing(name).sort((a, b) => b.at - a.at)[0];
+			if (!screen) throw new Refused("unavailable", `No screen is showing the canvas ${name}, so none can draw ${card}.`, "canvas.screenshot");
+			const { id, answer } = p().answers.ask(screen.client, `a picture of ${card}`);
+			p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.screenshot", args: { card }, id }, [screen.client]);
+			return (await answer) as Infer<typeof calls.view.screenshot.answer>;
+		},
+		answer: (ctx, { id, value, error }) => ({ ok: p().answers.answer(id, ctx.client?.id, { ...(value !== undefined ? { value } : {}), ...(error !== undefined ? { error } : {}) }) }),
 		reload: (ctx, { card, canvas }) => {
 			const name = here(p(), ctx, canvas ?? (card ? canvasOfTarget(card) : undefined));
 			const screens = p().screens.showing(name).map((s) => s.client);
