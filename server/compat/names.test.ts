@@ -48,6 +48,7 @@ test("old arguments in order become the new call's, options spread", () => {
 	assert.ok(!("refusal" in step) && step.name === "canvas.undo" && step.args.redo === true);
 	assert.deepEqual(answerBack("canvas.space", { x: 3, y: 4 }), { x1: 3, y1: 4 });
 	assert.equal((answerBack("canvas.insert", { type: "app", app: "n", title: "N notes" }) as { name: string }).name, "N notes");
+	assert.deepEqual(answerBack("canvas.screenshot", { file: "f.png", size: { w: 9, h: 4 } }), { file: "f.png", size: { w: 9, h: 4 }, width: 9, height: 4 });
 	assert.deepEqual(answerBack("view.reload", 2), { reloaded: 2 });
 	assert.deepEqual(answerBack("view.camera", { canvas: "c", camera: { x: 1, y: 2, zoom: 1 } }), { x: 1, y: 2, zoom: 1 });
 	assert.deepEqual(answerBack("view.viewport", { canvas: "c", camera: { x: 0, y: 0, zoom: 1 }, screen: { w: 800, h: 600 } }), { width: 800, height: 600 });
