@@ -1,5 +1,5 @@
 import { CARD, MEDIA } from "@decks/pen";
-import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "./card-frame.ts";
+import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "../model/card-frame.ts";
 
 /**
  * Files dropped on a canvas, as the items that hold them: pure, the drawing's `insert` ops for what a

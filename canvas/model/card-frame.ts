@@ -1,7 +1,7 @@
 import { CARD, isCard, MARKDOWN, MEDIA, type Op, type PenNode } from "@decks/pen";
 import type { Tokens } from "marked";
 import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.ts";
-import { FILE, isFile, isLiveFile, LIVE_FILE } from "./file-kinds.ts";
+import { FILE, isFile, isLiveFile, LIVE_FILE } from "../items/file-kinds.ts";
 
 /**
  * A card as a frame of items (`@decks/pen`, `CARD`), and as the one piece of markdown it reads as.
