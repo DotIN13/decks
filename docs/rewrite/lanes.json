@@ -84,6 +84,8 @@
 		"packages/stage/Cargo.lock"
 	],
 	"Loom": [
-		"docs/rewrite/loom/"
+		"docs/rewrite/loom/",
+		"packages/canvas/src/frame/inside/boot.ts",
+		"packages/canvas/src/frame/inside/boot.test.ts"
 	]
 }
