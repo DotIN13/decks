@@ -31,6 +31,24 @@ const JSON_VALUE = `public enum JSONValue: Codable, Equatable, Sendable {
 	}
 }
 
+/** A value that may be sent as an explicit null, as opposed to left out (a nil Optional). */
+public enum Nullable<T: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
+	case null, value(T)
+
+	public init(from decoder: Decoder) throws {
+		let c = try decoder.singleValueContainer()
+		self = c.decodeNil() ? .null : .value(try c.decode(T.self))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var c = encoder.singleValueContainer()
+		switch self {
+		case .null: try c.encodeNil()
+		case .value(let v): try c.encode(v)
+		}
+	}
+}
+
 /** A coding key made from any string. */
 public struct AnyKey: CodingKey, Hashable {
 	public var stringValue: String

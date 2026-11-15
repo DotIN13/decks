@@ -55,14 +55,16 @@ export class SwiftTypes {
 
 	private union(node: Union, name: string): string {
 		const others = node.of.filter((one) => one.k !== "null");
-		if (others.length === 1 && others[0]) return this.typeOf(others[0], name);
+		const nullable = others.length < node.of.length;
+		if (others.length === 1 && others[0]) return nullable ? `Nullable<${this.typeOf(others[0], name)}>` : this.typeOf(others[0], name);
 		if (!others.every((one) => one.k === "obj")) return "JSONValue";
 		if (this.decls.has(name)) return name;
 		this.decls.set(name, "");
-		const members = others.map((one, i) => this.typeOf(one, `${name}${i + 1}`));
 		const tag = discriminator(others as Obj[]);
-		const values = tag ? (others as Obj[]).map((m) => String((m.props[tag] as unknown as { values: unknown[] }).values[0])) : [];
-		this.decls.set(name, unionDecl(name, members, tag, values));
+		const values = tag ? (others as Obj[]).map((m) => (m.props[tag.key] as unknown as { values: (string | boolean)[] }).values[0]!) : [];
+		const cases = caseNames(tag?.key, values, others.length);
+		const members = others.map((one, i) => this.typeOf(one, `${name}${upper(cases[i]!)}`));
+		this.decls.set(name, unionDecl(name, members, cases, tag, values));
 		return name;
 	}
 
@@ -78,16 +80,28 @@ export class SwiftTypes {
 	}
 }
 
-/** A key every member has as a single string literal, to tell them apart. */
-function discriminator(members: Obj[]): string | undefined {
+type Tag = { key: string; kind: "String" | "Bool" };
+
+/** A key every member has as one string, or one true or false, to tell them apart. */
+function discriminator(members: Obj[]): Tag | undefined {
 	const first = members[0];
-	if (!first) return undefined;
-	return Object.keys(first.props).find((key) =>
-		members.every((m) => {
-			const one = m.props[key];
-			return one?.k === "lit" && one.values.length === 1 && typeof one.values[0] === "string";
-		}),
-	);
+	for (const kind of ["String", "Bool"] as const) {
+		const key = Object.keys(first?.props ?? {}).find((k) =>
+			members.every((m) => {
+				const one = m.props[k];
+				return one?.k === "lit" && one.values.length === 1 && typeof one.values[0] === (kind === "String" ? "string" : "boolean");
+			}),
+		);
+		if (key) return { key, kind };
+	}
+	return undefined;
+}
+
+/** A case per member, named by its tag (insert, tokenAsk; ok and notOk), else m1, m2... */
+function caseNames(key: string | undefined, values: (string | boolean)[], count: number): string[] {
+	const name = (v: string | boolean) => (v === true ? key! : v === false ? `not${upper(key!)}` : upper(String(v)).replace(/^\w/, (c) => c.toLowerCase()).replace(/\W/g, "_"));
+	const names = values.map(name);
+	return names.length === count && new Set(names).size === count ? names : Array.from({ length: count }, (_, i) => `m${i + 1}`);
 }
 
 function structDecl(name: string, fields: { key: string; type: string }[], open: boolean): string {
@@ -126,15 +140,15 @@ function openCoding(fields: { key: string; type: string }[]): string[] {
 	];
 }
 
-function unionDecl(name: string, members: string[], tag: string | undefined, values: string[]): string {
-	const cases = members.map((m, i) => `\tcase m${i + 1}(${m})`);
-	const encodes = members.map((_, i) => `\t\tcase .m${i + 1}(let v): try v.encode(to: encoder)`);
+function unionDecl(name: string, members: string[], names: string[], tag: Tag | undefined, values: (string | boolean)[]): string {
+	const caseOf = (i: number) => field(names[i]!);
+	const encodes = members.map((_, i) => `\t\tcase .${caseOf(i)}(let v): try v.encode(to: encoder)`);
 	const decode = tag
-		? [`\t\tlet c = try decoder.container(keyedBy: AnyKey.self)`, `\t\tlet tag = try c.decode(String.self, forKey: AnyKey(${JSON.stringify(tag)}))`, ...members.map((m, i) => `\t\tif tag == ${JSON.stringify(values[i])} { self = .m${i + 1}(try ${m}(from: decoder)); return }`)]
-		: members.map((m, i) => `\t\tif let v = try? ${m}(from: decoder) { self = .m${i + 1}(v); return }`);
+		? [`\t\tlet c = try decoder.container(keyedBy: AnyKey.self)`, `\t\tlet tag = try c.decode(${tag.kind}.self, forKey: AnyKey(${JSON.stringify(tag.key)}))`, ...members.map((m, i) => `\t\tif tag == ${JSON.stringify(values[i])} { self = .${caseOf(i)}(try ${m}(from: decoder)); return }`)]
+		: members.map((m, i) => `\t\tif let v = try? ${m}(from: decoder) { self = .${caseOf(i)}(v); return }`);
 	return [
 		`public enum ${name}: Codable, Equatable, Sendable {`,
-		...cases,
+		...members.map((m, i) => `\tcase ${caseOf(i)}(${m})`),
 		"",
 		"\tpublic init(from decoder: Decoder) throws {",
 		...decode,

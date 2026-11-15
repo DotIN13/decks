@@ -31,8 +31,9 @@ switch-over removes them; then it checks only the declared side.
    The MCP list holds the server's calls an agent may make; the harness's own calls stay out of it.
 4. A required string or number argument is a word on the command line; every other is a flag.
 5. In Swift a named object is a struct, an object that takes other keys keeps them in `extra`, a union of
-   objects told apart by one literal field is an enum switched on it, and any other mixed union is
-   `JSONValue`. The four files must pass `swiftc -typecheck` together.
+   objects told apart by one literal field is an enum switched on it, its cases named by the tag (`insert`;
+   `ok` and `notOk` for a true or false one), and any other mixed union is `JSONValue`. A value that may
+   be null is `Nullable<T>`, so an explicit null can be sent. The four files must pass `swiftc -typecheck`.
 6. `calls.md` lists each of today's names exactly once, and every declared call and event; each call's
    Who column says what its declaration says.
 
