@@ -28,7 +28,7 @@ export function tabRoute(deck: () => Deck): Route {
 
 function openTab(peer: Peer, tab: Tab): void {
 	const stops: Stop[] = [];
-	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["agent.changed", "agent.deleted"] }, () => void roster(tab)));
+	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["agent.changed", "agent.deleted"] }, (e) => void agentHeard(tab, e.name, e.payload)));
 	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["item.changed", "card.changed"] }, (e) => void drawingChanged(tab, String(e.payload.canvas ?? ""))));
 	peer.onClose(() => (stops.forEach((stop) => stop()), (tab.client as Client & { end?: () => void }).end?.()));
 	peer.onText((text) => {
@@ -62,6 +62,17 @@ async function roster(tab: Tab): Promise<AgentRow[]> {
 	const chats = await Promise.all(agents.map(async (a) => ({ id: a.id, name: a.name, color: a.color, kind: a.kind ?? "pi", state: a.state ?? "idle", stage: a.canvas, workspace: a.workspace, tags: a.tags ?? [], unread: 0, inPlay: await inPlay(tab, a.canvas) })));
 	tab.send({ type: "agents", chats, ...(tab.focused ? { focused: tab.focused } : {}), defaultKind: "pi" });
 	return agents;
+}
+
+/** An agent's state is told as today's agent.state, one per agent; any other change sends the roster again. */
+async function agentHeard(tab: Tab, name: string, payload: Record<string, unknown>): Promise<void> {
+	const ids = Array.isArray(payload.ids) ? payload.ids.map(String) : [];
+	if (name === "agent.changed" && typeof payload.state === "string") {
+		for (const id of ids) tab.send({ type: "agent.state", id, state: payload.state });
+		return;
+	}
+	if (name === "agent.deleted") for (const id of ids) tab.send({ type: "agent.removed", id });
+	await roster(tab);
 }
 
 async function stages(tab: Tab): Promise<void> {
