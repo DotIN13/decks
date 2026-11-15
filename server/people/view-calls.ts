@@ -35,7 +35,8 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 			const name = here(p(), ctx, canvasOfTarget(card));
 			const color = ctx.caller.kind === "agent" ? p().roster.byIdOrUndefined(ctx.caller.id)?.color : undefined;
 			const screens = p().screens.showing(name).map((s) => s.client);
-			if (screens.length) p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.cursor", args: { card, at, label: ctx.caller.name, ...(color ? { color } : {}) } }, screens);
+			const lines = p().screens.drawing(name).map((s) => s.client);
+			if (lines.length) p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.cursor", args: { card, at, label: ctx.caller.name, ...(color ? { color } : {}) } }, lines);
 			return { ...look(p(), ctx, name), moved: screens.length > 0 };
 		},
 		screenshot: async (ctx, { card, canvas }) => {
@@ -50,7 +51,8 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 		reload: (ctx, { card, canvas }) => {
 			const name = here(p(), ctx, canvas ?? (card ? canvasOfTarget(card) : undefined));
 			const screens = p().screens.showing(name).map((s) => s.client);
-			if (screens.length) p().tell(ctx, events.viewRequested, { ids: card ? [card] : [], canvas: name, call: "view.reload", args: { ...(card ? { card } : {}), canvas: name } }, screens);
+			const lines = p().screens.drawing(name).map((s) => s.client);
+			if (lines.length) p().tell(ctx, events.viewRequested, { ids: card ? [card] : [], canvas: name, call: "view.reload", args: { ...(card ? { card } : {}), canvas: name } }, lines);
 			return screens.length;
 		},
 	});
