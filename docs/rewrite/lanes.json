@@ -68,7 +68,8 @@
 		"harness/prompts/"
 	],
 	"Pane": [
-		"harness/page/"
+		"harness/page/",
+		"packages/canvas/src/ui/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
