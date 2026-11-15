@@ -9,11 +9,24 @@ type Node = { type?: string; id?: string; name?: string; x?: number; y?: number;
 /** A canvas's folder: canvases/<name>, or shared/canvases/<owner>/<name> for a friend's. */
 export const folderOf = (canvas: string): string => (canvas.startsWith("shared/") ? `shared/canvases/${canvas.slice(7)}` : `canvases/${canvas}`);
 
-/** The drawing's document, parsed, with the files base it is read against. */
+const PAGES = new Set(["decks.card", "decks.board"]);
+
+/** A card's or board's path in the drawing as today's frame reads it: from the deck's root, not the canvas's folder. */
+function deckPaths(canvas: string, nodes: Node[] | undefined): Node[] | undefined {
+	return nodes?.map((node) => {
+		const path = node.metadata?.path;
+		const own = typeof path === "string" && PAGES.has(node.metadata?.type ?? "") && !/^(canvases|shared)\//.test(path);
+		const children = node.children ? { children: deckPaths(canvas, node.children) } : {};
+		return own ? { ...node, ...children, metadata: { ...node.metadata, path: `${folderOf(canvas)}/${path}` } } : { ...node, ...children };
+	});
+}
+
+/** The drawing's document, parsed, with the files base it is read against; pages named from the deck's root. */
 export async function readDrawing(deck: Deck, canvas: string, base: string): Promise<{ doc: { children?: Node[] }; base: string } | undefined> {
 	try {
 		const bytes = await deck.read(toDeckPath(`${folderOf(canvas)}/canvas.pen`));
-		return { doc: JSON.parse(new TextDecoder().decode(bytes)) as { children?: Node[] }, base };
+		const doc = JSON.parse(new TextDecoder().decode(bytes)) as { children?: Node[] };
+		return { doc: { ...doc, children: deckPaths(canvas, doc.children) ?? [] }, base };
 	} catch {
 		return undefined;
 	}
