@@ -5,6 +5,7 @@ import { canvasBox } from "../camera/insets.ts";
 import { COARSE } from "../edit/dom/touch-rules.ts";
 import { setPropsOpen } from "../edit/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
+import { menuLeft } from "./menu-place.ts";
 import { canvasHost, openInTab } from "../host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
@@ -189,9 +190,7 @@ export function PageCallout(props: {
 		if (!element || !moreButton || !stage) return;
 		const pill = element.getBoundingClientRect();
 		const button = moreButton.getBoundingClientRect();
-		const w = menu.offsetWidth;
-		const left = Math.max(stage.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, stage.right - 8 - w - pill.left));
-		setMenuAt({ left });
+		setMenuAt({ left: menuLeft(stage, pill, button, menu.offsetWidth) });
 	};
 	createEffect(on(more, (open) => open || setMenuAt(undefined)));
 	createEffect(on(() => props.hidden, (hidden) => hidden && setMore(false)));
@@ -308,7 +307,7 @@ export function PageCallout(props: {
 				</button>
 				<Show when={more()}>
 					<div
-						ref={(menu) => requestAnimationFrame(() => placeMenu(menu))}
+						ref={(menu) => queueMicrotask(() => placeMenu(menu))}
 						class="callout-more"
 						role="menu"
 						aria-label={props.board ? "More card actions" : "More actions"}
