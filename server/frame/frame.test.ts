@@ -98,3 +98,8 @@ test("the sandboxed frame (origin null) reads its page, assets and pass files", 
 	await doors.close();
 	await server.close();
 });
+
+test("the deck's import map is read as paths under assets/, as today", async () => {
+	const { importPaths } = await import("./routes.ts");
+	assert.deepEqual(importPaths({ greet: "./libs/greet/index.js", d3: "https://cdn.example/d3.js", out: "../secret.js", hid: "./.git/x.js", n: 3 }), { greet: "assets/libs/greet/index.js", d3: "https://cdn.example/d3.js" });
+});

@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
@@ -10,10 +11,29 @@ const PASS_ROOT = "/api/t/";
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
 const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || ["assets/", "lib/", "docs/", "apps/"].some((root) => rest.startsWith(root));
 
+/**
+ * The deck's import map as the frame reads it, as today (deckImportPaths): an https address as
+ * it is; a relative one as a path under assets/; one that climbs, hides or leaves assets/ dropped.
+ */
+export function importPaths(given: Record<string, unknown> | undefined): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [name, address] of Object.entries(given ?? {})) {
+		if (typeof address !== "string") continue;
+		if (/^https:\/\//.test(address)) {
+			out[name] = address;
+			continue;
+		}
+		const path = posix.normalize(`assets/${address.replace(/^\.\//, "")}`);
+		if (!path.startsWith("assets/") || path.split("/").some((part) => part === ".." || part.startsWith("."))) continue;
+		out[name] = path;
+	}
+	return out;
+}
+
 async function importsOf(ctx: Context): Promise<Record<string, string> | undefined> {
 	try {
 		const text = new TextDecoder().decode(await ctx.deck.read(toDeckPath("assets/importmap.json")));
-		return (JSON.parse(text) as { imports?: Record<string, string> }).imports;
+		return importPaths((JSON.parse(text) as { imports?: Record<string, unknown> }).imports);
 	} catch {
 		return undefined;
 	}
