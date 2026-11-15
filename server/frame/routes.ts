@@ -8,7 +8,7 @@ import { isPass, type Passes } from "./passes.ts";
 
 const PASS_ROOT = "/api/t/";
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
-const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || rest.startsWith("assets/") || rest.startsWith("lib/");
+const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || ["assets/", "lib/", "docs/", "apps/"].some((root) => rest.startsWith(root));
 
 async function importsOf(ctx: Context): Promise<Record<string, string> | undefined> {
 	try {
@@ -50,8 +50,8 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 		async serve(_ctx, req, res) {
 			const [path, query = ""] = (req.url ?? "").split("?");
 			const [pass = "", kind = "", ...parts] = path!.slice(PASS_ROOT.length).split("/");
-			// A canvas's lib/ is the deck's lib/, as today (servedAs); a card's folder at a revision is the folder.
-			const rest = decodeURIComponent(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?lib\//, "lib/");
+			// A canvas's lib/, assets/, docs/ and apps/ are the deck's, as today (servedAs); a card's folder at a revision is the folder.
+			const rest = decodeURIComponent(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?(lib|assets|docs|apps)\//, "$1/");
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
