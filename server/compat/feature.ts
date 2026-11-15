@@ -5,6 +5,7 @@ import { drawingRoute } from "./drawing.ts";
 import { uploadRoute, whereRoute } from "./files.ts";
 import { lineRoute } from "./line.ts";
 import { pictureRoutes } from "./pictures.ts";
+import { stageShotRoute } from "./shot.ts";
 import { tabRoute } from "./tab.ts";
 
 // Today's names, answered from this one folder: the old line, the old drawing and tile routes.
@@ -20,7 +21,7 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow, () => folder()), uploadRoute, whereRoute],
+		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow, () => folder()), uploadRoute, whereRoute, stageShotRoute],
 		start(kernel) {
 			deck = kernel.deck;
 			url = () => kernel.url();

@@ -36,3 +36,9 @@ test("an upload lands in the canvas's files/, never over another, and where find
 	await doors.close();
 	await server.close();
 });
+
+test("stage-shot's query becomes canvas.screenshot's arguments", async () => {
+	const { shotArgs } = await import("./shot.ts");
+	assert.deepEqual(shotArgs(new URLSearchParams("of=a&scale=1&scheme=light&live=1"), "plan"), { canvas: "plan", format: "png", scale: 1, scheme: "light", of: "a", live: true });
+	assert.deepEqual(shotArgs(new URLSearchParams("box=0,0,10,20&format=pdf"), "plan"), { canvas: "plan", format: "pdf", scale: 2, scheme: "light", of: { x1: 0, y1: 0, x2: 10, y2: 20 } });
+});
