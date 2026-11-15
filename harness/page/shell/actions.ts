@@ -184,7 +184,7 @@ export function createPage() {
 	const [findAt, setFindAt] = createSignal(0);
 	wireBrowser({ files, editorHandle, park: landing.park, find: setFindAt });
 	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => stageOf(id)?.name, state.focused));
-	onMount(() => onCleanup(answerViews({ editor: editorHandle, boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
+	onMount(() => onCleanup(answerViews({ editor: editorHandle, took: () => landing.stop(), boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
 	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyStage, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
 }
 

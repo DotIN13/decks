@@ -82,7 +82,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		const to: CameraOwner = { scope: agent, ...(canvas ? { canvas } : {}) };
 		untrack(() => landing.arrive(to, stageOf(agent)?.formerly));
 	});
-	return { park: landing.park, personMoved };
+	return { park: landing.park, personMoved, stop: landing.stop };
 }
 
 /**
