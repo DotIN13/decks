@@ -1,6 +1,6 @@
 import { isMarkdown, isMarkdownText, textStyleOf, walk, type PenDocument, type PenNode, type TextStyle, type ThemeState } from "@decks/pen";
-import { parseMarkdown, wordsOf } from "../model/markdown.ts";
-import { FACE_ALIAS } from "../model/card-syntax.ts";
+import { parseMarkdown, wordsOf } from "../cards/markdown.ts";
+import { FACE_ALIAS } from "../cards/card-syntax.ts";
 
 /** The serif a card's `{.serif}` words are set in. */
 export const SERIF_FAMILY = FACE_ALIAS.serif!;

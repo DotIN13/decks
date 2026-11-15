@@ -4,7 +4,7 @@
  * Each card looked for the map itself at `../../assets/importmap.json` from its own address, which is the
  * canvas's folder, not the deck's: a map in the deck's `assets/` was never found, and a deck without one had a
  * 404 in the console for every canvas. Now the harness hands the map with the canvas's pass (`/api/passes`,
- * `imports`), the frame adds it before any card's script runs (`items/card.ts`, `giveDeckImports`), and the
+ * `imports`), the frame adds it before any card's script runs (`cards/card.ts`, `giveDeckImports`), and the
  * pass reads the libraries it names and the files beside them. Here: with no map, no request for one; with a
  * map naming a library under `assets/`, a card's script imports it by name, and the library its own neighbour.
  */

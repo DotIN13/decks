@@ -1,7 +1,7 @@
 /**
  * A card's links to its canvas's files: Open opens the file in a tab, Download saves it.
  *
- * A link in a card is read against the card's own address (`items/card-surface.tsx`, `followLink`), so
+ * A link in a card is read against the card's own address (`cards/card-surface.tsx`, `followLink`), so
  * `../../files/questionnaire.html` is the file in the card's canvas's `files/`. Before, it was read against
  * the page the card is drawn in, and any `.html` link was taken for a board to open beside the card, so
  * both links said the board does not exist; and `download` was never honoured. Here: a card with the two

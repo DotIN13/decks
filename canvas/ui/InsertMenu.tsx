@@ -12,7 +12,7 @@ import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
 import { Show } from "solid-js";
 import { canvasHost } from "../host.ts";
 import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../editor/pen-tools.ts";
-import { newCard } from "../model/card-frame.ts";
+import { newCard } from "../cards/card-frame.ts";
 import { Insert } from "./Insert.tsx";
 import type { Box } from "../editor/snap.ts";
 import { joinAt as joinAtIn, newArrowEnds, type Join } from "../editor/core/arrows.ts";

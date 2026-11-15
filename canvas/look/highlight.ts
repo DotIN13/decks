@@ -21,7 +21,7 @@ import swift from "highlight.js/lib/languages/swift";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
-import { decodeEntities } from "../model/markdown.ts";
+import { decodeEntities } from "../cards/markdown.ts";
 
 /**
  * A card's fenced code, coloured as GitHub colours it: highlight.js reads the language named after

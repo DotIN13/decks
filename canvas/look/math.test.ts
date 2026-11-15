@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formulaOf, formulaText, MATH_FIRST } from "./math.ts";
-import { parseMarkdown } from "../model/markdown.ts";
+import { parseMarkdown } from "../cards/markdown.ts";
 
 /** The formulas a text was read as, by their TeX, and the words left around them. */
 const read = (text: string) => {

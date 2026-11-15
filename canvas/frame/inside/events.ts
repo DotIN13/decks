@@ -8,7 +8,7 @@ import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { runStageCall } from "../../camera/view-calls.ts";
-import { cardShot } from "../../items/card-surface.tsx";
+import { cardShot } from "../../cards/card-surface.tsx";
 import { handsOn } from "../../camera/touched.ts";
 import { drawingFollower } from "./backend.ts";
 import { installClipboard, sayer } from "./clipboard.ts";

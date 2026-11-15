@@ -1,4 +1,4 @@
-import { saysMissing } from "./missing.ts";
+import { saysMissing } from "../items/missing.ts";
 
 /**
  * How a card's file is read (`card-surface.tsx`): its HTML mounted once it has come, and nothing done

@@ -38,7 +38,7 @@ import TextAlignStart from "lucide-solid/icons/text-align-start";
 import Trash2 from "lucide-solid/icons/trash-2";
 import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
-import { obsidianNote } from "../model/card-frame.ts";
+import { obsidianNote } from "../cards/card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show, onMount, on, untrack } from "solid-js";
 import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLive, setPenSelection, setPropsOpen } from "../editor/pen-tools.ts";
 import { Icon } from "@decks/ui";

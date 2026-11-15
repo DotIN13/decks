@@ -254,7 +254,7 @@ test("deleting what an arrow joins lets that end go where it is drawn, so the ar
 });
 
 test("nothing a tool makes stores a fixed colour: its colours are the drawing's light/dark Decks variables, or the scheme's own", async () => {
-	const { newCard, fileItem } = await import("../../model/card-frame.ts");
+	const { newCard, fileItem } = await import("../../cards/card-frame.ts");
 	const fixed = /"#[0-9a-fA-F]{3,8}"/;
 	for (const tool of ["rectangle", "ellipse", "frame", "text", "note", "card", "icon", "shape"] as const) {
 		for (const shape of tool === "shape" ? ["Rectangle", "Decision", "Ellipse", "Arrow"] : ["Rectangle"]) {

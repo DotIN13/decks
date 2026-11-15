@@ -3,7 +3,7 @@
  *
  * The card sheet painted the card's page (`.card-body`, a board's `body.board`) with the theme's
  * ground, over the host, so a card that set `:host { background: #000 }` showed it only below its
- * content (`items/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
+ * content (`cards/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
  * both schemes; a point in its words' row and one below them are black.
  */
 import { API, asPerson, canvasFrame, flyToCard, open, resetStage, say, settle } from "../harness.mjs";

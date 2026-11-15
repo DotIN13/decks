@@ -7,7 +7,7 @@ import { isInk } from "../model/ink.ts";
 import { inkSelection, setInkSelection } from "../ink/ink.ts";
 import { setPenBoxes } from "../editor/pen-tools.ts";
 import { firstLine } from "../look/look.ts";
-import { parseMarkdown } from "../model/markdown.ts";
+import { parseMarkdown } from "../cards/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
 import type { StageEngine } from "../render/engine.ts";
 import {

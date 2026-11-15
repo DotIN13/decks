@@ -14,7 +14,7 @@ import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
 import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
 import { forgetMissing } from "../../items/missing.ts";
-import { giveDeckImports } from "../../items/card.ts";
+import { giveDeckImports } from "../../cards/card.ts";
 
 /**
  * What the frame holds once `start` has come: who keeps the canvas, the drawing first read, the

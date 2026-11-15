@@ -7,7 +7,7 @@ export { PenBar } from "../ui/PenBar.tsx";
 export { InkBar } from "../ui/InkBar.tsx";
 export * from "../host.ts";
 export * from "../camera/view-calls.ts";
-export * from "../items/card-reading.ts";
+export * from "../cards/card-reading.ts";
 export * from "../ui/keycaps.ts";
 export * from "../theme.ts";
 // The engine itself, for a host that draws a stage with no editor round it (the Decks app's shot page).

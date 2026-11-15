@@ -1,12 +1,12 @@
 /** The drawing tools' state, and cards for files dropped on the canvas. */
 export { insertPanel, setInsertPanel, type InsertPanel, type PenTool } from "../editor/pen-tools.ts";
-export { fileCard, fileItem, fileKind, FILE_CARD_W } from "../model/card-frame.ts";
+export { fileCard, fileItem, fileKind, FILE_CARD_W } from "../cards/card-frame.ts";
 export type { InkTool } from "../ink/ink.ts";
 export { naturalSize } from "../items/natural-size.ts";
 // The tools' and ink's state, and cards, for a host that draws its own tool bars.
 export * from "../editor/pen-tools.ts";
 export * from "../ink/ink.ts";
-export * from "../model/card-frame.ts";
+export * from "../cards/card-frame.ts";
 // A file dropped on a canvas, as the items that hold it.
 export * from "../items/file-drop.ts";
 // The drawing's top-level items as a layers list, for a sidebar.

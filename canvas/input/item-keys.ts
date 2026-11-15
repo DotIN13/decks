@@ -1,5 +1,5 @@
 import { zoomKey } from "../camera/zoom-keys.ts";
-import { INTERACTIVE, scrollsInside } from "../items/card.ts";
+import { INTERACTIVE, scrollsInside } from "../cards/card.ts";
 
 /**
  * What a press, a wheel or a key inside an awake item is: the item's own, or the stage's. One rule

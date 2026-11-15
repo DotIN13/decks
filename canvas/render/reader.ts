@@ -1,5 +1,5 @@
 import { highlight } from "../look/highlight.ts";
-import { parseMarkdown, type Block } from "../model/markdown.ts";
+import { parseMarkdown, type Block } from "../cards/markdown.ts";
 import { typesetFormula } from "../look/math.ts";
 
 /** The app's typesetter, as the engine calls it: TeX in, the formula's outlines out as JSON, or null. */

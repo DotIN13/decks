@@ -16,7 +16,7 @@ import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import { drawing } from "../ink/ink.ts";
 import { scheme } from "../theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
-import { isLiveFile } from "../model/card-frame.ts";
+import { isLiveFile } from "../cards/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { StageEditor } from "../editor/index.ts";
 import type { StageProps } from "./CanvasView.tsx";

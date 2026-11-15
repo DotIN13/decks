@@ -1,5 +1,5 @@
 import { FALLBACK_FAMILY, FONT_CDN, fontsourceId, roundWeight } from "./font-files.ts";
-import type { Block } from "../model/markdown.ts";
+import type { Block } from "../cards/markdown.ts";
 
 /**
  * What the stage's own HTML takes from how the engine draws: a card's palette and where its first
