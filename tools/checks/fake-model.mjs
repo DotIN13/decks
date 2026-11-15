@@ -15,12 +15,55 @@
  */
 import { createServer } from "node:http";
 import { appendFileSync } from "node:fs";
+
 const PORT = Number(process.env.FAKE_MODEL_PORT ?? 4700);
+
 const LOG = process.env.FAKE_MODEL_LOG;
+
 const log = (line) => LOG && appendFileSync(LOG, line + "\n");
 
-/** A message's words, whether its content is a string or a list of parts. */
-const textOf = (message) => (typeof message?.content === "string" ? message.content : (message?.content ?? []).map((part) => part.text ?? "").join("\n"));
+const sse = (res, obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+createServer((req, res) => {
+	let body = "";
+	req.on("data", (c) => (body += c));
+	req.on("end", () => {
+		if (req.url?.endsWith("/models")) { res.setHeader("content-type", "application/json"); return res.end(JSON.stringify({ object: "list", data: [{ id: "fake-1", object: "model" }] })); }
+		let request = {};
+		try { request = JSON.parse(body || "{}"); } catch {}
+		log(`${new Date().toISOString()} ${req.method} ${req.url} tools=${(request.tools ?? []).map((t) => t.function?.name).join(",")} messages=${request.messages?.length}`);
+		log("  last: " + JSON.stringify(request.messages?.slice(-2)).slice(0, 1200));
+		const answer = decide(request.messages ?? [], request.tools);
+		log("  answer: " + JSON.stringify(answer).slice(0, 400));
+		const id = "chatcmpl-" + Date.now();
+		const THINK_MS = Number(process.env.FAKE_MODEL_THINK_MS ?? 1500);
+		const WORD_MS = Number(process.env.FAKE_MODEL_WORD_MS ?? 60);
+		const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+		const base = { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: request.model ?? "fake-1" };
+		if (request.stream) {
+			void (async () => {
+			res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+			await sleep(THINK_MS);
+			sse(res, { ...base, choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] });
+			if (answer.tool_calls) {
+				answer.tool_calls.forEach((tc, i) => sse(res, { ...base, choices: [{ index: 0, delta: { tool_calls: [{ index: i, id: tc.id, type: "function", function: tc.function }] }, finish_reason: null }] }));
+				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
+			} else {
+				for (const word of answer.text.split(/(?<= )/)) {
+					sse(res, { ...base, choices: [{ index: 0, delta: { content: word }, finish_reason: null }] });
+					await sleep(WORD_MS);
+				}
+				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
+			}
+			res.write("data: [DONE]\n\n");
+			res.end();
+			})();
+			return;
+		}
+		res.setHeader("content-type", "application/json");
+		const message = answer.tool_calls ? { role: "assistant", content: null, tool_calls: answer.tool_calls } : { role: "assistant", content: answer.text };
+		res.end(JSON.stringify({ ...base, object: "chat.completion", choices: [{ index: 0, message, finish_reason: answer.tool_calls ? "tool_calls" : "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } }));
+	});
+}).listen(PORT, "127.0.0.1", () => console.log(`fake model on http://127.0.0.1:${PORT}/v1`));
 
 /** Decide what to answer: text, or tool calls, from the whole conversation so far. */
 function decide(messages, tools) {
@@ -109,45 +152,5 @@ function decide(messages, tools) {
 	return done("Understood.");
 }
 
-const sse = (res, obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
-createServer((req, res) => {
-	let body = "";
-	req.on("data", (c) => (body += c));
-	req.on("end", () => {
-		if (req.url?.endsWith("/models")) { res.setHeader("content-type", "application/json"); return res.end(JSON.stringify({ object: "list", data: [{ id: "fake-1", object: "model" }] })); }
-		let request = {};
-		try { request = JSON.parse(body || "{}"); } catch {}
-		log(`${new Date().toISOString()} ${req.method} ${req.url} tools=${(request.tools ?? []).map((t) => t.function?.name).join(",")} messages=${request.messages?.length}`);
-		log("  last: " + JSON.stringify(request.messages?.slice(-2)).slice(0, 1200));
-		const answer = decide(request.messages ?? [], request.tools);
-		log("  answer: " + JSON.stringify(answer).slice(0, 400));
-		const id = "chatcmpl-" + Date.now();
-		const THINK_MS = Number(process.env.FAKE_MODEL_THINK_MS ?? 1500);
-		const WORD_MS = Number(process.env.FAKE_MODEL_WORD_MS ?? 60);
-		const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-		const base = { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: request.model ?? "fake-1" };
-		if (request.stream) {
-			void (async () => {
-			res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-			await sleep(THINK_MS);
-			sse(res, { ...base, choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] });
-			if (answer.tool_calls) {
-				answer.tool_calls.forEach((tc, i) => sse(res, { ...base, choices: [{ index: 0, delta: { tool_calls: [{ index: i, id: tc.id, type: "function", function: tc.function }] }, finish_reason: null }] }));
-				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
-			} else {
-				for (const word of answer.text.split(/(?<= )/)) {
-					sse(res, { ...base, choices: [{ index: 0, delta: { content: word }, finish_reason: null }] });
-					await sleep(WORD_MS);
-				}
-				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
-			}
-			res.write("data: [DONE]\n\n");
-			res.end();
-			})();
-			return;
-		}
-		res.setHeader("content-type", "application/json");
-		const message = answer.tool_calls ? { role: "assistant", content: null, tool_calls: answer.tool_calls } : { role: "assistant", content: answer.text };
-		res.end(JSON.stringify({ ...base, object: "chat.completion", choices: [{ index: 0, message, finish_reason: answer.tool_calls ? "tool_calls" : "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } }));
-	});
-}).listen(PORT, "127.0.0.1", () => console.log(`fake model on http://127.0.0.1:${PORT}/v1`));
+/** A message's words, whether its content is a string or a list of parts. */
+const textOf = (message) => (typeof message?.content === "string" ? message.content : (message?.content ?? []).map((part) => part.text ?? "").join("\n"));

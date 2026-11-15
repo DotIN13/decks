@@ -11,48 +11,16 @@ const REPLACED_GONE = REPLACED.map((r) => r.old);
 import { render } from "./render.mjs";
 
 const PLAN_FILE = "docs/rewrite/switch-plan.md";
-const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-
-/** Commit only the switch's own paths: never git add -A, others' half-written files share this tree. */
-function commit(paths, title, body) {
-	git("add", "--", ...paths.filter((f) => existsSync(join(ROOT, f))));
-	git("commit", "-q", "-m", `${title}\n\n${body}\n\nChecked: node tools/gates/run.mjs\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, "--", ...paths);
-}
-
-function gates() {
-	spawnSync(process.execPath, ["tools/gates/run.mjs", "--shrink"], { cwd: ROOT, stdio: "ignore" });
-	const r = spawnSync(process.execPath, ["tools/gates/run.mjs"], { cwd: ROOT, encoding: "utf8" });
-	if (r.status !== 0) throw new Error(`the gates fail; stopping here:\n${r.stdout.split("\n").filter((l) => /FAIL|^\s{6}\S/.test(l)).slice(0, 20).join("\n")}`);
-}
 
 /** Where a target the old place named lives after the switch: moved files, the fixture, the page's icon. */
 const RETARGET = [["e2e/fixture/decks/", "tools/fixtures/deck/"], ["apps/web/public/", "harness/page/public/"]];
 
-/**
- * A moved file's relative paths, read from its old place and written from its new one: imports and
- * dynamic imports, and the paths it joins to its own address (new URL(…, import.meta.url),
- * join/resolve(dirname(fileURLToPath(import.meta.url)), …)). A path to another moved file names its new place.
- */
-export function relocate(text, from, to, moves) {
-	const fix = (rel) => {
-		let target = posix.normalize(posix.join(posix.dirname(from), rel));
-		if (target.startsWith("..")) return rel;
-		target = moves.get(target) ?? target;
-		for (const [old, now] of RETARGET) if (target.startsWith(old)) target = now + target.slice(old.length);
-		const back = posix.relative(posix.dirname(to), target) || ".";
-		return `${back.startsWith(".") ? back : `./${back}`}${rel.endsWith("/") && !back.endsWith("/") ? "/" : ""}`;
-	};
-	const quoted = (q, rel) => `${q}${fix(rel)}${q}`;
-	return text
-		// Only the file's own imports: a line that starts with import or export, or import(…) in code; never a path inside a string it writes.
-		.replace(/^(\s*(?:import|export)\b[^\n'"`]*?(?:\bfrom\s*)?)(["'])(\.\.?\/[^"']*)\2/gm, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
-		.replace(/((?<![\w'"])import\s*\(\s*)(["'])(\.\.?\/[^"']*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
-		.replace(/(new URL\(\s*)(["'`])(\.\.?\/[^"'`]*)\2(\s*,\s*import\.meta\.url)/g, (all, lead, q, rel, tail) => `${lead}${quoted(q, rel)}${tail}`)
-		.replace(/((?:join|resolve)\(\s*dirname\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)\s*,\s*)(["'`])(\.\.?\/[^"'`]*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`);
-}
-
 /** The helpers every check shares, beside the runner after the switch. */
 const HELPERS = ["harness.mjs", "backends-kit.mjs", "awake-canvas.mjs", "perf-canvas.mjs", "fake-model.mjs"];
+
+const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+// Step 1: move the checks, re-resolving their relative paths.
 
 function moveChecks(p) {
 	const moves = new Map([...p.checks.moved.map((m) => [`e2e/checks/${m.check}.mjs`, m.to]), ...HELPERS.filter((h) => existsSync(join(ROOT, "e2e", h))).map((h) => [`e2e/${h}`, `tools/checks/${h}`])]);
@@ -81,6 +49,31 @@ function moveChecks(p) {
 	commit(paths, "Move every browser check to the feature that owns it", "Stop 3's checks go to their owners' features, the agent checks to tools/checks/agent, the benches to tools/checks/bench, the rest by what they exercise; the shared helpers, the fake model and agent go beside the runner. Each moved file's relative paths are read from its old place and written from its new one, the fixture now tools/fixtures/deck and the page's icon harness/page/public; nothing else in a check changes. tools/checks/checks.json gives each its path, and the gate baselines' keys move with the files.");
 }
 
+/**
+ * A moved file's relative paths, read from its old place and written from its new one: imports and
+ * dynamic imports, and the paths it joins to its own address (new URL(…, import.meta.url),
+ * join/resolve(dirname(fileURLToPath(import.meta.url)), …)). A path to another moved file names its new place.
+ */
+export function relocate(text, from, to, moves) {
+	const fix = (rel) => {
+		let target = posix.normalize(posix.join(posix.dirname(from), rel));
+		if (target.startsWith("..")) return rel;
+		target = moves.get(target) ?? target;
+		for (const [old, now] of RETARGET) if (target.startsWith(old)) target = now + target.slice(old.length);
+		const back = posix.relative(posix.dirname(to), target) || ".";
+		return `${back.startsWith(".") ? back : `./${back}`}${rel.endsWith("/") && !back.endsWith("/") ? "/" : ""}`;
+	};
+	const quoted = (q, rel) => `${q}${fix(rel)}${q}`;
+	return text
+		// Only the file's own imports: a line that starts with import or export, or import(…) in code; never a path inside a string it writes.
+		.replace(/^(\s*(?:import|export)\b[^\n'"`]*?(?:\bfrom\s*)?)(["'])(\.\.?\/[^"']*)\2/gm, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
+		.replace(/((?<![\w'"])import\s*\(\s*)(["'])(\.\.?\/[^"']*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
+		.replace(/(new URL\(\s*)(["'`])(\.\.?\/[^"'`]*)\2(\s*,\s*import\.meta\.url)/g, (all, lead, q, rel, tail) => `${lead}${quoted(q, rel)}${tail}`)
+		.replace(/((?:join|resolve)\(\s*dirname\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)\s*,\s*)(["'`])(\.\.?\/[^"'`]*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`);
+}
+
+// Step 2: delete what the new folders replaced.
+
 function deleteOld(p) {
 	const gone = p.deletions.filter((d) => d.delete).map((d) => d.old);
 	// A folder goes whole but for the files it keeps for Loom (runtime/live-doc.ts).
@@ -94,18 +87,7 @@ function deleteOld(p) {
 	return gone;
 }
 
-/** The kept old package that a new name takes is renamed first (to <name>-old), with every specifier of it. */
-function renameOld(p) {
-	const touched = [];
-	for (const c of p.clashes) {
-		for (const f of c.files) {
-			const text = readFileSync(join(ROOT, f), "utf8");
-			const next = text.replace(specifier(c.name), `$1${c.to}`);
-			if (next !== text) (writeFileSync(join(ROOT, f), next), touched.push(f));
-		}
-	}
-	return touched;
-}
+// Step 3: rename the packages, the kept old protocol first.
 
 function rename(p) {
 	const old = renameOld(p);
@@ -122,6 +104,31 @@ function rename(p) {
 	commit([...new Set([...old, ...touched, "package-lock.json"])], "Rename the new packages from @decks-next to @decks", `${p.renames.map((r) => r.to).join(", ")}; ${touched.length} files.${clash ? ` First, so no two workspaces share a name: ${clash}.` : ""}`);
 }
 
+/** The kept old package that a new name takes is renamed first (to <name>-old), with every specifier of it. */
+function renameOld(p) {
+	const touched = [];
+	for (const c of p.clashes) {
+		for (const f of c.files) {
+			const text = readFileSync(join(ROOT, f), "utf8");
+			const next = text.replace(specifier(c.name), `$1${c.to}`);
+			if (next !== text) (writeFileSync(join(ROOT, f), next), touched.push(f));
+		}
+	}
+	return touched;
+}
+
+// Step 4: root scripts, workspaces and CI.
+
+function root(gone) {
+	const r = rootFiles(gone);
+	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+	writeFileSync(join(ROOT, "package.json"), `${JSON.stringify({ ...pkg, workspaces: r.workspaces, scripts: r.scripts }, null, 2)}\n`);
+	const ci = join(ROOT, ".github/workflows/test.yml");
+	writeFileSync(ci, ciFile(readFileSync(ci, "utf8")));
+	gates();
+	commit(["package.json", ".github/workflows/test.yml"], "Point the root scripts, workspaces and CI at the new programs", r.ci);
+}
+
 /** CI as the new programs run it: the cascade step goes (the built gate orders the page's sheets), the comments say what runs. */
 export function ciFile(text) {
 	const swap = (from, to) => {
@@ -135,14 +142,18 @@ export function ciFile(text) {
 	return text;
 }
 
-function root(gone) {
-	const r = rootFiles(gone);
-	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
-	writeFileSync(join(ROOT, "package.json"), `${JSON.stringify({ ...pkg, workspaces: r.workspaces, scripts: r.scripts }, null, 2)}\n`);
-	const ci = join(ROOT, ".github/workflows/test.yml");
-	writeFileSync(ci, ciFile(readFileSync(ci, "utf8")));
-	gates();
-	commit(["package.json", ".github/workflows/test.yml"], "Point the root scripts, workspaces and CI at the new programs", r.ci);
+// Each step's commit: the gates, then only the step's own paths.
+
+/** Commit only the switch's own paths: never git add -A, others' half-written files share this tree. */
+function commit(paths, title, body) {
+	git("add", "--", ...paths.filter((f) => existsSync(join(ROOT, f))));
+	git("commit", "-q", "-m", `${title}\n\n${body}\n\nChecked: node tools/gates/run.mjs\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, "--", ...paths);
+}
+
+function gates() {
+	spawnSync(process.execPath, ["tools/gates/run.mjs", "--shrink"], { cwd: ROOT, stdio: "ignore" });
+	const r = spawnSync(process.execPath, ["tools/gates/run.mjs"], { cwd: ROOT, encoding: "utf8" });
+	if (r.status !== 0) throw new Error(`the gates fail; stopping here:\n${r.stdout.split("\n").filter((l) => /FAIL|^\s{6}\S/.test(l)).slice(0, 20).join("\n")}`);
 }
 
 async function main(argv) {
@@ -169,3 +180,4 @@ async function main(argv) {
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) process.exitCode = await main(process.argv.slice(2));
+

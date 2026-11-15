@@ -19,19 +19,62 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const AWAKE_CANVAS = "awake";
+
 export const CELL = { w: 1400, h: 1000 };
 
 const WORDS = "the agent keeps a value for each square and moves toward the larger one until the cake is found reward state action return episode model policy step".split(" ");
 
-function random(seed) {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
+/** The canvas, its cards, apps and documents: `{ pen, cards, apps, documents }`. */
+export function awakeCanvas({ cards = 100, apps = 8, documents = 4, prefix = "awake" } = {}) {
+	const options = { prefix };
+	const rand = random(20261031);
+	const pick = (list) => list[Math.floor(rand() * list.length)];
+	const words = (n) => Array.from({ length: n }, () => pick(WORDS)).join(" ");
+	const total = cards + apps + documents;
+	const across = Math.ceil(Math.sqrt(total * (CELL.h / CELL.w)));
+	// Dealt out so apps and documents are spread through the cards, not bunched at the end.
+	const kinds = [];
+	let c = 0;
+	let a = 0;
+	let d = 0;
+	for (let i = 0; i < total; i++) {
+		const want = (k, made, of) => of > 0 && made / of <= (i + 1) / total - 1e-9 && made < of;
+		if (want("app", a, apps) && (i + 1) % 4 === 0) kinds.push("app"), a++;
+		else if (want("document", d, documents) && (i + 1) % 8 === 0) kinds.push("document"), d++;
+		else if (c < cards) kinds.push("card"), c++;
+		else if (a < apps) kinds.push("app"), a++;
+		else kinds.push("document"), d++;
+	}
+	const children = [];
+	const cardFiles = [];
+	const appFiles = [];
+	const docFiles = [];
+	// Centred on the origin: the page's first view is the middle of the grid.
+	const down = Math.ceil(total / across);
+	kinds.forEach((kind, i) => {
+		const ox = ((i % across) - across / 2) * CELL.w;
+		const oy = (Math.floor(i / across) - down / 2) * CELL.h;
+		if (kind === "card") {
+			const n = cardFiles.length;
+			const name = `awake-${String(n).padStart(3, "0")}`;
+			const path = `cards/${name}/index.html`;
+			cardFiles.push({ name, html: card(n, words) });
+			children.push({ type: "browser", id: `ac${n}`, name: `Awake card ${n}`, url: path, width: 1000, height: 700, metadata: { type: "decks.card", path }, x: ox + 40, y: oy + 40 });
+		} else if (kind === "app") {
+			const n = appFiles.length;
+			const name = `${options.prefix ?? "awake"}-app-${n}`;
+			appFiles.push({ name, html: app(n) });
+			children.push({ type: "browser", id: `aa${n}`, name: `Awake app ${n}`, url: `apps/${name}/`, width: 1100, height: 760, metadata: { type: "decks.app", name }, x: ox + 40, y: oy + 40 });
+		} else {
+			const n = docFiles.length;
+			const path = `docs/${prefix}-${n}.md`;
+			docFiles.push({ path, text: doc(n, words) });
+			children.push({ type: "browser", id: `ad${n}`, name: `Awake document ${n}`, url: path, width: 1000, height: 700, metadata: { type: "decks.document", path }, x: ox + 40, y: oy + 40 });
+		}
+		// Two notes beside each item, so the sheet paints too.
+		for (let k = 0; k < 2; k++) children.push({ type: "note", id: `an${i}-${k}`, width: 220, metadata: { type: "decks.markdown" }, content: `**${words(2)}** ${words(10 + Math.floor(rand() * 8))}`, x: ox + 1140, y: oy + 60 + k * 300 });
+	});
+	return { pen: { version: "2.14", children }, cards: cardFiles, apps: appFiles, documents: docFiles, across, down };
 }
 
 /** A card as `decks card create` writes one: a title, a few paragraphs, a list and a small table; 1,000 × 700. */
@@ -88,57 +131,15 @@ const app = (n) => `<!doctype html>
 
 const doc = (n, words) => `# Document ${n}\n\n${words(30)}\n\n## Notes\n\n- ${words(6)}\n- ${words(7)}\n\n${words(40)}\n`;
 
-/** The canvas, its cards, apps and documents: `{ pen, cards, apps, documents }`. */
-export function awakeCanvas({ cards = 100, apps = 8, documents = 4, prefix = "awake" } = {}) {
-	const options = { prefix };
-	const rand = random(20261031);
-	const pick = (list) => list[Math.floor(rand() * list.length)];
-	const words = (n) => Array.from({ length: n }, () => pick(WORDS)).join(" ");
-	const total = cards + apps + documents;
-	const across = Math.ceil(Math.sqrt(total * (CELL.h / CELL.w)));
-	// Dealt out so apps and documents are spread through the cards, not bunched at the end.
-	const kinds = [];
-	let c = 0;
-	let a = 0;
-	let d = 0;
-	for (let i = 0; i < total; i++) {
-		const want = (k, made, of) => of > 0 && made / of <= (i + 1) / total - 1e-9 && made < of;
-		if (want("app", a, apps) && (i + 1) % 4 === 0) kinds.push("app"), a++;
-		else if (want("document", d, documents) && (i + 1) % 8 === 0) kinds.push("document"), d++;
-		else if (c < cards) kinds.push("card"), c++;
-		else if (a < apps) kinds.push("app"), a++;
-		else kinds.push("document"), d++;
-	}
-	const children = [];
-	const cardFiles = [];
-	const appFiles = [];
-	const docFiles = [];
-	// Centred on the origin: the page's first view is the middle of the grid.
-	const down = Math.ceil(total / across);
-	kinds.forEach((kind, i) => {
-		const ox = ((i % across) - across / 2) * CELL.w;
-		const oy = (Math.floor(i / across) - down / 2) * CELL.h;
-		if (kind === "card") {
-			const n = cardFiles.length;
-			const name = `awake-${String(n).padStart(3, "0")}`;
-			const path = `cards/${name}/index.html`;
-			cardFiles.push({ name, html: card(n, words) });
-			children.push({ type: "browser", id: `ac${n}`, name: `Awake card ${n}`, url: path, width: 1000, height: 700, metadata: { type: "decks.card", path }, x: ox + 40, y: oy + 40 });
-		} else if (kind === "app") {
-			const n = appFiles.length;
-			const name = `${options.prefix ?? "awake"}-app-${n}`;
-			appFiles.push({ name, html: app(n) });
-			children.push({ type: "browser", id: `aa${n}`, name: `Awake app ${n}`, url: `apps/${name}/`, width: 1100, height: 760, metadata: { type: "decks.app", name }, x: ox + 40, y: oy + 40 });
-		} else {
-			const n = docFiles.length;
-			const path = `docs/${prefix}-${n}.md`;
-			docFiles.push({ path, text: doc(n, words) });
-			children.push({ type: "browser", id: `ad${n}`, name: `Awake document ${n}`, url: path, width: 1000, height: 700, metadata: { type: "decks.document", path }, x: ox + 40, y: oy + 40 });
-		}
-		// Two notes beside each item, so the sheet paints too.
-		for (let k = 0; k < 2; k++) children.push({ type: "note", id: `an${i}-${k}`, width: 220, metadata: { type: "decks.markdown" }, content: `**${words(2)}** ${words(10 + Math.floor(rand() * 8))}`, x: ox + 1140, y: oy + 60 + k * 300 });
-	});
-	return { pen: { version: "2.14", children }, cards: cardFiles, apps: appFiles, documents: docFiles, across, down };
+function random(seed) {
+	let a = seed >>> 0;
+	return () => {
+		a = (a + 0x6d2b79f5) >>> 0;
+		let t = a;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
 }
 
 /** Write the canvas into `deck`: `canvases/awake/`, its cards, the apps in `apps/`, the documents in `docs/`. */

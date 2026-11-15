@@ -3,6 +3,10 @@
 import { RETIRED_IN_NAME } from "./compat/old.mjs";
 import { KEPT_FILES } from "./plan.mjs";
 
+export function render(p, names, r, l) {
+	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), followUps(p), compat(names), root(r), ...(l ? [lanes(l)] : [])].filter(Boolean).join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.\n\n1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
+}
+
 const list = (rows) => rows.map((r) => `- ${r}`).join("\n");
 
 function deleted(p) {
@@ -37,6 +41,14 @@ function moved(p) {
 	return `## Moved\n\nAll ${p.checks.moved.length} browser checks move and start under \`node tools/checks/run.mjs\`; \`e2e/run.mjs\` goes with e2e/. Every browser check lives under \`tools/checks/<feature>/\`, never inside server/ or harness/: it drives three programs from outside, so it is a tool. The folder names the feature, and its owner (the stop 3 card's runs.json; with none, by what it exercises) gets it in lanes.json after the switch; \`library\` holds the canvas library's until Loom moves it; the agent checks go to \`agent\`, the benches to \`bench\`. Features' own tests, with no browser, stay beside their code:\n\n${list(rows)}\n\nWhat the runner must know of a check is a field in \`tools/checks/checks.json\`: \`timed\` runs alone on the dev server, as it was written for (DESIGN.md section 11), every other check on the built page; \`agent\` is skipped unless \`--agent\`; \`named\` and \`bench\` for the long checks and the measures; \`path\` where it lives. \`e2e/harness.mjs\` becomes \`tools/checks/harness.mjs\` and each moved check's \`../\` imports point there; the fake model and agent move to tools/checks; the fixture is \`tools/fixtures/deck\` (already there).\n\n### The agent checks, once on the new programs before the deletions\n\n${fake.join(", ")}: each starts an agent's turn through Pi with the fake model (\`fake-agent\`, \`fake-model.mjs\` on port 4700), which the runner starts; no signed-in Claude, no tokens. Run on 2026-11-14: all pass. ${real.join(", ")}: asks the agent to run the decks command, which the fake model cannot do; it needs a real model. The runner starts the harness with Pi on the fake model only, so that run needs the harness started with a signed-in Claude (\`--kinds claude\`), once, with Mason's yes.`;
 }
 
+function followUps(p) {
+	const rows = p.checks.moved.filter((m) => m.traits.dev).map((m) => `\`${m.check}\` (now \`${m.to}\`): ${m.traits.why}`);
+	const retired = p.checks.moved.filter((m) => RETIRED_IN_NAME.test(m.check)).map((m) => `\`${m.check}\``);
+	const dev = rows.length ? `Written against the dev page's timing, so they run on the dev server (\`dev\` in checks.json) until their owner does this, then go back to the built page:\n\n${list(rows)}` : "";
+	const names = retired.length ? `File names that carry a retired word, renamed by their owners after the switch (with their checks.json key and baseline keys): ${retired.join(", ")}.` : "";
+	return dev || names ? `## Follow-ups after the checks move\n\nChecks run unchanged until the switch-over.\n\n${[dev, names].filter(Boolean).join("\n\n")}` : "";
+}
+
 function compat(names) {
 	const spoken = names.filter((n) => n.spoken);
 	const quiet = names.filter((n) => !n.spoken);
@@ -48,19 +60,7 @@ function root(r) {
 	return `## Root files\n\n- Workspaces: ${r.workspaces.map((w) => `\`${w}\``).join(", ")}.\n- Kept until Loom moves the packages that use them: ${kept}.\n- Scripts: ${Object.entries(r.scripts).map(([k, v]) => `\`${k}\`: \`${v}\``).join("; ")}.\n- Scripts removed: ${r.removedScripts.map((s) => `\`${s}\``).join(", ")}.\n- CI: ${r.ci}.`;
 }
 
-function followUps(p) {
-	const rows = p.checks.moved.filter((m) => m.traits.dev).map((m) => `\`${m.check}\` (now \`${m.to}\`): ${m.traits.why}`);
-	const retired = p.checks.moved.filter((m) => RETIRED_IN_NAME.test(m.check)).map((m) => `\`${m.check}\``);
-	const dev = rows.length ? `Written against the dev page's timing, so they run on the dev server (\`dev\` in checks.json) until their owner does this, then go back to the built page:\n\n${list(rows)}` : "";
-	const names = retired.length ? `File names that carry a retired word, renamed by their owners after the switch (with their checks.json key and baseline keys): ${retired.join(", ")}.` : "";
-	return dev || names ? `## Follow-ups after the checks move\n\nChecks run unchanged until the switch-over.\n\n${[dev, names].filter(Boolean).join("\n\n")}` : "";
-}
-
 function lanes(l) {
 	const rows = [["1. moving the checks", l.move], ["2. deleting", l.delete], ["3. renaming (files that name @decks-next)", l.rename], ["4. root files and CI", l.root]];
 	return `## Lanes the switch needs, for that one job\n\n${list(rows.map(([what, paths]) => `${what}: ${paths.map((x) => `\`${x}\``).join(", ")}`))}`;
-}
-
-export function render(p, names, r, l) {
-	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), followUps(p), compat(names), root(r), ...(l ? [lanes(l)] : [])].filter(Boolean).join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.\n\n1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
 }

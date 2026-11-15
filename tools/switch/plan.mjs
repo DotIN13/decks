@@ -9,7 +9,18 @@ import { BY_NAME, BY_SUBJECT, KEEP_IN_WEB, KEPT } from "./compat/old.mjs";
 export { KEPT };
 
 export const ROOT = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
+
 const RUNS = "/Users/dotin13/Documents/DotGit/dotty-programs/decks/data/decks/canvases/decks-rewrite-build/cards/stop-3-today-s-browser-checks-against-the-new/runs.json";
+
+const NEW = ["protocol", "server", "harness", "clients", "tools"];
+
+const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
+
+const tracked = () => git("ls-files").split("\n").filter(Boolean);
+
+const nameOf = (dir) => (existsSync(join(ROOT, dir, "package.json")) ? JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf8")).name : undefined);
+
+// The plan: what each step will do, from the tree as it is.
 
 /** Today's code the new folders replaced, each with its new home and what proves it. */
 export const REPLACED = [
@@ -27,26 +38,14 @@ export const REPLACED = [
 	{ old: "e2e", home: "tools/checks (the runner, the harness, the fake model and agent) and the features' checks/ folders", proof: "every check moved first and started by node tools/checks/run.mjs" },
 ];
 
-const NEW = ["protocol", "server", "harness", "clients", "tools"];
-
-/**
- * Every browser check lives under tools/checks/<feature>/: it drives three programs from outside, so it
- * is a tool, never code inside server/ or harness/. The folder's name says the feature; lanes.json gives
- * each owner its folder after the switch. Features' own tests (no browser) stay beside their code.
- */
-const FEATURE_OF = { Easel: "canvas", Depot: "pictures", Folio: "cards", Roster: "people", Pane: "page", Scribe: "page", Loom: "library" };
-const home = (check, owner, traits) => `tools/checks/${traits.agent ? "agent" : traits.bench ? "bench" : BY_SUBJECT[check] ?? FEATURE_OF[owner] ?? "library"}`;
-
-const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
-const tracked = () => git("ls-files").split("\n").filter(Boolean);
-const nameOf = (dir) => (existsSync(join(ROOT, dir, "package.json")) ? JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf8")).name : undefined);
-
-/** Files that stay after the switch (new folders, Loom's kept packages, the moved checks) and import a package by name. */
-function importers(files, name) {
-	const word = new RegExp(`["']${name.replace("/", "\\/")}(?:/[^"']*)?["']`);
-	const stays = (f) => [...NEW, ...KEPT, "e2e/checks", "e2e/harness.mjs"].some((n) => f === n || f.startsWith(`${n}/`));
-	return files.filter((f) => stays(f) && /\.(ts|tsx|mjs|mts|js)$/.test(f) && word.test(readFileSync(join(ROOT, f), "utf8")));
+export function plan() {
+	const files = tracked();
+	const dels = deletions(files);
+	const rens = renames(files);
+	return { deletions: dels, kept: KEPT.filter((k) => existsSync(join(ROOT, k))), renames: rens, clashes: clashes(files, rens, dels.filter((d) => d.delete).map((d) => d.old)), checks: checkMoves() };
 }
+
+// Deleted: what has a new home and no importer left.
 
 function deletions(files) {
 	return REPLACED.filter((r) => !KEPT.includes(r.old)).map((r) => {
@@ -60,6 +59,15 @@ function deletions(files) {
 	});
 }
 
+/** Files that stay after the switch (new folders, Loom's kept packages, the moved checks) and import a package by name. */
+function importers(files, name) {
+	const word = new RegExp(`["']${name.replace("/", "\\/")}(?:/[^"']*)?["']`);
+	const stays = (f) => [...NEW, ...KEPT, "e2e/checks", "e2e/harness.mjs"].some((n) => f === n || f.startsWith(`${n}/`));
+	return files.filter((f) => stays(f) && /\.(ts|tsx|mjs|mts|js)$/.test(f) && word.test(readFileSync(join(ROOT, f), "utf8")));
+}
+
+// Renamed: the new packages, and a kept old one whose name they take.
+
 function renames(files) {
 	const dirs = files.filter((f) => /^(protocol|server|harness|harness\/page|clients\/[^/]+|tools)\/package\.json$/.test(f)).map((f) => f.replace(/\/package\.json$/, ""));
 	return dirs.map((dir) => {
@@ -69,29 +77,6 @@ function renames(files) {
 		return { dir, from, to, files: uses };
 	}).filter((r) => r.from?.startsWith("@decks-next/"));
 }
-
-/** A check with no owner in runs.json, by what it exercises: the page's, or the canvas library's (Loom's, wave 3). */
-const PAGE = ["panel", "chat-content", "slash", "notifications", "shell", "context", "per-agent", "working-marks", "panel-steady", "voice", "canvas-switch", "new-agent-opens"];
-const ownerFor = (check, owners) => owners[check] ?? (PAGE.includes(check) ? "Pane" : BY_NAME[check] ?? "Loom");
-
-/** What tools/checks/checks.json says of each check: timed, agent, named, bench. */
-export const traits = () => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks;
-
-/** Every check moves: stop 3's to their owners' features; the others too, agent checks and benches to tools/checks. */
-function checkMoves() {
-	const stop3 = readFileSync(join(ROOT, ".scratch/Mason/checks.txt"), "utf8").split(/\s+/).filter(Boolean);
-	const owners = existsSync(RUNS) ? JSON.parse(readFileSync(RUNS, "utf8")).owners ?? {} : {};
-	const all = git("ls-files", "e2e/checks").split("\n").filter(Boolean).map((f) => f.slice("e2e/checks/".length).replace(/\.mjs$/, ""));
-	const t = traits();
-	const moved = [...stop3, ...all.filter((c) => !stop3.includes(c))].map((c) => {
-		const owner = ownerFor(c, owners);
-		return { check: c, owner, to: `${home(c, owner, t[c] ?? {})}/${c}.mjs`, owned: c in owners, stop3: stop3.includes(c), traits: t[c] ?? {} };
-	});
-	return { moved, left: [] };
-}
-
-/** A specifier of one package name in code or a package.json, not a longer name that starts with it. */
-export const specifier = (name) => new RegExp(`(["'])${name.replace("/", "\\/")}(?=["'/])`, "g");
 
 /**
  * A kept old package whose name a new one takes at the rename (@decks/protocol): two workspaces cannot
@@ -110,12 +95,42 @@ function clashes(files, renamed, deleted) {
 	});
 }
 
-export function plan() {
-	const files = tracked();
-	const dels = deletions(files);
-	const rens = renames(files);
-	return { deletions: dels, kept: KEPT.filter((k) => existsSync(join(ROOT, k))), renames: rens, clashes: clashes(files, rens, dels.filter((d) => d.delete).map((d) => d.old)), checks: checkMoves() };
+/** A specifier of one package name in code or a package.json, not a longer name that starts with it. */
+export const specifier = (name) => new RegExp(`(["'])${name.replace("/", "\\/")}(?=["'/])`, "g");
+
+// Moved: every check to its feature's folder.
+
+/** Every check moves: stop 3's to their owners' features; the others too, agent checks and benches to tools/checks. */
+function checkMoves() {
+	const stop3 = readFileSync(join(ROOT, ".scratch/Mason/checks.txt"), "utf8").split(/\s+/).filter(Boolean);
+	const owners = existsSync(RUNS) ? JSON.parse(readFileSync(RUNS, "utf8")).owners ?? {} : {};
+	const all = git("ls-files", "e2e/checks").split("\n").filter(Boolean).map((f) => f.slice("e2e/checks/".length).replace(/\.mjs$/, ""));
+	const t = traits();
+	const moved = [...stop3, ...all.filter((c) => !stop3.includes(c))].map((c) => {
+		const owner = ownerFor(c, owners);
+		return { check: c, owner, to: `${home(c, owner, t[c] ?? {})}/${c}.mjs`, owned: c in owners, stop3: stop3.includes(c), traits: t[c] ?? {} };
+	});
+	return { moved, left: [] };
 }
+
+/** What tools/checks/checks.json says of each check: timed, agent, named, bench. */
+export const traits = () => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks;
+
+const home = (check, owner, traits) => `tools/checks/${traits.agent ? "agent" : traits.bench ? "bench" : BY_SUBJECT[check] ?? FEATURE_OF[owner] ?? "library"}`;
+
+/**
+ * Every browser check lives under tools/checks/<feature>/: it drives three programs from outside, so it
+ * is a tool, never code inside server/ or harness/. The folder's name says the feature; lanes.json gives
+ * each owner its folder after the switch. Features' own tests (no browser) stay beside their code.
+ */
+const FEATURE_OF = { Easel: "canvas", Depot: "pictures", Folio: "cards", Roster: "people", Pane: "page", Scribe: "page", Loom: "library" };
+
+const ownerFor = (check, owners) => owners[check] ?? (PAGE.includes(check) ? "Pane" : BY_NAME[check] ?? "Loom");
+
+/** A check with no owner in runs.json, by what it exercises: the page's, or the canvas library's (Loom's, wave 3). */
+const PAGE = ["panel", "chat-content", "slash", "notifications", "shell", "context", "per-agent", "working-marks", "panel-steady", "voice", "canvas-switch", "new-agent-opens"];
+
+// Compat, root files and the lanes the switch needs.
 
 /** Each old name of compat's table: who in the repo still speaks it after the switch (kept code, the moved checks). */
 export function compatNames() {
@@ -126,35 +141,6 @@ export function compatNames() {
 	const text = speakers.map((s) => git("ls-files", s).split("\n").filter((f) => /\.(ts|tsx|mjs|js)$/.test(f)).map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")).join("\n");
 	const goes = /GOES = "([^"]+)"/.exec(table)?.[1];
 	return [...calls, ...events].filter((n) => n.old !== n.now).map((n) => ({ ...n, spoken: text.includes(`"${n.old}"`), goes }));
-}
-
-/** Root scripts the kept packages still need, each with what uses it. */
-/** Files under scripts/ the kept packages build with; scripts/ itself is not deleted by the switch. */
-export const KEPT_FILES = { "scripts/vendor.mjs": "fills packages/card-host/lib (Loom's step 4c moves it)", "scripts/live-doc.mjs": "builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)" };
-
-export const KEPT_SCRIPTS = {
-	vendor: "copies d3, KaTeX, pdf.js and the bundles into packages/card-host/lib",
-	"build:live-doc": "builds packages/card-host/lib/live-doc.js",
-	"build:packages": "builds the public @decks packages (canvas, pen, ui, the engine, card-host, hub) for Studio and npm",
-	"test:packages": "packs and installs those packages to prove they run outside the repo",
-};
-
-/** The path prefixes each switch commit writes, for the one job's lanes. */
-export function lanesNeeded(p) {
-	const moves = p.checks.moved.flatMap((m) => [`e2e/checks/${m.check}.mjs`, m.to.replace(/\/[^/]+$/, "/")]);
-	const renamed = git("ls-files").split("\n").filter((f) => /\.(ts|tsx|mjs|mts|js|json|md)$/.test(f) && !f.endsWith("package-lock.json") && existsSync(join(ROOT, f)) && p.renames.some((r) => readFileSync(join(ROOT, f), "utf8").includes(r.from)));
-	const top = (f) => {
-		const segs = f.split("/");
-		const n = /^(harness\/page|server|clients)\//.test(f) ? (f.startsWith("harness/page/") ? 3 : 2) - 0 : 1;
-		return segs.length > n ? `${segs.slice(0, n).join("/")}/` : f;
-	};
-	const covered = (list) => list.filter((x) => !list.some((y) => y !== x && y.endsWith("/") && x.startsWith(y)));
-	return {
-		move: covered([...new Set([...moves.filter((x) => x.endsWith("/")), "e2e/", "tools/checks/"])]).sort(),
-		delete: p.deletions.filter((d) => d.delete).map((d) => `${d.old}/`),
-		rename: covered([...new Set(renamed.map(top))]).sort(),
-		root: ["package.json", "package-lock.json", ".github/workflows/"],
-	};
 }
 
 /** The root package.json after the switch: workspaces without the deleted folders, scripts on the new programs. */
@@ -176,4 +162,33 @@ export function rootFiles(deleted) {
 	// The kept packages still build and publish through these until Loom moves them (map step 4c and the last step).
 	for (const [k, why] of Object.entries(KEPT_SCRIPTS)) if (pkg.scripts[k]) scripts[k] = pkg.scripts[k];
 	return { workspaces, scripts, kept: KEPT_SCRIPTS, removedScripts: Object.keys(pkg.scripts).filter((k) => !(k in scripts)), ci: ".github/workflows/test.yml: npm run test:e2e runs tools/checks/run.mjs; the typecheck and test steps stay" };
+}
+
+export const KEPT_SCRIPTS = {
+	vendor: "copies d3, KaTeX, pdf.js and the bundles into packages/card-host/lib",
+	"build:live-doc": "builds packages/card-host/lib/live-doc.js",
+	"build:packages": "builds the public @decks packages (canvas, pen, ui, the engine, card-host, hub) for Studio and npm",
+	"test:packages": "packs and installs those packages to prove they run outside the repo",
+};
+
+/** Root scripts the kept packages still need, each with what uses it. */
+/** Files under scripts/ the kept packages build with; scripts/ itself is not deleted by the switch. */
+export const KEPT_FILES = { "scripts/vendor.mjs": "fills packages/card-host/lib (Loom's step 4c moves it)", "scripts/live-doc.mjs": "builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)" };
+
+/** The path prefixes each switch commit writes, for the one job's lanes. */
+export function lanesNeeded(p) {
+	const moves = p.checks.moved.flatMap((m) => [`e2e/checks/${m.check}.mjs`, m.to.replace(/\/[^/]+$/, "/")]);
+	const renamed = git("ls-files").split("\n").filter((f) => /\.(ts|tsx|mjs|mts|js|json|md)$/.test(f) && !f.endsWith("package-lock.json") && existsSync(join(ROOT, f)) && p.renames.some((r) => readFileSync(join(ROOT, f), "utf8").includes(r.from)));
+	const top = (f) => {
+		const segs = f.split("/");
+		const n = /^(harness\/page|server|clients)\//.test(f) ? (f.startsWith("harness/page/") ? 3 : 2) - 0 : 1;
+		return segs.length > n ? `${segs.slice(0, n).join("/")}/` : f;
+	};
+	const covered = (list) => list.filter((x) => !list.some((y) => y !== x && y.endsWith("/") && x.startsWith(y)));
+	return {
+		move: covered([...new Set([...moves.filter((x) => x.endsWith("/")), "e2e/", "tools/checks/"])]).sort(),
+		delete: p.deletions.filter((d) => d.delete).map((d) => `${d.old}/`),
+		rename: covered([...new Set(renamed.map(top))]).sort(),
+		root: ["package.json", "package-lock.json", ".github/workflows/"],
+	};
 }

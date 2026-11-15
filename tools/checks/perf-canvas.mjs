@@ -15,37 +15,16 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PERF_CANVAS = "perf";
+
 export const CELL = { w: 1600, h: 1200 };
+
 export const GRID = 10;
 
-/** A small seeded random, so the canvas is the same on every run. */
-function random(seed) {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
 const WORDS = "the agent keeps a value for each square and moves toward the larger one until the cake is found reward state action return episode model policy step".split(" ");
-const COLOURS = ["#fde68a", "#bfdbfe", "#bbf7d0", "#fecaca", "#ddd6fe", "#fed7aa"];
-const INKS = ["#e5484d", "#3b82f6", "#16a34a", "#111827"];
 
-/** A card's `index.html`, as `decks card create` writes one: a piece of HTML, drawn in the canvas's page. */
-const card = (n) => `<title>Perf card ${n}</title>
-<meta name="card" content='{"w":600,"h":400}' />
-<style>
-	.doc { padding: 32px; font-size: 17px; line-height: 1.5 }
-</style>
-<div class="doc" data-id="doc">
-<h2>Card ${n}</h2>
-<p>A generated card for the render-perf canvas: a heading, a line of words and a list.</p>
-<ul><li>one</li><li>two</li><li>three</li></ul>
-</div>
-`;
+const COLOURS = ["#fde68a", "#bfdbfe", "#bbf7d0", "#fecaca", "#ddd6fe", "#fed7aa"];
+
+const INKS = ["#e5484d", "#3b82f6", "#16a34a", "#111827"];
 
 /** The canvas's drawing and its cards' files: `{ pen, cards: [{ name, html }] }`, each `name` a folder in `cards/`. */
 export function perfCanvas({ items = 2000, cards = 100 } = {}) {
@@ -135,6 +114,31 @@ export function perfCanvas({ items = 2000, cards = 100 } = {}) {
 		}
 	}
 	return { pen: { version: "2.14", children }, cards: files, items: made };
+}
+
+/** A card's `index.html`, as `decks card create` writes one: a piece of HTML, drawn in the canvas's page. */
+const card = (n) => `<title>Perf card ${n}</title>
+<meta name="card" content='{"w":600,"h":400}' />
+<style>
+	.doc { padding: 32px; font-size: 17px; line-height: 1.5 }
+</style>
+<div class="doc" data-id="doc">
+<h2>Card ${n}</h2>
+<p>A generated card for the render-perf canvas: a heading, a line of words and a list.</p>
+<ul><li>one</li><li>two</li><li>three</li></ul>
+</div>
+`;
+
+/** A small seeded random, so the canvas is the same on every run. */
+function random(seed) {
+	let a = seed >>> 0;
+	return () => {
+		a = (a + 0x6d2b79f5) >>> 0;
+		let t = a;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
 }
 
 /** Write the canvas into `deck`: `canvases/perf/canvas.pen`, its `canvas.json` and its cards. */

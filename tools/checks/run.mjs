@@ -12,21 +12,30 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("../..", import.meta.url).pathname);
+
 const FIXTURE = join(ROOT, "tools/fixtures/deck");
+
 const BASE = Number(process.env.CHECKS_PORT ?? 4610);
+
+const WAIT_MS = 60_000;
+
+const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
+
+/** What one run shares: the page built once. */
+const RUN = { dist: undefined, kinds: "pi" };
+
 /** Checks that measure time run alone (e2e/run.mjs marks them alone: true; ink-long-stroke times the frame too). */
 /** What tools/checks/checks.json says of a check (timed, agent, named, bench, path), by name. */
 export const traitsOf = (file) => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks[file.replace(/\.mjs$/, "")] ?? {};
+
 /** A check that measures time runs alone, on the dev server it was written for (DESIGN.md section 11). */
 export const timed = (file) => traitsOf(file).timed === true;
+
 /** A check written against the dev page's timing (checks.json says why) runs on the dev server too. */
 const onDev = (file) => timed(file) || traitsOf(file).dev === true;
+
 /** The fake model and agent, in tools/checks after the switch-over, in e2e before. */
 const helper = (name) => (existsSync(join(ROOT, "tools/checks", name)) ? join(ROOT, "tools/checks", name) : join(ROOT, "e2e", name));
-const WAIT_MS = 60_000;
-/** What one run shares: the page built once. */
-const RUN = { dist: undefined, kinds: "pi" };
-const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 
 /** How each program starts, given its ports and the deck. Edit here when an owner changes theirs. */
 export const PROGRAMS = {
@@ -42,6 +51,78 @@ export const PROGRAMS = {
 
 /** Ports by lock slot (0 alone, 1 and 2 the check slots), so two checks at once never share one. */
 export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
+
+// A check's run: its programs up, the check against them, its first failing line.
+
+/** One check, start to end: the programs up, the check run, everything stopped and the copy gone. */
+export async function runCheck(file, i, { onlyServer = false } = {}) {
+	const log = [];
+	try {
+		return await runPrograms(async ({ ports, started }) => {
+			const web = onlyServer ? ports.server : ports.web;
+			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
+			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
+			const check = launch("check", { cmd: process.execPath, args: [checkPath(file)], env }, log);
+			started.push(check);
+			const code = await new Promise((done) => {
+				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
+				check.on("exit", (c) => (clearTimeout(timer), done(c)));
+			});
+			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
+		}, { i, onlyServer, log, dist: onDev(file) ? null : RUN.dist });
+	} catch (error) {
+		return { file, ok: false, why: error.message, log };
+	}
+}
+
+/** The first line of a check's output that says it failed, else the exit. */
+function firstFailure(log, code) {
+	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
+	const bad = lines.find((l) => /✗|\bFAIL\b|not ok/.test(l)) ?? lines.find((l) => /\bError\b|refusing/.test(l)) ?? (code !== 0 ? `exit ${code} with no failing line; see the log` : undefined);
+	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
+}
+
+export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
+	const ports = portsFor(i);
+	// The slot is ours, but the last caller's programs may still be closing its ports: wait for them.
+	await portsFree(Object.values(ports));
+	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
+	const deck = join(scratch, "deck");
+	const home = join(scratch, "home");
+	cpSync(FIXTURE, deck, { recursive: true });
+	mkdirSync(home);
+	const started = [];
+	try {
+		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) {
+			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home, dist }), log);
+			started.push(child);
+			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
+			await until(ready, child, name);
+		}
+		return await work({ ports, deck, started, log });
+	} finally {
+		await Promise.all(started.reverse().map(stopAndWait));
+		rmSync(scratch, { recursive: true, force: true });
+	}
+}
+
+/** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
+/** Where a check is: its path in checks.json after the switch-over, else today's e2e/checks. */
+export function checkPath(file) {
+	return join(ROOT, traitsOf(file).path ?? `e2e/checks/${file}`);
+}
+
+/** The page built once for a run, into a scratch folder: vite build of harness/page. */
+export function buildPage() {
+	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
+	// Development mode, unminified: the code today's checks were written against (vite's dev server).
+	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
+	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
+	return dist;
+}
+
+// Whether a program is up: the server listening, the harness's agent, the page.
 
 /** The person's token, from the lock file the server writes in the deck. */
 function personToken(deck) {
@@ -85,6 +166,8 @@ async function until(ready, child, name) {
 	throw new Error(`${name} was not ready in ${WAIT_MS / 1000} s`);
 }
 
+// The programs as child processes: started with a clean environment, stopped as a group.
+
 /** This shell's environment without any DECKS_ variable: a check must never reach the person's own Decks. */
 const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("DECKS_")));
 
@@ -109,6 +192,7 @@ function launch(name, { cmd, args, env = {}, cwd = ROOT }, log) {
 const signal = (child, name) => {
 	try { process.kill(-child.pid, name); } catch {}
 };
+
 const stop = (child) => signal(child, "SIGTERM");
 
 /** SIGTERM to the program's whole group, then SIGKILL if it has not exited after a grace period. */
@@ -122,73 +206,7 @@ async function stopAndWait(child) {
 	if (child.exitCode === null && child.signalCode === null) await Promise.race([exited, new Promise((r) => setTimeout(r, 2_000))]);
 }
 
-/** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
-/** Where a check is: its path in checks.json after the switch-over, else today's e2e/checks. */
-export function checkPath(file) {
-	return join(ROOT, traitsOf(file).path ?? `e2e/checks/${file}`);
-}
-
-/** The page built once for a run, into a scratch folder: vite build of harness/page. */
-export function buildPage() {
-	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
-	// Development mode, unminified: the code today's checks were written against (vite's dev server).
-	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
-	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
-	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
-	return dist;
-}
-
-export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
-	const ports = portsFor(i);
-	// The slot is ours, but the last caller's programs may still be closing its ports: wait for them.
-	await portsFree(Object.values(ports));
-	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
-	const deck = join(scratch, "deck");
-	const home = join(scratch, "home");
-	cpSync(FIXTURE, deck, { recursive: true });
-	mkdirSync(home);
-	const started = [];
-	try {
-		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) {
-			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home, dist }), log);
-			started.push(child);
-			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
-			await until(ready, child, name);
-		}
-		return await work({ ports, deck, started, log });
-	} finally {
-		await Promise.all(started.reverse().map(stopAndWait));
-		rmSync(scratch, { recursive: true, force: true });
-	}
-}
-
-/** One check, start to end: the programs up, the check run, everything stopped and the copy gone. */
-export async function runCheck(file, i, { onlyServer = false } = {}) {
-	const log = [];
-	try {
-		return await runPrograms(async ({ ports, started }) => {
-			const web = onlyServer ? ports.server : ports.web;
-			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
-			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
-			const check = launch("check", { cmd: process.execPath, args: [checkPath(file)], env }, log);
-			started.push(check);
-			const code = await new Promise((done) => {
-				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
-				check.on("exit", (c) => (clearTimeout(timer), done(c)));
-			});
-			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
-		}, { i, onlyServer, log, dist: onDev(file) ? null : RUN.dist });
-	} catch (error) {
-		return { file, ok: false, why: error.message, log };
-	}
-}
-
-/** The first line of a check's output that says it failed, else the exit. */
-function firstFailure(log, code) {
-	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
-	const bad = lines.find((l) => /✗|\bFAIL\b|not ok/.test(l)) ?? lines.find((l) => /\bError\b|refusing/.test(l)) ?? (code !== 0 ? `exit ${code} with no failing line; see the log` : undefined);
-	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
-}
+// The command line: a slot per check, the page built once, a line per check.
 
 async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
@@ -235,3 +253,4 @@ async function main(argv) {
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) process.exitCode = await main(process.argv.slice(2));
+
