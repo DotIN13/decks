@@ -48,7 +48,9 @@
 		"server/cards/",
 		"server/documents/",
 		"tools/checks/cards/",
-		"canvas/documents/"
+		"canvas/documents/",
+		"tools/checks/library/documents-typing.mjs",
+		"tools/checks/checks.json"
 	],
 	"Roster": [
 		"server/people/",
