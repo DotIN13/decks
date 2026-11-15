@@ -64,10 +64,6 @@
 	"packages/stage/demo/worker.js: top-level let camera": 1,
 	"packages/stage/demo/worker.js: top-level let engine": 1,
 	"packages/stage/fetch-fonts.mjs: top-level let failed": 1,
-	"packages/ui/src/portal.ts: top-level let layer": 1,
-	"packages/ui/src/scribble.tsx: top-level let watching": 1,
-	"packages/ui/src/time.ts: top-level let track": 1,
-	"packages/ui/src/time.ts: top-level let zone": 1,
 	"scripts/alloc-shares.mjs: top-level let total": 1,
 	"scripts/card-zoom.mjs: top-level let frameSession": 1,
 	"scripts/ipad-profile.mjs: top-level let id": 1,
@@ -136,5 +132,9 @@
 	"tools/checks/page/voice.mjs: top-level let now": 1,
 	"tools/checks/pictures/apps-in-frame.mjs: top-level let box": 1,
 	"tools/checks/pictures/awake.mjs: top-level let phase": 1,
-	"tools/checks/pictures/awake.mjs: top-level let state": 1
+	"tools/checks/pictures/awake.mjs: top-level let state": 1,
+	"ui/portal.ts: top-level let layer": 1,
+	"ui/scribble.tsx: top-level let watching": 1,
+	"ui/time.ts: top-level let track": 1,
+	"ui/time.ts: top-level let zone": 1
 }

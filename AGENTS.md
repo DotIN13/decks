@@ -28,8 +28,9 @@ New folders, today:
 | `tools/gates` | the ten rules as scripts, with their baselines |
 | `tools/fixtures` | a small deck and drawings shared with Studio and the iPad app |
 | `pen/` | the drawing's file format, the package @decks/pen (moved from packages/pen) |
+| `ui/` | controls that know nothing of Decks, the package @decks/ui (moved from packages/ui) |
 
-Still to come, as DESIGN.md section 3 says: canvas, engine, ui (libraries that move from
+Still to come, as DESIGN.md section 3 says: canvas, engine (libraries that move from
 today's packages), clients (sdk, cli, mcp, attach, extension), and docs/decisions.
 
 Today's code, read only:
@@ -39,7 +40,6 @@ Today's code, read only:
 | `packages/api` | the two tables of calls | protocol |
 | `packages/canvas` | the canvas page library | canvas |
 | `packages/stage` | the Rust drawing engine | engine |
-| `packages/ui` | controls that know nothing of Decks | ui |
 | `scripts` | measures and old gates | tools |
 
 ## Words

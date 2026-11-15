@@ -472,9 +472,6 @@
 	"packages/sync-protocol/src/names.ts: board": 3,
 	"packages/sync-protocol/src/schemas.ts: board": 4,
 	"packages/sync-protocol/test/names.test.ts: board": 6,
-	"packages/ui/src/icons.tsx: board": 2,
-	"packages/ui/src/Popover.tsx: board": 1,
-	"packages/ui/src/scribble.tsx: board": 1,
 	"pen/arrow-fixtures.test.ts: stage": 3,
 	"pen/arrows.ts: board": 5,
 	"pen/arrows.ts: stage": 6,
@@ -664,5 +661,8 @@
 	"tools/checks/pictures/placeholder.mjs: board": 1,
 	"tools/checks/pictures/placeholder.mjs: stage": 9,
 	"tools/checks/pictures/stage-shot.mjs: board": 8,
-	"tools/checks/pictures/stage-shot.mjs: stage": 27
+	"tools/checks/pictures/stage-shot.mjs: stage": 27,
+	"ui/icons.tsx: board": 2,
+	"ui/Popover.tsx: board": 1,
+	"ui/scribble.tsx: board": 1
 }

@@ -5,13 +5,13 @@
 	"license": "MIT",
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts",
-		"./float": "./src/float/float.ts",
-		"./agent-marks": "./src/agent-marks.tsx"
+		".": "./index.ts",
+		"./float": "./float/float.ts",
+		"./agent-marks": "./agent-marks.tsx"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"test": "node --import tsx --test \"src/**/*.test.ts\""
+		"test": "node --import tsx --test \"**/*.test.ts\""
 	},
 	"dependencies": {
 		"lucide-solid": "^1.37.0",

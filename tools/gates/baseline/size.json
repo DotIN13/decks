@@ -161,13 +161,6 @@
 	"packages/sync-client/src/sync.ts: function syncCanvases over 80 lines": 1,
 	"packages/sync-client/src/sync.ts: function syncCanvasFiles over 80 lines": 1,
 	"packages/sync-client/src/sync.ts: over 400 lines": 1,
-	"packages/ui/src/agent-marks.tsx: function AgentMark over 80 lines": 1,
-	"packages/ui/src/float/float-math.ts: over 400 lines": 1,
-	"packages/ui/src/float/float.ts: function makeFloat over 80 lines": 1,
-	"packages/ui/src/float/float.ts: over 400 lines": 1,
-	"packages/ui/src/Popover.tsx: function (anonymous) over 80 lines": 1,
-	"packages/ui/src/Popover.tsx: function Popover over 80 lines": 1,
-	"packages/ui/src/scribble.tsx: function ScribbleCatch over 80 lines": 1,
 	"pen/diff.ts: function diff over 80 lines": 1,
 	"pen/diff.ts: function editDocument over 80 lines": 1,
 	"pen/geometry.ts: function pathBounds over 80 lines": 1,
@@ -198,5 +191,12 @@
 	"tools/checks/library/nudge.mjs: function run over 80 lines": 1,
 	"tools/checks/page/agents-tab.mjs: over 400 lines": 1,
 	"tools/checks/perf-canvas.mjs: function perfCanvas over 80 lines": 1,
-	"tools/checks/pictures/awake.mjs: over 400 lines": 1
+	"tools/checks/pictures/awake.mjs: over 400 lines": 1,
+	"ui/agent-marks.tsx: function AgentMark over 80 lines": 1,
+	"ui/float/float-math.ts: over 400 lines": 1,
+	"ui/float/float.ts: function makeFloat over 80 lines": 1,
+	"ui/float/float.ts: over 400 lines": 1,
+	"ui/Popover.tsx: function (anonymous) over 80 lines": 1,
+	"ui/Popover.tsx: function Popover over 80 lines": 1,
+	"ui/scribble.tsx: function ScribbleCatch over 80 lines": 1
 }
