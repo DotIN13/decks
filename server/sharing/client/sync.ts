@@ -4,6 +4,7 @@ import { pairs } from "./canvases.ts";
 import { syncDrawing, type Pass } from "./drawing.ts";
 import { syncFiles, type FilePass } from "./files.ts";
 import { readState, writeState, type SyncState } from "./link.ts";
+import { answerAsk, isAsk, type Run } from "./asks.ts";
 import { StudioApi, StudioError, type LiveLink, type Transport } from "./transport.ts";
 
 // Keeps a deck in step with Studio: a pass over every canvas when asked, when
@@ -22,6 +23,8 @@ export type SyncOptions = {
 	inventory?: () => App[] | Promise<App[]>;
 	issueToken?: (ask: TokenAsk) => { token: string; expires: number } | Promise<{ token: string; expires: number }>;
 	unlinked?: (reason: string) => void;
+	/** Runs a call Studio passes down for the deck's owner. */
+	run?: Run;
 };
 
 export const STUDIO: Caller = { kind: "person", id: "studio", name: "Decks Studio" };
@@ -146,6 +149,7 @@ export class DeckSync {
 			return;
 		}
 		if (got.type === "canvas" || got.type === "file" || got.type === "canvases") return this.later(100);
+		if (isAsk(got)) return this.reply(link, got);
 		if (got.type !== "token.ask" || !got.id || !got.user || !got.origin) return;
 		try {
 			if (!this.o.issueToken) throw new Error("This server gives no tokens.");
@@ -154,6 +158,11 @@ export class DeckSync {
 		} catch (error) {
 			link.send(JSON.stringify({ type: "token", id: got.id, error: (error as Error).message }));
 		}
+	}
+
+	private async reply(link: LiveLink, ask: Parameters<typeof answerAsk>[0]): Promise<void> {
+		const owner = (await readState(this.o.store)).user ?? (await this.hello().catch(() => undefined))?.user.id;
+		link.send(JSON.stringify({ type: "reply", id: ask.id, envelope: await answerAsk(ask, owner, this.o.run) }));
 	}
 
 	async stop(): Promise<void> {

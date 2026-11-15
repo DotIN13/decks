@@ -44,6 +44,9 @@ own modules. Never another feature.
 13. On the hub, who may read and edit is the store's role: a viewer may read, never write.
 14. `GET /api/bundle/<canvas>` (`bundle/`) gives the person the canvas as one `.decks` zip: a
     manifest, its folder, `lib/`, and the files its cards name. Pictures wait for `pictures/`.
+15. Studio may pass a call down the live socket (`ask`, answered by `reply`, `Live.askCall` on the
+    hub). Only the account that owns this deck's key is served, as `studio:<id>`; `studio.*`,
+    `deck.pair`, `deck.revoke`, `deck.update` and `agent.attach` stay at this machine.
 
 Left out for now: presence through Studio, card pictures, deck files a canvas mirrors (`assets/`,
 `docs/`), the multi-process live bus (Studio's), and the canvas follower (the page's, in `canvas/`).

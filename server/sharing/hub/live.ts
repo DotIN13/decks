@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Envelope } from "../../../protocol/index.ts";
 import type { HubStore, Who } from "./store.ts";
 
 // The live socket: each socket hears about the canvases its person may see.
@@ -15,10 +16,11 @@ export interface LiveSocket {
 /** The most bytes of edits a live message carries; a bigger revision is fetched. */
 export const INLINE_MAX = 64 * 1024;
 export const ASK_MS = 10_000;
+export const CALL_MS = 30_000;
 const COLORS = ["#2563eb", "#d946ef", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"];
 
 type Entry = { ws: LiveSocket; who: Who };
-type Ask = { harness: string; done: (answer: { token: string; expires: number } | Error) => void };
+type Ask = { harness: string; answer: string; done: (got: Sent | Error) => void };
 type Sent = Record<string, unknown> & { type?: unknown; canvas?: unknown; id?: unknown };
 
 export class Live {
@@ -43,7 +45,7 @@ export class Live {
 		const got = parse(raw);
 		if (!got) return;
 		if (entry.who.harness) {
-			if (got.type === "token") this.answered(entry.who.harness.id, got);
+			if (got.type === "token" || got.type === "reply") this.answered(entry.who.harness.id, got);
 			return;
 		}
 		if (got.type !== "presence" || typeof got.canvas !== "string" || !this.store.role(entry.who.user.id, got.canvas)) return;
@@ -83,29 +85,42 @@ export class Live {
 
 	/** Ask a harness, over its own socket, for a token for a person's browser at origin. */
 	askToken(harness: string, user: { id: string; name: string }, origin: string, ms = ASK_MS): Promise<{ token: string; expires: number }> {
+		return this.ask(harness, { type: "token.ask", user, origin }, "token", ms, (got) => {
+			if (typeof got.token === "string" && typeof got.expires === "number") return { token: got.token, expires: got.expires };
+			return new Error(typeof got.error === "string" ? got.error : "The harness would not give a token.");
+		});
+	}
+
+	/** Pass a person's call to a harness's Decks-local; its envelope comes back as it answered. */
+	askCall(harness: string, name: string, args: Record<string, unknown>, caller: { id: string; name: string }, ms = CALL_MS): Promise<Envelope<unknown>> {
+		const frame = { type: "ask", name, args, caller: { kind: "person", id: caller.id, name: caller.name } };
+		return this.ask(harness, frame, "reply", ms, (got) => (isEnvelope(got.envelope) ? got.envelope : new Error("The harness sent no answer.")));
+	}
+
+	/** One request on a harness's socket, answered once by a frame of the given type and id. */
+	private ask<T>(harness: string, frame: Sent, answer: string, ms: number, read: (got: Sent) => T | Error): Promise<T> {
 		const socket = this.socketOf(harness);
 		if (!socket) return Promise.reject(new Error("That harness is not connected."));
 		const id = randomUUID();
 		return new Promise((resolve, reject) => {
 			const timer = setTimeout(() => (this.asks.delete(id), reject(new Error("That harness did not answer."))), ms);
 			timer.unref?.();
-			const done = (answer: { token: string; expires: number } | Error) => {
+			const done = (got: Sent | Error) => {
 				clearTimeout(timer);
 				this.asks.delete(id);
-				if (answer instanceof Error) reject(answer);
-				else resolve(answer);
+				const value = got instanceof Error ? got : read(got);
+				if (value instanceof Error) reject(value);
+				else resolve(value);
 			};
-			this.asks.set(id, { harness, done });
-			socket.ws.send(JSON.stringify({ type: "token.ask", id, user, origin }));
+			this.asks.set(id, { harness, answer, done });
+			socket.ws.send(JSON.stringify({ ...frame, id }));
 		});
 	}
 
-	/** An answer counts only from the harness that was asked. */
+	/** An answer counts only from the harness that was asked, in the frame it was asked for. */
 	private answered(harness: string, got: Sent): void {
 		const ask = typeof got.id === "string" ? this.asks.get(got.id) : undefined;
-		if (!ask || ask.harness !== harness) return;
-		if (typeof got.token === "string" && typeof got.expires === "number") ask.done({ token: got.token, expires: got.expires });
-		else ask.done(new Error(typeof got.error === "string" ? got.error : "The harness would not give a token."));
+		if (ask && ask.harness === harness && ask.answer === got.type) ask.done(got);
 	}
 
 	private socketOf(harness: string): Entry | undefined {
@@ -116,6 +131,11 @@ export class Live {
 	dropHarness(id: string): void {
 		for (const s of this.sockets) if (s.who.harness?.id === id) s.ws.close(4001, "revoked");
 	}
+}
+
+function isEnvelope(value: unknown): value is Envelope<unknown> {
+	const e = value as { ok?: unknown; notes?: unknown } | undefined;
+	return !!e && typeof e.ok === "boolean" && Array.isArray(e.notes);
 }
 
 function parse(raw: unknown): Sent | undefined {

@@ -1,6 +1,7 @@
 import { calls, Refused } from "../../protocol/index.ts";
 import { defineFeature, handleAll, type Context, type Deck, type Feature, type Kernel, type Store } from "../kernel/types.ts";
 import { forget, readLink, writeLink, type Link } from "./client/link.ts";
+import type { Run } from "./client/asks.ts";
 import { DeckSync, type SyncOptions } from "./client/sync.ts";
 import { bundleRoute } from "./bundle/bundle.ts";
 import { networkTransport } from "./client/network.ts";
@@ -11,14 +12,18 @@ import { StudioError, type Transport } from "./client/transport.ts";
 
 export type SharingOptions = Pick<SyncOptions, "log" | "inventory" | "issueToken" | "unlinked"> & { transport?: Transport; settleMs?: number };
 
-type Running = { sync?: DeckSync; deck?: Deck; store?: Store; stopWatch?: () => void; timer?: ReturnType<typeof setTimeout> };
+type Running = { kernel?: Kernel; sync?: DeckSync; deck?: Deck; store?: Store; stopWatch?: () => void; timer?: ReturnType<typeof setTimeout> };
 
 export function sharingFeature(given: SharingOptions = {}): Feature {
 	const opts = { ...given, transport: given.transport ?? networkTransport() };
 	const running: Running = {};
 	const begin = async (deck: Deck, store: Store, link: Link) => {
 		await end(running);
-		const sync = new DeckSync({ ...opts, deck, store, url: link.url, key: link.key });
+		const run: Run = async (name, args, caller) => {
+			if (!running.kernel) throw new Error("the server has not started");
+			return running.kernel.call(name, args, caller);
+		};
+		const sync = new DeckSync({ ...opts, deck, store, url: link.url, key: link.key, run });
 		Object.assign(running, { sync, deck, store });
 		running.stopWatch = deck.watch((change) => {
 			if (change.by === sync.by.id || !/^(?:shared\/)?canvases\//.test(change.path)) return;
@@ -42,6 +47,7 @@ export function sharingFeature(given: SharingOptions = {}): Feature {
 			},
 		}),
 		async start(kernel: Kernel) {
+			running.kernel = kernel;
 			const store = kernel.store("sharing");
 			const link = await readLink(store);
 			if (link) await begin(kernel.deck, store, link);
