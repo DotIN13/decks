@@ -73,6 +73,11 @@ function shaped(now: string, old: string, args: Args): Args {
 	if (now === "canvas.undo") return { ...(args.canvas ? { canvas: args.canvas } : {}), redo: args.direction === "redo" };
 	if (old === "canvas.edit" && Array.isArray(args.ops)) args.ops = args.ops.map(itemOp);
 	if (now === "file.url" && typeof args.file === "string" && args.path === undefined) args.path = args.file;
+	// Today's canvas.update took the change as one object; item.update takes its parts.
+	if (now === "item.update" && isObject(args.change)) {
+		const { change, ...rest } = args;
+		args = { ...rest, ...change, ...(isObject(change.at) ? { at: point(change.at) } : {}) };
+	}
 	// Today's agent.update and agent.set took the change as patch; the new call calls it change.
 	if (now === "agent.update" && args.patch !== undefined && args.change === undefined) {
 		args.change = args.patch;
