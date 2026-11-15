@@ -81,7 +81,7 @@ export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	const card = ids.length === 1 ? /(?:^|\/)cards\/([^/]+)\//.exec(ids[0] ?? "")?.[1] : undefined;
 	void (async () => {
 		try {
-			const shot = await call<{ file: string }>("canvas.screenshot", { canvas, of: ids.length === 1 ? ids[0] : ids, format, scheme: scheme() });
+			const shot = await call<{ file: string }>("canvas.screenshot", { canvas, of: ids.length === 1 ? ids[0] : ids, format, scheme: scheme(), scale: 2 });
 			if (!shot.ok) throw new Error(shot.error);
 			const response = await fetch(`/files/${shot.value.file.split("/").map(encodeURIComponent).join("/")}`, { headers: authHeaders() });
 			if (!response.ok) throw new Error(`the server answered ${response.status}`);
