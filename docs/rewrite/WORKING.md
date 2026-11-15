@@ -114,3 +114,7 @@ sat waiting for an hour:
   A report at the end of a turn does not reach Mason.
 - Take the heavy lock for one run, never for a loop of runs. Ten runs are ten takes, so others get a
   turn between them. Write what you wait for in your progress file's `doing` before you wait.
+
+Browser checks: call `node tools/checks/run.mjs <check>` directly; it takes a slot per run, two checks at
+once, timed checks alone. `node tools/heavy.mjs --wait -- <command>` is for builds, installs and the whole
+type check, which run alone. Do not wrap `run.mjs` in `heavy.mjs`.
