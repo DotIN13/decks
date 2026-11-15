@@ -43,28 +43,23 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	}
 	if (!frame) throw new Error(`the frame never showed its stage (frame page asked ${served.length} times)\n${said.slice(0, 30).join("\n")}`);
 	const before = xOf(deck);
-	// As card-keys.mjs does it: a press on the card's words, Escape (the card stays selected),
-	// then an arrow; and Backspace, which takes the card off the drawing.
-	// Fit the canvas first (the key 0), so the card is on screen wherever the camera opened.
+		// Fit the canvas first (the key 0), so the card is on screen wherever the camera opened.
 	await frame.evaluate(() => document.querySelector(".stage")?.focus({ preventScroll: true }));
 	await page.keyboard.press("0");
 	await page.waitForTimeout(1200);
-	const host = await frame.evaluate((path) => {
-		const r = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === path)?.querySelector(".card-host")?.getBoundingClientRect();
+	// At a fitted zoom a card is its picture: pressed where the stage says it is, it is selected,
+	// and the canvas's keys act on it: an arrow nudges it, Backspace takes it off the drawing.
+	const rect = await frame.evaluate((path) => {
+		const r = window.__decksProbes?.cards?.().find((one) => one.path === path)?.rect;
 		return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null;
 	}, card);
-	const drawn = !!host;
-	if (host) {
+	const drawn = !!rect;
+	if (rect) {
 		const box = await (await frame.frameElement()).boundingBox();
-		// The first press selects the card and wakes it; the second puts the focus in its words.
-		await page.mouse.click(box.x + host.x + host.w * 0.5, box.y + host.y + host.h * 0.6);
-		await page.waitForTimeout(1000);
-		await page.mouse.click(box.x + host.x + host.w * 0.5, box.y + host.y + host.h * 0.6);
-		await page.waitForTimeout(400);
-		await page.keyboard.press("Escape");
-		await page.waitForTimeout(400);
-		await page.keyboard.press("ArrowRight");
+		await page.mouse.click(box.x + rect.x + rect.w * 0.5, box.y + rect.y + rect.h * 0.5);
 		await page.waitForTimeout(800);
+		await page.keyboard.press("ArrowRight");
+		await page.waitForTimeout(1000);
 		await page.keyboard.press("Backspace");
 	}
 	let after = before;
