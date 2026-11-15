@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Runs today's browser checks, unchanged, against the new programs: node tools/checks/run.mjs <check> ...
 // Per check: Decks-local on a fresh fixture copy, the harness, and the page, each on ports of its own.
-// A heavy job: node tools/heavy.mjs --wait -- node tools/checks/run.mjs <check>. Only server: --only-server.
+// It takes the heavy lock itself, a slot per check run (call it directly). Only server: --only-server.
 // CHECKS_LOG_DIR=<dir> keeps each check's whole log there; CHECKS_VERBOSE=1 prints a failure's tail.
 import { spawn, spawnSync } from "node:child_process";
+import { freeGb, withSlot } from "../heavy.mjs";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -11,7 +12,9 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 const FIXTURE = join(ROOT, "tools/fixtures/deck");
-const BASE = Number(process.env.CHECKS_PORT ?? 4612);
+const BASE = Number(process.env.CHECKS_PORT ?? 4610);
+/** Checks that measure time run alone (e2e/run.mjs marks them alone: true; ink-long-stroke times the frame too). */
+export const ALONE = new Set(["bent-arrows.mjs", "smooth-edits.mjs", "ink-long-stroke.mjs"]);
 const WAIT_MS = 60_000;
 /** What one run shares: the page built once. */
 const RUN = { dist: undefined };
@@ -29,6 +32,7 @@ export const PROGRAMS = {
 			: { cmd: process.execPath, args: [join(ROOT, "tools/checks/page-server.mjs"), "--dist", dist, "--deck", deck, "--port", String(web), "--compat"] },
 };
 
+/** Ports by lock slot (0 alone, 1 and 2 the check slots), so two checks at once never share one. */
 export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
 
 /** The person's token, from the lock file the server writes in the deck. */
@@ -112,7 +116,9 @@ async function stopAndWait(child) {
 /** The page built once for a run, into a scratch folder: vite build of harness/page. */
 export function buildPage() {
 	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
-	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+	// Development mode, unminified: the code today's checks were written against (vite's dev server).
+	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
+	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
 	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
 	return dist;
 }
@@ -174,13 +180,21 @@ async function main(argv) {
 	if (!files.length) return console.error("usage: node tools/checks/run.mjs [--only-server] <check> ..."), 2;
 	const missing = files.filter((f) => !existsSync(join(ROOT, "e2e/checks", f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
-	if (!onlyServer && process.env.CHECKS_PAGE !== "dev") RUN.dist = buildPage();
+	// A slot per run, never for the loop: a build alone, each check in a check slot (alone if it times).
+	// A caller already holding one (heavy.mjs -- run.mjs, HEAVY_HELD) has the run's lock: take nothing more.
+	const held = process.env.HEAVY_HELD;
+	const inSlot = async (cls, work) => {
+		if (held) return work(held === "check" ? 1 : 0);
+		if (freeGb() < 8) throw new Error(`only ${freeGb().toFixed(1)} GB free, under 8 GB: free disk, then tell Mason`);
+		return withSlot(cls, work);
+	};
+	if (!onlyServer && process.env.CHECKS_PAGE !== "dev") RUN.dist = await inSlot("exclusive", () => buildPage());
 	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
 	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [join(ROOT, "e2e/fake-model.mjs")] }, []);
 	let failed = 0;
 	const seen = new Map();
 	for (const file of files) {
-		const result = await runCheck(file, 0, { onlyServer });
+		const result = await inSlot(ALONE.has(file) ? "exclusive" : "check", (slot) => runCheck(file, slot, { onlyServer }));
 		if (!result.ok) failed++;
 		console.log(`${result.ok ? "pass" : "FAIL"}  ${file}${result.ok ? "" : `  ${result.why}`}`);
 		if (!result.ok && process.env.CHECKS_VERBOSE === "1") console.log(result.log?.join("").split("\n").slice(-40).join("\n"));

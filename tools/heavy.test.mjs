@@ -88,3 +88,30 @@ test("waiters take the lock in the order they came", async () => {
 	await Promise.all([a, b].map((c) => new Promise((r) => c.on("exit", r))));
 	assert.equal(readFileSync(order, "utf8"), "a\nb\n");
 });
+
+test("two checks run at once, and a third waits for one of them", async () => {
+	const { lock } = heavy([]);
+	const { spawn } = await import("node:child_process");
+	const { readFileSync, appendFileSync } = await import("node:fs");
+	const log = join(lock, "..", "log");
+	appendFileSync(log, "");
+	const check = (name) => spawn(process.execPath, [HEAVY, "--wait", "--class", "check", "--", "sh", "-c", `echo "${name} in $(date +%s%N)" >> "${log}"; sleep 1.5; echo "${name} out" >> "${log}"`], { env: { ...process.env, HEAVY_LOCK: lock, HEAVY_FREE_GB: "50" } });
+	const runs = ["a", "b", "c"].map((n, i) => new Promise((r) => setTimeout(() => check(n).on("exit", r), i * 150)));
+	await Promise.all(runs);
+	const lines = readFileSync(log, "utf8").trim().split("\n").map((l) => l.split(" ").slice(0, 2).join(" "));
+	assert.deepEqual(lines.slice(0, 2).sort(), ["a in", "b in"], "a and b start together");
+	assert.ok(lines.indexOf("c in") > Math.min(lines.indexOf("a out"), lines.indexOf("b out")), "c waits for a slot");
+});
+
+test("an exclusive job waits for running checks, and checks wait for it", async () => {
+	const { lock } = heavy([]);
+	const { spawn } = await import("node:child_process");
+	const { readFileSync, appendFileSync } = await import("node:fs");
+	const log = join(lock, "..", "log");
+	appendFileSync(log, "");
+	const job = (name, cls, secs) => spawn(process.execPath, [HEAVY, "--wait", ...(cls ? ["--class", cls] : []), "--", "sh", "-c", `echo "${name} in" >> "${log}"; sleep ${secs}; echo "${name} out" >> "${log}"`], { env: { ...process.env, HEAVY_LOCK: lock, HEAVY_FREE_GB: "50" } });
+	const delays = [["check1", "check", 1.2, 0], ["build", undefined, 0.6, 200], ["check2", "check", 0.3, 400]];
+	await Promise.all(delays.map(([n, c, s, d]) => new Promise((r) => setTimeout(() => job(n, c, s).on("exit", r), d))));
+	const lines = readFileSync(log, "utf8").trim().split("\n");
+	assert.deepEqual(lines, ["check1 in", "check1 out", "build in", "build out", "check2 in", "check2 out"]);
+});
