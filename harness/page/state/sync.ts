@@ -32,7 +32,7 @@ type Canvas = Parameters<typeof stageRowOf>[0];
 /** The latest answers the rows are made from; not drawn, so not reactive. */
 const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[] };
 
-/** Rows told by today's socket messages (state/compat), drawn beside the server's until it has the same id. */
+/** Rows told by today's socket messages (state/compat): an old agent list was the whole list, so it is drawn alone. */
 export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
 	held.told = chats;
 	drawAgents(hooks);
@@ -56,7 +56,7 @@ export function heardState(id: string, next: AgentState, hooks: SyncHooks): void
 /** Rebuild the agent rows from what is held, writing only what changed. */
 function drawAgents(hooks: SyncHooks): void {
 	const served = held.agents.map((agent) => chatOf(agent, held.extras[agent.id], cardsOn(held.cards, agent.canvas)));
-	const chats = [...served, ...held.told.filter((one) => !served.some((row) => row.id === one.id))];
+	const chats = held.told.length > 0 ? held.told : served;
 	setState("chats", reconcile(chats, { key: "id", merge: true }));
 	for (const chat of chats) {
 		ensureAgent(chat.id);

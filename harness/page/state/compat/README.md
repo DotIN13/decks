@@ -15,7 +15,7 @@ The page's `state/` modules, and `@decks-next/protocol`.
 ## Rules
 
 1. Only today's browser checks send these: they dispatch today's messages on the page's socket.
-2. Rows from an old agent list are drawn beside the server's until the server has the same id.
+2. An old agent list is the whole list: while one has been told, its rows are drawn alone.
 3. A message the page never drew from is left alone.
 4. Nothing outside `shell/actions.ts` calls it, so deleting this folder is one import.
 
