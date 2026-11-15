@@ -61,6 +61,8 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 			const answer = await fetch(`${base}${forward}${rest.split("/").map(encodeURIComponent).join("/")}?${params}`);
 			const headers: Record<string, string> = {};
 			answer.headers.forEach((value, key) => void (key !== "content-encoding" && key !== "content-length" && (headers[key] = value)));
+			// Read by the sandboxed frame, whose origin is null: modules and fetches need it said.
+			headers["access-control-allow-origin"] = "*";
 			res.writeHead(answer.status, headers).end(Buffer.from(await answer.arrayBuffer()));
 		},
 	};

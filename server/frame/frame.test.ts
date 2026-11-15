@@ -86,3 +86,14 @@ test("a pass's caller id starts with its asker's id", async () => {
 	assert.ok(isPass(issued[0]!.id) && !isPass("acct-7"));
 	passes.end("tok");
 });
+
+test("the sandboxed frame (origin null) reads its page, assets and pass files", async () => {
+	const server = await testServer({ features: features(), deck });
+	const doors = await server.listen(0);
+	const got = (await (await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify({ canvas: "plan" }) })).json()) as { pass: string };
+	const file = await fetch(`${doors.url}/api/t/${got.pass}/card/canvases/plan/files/a.txt`, { headers: { origin: "null" } });
+	assert.equal(file.status, 200);
+	assert.equal(file.headers.get("access-control-allow-origin"), "*");
+	await doors.close();
+	await server.close();
+});
