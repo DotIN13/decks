@@ -3,7 +3,7 @@ import { translate } from "./args.ts";
 import { deckRoute } from "./deck.ts";
 import { drawingRoute } from "./drawing.ts";
 import { lineRoute } from "./line.ts";
-import { stageThumbRoute } from "./pictures.ts";
+import { pictureRoutes } from "./pictures.ts";
 import { tabRoute } from "./tab.ts";
 
 // Today's names, answered from this one folder: the old line, the old drawing and tile routes.
@@ -18,7 +18,7 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow), stageThumbRoute(() => url()), tabRoute(deckNow), deckRoute(deckNow)],
+		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow)],
 		start(kernel) {
 			deck = kernel.deck;
 			url = () => kernel.url();

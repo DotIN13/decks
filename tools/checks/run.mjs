@@ -2,8 +2,9 @@
 // Runs today's browser checks, unchanged, against the new programs: node tools/checks/run.mjs <check> ...
 // Per check: Decks-local on a fresh fixture copy, the harness, and the page, each on ports of its own.
 // A heavy job: node tools/heavy.mjs --wait -- node tools/checks/run.mjs <check>. Only server: --only-server.
+// CHECKS_LOG_DIR=<dir> keeps each check's whole log there; CHECKS_VERBOSE=1 prints a failure's tail.
 import { spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -165,6 +166,7 @@ async function main(argv) {
 		if (!result.ok) failed++;
 		console.log(`${result.ok ? "pass" : "FAIL"}  ${file}${result.ok ? "" : `  ${result.why}`}`);
 		if (!result.ok && process.env.CHECKS_VERBOSE === "1") console.log(result.log?.join("").split("\n").slice(-40).join("\n"));
+		if (process.env.CHECKS_LOG_DIR) writeFileSync(join(process.env.CHECKS_LOG_DIR, `${file}.log`), result.log?.join("") ?? "");
 	}
 	if (model) stop(model);
 	console.log(`${files.length - failed} of ${files.length} checks pass`);

@@ -1,12 +1,17 @@
 import type { Route } from "../kernel/index.ts";
 
-// Today's /api/stage-thumb/<canvas>, a canvas's tile picture, read from server/pictures'
-// /pictures/canvas-tile/<canvas> with the same token and query.
+// Today's /api/stage-thumb/<canvas> and /api/thumb/<card>, read from server/pictures'
+// /pictures/canvas-tile/<canvas> and /pictures/<card> with the same token and query.
 
-const OLD = "/api/stage-thumb/";
-const NOW = "/pictures/canvas-tile/";
+/** Today's picture routes and where each is now: a canvas's tile, a card's picture. */
+const FORWARDS = [
+	{ old: "/api/stage-thumb/", now: "/pictures/canvas-tile/" },
+	{ old: "/api/thumb/", now: "/pictures/" },
+];
 
-export function stageThumbRoute(url: () => string | undefined): Route {
+export const pictureRoutes = (url: () => string | undefined): Route[] => FORWARDS.map(({ old, now }) => forward(old, now, url));
+
+function forward(OLD: string, NOW: string, url: () => string | undefined): Route {
 	return {
 		method: "GET",
 		prefix: OLD,
