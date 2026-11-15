@@ -71,6 +71,8 @@ export default defineConfig({
 			"/files/": pass(),
 			"/mcp": pass(),
 			"/compat/": pass(true),
+			// Today's tab socket, which today's browser checks still open; compat answers it.
+			"/ws": pass(true),
 			"/frame-assets/": pass(),
 			"/frame/": pass(true),
 			"/app/": pass(true),
