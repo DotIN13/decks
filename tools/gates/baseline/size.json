@@ -162,7 +162,6 @@
 	"packages/sync-client/src/sync.ts: function syncCanvasFiles over 80 lines": 1,
 	"packages/sync-client/src/sync.ts: over 400 lines": 1,
 	"pen/html.ts: over 400 lines": 1,
-	"pen/outline.ts: function mapped over 80 lines": 1,
 	"pen/pen.test.ts: over 400 lines": 1,
 	"scripts/css-order.mjs: function describe over 80 lines": 1,
 	"scripts/css-order.mjs: function flattenSheet over 80 lines": 1,

@@ -80,21 +80,31 @@ function polygon(w: number, h: number, sides: number): string {
 const COMMAND = /([MmLlHhVvCcSsQqTtAaZz])|(-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)/g;
 const ARITY: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
 
+/** A path's viewBox, or the box of its geometry when it has none. */
+function viewBoxOf(node: PenNode, d: string): [number, number, number, number] | undefined {
+	if (Array.isArray(node.viewBox) && node.viewBox.length === 4) return node.viewBox as [number, number, number, number];
+	const b = pathBounds(d);
+	return b ? [b.x, b.y, b.w, b.h] : undefined;
+}
+
+/** A path's commands and numbers, in order. */
+function tokensOf(d: string): Array<string | number> {
+	const list: Array<string | number> = [];
+	for (const m of d.matchAll(COMMAND)) list.push(m[1] ? m[1] : Number(m[2]));
+	return list;
+}
+
 /** A path item's geometry, made absolute and mapped from its viewBox onto 0..w, 0..h. */
 function mapped(node: PenNode, w: number, h: number): string | undefined {
 	const d = typeof node.geometry === "string" ? node.geometry.trim() : "";
 	if (!d) return undefined;
-	const vb = Array.isArray(node.viewBox) && node.viewBox.length === 4 ? node.viewBox : (() => {
-		const b = pathBounds(d);
-		return b ? ([b.x, b.y, b.w, b.h] as [number, number, number, number]) : undefined;
-	})();
+	const vb = viewBoxOf(node, d);
 	if (!vb) return undefined;
 	const sx = vb[2] ? w / vb[2] : 1;
 	const sy = vb[3] ? h / vb[3] : 1;
 	const X = (x: number) => (x - vb[0]) * sx;
 	const Y = (y: number) => (y - vb[1]) * sy;
-	const list: Array<string | number> = [];
-	for (const m of d.matchAll(COMMAND)) list.push(m[1] ? m[1] : Number(m[2]));
+	const list = tokensOf(d);
 	const out: string[] = [];
 	let [x, y, startX, startY] = [0, 0, 0, 0];
 	let i = 0;
