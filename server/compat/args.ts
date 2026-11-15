@@ -113,6 +113,8 @@ export function answerBack(old: string, value: unknown): unknown {
 		const screen = value.screen as { w?: number; h?: number } | undefined;
 		return screen && typeof screen.w === "number" ? { width: screen.w, height: screen.h } : null;
 	}
+	// canvas.insert answered the pen node, whose name was an app's or card's title.
+	if (old === "canvas.insert" && isObject(value) && typeof value.title === "string" && value.name === undefined) return { ...value, name: value.title };
 	// canvas.fit answered the card's measured size; card.fit answers its Placement, the size in its box.
 	if (old === "canvas.fit" && isObject(value) && isObject(value.box)) {
 		const b = value.box as { x1: number; y1: number; x2: number; y2: number };
