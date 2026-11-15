@@ -1,8 +1,6 @@
 {
 	"apps/web/scripts/stage-backends.ts: function main over 80 lines": 1,
 	"apps/web/scripts/stage-backends.ts: over 400 lines": 1,
-	"canvas/camera/controller.ts: function createCameraController over 80 lines": 1,
-	"canvas/camera/controller.ts: over 400 lines": 1,
 	"canvas/camera/insets.ts: function watchInsets over 80 lines": 1,
 	"canvas/camera/view-calls.ts: function runStageCall over 80 lines": 1,
 	"canvas/cards/card-surface.tsx: function CardSurface over 80 lines": 1,

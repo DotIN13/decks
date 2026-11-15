@@ -10,8 +10,8 @@
 	"canvas/camera/camera.test.ts: stage": 9,
 	"canvas/camera/camera.ts: board": 30,
 	"canvas/camera/camera.ts: stage": 9,
-	"canvas/camera/controller.ts: board": 13,
-	"canvas/camera/controller.ts: stage": 8,
+	"canvas/camera/controller.ts: board": 1,
+	"canvas/camera/controller.ts: stage": 3,
 	"canvas/camera/coords.ts: board": 6,
 	"canvas/camera/coords.ts: stage": 21,
 	"canvas/camera/glide.ts: stage": 3,
@@ -674,5 +674,9 @@
 	"canvas/editor/core/handles.ts: stage": 3,
 	"canvas/drawing/pages.ts: board": 23,
 	"canvas/drawing/pages.ts: stage": 3,
-	"canvas/drawing/edits.ts: stage": 4
+	"canvas/drawing/edits.ts: stage": 4,
+	"canvas/camera/controller-write.ts: stage": 3,
+	"canvas/camera/controller-write.ts: board": 10,
+	"canvas/camera/controller-motion.ts: stage": 2,
+	"canvas/camera/controller-api.ts: board": 2
 }

@@ -13,8 +13,7 @@
 	"canvas/camera/camera.test.ts: em dash": 3,
 	"canvas/camera/camera.ts: comment over 5 lines": 11,
 	"canvas/camera/camera.ts: em dash": 16,
-	"canvas/camera/controller.ts: comment over 5 lines": 20,
-	"canvas/camera/controller.ts: em dash": 12,
+	"canvas/camera/controller.ts: comment over 5 lines": 1,
 	"canvas/camera/coords.ts: comment over 5 lines": 3,
 	"canvas/camera/coords.ts: em dash": 9,
 	"canvas/camera/glide.ts: comment over 5 lines": 3,
@@ -725,5 +724,10 @@
 	"ui/scribble.tsx: comment over 5 lines": 1,
 	"ui/time.ts: comment over 5 lines": 1,
 	"canvas/drawing/pages.ts: comment over 5 lines": 2,
-	"canvas/drawing/edits.ts: comment over 5 lines": 2
+	"canvas/drawing/edits.ts: comment over 5 lines": 2,
+	"canvas/camera/controller-write.ts: comment over 5 lines": 11,
+	"canvas/camera/controller-write.ts: em dash": 7,
+	"canvas/camera/controller-motion.ts: comment over 5 lines": 6,
+	"canvas/camera/controller-motion.ts: em dash": 5,
+	"canvas/camera/controller-api.ts: comment over 5 lines": 2
 }
