@@ -4,6 +4,7 @@ import { canvasItems, type CanvasItem } from "@decks/canvas/tools";
 import type { FramedHandle } from "@decks/canvas";
 import { setMineReader } from "../chat/index.ts";
 import { api } from "../connections/connection.ts";
+import { fileAddress } from "../files/model.ts";
 import { openAuthed } from "../lib/authed.tsx";
 import { aboutSent, readParts, readSent } from "../composer/index.ts";
 import type { DraftMention } from "../composer/index.ts";
@@ -59,7 +60,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	 */
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
-		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
+		if (node.kind === "file") return void openAuthed(fileAddress(node.id)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
 		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
 		const name = stageOf(state.focused)?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(

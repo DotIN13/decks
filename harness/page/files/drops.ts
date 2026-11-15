@@ -17,7 +17,7 @@ import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/canvases.ts";
 import { authedSrc } from "../lib/authed.tsx";
-import { DOCUMENTS, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
+import { DOCUMENTS, fileAddress, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
 
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
@@ -312,7 +312,7 @@ export function createFileDrops() {
 				const image = new Image();
 				image.onload = () => resolve({ width: image.naturalWidth || 480, height: image.naturalHeight || 360 });
 				image.onerror = () => resolve({ width: 480, height: 360 });
-				void authedSrc(api(`/file?path=${encodeURIComponent(deckPath)}`)).then(
+				void authedSrc(fileAddress(deckPath)).then(
 					(src) => (image.src = src),
 					() => resolve({ width: 480, height: 360 }),
 				);
@@ -333,7 +333,7 @@ export function createFileDrops() {
 			return undefined;
 		}
 		// A file outside the deck: its bytes, the way a drop brings them.
-		const response = await fetch(api(`/file?path=${encodeURIComponent(picked)}`));
+		const response = await fetch(fileAddress(picked));
 		if (!response.ok) {
 			notice("warn", `${name} could not be read (${response.status}).`);
 			return undefined;

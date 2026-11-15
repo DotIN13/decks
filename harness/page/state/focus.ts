@@ -1,5 +1,5 @@
-// The agent this browser last opened, so a reload comes back to it. Kept in
-// this browser until the harness remembers it for every screen.
+// The agent to open when the page opens: the one the harness last had on
+// screen (runtime.get), else the one this browser last opened.
 
 const KEY = "decks.focused";
 
@@ -11,8 +11,9 @@ export function keepFocus(id: string): void {
 	}
 }
 
-/** The agent to open first: the one kept, when it is still here, else the first. */
-export function firstFocus(ids: readonly string[]): string | undefined {
+/** The agent to open first: the harness's, else the one this browser kept, when still here; else the first. */
+export function firstFocus(ids: readonly string[], harness?: string): string | undefined {
+	if (harness && ids.includes(harness)) return harness;
 	let kept: string | null = null;
 	try {
 		kept = localStorage.getItem(KEY);

@@ -20,6 +20,8 @@ import Upload from "lucide-solid/icons/upload";
 import X from "lucide-solid/icons/x";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "@decks/ui";
+import { call } from "../state/line.ts";
+import { browsed } from "./model.ts";
 
 interface BrowseEntry {
 	name: string;
@@ -151,10 +153,9 @@ export function FilePicker(props: {
 	 */
 	const [at, setAt] = createSignal<string>("");
 	const [listing] = createResource(at, async (path) => {
-		const url = path ? api(`/browse?path=${encodeURIComponent(path)}`) : api("/browse");
-		const response = await fetch(url);
-		if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
-		return (await response.json()) as BrowseResult;
+		const answer = await call<Array<{ path: string; size?: number; dir?: boolean }>>("file.list", { path });
+		if (!answer.ok) throw new Error(answer.error);
+		return browsed(path, answer.value) as BrowseResult;
 	});
 	const [filter, setFilter] = createSignal("");
 	const go = (path: string) => {

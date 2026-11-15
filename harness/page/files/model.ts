@@ -35,3 +35,15 @@ export function sizeLabel(bytes: number): string {
 	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+export type Browsed = { path: string; parent: string | null; entries: Array<{ name: string; path: string; kind: "dir" | "file"; size?: number }> };
+
+/** file.list's answer as the picker lists a folder: its entries by name, and the folder above it. */
+export function browsed(path: string, files: ReadonlyArray<{ path: string; size?: number; dir?: boolean }>): Browsed {
+	const parent = path ? path.split("/").slice(0, -1).join("/") : null;
+	const entries = files.map((one) => ({ name: one.path.split("/").pop() ?? one.path, path: one.path, kind: one.dir ? ("dir" as const) : ("file" as const), ...(one.size !== undefined ? { size: one.size } : {}) }));
+	return { path, parent, entries };
+}
+
+/** A deck file's address through the server's files door. */
+export const fileAddress = (path: string): string => `/files/${path.split("/").map(encodeURIComponent).join("/")}`;

@@ -32,7 +32,7 @@ type Card = Parameters<typeof pageOf>[0];
 type Canvas = Parameters<typeof stageRowOf>[0];
 
 /** The latest answers the rows are made from; not drawn, so not reactive. */
-const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[], soon: undefined as ReturnType<typeof setTimeout> | undefined };
+const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[], soon: undefined as ReturnType<typeof setTimeout> | undefined, focused: undefined as string | undefined };
 
 /** Rows told by today's socket messages (state/compat): an old agent list was the whole list, so it is drawn alone. */
 export function tellChats(chats: AgentChat[], hooks: SyncHooks): void {
@@ -71,7 +71,7 @@ function drawAgents(hooks: SyncHooks): void {
 		heardState(chat.id, chat.state, hooks);
 	}
 	setStages(held.canvases.map((canvas) => stageRowOf(canvas, held.agents)));
-	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id)));
+	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id), held.focused));
 	if (!state.focused) releasePages();
 }
 
@@ -118,6 +118,12 @@ async function readDeck(): Promise<void> {
 	for (const warning of answer.value.warnings) notice("warn", warning);
 }
 
+/** The agent the harness last had on screen, for a page that opens. */
+async function readFocus(): Promise<void> {
+	const answer = await call<{ focused?: string }>("runtime.get", {});
+	if (answer.ok && answer.value.focused) held.focused = answer.value.focused;
+}
+
 async function readRuntimes(): Promise<void> {
 	const answer = await call<Parameters<typeof runtimeOf>[0][]>("runtime.list", {});
 	if (answer.ok) setState("runtimes", answer.value.map(runtimeOf));
@@ -143,7 +149,7 @@ function cardsSoon(hooks: SyncHooks): void {
 
 /** Everything, read again: what the line coming up means. */
 export async function readAll(hooks: SyncHooks): Promise<void> {
-	await Promise.all([readDeck(), readRuntimes(), readAccounts(), readTab(), readCanvases(hooks)]);
+	await Promise.all([readDeck(), readRuntimes(), readAccounts(), readTab(), readFocus(), readCanvases(hooks)]);
 	await readCards(hooks);
 	await readAgents(hooks);
 }

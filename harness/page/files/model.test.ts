@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
+import { browsed, folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
 
 // A dropped file shows on the canvas as itself when it is a picture, short words or a player.
 
@@ -26,4 +26,11 @@ test("sizes read in bytes, kB and MB", () => {
 	assert.equal(sizeLabel(512), "512 B");
 	assert.equal(sizeLabel(2048), "2 kB");
 	assert.equal(sizeLabel(3 * 1024 * 1024), "3.0 MB");
+});
+
+test("a folder lists its entries by name, and the folder above it", () => {
+	const at = browsed("assets/films", [{ path: "assets/films/a.mp4", size: 3 }, { path: "assets/films/old", dir: true }]);
+	assert.equal(at.parent, "assets");
+	assert.deepEqual(at.entries.map((one) => `${one.name}:${one.kind}`), ["a.mp4:file", "old:dir"]);
+	assert.equal(browsed("", []).parent, null);
 });
