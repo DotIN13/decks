@@ -65,6 +65,9 @@ function moveChecks(p) {
 		const next = relocate(text, from, to, moves);
 		if (next !== text) writeFileSync(file, next);
 	}
+	// The old stale-paths script lists files that tell history on purpose, by path: they move too.
+	const stale = join(ROOT, "scripts/stale-paths.mjs");
+	if (existsSync(stale)) writeFileSync(stale, [...moves].reduce((t, [from, to]) => t.split(`"${from}"`).join(`"${to}"`), readFileSync(stale, "utf8")));
 	// Each check's place is a field beside its others in checks.json; its baseline keys move with it.
 	const file = join(ROOT, "tools/checks/checks.json");
 	const json = JSON.parse(readFileSync(file, "utf8"));
@@ -72,7 +75,7 @@ function moveChecks(p) {
 	writeFileSync(file, `${JSON.stringify(json, null, "\t")}\n`);
 	execFileSync(process.execPath, ["tools/gates/rekey.mjs", ...[...moves].flat(), "e2e/fake-agent", "tools/checks/fake-agent"], { cwd: ROOT, stdio: "inherit" });
 	gates();
-	const paths = [...[...moves].flat(), "e2e/fake-agent", "tools/checks/fake-agent", "tools/checks/checks.json", "tools/gates/baseline"];
+	const paths = [...[...moves].flat(), "e2e/fake-agent", "tools/checks/fake-agent", "tools/checks/checks.json", "tools/gates/baseline", "scripts/stale-paths.mjs"];
 	commit(paths, "Move every browser check to the feature that owns it", "Stop 3's checks go to their owners' features, the agent checks to tools/checks/agent, the benches to tools/checks/bench, the rest by what they exercise; the shared helpers, the fake model and agent go beside the runner. Each moved file's relative paths are read from its old place and written from its new one, the fixture now tools/fixtures/deck and the page's icon harness/page/public; nothing else in a check changes. tools/checks/checks.json gives each its path, and the gate baselines' keys move with the files.");
 }
 
