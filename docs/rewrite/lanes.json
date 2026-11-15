@@ -7,7 +7,8 @@
 		"tools/gen/",
 		"docs/rewrite/calls.md",
 		"clients/",
-		"tools/clients/"
+		"tools/clients/",
+		"extension/"
 	],
 	"Warden": [
 		"AGENTS.md",
@@ -70,7 +71,8 @@
 	],
 	"Pane": [
 		"harness/page/",
-		"packages/canvas/src/ui/"
+		"packages/canvas/src/ui/",
+		"packages/agent-ui/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
