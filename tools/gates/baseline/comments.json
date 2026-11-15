@@ -91,7 +91,7 @@
 	"canvas/drawing/boxes.ts: comment over 5 lines": 1,
 	"canvas/drawing/comment-text.ts: comment over 5 lines": 2,
 	"canvas/drawing/doc-index.ts: comment over 5 lines": 1,
-	"canvas/drawing/drawing.ts: comment over 5 lines": 7,
+	"canvas/drawing/drawing.ts: comment over 5 lines": 3,
 	"canvas/editor/core/arrows.ts: comment over 5 lines": 2,
 	"canvas/editor/core/dispatch.ts: comment over 5 lines": 3,
 	"canvas/editor/core/drop.ts: comment over 5 lines": 2,
@@ -723,5 +723,7 @@
 	"ui/Popover.tsx: comment over 5 lines": 1,
 	"ui/Popover.tsx: em dash": 2,
 	"ui/scribble.tsx: comment over 5 lines": 1,
-	"ui/time.ts: comment over 5 lines": 1
+	"ui/time.ts: comment over 5 lines": 1,
+	"canvas/drawing/pages.ts: comment over 5 lines": 2,
+	"canvas/drawing/edits.ts: comment over 5 lines": 2
 }

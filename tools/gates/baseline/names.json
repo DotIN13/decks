@@ -73,8 +73,8 @@
 	"canvas/drawing/doc-index.ts: stage": 2,
 	"canvas/drawing/drawing.test.ts: board": 16,
 	"canvas/drawing/drawing.test.ts: stage": 3,
-	"canvas/drawing/drawing.ts: board": 25,
-	"canvas/drawing/drawing.ts: stage": 13,
+	"canvas/drawing/drawing.ts: board": 2,
+	"canvas/drawing/drawing.ts: stage": 5,
 	"canvas/drawing/layers.test.ts: board": 7,
 	"canvas/drawing/layers.ts: board": 8,
 	"canvas/editor/core/arrows.test.ts: board": 11,
@@ -671,5 +671,8 @@
 	"canvas/editor/core/handles.ts: board": 6,
 	"canvas/editor/core/measure.ts: board": 1,
 	"canvas/editor/core/outlines.ts: stage": 1,
-	"canvas/editor/core/handles.ts: stage": 3
+	"canvas/editor/core/handles.ts: stage": 3,
+	"canvas/drawing/pages.ts: board": 23,
+	"canvas/drawing/pages.ts: stage": 3,
+	"canvas/drawing/edits.ts: stage": 4
 }
