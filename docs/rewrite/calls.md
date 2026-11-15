@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 126 calls (106 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 127 calls (107 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -126,8 +126,9 @@ A folder in apps/ that the server serves, builds or runs, shown on a canvas as a
 |---|---|---|---|---|
 | `apps.build` | agents | `app.build` | person, agent | Answers the App (status, errors); the time rides as a note. |
 | `apps.check` | agents | `app.check` | person, agent | Renamed. |
-| `apps.clone` | agents | `app.clone` | person, agent | Answers the App. |
-| `apps.create` | agents | `app.create` | person, agent | Answers the App; place it with item.insert({ type: app, app }). |
+| `apps.clone` | agents | `app.clone` | person, agent | Answers the App. Since 0.14.0 `to` names a folder outside the deck, which only the person may. |
+| new | | `app.move` | person | Added in 0.14.0 (DESIGN section 10): move an app's source out of the deck; the deck keeps where it went. |
+| `apps.create` | agents | `app.create` | person, agent | Answers the App; place it with item.insert({ type: app, app }). Since 0.14.0 `source` puts it outside the deck, which only the person may. |
 | `apps.status` | agents | `app.get` | person, agent, app | Answers the App, its repository included. |
 | `apps.repo` | agents | alias of `app.get` | person, agent, app | app.get's `repo` says it. Every app is a repository from the start; older folders become one in upgrade/. |
 | `apps.list` | agents | `app.list` | person, agent, app | Renamed. |
@@ -136,7 +137,7 @@ A folder in apps/ that the server serves, builds or runs, shown on a canvas as a
 | `apps.restart` | agents | `app.restart` | person, agent | Answers the App. |
 | `apps.run` | agents | `app.run` | person, agent | Answers the App. |
 | `apps.stop` | agents | `app.stop` | person, agent | Answers the App, not { stopped }. |
-| `apps.seen` | person | `app.update` | person | `seen` is when the person looked. |
+| `apps.seen` | person | `app.update` | person | `seen` is when the person looked; since 0.14.0 it also takes `source`, where the app's source now is. |
 
 ### port
 

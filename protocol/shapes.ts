@@ -124,11 +124,12 @@ export const View = named(
 );
 
 export const AppKind = named("AppKind", lit("static", "build", "server"));
-export const AppStatus = named("AppStatus", lit("stopped", "installing", "building", "starting", "running", "asleep", "broken"));
+export const AppStatus = named("AppStatus", lit("stopped", "installing", "building", "starting", "running", "asleep", "broken", "missing"), "missing: the source folder is not on this machine.");
+export const Source = named("Source", obj({ path: str("A folder on this machine."), repo: opt(str("The git address it can be cloned from.")) }), "Where an app's source lives when not in the deck.");
 export const Repo = named("Repo", obj({ branch: str(), head: str(), dirty: opt(int()), remote: opt(str()) }));
 export const App = named(
 	"App",
-	obj({ name: str(), title: str(), kind: AppKind, status: AppStatus, url: str(), folder: opt(str()), port: opt(int()), errors: opt(arr(str())), seen: opt(num()), at: opt(num()), version: opt(int()), repo: opt(Repo) }),
+	obj({ name: str(), title: str(), kind: AppKind, status: AppStatus, url: str(), folder: opt(str()), port: opt(int()), errors: opt(arr(str())), seen: opt(num()), at: opt(num()), version: opt(int()), repo: opt(Repo), source: opt(Source) }),
 	"An app folder and its state.",
 );
 export const AppCheck = named("AppCheck", obj({ verdict: str(), url: opt(str()), title: opt(str()), errors: arr(str()), failed: opt(arr(str())), words: opt(int()), file: opt(str()) }));
