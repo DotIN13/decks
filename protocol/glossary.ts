@@ -3,7 +3,9 @@
 
 export const SERVER_NOUNS = ["deck", "canvas", "item", "card", "file", "frame", "app", "port", "agent", "view", "tab", "studio", "google"] as const;
 export const HARNESS_NOUNS = ["chat", "account", "runtime"] as const;
-export const NOUNS = [...SERVER_NOUNS, ...HARNESS_NOUNS] as const;
+/** Nouns only Studio answers, declared in its own repo (DESIGN.md section 5). */
+export const STUDIO_NOUNS = ["share", "machine"] as const;
+export const NOUNS = [...SERVER_NOUNS, ...HARNESS_NOUNS, ...STUDIO_NOUNS] as const;
 export type Noun = (typeof NOUNS)[number];
 
 export const nouns: Record<Noun, string> = {
@@ -23,6 +25,8 @@ export const nouns: Record<Noun, string> = {
 	chat: "An agent's conversation, as the harness keeps it.",
 	account: "A login the harness spends from.",
 	runtime: "A kind of agent the harness can run, and the harness's own settings.",
+	share: "A canvas shared with a friend in Studio, and what they may do with it.",
+	machine: "A person's computer that Studio reaches, with the Decks-local server on it.",
 };
 
 /** Words the rewrite no longer uses, each with the word that replaced it. */
