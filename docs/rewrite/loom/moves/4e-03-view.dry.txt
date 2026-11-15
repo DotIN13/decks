@@ -1,12 +1,12 @@
 # Step 4e-03-view: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx
 
-Dry run on 04115c50, on top of 4e-02-camera. Nothing was moved.
+Dry run on f233ce1f, on top of 4e-04-input. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 28
-- import lines rewritten: 52
+- files edited or created: 27
+- import lines rewritten: 51
 - warnings: 0
 
 ## Moved
@@ -26,9 +26,6 @@ canvas/camera/scroll-area.ts:10
 canvas/cards/CardEditor.tsx:28
   - * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
   + * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back
-canvas/edit/dom/pointer.ts:50
-  - /** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
-  + /** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
 canvas/edit/index.ts:2
   - * The editor, as the stage (`canvas/Stage.tsx`) uses it: the one way in. `createStageEditor` puts
   + * The editor, as the stage (`canvas/view/CanvasView.tsx`) uses it: the one way in. `createStageEditor` puts
@@ -47,6 +44,21 @@ canvas/editor.tsx:18
 canvas/frame/outside/host.tsx:13
   - * `stage/items-layer.tsx`), run in the frame, where the stage is.
   + * `view/items-layer.tsx`), run in the frame, where the stage is.
+canvas/input/canvas-input.ts:15
+  - import type { StageProps } from "../stage/Stage.tsx";
+  + import type { StageProps } from "../view/CanvasView.tsx";
+canvas/input/canvas-input.ts:31
+  - /** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+  + /** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
+canvas/input/canvas-input.ts:35
+  - /** The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`). */
+  + /** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
+canvas/input/canvas-input.ts:114
+  - // The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
+  + // The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
+canvas/input/pointer.ts:50
+  - /** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
+  + /** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
 canvas/items/MediaPlayer.tsx:5
   - * The one live player, laid over the film or sound it plays (`Stage.tsx` `playing`).
   + * The one live player, laid over the film or sound it plays (`CanvasView.tsx` `playing`).
@@ -71,21 +83,6 @@ canvas/render/engine.ts:1006
 canvas/render/engine.ts:2155
   - * A picture of what a drag carries, for the ghost a drag over a card shows (`Stage.tsx`): the lifted
   + * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
-canvas/view/CanvasView.tsx:37
-  - import { createStageInput } from "./input.ts";
-  + import { createStageInput } from "../stage/input.ts";
-canvas/stage/input.ts:15
-  - import type { StageProps } from "./Stage.tsx";
-  + import type { StageProps } from "../view/CanvasView.tsx";
-canvas/stage/input.ts:31
-  - /** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
-  + /** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
-canvas/stage/input.ts:35
-  - /** The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`). */
-  + /** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
-canvas/stage/input.ts:114
-  - // The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
-  + // The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
 canvas/view/items-layer.tsx:22
   - import type { StageProps } from "./Stage.tsx";
   + import type { StageProps } from "./CanvasView.tsx";

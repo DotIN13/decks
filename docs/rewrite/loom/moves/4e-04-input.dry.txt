@@ -1,12 +1,12 @@
 # Step 4e-04-input: Regroup canvas: pointer, keys and touch rules into input/
 
-Dry run on 04115c50, on top of 4e-02-camera, 4e-03-view. Nothing was moved.
+Dry run on f233ce1f. Nothing was moved.
 
 - files moved by git mv: 6
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 21
-- import lines rewritten: 44
+- files edited or created: 22
+- import lines rewritten: 45
 - warnings: 0
 
 ## Moved
@@ -116,6 +116,27 @@ canvas/items/item-surfaces.tsx:125
 canvas/items/item-surfaces.tsx:193
   - * zooms with it as it does over a card whose insides cannot scroll (`input.ts`, `ownInput`). The point
   + * zooms with it as it does over a card whose insides cannot scroll (`item-keys.ts`, `ownInput`). The point
+canvas/stage/Stage.tsx:19
+  - import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
+  + import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
+canvas/stage/Stage.tsx:37
+  - import { createStageInput } from "./input.ts";
+  + import { createStageInput } from "../input/canvas-input.ts";
+canvas/stage/Stage.tsx:177
+  - * The stage is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
+  + * The stage is four files: this one, which wires the pieces together and draws the tree; `canvas-input.ts`,
+canvas/stage/Stage.tsx:349
+  - /* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
+  + /* What the stage hears from the person (`canvas-input.ts`): made where its listeners were, before the engine. */
+canvas/input/canvas-input.ts:15
+  - import type { StageProps } from "./Stage.tsx";
+  + import type { StageProps } from "../stage/Stage.tsx";
+canvas/stage/items-layer.tsx:41
+  - /** What an item's slot asks of the stage's fingers (`input.ts`). */
+  + /** What an item's slot asks of the stage's fingers (`canvas-input.ts`). */
+canvas/stage/selection.tsx:54
+  - /** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
+  + /** A press is held on the canvas (`canvas-input.ts`): the drawn items' pill steps aside. */
 canvas/ui/Callout.tsx:5
   - import { COARSE } from "../edit/dom/touch-rules.ts";
   + import { COARSE } from "../input/touch-rules.ts";
@@ -125,24 +146,6 @@ canvas/ui/HoldMenu.tsx:13
 canvas/ui/Properties.tsx:47
   - import { COARSE } from "../edit/dom/touch-rules.ts";
   + import { COARSE } from "../input/touch-rules.ts";
-canvas/view/CanvasView.tsx:19
-  - import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
-  + import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
-canvas/view/CanvasView.tsx:37
-  - import { createStageInput } from "../stage/input.ts";
-  + import { createStageInput } from "../input/canvas-input.ts";
-canvas/view/CanvasView.tsx:177
-  - * The stage is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
-  + * The stage is four files: this one, which wires the pieces together and draws the tree; `canvas-input.ts`,
-canvas/view/CanvasView.tsx:349
-  - /* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
-  + /* What the stage hears from the person (`canvas-input.ts`): made where its listeners were, before the engine. */
-canvas/view/items-layer.tsx:41
-  - /** What an item's slot asks of the stage's fingers (`input.ts`). */
-  + /** What an item's slot asks of the stage's fingers (`canvas-input.ts`). */
-canvas/view/selection.tsx:54
-  - /** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
-  + /** A press is held on the canvas (`canvas-input.ts`): the drawn items' pill steps aside. */
 harness/page/canvases/CanvasOps.tsx:25
   - * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
   + * Every row is checked against the code that implements it, in `@decks/canvas`: `input/canvas-input.ts`
