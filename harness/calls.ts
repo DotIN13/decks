@@ -1,5 +1,5 @@
-import { CALLS } from "@decks-next/protocol";
-import type { Answerer } from "@decks-next/sdk";
+import { CALLS } from "@decks/protocol";
+import type { Answerer } from "@decks/sdk";
 import type { ClaudeAccounts } from "./accounts/accounts.ts";
 import { accountAnswers } from "./accounts/answers.ts";
 import { runtimeAnswers } from "./runtimes/answers.ts";

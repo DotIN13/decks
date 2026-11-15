@@ -1,4 +1,4 @@
-import { host as openHost, type Host } from "@decks-next/sdk";
+import { host as openHost, type Host } from "@decks/sdk";
 import { ClaudeAccounts } from "./accounts/index.ts";
 import { harnessAnswers, type Parts } from "./calls.ts";
 import { AGENT_KINDS, type RunKind } from "./runtimes/types/index.ts";

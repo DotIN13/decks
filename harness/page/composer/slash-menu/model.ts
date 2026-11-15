@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@decks-next/protocol";
+import type { SlashCommand } from "@decks/protocol";
 
 /** Fifty at a time. */
 const MAX_MATCHES = 50;

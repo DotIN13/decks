@@ -15,7 +15,7 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
 import type { PageEngine } from "@decks/stage";
 import { markMissing, saysMissing } from "../items/missing.ts";
 import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
 import { pictureAddress } from "../host.ts";

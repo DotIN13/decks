@@ -1,8 +1,8 @@
-import { clientFor, DecksError, Line, type Client, type Heard, type Typed } from "@decks-next/sdk/browser";
+import { clientFor, DecksError, Line, type Client, type Heard, type Typed } from "@decks/sdk/browser";
 import { batch } from "solid-js";
 import { openOldLine } from "./compat/line.ts";
 
-// The page's one line to the server: every call through @decks-next/sdk, and
+// The page's one line to the server: every call through @decks/sdk, and
 // one socket (the sdk's Line) for the events the page hears, by name, handed
 // out in one batch per paint, and for the calls tied to this screen.
 

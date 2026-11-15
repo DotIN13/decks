@@ -1,4 +1,4 @@
-import type { Answerer } from "@decks-next/sdk";
+import type { Answerer } from "@decks/sdk";
 import type { Sessions } from "../sessions/index.ts";
 import type { ClaudeAccounts } from "./accounts.ts";
 

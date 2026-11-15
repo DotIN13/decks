@@ -1,4 +1,4 @@
-import type { AgentState } from "@decks-next/protocol";
+import type { AgentState } from "@decks/protocol";
 import { isWorking, workingWords } from "../status/model.ts";
 
 /** Where this device remembers the conversation's height, and whether it was folded. */

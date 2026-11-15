@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import { Show, createEffect, createMemo, type Accessor } from "solid-js";
 import { boxOf, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";

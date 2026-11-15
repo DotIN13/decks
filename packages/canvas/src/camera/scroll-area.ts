@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import type { Viewport } from "./camera.ts";
 
 /**

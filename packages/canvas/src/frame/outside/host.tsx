@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { dismissMenus } from "@decks/ui";
 import type { EditorState, StageComment } from "../../types.ts";

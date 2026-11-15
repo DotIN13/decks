@@ -1,4 +1,4 @@
-import { SOCKET_PATH } from "@decks-next/protocol";
+import { SOCKET_PATH } from "@decks/protocol";
 
 // Today's browser checks hand the page today's socket messages by dispatching
 // them on its last WebSocket. The line's socket hears only new events; this

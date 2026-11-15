@@ -4,7 +4,7 @@ import { serialize } from "@decks/pen";
 import { untrack } from "solid-js";
 import { touchedBy } from "./marks.ts";
 import { dismissMenus } from "@decks/ui";
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { runStageCall } from "../../camera/stage-ops.ts";

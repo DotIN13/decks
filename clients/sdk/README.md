@@ -1,6 +1,6 @@
 # clients/sdk
 
-`@decks-next/sdk`: every call, typed from the protocol, over HTTP, and the event stream over the socket.
+`@decks/sdk`: every call, typed from the protocol, over HTTP, and the event stream over the socket.
 Runs in node 22 and later and in a browser.
 
 ## Owns

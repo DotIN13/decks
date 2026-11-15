@@ -1,4 +1,4 @@
-import type { Client } from "@decks-next/sdk";
+import type { Client } from "@decks/sdk";
 import type { AgentBackend, AgentBackendContext, ClaudeAccountSwitcher } from "../runtimes/backend.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import { ExtensionUiBridge } from "../runtimes/shared/extension-ui.ts";

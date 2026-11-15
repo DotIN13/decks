@@ -16,7 +16,7 @@
 	"dependencies": {
 		"lucide-solid": "^1.37.0",
 		"solid-js": "^1.9.14",
-		"@decks/protocol": "*"
+		"@decks/protocol-old": "*"
 	},
 	"devDependencies": {
 		"tsx": "^4.20.7",

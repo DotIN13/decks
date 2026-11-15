@@ -5,10 +5,10 @@ import { host, type Answerer, type Host, type HostOptions } from "./host.ts";
 import { Line, type Ask } from "./line.ts";
 import type { Heard, Stream, Watch } from "./socket.ts";
 
-// @decks-next/sdk: every call, typed from the protocol, over HTTP; the event
+// @decks/sdk: every call, typed from the protocol, over HTTP; the event
 // stream over the socket. decks.item.move({ id, at }) answers the item as it
 // now is; a refusal throws a DecksError with code, message and hint. A page
-// imports @decks-next/sdk/browser, which holds no node module.
+// imports @decks/sdk/browser, which holds no node module.
 
 export { clientFor, DecksError, find, host, Line, tokensFile, type Answered, type Answerer, type Ask, type Client, type Heard, type Host, type HostOptions, type Stream, type Typed, type Watch };
 

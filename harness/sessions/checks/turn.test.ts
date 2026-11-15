@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { clientFor, type Client } from "@decks-next/sdk";
+import { clientFor, type Client } from "@decks/sdk";
 import { readLock, startServer } from "../../main.ts";
 
 // Decks-local and the harness as two processes, a Pi agent on the fake model:

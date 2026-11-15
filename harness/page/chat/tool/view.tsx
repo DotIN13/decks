@@ -2,7 +2,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, Index, Show } from "solid-js";
 import { Icon } from "@decks/ui";
 import type { ToolSlot } from "./model.ts";
-import type { ChatItem } from "@decks-next/protocol";
+import type { ChatItem } from "@decks/protocol";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { askFullResult, awaitingResult, fullResult } from "./actions.ts";
 

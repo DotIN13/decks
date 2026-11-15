@@ -1,7 +1,7 @@
 # clients/extension
 
 The Decks extension for Chrome: share one tab of your own browser with a deck, so its agents can read the
-page you are logged into and fill it in, with you watching. Package `@decks-next/extension` until the
+page you are logged into and fill it in, with you watching. Package `@decks/extension` until the
 switch-over. Chrome loads these files as they are; there is no build.
 
 ## Owns

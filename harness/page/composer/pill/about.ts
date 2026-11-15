@@ -1,7 +1,7 @@
 import { commentLabel, type Draft, type DraftMention, mentionAddress, shortLabel } from "../draft/model.ts";
 import type { PillAbout } from "./card.ts";
 import { cardKind, OLD_HEADS, WHOLE_ENDS } from "./compat/old-words.ts";
-import type { MessageMention, MessagePart } from "@decks-next/protocol";
+import type { MessageMention, MessagePart } from "@decks/protocol";
 import { commentItem } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/index.ts";
 

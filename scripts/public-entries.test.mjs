@@ -54,7 +54,7 @@ const STUDIO_IMPORTS = {
 	"@decks/sync-client": ["HarnessSync"],
 	"@decks/sync-protocol": ["CANVAS_NAME", "safeSyncPath", "Changes", "HarnessApp", "Inventory", "LiveEvent", "LiveSend", "PenEdit", "Role", "SyncCanvas", "SyncFile"],
 	"@decks/pen": ["applyEdits", "baseTheme", "boxOf", "diff", "emptyDocument", "idFor", "ids", "parse", "placements", "read", "serialize", "Op", "PenDocument", "PenEdit"],
-	"@decks/protocol": ["THINKING_LEVELS", "AgentKind", "AgentMode", "AgentState", "ChatItem", "ModelOption", "SlashCommand", "ThinkingLevel"],
+	"@decks/protocol-old": ["THINKING_LEVELS", "AgentKind", "AgentMode", "AgentState", "ChatItem", "ModelOption", "SlashCommand", "ThinkingLevel"],
 	"@decks/sdk": ["connect", "DecksError", "Decks"],
 };
 

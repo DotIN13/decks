@@ -1,4 +1,4 @@
-import type { ChatItem } from "@decks-next/protocol";
+import type { ChatItem } from "@decks/protocol";
 
 /** A tool call as the transcript carries it. */
 export type ToolItem = Extract<ChatItem, { kind: "tool" }>;

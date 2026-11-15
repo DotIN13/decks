@@ -357,7 +357,7 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 ## The canvas library's old types (0.19.0, for Loom)
 
 `packages/canvas` still imports these from the old `@decks/protocol` and `@decks/api`. Each has a new name in
-`@decks-next/protocol`; nothing in the old packages changes, and Loom rewires the 37 files later.
+`@decks/protocol`; nothing in the old packages changes, and Loom rewires the 37 files later.
 
 | Old (where) | New name (where) | What changed |
 |---|---|---|

@@ -1,5 +1,5 @@
 import type { Frame, PenDocument, PenEdit } from "@decks/pen";
-import type { Page, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol-old";
 import type { Accessor, JSX } from "solid-js";
 import type { ViewStorage } from "./camera/agent-views.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";

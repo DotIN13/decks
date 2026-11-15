@@ -1,4 +1,4 @@
-import { THINKING_LEVELS, type AgentKind, type AgentMode, type ModelOption, type SlashCommand, type ThinkingLevel } from "@decks-next/protocol";
+import { THINKING_LEVELS, type AgentKind, type AgentMode, type ModelOption, type SlashCommand, type ThinkingLevel } from "@decks/protocol";
 /** An agent as the chat list draws it: its runtime, its identity, and what it can do. */
 
 /**

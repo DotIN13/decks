@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import { isNews } from "./news.ts";
 
 const NOW = 1_700_000_000_000;

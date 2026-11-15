@@ -13,7 +13,7 @@ and the old page's conversation section and stream; markup, class names and beha
 
 ## May import
 
-`@decks-next/protocol` (types; `@decks/protocol` until Lexicon moves them), `@decks/ui`,
+`@decks/protocol` (types; `@decks/protocol` until Lexicon moves them), `@decks/ui`,
 `solid-js`, `lucide-solid`, `../composer` (its pills), and Pane's entries under
 `harness/page/<area>/index.ts`. Never `server/`, never a neighbour's inner file.
 

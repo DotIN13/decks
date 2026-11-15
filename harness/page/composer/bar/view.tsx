@@ -1,5 +1,5 @@
-import type { AgentUsage } from "@decks-next/protocol";
-import type { AgentMode, AgentModel, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks-next/protocol";
+import type { AgentUsage } from "@decks/protocol";
+import type { AgentMode, AgentModel, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Mic from "lucide-solid/icons/mic";
 import Paperclip from "lucide-solid/icons/paperclip";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { SlashCommand } from "@decks-next/protocol";
+import type { SlashCommand } from "@decks/protocol";
 import { filterCommands } from "./model.ts";
 
 const cmd = (name: string, aliases?: string[]): SlashCommand => ({ name, ...(aliases ? { aliases } : {}) });

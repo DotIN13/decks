@@ -1,6 +1,6 @@
 import { life } from "./life.ts";
 import { createSignal, type Accessor } from "solid-js";
-import type { Camera, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
+import type { Camera, Presence, PresenceBy, ServerMessage } from "@decks/protocol-old";
 import { toWorld } from "../../camera/camera.ts";
 
 /** Someone else on this canvas, as last heard: who, and where their pointer, selection and camera are. */

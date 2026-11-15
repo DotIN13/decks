@@ -1,4 +1,4 @@
-import type { ModelOption, ThinkingLevel } from "@decks-next/protocol";
+import type { ModelOption, ThinkingLevel } from "@decks/protocol";
 import { levelsFor, nearestLevel } from "./model.ts";
 
 /** A model was picked: the thinking level comes across only as far as the new model allows. */

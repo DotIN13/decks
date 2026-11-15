@@ -1,4 +1,4 @@
-import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks-next/protocol";
+import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
 import FiveHour from "../../settings/index.ts";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";

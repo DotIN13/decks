@@ -1,4 +1,4 @@
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { PageView } from "../edit/index.ts";
 import { CardSurface } from "./card-surface.tsx";

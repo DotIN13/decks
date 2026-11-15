@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { clientFor, type Client } from "@decks-next/sdk";
+import { clientFor, type Client } from "@decks/sdk";
 import type { DecksAccess } from "../runtimes/backend.ts";
 import { decksEnv } from "../runtimes/env.ts";
 import { deckContext, type DeckFacts } from "../runtimes/shared/context.ts";

@@ -1,4 +1,4 @@
-import type { AgentUsage } from "@decks-next/protocol";
+import type { AgentUsage } from "@decks/protocol";
 import { For, Show } from "solid-js";
 import { Popover, Icon } from "@decks/ui";
 import { ContextRing } from "../../shell/index.ts";

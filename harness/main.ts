@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { LOCK_FILE } from "@decks-next/protocol";
+import { LOCK_FILE } from "@decks/protocol";
 import { startHarness } from "./host.ts";
 import type { RunKind } from "./runtimes/types/index.ts";
 

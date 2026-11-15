@@ -3,7 +3,7 @@ import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { clockTime } from "@decks/ui";
 import { createEffect, createSignal, Index, Match, onCleanup, onMount, Show, Switch } from "solid-js";
-import type { MessagePart } from "@decks-next/protocol";
+import type { MessagePart } from "@decks/protocol";
 import type { Draft } from "../../composer/draft/model.ts";
 import { closePillCard, pillNode, wirePills, type PillHost } from "../../composer/pill/card.ts";
 import { drawMine, setMineReader } from "./actions.ts";

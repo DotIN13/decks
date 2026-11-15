@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AgentChat, Identity } from "@decks-next/protocol";
+import type { AgentChat, Identity } from "@decks/protocol";
 import { focusedFacts } from "./model.ts";
 
 test("with no agent, the stream is idle, says It, and uses the default runtime", () => {

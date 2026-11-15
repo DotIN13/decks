@@ -1,4 +1,4 @@
-import type { AgentState } from "@decks-next/protocol";
+import type { AgentState } from "@decks/protocol";
 
 /** Where the working sign goes: over the input bar, at the foot of the conversation, or nowhere at all. */
 export type SignPlace = "none" | "dock" | "column";

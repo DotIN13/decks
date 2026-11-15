@@ -1,4 +1,4 @@
-import type { Page, Camera, StageCall } from "@decks/protocol";
+import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { cssEscape } from "@decks/ui";
 import { boxOf, fit } from "./camera.ts";
 

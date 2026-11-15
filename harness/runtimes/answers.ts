@@ -1,4 +1,4 @@
-import type { Answerer } from "@decks-next/sdk";
+import type { Answerer } from "@decks/sdk";
 import type { Sessions, Session } from "../sessions/index.ts";
 import type { Settings } from "../voice.ts";
 import { runtimeList, runtimeOf } from "./registry.ts";

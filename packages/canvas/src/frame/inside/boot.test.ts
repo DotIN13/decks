@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import type { PenDocument } from "@decks/pen";
 import type { FramePage } from "../protocol.ts";
 import { createCardPlacer } from "./boot.ts";

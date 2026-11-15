@@ -9,4 +9,4 @@ export * from "./extension-ui.ts";
 export * from "./files.ts";
 export * from "./stage.ts";
 export * from "./rows.ts";
-export type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, ClaudeAccount, Identity, MessageMention, MessagePart, ModelOption, SlashCommand, ThinkingLevel } from "@decks-next/protocol";
+export type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, ClaudeAccount, Identity, MessageMention, MessagePart, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";

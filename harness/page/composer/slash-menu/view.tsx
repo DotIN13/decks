@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@decks-next/protocol";
+import type { SlashCommand } from "@decks/protocol";
 import { createEffect, For, Show } from "solid-js";
 import { keepInView } from "./actions.ts";
 import { badge } from "./model.ts";

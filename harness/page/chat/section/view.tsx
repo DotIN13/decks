@@ -1,4 +1,4 @@
-import type { AgentChat, Identity } from "@decks-next/protocol";
+import type { AgentChat, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronsDownUp from "lucide-solid/icons/chevrons-down-up";
 import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";

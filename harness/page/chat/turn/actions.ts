@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import type { MessagePart } from "@decks-next/protocol";
+import type { MessagePart } from "@decks/protocol";
 import { pillElement, type PillHost } from "../../composer/pill/card.ts";
 import type { MineReader } from "./view.tsx";
 

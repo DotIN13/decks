@@ -1,5 +1,5 @@
 {
-	"name": "@decks-next/page",
+	"name": "@decks/page",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -13,8 +13,8 @@
 		"test": "node ../../tools/check.mjs harness/page"
 	},
 	"dependencies": {
-		"@decks-next/protocol": "0.0.0",
-		"@decks-next/sdk": "0.0.0",
+		"@decks/protocol": "0.0.0",
+		"@decks/sdk": "0.0.0",
 		"@decks/canvas": "*",
 		"@decks/ink": "*",
 		"@decks/pen": "*",

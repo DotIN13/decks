@@ -1,4 +1,4 @@
-import type { shapes } from "@decks-next/protocol";
+import type { shapes } from "@decks/protocol";
 import type { AgentChat, AgentKind, AgentModel, AgentState, ClaudeAccount, Identity, Page, RuntimeInfo, StageRow, ThinkingLevel } from "./types/index.ts";
 
 // What the server and the harness answer, as the rows the page draws. Pure:

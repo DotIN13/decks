@@ -1,9 +1,9 @@
 {
-	"name": "@decks-next/attach",
+	"name": "@decks/attach",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
 	"exports": { ".": "./index.ts" },
 	"scripts": { "test": "node ../../tools/check.mjs clients/attach" },
-	"dependencies": { "@decks-next/protocol": "0.0.0", "@decks-next/sdk": "0.0.0" }
+	"dependencies": { "@decks/protocol": "0.0.0", "@decks/sdk": "0.0.0" }
 }

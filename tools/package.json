@@ -1,5 +1,5 @@
 {
-	"name": "@decks-next/tools",
+	"name": "@decks/tools",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -7,6 +7,6 @@
 		"test": "node ../tools/check.mjs tools"
 	},
 	"dependencies": {
-		"@decks-next/protocol": "0.0.0"
+		"@decks/protocol": "0.0.0"
 	}
 }

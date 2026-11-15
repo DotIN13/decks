@@ -1,4 +1,4 @@
-import type { AgentChat } from "@decks-next/protocol";
+import type { AgentChat } from "@decks/protocol";
 
 /** Somebody an `@` in the line can name: an agent. */
 export interface Mentionable {

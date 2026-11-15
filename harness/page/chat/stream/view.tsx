@@ -1,4 +1,4 @@
-import type { AgentKind, AgentState, ChatItem } from "@decks-next/protocol";
+import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";

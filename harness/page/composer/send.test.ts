@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { clientFor, host, type Host } from "@decks-next/sdk";
+import { clientFor, host, type Host } from "@decks/sdk";
 import { draftComments, draftForAgent, type Draft } from "./draft/model.ts";
 import { messageParts, readParts } from "./pill/about.ts";
 

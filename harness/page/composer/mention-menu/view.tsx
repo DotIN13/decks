@@ -1,4 +1,4 @@
-import type { Identity } from "@decks-next/protocol";
+import type { Identity } from "@decks/protocol";
 import { createEffect, For } from "solid-js";
 import { AgentFace } from "../../agents/index.ts";
 import { keepInView } from "./actions.ts";

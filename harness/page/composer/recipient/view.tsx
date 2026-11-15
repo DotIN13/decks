@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Identity } from "@decks-next/protocol";
+import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import { createMemo, Show } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { AgentFace, AgentMenu } from "../../agents/index.ts";

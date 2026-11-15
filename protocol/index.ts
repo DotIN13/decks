@@ -4,7 +4,7 @@ import type { Payload } from "./event.ts";
 import type * as shapesModule from "./shapes.ts";
 import type * as syncModule from "./sync.ts";
 import type * as wireModule from "./wire.ts";
-// @decks-next/protocol: what every program agrees on. Touches no disk and
+// @decks/protocol: what every program agrees on. Touches no disk and
 // no network, and imports nothing outside this folder.
 
 export * from "./schema.ts";

@@ -1,4 +1,4 @@
-// @decks-next/sdk/browser: what a page needs, with no node module behind it.
+// @decks/sdk/browser: what a page needs, with no node module behind it.
 // A page knows its server and token, so it never looks for them.
 
 export { clientFor, type Client, type Typed } from "./client.ts";

@@ -1,6 +1,6 @@
 import { probes } from "../debug.ts";
 import type { JSX } from "solid-js";
-import type { Page, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol-old";
 import { Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";

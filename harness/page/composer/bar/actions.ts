@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@decks-next/protocol";
+import type { SlashCommand } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor } from "solid-js";
 import { notice, type WaitingComment } from "../../state/index.ts";
 import { carriesFiles } from "../../files/index.ts";

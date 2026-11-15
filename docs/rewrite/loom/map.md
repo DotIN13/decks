@@ -406,7 +406,7 @@ imports by package and folder, top-level outlines and inner function sizes of ea
   `cardCalls(route)` becomes `callsFor("card")`, and the follower moves into the canvas's host. This
   changes code in 37 files, so it is its own commit after the move, with the frame's browser checks.
 - **A clash for the switch-over**: `switch-plan.md` keeps `packages/protocol` (named
-  `@decks/protocol`) and also renames `@decks-next/protocol` to `@decks/protocol`. Two workspaces
+  `@decks/protocol`) and also renames `@decks/protocol` to `@decks/protocol`. Two workspaces
   cannot share a name; the kept one needs another name until step 4a (Warden's call).
 
 ## 11. Steps 4b to 5 prepared (2026-11-14)

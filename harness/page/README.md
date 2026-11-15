@@ -15,14 +15,14 @@ holds the canvas page, settings, connections, panels and pages. Pane owns it; `c
 
 ## May import
 
-`@decks-next/protocol` and `@decks-next/sdk` by name; `@decks/ui`, `@decks/canvas`,
+`@decks/protocol` and `@decks/sdk` by name; `@decks/ui`, `@decks/canvas`,
 `@decks/pen`, `@decks/ink` as libraries by name until they move; solid-js, lucide-solid, marked.
 Never `server/`, `apps/`, nor the old `packages/protocol`, `packages/api`, `packages/sdk` or
 `packages/agent-ui`, whatever names they go by.
 
 ## Rules
 
-1. The page talks to one door, the server's: every call through `decks` from `@decks-next/sdk`,
+1. The page talks to one door, the server's: every call through `decks` from `@decks/sdk`,
    every event through `on(name, hear)` from `state/`. It opens no socket of its own.
 2. The harness's calls (`chat.*`, `account.*`, `runtime.*`) are made at the same door; the
    server passes them to the harness. When none is connected they answer `unavailable`, and the
@@ -43,6 +43,6 @@ Never `server/`, `apps/`, nor the old `packages/protocol`, `packages/api`, `pack
 ## Check
 
 - `node tools/check.mjs harness/page`: the type check and unit tests.
-- `node tools/heavy.mjs --wait -- npm run build -w @decks-next/page`: the build.
-- `npm run dev -w @decks-next/page`: the dev server on 4680, proxying the server's door
+- `node tools/heavy.mjs --wait -- npm run build -w @decks/page`: the build.
+- `npm run dev -w @decks/page`: the dev server on 4680, proxying the server's door
   (`DECKS_URL`, else the lock file of `DECKS_DECK`).

@@ -1,4 +1,4 @@
-import type { AgentMode } from "@decks-next/protocol";
+import type { AgentMode } from "@decks/protocol";
 
 /** A mode the chip offers: its name, and what it means for the rest of the session. */
 export interface ModeEntry {

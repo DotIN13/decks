@@ -1,4 +1,4 @@
-import type { ChatItem, MessagePart } from "@decks-next/protocol";
+import type { ChatItem, MessagePart } from "@decks/protocol";
 import { floatRows } from "./rows.ts";
 import { toolSlots, type ToolSlot } from "../tool/model.ts";
 

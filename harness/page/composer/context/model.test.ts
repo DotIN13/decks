@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AgentUsage } from "@decks-next/protocol";
+import type { AgentUsage } from "@decks/protocol";
 import { dialLabel, usageRows } from "./model.ts";
 
 test("the summary shows used, window and cost, in that order", () => {

@@ -1,4 +1,4 @@
-import type { AgentKind, AgentUsage } from "@decks-next/protocol";
+import type { AgentKind, AgentUsage } from "@decks/protocol";
 /** What the usage panel draws: the plan's windows, what a conversation spent, what drove it. */
 
 

@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import { cardCalls as cardCallsTo } from "@decks/api";
 import { CallRefused } from "../protocol.ts";
 

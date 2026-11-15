@@ -1,4 +1,4 @@
-import { THINKING_LEVELS, type ModelOption, type ThinkingLevel } from "@decks-next/protocol";
+import { THINKING_LEVELS, type ModelOption, type ThinkingLevel } from "@decks/protocol";
 
 // The thinking scale is the protocol's; the nearest-level rule and the default are behaviour.
 export { THINKING_LEVELS };

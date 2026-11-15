@@ -1,4 +1,4 @@
-import type { Answerer } from "@decks-next/sdk";
+import type { Answerer } from "@decks/sdk";
 import type { ExtensionUiAnswer, MessagePart } from "../runtimes/types/index.ts";
 import { cleanParts } from "../runtimes/shared/message-parts.ts";
 import type { Sessions } from "./index.ts";

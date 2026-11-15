@@ -4,8 +4,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { clientFor, host, type Heard, type Host } from "@decks-next/sdk";
-import type { ChatItem } from "@decks-next/protocol";
+import { clientFor, host, type Heard, type Host } from "@decks/sdk";
+import type { ChatItem } from "@decks/protocol";
 import { askFullResult, fullResult, receiveToolResult, setToolResultSender } from "./tool/actions.ts";
 import { turnCards } from "./turn/model.ts";
 

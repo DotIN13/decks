@@ -1,4 +1,4 @@
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 
 /** How long a board stays news without being read: a day, after which it is simply there. */
 const CHANGED_WITHIN = 24 * 60 * 60 * 1000;

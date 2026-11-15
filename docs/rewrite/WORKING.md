@@ -27,7 +27,7 @@ Only Warden edits the root `package.json`, the lockfile and the root `tsconfig` 
 dependency without asking Mason.
 
 Until the switch-over, the old packages keep the `@decks/*` names. New folders are workspace packages
-named `@decks-next/<folder>` (`@decks-next/protocol`, `@decks-next/server`, …). Warden renames them at
+named `@decks-next/<folder>` (`@decks/protocol`, `@decks/server`, …). Warden renames them at
 the switch-over.
 
 ## Commits

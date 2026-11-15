@@ -1,4 +1,4 @@
-import type { AgentMode } from "@decks-next/protocol";
+import type { AgentMode } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ClipboardList from "lucide-solid/icons/clipboard-list";
 import Shield from "lucide-solid/icons/shield";

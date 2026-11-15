@@ -1,4 +1,4 @@
-import type { AgentUsage } from "@decks-next/protocol";
+import type { AgentUsage } from "@decks/protocol";
 
 /** Thousands separated, because these are read at a glance and not counted digit by digit. */
 export const figure = (value: number): string => value.toLocaleString("en-US");

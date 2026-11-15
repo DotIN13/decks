@@ -1,5 +1,5 @@
 import { cssEscape } from "@decks/ui";
-import type { ChatItem } from "@decks-next/protocol";
+import type { ChatItem } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor } from "solid-js";
 import { hasEarlier, LOAD_MORE_AT, WINDOW, windowStart } from "./model.ts";
 

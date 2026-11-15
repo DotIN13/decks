@@ -1,4 +1,4 @@
-import type { AgentKind } from "@decks/protocol";
+import type { AgentKind } from "@decks/protocol-old";
 import { createUniqueId, For, Match, Show, Switch } from "solid-js";
 
 /**

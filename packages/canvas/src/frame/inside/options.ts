@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js";
 import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import type { createEditor } from "../../editor.tsx";
 import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
 import { drawing } from "../../ink/ink.ts";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./agent-view.ts";
 
 /*

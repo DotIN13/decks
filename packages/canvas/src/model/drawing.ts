@@ -1,5 +1,5 @@
 import { apply, withDecksColors, baseTheme, diff, editDocument, num as penNum, parse, walk, type MeasureText, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
-import type { Page } from "@decks/protocol";
+import type { Page } from "@decks/protocol-old";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
 

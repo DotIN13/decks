@@ -1,5 +1,5 @@
 import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
-import type { Page, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol-old";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { fitInto, frames } from "./camera/camera.ts";

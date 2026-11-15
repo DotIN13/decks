@@ -1,7 +1,7 @@
 # protocol
 
 What every program agrees on: the calls, the events, the shapes they carry, the deck's layout and the
-messages a server and Studio exchange. Package `@decks-next/protocol`. Only Lexicon edits it.
+messages a server and Studio exchange. Package `@decks/protocol`. Only Lexicon edits it.
 
 ## Owns
 

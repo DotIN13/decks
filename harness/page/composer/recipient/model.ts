@@ -1,4 +1,4 @@
-import type { AgentChat } from "@decks-next/protocol";
+import type { AgentChat } from "@decks/protocol";
 
 /** The parts of a destination the chip reads: who it names, if anyone. */
 export type DestinationLike = { kind: "prompt"; id: string; name: string } | { kind: string };

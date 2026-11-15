@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AgentChat } from "@decks-next/protocol";
+import type { AgentChat } from "@decks/protocol";
 import { recipientChat, recipientName } from "./model.ts";
 
 test("the chip names the agent, a card for a note, or nobody", () => {

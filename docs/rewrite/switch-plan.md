@@ -40,16 +40,16 @@ Decided in DESIGN.md section 11; they go at the map's step 4a.
 
 After the deletions, so no new name meets a deleted package's:
 
-- `@decks-next/attach` to `@decks/attach` (clients/attach): 1 file(s) name it
-- `@decks-next/cli` to `@decks/cli` (clients/cli): 1 file(s) name it
-- `@decks-next/extension` to `@decks/extension` (clients/extension): 1 file(s) name it
-- `@decks-next/mcp` to `@decks/mcp` (clients/mcp): 1 file(s) name it
-- `@decks-next/sdk` to `@decks/sdk` (clients/sdk): 19 file(s) name it
-- `@decks-next/harness` to `@decks/harness` (harness): 2 file(s) name it
-- `@decks-next/page` to `@decks/page` (harness/page): 1 file(s) name it
-- `@decks-next/protocol` to `@decks/protocol` (protocol): 62 file(s) name it
-- `@decks-next/server` to `@decks/server` (server): 1 file(s) name it
-- `@decks-next/tools` to `@decks/tools` (tools): 1 file(s) name it
+- `@decks/attach` to `@decks/attach` (clients/attach): 1 file(s) name it
+- `@decks/cli` to `@decks/cli` (clients/cli): 1 file(s) name it
+- `@decks/extension` to `@decks/extension` (clients/extension): 1 file(s) name it
+- `@decks/mcp` to `@decks/mcp` (clients/mcp): 1 file(s) name it
+- `@decks/sdk` to `@decks/sdk` (clients/sdk): 19 file(s) name it
+- `@decks/harness` to `@decks/harness` (harness): 2 file(s) name it
+- `@decks/page` to `@decks/page` (harness/page): 1 file(s) name it
+- `@decks/protocol` to `@decks/protocol` (protocol): 62 file(s) name it
+- `@decks/server` to `@decks/server` (server): 1 file(s) name it
+- `@decks/tools` to `@decks/tools` (tools): 1 file(s) name it
 
 Two workspaces cannot share a name:
 

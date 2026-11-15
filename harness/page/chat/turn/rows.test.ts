@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ChatItem } from "@decks-next/protocol";
+import type { ChatItem } from "@decks/protocol";
 import { floatRows } from "./rows.ts";
 
 const user = (id: string, text = "hello"): ChatItem => ({ kind: "user", id, text, at: 1 });

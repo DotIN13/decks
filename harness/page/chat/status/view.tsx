@@ -1,4 +1,4 @@
-import type { AgentKind, AgentState } from "@decks-next/protocol";
+import type { AgentKind, AgentState } from "@decks/protocol";
 import { Show } from "solid-js";
 import { historyShown } from "../edge.ts";
 import { showConversation } from "./actions.ts";

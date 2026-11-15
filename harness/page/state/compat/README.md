@@ -12,7 +12,7 @@ with the server's compat after stop 3.
 
 ## May import
 
-The page's `state/` modules, and `@decks-next/protocol`.
+The page's `state/` modules, and `@decks/protocol`.
 
 ## Rules
 

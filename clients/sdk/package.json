@@ -1,5 +1,5 @@
 {
-	"name": "@decks-next/sdk",
+	"name": "@decks/sdk",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -12,6 +12,6 @@
 		"test": "node ../../tools/check.mjs clients/sdk"
 	},
 	"dependencies": {
-		"@decks-next/protocol": "0.0.0"
+		"@decks/protocol": "0.0.0"
 	}
 }

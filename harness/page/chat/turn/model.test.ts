@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ChatItem } from "@decks-next/protocol";
+import type { ChatItem } from "@decks/protocol";
 import { turnCards } from "./model.ts";
 
 /**

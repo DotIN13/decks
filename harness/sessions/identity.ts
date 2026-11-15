@@ -1,4 +1,4 @@
-import type { shapes, Infer } from "@decks-next/protocol";
+import type { shapes, Infer } from "@decks/protocol";
 import { AGENT_KINDS, type AgentMode, type RunKind } from "../runtimes/types/index.ts";
 
 // Who an agent is, as the harness holds it: what agent.requested said, and

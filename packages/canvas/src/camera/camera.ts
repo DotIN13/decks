@@ -1,4 +1,4 @@
-import type { Page, Camera } from "@decks/protocol";
+import type { Page, Camera } from "@decks/protocol-old";
 
 /**
  * The camera, and the two conversions everything else is built on.

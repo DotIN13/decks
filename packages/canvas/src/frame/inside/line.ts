@@ -1,4 +1,4 @@
-import type { LineClientMessage, ServerMessage } from "@decks/protocol";
+import type { LineClientMessage, ServerMessage } from "@decks/protocol-old";
 
 /** The answer to one `call` on the line, as the SDK reads it. */
 export type LineAnswer = { ok: boolean; value?: unknown; error?: string; notes?: string[] };

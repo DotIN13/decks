@@ -1,4 +1,4 @@
-import type { AgentKind } from "@decks-next/protocol";
+import type { AgentKind } from "@decks/protocol";
 
 /** What picking in the chip's menu does: the shell's own callbacks, named for the menu's rows. */
 export function menuActions(props: { onPick: (id: string) => void; onNew: (kind: AgentKind) => void; onClose: (id: string) => void; onMore?: () => void }) {

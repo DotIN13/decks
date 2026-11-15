@@ -1,5 +1,5 @@
 import { knobs } from "../debug.ts";
-import type { Camera } from "@decks/protocol";
+import type { Camera } from "@decks/protocol-old";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { touchedCanvas } from "../camera/touched.ts";
 import { boxOf, pan, pinchCamera, zoomAbout, type Viewport } from "../camera/camera.ts";
