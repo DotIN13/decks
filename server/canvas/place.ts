@@ -68,3 +68,15 @@ function stepOut(items: readonly Box[], size: Size, near: Box, side: Side, margi
 	}
 	return [x, y];
 }
+
+/** The nearest open slot to the right of newest, top edges level; past whatever is in the way. */
+export function joinCorner(size: Size, newest: Box | undefined, taken: readonly Box[]): Corner {
+	if (!newest) return { x: 0, y: 0 };
+	const aimed = { x: newest.x2 + GAP, y: newest.y1 };
+	const spots = [aimed, ...taken.flatMap((b) => [{ x: b.x2 + GAP, y: b.y1 }, { x: b.x1, y: b.y2 + GAP }, { x: b.x1 - size.w - GAP, y: b.y1 }])];
+	const clear = (c: Corner) => inWay(taken, c.x, c.y, size, GAP / 2).length === 0;
+	const far = (c: Corner) => Math.hypot(c.x - aimed.x, c.y - aimed.y);
+	const best = spots.filter(clear).sort((a, b) => far(a) - far(b))[0];
+	if (best) return { x: Math.round(best.x), y: Math.round(best.y) };
+	return { x: Math.round(Math.max(...taken.map((b) => b.x2)) + GAP), y: Math.round(newest.y1) };
+}

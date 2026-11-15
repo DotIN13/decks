@@ -2,7 +2,7 @@ import { apply as penApply, baseTheme, expandVariables, indexOf, isArrow, rerout
 import { Refused } from "../../protocol/index.ts";
 import type { ItemOp } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
-import { besideOf, cornerOf, type Box, type Corner } from "./place.ts";
+import { cornerOf, joinCorner, type Box, type Corner } from "./place.ts";
 
 // One protocol op on a working copy of a drawing: found, placed, turned into
 // pen's own edit and applied. The op comes back as written down, with the ids
@@ -40,7 +40,22 @@ function must(doc: PenDocument, ref: string, where: Where): string {
 	return id;
 }
 
-const lastTop = (doc: PenDocument): string | undefined => doc.children[doc.children.length - 1]?.id;
+/** Top-level boxes, arrows aside. */
+function tops(doc: PenDocument): Box[] {
+	const all = boxes(doc);
+	return doc.children.filter((n) => !isArrow(n)).map((n) => all.get(n.id)).filter((b): b is Box => !!b);
+}
+
+/** The newest top-level item a kind owns (a page: a card, a document, an app), else the newest one drawn. */
+function newestPage(doc: PenDocument, where: Where): Box | undefined {
+	const all = boxes(doc);
+	const items = [...doc.children].reverse().filter((n) => !isArrow(n) && all.has(n.id));
+	const page = items.find((n) => where.kinds.of(n)) ?? items[0];
+	return page ? all.get(page.id) : undefined;
+}
+
+const sizeOf = (node: Partial<PenNode>, given: Box | undefined): { w: number; h: number } =>
+	given ? { w: given.x2 - given.x1, h: given.y2 - given.y1 } : { w: typeof node.width === "number" ? node.width : 240, h: typeof node.height === "number" ? node.height : 120 };
 
 /** Apply one op to doc (unchanged) and give the new copy. */
 export function step(doc: PenDocument, op: ItemOp, where: Where): Step {
@@ -120,13 +135,10 @@ function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where
 	const given = op.item.box;
 	if (!corner && given) corner = { x: given.x1, y: given.y1 };
 	const ownXY = typeof op.item.x === "number" && typeof op.item.y === "number";
-	if (!corner && !ownXY && op.parent == null) {
-		const last = lastTop(doc);
-		const box = last ? boxOf(last) : undefined;
-		corner = box ? besideOf(box) : { x: 0, y: 0 };
-	}
+	const node0 = where.kinds.toNode(op.item, where.canvas);
+	if (!corner && !ownXY && op.parent == null && !isArrow(node0 as PenNode)) corner = joinCorner(sizeOf(node0, given), newestPage(doc, where), tops(doc));
 	const box = corner ? { x1: corner.x, y1: corner.y, ...(given ? { x2: corner.x + given.x2 - given.x1, y2: corner.y + given.y2 - given.y1 } : {}) } : undefined;
-	const node = where.kinds.toNode(op.item, where.canvas) as Partial<PenNode> & { type: string };
+	const node = node0 as Partial<PenNode> & { type: string };
 	const { box: _drop, ...item } = op.item;
 	const pen: PenOp = { op: "insert", node, ...inside(op), ...(box ? { box } : {}) };
 	return { pen, written: { op: "insert", item: given ? { ...item, box: given } : item, ...inside(op), ...(corner ? { at: corner } : {}) } };

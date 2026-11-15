@@ -193,3 +193,12 @@ test("before a kind's item is inserted, the kind may prepare it", async () => {
 	assert.equal(await text(s, "canvases/plan/stickers/new-one/index.html"), "<p>new one</p>");
 	await s.close();
 });
+
+test("an item given no place joins right of the newest page, in the nearest open slot", async () => {
+	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x" });
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
+	assert.deepEqual((await s.value<Item>("item.insert", { item: { type: "note", id: "n", width: 240, height: 120 } }, ann)).box!.x1, 460);
+	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html", id: "s2" } }, ann);
+	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
+	await s.close();
+});

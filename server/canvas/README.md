@@ -29,8 +29,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
    a call that makes it answers after both.
 7. A place is one of `at` (the top-left corner), `beside` (160 px right of an item, tops aligned)
    or `below` (160 px under it, lefts aligned). Two at once is refused. A later op may be beside
-   an item an earlier op made. An insert given no place keeps its own x and y, or else goes
-   beside the last top-level item. An item moved to another parent keeps the size it was drawn at.
+   an item an earlier op made. An insert given no place keeps its own x and y, or else joins
+   right of the newest page (a kind's item), in the nearest open slot. An item moved to another parent keeps the size it was drawn at.
 8. `item.space` finds the free corner nearest the middle, or on one side of `near`, with `margin`
    (160) clear of every top-level item but arrows. Nothing is placed.
 9. Undo takes back the person's last change, only while it is the drawing's latest change.
