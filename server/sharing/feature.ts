@@ -7,6 +7,9 @@ import { bundleRoute } from "./bundle/bundle.ts";
 import { networkTransport } from "./client/network.ts";
 import { StudioError, type Transport } from "./client/transport.ts";
 
+/** The calls this feature handles, named, so a call added to the noun for another feature stays unhandled. */
+const STUDIO_CALLS = (({ status, connect, disconnect }: typeof calls.studio) => ({ status, connect, disconnect }))(calls.studio);
+
 // The sharing feature: studio.status, connect and disconnect, and the sync
 // client that runs while a key is kept. Only the person connects.
 
@@ -37,7 +40,7 @@ export function sharingFeature(given: SharingOptions = {}): Feature {
 	return defineFeature({
 		name: "sharing",
 		routes: [bundleRoute],
-		calls: handleAll(calls.studio, {
+		calls: handleAll(STUDIO_CALLS, {
 			status: async (ctx) => status(await readLink(ctx.store)),
 			connect: async (ctx, { url, key }) => connect(ctx, opts, url, key, begin),
 			disconnect: async (ctx) => {

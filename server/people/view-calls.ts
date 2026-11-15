@@ -3,6 +3,9 @@ import { handleAll, type Context } from "../kernel/types.ts";
 import { canvasName, followHome } from "./agent-calls.ts";
 import type { Holder, People } from "./state.ts";
 
+/** The calls this feature handles, named, so a call added to the noun for another feature stays unhandled. */
+const VIEW_CALLS = (({ get, move, focus, goto, cursor, screenshot, answer, update, reload }: typeof calls.view) => ({ get, move, focus, goto, cursor, screenshot, answer, update, reload }))(calls.view);
+
 // What screens show. An agent's request reaches only the screens that follow
 // it; the person's, only their own screens; a card's or app's, the screens
 // showing its canvas. A screen says whom it follows with view.move.
@@ -12,7 +15,7 @@ const ORIGIN = { x: 0, y: 0, zoom: 1 };
 
 export function viewCalls(holder: Holder): Handled<Context>[] {
 	const p = () => holder.get();
-	return handleAll(calls.view, {
+	return handleAll(VIEW_CALLS, {
 		get: (ctx, { canvas }) => look(p(), ctx, here(p(), ctx, canvas)),
 		move: (ctx, args) => move(p(), ctx, args),
 		focus: async (ctx, { target, highlight, animate, canvas }) => {

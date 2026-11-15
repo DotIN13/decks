@@ -4,13 +4,16 @@ import { deliver, takeNews } from "./agent-mail.ts";
 import type { AgentChange, AgentRecord } from "./records.ts";
 import type { Holder, People } from "./state.ts";
 
+/** The calls this feature handles, named, so a call added to the noun for another feature stays unhandled. */
+const AGENT_CALLS = (({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }: typeof calls.agent) => ({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }))(calls.agent);
+
 // The agent calls: records, attach, hosts, mail and news. One short handler each.
 
 const NO_HOST = "No harness is running to start an agent: start the Decks harness on this machine, then try again.";
 
 export function agentCalls(holder: Holder): Handled<Context>[] {
 	const p = () => holder.get();
-	return handleAll(calls.agent, {
+	return handleAll(AGENT_CALLS, {
 		me: (ctx) => p().shown(p().actor(ctx)),
 		list: (_ctx, { workspace }) => p().roster.all().filter((a) => workspace === undefined || (a.workspace ?? "") === workspace).map((a) => p().shown(a)),
 		get: (_ctx, { agent }) => p().shown(p().roster.find(agent)),
