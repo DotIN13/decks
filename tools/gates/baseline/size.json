@@ -44,7 +44,6 @@
 	"canvas/host/inside/events.ts: function wireFrame over 80 lines": 1,
 	"canvas/host/inside/frame.tsx: function (anonymous) over 80 lines": 1,
 	"canvas/host/inside/frame.tsx: function run over 80 lines": 1,
-	"canvas/host/inside/line.ts: function openLine over 80 lines": 1,
 	"canvas/host/inside/options.ts: function editorOptions over 80 lines": 1,
 	"canvas/host/inside/options.ts: function installHost over 80 lines": 1,
 	"canvas/host/inside/presence.ts: function installPresence over 80 lines": 1,

@@ -29,6 +29,23 @@ export interface LineClient {
 	open(): boolean;
 }
 
+/** A message on the line: the answer to a call goes to its caller, anything else is heard. */
+function heard(data: string, pending: Map<string, (answer: LineAnswer) => void>, hear: (message: ServerMessage) => void): void {
+	let message: ServerMessage;
+	try {
+		message = JSON.parse(data) as ServerMessage;
+	} catch {
+		return;
+	}
+	if (message.type === "call.answered") {
+		const done = pending.get(message.id);
+		pending.delete(message.id);
+		done?.({ ok: message.ok, ...(message.value !== undefined ? { value: message.value } : {}), ...(message.error ? { error: message.error } : {}), ...(message.notes ? { notes: message.notes } : {}) });
+		return;
+	}
+	hear(message);
+}
+
 /**
  * The frame's end of the line (`server/src/line.ts`): one WebSocket to `/api/v1/socket` that carries
  * the frame's calls, the canvas's changes and the frame's own messages, in one envelope. It opens as
@@ -60,21 +77,7 @@ export function openLine(options: LineOptions): LineClient {
 			everOpen = true;
 			while (queue.length) ws.send(JSON.stringify(queue.shift()));
 		};
-		ws.onmessage = (event) => {
-			let message: ServerMessage;
-			try {
-				message = JSON.parse(String(event.data)) as ServerMessage;
-			} catch {
-				return;
-			}
-			if (message.type === "call.answered") {
-				const done = pending.get(message.id);
-				pending.delete(message.id);
-				done?.({ ok: message.ok, ...(message.value !== undefined ? { value: message.value } : {}), ...(message.error ? { error: message.error } : {}), ...(message.notes ? { notes: message.notes } : {}) });
-				return;
-			}
-			options.hear(message);
-		};
+		ws.onmessage = (event) => heard(String(event.data), pending, options.hear);
 		ws.onclose = (event) => {
 			if (socket === ws) socket = undefined;
 			options.onState?.(false, everOpen);
