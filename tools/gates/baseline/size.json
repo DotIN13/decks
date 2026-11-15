@@ -9,7 +9,6 @@
 	"canvas/cards/CardEditor.tsx: function CardEditor over 80 lines": 1,
 	"canvas/cards/CardEditor.tsx: function inline over 80 lines": 1,
 	"canvas/cards/CardEditor.tsx: over 400 lines": 1,
-	"canvas/chrome/AgentCursor.tsx: function AgentCursor over 80 lines": 1,
 	"canvas/chrome/Callout.tsx: function PageCallout over 80 lines": 1,
 	"canvas/chrome/ColorPicker.tsx: function ColorPicker over 80 lines": 1,
 	"canvas/chrome/InkBar.tsx: function InkBar over 80 lines": 1,

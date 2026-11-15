@@ -89,31 +89,32 @@ export function AgentCursor(props: { cursor: CursorAt | null | undefined; zoom: 
 		),
 	);
 
+	return <Show when={shown()}>{(cursor) => <CursorMark cursor={cursor()} zoom={props.zoom} moving={moving()} jumped={jumped()} gone={gone()} ping={ping()} />}</Show>;
+}
+
+/** The arrow, its ring and its name, where the cursor is shown now. */
+function CursorMark(props: { cursor: CursorAt; zoom: number; moving: boolean; jumped: boolean; gone: boolean; ping: number }) {
 	return (
-		<Show when={shown()}>
-			{(cursor) => (
-				<div
-					class="agent-cursor"
-					data-moving={moving() ? "true" : undefined}
-					data-jump={jumped() ? "true" : undefined}
-					data-gone={gone() ? "true" : undefined}
-					style={{
-						left: `${cursor().x}px`,
-						top: `${cursor().y}px`,
-						"--zoom": props.zoom,
-						"--cursor-color": cursor().color,
-					}}
-				>
-					{/* Keyed on the count so each arrival starts the ring from the beginning. */}
-					<Show when={ping() > 0 ? ping() : undefined} keyed>
-						{(count) => <span class="ring" data-count={count} />}
-					</Show>
-					<svg class="arrow" viewBox="0 0 22 24" width="22" height="24" aria-hidden="true">
-						<path d="M3 2.5 L19 10.4 Q19.9 10.9 18.9 11.3 L11.9 13.4 Q11.4 13.6 11.1 14.1 L7.6 20.8 Q7.1 21.6 6.8 20.7 Z" />
-					</svg>
-					<span class="label">{cursor().label}</span>
-				</div>
-			)}
-		</Show>
+		<div
+			class="agent-cursor"
+			data-moving={props.moving ? "true" : undefined}
+			data-jump={props.jumped ? "true" : undefined}
+			data-gone={props.gone ? "true" : undefined}
+			style={{
+				left: `${props.cursor.x}px`,
+				top: `${props.cursor.y}px`,
+				"--zoom": props.zoom,
+				"--cursor-color": props.cursor.color,
+			}}
+		>
+			{/* Keyed on the count so each arrival starts the ring from the beginning. */}
+			<Show when={props.ping > 0 ? props.ping : undefined} keyed>
+				{(count) => <span class="ring" data-count={count} />}
+			</Show>
+			<svg class="arrow" viewBox="0 0 22 24" width="22" height="24" aria-hidden="true">
+				<path d="M3 2.5 L19 10.4 Q19.9 10.9 18.9 11.3 L11.9 13.4 Q11.4 13.6 11.1 14.1 L7.6 20.8 Q7.1 21.6 6.8 20.7 Z" />
+			</svg>
+			<span class="label">{props.cursor.label}</span>
+		</div>
 	);
 }
