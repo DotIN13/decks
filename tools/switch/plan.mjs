@@ -24,6 +24,7 @@ export const REPLACED = [
 	{ old: "packages/sdk", home: "clients/sdk, clients/cli", proof: "node tools/check.mjs clients/sdk, tools/clients/same.test.ts" },
 	{ old: "runtime", home: "harness/prompts, harness/runtimes", proof: "node tools/check.mjs harness; running, time-machine checks" },
 	{ old: "extension", home: "clients/extension", proof: "a clients/extension folder" },
+	{ old: "e2e", home: "tools/checks (the runner, the harness, the fake model and agent) and the features' checks/ folders", proof: "every check moved first and started by node tools/checks/run.mjs" },
 ];
 
 const NEW = ["protocol", "server", "harness", "clients", "tools"];
@@ -48,6 +49,7 @@ function deletions(files) {
 		const name = nameOf(r.old);
 		const users = name ? importers(files, name) : [];
 		const homeThere = r.old !== "extension" || existsSync(join(ROOT, "clients/extension"));
+		// e2e goes once its checks have moved (the first commit); its files are not imported by name.
 		const why = !there ? "already gone" : !homeThere ? "clients/extension does not exist yet" : users.length ? `still imported by ${users.length} file(s) that stay: ${users.slice(0, 4).join(", ")}${users.length > 4 ? ", ..." : ""}` : undefined;
 		return { ...r, name, delete: there && !why, why };
 	});
@@ -67,16 +69,21 @@ function renames(files) {
 const PAGE = ["panel", "chat-content", "slash", "notifications", "shell", "context", "per-agent", "working-marks", "panel-steady", "voice", "canvas-switch", "new-agent-opens"];
 const ownerFor = (check, owners) => owners[check] ?? (PAGE.includes(check) ? "Pane" : BY_NAME[check] ?? "Loom");
 
+/** What tools/checks/checks.json says of each check: timed, agent, named, bench. */
+export const traits = () => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks;
+
+/** Every check moves: stop 3's to their owners' features; the others too, agent checks and benches to tools/checks. */
 function checkMoves() {
-	const checks = readFileSync(join(ROOT, ".scratch/Mason/checks.txt"), "utf8").split(/\s+/).filter(Boolean);
+	const stop3 = readFileSync(join(ROOT, ".scratch/Mason/checks.txt"), "utf8").split(/\s+/).filter(Boolean);
 	const owners = existsSync(RUNS) ? JSON.parse(readFileSync(RUNS, "utf8")).owners ?? {} : {};
 	const all = git("ls-files", "e2e/checks").split("\n").filter(Boolean).map((f) => f.slice("e2e/checks/".length).replace(/\.mjs$/, ""));
-	const moved = checks.map((c) => {
+	const t = traits();
+	const home = (c) => (t[c]?.agent ? "tools/checks/agent" : t[c]?.bench ? "tools/checks/bench" : undefined);
+	const moved = [...stop3, ...all.filter((c) => !stop3.includes(c))].map((c) => {
 		const owner = ownerFor(c, owners);
-		return { check: c, owner, to: `${HOME_OF[owner] ?? HOME_OF.Warden}/${c}.mjs`, owned: c in owners };
+		return { check: c, owner, to: `${home(c) ?? HOME_OF[owner] ?? HOME_OF.Warden}/${c}.mjs`, owned: c in owners, stop3: stop3.includes(c), traits: t[c] ?? {} };
 	});
-	const left = all.filter((c) => !checks.includes(c));
-	return { moved, left };
+	return { moved, left: [] };
 }
 
 export function plan() {
@@ -95,6 +102,32 @@ export function compatNames() {
 	return [...calls, ...events].filter((n) => n.old !== n.now).map((n) => ({ ...n, spoken: text.includes(`"${n.old}"`), goes }));
 }
 
+/** Root scripts the kept packages still need, each with what uses it. */
+export const KEPT_SCRIPTS = {
+	vendor: "copies d3, KaTeX, pdf.js and the bundles into packages/card-host/lib",
+	"build:live-doc": "builds packages/card-host/lib/live-doc.js",
+	"build:packages": "builds the public @decks packages (canvas, pen, ui, the engine, card-host, hub) for Studio and npm",
+	"test:packages": "packs and installs those packages to prove they run outside the repo",
+};
+
+/** The path prefixes each switch commit writes, for the one job's lanes. */
+export function lanesNeeded(p) {
+	const moves = p.checks.moved.flatMap((m) => [`e2e/checks/${m.check}.mjs`, m.to.replace(/\/[^/]+$/, "/")]);
+	const renamed = git("ls-files").split("\n").filter((f) => /\.(ts|tsx|mjs|mts|js|json|md)$/.test(f) && !f.endsWith("package-lock.json") && existsSync(join(ROOT, f)) && p.renames.some((r) => readFileSync(join(ROOT, f), "utf8").includes(r.from)));
+	const top = (f) => {
+		const segs = f.split("/");
+		const n = /^(harness\/page|server|clients)\//.test(f) ? (f.startsWith("harness/page/") ? 3 : 2) - 0 : 1;
+		return segs.length > n ? `${segs.slice(0, n).join("/")}/` : f;
+	};
+	const covered = (list) => list.filter((x) => !list.some((y) => y !== x && y.endsWith("/") && x.startsWith(y)));
+	return {
+		move: covered([...new Set([...moves.filter((x) => x.endsWith("/")), "e2e/", "tools/checks/"])]).sort(),
+		delete: p.deletions.filter((d) => d.delete).map((d) => `${d.old}/`),
+		rename: covered([...new Set(renamed.map(top))]).sort(),
+		root: ["package.json", "package-lock.json", ".github/workflows/"],
+	};
+}
+
 /** The root package.json after the switch: workspaces without the deleted folders, scripts on the new programs. */
 export function rootFiles(deleted) {
 	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -111,5 +144,7 @@ export function rootFiles(deleted) {
 		check: "node tools/check.mjs",
 		heavy: "node tools/heavy.mjs",
 	};
-	return { workspaces, scripts, removedScripts: Object.keys(pkg.scripts).filter((k) => !(k in scripts)), ci: ".github/workflows/test.yml: npm run test:e2e runs tools/checks/run.mjs; the typecheck and test steps stay" };
+	// The kept packages still build and publish through these until Loom moves them (map step 4c and the last step).
+	for (const [k, why] of Object.entries(KEPT_SCRIPTS)) if (pkg.scripts[k]) scripts[k] = pkg.scripts[k];
+	return { workspaces, scripts, kept: KEPT_SCRIPTS, removedScripts: Object.keys(pkg.scripts).filter((k) => !(k in scripts)), ci: ".github/workflows/test.yml: npm run test:e2e runs tools/checks/run.mjs; the typecheck and test steps stay" };
 }

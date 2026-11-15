@@ -21,9 +21,14 @@ function renamed(p) {
 
 function moved(p) {
 	const by = new Map();
-	for (const m of p.checks.moved) by.set(m.to.replace(/\/[^/]+$/, ""), [...(by.get(m.to.replace(/\/[^/]+$/, "")) ?? []), m.check + (m.owned ? "" : ` (by subject: ${m.owner})`)]);
+	for (const m of p.checks.moved) {
+		const dir = m.to.replace(/\/[^/]+$/, "");
+		const tag = [m.stop3 ? "" : "not in stop 3", m.owned || !m.stop3 ? "" : `by subject: ${m.owner}`, m.traits.timed ? "timed" : "", m.traits.named ? "named" : ""].filter(Boolean).join(", ");
+		by.set(dir, [...(by.get(dir) ?? []), m.check + (tag ? ` (${tag})` : "")]);
+	}
 	const rows = [...by].map(([dir, checks]) => `\`${dir}/\` (${checks.length}): ${checks.join(", ")}`);
-	return `## Moved\n\nThe ${p.checks.moved.length} browser checks of stop 3, each to its owner's feature (owners from the stop 3 card's runs.json; with none, by what it exercises: the page's to Pane, the canvas library's to tools/checks/canvas until Loom moves the library):\n\n${list(rows)}\n\n\`e2e/harness.mjs\` becomes \`tools/checks/harness.mjs\`; each moved check's \`../harness.mjs\` import is rewritten to it, and nothing else in a check changes. \`e2e/run.mjs\` is replaced by \`tools/checks/run.mjs\`, which finds checks in their new places. The fixture moves from \`e2e/fixture\` to \`tools/fixtures/deck\` (already there).\n\n### Not in stop 3 (${p.checks.left.length}): they stay in e2e/checks with today's e2e/run.mjs, for their owners to keep or drop\n\n${p.checks.left.join(", ")}`;
+	const agent = p.checks.moved.filter((m) => m.traits.agent).map((m) => m.check);
+	return `## Moved\n\nAll ${p.checks.moved.length} browser checks move and start under \`node tools/checks/run.mjs\`; \`e2e/run.mjs\` goes with e2e/. Stop 3's go to their owners' features (owners from the stop 3 card's runs.json; with none, by what they exercise: the page's to Pane, the canvas library's to tools/checks/canvas until Loom moves the library); the agent checks to tools/checks/agent, the benches to tools/checks/bench:\n\n${list(rows)}\n\nWhat the runner must know of a check is a field in \`tools/checks/checks.json\`: \`timed\` runs alone on the dev server, as it was written for (DESIGN.md section 11), every other check on the built page; \`agent\` is skipped unless \`--agent\`; \`named\` and \`bench\` for the long checks and the measures; \`path\` where it lives. \`e2e/harness.mjs\` becomes \`tools/checks/harness.mjs\` and each moved check's \`../\` imports point there; the fake model and agent move to tools/checks; the fixture is \`tools/fixtures/deck\` (already there).\n\n### The agent checks, once on the new programs before the deletions\n\n${agent.join(", ")}: each starts an agent's turn through Pi with the fake model (\`e2e/fake-agent\`, \`e2e/fake-model.mjs\` on port 4700), which the runner starts; no signed-in Claude and no tokens. \`node tools/checks/run.mjs --agent ${agent.join(" ")}\`.`;
 }
 
 function compat(names) {
@@ -33,9 +38,15 @@ function compat(names) {
 }
 
 function root(r) {
-	return `## Root files\n\n- Workspaces: ${r.workspaces.map((w) => `\`${w}\``).join(", ")}.\n- Scripts: ${Object.entries(r.scripts).map(([k, v]) => `\`${k}\`: \`${v}\``).join("; ")}.\n- Scripts removed: ${r.removedScripts.map((s) => `\`${s}\``).join(", ")}.\n- CI: ${r.ci}.`;
+	const kept = Object.entries(r.kept).map(([k, why]) => `\`${k}\` (${why})`).join("; ");
+	return `## Root files\n\n- Workspaces: ${r.workspaces.map((w) => `\`${w}\``).join(", ")}.\n- Kept until Loom moves the packages that use them: ${kept}.\n- Scripts: ${Object.entries(r.scripts).map(([k, v]) => `\`${k}\`: \`${v}\``).join("; ")}.\n- Scripts removed: ${r.removedScripts.map((s) => `\`${s}\``).join(", ")}.\n- CI: ${r.ci}.`;
 }
 
-export function render(p, names, r) {
-	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), compat(names), root(r)].join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders (the moved checks, the deleted code): Mason opens those paths to Warden for the switch, or commits them.\n\n1. Move the 76 checks and the harness into place; run.mjs finds them there.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
+function lanes(l) {
+	const rows = [["1. moving the checks", l.move], ["2. deleting", l.delete], ["3. renaming (files that name @decks-next)", l.rename], ["4. root files and CI", l.root]];
+	return `## Lanes the switch needs, for that one job\n\n${list(rows.map(([what, paths]) => `${what}: ${paths.map((x) => `\`${x}\``).join(", ")}`))}`;
+}
+
+export function render(p, names, r, l) {
+	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), compat(names), root(r), ...(l ? [lanes(l)] : [])].join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.\n\n1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
 }

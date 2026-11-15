@@ -5,7 +5,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { compatNames, plan, ROOT, rootFiles } from "./plan.mjs";
+import { compatNames, lanesNeeded, plan, ROOT, rootFiles } from "./plan.mjs";
 import { render } from "./render.mjs";
 
 const PLAN_FILE = "docs/rewrite/switch-plan.md";
@@ -36,20 +36,24 @@ function rewriteImports(file, helpers) {
 
 function moveChecks(p) {
 	const helpers = new Set(["harness.mjs"]);
-	const where = {};
 	for (const m of p.checks.moved) {
 		mkdirSync(dirname(join(ROOT, m.to)), { recursive: true });
 		git("mv", `e2e/checks/${m.check}.mjs`, m.to);
 		rewriteImports(m.to, helpers);
-		where[m.check] = m.to;
 	}
 	for (const name of helpers) if (existsSync(join(ROOT, "e2e", name))) copyFileSync(join(ROOT, "e2e", name), join(ROOT, "tools/checks", name));
+	// The fake model and agent the agent checks drive Pi with move beside the runner, which looks there first.
+	for (const name of ["fake-model.mjs", "fake-agent"]) git("mv", `e2e/${name}`, `tools/checks/${name}`);
 	const harness = join(ROOT, "tools/checks/harness.mjs");
 	writeFileSync(harness, readFileSync(harness, "utf8").replace("./fixture/decks/", "../fixtures/deck/"));
-	writeFileSync(join(ROOT, "tools/checks/where.json"), `${JSON.stringify(where, null, "\t")}\n`);
+	// Each check's place is a field beside its others in checks.json.
+	const file = join(ROOT, "tools/checks/checks.json");
+	const json = JSON.parse(readFileSync(file, "utf8"));
+	for (const m of p.checks.moved) json.checks[m.check] = { ...(json.checks[m.check] ?? {}), path: m.to };
+	writeFileSync(file, `${JSON.stringify(json, null, "\t")}\n`);
 	gates();
-	const paths = [...p.checks.moved.flatMap((m) => [m.to, `e2e/checks/${m.check}.mjs`]), ...[...helpers].map((h) => `tools/checks/${h}`), "tools/checks/where.json"];
-	commit(paths, "Move today's browser checks to the features that own them", "Each of stop 3's checks moves to its owner's feature, its ../harness.mjs import pointed at tools/checks; nothing else in a check changes. tools/checks/where.json says where each is.");
+	const paths = [...p.checks.moved.flatMap((m) => [m.to, `e2e/checks/${m.check}.mjs`]), ...[...helpers].map((h) => `tools/checks/${h}`), "e2e/fake-model.mjs", "e2e/fake-agent", "tools/checks/fake-model.mjs", "tools/checks/fake-agent", "tools/checks/checks.json"];
+	commit(paths, "Move every browser check to the feature that owns it", "Stop 3's checks go to their owners' features, the agent checks to tools/checks/agent, the benches to tools/checks/bench, the rest by what they exercise; each ../ import points at tools/checks, and nothing else in a check changes. tools/checks/checks.json gives each its path; the fake model and agent move beside the runner.");
 }
 
 function deleteOld(p) {
@@ -85,7 +89,7 @@ async function main(argv) {
 	const p = plan();
 	const names = compatNames();
 	const r = rootFiles(p.deletions.filter((d) => d.delete).map((d) => d.old));
-	const text = render(p, names, r);
+	const text = render(p, names, r, lanesNeeded(p));
 	if (argv.includes("--dry")) {
 		writeFileSync(join(ROOT, PLAN_FILE), text);
 		console.log(text);
