@@ -1,12 +1,10 @@
 import { any, arr, bool, int, lit, named, nul, num, obj, opt, str, union, type Infer } from "./schema.ts";
 
-export const AgentKind = named("AgentKind", lit("pi", "claude", "opencode", "opencode2", "antigravity", "codex"));
-export const AgentMode = named("AgentMode", lit("manual", "acceptEdits", "plan", "auto"));
+// What the harness says about a conversation: its entries and the pills in a
+// message, an agent as the chat list draws it, and the accounts it spends from.
+// The agent's kind and mode live here too, so shapes.ts can import them.
 
-// What the harness says about a conversation, with today's shapes (moved from
-// packages/protocol transcript.ts, chat.ts and usage.ts): the entries, the
-// pills in a message, an agent as the chat list draws it, and accounts.
-
+// A conversation's entries, and the pills in a message.
 export const MessageMention = named(
 	"MessageMention",
 	obj({
@@ -39,6 +37,9 @@ export const ChatItem = named(
 	"One entry of a conversation: the person's message, the agent's reply, a tool call, or a notice.",
 );
 
+// An agent as the chat list draws it.
+export const AgentKind = named("AgentKind", lit("pi", "claude", "opencode", "opencode2", "antigravity", "codex"));
+export const AgentMode = named("AgentMode", lit("manual", "acceptEdits", "plan", "auto"));
 export const AgentState = named("AgentState", lit("idle", "thinking", "streaming", "tool", "waiting"));
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export const ThinkingLevel = named("ThinkingLevel", lit(...THINKING_LEVELS));
@@ -74,11 +75,13 @@ export const AgentChat = named(
 	}),
 	"An agent as the chat list draws it, with the cards it wrote and those in play.",
 );
+// The accounts the harness spends from.
 export const ClaudeAccount = named(
 	"ClaudeAccount",
 	obj({ id: str(), email: opt(str()), orgName: opt(str()), plan: opt(str()), isDefault: opt(lit(true)), signedIn: bool(), fiveHour: opt(obj({ percent: num(), resetsAt: opt(num()), at: num() })) }),
 );
 
+// Types read from the shapes above.
 export type AgentKind = Infer<typeof AgentKind>;
 export type AgentMode = Infer<typeof AgentMode>;
 export type MessageMention = Infer<typeof MessageMention>;

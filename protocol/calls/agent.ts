@@ -8,6 +8,7 @@ import { AGENT, ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
 const Name = str("An agent's name or id.");
 
+// Records: who works, and changing them.
 export const me = defineCall({ name: "agent.me", summary: "You: name, avatar, colour, workspace, tags and home canvas; for the person, the agent whose conversation is on their screen.", who: PEOPLE, args: {}, answer: Agent, effect: "read" });
 
 export const list = defineCall({
@@ -51,6 +52,7 @@ export const update = defineCall({
 
 export const remove = defineCall({ name: "agent.delete", summary: "Remove an agent. Refused while it is working.", who: PERSON, args: { agent: Name }, answer: Deleted, effect: "change" });
 
+// Joining: a terminal agent of its own, a client that starts agents.
 export const attach = defineCall({
 	name: "agent.attach",
 	summary: "Trade a person's login for an agent of its own: a name, a colour, a token, and a home canvas, the one named or a new one titled for it.",
@@ -69,6 +71,7 @@ export const host = defineCall({
 	effect: "change",
 });
 
+// Mail, and what changed since you last asked.
 export const send = defineCall({
 	name: "agent.send",
 	summary: "Deliver now, into the turn the agent is running, or a new turn when it is idle.",

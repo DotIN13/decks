@@ -3,9 +3,10 @@ import { any, arr, bool, int, lit, named, nul, num, obj, opt, str, union } from 
 import { Camera, Point, View } from "../shapes.ts";
 import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
-// What a screen shows. Only these calls move the person's screen, and only
-// while the caller's chat is on it; otherwise the person is offered a button.
+// What a screen shows, and what it says back. The calls that move the
+// person's screen do so only while the caller's chat is on it.
 
+// Where a screen looks, points and selects.
 export const get = defineCall({
 	name: "view.get",
 	summary: "Where the person's screen looks on the canvas, its zoom, and its size.",
@@ -24,6 +25,16 @@ export const move = defineCall({
 	effect: "change",
 });
 
+export const update = defineCall({
+	name: "view.update",
+	summary: "A screen says where it points, what it selected and where it looks; the others on the canvas hear view.changed.",
+	who: PERSON,
+	args: { pointer: opt(union(Point, nul)), selection: opt(arr(str())), camera: opt(Camera), gone: opt(bool()), ...onCanvas },
+	answer: View,
+	effect: "change",
+});
+
+// Moving the person's screen, and reloading what it shows.
 export const focus = defineCall({
 	name: "view.focus",
 	summary: "Fly to items or a card, outlining one data-id block inside a card when asked.",
@@ -60,6 +71,7 @@ export const reload = defineCall({
 	effect: "change",
 });
 
+// A screen answering: a card's picture, and the answer to a request.
 const Shot = named("Shot", obj({ how: lit("canvas", "snapshot"), data: str("The picture, base64."), mime: str() }), "A card as a screen draws it now.");
 
 export const screenshot = defineCall({
@@ -77,14 +89,5 @@ export const answer = defineCall({
 	who: PERSON,
 	args: { id: str(), value: opt(any()), error: opt(str()) },
 	answer: obj({ ok: bool() }),
-	effect: "change",
-});
-
-export const update = defineCall({
-	name: "view.update",
-	summary: "A screen says where it points, what it selected and where it looks; the others on the canvas hear view.changed.",
-	who: PERSON,
-	args: { pointer: opt(union(Point, nul)), selection: opt(arr(str())), camera: opt(Camera), gone: opt(bool()), ...onCanvas },
-	answer: View,
 	effect: "change",
 });

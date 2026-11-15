@@ -6,6 +6,7 @@ import { obj, type Infer, type ObjOf, type Props, type Shape } from "./schema.ts
 // then options. A missing or wrong handler is a compile error; at run time a
 // missing one answers unavailable, so an addition never stops a server.
 
+// Who calls, and how a refusal is said.
 export const WHO = ["person", "agent", "app", "card"] as const;
 export type Who = (typeof WHO)[number];
 
@@ -35,6 +36,7 @@ export class Refused extends Error {
 	}
 }
 
+// Declaring a call.
 /** Where a call is answered: the canvas server, or the harness by itself. */
 export type Side = "server" | "harness";
 /** Whether a call changes what it touches, or only reads it. */
@@ -63,6 +65,7 @@ export function defineCall<const N extends CallName, A extends Props, R extends 
 	return { ...spec, side: spec.side ?? "server", input: obj(spec.args) };
 }
 
+// Handling a call.
 export type Args<C> = C extends Call<string, infer A, Shape<any>> ? ObjOf<A> : never;
 export type Answer<C> = C extends Call<string, Props, infer R> ? Infer<R> : never;
 export type Handler<C, Ctx> = (ctx: Ctx, args: Args<C>) => Answer<C> | Promise<Answer<C>>;
@@ -70,14 +73,6 @@ export type Handler<C, Ctx> = (ctx: Ctx, args: Args<C>) => Answer<C> | Promise<A
 export interface Handled<Ctx> {
 	call: AnyCall;
 	run: (ctx: Ctx, args: never) => unknown;
-}
-
-/** A call declared but not handled yet, given at run time: it answers unavailable and warns once. */
-function stub(name: string): Handler<AnyCall, unknown> {
-	(globalThis as { console?: { warn(text: string): void } }).console?.warn(`decks: ${name} is declared but has no handler here; it answers unavailable.`);
-	return () => {
-		throw new Refused("unavailable", `${name} is not handled on this server yet.`);
-	};
 }
 
 /** handle and handleAll, bound to one kind of handler context. */
@@ -93,4 +88,12 @@ export function handlersFor<Ctx>() {
 		});
 	}
 	return { handle, handleAll };
+}
+
+/** A call declared but not handled yet, given at run time: it answers unavailable and warns once. */
+function stub(name: string): Handler<AnyCall, unknown> {
+	(globalThis as { console?: { warn(text: string): void } }).console?.warn(`decks: ${name} is declared but has no handler here; it answers unavailable.`);
+	return () => {
+		throw new Refused("unavailable", `${name} is not handled on this server yet.`);
+	};
 }

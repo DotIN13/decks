@@ -19,6 +19,7 @@ const clean = (path: string): string => path.split("\\").join("/").replace(/^\/+
 const isOwn = (top: string | undefined) => (OWN_PARTS as readonly string[]).includes(top ?? "");
 const isDeck = (top: string | undefined) => (DECK_PARTS as readonly string[]).includes(top ?? "");
 
+// Paths: what is hidden, what is plain, what the file calls may reach.
 /** The first hidden part of a path (.decks, .git), or undefined. */
 export function hiddenPart(path: string): string | undefined {
 	return partsOf(path).find((part) => part.length > 1 && part.startsWith(".") && part !== "..");
@@ -29,6 +30,24 @@ export function plainSegment(name: unknown): name is string {
 	return typeof name === "string" && name.length > 0 && name.length <= 200 && !name.startsWith(".") && !/[/\\\0]/.test(name);
 }
 
+function normalise(parts: string[]): string[] | undefined {
+	const out: string[] = [];
+	for (const part of parts) {
+		if (part === "" || part === ".") continue;
+		if (part !== "..") out.push(part);
+		else if (!out.pop()) return undefined;
+	}
+	return out;
+}
+
+/** Whether a path may be read or written through file.* calls: inside the deck, nothing hidden. */
+export function deckPathOk(path: string): boolean {
+	if (typeof path !== "string" || path.includes("\0") || /^(?:[a-z]:|\/)/i.test(path)) return false;
+	const parts = normalise(partsOf(path));
+	return parts !== undefined && hiddenPart(path) === undefined;
+}
+
+// Canvases by name, a friend's included.
 export function sharedName(owner: string, canvas: string): string {
 	return `shared/${owner}/${canvas}`;
 }
@@ -43,6 +62,18 @@ export const isSharedCanvas = (name: string): boolean => sharedParts(name) !== u
 
 export function canvasNameOk(name: unknown): name is string {
 	return typeof name === "string" && (plainSegment(name) || isSharedCanvas(name));
+}
+
+/** The folder a friend's canvases land in, from their name; "friend" when nothing is left. */
+export function ownerFolderBase(ownerName: string): string {
+	const slug = ownerName.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+	let cut = slug;
+	if (cut.length > 40) {
+		const head = slug.slice(0, 40);
+		const at = head.lastIndexOf("-");
+		cut = (at > 0 ? head.slice(0, at) : head).replace(/-+$/g, "");
+	}
+	return cut.replace(/[^A-Za-z0-9._-]/g, "").replace(/^[._-]+/, "") || "friend";
 }
 
 /** A canvas's folder from the deck's root. */
@@ -65,16 +96,7 @@ export function canvasOfPath(path: string): { name: string; folder: string; rest
 	return undefined;
 }
 
-function normalise(parts: string[]): string[] | undefined {
-	const out: string[] = [];
-	for (const part of parts) {
-		if (part === "" || part === ".") continue;
-		if (part !== "..") out.push(part);
-		else if (!out.pop()) return undefined;
-	}
-	return out;
-}
-
+// The references a drawing writes.
 /** What a reference written in a canvas's drawing names, as a deck path. */
 export function resolveReference(name: string, reference: string): Resolution {
 	if (typeof reference !== "string" || !reference.trim()) return { refused: "it names nothing" };
@@ -110,6 +132,7 @@ export function referenceFor(name: string, deckPath: string): Resolution {
 	return { refused: `${p} is not in this canvas's folder: ${MAY}` };
 }
 
+// Cards.
 /** Whether a deck path is a card: cards/<name>/index.html inside a canvas. */
 export function isCardPath(path: string): boolean {
 	const at = canvasOfPath(path);
@@ -124,21 +147,3 @@ export function cardOf(path: string): string | undefined {
 	return at && name ? `${at.folder}/cards/${name}/index.html` : undefined;
 }
 
-/** Whether a path may be read or written through file.* calls: inside the deck, nothing hidden. */
-export function deckPathOk(path: string): boolean {
-	if (typeof path !== "string" || path.includes("\0") || /^(?:[a-z]:|\/)/i.test(path)) return false;
-	const parts = normalise(partsOf(path));
-	return parts !== undefined && hiddenPart(path) === undefined;
-}
-
-/** The folder a friend's canvases land in, from their name; "friend" when nothing is left. */
-export function ownerFolderBase(ownerName: string): string {
-	const slug = ownerName.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
-	let cut = slug;
-	if (cut.length > 40) {
-		const head = slug.slice(0, 40);
-		const at = head.lastIndexOf("-");
-		cut = (at > 0 ? head.slice(0, at) : head).replace(/-+$/g, "");
-	}
-	return cut.replace(/[^A-Za-z0-9._-]/g, "").replace(/^[._-]+/, "") || "friend";
-}

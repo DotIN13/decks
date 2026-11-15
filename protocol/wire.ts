@@ -7,6 +7,7 @@ import { any, arr, int, lit, named, obj, opt, str, union } from "./schema.ts";
 // an ask for each harness call it offered and sends one reply; it tells the
 // harness's events, which the server fans out like its own.
 
+// Where things are, and the environment a client reads.
 export const API = "/api/v1";
 export const callPath = (name: string): string => `${API}/${name}`;
 export const SOCKET_PATH = `${API}/socket`;
@@ -24,6 +25,7 @@ export const PICTURE_LADDER = [192, 480, 800] as const;
 /** Where a client finds a server and who it is, when it is not told. */
 export const ENV = { url: "DECKS_URL", token: "DECKS_TOKEN", deck: "DECKS_DECK", tools: "DECKS_TOOLS", home: "DECKS_HOME" } as const;
 
+// The lock file, the answer to every call, and login.
 /** The lock file a running server keeps in its deck, readable by its user only. */
 export const LOCK_FILE = ".decks/server.json";
 export const Lock = named(
@@ -42,6 +44,7 @@ export const Envelope = named(
 export const Login = named("Login", obj({ code: opt(str()), label: opt(str()) }), "POST /api/v1/login: a code, or the lock's token as the bearer.");
 export const LoginAnswer = named("LoginAnswer", obj({ token: str(), name: str() }), "The value of login's envelope.");
 
+// The socket's messages.
 const Who = obj({ kind: lit(...WHO), id: str(), name: str(), canvas: opt(str()) });
 
 /** What a client sends on the socket. */

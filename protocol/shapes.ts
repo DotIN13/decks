@@ -6,6 +6,7 @@ export { AgentKind, AgentMode, ChatItem };
 // The shapes calls take and give. Each is named, so the generators declare it
 // once. One geometry: Box, Size, Point. A path starts at the deck's root.
 
+// Geometry, and what a delete answers.
 export const Box = named("Box", obj({ x1: num(), y1: num(), x2: num(), y2: num() }), "A box on a canvas: both corners.");
 export const BoxChange = named("BoxChange", obj({ x1: opt(num()), y1: opt(num()), x2: opt(num()), y2: opt(num()) }), "Some corners of a box.");
 export const Point = named("Point", obj({ x: num(), y: num() }), "A point on a canvas.");
@@ -13,6 +14,7 @@ export const Size = named("Size", obj({ w: num(), h: num() }), "A width and a he
 export const SizeChange = named("SizeChange", obj({ w: opt(num()), h: opt(num()) }), "A width, a height, or both.");
 export const Deleted = named("Deleted", obj({ deleted: str() }), "What a delete answers: the id or path that went.");
 
+// Items on a canvas.
 export const Item = named(
 	"Item",
 	obj({ type: str(), id: opt(str()), card: opt(str()), html: opt(str()), title: opt(str()), app: opt(str()), path: opt(str()), box: opt(Box), children: opt(arr(any())) }, true),
@@ -34,6 +36,7 @@ export const ItemOp = named(
 );
 export const Clip = named("Clip", obj({ id: str(), canvas: str(), box: Box, items: int() }), "Items held for a paste.");
 
+// Canvases, cards and frames.
 export const Shared = named("Shared", obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) }), "Who shared a friend's canvas, and what you may do.");
 export const Canvas = named(
 	"Canvas",
@@ -69,6 +72,7 @@ export const Card = named(
 );
 export const Frame = named("Frame", obj({ path: str(), id: str(), ref: opt(str()) }), "A reusable frame file and its one item.");
 
+// Files, documents and pictures.
 export const File = named("File", obj({ path: str(), size: opt(int()), rev: opt(int()), by: opt(str()), at: opt(num()), dir: opt(bool()) }), "A file or folder in the deck.");
 export const FileText = named("FileText", obj({ path: str(), text: str(), rev: int(), sha: opt(str()), truncated: opt(bool()) }), "A file's words; sha when read from a past version.");
 export const Splice = named("Splice", obj({ at: int("In UTF-16 units, after the splices before it in the batch."), before: str(), text: str() }), "Words replaced in a document.");
@@ -84,6 +88,7 @@ export const FileMatch = named("FileMatch", obj({ path: str(), line: int(), text
 export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file.");
 export const Screenshot = named("Screenshot", obj({ file: str(), size: Size, box: opt(Box), how: opt(str()) }), "A saved picture.");
 
+// Agents and their mail.
 export const Avatar = named("Avatar", union(obj({ emoji: str() }), obj({ svg: str() })), "An emoji, or an SVG with a viewBox.");
 export const Agent = named(
 	"Agent",
@@ -128,6 +133,7 @@ export const Message = named(
 );
 export const News = named("News", obj({ rev: int(), changes: arr(obj({ canvas: opt(str()), ids: arr(str()), by: str(), rev: int(), event: str() })), mail: arr(Message) }), "What changed since the caller last asked.");
 
+// What a screen shows.
 export const Camera = named("Camera", obj({ x: num(), y: num(), zoom: num() }), "Where a screen looks, and its zoom (1 is life size).");
 export const View = named(
 	"View",
@@ -135,6 +141,7 @@ export const View = named(
 	"What a screen shows. waiting says why it has not moved yet.",
 );
 
+// Apps and ports.
 export const AppKind = named("AppKind", lit("static", "build", "server"));
 export const AppStatus = named("AppStatus", lit("stopped", "installing", "building", "starting", "running", "asleep", "broken", "missing"), "missing: the source folder is not on this machine.");
 export const Source = named("Source", obj({ path: str("A folder on this machine."), repo: opt(str("The git address it can be cloned from.")) }), "Where an app's source lives when not in the deck.");
@@ -147,6 +154,7 @@ export const App = named(
 export const AppCheck = named("AppCheck", obj({ verdict: str(), url: opt(str()), title: opt(str()), errors: arr(str()), failed: opt(arr(str())), words: opt(int()), file: opt(str()) }));
 export const Port = named("Port", obj({ port: int(), label: opt(str()), by: opt(str()), at: num(), path: str(), stripped: str() }), "A forwarded port and its two addresses.");
 
+// The shared tab, the deck, Studio and the clock.
 export const Tab = named(
 	"Tab",
 	obj({ paired: bool(), connected: bool(), url: opt(str()), title: opt(str()), pending: opt(obj({ id: str(), text: str() })), closed: opt(str()) }),
@@ -159,10 +167,12 @@ export const Studio = named("Studio", obj({ connected: bool(), url: opt(str()) }
 export const Now = named("Now", obj({ iso: str(), timezone: str(), words: str(), epoch: num() }), "The time where the person is.");
 export const Deck = named("Deck", obj({ version: str(), protocol: str(), timezone: opt(str()), requireCode: opt(bool()), warnings: arr(str()) }), "The deck as its server sees it.");
 
+// The harness's own: accounts, runtimes, settings.
 export const Account = named("Account", obj({ id: str(), label: str(), active: bool(), spending: opt(str()) }), "A login the harness holds.");
 export const Runtime = named("Runtime", obj({ kind: AgentKind, available: bool(), reason: opt(str()), models: opt(arr(str())) }), "A kind of agent this harness can run.");
 export const Settings = named("Settings", obj({}, true), "A settings page: the harness's, or one agent's.");
 
+// Types read from the shapes above.
 export type Item = Infer<typeof Item>;
 export type ItemOp = Infer<typeof ItemOp>;
 export type Box = Infer<typeof Box>;

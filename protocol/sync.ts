@@ -5,6 +5,7 @@ import { Envelope } from "./wire.ts";
 // What a server and Studio exchange. Neither trusts the other to name places
 // on its disk: canvas names and file paths are checked here, the same way.
 
+// What each side checks before it trusts a name or a path.
 export const CANVAS_NAME = /^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]{0,99}$/u;
 export const BUNDLE_PARTS: readonly string[] = ["cards", "frames", "files", "assets", "docs", ".pictures"];
 export const EDITS_MAX = 5000;
@@ -28,6 +29,7 @@ export function secretLooking(path: string): boolean {
 	return parts.includes("node_modules") || SECRET_FILE.test(parts[parts.length - 1] ?? "");
 }
 
+// Canvases, files and edits as they are synced.
 export const Role = named("Role", lit("owner", "edit", "view"));
 export const PenOp = named("PenOp", obj({ op: lit("insert", "remove", "set", "place", "meta") }, true), "A drawing edit as the pen diff makes it.");
 export const SyncCanvas = named(
@@ -46,6 +48,7 @@ export const EditsAnswer = named(
 export const NewCanvas = named("NewCanvas", obj({ name: str(), title: opt(str()), pen: opt(rec(any())) }));
 export const Hello = named("Hello", obj({ user: obj({ id: str(), email: str(), name: str() }, true), harness: opt(obj({ id: str(), name: str() }, true)) }));
 
+// The live socket: presence, and what each side sends.
 export const PresenceBy = named("PresenceBy", obj({ kind: lit("person", "agent"), id: str(), name: opt(str()), color: str(), harness: opt(str()) }));
 const presence = { canvas: str(), pointer: opt(union(Point, nul)), selection: opt(arr(str())), camera: opt(union(Camera, nul)), gone: opt(lit(true)) };
 
@@ -68,6 +71,7 @@ export const TokenGiven = named("TokenGiven", obj({ type: lit("token"), id: str(
 /** What a server may send on its live socket, a reply to Studio's ask included. */
 export const ServerSend = named("ServerSend", union(TokenGiven, obj({ type: lit("presence"), by: PresenceBy, ...presence }), obj({ type: lit("reply"), id: str(), envelope: Envelope })));
 
+// The routes.
 /** The routes Studio offers a server, under /sync/v1, each on the server's key. */
 export const SYNC_ROUTES = {
 	hello: { method: "GET", path: "/sync/v1/hello" },

@@ -3,6 +3,7 @@
 
 declare const TYPE: unique symbol;
 
+// Shapes, and the type each carries.
 export type Scalar = string | number | boolean;
 
 export type Node =
@@ -33,6 +34,7 @@ type Optional<P extends Props> = { [K in keyof P as P[K] extends Opt ? K : never
 /** The type of an object built from props. */
 export type ObjOf<P extends Props> = Flat<Needed<P> & Optional<P>>;
 
+// The builders.
 const shape = <T>(node: Node): Shape<T> => node as Shape<T>;
 const withDoc = (doc?: string) => (doc ? { doc } : {});
 
@@ -79,6 +81,7 @@ export function rec<S extends Shape<any>>(value: S): Shape<Record<string, Infer<
 	return shape({ k: "obj", props: {}, required: [], rest: value });
 }
 
+// Naming shapes, and finding the named ones.
 /** Give a shape a name, so generated code declares it once and refers to it. */
 export function named<S extends Shape<any>>(name: string, s: S, doc?: string): S {
 	return { ...s, name, ...withDoc(doc ?? s.doc) } as S;

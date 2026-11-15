@@ -6,6 +6,7 @@ import { Box, Camera, ChatItem, Message, Point, Splice } from "./shapes.ts";
 // Every event, on one stream. Each says which ids changed, who changed them
 // and the revision; a client that wants the whole thing makes a call.
 
+// The deck, its canvases, items, cards, files and apps.
 export const deckChanged = defineEvent("deck.changed", "The deck's settings or pairings changed; deck.get reads them.", { part: opt(str()) });
 export const canvasChanged = defineEvent("canvas.changed", "Canvases were made, renamed or deleted; canvas.list reads them.");
 export const itemChanged = defineEvent("item.changed", "Items on a canvas changed. edits carries the ops when they fit in a message.", {
@@ -27,6 +28,7 @@ export const fileChanged = defineEvent("file.changed", "A file changed: its word
 	settled: opt(bool()),
 });
 export const appChanged = defineEvent("app.changed", "An app's state changed; app.get reads it.", { status: opt(str()) });
+// Agents.
 export const agentChanged = defineEvent("agent.changed", "Agents' records or states changed; agent.get reads one.", { state: opt(str()) });
 export const agentDeleted = defineEvent("agent.deleted", "An agent was removed.");
 export const agentMailed = defineEvent("agent.mailed", "Mail for an agent whose host is connected; the host delivers it into a turn.", { message: Message }, "person");
@@ -38,6 +40,7 @@ export const agentActed = defineEvent("agent.acted", "An agent began or finished
 	color: str(),
 	boxes: opt(arr(Box)),
 });
+// Screens and the shared tab.
 export const viewChanged = defineEvent("view.changed", "Someone on a canvas moved, selected or looked elsewhere, or left.", {
 	pointer: opt(union(Point, nul)),
 	selection: opt(arr(str())),
@@ -50,6 +53,7 @@ export const viewChanged = defineEvent("view.changed", "Someone on a canvas move
 export const viewRequested = defineEvent("view.requested", "A view call waits for a screen to act on it: move, focus, go to, reload, a picture. With id, the screen answers with view.answer.", { call: str(), args: any(), id: opt(str()) });
 export const tabChanged = defineEvent("tab.changed", "The shared tab changed; tab.status reads it.", { code: opt(str()) });
 
+// The harness's own, heard by the person.
 export const chatAdded = defineEvent("chat.added", "An entry was added to a conversation, or grew by delta while it streams.", { item: opt(ChatItem), delta: opt(str()), field: opt(lit("text", "thinking")) }, "person");
 export const chatChanged = defineEvent("chat.changed", "The person's queue or the conversation's state changed.", {}, "person");
 export const chatAsked = defineEvent("chat.asked", "The agent's runtime put up a question for the person.", { question: any() }, "person");

@@ -3,8 +3,10 @@ import { arr, bool, int, lit, named, num, obj, opt, str, union } from "../schema
 import { BoxChange, Canvas, Deleted, File, Screenshot } from "../shapes.ts";
 import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas, onItems } from "./parts.ts";
 
-// Canvases as wholes: list, make, rename, delete, undo, picture, export.
+// Canvases as wholes: list, make, rename, delete, undo, picture, export, and
+// a drawing's history.
 
+// Canvases as wholes.
 export const list = defineCall({
 	name: "canvas.list",
 	summary: "Every canvas in the deck, and who has each open.",
@@ -77,6 +79,7 @@ export const undo = defineCall({
 	effect: "change",
 });
 
+// Pictures and pages made from a canvas.
 export const screenshot = defineCall({
 	name: "canvas.screenshot",
 	summary: "A picture of the canvas or part of it (of: ids, a card's path, or a box), drawing and cards together.",
@@ -103,6 +106,7 @@ export const exportPage = defineCall({
 	effect: "change",
 });
 
+// A drawing's history.
 const CanvasVersion = named("CanvasVersion", obj({ rev: int(), by: str(), at: num(), items: int("Ops in it, or 0 when not known.") }), "One revision of a drawing.");
 
 export const versions = defineCall({
