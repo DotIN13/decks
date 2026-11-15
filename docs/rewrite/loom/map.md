@@ -61,7 +61,7 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 | `cards/` | cards: mounting, reading, pictures, the card editor | `src/items/{card,card-load,card-reading,card-snapshot,card-surface}` (+tests), `src/cards/CardEditor.tsx`, `src/model/{card-frame,card-syntax,markdown}` (+tests) |
 | `cards/runtime/` | what a card needs to run anywhere | `packages/card-host/src/*` → `cards/runtime/*`, its test; `lib/` (112 files) built, section 5 |
 | `documents/` | files you type into, drawn as pages | `packages/docs/src/page/*` → `documents/*`; `docs/src/client.ts`, `merge.ts` (+tests) → `documents/`; `docs/src/index.ts` → `documents/model.ts`; `docs/src/gdoc/{types,units}.ts` → `documents/google/` |
-| `ink/` | Pencil strokes: shaping, the ink layer, the tray keys | `packages/ink/src/ink.ts` (+test) → *ink/shaper.ts*; `src/ink/StageInk.tsx` → *ink/InkLayer.tsx*; `src/ink/{ink,ink-keys}.ts`; `src/model/ink.ts` → `ink/model.ts` |
+| `ink/` | Pencil strokes: shaping, the ink layer, the tray keys | `packages/ink/src/ink.ts` (+test) → *ink/shaper.ts*; *src/ink/StageInk.tsx* → *ink/InkLayer.tsx*; `src/ink/{ink,ink-keys}.ts`; `src/model/ink.ts` → `ink/model.ts` |
 | `render/` | the engine's page side and its worker | `src/render/*` (`engine.ts` keeps its role, split in section 2) |
 | `look/` | fonts, icons, code colours, maths, media | `src/look/*` |
 | `chrome/` | the canvas's own controls: properties, insert, pen bar | `src/ui/*` (Pane's lane today) |
@@ -347,7 +347,7 @@ of docs excluded:
 | `canvas/src/frame/inside/presence.ts` | `installPresence` 127 |
 | `canvas/src/frame/inside/studio-line.ts` | `createStudioLine` 87 |
 | `canvas/src/frame/outside/host.tsx` | `createFramedEditor` 494, `wire` 83, `keepInStep` 108 |
-| `canvas/src/ink/StageInk.tsx` | `StageInk` 668 |
+| *canvas/src/ink/StageInk.tsx* | `StageInk` 668 |
 | `canvas/src/items/MediaPlayer.tsx` | `MediaPlayer` 243 |
 | `canvas/src/items/card-surface.tsx` | `CardSurface` 229 |
 | `canvas/src/items/card.ts` | `mountCard` 152 |

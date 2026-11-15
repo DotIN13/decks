@@ -1,6 +1,6 @@
 # Step 4e-10-chrome: Regroup canvas: ui/ becomes chrome/
 
-Dry run on 8b467b8a, on top of 4e-07-items, 4e-08-cards, 4e-09-ink. Nothing was moved.
+Dry run on 8ae4ded4, on top of 4e-09-ink. Nothing was moved.
 
 - files moved by git mv: 15
 - files taken out of git (moved on disk): 0

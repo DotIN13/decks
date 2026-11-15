@@ -1,6 +1,6 @@
 # Step 4e-09-ink: Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink.ts is ink/model.ts
 
-Dry run on 8b467b8a, on top of 4e-07-items, 4e-08-cards. Nothing was moved.
+Dry run on 8ae4ded4. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
