@@ -110,7 +110,8 @@ function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>
 		case "variables": {
 			const themes = op.themes === null ? undefined : (op.themes ?? doc.themes);
 			const wide = expandVariables(op.set, themes);
-			const pen = { op: "variables", set: wide.set, ...(wide.themes ? { themes: wide.themes } : op.themes === null ? { themes: null } : {}) } as PenOp;
+			const axes = wide.themes ?? op.themes;
+			const pen = { op: "variables", set: wide.set, ...(axes !== undefined ? { themes: axes } : {}) } as PenOp;
 			return { pen, written: op };
 		}
 	}

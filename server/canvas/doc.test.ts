@@ -100,3 +100,11 @@ test("an item moved out of a frame that lays it out keeps the width it was drawn
 	const moved = doc.pen().children.find((n) => n.id === "w")!;
 	assert.equal(moved.width, 300);
 });
+
+test("a variables op keeps the theme axes it is given, so a dark value is drawn", () => {
+	let file = "";
+	const doc = new PenCanvas("p", JSON.stringify({ version: "2.14", children: [] }), new Kinds(), (t) => { file = t; });
+	const set = { slate: { type: "color", value: [{ value: "#dbe4f0" }, { value: "#34404f", theme: { mode: "dark" } }] } };
+	doc.apply([{ op: "variables", set, themes: { mode: ["light", "dark"] } }], person);
+	assert.deepEqual(JSON.parse(file).themes, { mode: ["light", "dark"] });
+});
