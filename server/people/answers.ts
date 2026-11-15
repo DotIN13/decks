@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Refused } from "../../protocol/index.ts";
 
-// Questions put to one screen (view.requested with an id), each answered once
-// by that screen's view.answer, or given up after a while.
+// Questions put to the screens of a canvas (view.requested with an id), each
+// answered once by view.answer, or given up after a while or when the asked screen goes.
 
 export const ANSWER_MS = 20_000;
 type Waiting = { client: string; done: (got: { value?: unknown; error?: string }) => void };
@@ -32,10 +32,11 @@ export class Answers {
 		return { id, answer };
 	}
 
-	/** An answer counts only from the screen that was asked; false when nothing waits for it. */
-	answer(id: string, client: string | undefined, got: { value?: unknown; error?: string }): boolean {
+	/** The first answer to an id counts, from any of the person's connections (the canvas frame's line
+	 * answers for its page); false when nothing waits for it. */
+	answer(id: string, got: { value?: unknown; error?: string }): boolean {
 		const waiting = this.waiting.get(id);
-		if (!waiting || (client !== undefined && client !== waiting.client)) return false;
+		if (!waiting) return false;
 		waiting.done(got);
 		return true;
 	}
