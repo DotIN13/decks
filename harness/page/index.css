@@ -59,6 +59,8 @@
 @import "./styles/tokens.css";
 /* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
 @import "./styles/v3.css";
+@import "./canvases/manager/drawn.css";
+@import "./styles/v3-after.css";
 
 
 /*

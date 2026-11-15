@@ -1,0 +1,349 @@
+/* ---- the canvas switcher: a small picture, the name, its faces and its age ------------------- */
+@layer components {
+	body .popover [data-row].switcher-canvas {
+		min-height: 38px;
+		gap: 10px;
+	}
+	.switcher-thumb {
+		display: block;
+		width: 34px;
+		height: 24px;
+		flex: none;
+		overflow: hidden;
+		border-radius: 4px;
+		background: var(--v3-bg2);
+		box-shadow: inset 0 0 0 1px var(--v3-line);
+	}
+	.switcher-thumb > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.switcher-faces {
+		display: flex;
+		flex: none;
+	}
+	.switcher-face {
+		display: grid;
+		width: 18px;
+		height: 18px;
+		margin-left: -4px;
+		place-items: center;
+		border-radius: 50%;
+		box-shadow: 0 0 0 2px var(--v3-panel);
+		color: #fff;
+		font-size: 9px;
+		font-weight: 600;
+	}
+	body .popover [data-row].switcher-canvas .menu-note {
+		min-width: 24px;
+		padding-left: 4px;
+		text-align: right;
+	}
+}
+
+/* ---- the agent's details, as drawn: each label over its field, the tags inside theirs, Done at the foot ---- */
+@layer components {
+	body .agent-edit {
+		gap: 12px;
+		padding: 2px 18px 16px;
+	}
+	body .agent-edit-row,
+	body .agent-edit-row.agent-edit-tags {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+		min-height: 0;
+		padding: 0;
+	}
+	body .agent-edit-k,
+	body .agent-edit-row.agent-edit-tags > .agent-edit-k {
+		width: auto;
+		color: var(--v3-fg2);
+		font-size: 12px;
+		font-weight: 500;
+		line-height: 1.3;
+	}
+	body .agent-edit-v > .field,
+	body .agent-edit-pick {
+		height: 32px;
+		border-radius: 6px;
+	}
+	.agent-edit-chips {
+		display: flex;
+		min-height: 34px;
+		height: auto !important;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 5px;
+		box-sizing: border-box;
+		padding: 5px 6px;
+		border-radius: 6px;
+		cursor: text;
+	}
+	.agent-edit-chips .tag {
+		height: 22px;
+		padding: 0 3px 0 8px;
+		border-radius: 5px;
+		font-size: 12px;
+	}
+	.agent-edit-foot {
+		display: flex;
+		justify-content: flex-end;
+		padding: 12px 18px;
+		border-top: 1px solid var(--v3-line);
+	}
+	.agent-edit-foot .btn[data-primary="true"] {
+		border-color: transparent;
+		background: var(--v3-accent);
+		color: #fff;
+	}
+}
+
+/* ---- a dialog covers the floating tools ------------------------------------------------------
+   The tools, the zoom and the other floats sit at --z-float (30), over the canvas; a dialog's
+   backdrop sat at --z-backdrop (20), under them, so the tool column stayed lit over Settings and the
+   agent's details. Over every float now, and still under a menu (40), which a dialog's own pickers open. */
+@layer components {
+	body .picker-backdrop {
+		z-index: 35;
+	}
+}
+
+/* ---- the two splitters under a finger -----------------------------------------------------
+   An 8px strip shown only on hover is a mouse's handle: a finger cannot see it and seldom lands on
+   it. On a touchscreen the side panel's edge takes 30px (mostly inside the panel, so the canvas's
+   tools beside it keep theirs), unmarked, and the conversation's top a 22px band across its middle
+   with a small grip. */
+@layer components {
+	@media (pointer: coarse) {
+		.panel-resize {
+			right: -10px;
+			width: 30px;
+		}
+		/* No grip on the panel's edge: the edge is the handle; its line shows only while it is dragged. */
+		.panel-resize::after {
+			left: 18px;
+		}
+		/* A tap leaves :hover behind on a touchscreen; the line is for the drag alone. */
+		.panel-resize:hover::after {
+			opacity: 0;
+		}
+		.panel-shell[data-resizing="true"] .panel-resize::after {
+			opacity: 1;
+		}
+		/* Inside the conversation's top (its box clips what stands above it), across the middle, clear of
+		   its name on the left and its fold on the right. */
+		.v3-chat-resize {
+			top: 0;
+			right: 30%;
+			left: 30%;
+			height: 22px;
+		}
+		.v3-chat-resize::after {
+			top: 6px;
+			right: auto;
+			left: 50%;
+			width: 40px;
+			height: 4px;
+			border-radius: 2px;
+			background: var(--v3-line2, #d9d9d9);
+			opacity: 1;
+			transform: translateX(-50%);
+		}
+		.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+			background: var(--v3-accent);
+		}
+	}
+}
+
+/* ---- the comment popup (`markup/CommentPopup.tsx`), in the menus' look ----
+   The same card as a menu: a hairline, the soft shadow and 12px corners; the field a grey well
+   with no border of its own, and buttons with the menus' 7px corners. */
+@layer components {
+	body .comment-popup {
+		border: 1px solid var(--v3-line);
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+		animation: v3-arrive 160ms var(--v3-ease);
+	}
+	[data-color-scheme="dark"] body .comment-popup {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .comment-popup[data-open="true"] {
+		width: min(360px, calc(100vw - 16px));
+		gap: 10px;
+		padding: 12px;
+	}
+	body .comment-popup .comment-start,
+	body .comment-popup .comment-act {
+		height: 28px;
+		padding: 0 10px;
+		border-radius: 7px;
+		font-size: 13px;
+	}
+	body .comment-popup .comment-start:hover,
+	body .comment-popup .comment-act:hover:not(:disabled) {
+		background: var(--v3-bg2);
+	}
+	body .comment-popup .comment-act {
+		border-color: var(--v3-line2);
+	}
+	body .comment-popup .comment-act[data-primary="true"] {
+		border-color: var(--v3-fg);
+		background: var(--v3-fg);
+		color: var(--v3-panel);
+	}
+	/* The hover above is the grey of a plain button; the primary one keeps its own fill and its words. */
+	body .comment-popup .comment-act[data-primary="true"]:hover:not(:disabled) {
+		background: var(--v3-fg);
+		opacity: 0.88;
+	}
+	/* The whole quote, scrolling when long: what Send now sends is what the box shows (`canvas-host.tsx`, QUOTE_MAX). */
+	body .comment-popup .comment-quote {
+		display: block;
+		max-height: 7.5em;
+		overflow-y: auto;
+		-webkit-line-clamp: unset;
+		line-clamp: unset;
+		padding: 1px 0 1px 10px;
+		border-left-width: 3px;
+		border-radius: 1px;
+		color: var(--v3-fg2);
+	}
+	body .comment-popup .comment-field {
+		min-height: 72px;
+		padding: 9px 11px;
+		border: 1px solid transparent;
+		border-radius: 9px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font-size: 14px;
+		resize: none;
+	}
+	body .comment-popup .comment-field::placeholder {
+		color: var(--v3-fg3);
+	}
+	body .comment-popup .comment-field:focus {
+		border-color: var(--v3-accent);
+		background: var(--v3-panel);
+	}
+	body .comment-popup .comment-acts .icon-button {
+		border-radius: 7px;
+	}
+}
+
+/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
+@layer components {
+	.fps-meter {
+		position: fixed;
+		z-index: var(--z-float);
+		/* The top-right bar is 12px from the top and right and 44px tall (`.v3-topright`): 8px under it, its right edge in line. */
+		top: calc(env(safe-area-inset-top, 0px) + 64px);
+		right: calc(var(--inset-right, 0px) + 12px);
+		width: 260px;
+		padding: 8px 10px 8px;
+		border: 1px solid var(--v3-line);
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		color: var(--v3-fg);
+		font-size: 12px;
+		font-variant-numeric: tabular-nums;
+		pointer-events: none;
+	}
+	.fps-head {
+		display: flex;
+		align-items: baseline;
+		gap: 4px;
+	}
+	.fps-n {
+		font-size: 20px;
+		font-weight: 650;
+	}
+	.fps-meter[data-level="good"] .fps-n { color: #2ea043; }
+	.fps-meter[data-level="meh"] .fps-n { color: #d29922; }
+	.fps-meter[data-level="bad"] .fps-n { color: var(--v3-danger); }
+	.fps-u {
+		color: var(--v3-fg2);
+	}
+	.fps-plot {
+		display: block;
+		width: 100%;
+		height: 56px;
+		margin: 4px 0 4px;
+		border-radius: 6px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.fps-d {
+		color: var(--v3-fg2);
+	}
+	.fps-key {
+		display: flex;
+		gap: 10px;
+		margin-top: 2px;
+		color: var(--v3-fg3);
+		font-size: 11px;
+	}
+	.fps-key span::before {
+		content: "";
+		display: inline-block;
+		width: 10px;
+		margin-right: 4px;
+		vertical-align: middle;
+		border-top: 1px dashed currentColor;
+	}
+	.fps-key .k120::before { border-color: #2ea043; }
+	.fps-key .k60::before { border-color: #d29922; }
+}
+
+/* ---- the canvas frame's own chrome beside its tools (`frame/chrome.tsx`) ---------------- */
+
+@layer components {
+	.frame-offer.float.pill {
+		top: 68px;
+		left: 50%;
+		gap: 8px;
+		padding: 0 6px 0 14px;
+		color: var(--v3-fg);
+		font-size: 13px;
+		transform: translateX(-50%);
+	}
+	.frame-offer-go,
+	.frame-offer-no {
+		height: 30px;
+		padding: 0 12px;
+		border: 0;
+		border-radius: 10px;
+		cursor: pointer;
+		font: inherit;
+	}
+	.frame-offer-go {
+		background: var(--v3-accent);
+		color: white;
+	}
+	.frame-offer-no {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	/* A phone's tool row in the canvas frame, above the page's dock (`frame/chrome.tsx`). */
+	.frame-tool-row {
+		position: absolute;
+		z-index: 20;
+		left: 8px;
+		right: 8px;
+	}
+	.frame-tool-row .v3-tools[data-row="true"] {
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+}
