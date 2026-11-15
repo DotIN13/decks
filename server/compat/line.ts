@@ -12,7 +12,8 @@ const QUIET = new Set(["canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
 /** edits: the frame's names for its edits sent and not yet told back as made, oldest first. */
-type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: string[] };
+type Pointer = { last: number; timer?: ReturnType<typeof setTimeout>; value: unknown; canvas: string };
+type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: string[]; pointer?: Pointer };
 
 /** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
 export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
@@ -36,6 +37,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 	const timer = setTimeout(() => !state.caller && peer.close(4401, "Say hello with a token first."), 5_000);
 	peer.onClose(() => {
 		clearTimeout(timer);
+		clearTimeout(state.pointer?.timer);
 		for (const stop of state.watched.values()) stop();
 		client.end();
 	});
@@ -108,10 +110,32 @@ type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: S
 async function screen(L: LineParts, message: Said): Promise<void> {
 	const canvas = String(message.canvas ?? "");
 	const fields = Object.fromEntries(["pointer", "selection", "camera"].filter((k) => k in message).map((k) => [k, message[k]]));
+	if (Object.keys(fields).length === 1 && "pointer" in fields) return pointerSoon(L, canvas, fields.pointer);
 	if (Object.keys(fields).length) await L.door.call("view.update", { ...fields, canvas }, L.state.caller!, L.client);
 	const camera = message.camera as { x?: number; y?: number; zoom?: number } | null | undefined;
 	if (!camera || typeof camera.x !== "number" || typeof camera.y !== "number" || typeof camera.zoom !== "number") return;
 	await L.door.call("view.move", { x: camera.x, y: camera.y, zoom: camera.zoom, canvas, device: "frame" }, L.state.caller!, L.client);
+}
+
+export const POINTER_MS = 50;
+
+/**
+ * A pointer alone is said at most once each POINTER_MS, the last one winning: the frame says
+ * every move, and each would wake every other screen of the canvas while the person draws.
+ */
+function pointerSoon(L: LineParts, canvas: string, pointer: unknown): void {
+	const p = L.state.pointer ?? { last: 0, timer: undefined, value: undefined, canvas };
+	L.state.pointer = p;
+	Object.assign(p, { value: pointer, canvas });
+	if (p.timer) return;
+	const say = () => {
+		p.timer = undefined;
+		p.last = Date.now();
+		void L.door.call("view.update", { pointer: p.value, canvas: p.canvas }, L.state.caller!, L.client);
+	};
+	const wait = POINTER_MS - (Date.now() - p.last);
+	if (wait <= 0) return say();
+	p.timer = setTimeout(say, wait);
 }
 
 /** The person read a card: recorded, and the frame told the card's page again, its dot gone. */

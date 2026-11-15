@@ -89,7 +89,8 @@ function launch(name, { cmd, args, env = {}, cwd = ROOT }, log) {
 	const child = spawn(cmd, args, { cwd, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
 	LIVE.add(child);
 	child.once("exit", () => LIVE.delete(child));
-	for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => log.push(`[${name}] ${chunk}`));
+	// Every line tagged with its program, so a check's FAIL line is found wherever its chunk broke.
+	for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => log.push(String(chunk).replace(/^(?=.)/gm, `[${name}] `)));
 	return child;
 }
 
