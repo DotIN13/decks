@@ -21,21 +21,39 @@ export function moved(path, pairs) {
 	return path;
 }
 
-/** One key with its path moved by the pairs. */
-export function rekeyed(key, pairs) {
+/**
+ * The old packages the pairs move out of, each with its new folder: a file from packages/<x>/ (or
+ * apps/<x>/) landing in <folder>/ moves the unit packages/<x> to <folder>, as the imports gate names units.
+ */
+export function units(pairs) {
+	const out = new Map();
+	for (const [from, to] of pairs) {
+		const unit = /^(packages|apps)\/[^/]+(?=\/)/.exec(from)?.[0];
+		const top = to.split("/")[0];
+		if (unit && top && !to.startsWith(`${unit}/`) && !out.has(unit)) out.set(unit, /^(clients|packages|apps)$/.test(top) ? to.split("/").slice(0, 2).join("/") : top);
+	}
+	return out;
+}
+
+/** One key with its path moved by the pairs, and the old units its text names (the imports gate's) moved with them. */
+export function rekeyed(key, pairs, moves = units(pairs)) {
 	const [, legacy = "", path, rest = ""] = PREFIX.exec(key) ?? [];
-	return path === undefined ? key : `${legacy}${moved(path, pairs)}${rest}`;
+	if (path === undefined) return key;
+	let text = rest;
+	for (const [unit, now] of moves) text = text.replace(new RegExp(`(?<![\\w/.-])${unit.replace("/", "\\/")}(?![\\w/.-])`, "g"), now);
+	return `${legacy}${moved(path, pairs)}${text}`;
 }
 
 /** Every baseline re-keyed by pairs; a key landing on one already there adds its count. Answers the keys moved. */
 export function rekey(root, pairs) {
 	const dir = join(root, "tools/gates/baseline");
 	let count = 0;
+	const moving = units(pairs);
 	for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
 		const name = file.replace(/\.json$/, "");
 		const next = {};
 		for (const [key, n] of Object.entries(readBaseline(root, name))) {
-			const to = rekeyed(key, pairs);
+			const to = rekeyed(key, pairs, moving);
 			if (to !== key) count++;
 			next[to] = (next[to] ?? 0) + n;
 		}

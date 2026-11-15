@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { MOVED, ROOT, adoptBaseline, compare, context, readBaseline, writeBaseline } from "./lib.mjs";
-import { rekeyed, stagedRenames } from "./rekey.mjs";
+import { rekeyed, stagedRenames, units } from "./rekey.mjs";
 
 export const GATES = ["size", "names", "imports", "calls", "readme", "comments", "commits", "parts", "state", "built", "lanes", "agents-md", "legacy"];
 
@@ -22,7 +22,10 @@ export function grown(root, name) {
 	} catch { return []; }
 	// A key that moved with a file staged as renamed (git mv, then rekey.mjs) is the same exception, not growth.
 	const pairs = stagedRenames(root);
-	if (pairs.length) before = Object.entries(before).reduce((all, [k, n]) => ((all[rekeyed(k, pairs)] = (all[rekeyed(k, pairs)] ?? 0) + n), all), {});
+	if (pairs.length) {
+		const moving = units(pairs);
+		before = Object.entries(before).reduce((all, [k, n]) => ((all[rekeyed(k, pairs, moving)] = (all[rekeyed(k, pairs, moving)] ?? 0) + n), all), {});
+	}
 	const now = readBaseline(root, name);
 	return Object.keys(now).filter((k) => now[k] > (before[k] ?? 0)).map((k) => `baseline gained ${k}`);
 }

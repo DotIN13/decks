@@ -34,3 +34,19 @@ test("keys move with the same counts, the legacy gate's prefix kept, a collision
 	assert.deepEqual(read(root, "readme"), { "canvas: has no README.md": 1 });
 	assert.deepEqual(read(root, "size"), { "canvas/a.ts: over 400 lines": 2 });
 });
+
+test("an imports key's old unit moves with the package's files: its name in the text too", () => {
+	const root = scratch({
+		imports: {
+			"packages/pen/src/a.ts: reaches past the entry of packages/pen": 1,
+			"harness/x.ts: harness may not import pen (packages/pen)": 2,
+			"harness/y.ts: harness may not import pen (packages/penny)": 1,
+		},
+	});
+	rekey(root, [["packages/pen/src/a.ts", "pen/a.ts"], ["packages/pen/package.json", "pen/package.json"]]);
+	assert.deepEqual(read(root, "imports"), {
+		"pen/a.ts: reaches past the entry of pen": 1,
+		"harness/x.ts: harness may not import pen (pen)": 2,
+		"harness/y.ts: harness may not import pen (packages/penny)": 1,
+	});
+});
