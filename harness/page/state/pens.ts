@@ -18,11 +18,12 @@ export { pens };
 /** Which canvas is watched, and a read waiting to run. Not drawn. */
 const watching = { canvas: undefined as string | undefined, soon: undefined as number | undefined, stop: undefined as (() => void) | undefined };
 
-/** An item as a pen.dev node: its box as x, y, width and height, inside and out. */
+/** An item as a pen.dev node: its box as x, y, width and height, inside and out; a card's title as its name. */
 export function nodeOf(item: Node): Node {
 	const { box, children, ...rest } = item as Node & { box?: { x1: number; y1: number; x2: number; y2: number } };
 	const place = box ? { x: box.x1, y: box.y1, width: box.x2 - box.x1, height: box.y2 - box.y1 } : {};
-	return { ...rest, ...place, ...(children ? { children: children.map(nodeOf) } : {}) };
+	const name = typeof rest.name !== "string" && typeof rest.title === "string" ? { name: rest.title } : {};
+	return { ...rest, ...name, ...place, ...(children ? { children: children.map(nodeOf) } : {}) };
 }
 
 async function read(canvas: string): Promise<void> {
