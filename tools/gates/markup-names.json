@@ -1,0 +1,4 @@
+{
+	"why": "The canvas's markup class names keep the word stage: today's checks, Studio and cards people wrote select by them (docs/rewrite/DESIGN.md section 11). The names gate passes them as markup only: a .name selector, a class attribute, className or classList.",
+	"names": ["stage", "stage-fixed", "stage-ink", "stage-content", "stage-sheet", "stage-notice", "stage-engine", "stage-engine-over"]
+}
