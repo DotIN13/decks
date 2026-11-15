@@ -196,7 +196,6 @@
 	"harness/page/state/ui.ts: function createUi over 80 lines": 1,
 	"harness/page/styles/kit/chrome.css: over 400 lines": 1,
 	"harness/page/styles/kit/properties.css: over 400 lines": 1,
-	"harness/page/styles/stream.css: over 400 lines": 1,
 	"harness/runtimes/claude/backend.ts: function slashLogin over 80 lines": 1,
 	"harness/runtimes/claude/backend.ts: function startQuery over 80 lines": 1,
 	"harness/runtimes/claude/backend.ts: over 400 lines": 1,
