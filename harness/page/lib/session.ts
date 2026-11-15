@@ -15,11 +15,6 @@ export function authHeaders(): Record<string, string> {
 	return now ? { Authorization: `Bearer ${now}` } : {};
 }
 
-/** Whether the server no longer takes this page's token: a call answers that instead. */
-export async function sessionStale(): Promise<boolean> {
-	return false;
-}
-
 /** A digest of the token, for the service worker to check a request against without holding it. */
 export async function tokenDigest(): Promise<string | undefined> {
 	const now = token();

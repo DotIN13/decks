@@ -1,5 +1,5 @@
 /**
- * A picture of the stage (`stage.screenshot`, the drawing's Export: `server/stage/shots.ts`) has
+ * A picture of the stage (`stage.screenshot`, the drawing's Export: the server's shots) has
  * every drawn item in it, where the canvas itself draws it.
  *
  * The server takes the picture on `shot.html`, a page of its own that has to place the engine's
@@ -221,7 +221,7 @@ const CASES = [
 
 /*
  * Each case both ways: as the server takes it by default (drawn natively when it can be,
- * `native-shots.ts`) and in the browser with live boards (`live=1`, `shot.html`). `how` says which
+ * the server's native shots) and in the browser with live boards (`live=1`, `shot.html`). `how` says which
  * it was; the drawing-only boxes must be native when the native renderer is built.
  */
 const PATHS = [

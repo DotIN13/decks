@@ -4,7 +4,7 @@ import { type Notice, setState } from "./deck.ts";
  * The notice strip: the things the app has to say, briefly.
  *
  * Layer 1. It imports `deck` for the store it writes into and nothing else, and it is the
- * only writer of `state.notices` — `App.tsx` reads that field to draw the strip and never
+ * only writer of `state.notices` — the page's shell reads that field to draw the strip and never
  * touches it otherwise, so the whole lifetime of a notice is the two functions here.
  *
  * `Notice` itself stays declared in `deck`, deliberately. The store holds `notices: Notice[]`,

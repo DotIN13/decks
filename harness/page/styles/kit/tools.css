@@ -23,7 +23,7 @@
 	scrollbar-width: none;
 }
 	/*
-	 * The column as a float (`App.tsx`, `chrome/float.ts`): the grip at its head is where a drag
+	 * The column as a float (the page's shell, `chrome/float.ts`): the grip at its head is where a drag
 	 * starts, away from home the inline position wins over the centring transform, and thrown
 	 * hard at the left edge it stands behind it with only its tab showing.
 	 */

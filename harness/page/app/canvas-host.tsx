@@ -31,7 +31,7 @@ export interface CanvasHostInputs {
 	openAppsPanel: () => void;
 	files: ReturnType<typeof createFileDrops>;
 	frameWhenPlaced: (path: string) => void;
-	/** Move a conversation to a canvas, as the person (`App.tsx`): an agent's offered `view.goto` they said Go to in the frame. */
+	/** Move a conversation to a canvas, as the person (the page's shell): an agent's offered `view.goto` they said Go to in the frame. */
 	moveConversation: (agentId: string, canvas: string) => void;
 }
 

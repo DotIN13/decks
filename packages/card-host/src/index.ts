@@ -34,7 +34,7 @@ export function contentType(path: string): string {
 }
 
 /**
- * The file a page asks `lib/` for: `board.css` and `board.js`, which pages written before cards
+ * The file a page asks `lib/` for: board.css and board.js, which pages written before cards
  * (a friend's leftover board, a card written then) ask for by name, are `card.css` and `card.js`.
  */
 export function libName(path: string): string {

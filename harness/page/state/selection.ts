@@ -13,7 +13,7 @@ import { createSignal } from "solid-js";
  * that can only exist once is module state no test can set up.
  *
  * Nothing here needs an owner: signals work at module scope, and only `onMount`,
- * `onCleanup` and `createEffect` require a component to hang from. Those stay in `App.tsx`,
+ * `onCleanup` and `createEffect` require a component to hang from. Those stay in the page's shell,
  * where they belong.
  */
 /**

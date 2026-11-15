@@ -1,9 +1,8 @@
 # harness/page/chat
 
 The conversation on the person's page: the stream of turns, tool chips and groups, the status
-line, the time machine, and the section that holds them. Moved from `packages/agent-ui/src/chat`,
-`apps/web/src/shell/ChatSection.tsx` and `apps/web/src/app/chat-stream.tsx`; markup, class names
-and behaviour are today's.
+line, the time machine, and the section that holds them. Moved from the old shared chat package
+and the old page's conversation section and stream; markup, class names and behaviour are today's.
 
 ## Owns
 

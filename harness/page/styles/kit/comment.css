@@ -151,7 +151,7 @@
 	}
 
 	/*
-	 * The card a press on a pill opens (`@decks/agent-ui` `pill-card.ts`), in `.floatcard`'s look: what it
+	 * The card a press on a pill opens (the pill's card), in `.floatcard`'s look: what it
 	 * is about by name, which shows it; the quote and the note; Exact text, and Remove in the composer.
 	 */
 	.floatcard.pill-card {

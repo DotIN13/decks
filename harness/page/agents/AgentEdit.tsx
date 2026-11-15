@@ -6,7 +6,7 @@ import { Icon, Popover } from "@decks/ui";
 import { NO_WORKSPACE } from "./agent-sections.ts";
 import { WorkspaceField } from "./NewWorkspace.tsx";
 
-/** The server keeps four of your tags at most (`agents/tags.ts`); past that the field goes away. */
+/** The server keeps four of your tags at most (the server's tag rules); past that the field goes away. */
 const MAX_TAGS = 4;
 
 /**
@@ -133,7 +133,7 @@ export function AgentEdit(props: {
 	 *
 	 * A tag may contain spaces, which the server turns into hyphens — so `Panel CSS` is one
 	 * tag called `panel-css`, and splitting on whitespace made it two. Nothing else is
-	 * validated here: the server slugs, dedupes and caps whatever arrives (`agents/tags.ts`),
+	 * validated here: the server slugs, dedupes and caps whatever arrives (the server's tag rules),
 	 * and two places deciding what a tag may be is how they come to disagree.
 	 */
 	const add = () => {

@@ -110,7 +110,7 @@ export interface ComposerProps {
 	 */
 	agentId: string | undefined;
 	/**
-	 * The page the bar is on, `agent:<id>@<canvas>` (`parked.ts`). What is typed is kept per page,
+	 * The page the bar is on, `agent:<id>@<canvas>` (the parked drafts). What is typed is kept per page,
 	 * so leaving a page never loses a message, and another canvas starts with its own.
 	 */
 	page: string;

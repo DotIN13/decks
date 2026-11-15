@@ -44,7 +44,7 @@ deck/
 A canvas may point at its own folder and at the deck's `assets/`, `docs/` and `apps/`, never at
 another canvas, a hidden folder or outside the deck (`packages/hub/src/layout.ts`); placing
 something from elsewhere copies it in. That is what lets a canvas be copied, shared or synced
-whole. The rules for a path that becomes a file are in `deck/roots.ts`, which resolves symlinks
+whole. The rules for a path that becomes a file are in the deck's path rules, which resolve symlinks
 before it compares.
 
 When the shape on disk changes, a migration converts it (`apps/server/src/migrations`, one file
@@ -52,7 +52,7 @@ per change, named by the day it shipped). The last two turned the deck's boards 
 its document and app boards into items. A friend's shared canvas is never rewritten: a board left
 on one is drawn as its picture.
 
-Every write the harness makes is recorded as a revision (`deck/snapshots.ts`), content
+Every write the harness makes is recorded as a revision (the deck's revisions), content
 addressed under `.decks/revisions`, so the timeline can show the canvas as it was at any point
 of a conversation and restore it when asked.
 
@@ -84,7 +84,7 @@ one, never make one or change what it names (`verbs/router.ts`, `touchesTrustedI
 ## 4. Trust
 
 Who is calling is a token or a pass, and nothing else: no header, address or machine says it
-(`auth/guard.ts`, `auth/tokens.ts`, `auth/passes.ts`).
+(the server's guard, tokens and passes).
 
 - **A harness token** (`dk_h_`) is the person (a Decks tab, a terminal after `decks login`), a
   site the person paired (Studio, a second Decks), or one agent. Only its hash is kept; it slides,
@@ -107,7 +107,7 @@ anything that reaches past the canvas is refused. A canvas shared with you to vi
 
 A card from a friend's canvas runs no scripts: they are cleaned out before it is placed and never
 served. An app calling the verbs is asked about once ("Allow until Decks restarts", "Always
-allow"), remembered in `AppTrust` (`auth/app-trust.ts`).
+allow"), remembered in `AppTrust` (the server's app trust).
 
 ## 5. The verbs
 
@@ -141,7 +141,7 @@ DOM, within a budget per device. Panning is native scrolling over the engine's c
 **Pictures** are taken on the server by its own Chromium (`pictures/service.ts`): a card is a page
 of its own, and the server is the one place that can reach every card without anybody opening it.
 One browser, two pages at a time, newest request first, kept on disk by path, revision and scheme,
-at a ladder of widths (`pictures/ladder.ts`), compressed for the GPU and the wire. A picture of a
+at a ladder of widths (the server's picture ladder), compressed for the GPU and the wire. A picture of a
 whole canvas (`canvas.screenshot`, export) is drawn natively by `stage-shot` over the cards'
 pictures where it can, and in Chromium where it must.
 

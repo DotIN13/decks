@@ -42,7 +42,7 @@ export interface OpencodeServerSpec {
 	 * deck's project, which is where the tool's `directory` points as well.
 	 */
 	cwd: string;
-	/** Decks' address, for the `decks` command in every session's shell (`runtimes/decks-env.ts`). */
+	/** Decks' address, for the `decks` command in every session's shell (the harness's agent environment). */
 	decksUrl?: string;
 	/**
 	 * The configuration `OPENCODE_CONFIG_CONTENT` carries. What it deliberately does *not*
@@ -199,7 +199,7 @@ export class OpencodeManager {
 				// and the session id does the rest of the naming.
 				DECKS_OPENCODE_SECRET: this.token,
 				// The `decks` command and where Decks is, for every session's shell; the plugin in
-				// `runtime/opencode/plugin/` trades the session for its agent's token (`runtimes/decks-env.ts`).
+				// The opencode plugin trades the session for its agent's token (the harness's agent environment).
 				...(spec.decksUrl ? decksServerEnv(spec.decksUrl) : {}),
 			};
 			let child: OpencodeChild;

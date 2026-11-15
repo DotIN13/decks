@@ -58,7 +58,7 @@ export interface SyncOptions {
 	 * shows it on the canvas's card. Absent: no canvas pictures, only cards'.
 	 */
 	harness?: string;
-	/** A person token for this harness, read per call: what its screenshot call carries (`auth/guard.ts`). */
+	/** A person token for this harness, read per call: what its screenshot call carries (the server's guard). */
 	harnessToken?: () => string;
 	/**
 	 * This harness's apps (`apps/service.ts`), told to Studio so it can list them beside the

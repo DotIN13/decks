@@ -218,7 +218,7 @@ export interface Identity {
 	 * two truths — the agent's and yours — but a workspace is a location, and an agent in two
 	 * locations is a contradiction rather than a richer answer.
 	 *
-	 * A slug rather than a label, for the reason `agents/tags.ts` gives: `"Political LLM"` and
+	 * A slug rather than a label, for the reason the server's tag rules gives: `"Political LLM"` and
 	 * `political-llm` have to be the same group or "who else is on this" has no answer.
 	 *
 	 * Here and not on `AgentChat` because it is the same kind of fact as a name: the agent

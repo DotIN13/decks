@@ -5,7 +5,7 @@ export interface StudioLinkRow {
 	env?: true;
 }
 
-/** Another Decks front end this server has given a token to (`server/src/auth/issue.ts`). */
+/** Another Decks front end this server has given a token to (the server's tokens). */
 export interface PairedRow {
 	id: string;
 	/** What the other front end called itself when it paired. */
@@ -56,7 +56,7 @@ export interface StageRow {
 	othersEdit?: true;
 	/**
 	 * The folders it had before, since this server started: the first name chosen for a canvas names
-	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
+	 * its folder (the server's canvas admin), and a browser on it keeps its view rather than landing anew.
 	 */
 	formerly?: string[];
 }

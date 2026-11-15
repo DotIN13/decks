@@ -12,7 +12,7 @@ import { canvasOf } from "../state/canvases.ts";
  *
  * A pan is hundreds of camera changes and the server only needs the resting place, so the
  * report trails the gesture by a beat rather than narrating it. This was four statements in
- * `App.tsx` — a timer, a debounce, the reading, and the setter that does both — and it is
+ * the page's shell — a timer, a debounce, the reading, and the setter that does both — and it is
  * the only place that knows a camera reading travels *with* the size of the canvas.
  *
  * The camera itself is `state/camera.ts`; this is the mechanism over it — the thing that
@@ -33,7 +33,7 @@ let timer: number | undefined;
  * beside it — not `innerWidth`, which counts the boards panel as space a board could use.
  *
  * **Every reading says whose stage it is, which canvas, and which device**, because the server places an agent's new boards
- * at the middle of that agent's view and nobody else's (`deck/cameras.ts` on the server). The
+ * at the middle of that agent's view and nobody else's (the server's views). The
  * view on screen is the focused conversation's; a parked view passes the agent it belongs to.
  * With no agent to name, nothing is sent.
  */

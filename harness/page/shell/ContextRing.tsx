@@ -6,7 +6,7 @@ import { contextLevel, contextPercent } from "../lib/context-usage.ts";
  * How full the context is, as a ring.
  *
  * Drawn in two places and therefore a component: at the right end of the hint row under the
- * input bar (`composer/ContextDial.tsx`) and in the `⋯` menu's one row on a touchscreen. It
+ * input bar (the context dial) and in the `⋯` menu's one row on a touchscreen. It
  * was written out twice before, which is how the two came to disagree about the radius.
  *
  * Nothing is drawn when the reading is unknown — `contextTokens` is `number | null` and the

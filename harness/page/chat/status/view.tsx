@@ -28,7 +28,7 @@ export function StatusLine(props: {
 	agent: AgentKind;
 }) {
 	/*
-	 * Whether the sign is *this* surface's to draw, `working-sign.ts` decides, because the column draws
+	 * Whether the sign is *this* surface's to draw, the working sign's rule decides, because the column draws
 	 * one too and both deciding for themselves is how they end up both up at once, 12px apart, saying the
 	 * same thing.
 	 */

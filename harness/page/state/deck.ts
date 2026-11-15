@@ -18,7 +18,7 @@ import { emptyAgent, type AgentRecord } from "./agent.ts";
  *
  * The four derived below are plain functions, so they need no owner and live here beside
  * what they read. The memos — `focusedChat`, `transcript`, `busy`, `stagePages` — stay in
- * `App.tsx`: a memo is a computation and
+ * the page's shell: a memo is a computation and
  * needs a reactive owner, which module scope does not have. They read this store by import
  * instead of by closure, which is the only thing that changed for them.
  *
@@ -83,12 +83,12 @@ function createDeck() {
 		 * Empty until the first frame arrives, which is why `runtimes` below has a fallback.
 		 */
 		runtimes: RuntimeInfo[];
-		/** The Claude subscriptions this install can use (`settings/Settings.tsx`). */
+		/** The Claude subscriptions this install can use (the Settings window). */
 		accounts: ClaudeAccount[];
 		/** The deck's own settings, kept by the server, and the zone its machine is on. */
 		settings: DeckSettings;
 		machineZone: string;
-		/** Whether the server has a key for its speech recogniser (`OPENAI_API_KEY`, `stt.ts`). */
+		/** Whether the server has a key for its speech recogniser (`OPENAI_API_KEY`). */
 		sttKey: boolean;
 		/**
 		 * Which of them a **new** agent starts on. `default` is the CLI's own login.

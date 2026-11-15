@@ -9,7 +9,7 @@ import type { Plugin } from "@opencode-ai/plugin"
  * proves the call is the process Decks spawned) and the session id for that agent's token
  * (`POST /api/tokens/session`), once per session, and gives the command the agent's token and not the
  * secret: a command holding the secret could ask for any session's token. Where Decks is and the
- * command itself are already in the server's environment (`runtimes/decks-env.ts`).
+ * command itself are already in the server's environment (the harness's agent environment).
  */
 const tokens = new Map<string, Promise<string | undefined>>()
 

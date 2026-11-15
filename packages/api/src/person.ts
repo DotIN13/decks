@@ -11,7 +11,7 @@ import type { Verb } from "./verbs.ts";
  * in the SDK agents read, so `decks --help` does not list them; `GET /api/v1` does, to the person.
  *
  * The 52 requests the tab's socket took are these, under the same shape as every other call. The
- * socket still takes the old requests for one release, as aliases of these (`server/src/wire/legacy.ts`).
+ * socket still takes the old requests for one release, as aliases of these (the old socket's aliases).
  */
 
 const agents = { touches: "agents", effect: "change", who: "person" } as const;

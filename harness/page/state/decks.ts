@@ -18,11 +18,6 @@ export function stageOnScreen(): string | undefined {
 	return person.canvas();
 }
 
-/** The address the page's calls go to. */
-export function deckAddress(): string {
-	return location.origin;
-}
-
 /** Make a call for the person; a refusal is said as a notice and answers undefined. */
 export async function act<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T | undefined> {
 	const answer = await call<T>(name, args);

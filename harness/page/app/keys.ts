@@ -3,7 +3,7 @@ import { onCleanup, onMount } from "solid-js";
 /**
  * The keyboard shortcut that belongs to the app rather than to a field: `⌘K`.
  *
- * It was in one `onMount` in `App.tsx` with the paste listener, the visual viewport, the
+ * It was in one `onMount` in the page's shell with the paste listener, the visual viewport, the
  * page-zoom block and the dock measurement — six unrelated wires in one closure.
  */
 export function installKeys(deps: {

@@ -14,7 +14,7 @@ import type { Rect } from "../protocol.ts";
 
 /**
  * How the server draws card pictures, in each picture's address: raised with `CARD_LOOK` in the server's
- * `pictures/ladder.ts`, since the browser keeps a picture a year under the same address.
+ * the server's picture ladder, since the browser keeps a picture a year under the same address.
  */
 const PICTURE_LOOK = 6;
 

@@ -10,7 +10,7 @@
  * The socket is driven directly. Five agents across two runtimes, in five different states,
  * with tags — a state that would otherwise need five real sessions, a model, and several
  * minutes per assertion, and which cannot be produced on demand at all. The tag *rules* are
- * unit-tested in `agents/tags.ts`; what a browser is needed for is whether the rows draw
+ * unit-tested in the server's tag rules; what a browser is needed for is whether the rows draw
  * them, and whether the customise popup reaches the server.
  *
  * Two things about the list itself are pinned here as well, because they are decisions rather
@@ -129,7 +129,7 @@ say("a dormant agent keeps its runtime, dimmed", menu.rows.find((row) => row.nam
  * carrying the full story and the card a hover away, that was unnecessary — and this is the
  * assertion that stops it creeping back.
  */
-// 280px since the menus redesign (b4905071, `agents/AgentPill.tsx`).
+// 280px since the menus redesign (b4905071, the agent pill).
 say("the rows are still one line, at 280px", menu.width === 280 && menu.rows.every((row) => row.h <= 36), `${menu.width}px · ${JSON.stringify(menu.rows.map((r) => r.h))}`);
 say("…and carry no tags: that is the panel's job", menu.tags === 0, `${menu.tags} tags in the menu`);
 

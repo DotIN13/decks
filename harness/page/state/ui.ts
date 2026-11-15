@@ -18,7 +18,7 @@ import { call } from "./line.ts";
  * `lib/media.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
  * try/catch, and this follows it.
  *
- * **`usageReport` is not called `report`.** It was, in `App.tsx`, where it was a closure. As
+ * **`usageReport` is not called `report`.** It was, in the page's shell, where it was a closure. As
  * an import it would have been shadowed by the two upload handlers, which each declare a
  * local `const report = working(…)` and then call `report.update` on it. Shadowing is legal
  * and silent — neither the compiler nor the tests would have said anything — so the name
@@ -61,7 +61,7 @@ function createUi() {
 	 */
 	const [panelOpen, setPanelOpen] = createSignal(panelOpensWith());
 
-	/** Settings: the Claude subscriptions this install can use (`settings/Settings.tsx`). */
+	/** Settings: the Claude subscriptions this install can use (the Settings window). */
 	const [settings, setSettings] = createSignal(false);
 
 	/**
@@ -84,7 +84,7 @@ function createUi() {
 				 * Whole mentions rather than ids, because what is dragged is the only thing that
 				 * knows what to call it — a board its title, an item its name on the stage — and a
 				 * label worked out again at the other end would be a second answer to the same
-				 * question (`composer/draft.ts`).
+				 * question (the composer's draft).
 				 */
 				pills?: Array<{ kind: "card" | "item"; id: string; label: string }>;
 				/** Files attached or dropped, by their path in the deck: each a pill where the caret is. */
@@ -114,7 +114,7 @@ function createUi() {
 	 * Two ways in. On a desktop the cheap reading is a popover on the dial under the input
 	 * bar and this is what its last row opens; on a phone there is no room under the box, so
 	 * `⋯` has one row for the reading and it opens this directly. The third way is `/cost`,
-	 * which arrives from the server with `show` — see the `agent.report` case in `App.tsx`.
+	 * which arrives from the server with `show` — see the `agent.report` case in the page's shell.
 	 *
 	 * The reading is always asked for again on opening, because two of its three parts are
 	 * running totals and the third is a countdown. What it is *not* any more is withheld
@@ -215,7 +215,7 @@ function createUi() {
 	 * conversation's history — and from a timer, because a history that never comes must not
 	 * keep the canvas empty. Idempotent: the first call wins and the rest are a boolean.
 	 *
-	 * It was `appOpened` in `App.tsx`, which is where the *decisions* about when to call it
+	 * It was `appOpened` in the page's shell, which is where the *decisions* about when to call it
 	 * still are. The gate it fires is here, beside the signal it sets, so the frame switch can
 	 * reach it without a hook.
 	 */

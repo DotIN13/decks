@@ -125,7 +125,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			 *
 			 * The first draft warmed all forty-five so the first press would be instant — 356kB
 			 * fetched because somebody opened a menu, to save a round trip on an 8kB file. The
-			 * browser fetches the one that is pressed, and `App.tsx` warms the three that are
+			 * browser fetches the one that is pressed, and the page's shell warms the three that are
 			 * *configured* on the first gesture, which is the case that actually matters: a cue
 			 * arriving late is only a problem when it is announcing something.
 			 */

@@ -56,7 +56,7 @@ const select = async (path) => {
 	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
 	for (const other of others) link.send({ type: "card.hide", path: other });
-	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
+	// Brought back if an earlier select hid it, as its row in the panel used to (the page's shell, `playAndFrame`).
 	link.send({ type: "card.play", path });
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	link.close();
@@ -80,7 +80,7 @@ const select = async (path) => {
 
 /**
  * Zoom out until the board's bottom corner is on the screen, where the handle this check drags is. A
- * board that reads top to bottom is drawn as tall as its content (`App.tsx`, `stageBoards`), which at
+ * board that reads top to bottom is drawn as tall as its content (the page's shell, `stageBoards`), which at
  * the zoom `select` picks runs past the bottom of the window.
  */
 const cornerOnScreen = async (path) => {

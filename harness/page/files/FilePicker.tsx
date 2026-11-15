@@ -168,7 +168,7 @@ export function FilePicker(props: {
 	/** Folders first, then files, then the filter. */
 	const rows = createMemo(() => {
 		const typed = filter().trim().toLowerCase();
-		// A film's poster and a file's preview are the server's pictures of them (`files/media.ts`, `files/preview.ts`), not files anyone put there.
+		// A film's poster and a file's preview are the server's pictures of them (the server's media and previews), not files anyone put there.
 		return (listing()?.entries ?? []).filter((entry) => !/\.(poster\.jpg|preview\.png)$/i.test(entry.name) && (!typed || entry.name.toLowerCase().includes(typed))).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "dir" ? -1 : 1));
 	});
 

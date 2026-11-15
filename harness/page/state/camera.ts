@@ -9,14 +9,14 @@ import { batch, createSignal } from "solid-js";
  * moves it, and no board file records it. It is also per conversation: a switch parks the
  * view you are leaving and takes the one you are arriving at (`camera/agent-view.ts`).
  *
- * It lived in `App.tsx` until four modules were reaching back into the component for it —
+ * It lived in the page's shell until four modules were reaching back into the component for it —
  * `app/files/drops.ts` to turn a drop's stage pixels into world pixels, `app/camera-report.ts` to
  * read it and write it, and two fields of `FrameHooks`. That is what puts a value here
  * rather than in the component: not that it is state, but that modules have to reach it.
  *
  * **The derived zoom check stayed behind.** `zoomInteractive` is a `createMemo`, and the
  * convention this repository states in `state/deck.ts` is that a memo needs a reactive owner
- * — which module scope has not got. `App.tsx` computes it from this signal, which is what a
+ * — which module scope has not got. The page's shell computes it from this signal, which is what a
  * component is for.
  */
 const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });

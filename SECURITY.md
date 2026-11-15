@@ -19,7 +19,7 @@ So the interesting security work here is not "add a password". It is:
   of [docs/DESIGN.md](docs/DESIGN.md) is the trust model: the tokens and passes, what the frame
   lets a card's script call, and what it does not.
 - **Keeping a path from escaping the deck.** Every route that turns a URL into a file goes
-  through `deck/roots.ts`, which resolves symlinks before it compares. An escape there is a
+  through the deck's path rules, which resolve symlinks before it compares. An escape there is a
   bug worth reporting.
 - **Keeping the agent inside the blast radius its operator chose.** The systemd unit in the
   deployment doc is the mitigation; a way around it from inside a board rather than from a

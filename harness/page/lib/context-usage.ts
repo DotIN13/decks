@@ -8,7 +8,7 @@ import type { AgentUsage } from "../state/types/index.ts";
  * these two functions, and the only way to ask "does 84.6% read as amber or as red" of a
  * component is to render one and look.
  *
- * The reading is drawn in the corner's `⋯` (`ContextSummary.tsx`) and the level is worn by
+ * The reading is drawn in the corner's `⋯` (the context summary) and the level is worn by
  * the `⋯` button itself, so both callers agree on the numbers by construction.
  */
 

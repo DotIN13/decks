@@ -106,7 +106,7 @@
 		transition: none;
 	}
 	/* Away from home the inline position wins: no centring transform. The inline `bottom`
-	   `App.tsx` writes is what pins it, so the box does not move when its status row goes. */
+	   the page's shell writes is what pins it, so the box does not move when its status row goes. */
 	.dock[data-floating="true"] {
 		transform: none;
 		transition: none;
@@ -115,7 +115,7 @@
 	 * Put away: thrown hard at either edge, a float (the composer, the drawing tools) stands
 	 * past it with only this tab showing, on the side still on screen. The rest fades rather
 	 * than being removed, so the float keeps its size and the glide back is the same box
-	 * coming out again. `data-stowed` is the edge (`App.tsx`); each float sets the tab's size.
+	 * coming out again. `data-stowed` is the edge (the page's shell); each float sets the tab's size.
 	 */
 	.dock {
 		--stowtab-w: 36px;
@@ -182,7 +182,7 @@
 	}
 	/*
 	 * Who gets the line: the word `To` and a chip with the agent's face and name. The chip
-	 * opens the pill's agent menu (`composer/Recipient.tsx`).
+	 * opens the pill's agent menu (the recipient pill).
 	 */
 	.dock-to {
 		display: flex;
@@ -421,7 +421,7 @@
  * While the pencil is the hand in use, the page is not text to select. A pencil presses and drags
  * everywhere, and Safari took every stroke that began on a label or the canvas as a text selection,
  * reaching across the bars and the whole canvas. Only then: a finger or a mouse selects as before.
- * `data-pen` is set on the root by the last press's pointer type (`App.tsx`). Prefixed as well:
+ * `data-pen` is set on the root by the last press's pointer type (the page's shell). Prefixed as well:
  * Safari 18 ignores the bare property. What is typed into stays selectable.
  */
 @layer components {

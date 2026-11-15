@@ -50,7 +50,7 @@
 		gap: var(--roll-gap);
 		padding: var(--gutter);
 		overflow-y: auto;
-		/* The column keeps its own place (`Stream.tsx`): the browser's anchoring moved it under changed content. */
+		/* The column keeps its own place (the stream's view): the browser's anchoring moved it under changed content. */
 		overflow-anchor: none;
 		overscroll-behavior: contain;
 		/*
@@ -74,7 +74,7 @@
 	}
 
 	/*
-	 * The two ends the column's observers watch (`Stream.tsx`): empty rows that take no room, the gap
+	 * The two ends the column's observers watch (the stream's view): empty rows that take no room, the gap
 	 * beside each given back, so the column is laid out as if they were not there.
 	 */
 	.stream-roll > .stream-edge {

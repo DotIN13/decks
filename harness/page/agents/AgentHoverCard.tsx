@@ -101,7 +101,7 @@ export function AgentHoverCard(props: {
 	 * One frame, not two: the card exists already, so the only thing worth waiting for is
 	 * the new text having changed its width. Reading `props.anchor` and `name()` here is
 	 * what makes this run — moving from one face to the next is a new anchor, and the
-	 * transition in `agents.css` turns the difference into a slide rather than a jump.
+	 * transition in the agents' stylesheet turns the difference into a slide rather than a jump.
 	 */
 	createEffect(() => {
 		props.anchor;

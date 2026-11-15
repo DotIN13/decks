@@ -62,9 +62,9 @@ jobs:
       # `stale-paths.mjs` each exit 1 naming what they found.
       - run: npm run gates
 
-      # **Before the unit tests, not after.** Three files in `apps/server` drive a real page —
-      # `web/bridge.test.ts` over the extension's socket, and two in `app.test.ts` that measure a
-      # frame and write the number back — so `npm test` needs a browser. This step used to come
+      # **Before the unit tests, not after.** Some unit tests drive a real page (the browser
+      # bridge over the extension's socket, and the frame measures that write their number
+      # back), so `npm test` needs a browser. This step used to come
       # after it, which is why the build was red for its first three pushes, with nineteen
       # failures that were all "no browser here".
       #

@@ -14,7 +14,7 @@ import { Icon, Popover } from "@decks/ui";
 
 export type PanelApp = { name: string; title: string; status: string; board: string };
 
-/** What the ⋯ menu and a double-click ask of an app (`App.tsx` carries them out). */
+/** What the ⋯ menu and a double-click ask of an app (the page's shell carries them out). */
 export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "delete";
 
 /** Bright tiles, one per app by its name; no olive. */

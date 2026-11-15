@@ -15,7 +15,7 @@
 .md li {
 	white-space: pre-wrap;
 }
-	/* Weight and size, not an outline entry, see the note in `MarkdownView.tsx` (`@decks/agent-ui`). */
+	/* Weight and size, not an outline entry, see the note in the markdown view. */
 .md .md-h {
 	font-weight: 600;
 	line-height: 1.3;

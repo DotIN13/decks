@@ -343,7 +343,7 @@ export class Translator {
 
 	/**
 	 * Every tool call, as it starts and ends, for whoever wants to know what the agent is
-	 * touching (`agents/acts.ts`). Set by the session; the translator itself only draws rows.
+	 * touching (the server's record of acts). Set by the session; the translator itself only draws rows.
 	 */
 	onTool?: (event: { callId: string; name: string; args: unknown; phase: "start" | "end" }) => void;
 

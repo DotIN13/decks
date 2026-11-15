@@ -6,7 +6,7 @@ import { caretOffset, readDraft, writeDraft } from "./dom.ts";
 
 /**
  * The composer's field: a small rich text editor whose only rich thing is a mention. Ported from picone
- * (`components/DraftField.tsx`, its §57), with the reasoning left as it was written there.
+ * (the draft field, its §57), with the reasoning left as it was written there.
  */
 
 export interface DraftFieldProps {
@@ -19,7 +19,7 @@ export interface DraftFieldProps {
 	onComposing?: (composing: boolean) => void;
 	/** The words a pill shows on hover, as a `title`: for a host without `pills`. */
 	describe?: (node: DraftMention) => string | undefined;
-	/** What each pill is about: its tooltip, and the card a press on it opens (`pill-card.ts`). */
+	/** What each pill is about: its tooltip, and the card a press on it opens (the pill's card). */
 	pills?: PillHost;
 	placeholder: string;
 	/** The field's accessible name. The placeholder is a hint, not a name. */

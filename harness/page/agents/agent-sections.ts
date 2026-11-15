@@ -36,7 +36,7 @@ export interface AgentRow {
 	chat: AgentChat;
 	status: AgentStatus;
 	unread: number;
-	/** The agent's own tags, then yours. Both cleaned by the server; see `agents/tags.ts`. */
+	/** The agent's own tags, then yours. Both cleaned by the server; see the server's tag rules. */
 	tags: string[];
 	userTags: string[];
 	/**

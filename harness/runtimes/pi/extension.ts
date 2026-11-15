@@ -15,7 +15,7 @@ import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";
 
 export function decksStage(deps: {
 	gdocs?: GdocsCall;
-	/** The agent's shell: where it runs, and the variables that put `decks` in it (`runtimes/decks-env.ts`). */
+	/** The agent's shell: where it runs, and the variables that put `decks` in it (the harness's agent environment). */
 	shell?: { cwd: string; env: Record<string, string> };
 }): InlineExtension {
 	const { gdocs, shell } = deps;

@@ -41,7 +41,7 @@ import { gdocsCaller } from "../shared/gdocs.ts";
  * child process per started agent, which is what `dispose` closes.
  *
  * What is *not* here: the transcript (`agents/translator.ts`, shared with Pi), and the
- * guidelines every agent is given (`stage/tool.ts`, likewise).
+ * guidelines every agent is given (the canvas tool, likewise).
  */
 
 /** Anthropic is the only provider behind this backend. */
@@ -286,7 +286,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * link, which made every word above true of a variable the CLI does not read a
 			 * token from. `accounts.ts` has the measurement.
 			 */
-			// …and, whichever it is, the `decks` command and who this agent is, for its shell (`runtimes/decks-env.ts`).
+			// …and, whichever it is, the `decks` command and who this agent is, for its shell (the harness's agent environment).
 			env: { ...(accountEnv ?? process.env), ...this.context.decks.env((accountEnv ?? process.env).PATH) },
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
@@ -1671,12 +1671,4 @@ export async function probeUsage(env: NodeJS.ProcessEnv | undefined): Promise<SD
 	} finally {
 		probe.close?.();
 	}
-}
-
-/** The 5-hour window out of a usage read, as an account row shows it. */
-export function fiveHourOf(read: SDKControlGetUsageResponse | undefined): { percent: number; resetsAt?: number } | undefined {
-	const window = (read as { rate_limits?: { five_hour?: { utilization?: unknown; resets_at?: unknown } | null } } | undefined)?.rate_limits?.five_hour;
-	if (!window || typeof window.utilization !== "number" || !Number.isFinite(window.utilization)) return undefined;
-	const resetsAt = typeof window.resets_at === "string" ? Date.parse(window.resets_at) : typeof window.resets_at === "number" ? epochMs(window.resets_at) : undefined;
-	return { percent: Math.max(0, Math.min(100, Math.round(window.utilization))), ...(resetsAt && Number.isFinite(resetsAt) ? { resetsAt } : {}) };
 }

@@ -91,11 +91,6 @@ export function personToken(api) {
 	return tokens.get(api);
 }
 
-/** Drop the token kept for `api`: the runner starts a new server, with a new token, on the same address for each check. */
-export function forgetPersonToken(api) {
-	tokens.delete(typeof api === "string" ? api : API);
-}
-
 /** The headers that make a check's request the person's. */
 export async function asPerson(api) {
 	return { authorization: `Bearer ${await personToken(api)}` };
@@ -822,23 +817,6 @@ export async function newAgent(page, kind = "pi") {
 		{ timeout: 15000 },
 	);
 	await page.keyboard.press("Escape");
-	await page.waitForTimeout(300);
-}
-
-/**
- * Every board in the deck — which is the panel's list, all of it.
- *
- * There is no browser to open and no tab to switch to: the deck is the third section of the
- * one list, under whatever the focused agent is holding. Kept as a name because the checks
- * that call it are asking a question — "is every board reachable from here" — that is still
- * worth asking under that name.
- */
-export async function openAllCards(page) {
-	// The side panel's Canvas tab lists what is on the canvas, boards among it (`.v3-item`).
-	await openPanel(page);
-	const tab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Canvas\s*$/i }).first();
-	if ((await tab.count()) > 0 && (await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-	await page.waitForSelector('.v3-item[data-kind="board"]', { timeout: 6000 });
 	await page.waitForTimeout(300);
 }
 

@@ -6,7 +6,7 @@ import { commentItem } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/index.ts";
 
 /**
- * What a pill is about, for its tooltip and its card (`@decks/agent-ui` `pill-card.ts`), what a sent
+ * What a pill is about, for its tooltip and its card (the pill's card), what a sent
  * message keeps of its pills (`messageParts`), and a sent message read back into its pills.
  */
 

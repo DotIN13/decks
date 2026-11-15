@@ -95,7 +95,7 @@
  * beat `@media (pointer: coarse) { .notices { top: 74px } }` and the rule silently did
  * nothing. Anything responsive about a utility-styled element has to be a variant in the
  * markup (`pointer-coarse:`), which is why those read oddly long in
- * `App.tsx`. The alternative — leaving the base declaration here too —
+ * the page's shell. The alternative — leaving the base declaration here too —
  * is fine, and is what the surfaces above with `env()` corners actually do; what does not
  * work is one property stated in both places.
  */

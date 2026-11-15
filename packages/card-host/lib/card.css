@@ -83,7 +83,7 @@ body.board[data-bg="dots"] {
 
 /*
  * A board that is one thing edge to edge: a live document, a file, an app, the shared
- * browser's card (the server writes these, `cards/size.ts`). The thing is the board, so it
+ * browser's card (the server writes these, the server's card sizes). The thing is the board, so it
  * fills the frame the canvas gives it — `100vh` inside a frame is that rectangle — and its own
  * content scrolls inside it.
  */

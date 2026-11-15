@@ -154,7 +154,7 @@ function siteRelative(html: string, origin: string): string {
 
 /**
  * The canvas pass taken out of every address (`/api/t/<pass>/card/…` becomes `/api/card/…`): the server's
- * Chrome reads the harness on a pass of its own (`pictures/pool.ts`, `withOwnReads`), which may read
+ * Chrome reads the harness on a pass of its own (the server's picture pool, `withOwnReads`), which may read
  * `/api/card/…` and nothing under another pass's address, so a card's pictures from its canvas's `files/`
  * were refused and drawn broken; and the person's pass has no business in a page sent to the server.
  */

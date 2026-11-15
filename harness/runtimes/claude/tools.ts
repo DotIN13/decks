@@ -6,7 +6,7 @@ import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";
  * Decks' own tools, for Claude: the Google Docs tools.
  *
  * The canvas is not one of them any more. A Claude agent reaches the canvas with the `decks`
- * command in its shell (`runtimes/decks-env.ts`), as every runtime's agent does, so what is left
+ * command in its shell (the harness's agent environment), as every runtime's agent does, so what is left
  * here is the two Google Docs tools, read and edited as markdown (`google/docs.ts`).
  *
  * "MCP" oversells what this is. The server runs in-process, in this Node process — no

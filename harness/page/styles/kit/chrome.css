@@ -212,7 +212,7 @@
 	 * A reading carried on the glyph: the context, over 70% and over 85%.
 	 *
 	 * The corner's `⋯` is the only button that wears this. The number itself moved into that
-	 * menu (`composer/ContextSummary.tsx`), and a full context that only announces itself once
+	 * menu (the context summary), and a full context that only announces itself once
 	 * you happen to open a menu is the one thing a reading like this must not become — so the
 	 * alarm stays outside and the numbers go in. Colour only: no dot, no badge, nothing that
 	 * changes the size of a control in a line of them.
@@ -468,7 +468,7 @@
 	}
 
 	/* `.set-k` is the same object outside a row: a name with a sentence under it, in a settings
-	   group (`settings/Settings.tsx`). Added to the selector rather than given its own copy of these
+	   group (the Settings window). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
 	:is(.popover, .row-list) [data-row] > .row-label,

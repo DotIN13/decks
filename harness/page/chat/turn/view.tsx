@@ -12,7 +12,7 @@ import { TimeMachine } from "../time-machine/view.tsx";
 import { ToolGroup } from "../tool/view.tsx";
 import type { AgentPart, TurnCard } from "./model.ts";
 
-/* A card, and the pieces of one, are `chat/turn-cards.ts`'s now. */
+/* A card, and the pieces of one, belong to the turn's cards now. */
 export type { AgentPart, TurnCard };
 
 /** One turn, as a card floating over the cards. */

@@ -3,7 +3,7 @@ import { pillElement, pillNode } from "../pill/card.ts";
 
 // The field's DOM: a draft read from it and written into it, and where the caret is.
 
-/** A mention, as the DOM holds it (`pill-card.ts`), with the host's `title` when it has no cards. */
+/** A mention, as the DOM holds it (the pill's card), with the host's `title` when it has no cards. */
 export function mentionElement(node: DraftMention, describe?: (node: DraftMention) => string | undefined): HTMLElement {
 	const span = pillElement(node);
 	const words = describe?.(node);

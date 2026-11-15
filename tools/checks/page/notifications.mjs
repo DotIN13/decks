@@ -166,7 +166,7 @@ await page.waitForSelector(".settings", { timeout: 6000 });
 await settle(page, 500);
 
 /*
- * The Settings redesign (`settings/Settings.tsx`): a window of six sections on a grey left, the
+ * The Settings redesign (the Settings window): a window of six sections on a grey left, the
  * open one on the right under its name, opening on Notifications. Notifications is one table
  * (`settings/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
  * When / Sound / Banner, then Volume as four stops, then the permission line when the browser

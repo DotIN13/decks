@@ -57,7 +57,7 @@ export const isMarkdownText = (node: PenNode): boolean => node.type === "text" &
  *
  * It was `decks.card` until a card became a board drawn in the stage's own page (a `browser` item with
  * that tag). A frame still tagged so is read as a markdown card, and rewritten once when its harness
- * starts (`migrations/2026-10-28-markdown-cards.ts`).
+ * starts (the markdown-cards migration).
  */
 export const CARD = "decks.markdown-card";
 /** The markdown card's old tag, on a frame only: a `browser` item with it is an HTML card. */

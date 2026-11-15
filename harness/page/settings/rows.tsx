@@ -3,9 +3,9 @@ import { For, Show, type JSX } from "solid-js";
 import { Icon, Popover } from "@decks/ui";
 
 /*
- * The rows Settings is made of (`settings/Settings.tsx`, `settings/AlertSettings.tsx`): a group's
+ * The rows Settings is made of (the Settings window, `settings/AlertSettings.tsx`): a group's
  * grey label over hairline rows, each row its words on the left and one control on the right.
- * `styles/settings.css` lays them out, and stacks a row's control under its words on a phone.
+ * The Settings stylesheet lays them out, and stacks a row's control under its words on a phone.
  */
 
 /** A group: a small grey label over rows divided by hairlines. */

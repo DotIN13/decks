@@ -18,7 +18,7 @@ export interface StreamProps {
 	agentId: string;
 	/** The header element, once mounted: the app makes it the float's drag handle. */
 	onHead?: (element: HTMLDivElement) => void;
-	/** Whether the server holds anything older than `items` (`chat/history-page.ts`). */
+	/** Whether the server holds anything older than `items` (the history pager). */
 	more: boolean;
 	/** Fetch the page before the oldest row held. Answers with how many arrived. */
 	onEarlier: () => Promise<number>;

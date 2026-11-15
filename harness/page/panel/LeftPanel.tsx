@@ -199,7 +199,7 @@ export function LeftPanel(props: {
 	/** An app's recent output, for its Logs panel. */
 	onAppLogs?: (app: PanelApp) => Promise<string[] | undefined>;
 
-	/** The conversation, under the list: the v3 panel's lower half (`shell/ChatSection.tsx`). */
+	/** The conversation, under the list: the v3 panel's lower half (the conversation section). */
 	chat?: JSX.Element;
 }) {
 	const ids = createUniqueId();

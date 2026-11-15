@@ -4,7 +4,7 @@ import { authHeaders } from "./session.ts";
 /**
  * A picture or a file of the harness's, read with this tab's token.
  *
- * Every file and picture the harness serves is read with a credential (`server/src/auth/guard.ts`),
+ * Every file and picture the harness serves is read with a credential (the server's guard),
  * and an `<img>` or a new tab cannot send a header. So this page fetches it, with its token in the
  * header as every fetch of its own carries it, and shows what came back from memory (`blob:`). An
  * address that is not this harness's (`data:`, another site's) is used as it is.

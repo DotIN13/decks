@@ -32,7 +32,7 @@ export interface StudioLinkRow {
 	env?: true;
 }
 
-/** Another Decks front end this server has given a token to (`server/src/auth/issue.ts`). */
+/** Another Decks front end this server has given a token to (the server's tokens). */
 export interface PairedRow {
 	id: string;
 	/** What the other front end called itself when it paired. */
@@ -83,7 +83,7 @@ export interface StageRow {
 	othersEdit?: true;
 	/**
 	 * The folders it had before, since this server started: the first name chosen for a canvas names
-	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
+	 * its folder (the server's canvas admin), and a browser on it keeps its view rather than landing anew.
 	 */
 	formerly?: string[];
 }
@@ -179,7 +179,7 @@ export type ClientMessage =
 	/** Where the person is looking. `agentId` names a parked conversation's view. */
 	/**
 	 * Where one agent's stage is looking. `agentId` is required: a reading that does not say whose
-	 * stage it is would anchor new boards on somebody else's view (`deck/cameras.ts`).
+	 * stage it is would anchor new boards on somebody else's view (the server's views).
 	 */
 	/** Where one agent's canvas is looking on one device: `stage` names the canvas, `device` the browser. */
 	| { type: "camera.set"; camera: Camera; agentId: string; stage?: string; device?: string }
@@ -473,7 +473,7 @@ export type ServerMessage =
 	/** The line is open and knows who is on it: the first message down it, after `hello` was taken. */
 	| { type: "line.hello"; who: "person" | "site" | "agent" | "canvas"; canvas?: string; role?: "edit" | "view" }
 	/**
-	 * Every stage in the deck, for the canvas manager (`canvases/CanvasManager.tsx`).
+	 * Every stage in the deck, for the canvas manager (the canvas switcher).
 	 *
 	 * A stage is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
 	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and
@@ -483,7 +483,7 @@ export type ServerMessage =
 	| { type: "canvas.list"; stages: StageRow[] }
 	/**
 	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
-	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call
+	 * editing marks are drawn from it (the server's acts). `start` is a write or edit tool call
 	 * naming the file, with the root block when the old text was found in it; `done` is the
 	 * file landing, with the blocks whose markup changed, or a stage verb. `at` is the act's
 	 * own clock, so two of them are two.

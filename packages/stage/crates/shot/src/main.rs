@@ -1,4 +1,4 @@
-//! `stage-shot`: the native stage picture, kept running by the server (`native-shots.ts`).
+//! `stage-shot`: the native stage picture, kept running by the server (the server's native shots).
 //!
 //! One JSON request a line on stdin, one JSON answer a line on stdout, in order:
 //!

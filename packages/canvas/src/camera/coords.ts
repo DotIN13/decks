@@ -32,8 +32,6 @@ type In<S extends string> = { readonly [space]?: S };
 
 /** A position. The space is part of the type, so the compiler refuses a mix-up. */
 export type Point<S extends string> = { x: number; y: number } & In<S>;
-/** A movement. Not a position: no origin is involved, so only the scale applies. */
-export type Delta<S extends string> = { dx: number; dy: number } & In<S>;
 
 /**
  * A pointer event's position, in stage pixels — **which is the event's own `clientX`.**

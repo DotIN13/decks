@@ -104,8 +104,8 @@ export interface DocServiceOptions {
 	 */
 	compile?(job: { file: string; inputs: string; out: string }): Promise<CompileResult>;
 	/**
-	 * The git repository a file is in, for syncing with a remote such as Overleaf (`apps/server`'s
-	 * `docs/git.ts`). `status` is `undefined` for a file in no repository. `pull` commits what is
+	 * The git repository a file is in, for syncing with a remote such as Overleaf (the
+	 * documents' git). `status` is `undefined` for a file in no repository. `pull` commits what is
 	 * not committed and merges the remote's commits; `push` does that and sends them. Each writes
 	 * the file only through git, and what that changed in an open document becomes a change to review.
 	 */

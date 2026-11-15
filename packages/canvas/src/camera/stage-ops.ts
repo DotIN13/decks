@@ -30,7 +30,7 @@ export interface StageOpsHost {
 	 * `animate` is the agent's own request — `decks.view.focus(paths, { animate: true })` — and it is off
 	 * by default, which is not an oversight: an op is a statement about where to look, and the
 	 * people reading this file's checks measure it a frame later. A gesture is the other way round
-	 * (`App.tsx`), because a click *is* about the journey to what was clicked.
+	 * (the page's shell), because a click *is* about the journey to what was clicked.
 	 */
 	setCamera(camera: Camera, options?: { animate?: boolean }): void;
 	/** The person has used the canvas in the last few seconds (`camera/touched.ts`): the view is theirs. */

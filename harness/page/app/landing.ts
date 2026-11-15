@@ -98,7 +98,7 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
  * and the deck may still be arriving at 400ms. A later switch reports from its landing (`settle`).
  *
  * And again whenever this browser is come back to: the harness answers an agent's `view.camera` with
- * the newest reading of its canvas from any device (`deck/cameras.ts`), and the device the person is
+ * the newest reading of its canvas from any device (the server's views), and the device the person is
  * on now is the one whose view that should be, even before they pan.
  */
 export function reportCameraOnArrival() {

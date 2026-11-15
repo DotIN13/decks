@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
  * the only way Decks' own tools get into the agent's toolset is MCP. This server is what the CLI
  * spawns (`mcp_config.json` in the HOME Decks hands it), and it exposes the Google Docs tools. The
  * canvas is not one of them: the agent reaches it with the `decks` command in its shell, which
- * Decks puts on the CLI's PATH (`apps/server/src/runtimes/decks-env.ts`).
+ * Decks puts on the CLI's PATH (the harness's agent environment).
  *
  * The body is one HTTP call back to the Decks server that spawned the CLI. The *CLI process*
  * carries `DECKS_STAGE_URL` and `DECKS_STAGE_TOKEN` in its environment and the MCP child inherits

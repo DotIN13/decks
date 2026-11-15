@@ -110,7 +110,7 @@ function createAgentScratch() {
 		 * Only the two history flags: a reconnect means nothing that was asked for is coming,
 		 * but the camera you parked and the state an agent was last in are still true.
 		 *
-		 * Not to be confused with `forgetAskedResults` in `chat/tool-results.ts`, which is
+		 * Not to be confused with `forgetAskedResults` in the tool results, which is
 		 * about tool output and is called beside this one on the same reconnect.
 		 */
 		forgetAsked() {

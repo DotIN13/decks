@@ -138,7 +138,7 @@ const [shut, setShut] = createSignal<ReadonlySet<string>>(new Set(["effects"]));
 export function Properties(props: {
 	doc: PenDocument | undefined;
 	onEdit: (ops: unknown[]) => void;
-	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
+	/** Download a picture of these items, taken by the server (the server's shots). */
 	onExport: (ids: string[]) => void;
 }) {
 	const index = createMemo(() => (props.doc ? indexOf(props.doc) : new Map()));

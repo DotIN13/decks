@@ -1,5 +1,5 @@
 /**
- * A thing put into a message as a pill (`@decks/agent-ui` `composer/draft.ts`): a comment, a card (or
+ * A thing put into a message as a pill (the composer's draft): a comment, a card (or
  * an old board), a drawn item, a file. Kept with the message as it was sent, so the conversation draws
  * the same pill with the same card after a reload and on another device, without reading it back out of
  * the text. A message saved before cards says `"board"` for a card: whoever reads one reads it as `"card"`.

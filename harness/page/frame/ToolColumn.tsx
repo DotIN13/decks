@@ -65,7 +65,7 @@ export function ToolColumn(props: {
 	onStep: (direction: "undo" | "redo") => void;
 	onOpenFile?: () => void;
 	onApps: () => void;
-	/** The column as a float: dragged by its grip (`App.tsx`, `mountToolsFloat`). */
+	/** The column as a float: dragged by its grip (the page's shell, `mountToolsFloat`). */
 	onFloat?: (tools: HTMLElement, grip: HTMLElement) => { unstow: () => void };
 	/** On a phone the column is a row above the composer. */
 	row?: boolean;

@@ -309,7 +309,7 @@ tailscale serve status
 That is the whole configuration. The proxy terminates TLS with a real certificate, forwards
 to the loopback port, and handles the WebSocket upgrade without further setup. The client
 needs no changes at any point: `socket.ts` derives `wss://` from `location.protocol` and
-`api.ts` uses relative paths, so Decks works at whatever origin it is served from.
+The page's calls use relative paths, so Decks works at whatever origin it is served from.
 
 Worth deciding before you provision, because it is baked into the certificate and published
 permanently in public Certificate Transparency logs: **the machine's name becomes part of a

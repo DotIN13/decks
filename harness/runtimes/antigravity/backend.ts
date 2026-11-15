@@ -21,7 +21,7 @@ import { AntigravityStream, type AntigravityResult, type AntigravityStep } from 
  * Two of the CLI's behaviours are worth stating before the code.
  *
  * **The canvas is the `decks` command; Decks' other tools arrive over MCP.** The CLI's shell
- * has `decks` on its PATH (`runtimes/decks-env.ts`). Its own tool list is fixed at its built-ins
+ * has `decks` on its PATH (the harness's agent environment). Its own tool list is fixed at its built-ins
  * plus `call_mcp_tool`, so the Google Docs tools come from an MCP server: Decks points the CLI's
  * `HOME` at a sandbox it owns (`install.ts`), whose `mcp_config.json` names that server, and the
  * MCP child inherits this agent's token from the process environment.

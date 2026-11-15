@@ -2113,7 +2113,7 @@ body {
 	 * The conversation folds by its share of the panel: open it takes the room the list leaves,
 	 * folded it gives that room back and comes to rest at the panel's foot. Its body stays
 	 * mounted, clipped, so nothing in it is redrawn by a fold, and its history is held at the
-	 * bottom while it moves (`App.tsx`, `holdHistory`).
+	 * bottom while it moves (the page's shell, `holdHistory`).
 	 */
 	.v3-chat,
 	.v3-chat[data-folded="true"] {

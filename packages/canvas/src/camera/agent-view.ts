@@ -21,7 +21,7 @@ import { boxOf, fitInto, frames } from "./camera.ts";
  * can only answer by deleting a board and switching.
  */
 
-/** What is remembered per agent. Not persisted: a reload starts over — see `App.tsx`. */
+/** What is remembered per agent. Not persisted: a reload starts over — see the page's shell. */
 export interface AgentView {
 	camera: Camera;
 	/** The board that was selected, so returning restores the selection too. */

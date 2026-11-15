@@ -3,7 +3,7 @@
  *
  * The arrival waited for a deck frame sent after it began, which a switch needs (the frame on hand may
  * still be the canvas being left) but the page's first landing does not: its deck frame came before
- * it began, so it waited out its 3 s cap over the empty origin (`App.tsx`, `landOn`).
+ * it began, so it waited out its 3 s cap over the empty origin (the page's shell, `landOn`).
  */
 import { canvasFrame, open, resetStage, say } from "../harness.mjs";
 

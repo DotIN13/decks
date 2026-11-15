@@ -15,7 +15,7 @@ export function can(what: keyof BackendInfo["can"]): boolean {
 	return backend()?.can[what] ?? true;
 }
 
-/** The pairing code on show in this server's Settings, and who holds a token (`auth/issue.ts`). */
+/** The pairing code on show in this server's Settings, and who holds a token (the server's tokens). */
 interface PairingState {
 	code?: string;
 	expires?: number;

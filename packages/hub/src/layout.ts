@@ -35,12 +35,12 @@ export const DECK_PARTS = ["assets", "docs", "apps"] as const;
 /**
  * The card runtime (`@decks/card-host`'s `lib/`: card.css, theme.css, card.js and the live pages),
  * served at the deck's `lib/` and inside every canvas's folder, so a card's `../../lib/card.css`
- * and an old board's `../lib/board.css` both find it.
+ * and an old board's ../lib/board.css both find it.
  */
 export const LIB = "lib";
 
 /**
- * A file of `lib/` by the name a page asked for: `board.css` and `board.js`, which pages written
+ * A file of `lib/` by the name a page asked for: board.css and board.js, which pages written
  * before cards ask for, are `card.css` and `card.js` (at a version too, `~ab12/board.css`). The same
  * rule as `@decks/card-host`'s `libName`.
  */
@@ -66,11 +66,6 @@ const partsOf = (path: string): string[] => path.split("\\").join("/").split("/"
 /** The first hidden part of a path (`.decks`, `.git`, `.env`), or undefined. `.` and `..` are not hidden, they are steps. */
 export function hiddenPart(path: string): string | undefined {
 	return partsOf(path).find((part) => part.length > 1 && part.startsWith(".") && part !== "..");
-}
-
-/** Whether a deck-relative path, or the part of an absolute path below a root, has a hidden part. */
-export function isHidden(path: string): boolean {
-	return hiddenPart(path) !== undefined;
 }
 
 /** One plain folder name: what a canvas or an owner may be called on disk. */
@@ -114,9 +109,6 @@ export function canvasOfPath(path: string): { name: string; folder: string; rest
 	if (shared && plainSegment(shared[1]) && plainSegment(shared[2])) return { name: sharedName(shared[1]!, shared[2]!), folder: `${SHARED_CANVASES}/${shared[1]}/${shared[2]}`, rest: shared[3]! };
 	return undefined;
 }
-
-/** How many folders deep a canvas's folder is: 2 for `canvases/x`, 4 for a shared one. */
-export const canvasDepth = (name: string): number => canvasFolder(name).split("/").length;
 
 /** A path's parts with `.` and `..` worked out, or undefined when `..` climbs past its start. */
 function normalise(parts: string[]): string[] | undefined {
@@ -180,17 +172,10 @@ export function referenceFor(name: string, deckPath: string): Resolution {
 	return { refused: `${clean} is not ${canvasOfPath(clean) ? "on this canvas" : "in this canvas's folder"}: ${MAY}` };
 }
 
-/** The address a board item gives pen.dev for a reference: its own folder's as written, the deck's climbing out. */
-export function urlFor(name: string, reference: string): string {
-	const top = reference.split("/")[0]!;
-	if ((OWN_PARTS as readonly string[]).includes(top) || isSharedCanvas(name)) return reference;
-	return `${"../".repeat(canvasDepth(name))}${reference}`;
-}
-
 /**
  * The file a board's page asks for, through a canvas's folder, as the deck path it is.
  *
- * A board in `canvases/plan/boards/` asks for `../lib/board.css`, which is `lib/card.css` (`libName`):
+ * A board in `canvases/plan/boards/` asks for ../lib/board.css, which is `lib/card.css` (`libName`):
  * the deck's `lib/`, served there so a board moved into a canvas needs no rewrite. The same for the
  * deck's `assets/`, `docs/` and `apps/` from one of this deck's own canvases. A friend's canvas gets
  * the deck's `lib/` too, but its `assets/` and `docs/` are the copies in its own folder, and nothing
@@ -245,14 +230,6 @@ export function pageName(path: string): string {
 	const parts = path.split("/");
 	if (isCardPath(path)) return parts[parts.length - 2] ?? "card";
 	return (parts[parts.length - 1] ?? "board").replace(/\.[^.]+$/, "");
-}
-
-/**
- * What a canvas shared with you to view says to anything that would change it: whose it is, that it
- * follows their copy, and how to have one you can change.
- */
-export function viewOnlySentence(title: string, owner: string, name: string): string {
-	return `${title} is shared with you to view, by ${owner}: it follows their copy, and only they can change it. To change it, make your own copy: Make a copy in the canvas menu, or decks canvas copy-shared --canvas ${name}.`;
 }
 
 /**

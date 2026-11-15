@@ -38,7 +38,7 @@ const isCardPath = (path: string): boolean => /(^|\/)cards\/[^/]+\/index\.html$/
  * A system prompt is written once per session, so it says *which* clock the person is on
  * and how to read it, and leaves the time itself to the places written when work runs
  * (a handed-over brief carries "now") and to `decks now`. The zone is the process
- * clock's, which is the deck's Time setting once one is chosen (`settings.ts`).
+ * clock's, which is the deck's Time setting once one is chosen (the deck's settings).
  */
 function timeLine(): string {
 	const zone = processZone();

@@ -26,7 +26,7 @@ export interface Root {
  */
 export interface DeckSettings {
 	timezone?: string;
-	/** The model the server's speech recogniser uses (`stt.ts`); its default when unset. */
+	/** The model the server's speech recogniser uses; its default when unset. */
 	sttModel?: string;
 }
 
@@ -134,7 +134,7 @@ export interface Page {
 	/**
 	 * The file's last modification, as `mtimeMs`.
 	 *
-	 * Half of what the canvas's "changed" mark reads (`items/news.ts` in the canvas, `agents/canvas-news.ts` in the server). Optional because
+	 * Half of what the canvas's "changed" mark reads (`items/news.ts` in the canvas, the server's canvas news). Optional because
 	 * every fixture and every older record predates it — the server always sends it, and a
 	 * reader treats its absence as "unknown" (`?? 0`).
 	 */
