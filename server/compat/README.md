@@ -14,7 +14,7 @@ checks speak them; they are how we know the new programs behave.
 - `drawing.ts`: today's `/compat/stage-pen/<canvas>`, the drawing as the canvas frame first reads it.
 - `deck.ts`: today's `GET /api/deck`, the deck's folder and its cards and boards.
 - `files.ts`: today's `POST /api/upload` and `GET /api/where`.
-- `pictures.ts`: today's picture routes (`/api/stage-thumb/`, `/api/thumb/`, `/api/stage-shot`), read from server/pictures.
+- `pictures.ts`: today's picture routes (`/api/stage-thumb/`, `/api/thumb/`, `/api/stage-shot`, `/api/snapshot`, the frame's `/compat/snapshot`), read from server/pictures.
 - `feature.ts`: its one export.
 
 ## May import

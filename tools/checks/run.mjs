@@ -19,7 +19,8 @@ const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 export const PROGRAMS = {
 	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
 	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: join(ROOT, "e2e/fake-agent"), DECKS_DATA_DIR: home } }),
-	page: ({ deck, web }) => ({ cmd: "npm", args: ["run", "dev", "--workspace", "@decks-next/page"], env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web) } }),
+	// vite itself, not through npm: npm reports the stop at the end of a check as an error.
+	page: ({ deck, web }) => ({ cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web) } }),
 };
 
 export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
@@ -78,8 +79,8 @@ for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 	});
 }
 
-function launch(name, { cmd, args, env = {} }, log) {
-	const child = spawn(cmd, args, { cwd: ROOT, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+function launch(name, { cmd, args, env = {}, cwd = ROOT }, log) {
+	const child = spawn(cmd, args, { cwd, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
 	LIVE.add(child);
 	child.once("exit", () => LIVE.delete(child));
 	for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => log.push(`[${name}] ${chunk}`));
