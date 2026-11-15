@@ -1,5 +1,7 @@
 import type { AgentChat, AgentKind, AgentState, Identity } from "@decks/protocol";
 
+// The facts the focused conversation shows about its agent, with the defaults for none.
+
 /** What the stream says of the focused agent: its state, its name and its runtime. */
 export function focusedFacts(chat: AgentChat | undefined, identity: Identity | undefined, defaultKind: AgentKind): { state: AgentState; name: string; agent: AgentKind } {
 	return { state: chat?.state ?? "idle", name: identity?.name ?? chat?.name ?? "It", agent: chat?.kind ?? defaultKind };

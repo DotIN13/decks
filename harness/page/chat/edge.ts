@@ -1,12 +1,17 @@
 import { createSignal } from "solid-js";
 
+// Who owns the right edge, the conversation or the inspector:
+// the one asked for most recently, with a yielded conversation coming back when the selection goes.
+
 /** Who owns the right edge. */
 export type EdgeOwner = "history" | "inspector" | "none";
 
 /** Whether the conversation is wanted at all, whatever is currently on the edge. */
 const [wanted, setWanted] = createSignal(false);
+
 /** Which of the two acted last. Only consulted when both could be shown. */
 const [claim, setClaim] = createSignal<"history" | "inspector">("inspector");
+
 /** Whether there is anything for the inspector to describe. */
 const [describable, setDescribable] = createSignal(false);
 
@@ -21,6 +26,7 @@ export const edgeOwner = (): EdgeOwner => {
 
 /** The conversation is up. */
 export const historyShown = () => edgeOwner() === "history";
+
 export const inspectorShown = () => edgeOwner() === "inspector";
 
 /** What the history button draws: off, on, or on-but-yielding. */

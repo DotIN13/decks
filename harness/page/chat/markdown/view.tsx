@@ -2,6 +2,8 @@ import { createMemo, For, Match, Show, Switch, type JSX } from "solid-js";
 import { linkProps } from "./actions.ts";
 import { blocks, type Align, type Block, type Inline } from "./model.ts";
 
+// A reply's markdown drawn as elements: its blocks, tables, lists and inline spans.
+
 /** A reply, drawn from the token tree `markdown.ts` produced. */
 export function Markdown(props: {
 	text: string;

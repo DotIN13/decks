@@ -1,3 +1,5 @@
+// The time machine's four acts on a point in the conversation, and which end a preview first.
+
 /** The four things you can do to a point in the conversation. */
 export type Act = "preview" | "rewind" | "fork" | "restore";
 

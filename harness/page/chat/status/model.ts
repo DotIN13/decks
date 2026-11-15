@@ -1,5 +1,8 @@
 import type { AgentState } from "@decks/protocol";
 
+// The working sign's rules: whether the agent is working, the words for its state,
+// and which one surface draws the sign.
+
 /** Where the working sign goes: over the input bar, at the foot of the conversation, or nowhere at all. */
 export type SignPlace = "none" | "dock" | "column";
 

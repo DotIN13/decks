@@ -1,4 +1,4 @@
-/** Markdown, parsed to a tree the app builds elements from, never to HTML. */
+// Markdown, parsed to a tree of blocks and inline spans the view builds elements from, never to HTML.
 
 export type Inline =
 	| { kind: "text"; text: string }
@@ -29,17 +29,25 @@ export type Block =
 	| { kind: "table"; align: Align[]; head: TableCell[]; rows: TableCell[][] }
 	| { kind: "rule" };
 
+// Blocks: a reply's lines read as paragraphs, headings, quotes, lists, code and tables.
 /** How deep a nested list item is allowed to get before it stops indenting. */
 const MAX_DEPTH = 3;
 
 const HEADING = /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
+
 const RULE = /^ {0,3}([-*_])[ \t]*(?:\1[ \t]*){2,}$/;
+
 const QUOTE = /^ {0,3}> ?(.*)$/;
+
 const BULLET = /^([ \t]*)([-*+])[ \t]+(.*)$/;
+
 const ORDERED = /^([ \t]*)(\d{1,9})[.)][ \t]+(.*)$/;
+
 const FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*([\w+#.-]*)[ \t]*$/;
+
 /** The `|---|:--:|` line, which is what turns the row above it into a header. */
 const DIVIDER = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+
 /** A row written with both outer pipes, which is what makes a one-column table unambiguous. */
 const PIPED = /^[ \t]*\|.*\|[ \t]*$/;
 
@@ -192,6 +200,7 @@ function depthOf(indent: string): number {
 	return Math.min(MAX_DEPTH, Math.floor(columns / 2));
 }
 
+// Inline spans: code, emphasis, strike and links inside a block.
 /** A run of text, as spans. */
 export function inline(text: string): Inline[] {
 	const spans: Inline[] = [];

@@ -3,6 +3,9 @@ import type { ChatItem } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor } from "solid-js";
 import { hasEarlier, LOAD_MORE_AT, WINDOW, windowStart } from "./model.ts";
 
+// How the conversation's column behaves: it follows its foot, draws the last rows and reaches back,
+// and answers the wheel, Escape and a jump to a turn.
+
 /** The column's elements, read once mounted. */
 export interface Column {
 	column: () => HTMLElement | undefined;
@@ -10,6 +13,7 @@ export interface Column {
 	shown: Accessor<boolean>;
 }
 
+// Following the foot, and holding the reader's row still away from it.
 /** Following the foot while the reader is there, and holding their row still away from it. */
 export function createFollow(col: Column) {
 	let atFoot = true;
@@ -78,6 +82,21 @@ export function watchRows(scroller: HTMLDivElement, follow: ReturnType<typeof cr
 	});
 }
 
+/** Glide to the foot, and follow from exactly there once the glide ends. */
+export function glideToFoot(scroller: HTMLDivElement | undefined, pinned: Accessor<boolean>, toFootNow: () => void): void {
+	if (!scroller) return;
+	if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return toFootNow();
+	scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+	const land = () => {
+		clearTimeout(timer);
+		scroller.removeEventListener("scrollend", land);
+		if (pinned()) toFootNow();
+	};
+	const timer = setTimeout(land, 900);
+	scroller.addEventListener("scrollend", land);
+}
+
+// The drawn span of the conversation.
 /** The props the drawn span of the conversation reads. */
 interface WindowInputs {
 	items: () => ChatItem[];
@@ -157,6 +176,7 @@ export function watchEnds(col: Column, ends: { top: () => HTMLElement; foot: () 
 		});
 }
 
+// The wheel, Escape and a jump to a turn.
 /** The wheel scrolls the column from anywhere over it, while there is room; a pinch never does. */
 export function wheelOverColumn(col: Column): void {
 	const wheel = (event: WheelEvent) => {
@@ -216,18 +236,4 @@ export function followScrollTo(col: Column, target: () => { id: string; at: numb
 			element.scrollIntoView({ block: "start", behavior: "auto" });
 		});
 	});
-}
-
-/** Glide to the foot, and follow from exactly there once the glide ends. */
-export function glideToFoot(scroller: HTMLDivElement | undefined, pinned: Accessor<boolean>, toFootNow: () => void): void {
-	if (!scroller) return;
-	if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return toFootNow();
-	scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
-	const land = () => {
-		clearTimeout(timer);
-		scroller.removeEventListener("scrollend", land);
-		if (pinned()) toFootNow();
-	};
-	const timer = setTimeout(land, 900);
-	scroller.addEventListener("scrollend", land);
 }

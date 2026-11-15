@@ -12,8 +12,21 @@ import { TimeMachine } from "../time-machine/view.tsx";
 import { ToolGroup } from "../tool/view.tsx";
 import type { AgentPart, TurnCard } from "./model.ts";
 
+// One card of the conversation: your message with its way back, the agent's turn, or a notice.
+
 /* A card, and the pieces of one, belong to the turn's cards now. */
 export type { AgentPart, TurnCard };
+
+export { setMineReader };
+
+/** A sent message read back into the words and pills it was written as, and what each pill is about. */
+export interface MineReading {
+	draft: Draft;
+	pills: PillHost;
+}
+
+/** Reads a sent message into its pills: from its stored `parts` when it has them, else from its text. */
+export type MineReader = (text: string, parts?: MessagePart[]) => MineReading | undefined;
 
 /** One turn, as a card floating over the cards. */
 export function Turn(props: {
@@ -80,29 +93,6 @@ export function Turn(props: {
 	);
 }
 
-export { setMineReader };
-
-/** A sent message read back into the words and pills it was written as, and what each pill is about. */
-export interface MineReading {
-	draft: Draft;
-	pills: PillHost;
-}
-
-/** Reads a sent message into its pills: from its stored `parts` when it has them, else from its text. */
-export type MineReader = (text: string, parts?: MessagePart[]) => MineReading | undefined;
-
-/** A message's words with its pills in them, as the field drew them. */
-function MineWords(props: { text: string; parts?: MessagePart[] }) {
-	let el!: HTMLSpanElement;
-	let host: PillHost | undefined;
-	createEffect(() => {
-		host = drawMine(el, props.text, props.parts);
-	});
-	onMount(() => onCleanup(wirePills(el, () => host, pillNode)));
-	onCleanup(closePillCard);
-	return <span ref={el} />;
-}
-
 /** Your own message, and the way back to it. */
 function Mine(props: {
 	card: Extract<TurnCard, { kind: "mine" }>;
@@ -155,6 +145,18 @@ function Mine(props: {
 			</Show>
 		</div>
 	);
+}
+
+/** A message's words with its pills in them, as the field drew them. */
+function MineWords(props: { text: string; parts?: MessagePart[] }) {
+	let el!: HTMLSpanElement;
+	let host: PillHost | undefined;
+	createEffect(() => {
+		host = drawMine(el, props.text, props.parts);
+	});
+	onMount(() => onCleanup(wirePills(el, () => host, pillNode)));
+	onCleanup(closePillCard);
+	return <span ref={el} />;
 }
 
 /** What the agent said, and what it was thinking if it says. */

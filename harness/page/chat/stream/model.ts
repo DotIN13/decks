@@ -1,7 +1,8 @@
 import { dayKey, formatDate, yearOf } from "@decks/ui";
 import type { ChatItem } from "@decks/protocol";
 
-/** How much of a long conversation is in the DOM, and how it grows (DESIGN §6.2). */
+// The column's rules: how much of a long conversation is drawn, how it reaches back,
+// and where a line between days falls.
 
 /** How many rows a fresh span holds, and how many each reach back adds. */
 export const WINDOW = 60;

@@ -2,6 +2,8 @@ import type { ChatItem, MessagePart } from "@decks/protocol";
 import { floatRows } from "./rows.ts";
 import { toolSlots, type ToolSlot } from "../tool/model.ts";
 
+// The conversation's rows folded into one card per speaker's turn.
+
 /** A piece of what the agent did in one turn, in the order it happened. */
 export type AgentPart =
 	| { kind: "text"; id: string; text: string; streaming: boolean; thinking?: string }

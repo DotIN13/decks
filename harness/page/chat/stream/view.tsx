@@ -11,6 +11,8 @@ import { Turn } from "../turn/view.tsx";
 import { createFollow, createWindow, escapeCloses, followScrollTo, glideToFoot, resetWindow, watchEnds, watchRows, wheelOverColumn, type Column } from "./actions.ts";
 import { divides, earlierLabel } from "./model.ts";
 
+// The conversation's column: one card per turn over the canvas, always drawn, even while away.
+
 /** What the conversation's column is given by its host. */
 export interface StreamProps {
 	items: ChatItem[];
@@ -46,12 +48,6 @@ export interface StreamProps {
 	onClose?: () => void;
 	timeMachine?: boolean | "buttons";
 }
-
-/** Whether the tail of the column is a reply in flight. */
-const arriving = (cards: TurnCard[]) => {
-	const last = cards.at(-1);
-	return last?.kind === "agent" && last.parts.some((part) => part.kind === "text" && part.streaming);
-};
 
 /** The conversation: a column of cards over the canvas, always rendered, even while away. */
 export function Stream(props: StreamProps) {
@@ -114,6 +110,12 @@ export function Stream(props: StreamProps) {
 		</section>
 	);
 }
+
+/** Whether the tail of the column is a reply in flight. */
+const arriving = (cards: TurnCard[]) => {
+	const last = cards.at(-1);
+	return last?.kind === "agent" && last.parts.some((part) => part.kind === "text" && part.streaming);
+};
 
 /** The header: whose thread this is, and the handle to move it by. */
 function StreamHead(props: { name: string; state: AgentState; onHead?: (element: HTMLDivElement) => void; onClose: () => void }) {

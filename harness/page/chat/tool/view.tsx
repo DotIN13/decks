@@ -6,6 +6,8 @@ import type { ChatItem } from "@decks/protocol";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { askFullResult, awaitingResult, fullResult } from "./actions.ts";
 
+// A turn's tool calls inside its card: a group as a count, each call as a row, its output behind the row.
+
 /** A turn's tool calls, inside the turn's own card. */
 export function ToolGroup(props: { slots: ToolSlot[] }) {
 	return (

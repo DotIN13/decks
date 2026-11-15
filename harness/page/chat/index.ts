@@ -14,5 +14,6 @@ export * from "./markdown/view.tsx";
 export * from "./markdown/model.ts";
 export * from "./section/view.tsx";
 export * from "./section/actions.ts";
+export * from "./section/layout.ts";
 export * from "./focused/view.tsx";
 export * from "./edge.ts";

@@ -1,16 +1,28 @@
 import type { AgentState } from "@decks/protocol";
 import { isWorking, workingWords } from "../status/model.ts";
 
-/** Where this device remembers the conversation's height, and whether it was folded. */
-export const CHAT_HEIGHT_KEY = "decks.chatHeight";
-export const CHAT_FOLDED_KEY = "decks.chatFolded";
+// The conversation section's rules: the words for an agent's state, its height in the panel,
+// and how the phone's sheet opens and goes.
 
+// What the head says.
 /** What an agent is doing, said after its name: "running tools…", "waiting for you", or nothing. */
 export function stateWords(state: AgentState, name: string): string | undefined {
 	if (state === "waiting") return "waiting for you";
 	const words = workingWords(state, name);
 	return words && isWorking(state) ? words : undefined;
 }
+
+/** The words on the fold control, for the sheet, a folded section and an open one. */
+export function foldWords(state: { sheet?: boolean; folded: boolean }): { tip: string; label: string } {
+	const label = state.folded ? "Show the conversation" : "Fold the conversation";
+	return { tip: state.sheet ? "Back into the pill" : label, label };
+}
+
+// The height the person drags.
+/** Where this device remembers the conversation's height, and whether it was folded. */
+export const CHAT_HEIGHT_KEY = "decks.chatHeight";
+
+export const CHAT_FOLDED_KEY = "decks.chatFolded";
 
 /** A dragged height, kept between 120 px and 160 px short of the panel's own height. */
 export function clampHeight(h: number, panelHeight: number | undefined): number {
@@ -26,6 +38,7 @@ export function keyStep(key: string): number | "reset" | undefined {
 	return undefined;
 }
 
+// The phone's sheet.
 type Box = { top: number; right: number; bottom: number; left: number };
 
 /** The clip the phone's sheet opens from: the pill's shape, inside the sheet's box. */
@@ -57,10 +70,4 @@ export function sheetFling(dy: number, height: number, speed: number): { off: nu
 	const ms = Math.min(420, Math.max(180, (remaining / Math.max(fling, 0.9)) * 1.4));
 	const lift = Math.min(1, (0.25 * fling * ms) / remaining);
 	return { off, ms, easing: `cubic-bezier(0.25, ${lift.toFixed(3)}, 0.45, 1)` };
-}
-
-/** The words on the fold control, for the sheet, a folded section and an open one. */
-export function foldWords(state: { sheet?: boolean; folded: boolean }): { tip: string; label: string } {
-	const label = state.folded ? "Show the conversation" : "Fold the conversation";
-	return { tip: state.sheet ? "Back into the pill" : label, label };
 }

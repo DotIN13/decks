@@ -1,5 +1,7 @@
 import { endsPreview, previewTarget, type Act } from "./model.ts";
 
+// What a press in a message's time machine does.
+
 /** The shell's callbacks for one message's time machine. */
 export interface TimeMachineCalls {
 	entryId: string;

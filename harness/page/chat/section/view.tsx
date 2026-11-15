@@ -8,6 +8,9 @@ import { Icon } from "@decks/ui";
 import { keyResize, resetHeight, restoreHeight, revealSheet, startResize, startSheetDrag, type SectionHost } from "./actions.ts";
 import { foldWords, stateWords } from "./model.ts";
 
+// The conversation as the lower half of the side panel or the phone's sheet,
+// and the pill over the composer that says what the agent is doing while it is out of sight.
+
 export { stateWords };
 
 /**
@@ -97,4 +100,3 @@ export function StatusPill(props: { chat: AgentChat | undefined; identity: Ident
 		</Show>
 	);
 }
-

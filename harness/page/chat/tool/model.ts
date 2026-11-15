@@ -1,17 +1,11 @@
 import type { ToolItem } from "../turn/rows.ts";
 
-/** Which of a turn's tool calls may hide behind a count, and which may not. */
+// Which of a turn's tool calls may fold behind a count, and the names its header shows.
 
 /** One thing the group renders: either a header over finished calls, or a bare call. */
 export type ToolSlot =
 	| { kind: "group"; id: string; calls: ToolItem[]; names: string[]; more: number }
 	| { kind: "call"; id: string; call: ToolItem };
-
-/** How many distinct names a header shows before it starts counting them instead. */
-const NAMES = 3;
-
-/** A call that has finished and finished cleanly, the only kind that may be hidden. */
-const collapsible = (call: ToolItem) => call.state === "done";
 
 /** Split a turn's calls into what may hide behind a count and what may not. */
 export function toolSlots(calls: readonly ToolItem[]): ToolSlot[] {
@@ -38,6 +32,12 @@ export function toolSlots(calls: readonly ToolItem[]): ToolSlot[] {
 	flush();
 	return slots;
 }
+
+/** A call that has finished and finished cleanly, the only kind that may be hidden. */
+const collapsible = (call: ToolItem) => call.state === "done";
+
+/** How many distinct names a header shows before it starts counting them instead. */
+const NAMES = 3;
 
 /** The names in a header: distinct, in the order they first ran, and truncated. */
 export function distinctNames(calls: readonly ToolItem[], limit: number = NAMES): { names: string[]; more: number } {

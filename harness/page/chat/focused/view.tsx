@@ -4,7 +4,10 @@ import { Stream } from "../stream/view.tsx";
 import { forkAt, previewAt, restoreTo, rewindTo } from "./actions.ts";
 import { focusedFacts } from "./model.ts";
 
+// The focused agent's conversation: the stream, given the page state's transcript and the time machine's calls.
+
 type TranscriptItem = ComponentProps<typeof Stream>["items"][number];
+
 type AgentChat = (typeof state.chats)[number];
 
 /** The focused agent's conversation, as both the panel and the phone's sheet draw it. */

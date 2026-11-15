@@ -8,7 +8,7 @@ import { Popover } from "@decks/ui";
 import { runAct } from "./actions.ts";
 import { actRows, type Act } from "./model.ts";
 
-const ICONS: Record<Act, typeof Eye> = { preview: Eye, rewind: RotateCcw, fork: GitBranch, restore: ArchiveRestore };
+// The way back to a message, on the message: a menu of preview, rewind, fork and restore.
 
 /** The way back to a message, on the message. */
 export function TimeMachine(props: {
@@ -81,3 +81,5 @@ export function TimeMachine(props: {
 		</Popover>
 	);
 }
+
+const ICONS: Record<Act, typeof Eye> = { preview: Eye, rewind: RotateCcw, fork: GitBranch, restore: ArchiveRestore };

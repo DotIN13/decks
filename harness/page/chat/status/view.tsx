@@ -5,6 +5,8 @@ import { showConversation } from "./actions.ts";
 import { AgentMark } from "@decks/ui";
 import { isWorking, signPlacement, workingWords } from "./model.ts";
 
+// The working sign: the agent's own moving mark and its words, and the row above the composer that holds it.
+
 /** The mark and the words, without any chrome of its own. */
 export function WorkingSign(props: { state: AgentState; name: string; agent: AgentKind }) {
 	return (

@@ -3,6 +3,8 @@ import type { MessagePart } from "@decks/protocol";
 import { pillElement, type PillHost } from "../../composer/pill/card.ts";
 import type { MineReader } from "./view.tsx";
 
+// A message you sent, drawn back with its pills: the host's reader, and the drawing.
+
 const [mineReader, setReader] = createSignal<MineReader | undefined>();
 
 /** How the host reads a message you sent back into its pills. */

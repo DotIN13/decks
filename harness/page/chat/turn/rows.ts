@@ -1,5 +1,7 @@
 import type { ChatItem } from "@decks/protocol";
 
+// The rows of a conversation as the column floats them: a tool call is a row like any other.
+
 /** A tool call as the transcript carries it. */
 export type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 
