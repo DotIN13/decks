@@ -51,14 +51,17 @@ export function cardPage(input: { path: string; source: string; pass: string; de
 	const urls = shared ? [] : Array.from({ length: n }, (_, i) => `./${name}.m${i}.js${input.pass}`);
 	const html = input.source.replace(SCRIPT, (all, attrs: string) => (runs(attrs) ? "" : all));
 	const w = widthOf(input.source);
-	const map = JSON.stringify({ imports: { ...input.deckImports, ...IMPORTS } });
+	// Relative to the card, so a pass in the path (a compat address) or in the query reaches them too.
+	const up = "../".repeat(input.path.split("/").length - 1);
+	const deck = Object.fromEntries(Object.entries(input.deckImports).map(([name, address]) => [name, address.startsWith(FILES) ? up + address.slice(FILES.length) + (address.endsWith("/") ? "" : input.pass) : address]));
+	const map = JSON.stringify({ imports: { ...deck, ...IMPORTS } });
 	return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8" /><title>${escape(titleOf(input.path, input.source))}</title>
-<link rel="stylesheet" href="${FILES}lib/card.css${input.pass}" />
+<link rel="stylesheet" href="${up}lib/card.css${input.pass}" />
 <script type="importmap">${map}</script></head>
 <body class="card" style="width:${w}px"><div class="card-body" id="decks-card">${html}</div>
 <script type="module">${PAGE_SCRIPT.replace("__PATH__", JSON.stringify(input.path)).replace("__URLS__", JSON.stringify(urls)).replace("__W__", String(w))}</script>
-<script src="${FILES}lib/card.js${input.pass}"></script></body></html>
+<script src="${up}lib/card.js${input.pass}"></script></body></html>
 `;
 }
 
