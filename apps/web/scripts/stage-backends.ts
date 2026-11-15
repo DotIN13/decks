@@ -48,7 +48,7 @@ import { fileURLToPath } from "node:url";
 import { deflateSync, inflateSync } from "node:zlib";
 import { chromium, webkit, devices, type Browser, type BrowserContextOptions } from "playwright";
 
-const STAGE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/stage");
+const STAGE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../engine");
 const GOLDENS = join(STAGE, "crates/gpu/goldens");
 
 /** A channel may be this many levels off… */
@@ -334,7 +334,7 @@ async function main(): Promise<number> {
 	}
 	const fonts = (await readdir(join(STAGE, "fonts"))).some((f) => f.endsWith(".ttf"));
 	const fixtures = [...goldens].filter(([name]) => fonts || name === "shapes" || name === "effects").map(([name, g]) => ({ name, stage: name.startsWith("stage-") ? name.slice(6) : undefined, width: g.width, height: g.height }));
-	if (!fonts) console.log("no fonts in packages/stage/fonts: only shapes and effects are drawn");
+	if (!fonts) console.log("no fonts in engine/fonts: only shapes and effects are drawn");
 
 	const { server, url } = await serve();
 	const drawn = new Map<string, Map<string, Picture>>();

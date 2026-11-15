@@ -27,7 +27,7 @@
 		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol-old": "*",
-		"@decks/stage": "*",
+		"@decks/engine": "*",
 		"@decks/ui": "*",
 		"highlight.js": "^11.12.0",
 		"lucide-solid": "^1.37.0",

@@ -12,7 +12,7 @@ import renderWorkerUrl from "./render.worker.ts?worker&url";
  * Fonts, pictures, icons and the markdown reader are the app's own, fetched here and handed to both
  * engines once each.
  */
-import type { PageEngine } from "@decks/stage";
+import type { PageEngine } from "@decks/engine";
 import { markMissing, saysMissing } from "../items/missing.ts";
 import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol-old";

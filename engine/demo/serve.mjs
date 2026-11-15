@@ -4,7 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 
 const here = resolve(import.meta.dirname);
-const deck = resolve(process.env.DECK ?? join(here, "../../../data/decks"));
+const deck = resolve(process.env.DECK ?? join(here, "../../data/decks"));
 const port = Number(process.env.PORT ?? 4791);
 const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".wasm": "application/wasm", ".css": "text/css", ".json": "application/json", ".pen": "application/json", ".png": "image/png", ".svg": "image/svg+xml" };
 

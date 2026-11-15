@@ -4,7 +4,7 @@
  * from the same build: `backends/detect.ts`) and handing each to the page as a picture. It never shows anything itself: the page lays the tiles in the
  * same frame as the board pages, so the two cannot drift (`engine.ts`).
  */
-import type { WorkerEngine } from "@decks/stage";
+import type { WorkerEngine } from "@decks/engine";
 import { backendNamed } from "./backends/detect.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import type { FromWorker, ToWorker } from "./types.ts";

@@ -3,7 +3,7 @@
  * on a line of its own in a card, in place in a plain text), as Obsidian and GitHub read them, typeset by
  * MathJax into outlines the stage's engine fills like any shape.
  *
- * The engine finds the formulas in words itself (`packages/stage/crates/text/src/math.rs`, the same
+ * The engine finds the formulas in words itself (`engine/crates/text/src/math.rs`, the same
  * rules as `formulaText`) and asks for each one once (`typesetFormula`, handed over in
  * `stage/reader.ts`); it sets each as a box its size on the line's baseline. `formulaText` turns
  * each formula into one private-use character, U+F0000 plus its number, for code that needs a formula

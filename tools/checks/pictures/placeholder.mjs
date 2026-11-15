@@ -2,7 +2,7 @@
  * A frame marked `placeholder: true` is drawn unfinished: a dashed outline just inside its edge, in
  * the colour of the agent that last wrote the canvas, with that agent's name on a tag in its
  * top-left corner; with no writer known, in the accent and with no name (`placeholder_mark` in
- * `packages/stage/crates/paint/src/painter.rs`).
+ * `engine/crates/paint/src/painter.rs`).
  *
  * A placeholder frame is put on empty paper by the person (so no agent is the writer), and the
  * canvas is screenshotted at about zoom 1: its edge must be dashed in the accent, with no tag. Then

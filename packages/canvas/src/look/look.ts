@@ -4,7 +4,7 @@ import type { Block } from "../model/markdown.ts";
 /**
  * What the stage's own HTML takes from how the engine draws: a card's palette and where its first
  * line sits, so the editor over a card lines up with the words under it, and a note's corner.
- * The engine draws the same (`packages/stage/crates/text/src/card.rs`).
+ * The engine draws the same (`engine/crates/text/src/card.rs`).
  */
 
 /** The app's palette (`index.css`), light and dark. */

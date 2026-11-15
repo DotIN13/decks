@@ -18,7 +18,7 @@ import * as webgl from "./webgl.ts";
 type BackendName = "webgpu" | "webgl2";
 
 /** The engine's module, either build: they have the same calls. */
-export type StageModule = typeof import("@decks/stage");
+export type StageModule = typeof import("@decks/engine");
 
 /** Starts the engine again when its device goes, and stops watching when the stage goes. */
 type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () => void; isLost: () => boolean }) => () => void;
@@ -47,9 +47,9 @@ export class NoBackend extends Error {
 }
 
 const BACKENDS: Record<BackendName, Backend> = {
-	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled)), watch: webgpu.watch },
+	webgpu: { name: "webgpu", load: (compiled) => import("@decks/engine").then((module) => started(module, compiled)), watch: webgpu.watch },
 	// The same calls; only the wasm's own exports (`InitOutput`) differ between the builds.
-	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
+	webgl2: { name: "webgl2", load: (compiled) => import("@decks/engine/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
 };
 
 async function started(module: StageModule, compiled?: WebAssembly.Module): Promise<StageModule> {

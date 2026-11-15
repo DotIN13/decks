@@ -16,7 +16,7 @@ export type FontNeed = { family: string; weight: number; italic: boolean; text: 
 export function nativeBinary(): string | undefined {
 	const named = process.env.DECKS_NATIVE_SHOT;
 	if (named) return existsSync(named) ? named : undefined;
-	const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/stage/target/release/stage-shot");
+	const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../engine/target/release/stage-shot");
 	return existsSync(built) ? built : undefined;
 }
 

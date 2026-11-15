@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * The font files the engine's Rust tests set words in (`crates/paint/src/fixtures.rs`, `FONTS`), into
- * `fonts/`, from Fontsource's CDN: `npm run fonts -w packages/stage`.
+ * `fonts/`, from Fontsource's CDN: `npm run fonts -w engine`.
  *
  * They are not kept in git (a few MB, the Chinese one most of it), and without them every test that
  * sets words skips quietly: a glyph texture bug went unseen for a week that way. Each file is held

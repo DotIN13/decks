@@ -23,7 +23,7 @@ const FONTS: [(&str, &str, bool); 6] = [
 ];
 
 pub fn drawing(name: &str, ext: &str) -> String {
-	format!("{}/../../../../tools/fixtures/drawings/{name}.{ext}", env!("CARGO_MANIFEST_DIR"))
+	format!("{}/../../../tools/fixtures/drawings/{name}.{ext}", env!("CARGO_MANIFEST_DIR"))
 }
 
 pub fn golden(name: &str) -> String {

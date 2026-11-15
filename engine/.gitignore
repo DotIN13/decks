@@ -1,2 +1,4 @@
 target/
 fonts/*.ttf
+pkg/
+pkg-gl/
