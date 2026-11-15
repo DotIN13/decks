@@ -376,3 +376,12 @@ An app's source may live outside the deck, as long as the deck knows where it is
   moment. The canvas library's rule is unchanged and right. Until the switch-over the checks stay
   unchanged, so it runs on the dev server by a trait in the runner's list; after the checks move, it
   picks its card by path and returns to the built page.
+
+## 12. Stop 3 passed (Mason, 2026-11-15 01:19)
+
+Today's 76 browser checks, unchanged, pass on the new programs: Decks-local, the harness and its page
+as three processes. Two clean full runs on settled trees (run 5 on 21242311, run 9 on e7a009b2, the
+second in both slots), and `stage-api` 5 of 5 with a real Claude. What the runs found on the way is in
+the commits: a card named by its folder, an agent shown idle too early, the picture ladder, a focus on
+an unread card, and one race in today's canvas library (`tiers`, 2 of 10 on today's programs too). The
+switch-over follows `docs/rewrite/switch-plan.md`; Warden's lanes are opened for that one job.
