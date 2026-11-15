@@ -106,6 +106,13 @@ export function answerBack(old: string, value: unknown): unknown {
 	if (old === "canvas.read" && Array.isArray(value)) return { items: value };
 	if (old === "canvas.space" && isObject(value) && typeof value.x === "number") return { x1: value.x, y1: value.y };
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
+	// view.reload answered { reloaded }; view.camera the Camera itself; view.viewport the screen's { width, height }.
+	if (old === "view.reload" && typeof value === "number") return { reloaded: value };
+	if (old === "view.camera" && isObject(value) && "camera" in value) return value.camera;
+	if (old === "view.viewport" && isObject(value)) {
+		const screen = value.screen as { w?: number; h?: number } | undefined;
+		return screen && typeof screen.w === "number" ? { width: screen.w, height: screen.h } : null;
+	}
 	// canvas.fit answered the card's measured size; card.fit answers its Placement, the size in its box.
 	if (old === "canvas.fit" && isObject(value) && isObject(value.box)) {
 		const b = value.box as { x1: number; y1: number; x2: number; y2: number };

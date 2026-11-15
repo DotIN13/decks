@@ -47,6 +47,10 @@ test("old arguments in order become the new call's, options spread", () => {
 	const step = turn("canvas.step", ["redo"]);
 	assert.ok(!("refusal" in step) && step.name === "canvas.undo" && step.args.redo === true);
 	assert.deepEqual(answerBack("canvas.space", { x: 3, y: 4 }), { x1: 3, y1: 4 });
+	assert.deepEqual(answerBack("view.reload", 2), { reloaded: 2 });
+	assert.deepEqual(answerBack("view.camera", { canvas: "c", camera: { x: 1, y: 2, zoom: 1 } }), { x: 1, y: 2, zoom: 1 });
+	assert.deepEqual(answerBack("view.viewport", { canvas: "c", camera: { x: 0, y: 0, zoom: 1 }, screen: { w: 800, h: 600 } }), { width: 800, height: 600 });
+	assert.equal(answerBack("view.viewport", { canvas: "c", camera: { x: 0, y: 0, zoom: 1 } }), null);
 	assert.deepEqual(answerBack("canvas.fit", { card: "c", canvas: "x", box: { x1: 10, y1: 0, x2: 490, y2: 681 } }), { card: "c", canvas: "x", box: { x1: 10, y1: 0, x2: 490, y2: 681 }, w: 480, h: 681 });
 	assert.equal((answerBack("canvas.export", { path: "exports/a.html", size: 3 }) as { file: string }).file, "exports/a.html");
 	const app = answerBack("apps.create", { name: "e2e-notes", status: "stopped" }) as { item: unknown; next: string };
