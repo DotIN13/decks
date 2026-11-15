@@ -80,7 +80,10 @@ Commit only your paths: `git commit -m "..." -- <your paths>`. Never `git add -A
 Each is a gate in `tools/gates`. Old code is counted in a baseline that may shrink and never
 grow; new folders start at zero.
 
-1. A file holds 400 lines at most, a function 80. (`tools/gates/size.mjs`)
+1. A file holds 1,000 lines at most, a function 80. (`tools/gates/size.mjs`)
+   A file is one story: its name says its subject, it opens with a sentence saying what it is, the
+   main thing comes first, then what that calls, with functions that work together sitting together.
+   Split where the stories divide, not where a count runs out.
 2. One name per thing; a retired word lives only in compat and upgrade. (`tools/gates/names.mjs`)
 3. Imports go one way, through a folder's entry file only. (`tools/gates/imports.mjs`)
 4. A call is declared once in the protocol and handled once. (`tools/gates/calls.mjs`)
