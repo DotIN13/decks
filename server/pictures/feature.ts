@@ -6,6 +6,7 @@ import { pictureRoute } from "./picture.ts";
 import { tileRoute } from "./tile.ts";
 import { shotRoute } from "./download.ts";
 import { snapshotRoute } from "./snapshot.ts";
+import { Extents, extentRoute } from "./extent.ts";
 
 // The pictures feature: card.fit, canvas.screenshot, canvas.export, and a
 // card's picture at /pictures/. The browser is closed when the server stops.
@@ -17,10 +18,11 @@ export function picturesFeature(options: PicturesOptions = {}): Feature {
 	const browser = options.browser ?? chromium();
 	const origin = options.origin ?? (() => kernel?.url());
 	const m: Machine = machine(browser, origin, () => kernel);
+	const extents = new Extents();
 	return defineFeature({
 		name: "pictures",
-		calls: pictureCalls(() => m),
-		routes: [pictureRoute(() => m), tileRoute(() => m), shotRoute(() => m), snapshotRoute(() => m)],
+		calls: pictureCalls(() => m, extents),
+		routes: [pictureRoute(() => m), tileRoute(() => m), shotRoute(() => m), snapshotRoute(() => m), extentRoute(extents)],
 		start(given) {
 			kernel = given;
 			return () => void browser.close();

@@ -265,3 +265,32 @@ test("rule 11: with astc=1 a card's picture is every size in ASTC blocks, kept o
 	assert.equal(packed.length, 24 + 256 + 64);
 	assert.ok(encoder(), "astcenc is installed for this machine");
 });
+
+test("rule 4: fit waits for a height a script sets late, and stops waiting at 3 s", async () => {
+	const { steady } = await import("./fit.ts");
+	const heights = [400, 400, 733, 733, 733, 733, 733, 733];
+	let i = 0;
+	const read = async () => ({ h: heights[Math.min(i++, heights.length - 1)]!, words: 1 }) as never;
+	assert.equal((await steady(read, async () => {})).h, 733);
+	let n = 0;
+	const growing = async () => ({ h: n++, words: 1 }) as never;
+	assert.ok((await steady(growing, async () => {})).h <= 21, "a height that never holds is read for 3 s at most");
+});
+
+test("rule 16: fit answers from a fresh frame report at the card's width, without the browser", async () => {
+	const fake = fakeBrowser({ h: 420, words: 40, minFont: 17 });
+	const s = await start(fake.browser);
+	const served = await s.listen();
+	const report = (w: number) => fetch(`${served.url}/pictures/extent?pass=${served.token}`, { method: "POST", body: JSON.stringify({ path: CARD, rev: 1, w, h: 555, words: 30, minFont: 18 }) });
+	assert.equal((await report(799)).status, 200);
+	const answer = await s.call("card.fit", { card: CARD, canvas: "work" }, ann);
+	assert.ok(answer.ok, JSON.stringify(answer));
+	assert.equal(fake.seen.length, 0, "no browser page was opened");
+	assert.match(answer.notes.join(" "), /Measured by the canvas frame/);
+	assert.equal(((answer.value as { box: { y1: number; y2: number } }).box.y2 - (answer.value as { box: { y1: number } }).box.y1), 555);
+	await report(500);
+	await s.call("card.fit", { card: CARD, canvas: "work" }, ann);
+	assert.equal(fake.seen.length, 1, "a report at another width is not used");
+	await served.close();
+	await s.close();
+});

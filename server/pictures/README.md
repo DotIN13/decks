@@ -6,8 +6,7 @@ Pictures of what is on a canvas, and the one feature that drives a browser.
 
 - `card.fit`: a card measured in a browser at its width on a canvas, its height set, and what the
   browser found said in the notes (fit.ts, reading.ts).
-- `canvas.screenshot`: a picture of a canvas, part of it, or one card (shot.ts).
-- `canvas.export`: items as one self-contained web page (export.ts).
+- `canvas.screenshot` (shot.ts) and `canvas.export` (export.ts): a picture, a web page.
 - Pictures by address: `/pictures/<card>`, `canvas-tile/`, `shot`, `snapshot` (rules 11 to 14).
 - The browser (browser.ts): one Chromium, started on first use, closed a minute after the last.
 
@@ -23,7 +22,8 @@ HTML; `playwright` for the browser. No other feature.
    server's address comes from the `origin` option; without it these calls answer `unavailable`.
 3. Every picture and page is written through `ctx.deck`, so history names who asked for it.
 4. `card.fit` needs the card on the canvas: its width there is the width it is measured at, and
-   is never changed. The height is the content's, plus `margin`, written by `item.update`.
+   is never changed. The height is the content's once it holds for 0.6 s (3 s at most), not the
+   window's, plus `margin`, written by `item.update`.
 5. Fit reads: the height, the words (Chinese counts 1.6 characters a word), the smallest type,
    content wider than the card, boxes that cut off their own words, labels in a drawing that
    overlap, and script errors. Then it presses each control, twelve at most, and says which
@@ -49,11 +49,11 @@ HTML; `playwright` for the browser. No other feature.
     the card's own address with a pass for that origin only, and answers the PNG.
 15. A picture draws a card's own corner, outline and shadow, and a placeholder frame's dashed
     edge in its last writer's colour (the accent for the person).
-
+16. `POST /pictures/extent { path, w, h, ... }` keeps what a canvas frame measured; card.fit
+    answers from it while it is under 2 min old, at the card's width and newer than its last write.
 Not yet: the engine's native screenshot tool. Every picture is Chromium's, and `how` says so.
-
 ## Check
 
 - `node tools/check.mjs server`
-- Real browser, heavy: `node tools/heavy.mjs --wait -- env DECKS_HEAVY=1 node --import tsx --test server/pictures/browser.test.ts`
+- Heavy: `node tools/heavy.mjs --wait -- env DECKS_HEAVY=1 node --import tsx --test server/pictures/browser.test.ts`
 - `node tools/gates/run.mjs`

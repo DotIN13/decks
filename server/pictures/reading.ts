@@ -14,6 +14,8 @@ export const READ = `(() => {
 	${WORDS}
 	const body = document.body, root = document.getElementById("decks-card") || body, doc = document.documentElement;
 	body.style.height = "auto"; body.style.minHeight = "0";
+	if (root !== body) { root.style.height = "auto"; root.style.minHeight = "0"; }
+	doc.style.height = "auto";
 	if (getComputedStyle(body).display === "block") body.style.display = "flow-root";
 	const below = parseFloat(getComputedStyle(body).marginBottom) || 0;
 	const h = Math.ceil(Math.max(body.scrollHeight, body.getBoundingClientRect().bottom + scrollY + below));
