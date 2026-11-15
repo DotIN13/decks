@@ -1,6 +1,6 @@
 # Step 4c-card-runtime: canvas/cards/runtime/: card-host folds into the canvas library; vendored libraries leave git, copied at install
 
-Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing was moved.
+Dry run on 8830a5d5, on top of 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing was moved.
 
 - files moved by git mv: 18
 - files taken out of git (moved on disk): 99

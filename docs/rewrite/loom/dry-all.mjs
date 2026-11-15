@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Dry-runs every table in moves/order.json, each planned on top of the ones before it, and writes
+// Dry-runs every table in moves/order.json (or from --from <step>), each on top of the ones before it, and writes
 // each one's <step>.dry.txt and <step>.renames.json beside it: node docs/rewrite/loom/dry-all.mjs
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -14,7 +14,11 @@ function main() {
 	const head = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 	let repo = checkout(root);
 	const done = [];
-	for (const step of JSON.parse(readFileSync(join(MOVES, "order.json"), "utf8"))) {
+	const order = JSON.parse(readFileSync(join(MOVES, "order.json"), "utf8"));
+	// --from <step>: the steps before it are in the tree already, so planning starts there.
+	const from = process.argv.includes("--from") ? order.indexOf(process.argv[process.argv.indexOf("--from") + 1]) : 0;
+	if (from < 0) throw new Error("--from names no step in order.json");
+	for (const step of order.slice(from)) {
 		const table = loadTable(join(MOVES, `${step}.json`));
 		const p = plan(table, repo);
 		const at = done.length ? `${head}, on top of ${done.join(", ")}` : head;
