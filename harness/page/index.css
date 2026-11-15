@@ -33,19 +33,19 @@
  * is why the prose in this file could be rewritten and the hash did not move.
  */
 @import "./styles/kit/chrome.css";
-@import "./styles/agents.css";
-@import "./styles/panel.css";
-@import "./styles/forms.css";
-@import "./styles/inspector.css";
+@import "./agents/face/style.css";
+@import "./panel/lists/panel.css";
+@import "./agents/menu/forms.css";
+@import "./panel/lists/inspector.css";
 @import "./styles/stream.css";
-@import "./styles/dock.css";
+@import "./shell/dock.css";
 @import "./settings/usage/style.css";
 @import "@decks/canvas/styles/surface-tokens.css";
 @import "@decks/canvas/styles/canvas.css";
 @import "./styles/kit/callout.css";
 @import "./styles/kit/tools.css";
 @import "./canvases/manager/style.css";
-@import "./styles/shell.css";
+@import "./shell/shell.css";
 @import "@decks/canvas/styles/ink.css";
 @import "./styles/kit/ink-tray.css";
 @import "./styles/kit/comment.css";
@@ -53,15 +53,15 @@
 @import "@decks/canvas/styles/marks.css";
 @import "./styles/markdown.css";
 @import "./styles/composer.css";
-@import "./styles/connections.css";
+@import "./shell/connections.css";
 @import "./styles/kit/properties.css";
 /* The tokens are the canvas's (`@decks/canvas`), after every sheet, where they always were. */
-@import "./styles/tokens.css";
+@import "./shell/tokens.css";
 /* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
-@import "./styles/v3.css";
+@import "./shell/v3.css";
 @import "./shell/confirm.css";
 @import "./canvases/manager/drawn.css";
-@import "./styles/v3-after.css";
+@import "./shell/v3-after.css";
 
 
 /*
