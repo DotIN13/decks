@@ -17,6 +17,7 @@
 	"harness/page/styles/shell.css: style outside a part": 1,
 	"harness/page/styles/stream.css: style outside a part": 1,
 	"harness/page/styles/tokens.css: style outside a part": 1,
+	"harness/page/styles/v3-after.css: style outside a part": 1,
 	"harness/page/styles/v3.css: style outside a part": 1,
 	"packages/card-host/lib/d3.min.js: built file in git": 1,
 	"packages/card-host/lib/katex-auto-render.min.js: built file in git": 1,
