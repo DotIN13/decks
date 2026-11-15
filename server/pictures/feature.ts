@@ -8,8 +8,8 @@ import { shotRoute } from "./download.ts";
 import { snapshotRoute } from "./snapshot.ts";
 import { Extents, extentRoute } from "./extent.ts";
 
-// The pictures feature: card.fit, canvas.screenshot, canvas.export, and a
-// card's picture at /pictures/. The browser is closed when the server stops.
+// The pictures feature: card.fit, canvas.screenshot, canvas.export, and the
+// routes under /pictures/. The browser and the native tool stop with the server.
 
 export type PicturesOptions = { browser?: Browser; origin?: () => string | undefined; native?: boolean };
 

@@ -4,8 +4,8 @@ import { toDeckPath, type Bytes, type Context, type DeckPath, type Item, type Ke
 import type { Browser } from "./browser.ts";
 import { Native, nativeBinary } from "./native.ts";
 
-// What the pictures' calls need beyond ctx: the browser, the server's own
-// address, and a pass for a page. Rule 2.
+// What the pictures' calls need beyond ctx (rule 2): the browser, the server's
+// own address, a pass for a page and the native tool; then the card lookups they share.
 
 export interface Machine {
 	browser: Browser;

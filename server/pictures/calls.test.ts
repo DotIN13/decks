@@ -6,7 +6,8 @@ import type { Browser, Page, PageOptions } from "./browser.ts";
 import { picturesFeature } from "./feature.ts";
 import type { Reading, Views } from "./reading.ts";
 
-// The calls against a fake browser that answers what a page would read.
+// The calls and the /pictures/ routes against a fake browser that answers what
+// a page would read, in the order of the README's rules.
 
 const CARD = "canvases/work/cards/sales/index.html";
 const pen = (children: unknown[]) => JSON.stringify({ version: "2.14", children });
@@ -45,6 +46,14 @@ function fakeBrowser(reading: Reading, views: Views = { controls: 0, opening: re
 const start = (browser: Browser, origin: string | null = "http://127.0.0.1:4664") => testServer({ features: [...features().filter((one) => one.name !== "pictures"), picturesFeature({ browser, origin: () => origin ?? undefined, native: false })], deck: DECK });
 const ann = callers.agent("ann", "work");
 
+test("rule 2: with no address known, the browser calls are unavailable", async () => {
+	const s = await start(fakeBrowser({ h: 1, words: 1 }).browser, null);
+	const answer = await s.call("card.fit", { card: CARD }, ann);
+	assert.ok(!answer.ok);
+	assert.equal(answer.error.code, "unavailable");
+	await s.close();
+});
+
 test("rule 4: fit measures at the card's width there, writes its height, and says one screen", async () => {
 	const fake = fakeBrowser({ h: 420, words: 40, minFont: 17 });
 	const s = await start(fake.browser);
@@ -59,16 +68,6 @@ test("rule 4: fit measures at the card's width there, writes its height, and say
 	await s.close();
 });
 
-test("rules 5 and 6: what is over a limit is advice, with the view a control opens", async () => {
-	const views = { controls: 2, opening: 700, views: [{ label: "Method", h: 980, overflowX: 0 }] };
-	const fake = fakeBrowser({ h: 700, words: 300, minFont: 12, cut: 1 }, views, ["boom"]);
-	const s = await start(fake.browser);
-	const answer = await s.call("card.fit", { card: CARD, margin: 10 }, ann);
-	const said = answer.notes.join(" ");
-	for (const part of [/710 px tall, more than one screen/, /300 words/, /12px/, /1 box cut off/, /pressing "Method" it is 980 px tall/, /throws: boom/]) assert.match(said, part);
-	await s.close();
-});
-
 test("rule 4: a card not on the canvas is refused with the call that places it", async () => {
 	const s = await start(fakeBrowser({ h: 1, words: 1 }).browser);
 	await s.value("file.write", { path: "canvases/work/cards/other/index.html", text: "<p>x</p>" }, ann);
@@ -78,11 +77,24 @@ test("rule 4: a card not on the canvas is refused with the call that places it",
 	await s.close();
 });
 
-test("rule 2: with no address known, the browser calls are unavailable", async () => {
-	const s = await start(fakeBrowser({ h: 1, words: 1 }).browser, null);
-	const answer = await s.call("card.fit", { card: CARD }, ann);
-	assert.ok(!answer.ok);
-	assert.equal(answer.error.code, "unavailable");
+test("rule 4: fit waits for a height a script sets late, and stops waiting at 3 s", async () => {
+	const { steady } = await import("./fit.ts");
+	const heights = [400, 400, 733, 733, 733, 733, 733, 733];
+	let i = 0;
+	const read = async () => ({ h: heights[Math.min(i++, heights.length - 1)]!, words: 1 }) as never;
+	assert.equal((await steady(read, async () => {})).h, 733);
+	let n = 0;
+	const growing = async () => ({ h: n++, words: 1 }) as never;
+	assert.ok((await steady(growing, async () => {})).h <= 21, "a height that never holds is read for 3 s at most");
+});
+
+test("rules 5 and 6: what is over a limit is advice, with the view a control opens", async () => {
+	const views = { controls: 2, opening: 700, views: [{ label: "Method", h: 980, overflowX: 0 }] };
+	const fake = fakeBrowser({ h: 700, words: 300, minFont: 12, cut: 1 }, views, ["boom"]);
+	const s = await start(fake.browser);
+	const answer = await s.call("card.fit", { card: CARD, margin: 10 }, ann);
+	const said = answer.notes.join(" ");
+	for (const part of [/710 px tall, more than one screen/, /300 words/, /12px/, /1 box cut off/, /pressing "Method" it is 980 px tall/, /throws: boom/]) assert.match(said, part);
 	await s.close();
 });
 
@@ -123,6 +135,28 @@ test("rule 8: a card's path is its own page; an unknown id is not_found", async 
 	await s.close();
 });
 
+test("rule 8: a card's picture comes from a screen showing it when one answers, else from its file", async () => {
+	const { testContext } = await import("../kernel/testing.ts");
+	const { seenCard } = await import("./shot.ts");
+	const png = Buffer.from("89504e470d0a1a0a0000000d49484452000000100000000801", "hex").toString("base64");
+	const answered = testContext({ call: (async (name: string) => (name === "view.screenshot" ? { how: "canvas", data: png, mime: "image/png" } : undefined)) as never });
+	const seen = await seenCard(answered, CARD, "work");
+	assert.equal(seen?.how, "canvas", "how is the screen's own word, canvas or snapshot");
+	assert.equal(seen?.bytes[0], 0x89);
+	assert.equal(await seenCard(testContext(), CARD, "work"), undefined, "no screen: the file is used");
+});
+
+test("rule 8: a card's path in a list names its item; a card alone as a PDF is the card on its canvas", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	const both = await s.value<{ box: unknown }>("canvas.screenshot", { of: [CARD, "n1"] }, ann);
+	assert.deepEqual(both.box, { x1: 76, y1: 26, x2: 1324, y2: 974 });
+	const pdf = await s.value<{ box: unknown }>("canvas.screenshot", { of: CARD, format: "pdf" }, ann);
+	assert.deepEqual(pdf.box, { x1: 76, y1: 26, x2: 924, y2: 974 }, "the card's box with 24 px of paper");
+	assert.match(fake.seen.at(-1)!.html[0]!, /<iframe/);
+	await s.close();
+});
+
 test("rule 10: export writes pen's page, a card as an iframe from where the page is", async () => {
 	const s = await start(fakeBrowser({ h: 1, words: 1 }).browser);
 	const file = await s.value<{ path: string; by: string }>("canvas.export", { of: ["sales", "n1"] }, ann);
@@ -153,6 +187,29 @@ test("rule 11: a card's picture is taken once per version and rung", async () =>
 	await s.close();
 });
 
+test("rule 11: a page from before cards, any other .html in the deck, is pictured too", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	await s.value("file.write", { path: "shared/canvases/ada/old-notes/pages/notes.html", text: "<title>Notes</title><p>old</p>" }, ann);
+	const served = await s.listen();
+	const got = await fetch(`${served.url}/pictures/shared/canvases/ada/old-notes/pages/notes.html?w=480&v=0&pass=${served.token}`);
+	assert.equal(got.status, 200, await got.clone().text());
+	assert.equal(got.headers.get("content-type"), "image/jpeg");
+	assert.match(fake.seen[0]!.urls[0]!, /\/files\/shared\/canvases\/ada\/old-notes\/pages\/notes\.html\?pass=/);
+	assert.equal((await fetch(`${served.url}/pictures/canvases/work/nowhere.html?pass=${served.token}`)).status, 404);
+	await served.close();
+	await s.close();
+});
+
+test("rule 11: with astc=1 a card's picture is every size in ASTC blocks, kept once", async () => {
+	const { pack, MAGIC, encoder } = await import("./astc.ts");
+	const packed = Buffer.from(pack([{ width: 16, height: 16, rgba: new Uint8Array(1024) }, { width: 8, height: 8, rgba: new Uint8Array(256) }], [new Uint8Array(256), new Uint8Array(64)]));
+	assert.equal(packed.toString("ascii", 0, 4), MAGIC);
+	assert.deepEqual([packed.readUInt32LE(4), packed.readUInt32LE(8), packed.readUInt32LE(12), packed.readUInt32LE(16), packed.readUInt32LE(20)], [16, 16, 2, 256, 64]);
+	assert.equal(packed.length, 24 + 256 + 64);
+	assert.ok(encoder(), "astcenc is installed for this machine");
+});
+
 test("rule 12: a canvas's tile is a JPEG of the whole canvas, taken once per drawing and scheme", async () => {
 	const fake = fakeBrowser({ h: 1, words: 1 });
 	const s = await start(fake.browser);
@@ -167,20 +224,6 @@ test("rule 12: a canvas's tile is a JPEG of the whole canvas, taken once per dra
 	await get("work", "dark");
 	assert.equal(fake.seen.length, 2, "dark is a picture of its own");
 	assert.equal((await get("nowhere")).status, 404);
-	await served.close();
-	await s.close();
-});
-
-test("rule 11: a page from before cards, any other .html in the deck, is pictured too", async () => {
-	const fake = fakeBrowser({ h: 1, words: 1 });
-	const s = await start(fake.browser);
-	await s.value("file.write", { path: "shared/canvases/ada/old-notes/pages/notes.html", text: "<title>Notes</title><p>old</p>" }, ann);
-	const served = await s.listen();
-	const got = await fetch(`${served.url}/pictures/shared/canvases/ada/old-notes/pages/notes.html?w=480&v=0&pass=${served.token}`);
-	assert.equal(got.status, 200, await got.clone().text());
-	assert.equal(got.headers.get("content-type"), "image/jpeg");
-	assert.match(fake.seen[0]!.urls[0]!, /\/files\/shared\/canvases\/ada\/old-notes\/pages\/notes\.html\?pass=/);
-	assert.equal((await fetch(`${served.url}/pictures/canvases/work/nowhere.html?pass=${served.token}`)).status, 404);
 	await served.close();
 	await s.close();
 });
@@ -207,6 +250,12 @@ test("rule 13: a picture to download is answered as bytes, with its box, and kep
 	}
 });
 
+test("rule 13: live=1 on a picture to download asks for the browser", async () => {
+	const { shotArgs } = await import("./download.ts");
+	assert.equal(shotArgs(new URLSearchParams("live=1")).live, true);
+	assert.equal(shotArgs(new URLSearchParams("scale=1")).live, undefined);
+});
+
 test("rule 14: posted markup is drawn at the card's own address, with a pass for that origin only", async () => {
 	const fake = fakeBrowser({ h: 1, words: 1 });
 	const s = await start(fake.browser);
@@ -222,17 +271,6 @@ test("rule 14: posted markup is drawn at the card's own address, with a pass for
 	await s.close();
 });
 
-test("rule 8: a card's picture comes from a screen showing it when one answers, else from its file", async () => {
-	const { testContext } = await import("../kernel/testing.ts");
-	const { seenCard } = await import("./shot.ts");
-	const png = Buffer.from("89504e470d0a1a0a0000000d49484452000000100000000801", "hex").toString("base64");
-	const answered = testContext({ call: (async (name: string) => (name === "view.screenshot" ? { how: "canvas", data: png, mime: "image/png" } : undefined)) as never });
-	const seen = await seenCard(answered, CARD, "work");
-	assert.equal(seen?.how, "canvas", "how is the screen's own word, canvas or snapshot");
-	assert.equal(seen?.bytes[0], 0x89);
-	assert.equal(await seenCard(testContext(), CARD, "work"), undefined, "no screen: the file is used");
-});
-
 test("rule 15: a card's own frame and a placeholder's dashed edge are drawn in the picture", async () => {
 	const { marks, ACCENT } = await import("./marks.ts");
 	const card: never = { type: "browser", id: "c", cornerRadius: 0, stroke: "#ff0000", strokeWidth: 6, strokeAlignment: "outer", effect: { type: "shadow", offset: { x: 0, y: 0 }, blur: 0, spread: 14, color: "#0000ff" }, metadata: { type: "decks.card" } } as never;
@@ -244,37 +282,6 @@ test("rule 15: a card's own frame and a placeholder's dashed edge are drawn in t
 	assert.match(named, /border: 2px dashed #2eaf5a/);
 	assert.match(named, /::before \{ content: "Ann";[^}]*background: #2eaf5a/);
 	assert.equal(marks([{ type: "browser", id: "plain", metadata: { type: "decks.card" } }], undefined), "", "a plain card keeps pen's frame");
-});
-
-test("rule 8: a card's path in a list names its item; a card alone as a PDF is the card on its canvas", async () => {
-	const fake = fakeBrowser({ h: 1, words: 1 });
-	const s = await start(fake.browser);
-	const both = await s.value<{ box: unknown }>("canvas.screenshot", { of: [CARD, "n1"] }, ann);
-	assert.deepEqual(both.box, { x1: 76, y1: 26, x2: 1324, y2: 974 });
-	const pdf = await s.value<{ box: unknown }>("canvas.screenshot", { of: CARD, format: "pdf" }, ann);
-	assert.deepEqual(pdf.box, { x1: 76, y1: 26, x2: 924, y2: 974 }, "the card's box with 24 px of paper");
-	assert.match(fake.seen.at(-1)!.html[0]!, /<iframe/);
-	await s.close();
-});
-
-test("rule 11: with astc=1 a card's picture is every size in ASTC blocks, kept once", async () => {
-	const { pack, MAGIC, encoder } = await import("./astc.ts");
-	const packed = Buffer.from(pack([{ width: 16, height: 16, rgba: new Uint8Array(1024) }, { width: 8, height: 8, rgba: new Uint8Array(256) }], [new Uint8Array(256), new Uint8Array(64)]));
-	assert.equal(packed.toString("ascii", 0, 4), MAGIC);
-	assert.deepEqual([packed.readUInt32LE(4), packed.readUInt32LE(8), packed.readUInt32LE(12), packed.readUInt32LE(16), packed.readUInt32LE(20)], [16, 16, 2, 256, 64]);
-	assert.equal(packed.length, 24 + 256 + 64);
-	assert.ok(encoder(), "astcenc is installed for this machine");
-});
-
-test("rule 4: fit waits for a height a script sets late, and stops waiting at 3 s", async () => {
-	const { steady } = await import("./fit.ts");
-	const heights = [400, 400, 733, 733, 733, 733, 733, 733];
-	let i = 0;
-	const read = async () => ({ h: heights[Math.min(i++, heights.length - 1)]!, words: 1 }) as never;
-	assert.equal((await steady(read, async () => {})).h, 733);
-	let n = 0;
-	const growing = async () => ({ h: n++, words: 1 }) as never;
-	assert.ok((await steady(growing, async () => {})).h <= 21, "a height that never holds is read for 3 s at most");
 });
 
 test("rule 16: fit answers from a fresh frame report at the card's width, without the browser", async () => {
@@ -293,10 +300,4 @@ test("rule 16: fit answers from a fresh frame report at the card's width, withou
 	assert.equal(fake.seen.length, 1, "a report at another width is not used");
 	await served.close();
 	await s.close();
-});
-
-test("rule 13: live=1 on a picture to download asks for the browser", async () => {
-	const { shotArgs } = await import("./download.ts");
-	assert.equal(shotArgs(new URLSearchParams("live=1")).live, true);
-	assert.equal(shotArgs(new URLSearchParams("scale=1")).live, undefined);
 });
