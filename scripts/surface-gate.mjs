@@ -16,7 +16,9 @@ import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SURFACE = ["surface-tokens.css", "canvas.css", "ink.css", "marks.css", "host.css"].map((f) => join(ROOT, "canvas/styles", f));
+/** A sheet, then the sheets it imports by a relative path, in order: a split sheet is read whole. */
+const withImports = (file) => [file, ...[...readFileSync(file, "utf8").matchAll(/@import\s+(?:url\()?["']?(\.[^"')\s]+)["']?\)?/g)].flatMap((m) => withImports(resolve(dirname(file), m[1])))];
+const SURFACE = ["surface-tokens.css", "canvas.css", "ink.css", "marks.css", "host.css"].flatMap((f) => withImports(join(ROOT, "canvas/styles", f)));
 const APP_ENTRY = join(ROOT, "harness/page/index.css");
 /** Set on elements by the canvas's scripts (`style.setProperty`, inline `--x`): the surface reads them, nobody themes them. */
 const RUNTIME = new Set(["--u", "--act", "--zoom", "--read-ms", "--card-size", "--hit", "--cursor-color", "--inset-left", "--dock", "--frame-dock"]);
