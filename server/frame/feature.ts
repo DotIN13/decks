@@ -5,7 +5,8 @@ import { DIST, staticRoutes } from "./static.ts";
 
 // The canvas page clients frame, and the pass its frame calls with.
 
-export type FrameOptions = { dist?: string; clock?: () => number };
+/** page: false leaves the canvas page to the host (Studio serves its own); the passes stay. */
+export type FrameOptions = { dist?: string; clock?: () => number; page?: boolean };
 
 export function frameFeature(options: FrameOptions = {}): Feature {
 	let kernel: Kernel | undefined;
@@ -22,7 +23,7 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 	return defineFeature({
 		name: "frame",
 		calls: [],
-		routes: [...staticRoutes(options.dist ?? DIST), passRoute(passes), passFilesRoute(passes, () => kernel?.url())],
+		routes: [...(options.page === false ? [] : staticRoutes(options.dist ?? DIST)), passRoute(passes), passFilesRoute(passes, () => kernel?.url())],
 		start(k) {
 			kernel = k;
 		},

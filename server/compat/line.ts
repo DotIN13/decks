@@ -14,7 +14,7 @@ type Said = Record<string, unknown>;
 type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
 
 /** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
-export const boundTo = (caller: Caller): string | undefined => (caller.id.startsWith("frame-") ? caller.canvas : undefined);
+export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
 
 export function lineRoute(deck: () => Deck): Route {
 	return {

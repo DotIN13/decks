@@ -19,8 +19,9 @@ The kernel and the protocol through their entries. No other feature.
 
 1. The page is served as built; nothing is built on a request. Without a build, the page answers
    503 with the command that builds it.
-2. A pass is a kernel token for the person on one canvas, its caller id `frame-<n>`. It lives an
-   hour, and is revoked then. Asking for one needs the person's own token.
+2. A pass is a kernel token for the asker on one canvas, its caller id `<asker id>~frame-<n>`,
+   issued only once `canvas.get` answers the asker. It lives an hour, then is revoked.
+   `frameFeature({ page: false })` keeps the passes and leaves the page to the host (Studio).
 3. A file on a pass is a file of that pass's canvas folder, or of the deck's `assets/` and
    `lib/`. Anything else is 404, and so is a pass that ran out.
 4. The page and its assets are public: an iframe and a module script send no token. Nothing on

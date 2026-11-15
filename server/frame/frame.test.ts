@@ -64,3 +64,25 @@ test("a canvas's lib/ on a pass is the deck's lib/", async () => {
 	await doors.close();
 	await server.close();
 });
+
+test("a pass names its asker, and page: false leaves the page to the host", async () => {
+	const server = await testServer({ features: [...features().filter((f) => f.name !== "frame"), frameFeature({ page: false })], deck });
+	const doors = await server.listen(0);
+	assert.equal((await fetch(`${doors.url}/canvas-frame.html`)).status, 404);
+	const got = (await (await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify({ canvas: "plan" }) })).json()) as { pass: string };
+	const who = await fetch(`${doors.url}/api/v1/agent.list`, { method: "POST", headers: { authorization: `Bearer ${got.pass}` }, body: "{}" });
+	assert.ok(who.status === 200);
+	await doors.close();
+	await server.close();
+});
+
+test("a pass's caller id starts with its asker's id", async () => {
+	const { Passes, isPass } = await import("./passes.ts");
+	const issued: Array<{ id: string; name: string; canvas?: string }> = [];
+	const passes = new Passes({ issue: (who) => (issued.push(who), "tok"), revoke: () => undefined, describe: () => undefined });
+	passes.issue("plan", { kind: "person", id: "acct-7", name: "Ada" });
+	assert.match(issued[0]!.id, /^acct-7~frame-\d+-/);
+	assert.equal(issued[0]!.name, "Ada");
+	assert.ok(isPass(issued[0]!.id) && !isPass("acct-7"));
+	passes.end("tok");
+});

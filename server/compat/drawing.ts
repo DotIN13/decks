@@ -58,7 +58,7 @@ export function drawingRoute(deck: () => Deck): Route {
 		prefix: DRAWING_PATH,
 		async serve(ctx, req, res) {
 			const canvas = decodeURIComponent((req.url ?? "").split("?")[0]!.slice(DRAWING_PATH.length));
-			const bound = ctx.caller.id.startsWith("frame-") ? ctx.caller.canvas : undefined;
+			const bound = /(^|~)frame-/.test(ctx.caller.id) ? ctx.caller.canvas : undefined;
 			const pass = bearer(req.headers.authorization);
 			const base = bound && pass ? `/api/t/${pass}/card/canvases/${canvas}/` : `/files/canvases/${canvas}/`;
 			const got = bound && bound !== canvas ? undefined : await ctx.call<{ rev?: number }>("canvas.get", { canvas }).catch(() => undefined);

@@ -1,6 +1,6 @@
 import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
-import type { Passes } from "./passes.ts";
+import { isPass, type Passes } from "./passes.ts";
 
 // POST /api/passes, /api/t/<pass>/card/<path> and /thumb/<path>, as today's server gives them
 // (README rules 2, 3). They are read through /files/ and /pictures/ on the same pass, so a card's
@@ -24,7 +24,7 @@ export function passRoute(passes: Passes): Route {
 		method: "POST",
 		prefix: "/api/passes",
 		async answer(ctx, _path, _query, body) {
-			if (ctx.caller.kind !== "person" || ctx.caller.id.startsWith("frame-")) return json(403, { error: "Only the person's own token asks for a canvas pass." });
+			if (ctx.caller.kind !== "person" || isPass(ctx.caller.id)) return json(403, { error: "Only the person's own token asks for a canvas pass." });
 			let canvas = "";
 			try {
 				canvas = String((JSON.parse(new TextDecoder().decode(body)) as { canvas?: unknown }).canvas ?? "");
@@ -34,7 +34,7 @@ export function passRoute(passes: Passes): Route {
 			const got = await ctx.call<{ name: string }>("canvas.get", { canvas }).catch(() => undefined);
 			if (!got) return json(404, { error: `There is no canvas called ${canvas}.` });
 			const imports = await importsOf(ctx);
-			return json(200, { ...passes.issue(got.name), ...(imports ? { imports } : {}) });
+			return json(200, { ...passes.issue(got.name, ctx.caller), ...(imports ? { imports } : {}) });
 		},
 	};
 }
