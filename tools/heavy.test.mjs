@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -70,4 +70,21 @@ test("without a command it prints its usage", () => {
 	const r = heavy([]).run();
 	assert.equal(r.status, 2);
 	assert.match(r.stderr, /usage/);
+});
+
+test("waiters take the lock in the order they came", async () => {
+	const { lock } = heavy([]);
+	const { spawn } = await import("node:child_process");
+	const { appendFileSync, readFileSync } = await import("node:fs");
+	mkdirSync(lock);
+	const order = join(lock, "..", "order");
+	const waiter = (name) => spawn(process.execPath, [HEAVY, "--wait", "--", "sh", "-c", `echo ${name} >> "${order}"`], { env: { ...process.env, HEAVY_LOCK: lock, HEAVY_FREE_GB: "50" } });
+	const a = waiter("a");
+	await new Promise((r) => setTimeout(r, 300));
+	const b = waiter("b");
+	await new Promise((r) => setTimeout(r, 300));
+	appendFileSync(order, "");
+	rmSync(lock, { recursive: true });
+	await Promise.all([a, b].map((c) => new Promise((r) => c.on("exit", r))));
+	assert.equal(readFileSync(order, "utf8"), "a\nb\n");
 });

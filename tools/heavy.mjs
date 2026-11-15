@@ -4,12 +4,12 @@
 // REWRITE_AGENT names the owner. HEAVY_LOCK, HEAVY_MIN_GB and HEAVY_FREE_GB (a fake free size) are for tests.
 import { spawn } from "node:child_process";
 import { constants } from "node:os";
-import { mkdirSync, readFileSync, rmSync, statSync, statfsSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, statfsSync, writeFileSync } from "node:fs";
 
 const LOCK = process.env.HEAVY_LOCK || "/tmp/decks-rewrite-heavy.lock";
 const MIN_GB = Number(process.env.HEAVY_MIN_GB || 8);
 const STALE_MS = 30 * 60 * 1000;
-const WAIT_MS = 10 * 1000;
+const WAIT_MS = 2 * 1000;
 const BUSY = 75;
 
 export function freeGb() {
@@ -35,14 +35,29 @@ function take() {
 
 const release = () => rmSync(LOCK, { recursive: true, force: true });
 
+const QUEUE = `${LOCK}.queue`;
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+/** Waiters take turns: a ticket per waiter, and only the oldest live one may take the lock. */
+function first(ticket) {
+	const live = readdirSync(QUEUE).sort().filter((name) => alive(Number(name.split("-")[1])) || (rmSync(`${QUEUE}/${name}`, { force: true }), false));
+	return live[0] === ticket;
+}
+
 async function acquire(wait) {
-	for (;;) {
-		if (take()) return true;
+	if (!wait) return take() || (console.error(`heavy: the lock is held (${holder()?.owner ?? "someone"}). Wait, or pass --wait.`), false);
+	mkdirSync(QUEUE, { recursive: true });
+	const ticket = `${String(Date.now()).padStart(15, "0")}-${process.pid}`;
+	writeFileSync(`${QUEUE}/${ticket}`, "");
+	const leave = () => rmSync(`${QUEUE}/${ticket}`, { force: true });
+	process.on("exit", leave);
+	for (let round = 0; ; round++) {
+		if (first(ticket) && take()) return leave(), true;
 		const h = holder();
 		const who = h ? `${h.owner}, ${h.minutes} min` : "just released";
 		if (h?.stale) console.error(`heavy: the lock is stale (${who}). Tell Mason; do not break it.`);
 		if (!wait) { console.error(`heavy: the lock is held (${who}). Wait, or pass --wait.`); return false; }
-		console.error(`heavy: waiting for the lock (${who})`);
+		if (round % 15 === 0) console.error(`heavy: waiting for the lock (${who})`);
 		await new Promise((r) => setTimeout(r, WAIT_MS));
 	}
 }
