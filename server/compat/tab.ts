@@ -10,7 +10,7 @@ import { pagesOf, readDrawing } from "./drawing.ts";
 export const TAB_PATH = "/ws";
 type Said = Record<string, unknown>;
 type AgentRow = { id: string; name: string; color?: string; kind?: string; state?: string; canvas?: string; workspace?: string; tags?: string[] };
-type Tab = { door: SocketDoor; deck: () => Deck; caller: Caller; client: Client; send(m: Said): void; focused?: string; known?: string[] };
+type Tab = { door: SocketDoor; deck: () => Deck; caller: Caller; client: Client; send(m: Said): void; focused?: string };
 
 export function tabRoute(deck: () => Deck): Route {
 	return {
@@ -58,7 +58,6 @@ async function inPlay(tab: Tab, canvas: string | undefined): Promise<string[]> {
 /** The roster today's page and checks read: every agent as a chat row, and which is focused. */
 async function roster(tab: Tab): Promise<AgentRow[]> {
 	const agents = await call<AgentRow[]>(tab, "agent.list", {});
-	tab.known = agents.map((a) => a.id);
 	if (!tab.focused || !agents.some((a) => a.id === tab.focused)) tab.focused = agents[0]?.id;
 	const chats = await Promise.all(agents.map(async (a) => ({ id: a.id, name: a.name, color: a.color, kind: a.kind ?? "pi", state: a.state ?? "idle", stage: a.canvas, workspace: a.workspace, tags: a.tags ?? [], unread: 0, inPlay: await inPlay(tab, a.canvas) })));
 	tab.send({ type: "agents", chats, ...(tab.focused ? { focused: tab.focused } : {}), defaultKind: "pi" });
@@ -66,14 +65,11 @@ async function roster(tab: Tab): Promise<AgentRow[]> {
 	return agents;
 }
 
-/** An agent's state is told as today's agent.state, one per agent; a new agent or any other change sends the roster. */
+/** An agent's state is told as today's agent.state, one per agent; then the roster and stages again. */
 async function agentHeard(tab: Tab, name: string, payload: Record<string, unknown>): Promise<void> {
 	const ids = Array.isArray(payload.ids) ? payload.ids.map(String) : [];
-	const known = new Set(tab.known ?? []);
-	if (name === "agent.changed" && typeof payload.state === "string") {
-		for (const id of ids) tab.send({ type: "agent.state", id, state: payload.state });
-		if (ids.every((id) => known.has(id))) return;
-	}
+	// A state rides on every change of an agent, its canvas too, so the roster and stages follow each one.
+	if (name === "agent.changed" && typeof payload.state === "string") for (const id of ids) tab.send({ type: "agent.state", id, state: payload.state });
 	if (name === "agent.deleted") for (const id of ids) tab.send({ type: "agent.removed", id });
 	await roster(tab);
 }
