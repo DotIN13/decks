@@ -70,7 +70,7 @@
 	"canvas/documents/build-live-doc.mjs: board": 1,
 	"canvas/documents/gview.ts: board": 1,
 	"canvas/documents/live-doc.ts: board": 11,
-	"canvas/documents/live.ts: board": 1,
+	"canvas/documents/live/input.ts: board": 1,
 	"canvas/documents/page.ts: board": 3,
 	"canvas/drawing/boxes.ts: board": 5,
 	"canvas/drawing/comment-text.ts: board": 11,
