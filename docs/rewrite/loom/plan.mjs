@@ -201,8 +201,9 @@ export function setJson(text, values, file = "a JSON file") {
 		const path = key.startsWith("[") ? JSON.parse(key) : key.split(".");
 		const last = path.pop();
 		let at = obj;
-		for (const k of path) at = at[k] ??= {};
-		if (v === null) delete at[last];
+		// Removing makes nothing on the way: a value that is not there is already removed.
+		for (const k of path) at = v === null ? at?.[k] : (at[k] ??= {});
+		if (v === null) { if (at) delete at[last]; }
 		else at[last] = v;
 	}
 	return `${JSON.stringify(obj, null, indent)}\n`;

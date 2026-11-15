@@ -161,6 +161,26 @@
 					"to": "\"../../canvas/cards/runtime/lib/\""
 				}
 			]
+		},
+		{
+			"file": "tools/gates/lib.mjs",
+			"replace": [
+				{
+					"from": "|^packages\\/card-host\\/lib\\/|",
+					"to": "|^canvas\\/cards\\/runtime\\/lib\\/|"
+				}
+			],
+			"why": "the card runtime's lib/, served as it is and partly vendored, was not source at its old place either"
+		},
+		{
+			"file": "scripts/dead-exports.mjs",
+			"replace": [
+				{
+					"from": "!/^(packages\\/card-host\\/lib|runtime\\/lib)\\//",
+					"to": "!/^(canvas\\/cards\\/runtime\\/lib|runtime\\/lib)\\//"
+				}
+			],
+			"why": "the same exemption for the dead-export scan"
 		}
 	],
 	"keep": [
@@ -182,7 +202,6 @@
 				"dependencies.katex": "0.16.47",
 				"dependencies.mermaid": "11.17.2",
 				"dependencies.pdfjs-dist": "5.7.284",
-				"dependencies.highlight.js": null,
 				"[\"dependencies\",\"highlight.js\"]": "11.12.0",
 				"scripts.vendor": "node cards/runtime/vendor.mjs"
 			}

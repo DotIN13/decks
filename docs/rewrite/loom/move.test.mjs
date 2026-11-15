@@ -291,3 +291,7 @@ test("--go moves the files a table takes out of a folder it removes, and deletes
 		assert.match(git("status", "--porcelain"), /^R {2}packages\/lib\/src\/extra\.ts -> shared\/extra\.ts$/m);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("removing a value through a path that is not there makes nothing", () => {
+	assert.equal(setJson('{\n\t"d": { "a": "1" }\n}\n', { "d.highlight.js": null }), '{\n\t"d": {\n\t\t"a": "1"\n\t}\n}\n');
+});
