@@ -83,7 +83,7 @@ async function readExtra(id: string): Promise<void> {
 	if (answer.value.queued) setQueued(id, answer.value.queued);
 	const dialog = answer.value.dialogs?.[0] as { id: string } | undefined;
 	ensureAgent(id);
-	setState("agents", id, "dialog", dialog as never);
+	if (dialog) setState("agents", id, "dialog", dialog as never);
 }
 
 async function readAgents(hooks: SyncHooks): Promise<void> {
