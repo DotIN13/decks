@@ -51,6 +51,10 @@
 		[
 			"packages/ink",
 			"canvas/ink"
+		],
+		[
+			"`@decks/ink`",
+			"`@decks/canvas/ink`"
 		]
 	],
 	"set": [

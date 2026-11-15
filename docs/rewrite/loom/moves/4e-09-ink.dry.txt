@@ -1,6 +1,6 @@
 # Step 4e-09-ink: Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink.ts is ink/model.ts
 
-Dry run on b8ce78d6, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards. Nothing was moved.
+Dry run on 28c22710, on top of 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
@@ -57,8 +57,8 @@ harness/page/canvases/CanvasOps.tsx:28
   - * `ink/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
   + * `ink/InkLayer.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
 tools/checks/library/ink-long-stroke.mjs:5
-  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `StageInk.tsx`),
-  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `InkLayer.tsx`),
+  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `StageInk.tsx`),
+  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `InkLayer.tsx`),
 tools/checks/library/pencil-then-finger.mjs:4
   - * The glass a stroke is drawn on (`StageInk.tsx`) had `touch-action: none` and lay over the whole
   + * The glass a stroke is drawn on (`InkLayer.tsx`) had `touch-action: none` and lay over the whole

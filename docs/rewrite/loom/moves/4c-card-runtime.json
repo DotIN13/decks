@@ -50,6 +50,10 @@
 		[
 			"`card-host/lib`",
 			"`canvas/cards/runtime/lib`"
+		],
+		[
+			"`@decks/card-host`",
+			"`@decks/canvas/cards-runtime`"
 		]
 	],
 	"localize": [

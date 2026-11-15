@@ -1,12 +1,12 @@
 # Step 4b-ink: canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes
 
-Dry run on b8ce78d6, on top of 4a-canvas. Nothing was moved.
+Dry run on 28c22710. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
 - files deleted: 2
-- files edited or created: 9
-- import lines rewritten: 7
+- files edited or created: 10
+- import lines rewritten: 8
 - warnings: 0
 
 ## Deleted
@@ -43,6 +43,9 @@ canvas/ink/index.ts:7
 canvas/ink/shaper.test.ts:16
   - } from "./ink.ts";
   + } from "./shaper.ts";
+tools/checks/library/ink-long-stroke.mjs:5
+  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `StageInk.tsx`),
+  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `StageInk.tsx`),
 
 ## Files the table edits or creates
 
