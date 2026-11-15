@@ -120,12 +120,26 @@ function rename(p) {
 	commit([...new Set([...old, ...touched, "package-lock.json"])], "Rename the new packages from @decks-next to @decks", `${p.renames.map((r) => r.to).join(", ")}; ${touched.length} files.${clash ? ` First, so no two workspaces share a name: ${clash}.` : ""}`);
 }
 
+/** CI as the new programs run it: the cascade step goes (the built gate orders the page's sheets), the comments say what runs. */
+export function ciFile(text) {
+	const swap = (from, to) => {
+		if (!text.includes(from)) throw new Error(`the CI file no longer says: ${from.slice(0, 60)}`);
+		text = text.replace(from, to);
+	};
+	swap(text.slice(text.indexOf("      # **The cascade gate, on its own line"), text.indexOf("      # **Three more gates")), "");
+	swap("      # **Three more gates, each its own line for the same reason.** An exported symbol nothing\n      # references, a class no markup writes, and a comment naming a file that no longer exists are\n      # the three kinds of residue a reorganization leaves behind and a reader pays for; typecheck\n      # and the tests are blind to all three. `scripts/dead-exports.mjs`, `dead-css.mjs` and\n      # `stale-paths.mjs` each exit 1 naming what they found.", "      # **The gates, on their own line.** The thirteen rules of tools/gates (sizes, names, imports,\n      # comments, the page's style order, residue such as a dead export or a stale file name and the\n      # rest), each against its baseline; typecheck and the tests are blind to all of them.");
+	swap("      # One command over every workspace: the two apps, the protocol, the board vocabulary,\n      # the runtime assets, the extension and the browser checks.", "      # One command over every workspace: the protocol, Decks-local, the harness and its page,\n      # the clients, the tools, and the libraries still in packages/.");
+	return text;
+}
+
 function root(gone) {
 	const r = rootFiles(gone);
 	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 	writeFileSync(join(ROOT, "package.json"), `${JSON.stringify({ ...pkg, workspaces: r.workspaces, scripts: r.scripts }, null, 2)}\n`);
+	const ci = join(ROOT, ".github/workflows/test.yml");
+	writeFileSync(ci, ciFile(readFileSync(ci, "utf8")));
 	gates();
-	commit(["package.json"], "Point the root scripts and workspaces at the new programs", r.ci);
+	commit(["package.json", ".github/workflows/test.yml"], "Point the root scripts, workspaces and CI at the new programs", r.ci);
 }
 
 async function main(argv) {

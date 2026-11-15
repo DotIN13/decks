@@ -192,7 +192,9 @@ function firstFailure(log, code) {
 
 async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
-	const named = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--kinds").map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
+	const asked = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--kinds").map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
+	// None named: every check with a place in checks.json that is not an agent's, a long one or a bench, as CI runs them.
+	const named = asked.length ? asked : Object.entries(JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks).filter(([, t]) => t.path && !t.agent && !t.named && !t.bench).map(([name]) => `${name}.mjs`);
 	// A check that starts an agent's turn runs only with --agent: it needs a model and may cost tokens.
 	const withAgent = argv.includes("--agent");
 	// --kinds claude starts the harness with a signed-in Claude instead of Pi on the fake model, for a check marked model.
