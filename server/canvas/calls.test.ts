@@ -245,3 +245,13 @@ test("a page already on the canvas is not inserted again", async () => {
 	assert.equal((await s.value<Item[]>("item.list", {}, ann)).filter((i) => i.type === "sticker").length, 1);
 	await s.close();
 });
+
+test("a page is named by its path, with or without the canvas's folder, or by its own folder", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	for (const name of ["canvases/plan/stickers/s1/index.html", "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1/"]) {
+		assert.equal((await s.value<Item>("item.get", { id: name }, ann)).id, "st", name);
+	}
+	assert.deepEqual(await s.value("item.delete", { id: "canvases/plan/stickers/s1" }, ann), { deleted: "canvases/plan/stickers/s1" });
+	await s.close();
+});

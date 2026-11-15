@@ -25,13 +25,20 @@ export function boxes(doc: PenDocument): Map<string, Box> {
 export function findId(doc: PenDocument, ref: string, where: Where): string | undefined {
 	const nodes = [...walk(doc.children)];
 	if (nodes.some((n) => n.id === ref)) return ref;
-	const prefix = `canvases/${where.canvas}/`;
+	const want = pageKey(ref, where.canvas);
 	for (const node of nodes) {
 		const item = where.kinds.toItem(node, where.canvas);
-		for (const path of [item.card, item.path]) if (typeof path === "string" && (path === ref || path === `${prefix}${ref}` || `${prefix}${path}` === ref)) return node.id;
+		for (const path of [item.card, item.path]) if (typeof path === "string" && pageKey(path, where.canvas) === want) return node.id;
 	}
 	if (ref.includes("/") && boxes(doc).has(ref)) return ref;
 	return undefined;
+}
+
+/** A page's path in one spelling: no canvas prefix, no trailing /index.html, so its folder names it too. */
+function pageKey(path: string, canvas: string): string {
+	const prefix = `canvases/${canvas}/`;
+	const local = path.startsWith(prefix) ? path.slice(prefix.length) : path;
+	return local.replace(/\/+$/, "").replace(/\/index\.html$/i, "");
 }
 
 function must(doc: PenDocument, ref: string, where: Where): string {
