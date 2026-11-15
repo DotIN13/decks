@@ -86,6 +86,19 @@ test("an agent takes a message, makes a card with the decks command, and reports
 	await until("idle again", async () => ((await person.call("agent.get", { agent: agent.id })).value as { state?: string }).state === "idle" || undefined);
 });
 
+test("a rewind takes the message back and gives its words to the composer", async () => {
+	const agent = ((await person.call("agent.list")).value as Array<{ id: string; name: string }>).find((one) => one.name === "Checker")!;
+	const heard: Array<{ name: string; payload: { text?: string } }> = [];
+	const stream = person.events((event) => heard.push(event as never), { events: ["chat.drafted"] });
+	await new Promise((r) => setTimeout(r, 300));
+	const user = await until("the message's runtime entry", async () => (await chat(agent.id)).find((one) => one.kind === "user" && (one as { entryId?: string }).entryId));
+	await person.call("chat.rewind", { agent: agent.id, entry: user.id });
+	const drafted = await until("chat.drafted", async () => heard.find((one) => one.name === "chat.drafted"), 5_000);
+	stream.stop();
+	assert.match(drafted.payload.text ?? "", /Make a card titled 'Harness check'/);
+	assert.equal((await chat(agent.id)).filter((one) => one.kind === "user").length, 0, "the message is gone from the transcript");
+});
+
 test("with the harness stopped, its calls answer unavailable", async () => {
 	harness.kill("SIGTERM");
 	await until("the harness to go", async () => (await person.call("runtime.list").then(() => undefined, (e: { code?: string }) => e.code)) as string | undefined);

@@ -19,15 +19,19 @@ function runtimeEntry(session: Session, entry: string): string {
 	return found.entryId;
 }
 
-export async function rewind(session: Session, entry: string): Promise<void> {
+/** Back to just before a message; answers its words, for the composer, or nothing when cancelled. */
+export async function rewind(session: Session, entry: string): Promise<string | undefined> {
 	await session.start();
 	if (!session.backend) throw Object.assign(new Error(`Not started: ${session.failure ?? "unknown reason"}`), { code: "unavailable" });
 	const shown = userEntry(session, entry)?.text;
 	const result = await session.backend.rewindTo(runtimeEntry(session, entry));
-	if (result.cancelled) return;
-	session.translator.truncateToUserMessage(result.editorText ?? shown);
+	if (result.cancelled) return undefined;
+	// The person's words, not the runtime's copy, which carries the news put in front of them.
+	const words = shown ?? result.editorText;
+	session.translator.truncateToUserMessage(words);
 	await session.backend.syncEntryIds();
 	session.flush();
+	return words ?? "";
 }
 
 /** A handle a new session can resume, holding the conversation up to that message. */

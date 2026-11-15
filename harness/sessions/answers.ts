@@ -41,7 +41,11 @@ export function chatAnswers(deps: ChatDeps): Record<string, Answerer> {
 		"chat.preview": async (args) => (args.entry === null ? { entry: null, cards: {} } : { entry: text(args.entry), cards: await cardsAt(one(args), text(args.entry)) }),
 		"chat.rewind": async (args) => {
 			const session = one(args);
-			await rewind(session, text(args.entry));
+			const words = await rewind(session, text(args.entry));
+			if (words !== undefined) {
+				deps.host.tell("chat.changed", { ids: [session.id], by: session.id, rev: Date.now() });
+				if (words) deps.host.tell("chat.drafted", { ids: [session.id], by: session.id, rev: Date.now(), text: words });
+			}
 			return agent(session.id);
 		},
 		"chat.fork": (args) => fork(deps, one(args), text(args.entry)),

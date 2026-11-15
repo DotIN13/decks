@@ -37,7 +37,8 @@ who it is and what it is given. A session knows nothing of where its agent sits 
    delta of its text or thinking while it streams. `rev` counts the agent's changes.
 10. The transcript is kept in the harness's own folder, never the deck: the last 500 entries, and an
     archive of older ones that `chat.list` pages back through.
-11. A rewind or fork goes back to a user message by the runtime's own session tree. Before the
+11. A rewind or fork goes back to a user message by the runtime's own session tree; a rewind
+    tells `chat.drafted` with that message's words, for the composer. Before the
     runtime hears a message, the session marks it with the settled version (`file.versions`, once
     its text matches the file's) of each file the agent's tool calls named. Preview and restore
     (`file.restore`) use that mark, else the version current at the message's time.
