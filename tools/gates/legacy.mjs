@@ -7,11 +7,6 @@ import { bump } from "./lib.mjs";
 
 export const SCRIPTS = ["dead-exports", "dead-css", "stale-paths", "surface-gate"];
 
-export function breaks(script, output) {
-	const lines = output.split("\n").filter((l) => /^\s{2,}\S/.test(l)).map((l) => l.trim().replace(/:\d+(?=[:\s])/g, ""));
-	return lines.length ? lines.map((l) => `${script}: ${l}`) : [`${script}: failed (${output.trim().split("\n")[0] || "no output"})`];
-}
-
 export default {
 	name: "legacy",
 	rule: "The repo's earlier gates: dead exports, dead CSS, stale paths, the canvas surface.",
@@ -27,3 +22,8 @@ export default {
 		return { counts, notes };
 	},
 };
+
+export function breaks(script, output) {
+	const lines = output.split("\n").filter((l) => /^\s{2,}\S/.test(l)).map((l) => l.trim().replace(/:\d+(?=[:\s])/g, ""));
+	return lines.length ? lines.map((l) => `${script}: ${l}`) : [`${script}: failed (${output.trim().split("\n")[0] || "no output"})`];
+}

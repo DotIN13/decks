@@ -9,6 +9,22 @@ import { rekeyed, splitKeys, stagedRenames, stagedSplit, units } from "./rekey.m
 
 export const GATES = ["size", "names", "imports", "calls", "readme", "comments", "commits", "parts", "state", "built", "lanes", "agents-md", "legacy"];
 
+export async function runGates({ root = ROOT, only, shrink = false, init = false, adopt, quiet = false } = {}) {
+	if (adopt && !MOVED.includes(adopt)) throw new Error(`--adopt takes a moved folder: ${MOVED.join(", ")}`);
+	const ctx = context(root);
+	const results = [];
+	for (const gate of await loadGates(only)) {
+		const { counts, notes } = gate.scan(ctx);
+		if (adopt) adoptBaseline(root, gate.name, counts, adopt);
+		else if (init || shrink) writeBaseline(root, gate.name, counts, !init);
+		const { over, fixed } = compare(counts, readBaseline(root, gate.name));
+		const problems = [...over.map((o) => (o.was ? `${o.key} (${o.n}, was ${o.was})` : o.key)), ...(adopt ? [] : grown(root, gate.name))];
+		results.push({ name: gate.name, rule: gate.rule, problems, fixed, notes });
+		if (!quiet) report(gate.name, problems, fixed, notes);
+	}
+	return results;
+}
+
 export async function loadGates(only) {
 	const names = only ? GATES.filter((g) => g === only) : GATES;
 	return Promise.all(names.map(async (n) => (await import(`./${n}.mjs`)).default));
@@ -30,22 +46,6 @@ export function grown(root, name) {
 	// A file split into new ones, all staged: its exceptions moved onto them, not gained, while their total holds.
 	const split = splitKeys(before, now, stagedSplit(root));
 	return Object.keys(now).filter((k) => now[k] > (before[k] ?? 0) && !split.has(k)).map((k) => `baseline gained ${k}`);
-}
-
-export async function runGates({ root = ROOT, only, shrink = false, init = false, adopt, quiet = false } = {}) {
-	if (adopt && !MOVED.includes(adopt)) throw new Error(`--adopt takes a moved folder: ${MOVED.join(", ")}`);
-	const ctx = context(root);
-	const results = [];
-	for (const gate of await loadGates(only)) {
-		const { counts, notes } = gate.scan(ctx);
-		if (adopt) adoptBaseline(root, gate.name, counts, adopt);
-		else if (init || shrink) writeBaseline(root, gate.name, counts, !init);
-		const { over, fixed } = compare(counts, readBaseline(root, gate.name));
-		const problems = [...over.map((o) => (o.was ? `${o.key} (${o.n}, was ${o.was})` : o.key)), ...(adopt ? [] : grown(root, gate.name))];
-		results.push({ name: gate.name, rule: gate.rule, problems, fixed, notes });
-		if (!quiet) report(gate.name, problems, fixed, notes);
-	}
-	return results;
 }
 
 function report(name, problems, fixed, notes) {

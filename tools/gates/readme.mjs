@@ -4,10 +4,36 @@
 import { lineCount } from "./lib.mjs";
 
 const TOPS = ["protocol", "server", "harness", "tools", "canvas", "engine", "pen", "ui", "clients"];
+
 const OLD_UNITS = /^(packages\/[^/]+|apps\/[^/]+|runtime|extension|e2e|scripts)$/;
+
 const SKIP = new Set(["calls", "checks", "baseline", "doors", "node_modules", "dist", "dist-gen", "src", "styles", "lib"]);
+
 const HEADINGS = ["owns", "may import", "rules", "check"];
+
 export const README_MAX = 60;
+
+export default {
+	name: "readme",
+	rule: "5. Every folder has a README of 60 lines at most: owns, may import, rules, how to check.",
+	scan(ctx) {
+		const counts = new Map();
+		for (const dir of folders(ctx.files)) {
+			const path = `${dir}/README.md`;
+			for (const p of problems(ctx.exists(path) ? ctx.read(path) : null)) counts.set(`${dir}: ${p}`, 1);
+		}
+		return { counts, notes: [] };
+	},
+};
+
+export function problems(text) {
+	if (text === null) return ["has no README.md"];
+	const out = [];
+	if (lineCount(text) > README_MAX) out.push(`README over ${README_MAX} lines`);
+	const heads = text.split("\n").filter((l) => /^#{1,4}\s/.test(l)).map((l) => l.toLowerCase());
+	for (const h of HEADINGS) if (!heads.some((l) => l.includes(h))) out.push(`README has no "${h}" heading`);
+	return out;
+}
 
 /** The folders the rule covers, found from the files in the tree. */
 export function folders(files) {
@@ -23,25 +49,3 @@ export function folders(files) {
 	}
 	return [...out].sort();
 }
-
-export function problems(text) {
-	if (text === null) return ["has no README.md"];
-	const out = [];
-	if (lineCount(text) > README_MAX) out.push(`README over ${README_MAX} lines`);
-	const heads = text.split("\n").filter((l) => /^#{1,4}\s/.test(l)).map((l) => l.toLowerCase());
-	for (const h of HEADINGS) if (!heads.some((l) => l.includes(h))) out.push(`README has no "${h}" heading`);
-	return out;
-}
-
-export default {
-	name: "readme",
-	rule: "5. Every folder has a README of 60 lines at most: owns, may import, rules, how to check.",
-	scan(ctx) {
-		const counts = new Map();
-		for (const dir of folders(ctx.files)) {
-			const path = `${dir}/README.md`;
-			for (const p of problems(ctx.exists(path) ? ctx.read(path) : null)) counts.set(`${dir}: ${p}`, 1);
-		}
-		return { counts, notes: [] };
-	},
-};

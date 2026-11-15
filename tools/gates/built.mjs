@@ -8,11 +8,6 @@ import { bump } from "./lib.mjs";
 
 const BUILT = /\.wasm$|(^|\/)(pkg|pkg-gl|dist|dist-gen|dist-packages|target)\/|\.(bundle|min)\.(js|css)$/;
 
-function tracked(root, files) {
-	if (!existsSync(join(root, ".git"))) return files;
-	return execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);
-}
-
 export default {
 	name: "built",
 	rule: "10. Nothing built is in git; styles are scoped to their part.",
@@ -25,3 +20,8 @@ export default {
 		return { counts, notes: ["Not checked: style order outside harness/page; today's scripts/css-order.mjs still orders the old sheets."] };
 	},
 };
+
+function tracked(root, files) {
+	if (!existsSync(join(root, ".git"))) return files;
+	return execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);
+}

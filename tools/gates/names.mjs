@@ -5,36 +5,24 @@ import { readFileSync } from "node:fs";
 import { bump, isSource } from "./lib.mjs";
 
 const FALLBACK = ["board", "stage"];
+
 /** Where one word may stay: the Rust engine's crates keep "stage" (DESIGN.md section 5, Words). */
 const KEEPS = { stage: /^(engine|packages\/stage)\// };
+
 const TEXT = /\.(ts|tsx|mts|mjs|js|cjs|css|html|md|json|rs|swift)$/;
+
 const EXEMPT = /(^|\/)(compat|upgrade)\/|^protocol\/glossary\.ts$|^AGENTS\.md$|^tools\/gates\/|^docs\/rewrite\//;
 
 /** Markup class names that keep a retired word, by rule (markup-names.json): passed only where they are markup. */
 export const MARKUP = JSON.parse(readFileSync(new URL("./markup-names.json", import.meta.url), "utf8")).names;
+
 const longest = [...MARKUP].sort((a, b) => b.length - a.length).map((n) => n.replace(/-/g, "\\-")).join("|");
+
 const SELECTOR = new RegExp(`(?<![\\w$)\\]])\\.(?:${longest})(?![\\w-])`, "g");
+
 const CLASS_WORD = new RegExp(`(?<![\\w-])(?:${longest})(?![\\w-])`, "g");
+
 const CLASS_TEXT = /(\bclass(?:Name)?\s*[=:]\s*)(["'`])([^"'`]*)\2|(\bclassList\.\w+\()([^)]*)\)/g;
-
-/** The text with the markup names taken out of selectors, class attributes, className and classList calls. */
-export function withoutMarkup(text) {
-	return text.replace(SELECTOR, " ").replace(CLASS_TEXT, (all, attr, q, words, call, args) =>
-		attr !== undefined ? `${attr}${q}${words.replace(CLASS_WORD, " ")}${q}` : `${call}${args.replace(CLASS_WORD, " ")})`);
-}
-
-export function retiredWords({ exists, read }) {
-	if (!exists("protocol/glossary.ts")) return { words: FALLBACK, from: "the fallback list (protocol/glossary.ts does not exist yet)" };
-	const text = read("protocol/glossary.ts");
-	const block = text.slice(text.indexOf("retired"));
-	const words = [...block.matchAll(/word:\s*["'`]([A-Za-z]+\.?)["'`]/g)].map((m) => m[1].toLowerCase());
-	return words.length ? { words, from: "protocol/glossary.ts" } : { words: FALLBACK, from: "the fallback list (no `retired` words found)" };
-}
-
-/** Lower-case words of a text, with identifiers split at case changes, digits and underscores. */
-export function tokens(text) {
-	return text.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").toLowerCase().split(/[^a-z]+/);
-}
 
 export default {
 	name: "names",
@@ -57,3 +45,22 @@ export default {
 		return { counts, notes: [`Retired words from ${from}: ${words.join(", ")}.`, `Markup names kept by rule (markup-names.json): ${MARKUP.length}.`] };
 	},
 };
+
+export function retiredWords({ exists, read }) {
+	if (!exists("protocol/glossary.ts")) return { words: FALLBACK, from: "the fallback list (protocol/glossary.ts does not exist yet)" };
+	const text = read("protocol/glossary.ts");
+	const block = text.slice(text.indexOf("retired"));
+	const words = [...block.matchAll(/word:\s*["'`]([A-Za-z]+\.?)["'`]/g)].map((m) => m[1].toLowerCase());
+	return words.length ? { words, from: "protocol/glossary.ts" } : { words: FALLBACK, from: "the fallback list (no `retired` words found)" };
+}
+
+/** Lower-case words of a text, with identifiers split at case changes, digits and underscores. */
+export function tokens(text) {
+	return text.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").toLowerCase().split(/[^a-z]+/);
+}
+
+/** The text with the markup names taken out of selectors, class attributes, className and classList calls. */
+export function withoutMarkup(text) {
+	return text.replace(SELECTOR, " ").replace(CLASS_TEXT, (all, attr, q, words, call, args) =>
+		attr !== undefined ? `${attr}${q}${words.replace(CLASS_WORD, " ")}${q}` : `${call}${args.replace(CLASS_WORD, " ")})`);
+}

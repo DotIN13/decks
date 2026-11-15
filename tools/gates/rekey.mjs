@@ -12,6 +12,34 @@ import { ROOT, readBaseline } from "./lib.mjs";
 /** A key's path: "path: what", or "stale-paths: path: what" for the legacy gate. */
 const PREFIX = /^(stale-paths: )?([^:]+)(:.*)?$/;
 
+/** Every baseline re-keyed by pairs; a key landing on one already there adds its count. Answers the keys moved. */
+export function rekey(root, pairs) {
+	const dir = join(root, "tools/gates/baseline");
+	let count = 0;
+	const moving = units(pairs);
+	for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+		const name = file.replace(/\.json$/, "");
+		const next = {};
+		for (const [key, n] of Object.entries(readBaseline(root, name))) {
+			const to = rekeyed(key, pairs, moving);
+			if (to !== key) count++;
+			next[to] = (next[to] ?? 0) + n;
+		}
+		const sorted = Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)));
+		writeFileSync(join(dir, file), `${JSON.stringify(sorted, null, "\t")}\n`);
+	}
+	return count;
+}
+
+/** One key with its path moved by the pairs, and the old units its text names (the imports gate's) moved with them. */
+export function rekeyed(key, pairs, moves = units(pairs)) {
+	const [, legacy = "", path, rest = ""] = PREFIX.exec(key) ?? [];
+	if (path === undefined) return key;
+	let text = rest;
+	for (const [unit, now] of moves) text = text.replace(new RegExp(`(?<![\\w/.-])${unit.replace("/", "\\/")}(?![\\w/.-])`, "g"), now);
+	return `${legacy}${moved(path, pairs)}${text}`;
+}
+
 /** The path moved by the first pair that names it: the same file, or a file under a moved folder. */
 export function moved(path, pairs) {
 	for (const [from, to] of pairs) {
@@ -35,32 +63,10 @@ export function units(pairs) {
 	return out;
 }
 
-/** One key with its path moved by the pairs, and the old units its text names (the imports gate's) moved with them. */
-export function rekeyed(key, pairs, moves = units(pairs)) {
-	const [, legacy = "", path, rest = ""] = PREFIX.exec(key) ?? [];
-	if (path === undefined) return key;
-	let text = rest;
-	for (const [unit, now] of moves) text = text.replace(new RegExp(`(?<![\\w/.-])${unit.replace("/", "\\/")}(?![\\w/.-])`, "g"), now);
-	return `${legacy}${moved(path, pairs)}${text}`;
-}
-
-/** Every baseline re-keyed by pairs; a key landing on one already there adds its count. Answers the keys moved. */
-export function rekey(root, pairs) {
-	const dir = join(root, "tools/gates/baseline");
-	let count = 0;
-	const moving = units(pairs);
-	for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
-		const name = file.replace(/\.json$/, "");
-		const next = {};
-		for (const [key, n] of Object.entries(readBaseline(root, name))) {
-			const to = rekeyed(key, pairs, moving);
-			if (to !== key) count++;
-			next[to] = (next[to] ?? 0) + n;
-		}
-		const sorted = Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)));
-		writeFileSync(join(dir, file), `${JSON.stringify(sorted, null, "\t")}\n`);
-	}
-	return count;
+/** The renames staged in git, as [old, new] pairs. */
+export function stagedRenames(root) {
+	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
+	return out.split("\n").filter((l) => /^R\d*\t/.test(l)).map((l) => l.split("\t").slice(1, 3));
 }
 
 /** The files staged as added and as modified (renames aside), for the growth check's reading of a split. */
@@ -86,12 +92,6 @@ export function splitKeys(before, now, split) {
 	};
 	const was = total(before, modified), is = total(now, new Set([...added, ...modified]));
 	return new Set(Object.keys(now).filter((k) => added.has(pathOf(k)) && (is.get(kindOf(k)) ?? 0) <= (was.get(kindOf(k)) ?? 0)));
-}
-
-/** The renames staged in git, as [old, new] pairs. */
-export function stagedRenames(root) {
-	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
-	return out.split("\n").filter((l) => /^R\d*\t/.test(l)).map((l) => l.split("\t").slice(1, 3));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {

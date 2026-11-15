@@ -3,6 +3,18 @@
 import ts from "typescript";
 import { CODE, bump, isSource } from "./lib.mjs";
 
+export default {
+	name: "state",
+	rule: "9. Changing values live in a store, never loose at the top of a file.",
+	scan({ files, read }) {
+		const counts = new Map();
+		for (const f of files.filter((f) => isSource(f) && CODE.test(f) && !/\.test\./.test(f))) {
+			for (const name of looseValues(f, read(f))) bump(counts, `${f}: top-level let ${name}`);
+		}
+		return { counts, notes: ["Not checked: a top-level const Map, array or object changed later.", "Test files are not counted."] };
+	},
+};
+
 export function looseValues(path, text) {
 	const sf = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false, /\.tsx$/.test(path) ? ts.ScriptKind.TSX : undefined);
 	const names = [];
@@ -15,15 +27,3 @@ export function looseValues(path, text) {
 	}
 	return names;
 }
-
-export default {
-	name: "state",
-	rule: "9. Changing values live in a store, never loose at the top of a file.",
-	scan({ files, read }) {
-		const counts = new Map();
-		for (const f of files.filter((f) => isSource(f) && CODE.test(f) && !/\.test\./.test(f))) {
-			for (const name of looseValues(f, read(f))) bump(counts, `${f}: top-level let ${name}`);
-		}
-		return { counts, notes: ["Not checked: a top-level const Map, array or object changed later.", "Test files are not counted."] };
-	},
-};

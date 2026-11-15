@@ -4,16 +4,6 @@ import { lineCount } from "./lib.mjs";
 
 export const AGENTS_MAX = 150;
 
-export function namedPaths(text) {
-	const out = [];
-	for (const m of text.matchAll(/`([^`\n]+)`/g)) {
-		const w = m[1].trim();
-		if (/[<>*\s{}|$]/.test(w) || /^(node|npm|git|decks)\b/.test(w)) continue;
-		if (/^[\w.@-]+(\/[\w.@-]*)+$/.test(w) || /^[\w.-]+\.(md|json|ts|tsx|mjs|css|rs)$/.test(w)) out.push(w.replace(/\/$/, ""));
-	}
-	return out;
-}
-
 export default {
 	name: "agents-md",
 	rule: "AGENTS.md is 150 lines at most and names only paths that exist.",
@@ -26,3 +16,13 @@ export default {
 		return { counts, notes: [] };
 	},
 };
+
+export function namedPaths(text) {
+	const out = [];
+	for (const m of text.matchAll(/`([^`\n]+)`/g)) {
+		const w = m[1].trim();
+		if (/[<>*\s{}|$]/.test(w) || /^(node|npm|git|decks)\b/.test(w)) continue;
+		if (/^[\w.@-]+(\/[\w.@-]*)+$/.test(w) || /^[\w.-]+\.(md|json|ts|tsx|mjs|css|rs)$/.test(w)) out.push(w.replace(/\/$/, ""));
+	}
+	return out;
+}

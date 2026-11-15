@@ -7,58 +7,25 @@ import { constants } from "node:os";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, statfsSync, writeFileSync } from "node:fs";
 
 const LOCK = () => process.env.HEAVY_LOCK || "/tmp/decks-rewrite-heavy.lock";
-const MIN_GB = () => Number(process.env.HEAVY_MIN_GB || 8);
-export const CHECK_SLOTS = 2;
-const STALE_MS = 30 * 60 * 1000;
-const WAIT_MS = 2 * 1000;
-const BUSY = 75;
 
-export function freeGb() {
-	if (process.env.HEAVY_FREE_GB) return Number(process.env.HEAVY_FREE_GB);
-	const fs = statfsSync("/System/Volumes/Data", { bigint: false });
-	return (fs.bavail * fs.bsize) / 1024 ** 3;
-}
+const MIN_GB = () => Number(process.env.HEAVY_MIN_GB || 8);
+
+export const CHECK_SLOTS = 2;
+
+const STALE_MS = 30 * 60 * 1000;
+
+const WAIT_MS = 2 * 1000;
+
+const BUSY = 75;
 
 /** The slot folders: slot 0, the exclusive one, is the lock itself as before; check slots sit beside it. */
 const slotDir = (slot) => (slot === 0 ? LOCK() : `${LOCK()}.check-${slot}`);
+
 const CHECKS = Array.from({ length: CHECK_SLOTS }, (_, i) => i + 1);
+
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
 const ownerOf = (dir) => { try { return readFileSync(`${dir}/owner`, "utf8").trim(); } catch { return ""; } };
-
-/** Whether a slot is held: its folder is there and its owner still runs; a dead owner's folder is cleared. */
-function held(slot) {
-	const dir = slotDir(slot);
-	if (!existsSync(dir)) return false;
-	const pid = Number(/pid (\d+)/.exec(ownerOf(dir))?.[1]);
-	if (pid && !alive(pid)) return void rmSync(dir, { recursive: true, force: true }), false;
-	return true;
-}
-
-/** Take a free slot of the class, then back off if the other class holds one, so the two never overlap. */
-function take(cls) {
-	for (const slot of cls === "check" ? CHECKS : [0]) {
-		try { mkdirSync(slotDir(slot)); } catch (e) { if (e.code === "EEXIST" && held(slot)) continue; if (e.code !== "EEXIST") throw e; continue; }
-		writeFileSync(`${slotDir(slot)}/owner`, `${process.env.REWRITE_AGENT || "someone"} ${cls} ${new Date().toISOString()} pid ${process.pid}\n`);
-		const clash = cls === "check" ? held(0) : CHECKS.some(held);
-		if (clash) { rmSync(slotDir(slot), { recursive: true, force: true }); return undefined; }
-		return slot;
-	}
-	return undefined;
-}
-
-function holders() {
-	return [0, ...CHECKS].filter((s) => existsSync(slotDir(s))).map((s) => {
-		const minutes = Math.round((Date.now() - statSync(slotDir(s)).mtimeMs) / 60000);
-		return `${ownerOf(slotDir(s)).split(" ").slice(0, 2).join(" ")}, ${minutes} min${minutes * 60000 > STALE_MS ? " (stale: tell Mason)" : ""}`;
-	});
-}
-
-/** Tickets in order: the oldest may go; a check may also go while every older ticket is a check. */
-function mayTry(queue, ticket, cls) {
-	const live = readdirSync(queue).sort().filter((name) => alive(Number(name.split("-")[1])) || (rmSync(`${queue}/${name}`, { force: true }), false));
-	const older = live.slice(0, live.indexOf(ticket));
-	return older.length === 0 || (cls === "check" && older.every((name) => name.endsWith("-check")));
-}
 
 /** A slot of a class: { slot, release }, waiting in turn; undefined when not waiting and none is free. */
 export async function acquire({ cls = "exclusive", wait = true } = {}) {
@@ -89,6 +56,47 @@ export async function acquire({ cls = "exclusive", wait = true } = {}) {
 export async function withSlot(cls, work) {
 	const got = await acquire({ cls });
 	try { return await work(got.slot); } finally { got.release(); }
+}
+
+/** Tickets in order: the oldest may go; a check may also go while every older ticket is a check. */
+function mayTry(queue, ticket, cls) {
+	const live = readdirSync(queue).sort().filter((name) => alive(Number(name.split("-")[1])) || (rmSync(`${queue}/${name}`, { force: true }), false));
+	const older = live.slice(0, live.indexOf(ticket));
+	return older.length === 0 || (cls === "check" && older.every((name) => name.endsWith("-check")));
+}
+
+/** Take a free slot of the class, then back off if the other class holds one, so the two never overlap. */
+function take(cls) {
+	for (const slot of cls === "check" ? CHECKS : [0]) {
+		try { mkdirSync(slotDir(slot)); } catch (e) { if (e.code === "EEXIST" && held(slot)) continue; if (e.code !== "EEXIST") throw e; continue; }
+		writeFileSync(`${slotDir(slot)}/owner`, `${process.env.REWRITE_AGENT || "someone"} ${cls} ${new Date().toISOString()} pid ${process.pid}\n`);
+		const clash = cls === "check" ? held(0) : CHECKS.some(held);
+		if (clash) { rmSync(slotDir(slot), { recursive: true, force: true }); return undefined; }
+		return slot;
+	}
+	return undefined;
+}
+
+/** Whether a slot is held: its folder is there and its owner still runs; a dead owner's folder is cleared. */
+function held(slot) {
+	const dir = slotDir(slot);
+	if (!existsSync(dir)) return false;
+	const pid = Number(/pid (\d+)/.exec(ownerOf(dir))?.[1]);
+	if (pid && !alive(pid)) return void rmSync(dir, { recursive: true, force: true }), false;
+	return true;
+}
+
+function holders() {
+	return [0, ...CHECKS].filter((s) => existsSync(slotDir(s))).map((s) => {
+		const minutes = Math.round((Date.now() - statSync(slotDir(s)).mtimeMs) / 60000);
+		return `${ownerOf(slotDir(s)).split(" ").slice(0, 2).join(" ")}, ${minutes} min${minutes * 60000 > STALE_MS ? " (stale: tell Mason)" : ""}`;
+	});
+}
+
+export function freeGb() {
+	if (process.env.HEAVY_FREE_GB) return Number(process.env.HEAVY_FREE_GB);
+	const fs = statfsSync("/System/Volumes/Data", { bigint: false });
+	return (fs.bavail * fs.bsize) / 1024 ** 3;
 }
 
 function run(cmd, cls) {

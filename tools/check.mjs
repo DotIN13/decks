@@ -7,21 +7,8 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
-const SKIP = new Set(["node_modules", "dist", "dist-gen", "fixtures", ".scratch"]);
 
-/** Test files under dir; a folder with its own package.json is another project, checked by itself. */
-export function testFiles(dir) {
-	const out = [];
-	for (const name of readdirSync(dir)) {
-		if (SKIP.has(name) || name.startsWith(".")) continue;
-		const path = join(dir, name);
-		if (statSync(path).isDirectory()) {
-			if (!existsSync(join(path, "package.json"))) out.push(...testFiles(path));
-		}
-		else if (/\.test\.(ts|mts|mjs)$/.test(name)) out.push(path);
-	}
-	return out.sort();
-}
+const SKIP = new Set(["node_modules", "dist", "dist-gen", "fixtures", ".scratch"]);
 
 function typeCheck(dir) {
 	const configs = ["tsconfig.json", "tsconfig.test.json"].filter((c) => existsSync(join(dir, c)));
@@ -45,6 +32,20 @@ function unitTests(dir) {
 	if (!files.length) return { ok: true, note: "no tests yet" };
 	const r = spawnSync(process.execPath, ["--import", "tsx", "--test", ...files], { cwd: ROOT, stdio: "inherit" });
 	return { ok: r.status === 0, note: `${files.length} test files ${r.status === 0 ? "pass" : "fail"}` };
+}
+
+/** Test files under dir; a folder with its own package.json is another project, checked by itself. */
+export function testFiles(dir) {
+	const out = [];
+	for (const name of readdirSync(dir)) {
+		if (SKIP.has(name) || name.startsWith(".")) continue;
+		const path = join(dir, name);
+		if (statSync(path).isDirectory()) {
+			if (!existsSync(join(path, "package.json"))) out.push(...testFiles(path));
+		}
+		else if (/\.test\.(ts|mts|mjs)$/.test(name)) out.push(path);
+	}
+	return out.sort();
 }
 
 function main(arg) {

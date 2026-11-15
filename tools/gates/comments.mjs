@@ -5,7 +5,42 @@ import ts from "typescript";
 import { CODE, bump, isSource } from "./lib.mjs";
 
 export const COMMENT_MAX = 5;
+
 const STYLE = /\.(css|rs|wgsl|swift)$/;
+
+export default {
+	name: "comments",
+	rule: "6. A comment states the rule in 5 lines or fewer; no em dashes.",
+	scan({ files, read }) {
+		const counts = new Map();
+		for (const f of files.filter(isSource)) {
+			if (f.endsWith(".md")) {
+				const n = (read(f).match(/—/g) || []).length;
+				if (n) bump(counts, `${f}: em dash`, n);
+				continue;
+			}
+			if (!CODE.test(f) && !STYLE.test(f)) continue;
+			for (const c of comments(f, read(f))) {
+				if (c.to - c.from + 1 > COMMENT_MAX) bump(counts, `${f}: comment over ${COMMENT_MAX} lines`);
+				const dashes = (c.text.match(/—/g) || []).length;
+				if (dashes) bump(counts, `${f}: em dash`, dashes);
+			}
+		}
+		return { counts, notes: [] };
+	},
+};
+
+/** Comments with touching line comments joined, each as its first and last line and its words. */
+export function comments(path, text) {
+	const raw = CODE.test(path) ? tsComments(path, text) : styleComments(text);
+	const out = [];
+	for (const c of raw) {
+		const last = out[out.length - 1];
+		if (last && c.single && last.single && c.from === last.to + 1) Object.assign(last, { to: c.to, text: `${last.text}\n${c.text}` });
+		else out.push({ ...c });
+	}
+	return out;
+}
 
 function tsComments(path, text) {
 	const sf = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(path) ? ts.ScriptKind.TSX : undefined);
@@ -39,37 +74,3 @@ function styleComments(text) {
 	}
 	return out;
 }
-
-/** Comments with touching line comments joined, each as its first and last line and its words. */
-export function comments(path, text) {
-	const raw = CODE.test(path) ? tsComments(path, text) : styleComments(text);
-	const out = [];
-	for (const c of raw) {
-		const last = out[out.length - 1];
-		if (last && c.single && last.single && c.from === last.to + 1) Object.assign(last, { to: c.to, text: `${last.text}\n${c.text}` });
-		else out.push({ ...c });
-	}
-	return out;
-}
-
-export default {
-	name: "comments",
-	rule: "6. A comment states the rule in 5 lines or fewer; no em dashes.",
-	scan({ files, read }) {
-		const counts = new Map();
-		for (const f of files.filter(isSource)) {
-			if (f.endsWith(".md")) {
-				const n = (read(f).match(/—/g) || []).length;
-				if (n) bump(counts, `${f}: em dash`, n);
-				continue;
-			}
-			if (!CODE.test(f) && !STYLE.test(f)) continue;
-			for (const c of comments(f, read(f))) {
-				if (c.to - c.from + 1 > COMMENT_MAX) bump(counts, `${f}: comment over ${COMMENT_MAX} lines`);
-				const dashes = (c.text.match(/—/g) || []).length;
-				if (dashes) bump(counts, `${f}: em dash`, dashes);
-			}
-		}
-		return { counts, notes: [] };
-	},
-};

@@ -5,9 +5,24 @@
 import { CODE, bump, isSource } from "./lib.mjs";
 
 const DEFINE = /defineCall\s*\(\s*\{[^}]*?name:\s*["']([\w.]+)["']/gs;
+
 const HANDLE = /\bhandle\s*\(\s*([\w.$]+)\s*,/g;
+
 const TEST = /\.test\.[a-z]+$/;
+
 const OLD_TABLES = ["packages/api/src/verbs.ts", "packages/api/src/person.ts"];
+
+export default {
+	name: "calls",
+	rule: "4. A call is declared once in the protocol and handled once; everything else is generated.",
+	scan(ctx) {
+		const counts = new Map();
+		declarations(ctx, counts);
+		handlers(ctx, counts);
+		oldTables(ctx, counts);
+		return { counts, notes: ["Not checked: that the clients' call lists are generated, not written by hand."] };
+	},
+};
 
 function declarations(ctx, counts) {
 	const seen = new Map();
@@ -37,15 +52,3 @@ function oldTables(ctx, counts) {
 	if (names.length < 2) return;
 	for (const n of names[0]) if (names[1].has(n)) bump(counts, `${OLD_TABLES[1]}: declares ${n} again`);
 }
-
-export default {
-	name: "calls",
-	rule: "4. A call is declared once in the protocol and handled once; everything else is generated.",
-	scan(ctx) {
-		const counts = new Map();
-		declarations(ctx, counts);
-		handlers(ctx, counts);
-		oldTables(ctx, counts);
-		return { counts, notes: ["Not checked: that the clients' call lists are generated, not written by hand."] };
-	},
-};
