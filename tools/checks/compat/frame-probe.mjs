@@ -20,6 +20,7 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	page.on("pageerror", (e) => said.push(`pageerror: ${e.message.slice(0, 200)}`));
 	page.on("requestfailed", (r) => said.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText ?? ""}`));
 	page.on("response", (r) => r.status() >= 400 && said.push(`${r.status()}: ${r.url().slice(0, 160)}`));
+	page.on("request", (r) => r.method() === "POST" && said.push(`post: ${r.url().slice(0, 120)} ${(r.postData() ?? "").slice(0, 160)}`));
 	page.on("websocket", (ws) => {
 		ws.on("framesent", (f) => String(f.payload).includes("line.call") && said.push(`sent: ${String(f.payload).slice(0, 220)}`));
 		ws.on("framereceived", (f) => String(f.payload).includes("call.answered") && said.push(`got: ${String(f.payload).slice(0, 220)}`));
@@ -41,13 +42,12 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	if (!frame) throw new Error(`the frame never showed its stage (frame page asked ${served.length} times)\n${said.slice(0, 30).join("\n")}`);
 	const before = xOf(deck);
 	// Selected as today's checks select a card (e2e/harness.mjs selectCard: a spot on it, clear of the
-	// page's chrome), left with Escape, then nudged with the arrows.
+	// page's chrome), the focus given to the canvas, then nudged with the arrows.
 	process.env.DECKS_E2E_WEB = `http://127.0.0.1:${ports.web}`;
-	const { selectCard } = await import("../../../e2e/harness.mjs");
+	const { focusCanvas, selectCard } = await import("../../../e2e/harness.mjs");
 	const drawn = await selectCard(page, card).then(() => true, () => false);
 	await page.waitForTimeout(400);
-	await page.keyboard.press("Escape");
-	await page.waitForTimeout(300);
+	await focusCanvas(page);
 	for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
 	let after = before;
 	for (let i = 0; i < 40 && after === before; i++) {
