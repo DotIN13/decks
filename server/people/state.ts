@@ -2,6 +2,7 @@ import { Refused, events, type AnyEvent, type Caller, type Payload } from "../..
 import { LOCAL_PERSON } from "../kernel/index.ts";
 import type { Context, Kernel, Store, Tokens } from "../kernel/types.ts";
 import { Answers } from "./answers.ts";
+import { Presence } from "./presence.ts";
 import { Hosts } from "./hosts.ts";
 import { Mailboxes } from "./mail.ts";
 import { Marks } from "./news.ts";
@@ -15,6 +16,8 @@ export class People {
 	readonly hosts = new Hosts();
 	readonly screens = new Screens();
 	readonly answers = new Answers();
+	readonly presence = new Presence();
+	private events: Kernel["events"] | undefined;
 	readonly roster: Roster;
 	readonly mail: Mailboxes;
 	readonly marks: Marks;
@@ -30,6 +33,7 @@ export class People {
 
 	static async start(kernel: Kernel): Promise<People> {
 		const people = new People(kernel.store("people"), kernel.callers);
+		people.events = kernel.events;
 		await Promise.all([people.roster.load(), people.mail.load(), people.marks.load()]);
 		kernel.callers.describe("agent", (id) => people.roster.callerOf(id));
 		kernel.relay((call) => people.hosts.answerer(call));
@@ -51,6 +55,7 @@ export class People {
 				this.hosts.drop(client.id);
 				this.screens.drop(client.id);
 				this.answers.drop(client.id);
+				this.left(client.id, ctx.caller);
 			});
 		}
 		return client.id;
@@ -76,6 +81,14 @@ export class People {
 		const record = (follows ? this.roster.byIdOrUndefined(follows) : undefined) ?? this.roster.all().at(-1);
 		if (!record) throw new Refused("not_found", "There is no agent yet to answer for.", "agent.list");
 		return record;
+	}
+
+	/** A line that spoke on a canvas has gone: the others there hear it leave. */
+	private left(client: string, who: Caller): void {
+		const canvas = this.presence.leave(client);
+		if (!canvas || !this.events) return;
+		const others = this.screens.drawing(canvas).map((s) => s.client).filter((c) => c !== client);
+		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true }, { clients: others });
 	}
 
 	/** The record of the agent calling; refused for anyone else. */

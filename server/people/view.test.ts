@@ -126,3 +126,21 @@ test("a canvas frame's own line can draw a card but is no screen to count", asyn
 	assert.equal(s.callers.resolve(s.token(person))?.canvas, "a");
 	await s.close();
 });
+
+test("a line's pointer and selection reach the canvas's other lines, in its colour, and its leaving too", async () => {
+	const { on, listen, s } = await peopleServer();
+	const a = fakeClient("frame-a");
+	const b = fakeClient("frame-b");
+	const heardA = listen(a.id);
+	const heardB = listen(b.id);
+	const asA = { kind: "person" as const, id: "person~frame-1", name: "you", canvas: "a" };
+	const asB = { kind: "person" as const, id: "person~frame-2", name: "you", canvas: "a" };
+	await on(b, "view.update", { camera: { x: 0, y: 0, zoom: 1 } }, asB);
+	await on(a, "view.update", { pointer: { x: 5, y: 6 }, selection: ["n1"] }, asA);
+	const seen = heardB.find((h) => h.name === "view.changed");
+	assert.deepEqual([seen?.payload.pointer, seen?.payload.selection, typeof seen?.payload.color], [{ x: 5, y: 6 }, ["n1"], "string"]);
+	assert.equal(heardA.filter((h) => h.name === "view.changed" && h.payload.by === asA.id).length, 0, "no echo of its own");
+	a.close();
+	assert.ok(heardB.some((h) => h.name === "view.changed" && h.payload.gone === true), "B hears A leave");
+	await s.close();
+});

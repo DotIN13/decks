@@ -48,6 +48,7 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 			return (await answer) as Infer<typeof calls.view.screenshot.answer>;
 		},
 		answer: (ctx, { id, value, error }) => ({ ok: p().answers.answer(id, { ...(value !== undefined ? { value } : {}), ...(error !== undefined ? { error } : {}) }) }),
+		update: (ctx, args) => say(p(), ctx, args),
 		reload: (ctx, { card, canvas }) => {
 			const name = here(p(), ctx, canvas ?? (card ? canvasOfTarget(card) : undefined));
 			const screens = p().screens.showing(name).map((s) => s.client);
@@ -105,6 +106,20 @@ function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.i
 	}
 	people.screens.record(ctx.caller.id, name, args.device, camera);
 	return request(people, ctx, name, "view.move", { ...camera, canvas: name, ...(args.animate ? { animate: true } : {}) });
+}
+
+/** A line says where it points and what it selected; the canvas's other lines hear it, in its colour. */
+function say(people: People, ctx: Context, args: Infer<typeof calls.view.update.input>): View {
+	const name = here(people, ctx, args.canvas);
+	const client = people.meet(ctx);
+	const line = client ?? ctx.caller.id;
+	if (client && !people.screens.has(client)) people.screens.report(client, ctx.caller.id, { canvas: name, frame: true });
+	const color = people.presence.colorOf(line, name);
+	const { canvas: _c, ...said } = args;
+	const others = people.screens.drawing(name).map((s) => s.client).filter((c) => c !== client);
+	const kind = ctx.caller.kind === "agent" ? "agent" : "person";
+	if (others.length) people.tell(ctx, events.viewChanged, { canvas: name, ids: args.selection ?? [], ...said, name: ctx.caller.name, kind, color }, others);
+	return look(people, ctx, name);
 }
 
 /** Which screens a caller's view call reaches. */
