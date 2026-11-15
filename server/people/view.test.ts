@@ -77,7 +77,7 @@ test("view.reload answers how many screens on the canvas were asked", async () =
 test("the person's here is the canvas on their screen, and they act for the agent it follows", async () => {
 	const { s, on } = await peopleServer();
 	const token = s.token(person);
-	assert.equal(s.callers.resolve(token)?.canvas, undefined, "no screen yet, no here");
+	assert.equal(s.callers.resolve(token)?.canvas, "a", "no screen yet: the first canvas");
 	await s.value<shapes.Agent>("agent.attach", { name: "Ann", canvas: "a" });
 	const screen = fakeClient("screen-1");
 	await on(screen, "view.move", { x: 0, y: 0, zoom: 1, canvas: "a", agent: "Ann" }, person);

@@ -1,4 +1,5 @@
-import { Refused, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
+import { Refused, events, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
+import { LOCAL_PERSON } from "../kernel/index.ts";
 import type { Context, Kernel, Store, Tokens } from "../kernel/types.ts";
 import { Hosts } from "./hosts.ts";
 import { Mailboxes } from "./mail.ts";
@@ -16,6 +17,7 @@ export class People {
 	readonly mail: Mailboxes;
 	readonly marks: Marks;
 	private seen = new Set<string>();
+	private canvases: string[] = [];
 	private revs = 0;
 
 	constructor(store: Store, readonly tokens: Tokens, clock: () => number = Date.now) {
@@ -30,6 +32,9 @@ export class People {
 		kernel.callers.describe("agent", (id) => people.roster.callerOf(id));
 		kernel.relay((call) => people.hosts.answerer(call));
 		kernel.callers.describe("person", (_id, issued) => people.withHere(issued));
+		const learn = () => void people.learnCanvases(kernel);
+		kernel.events.on(events.canvasChanged, learn);
+		learn();
 		return people;
 	}
 
@@ -48,10 +53,16 @@ export class People {
 		return client.id;
 	}
 
-	/** A person's here: the home of the agent on their screen, else the canvas that screen shows. */
+	/** The deck's canvases, first first, kept for a person with no screen yet. */
+	async learnCanvases(kernel: Kernel): Promise<void> {
+		const listed = await kernel.call("canvas.list", {}, LOCAL_PERSON).catch(() => undefined);
+		if (listed?.ok && Array.isArray(listed.value)) this.canvases = (listed.value as { name: string }[]).map((c) => c.name);
+	}
+
+	/** A person's here: the home of the agent on their screen, else that screen's canvas, else the first. */
 	withHere(person: Caller): Caller {
 		const screen = this.screens.newestOf(person.id);
-		const canvas = (screen?.follows ? this.roster.byIdOrUndefined(screen.follows)?.canvas : undefined) ?? screen?.canvas;
+		const canvas = (screen?.follows ? this.roster.byIdOrUndefined(screen.follows)?.canvas : undefined) ?? screen?.canvas ?? this.canvases[0];
 		return canvas && !person.canvas ? { ...person, canvas } : person;
 	}
 

@@ -32,6 +32,7 @@ export function standInCanvas(names: string[]): { feature: Feature; docs: Map<st
 		name: "stand-in",
 		calls: [
 			handle(calls.item.insert, (ctx, { item, canvas }) => ctx.canvas(canvas).apply([{ op: "insert", item }], ctx.caller).items[0]!),
+			handle(calls.canvas.list, () => [...docs.keys()].map((name) => ({ name, title: name, open: [], cards: 0 }))),
 			handle(calls.canvas.create, (_ctx, { title }) => {
 				const name = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 				docs.set(name, new FakeDoc());
