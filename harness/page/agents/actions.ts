@@ -1,5 +1,5 @@
 import { call, warnIfFailed } from "../state/line.ts";
-import { stageOf } from "../state/canvases.ts";
+import { canvasOf } from "../state/canvases.ts";
 import { setState, state } from "../state/deck.ts";
 import { ensureHistory } from "../state/history.ts";
 import { setDraft, setUnread } from "../state/ui.ts";
@@ -20,7 +20,7 @@ export function focusAgent(id: string): void {
 
 /** Start an agent beside the one on screen, on its canvas, and open it. */
 export async function newAgent(spec: { kind?: string; workspace?: string }): Promise<void> {
-	const canvas = stageOf(state.focused)?.name;
+	const canvas = canvasOf(state.focused)?.name;
 	const answer = warnIfFailed(await call<{ id: string }>("agent.create", { ...spec, ...(state.focused ? { near: state.focused } : {}), ...(canvas ? { canvas } : {}) }));
 	if (answer.ok && answer.value?.id) focusAgent(answer.value.id);
 }

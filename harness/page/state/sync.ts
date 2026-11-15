@@ -8,7 +8,7 @@ import { call, on } from "./line.ts";
 import { reread } from "./history.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
-import { accountsOf, cardsOn, chatOf, pageOf, withPlacements, type Placed, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
+import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
 import type { AgentChat, AgentState, ClaudeAccount } from "./types/index.ts";
 import { accountChanged, releasePages } from "./ui.ts";
 import { hearChat } from "./sync-chat.ts";
@@ -100,16 +100,10 @@ async function readCanvases(hooks: SyncHooks): Promise<void> {
 	drawAgents(hooks);
 }
 
-/** Each canvas's cards and their boxes, from its items: card.list does not say where a card sits. */
-async function placedCards(): Promise<Placed[]> {
-	const lists = await Promise.all(held.canvases.map(async (canvas) => ({ canvas: canvas.name, items: await call<Array<{ type: string; card?: string; box?: Placed["box"] }>>("item.list", { canvas: canvas.name, depth: 0 }) })));
-	return lists.flatMap(({ canvas, items }) => (items.ok ? items.value.filter((item) => item.type === "card" && item.card && item.box).map((item) => ({ card: item.card!, canvas, box: item.box! })) : []));
-}
-
 async function readCards(hooks: SyncHooks): Promise<void> {
 	const answer = await call<Card[]>("card.list", {});
 	if (!answer.ok) return;
-	held.cards = withPlacements(answer.value, await placedCards());
+	held.cards = answer.value;
 	setState("pages", reconcile(held.cards.map(pageOf), { key: "path", merge: true }));
 	drawAgents(hooks);
 	hooks.landed();

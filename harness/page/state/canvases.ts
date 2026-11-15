@@ -42,7 +42,7 @@ export async function moveTo(agent: string, canvas: string, send: () => Promise<
 }
 
 /** The stage a given agent is on, by name, or nothing when it has never drawn. */
-export function stageOf(agentId: string | undefined): StageRow | undefined {
+export function canvasOf(agentId: string | undefined): StageRow | undefined {
 	if (!agentId) return undefined;
 	const going = moving();
 	if (going?.agent === agentId) {
@@ -51,6 +51,7 @@ export function stageOf(agentId: string | undefined): StageRow | undefined {
 	}
 	return stages().find((one) => one.agents.some((agent) => agent.id === agentId));
 }
+export const stageOf = canvasOf;
 
 /** The canvas of this name when it is a friend's, shared with you to view: read here, changed only in a copy. */
 export function viewOnly(name: string | undefined): StageRow | undefined {

@@ -178,6 +178,12 @@ export const dialog = () => (state.focused ? state.agents[state.focused]?.dialog
 export const clearDialog = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "dialog", undefined);
 export const clearPreview = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "preview", undefined);
 
+/** Show an agent's past at an entry, from chat.preview's answer; a null entry ends it. */
+export function setPreview(agent: string, seen: { entry: string | null; cards: Record<string, string> } | undefined): void {
+	ensureAgent(agent);
+	setState("agents", agent, "preview", seen?.entry ? { entryId: seen.entry, cards: seen.cards } : undefined);
+}
+
 /** The focused agent's preview, if it is looking at its own past. */
 export const preview = () => (state.focused ? state.agents[state.focused]?.preview : undefined);
 

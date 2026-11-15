@@ -60,12 +60,12 @@ const move = (path: string, x: number, y: number) => {
  * So the flight waits for two frames from the server, in the order they are sent: the deck
  * state, which carries the new place, and the context, which says the board is on the canvas.
  */
-export function createFraming(stagePages: () => Page[]) {
+export function createFraming(onCanvasNow: () => Page[]) {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
-		if (!stagePages().some((one) => one.path === path)) void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
+		if (!onCanvasNow().some((one) => one.path === path)) void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
 		frameWhenPlaced(path);
 	};
 	createEffect(() => {
@@ -77,7 +77,7 @@ export function createFraming(stagePages: () => Page[]) {
 			setFraming(undefined);
 			return;
 		}
-		if (!stagePages().some((one) => one.path === wanted.path)) return;
+		if (!onCanvasNow().some((one) => one.path === wanted.path)) return;
 		const board = state.pages.find((one) => one.path === wanted.path);
 		if (!board) return;
 		setFraming(undefined);

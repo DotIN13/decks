@@ -46,7 +46,7 @@ export interface AgentRecord {
 	/** The question it is waiting on, if any. Drawn only in its own conversation. */
 	dialog?: ExtensionUiPrompt;
 	/** A point in its past being previewed, and the revisions to render while it is. */
-	preview?: { entryId: string; boards: Record<string, string> };
+	preview?: { entryId: string; cards: Record<string, string> };
 	/** The Claude subscription it spends. */
 	spending?: string;
 	/**
