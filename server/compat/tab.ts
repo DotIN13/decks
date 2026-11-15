@@ -11,7 +11,7 @@ export const TAB_PATH = "/ws";
 type Said = Record<string, unknown>;
 type AgentRow = { id: string; name: string; color?: string; kind?: string; state?: string; canvas?: string; workspace?: string; tags?: string[] };
 /** held: every card each agent has had in play, as today's context kept it (boards), for this server's life. */
-type Tab = { door: SocketDoor; deck: () => Deck; caller: Caller; client: Client; send(m: Said): void; focused?: string; held: Map<string, Set<string>> };
+type Tab = { door: SocketDoor; deck: () => Deck; caller: Caller; client: Client; send(m: Said): void; focused?: string; held: Map<string, Set<string>>; agents?: AgentRow[]; sent?: Map<string, number> };
 
 export function tabRoute(deck: () => Deck): Route {
 	const held = new Map<string, Set<string>>();
@@ -31,7 +31,7 @@ export function tabRoute(deck: () => Deck): Route {
 function openTab(peer: Peer, tab: Tab): void {
 	const stops: Stop[] = [];
 	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["agent.changed", "agent.deleted"] }, (e) => void agentHeard(tab, e.name, e.payload)));
-	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["item.changed", "card.changed"] }, (e) => void drawingChanged(tab, String(e.payload.canvas ?? ""))));
+	stops.push(tab.door.subscribe({ caller: tab.caller, client: tab.client.id, events: ["item.changed", "card.changed"] }, (e) => void drawingChanged(tab, String(e.payload.canvas ?? ""), typeof e.payload.rev === "number" ? e.payload.rev : undefined)));
 	peer.onClose(() => (stops.forEach((stop) => stop()), (tab.client as Client & { end?: () => void }).end?.()));
 	peer.onText((text) => {
 		let message: Said;
@@ -62,20 +62,20 @@ function heldBy(tab: Tab, agent: string, now: string[]): string[] {
 	return [...set];
 }
 
-async function inPlay(tab: Tab, canvas: string | undefined): Promise<string[]> {
+async function inPlay(tab: Tab, canvas: string | undefined, doc?: unknown): Promise<string[]> {
 	if (!canvas) return [];
-	const read = await readDrawing(tab.deck(), canvas, "");
-	return read ? pagesOf(canvas, read.doc, true).map((page) => String(page.path)) : [];
+	const read = doc === undefined ? await readDrawing(tab.deck(), canvas, "") : { doc };
+	return read ? pagesOf(canvas, read.doc as never, true).map((page) => String(page.path)) : [];
 }
 
-async function context(tab: Tab, agent: string, canvas: string | undefined): Promise<{ boards: string[]; inPlay: string[] }> {
-	const now = await inPlay(tab, canvas);
+async function context(tab: Tab, agent: string, canvas: string | undefined, doc?: unknown): Promise<{ boards: string[]; inPlay: string[] }> {
+	const now = await inPlay(tab, canvas, doc);
 	return { boards: heldBy(tab, agent, now), inPlay: now };
 }
 
 /** The roster today's page and checks read: every agent as a chat row, and which is focused. */
 async function roster(tab: Tab): Promise<AgentRow[]> {
-	const agents = await call<AgentRow[]>(tab, "agent.list", {});
+	const agents = (tab.agents = await call<AgentRow[]>(tab, "agent.list", {}));
 	if (!tab.focused || !agents.some((a) => a.id === tab.focused)) tab.focused = agents[0]?.id;
 	const chats = await Promise.all(agents.map(async (a) => ({ id: a.id, name: a.name, color: a.color, kind: a.kind ?? "pi", state: a.state ?? "idle", stage: a.canvas, workspace: a.workspace, tags: a.tags ?? [], unread: 0, ...(await context(tab, a.id, a.canvas)) })));
 	tab.send({ type: "agents", chats, ...(tab.focused ? { focused: tab.focused } : {}), defaultKind: "pi" });
@@ -109,12 +109,22 @@ async function stagePen(tab: Tab, agentId: string): Promise<void> {
 	if (read) tab.send({ type: "stage.pen", agentId, stage: agent.canvas, rev: got.rev ?? 0, doc: read.doc, base: read.base });
 }
 
-async function drawingChanged(tab: Tab, canvas: string): Promise<void> {
-	const agents = await call<AgentRow[]>(tab, "agent.list", {});
-	for (const agent of agents.filter((a) => a.canvas === canvas)) {
-		await stagePen(tab, agent.id);
-		tab.send({ type: "context.changed", agentId: agent.id, ...(await context(tab, agent.id, canvas)) });
-	}
+/**
+ * A change of a canvas, as today's server pushed it: stage.pen to every agent on it at once, from one
+ * read of the file and the roster this socket already holds (a glide starts on that frame), then
+ * context.changed. An older revision read late is never sent after a newer one.
+ */
+async function drawingChanged(tab: Tab, canvas: string, rev?: number): Promise<void> {
+	const agents = (tab.agents ?? (await roster(tab))).filter((a) => a.canvas === canvas);
+	if (!agents.length) return;
+	const read = await readDrawing(tab.deck(), canvas, `/files/canvases/${canvas}/`);
+	if (!read) return;
+	const at = rev ?? (await call<{ rev?: number }>(tab, "canvas.get", { canvas })).rev ?? 0;
+	const sent = (tab.sent ??= new Map());
+	if (at < (sent.get(canvas) ?? 0)) return;
+	sent.set(canvas, at);
+	for (const agent of agents) tab.send({ type: "stage.pen", agentId: agent.id, stage: canvas, rev: at, doc: read.doc, base: read.base });
+	for (const agent of agents) tab.send({ type: "context.changed", agentId: agent.id, ...(await context(tab, agent.id, canvas, read.doc)) });
 }
 
 async function canvasOf(tab: Tab, message: Said): Promise<string | undefined> {
