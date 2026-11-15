@@ -16,6 +16,19 @@ export const DECK = {
 	"canvases/other/canvas.pen": pen([]),
 };
 
+/** An old board: a browser node tagged decks.board, answered as { type: board, board }. */
+export function boardFeature(): Feature {
+	return defineFeature({
+		name: "boards",
+		calls: [],
+		items: [{
+			type: "board",
+			fromPen: (node: PenNode) => ({ type: "board", id: node.id, board: (node.metadata as { path: string }).path }) as Item,
+			toPen: (item: Item) => ({ type: "browser", ...(item.id ? { id: item.id } : {}), width: 400, height: 300, metadata: { type: "decks.board", path: (item as { board?: string }).board } }),
+		}],
+	});
+}
+
 export function stickerFeature(): Feature {
 	let deck: Kernel["deck"] | undefined;
 	const prepare = async (item: Item, at: { canvas: string; caller: Caller }): Promise<Item> => {

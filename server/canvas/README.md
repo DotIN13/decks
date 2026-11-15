@@ -43,7 +43,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
     of such an item, its kind's `prepare` (if it has one) is awaited; a box it adds is a size only.
     Every other node is drawn:
     notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
-    Wherever an id is taken, a page is also named by its path or its folder.
+    Anywhere an item's id is taken, a page's path is too: a card's as its folder or its
+    index.html, an old board's as its file, with or without the canvas's folder before it.
 11. After every change each joined arrow is routed again between its ends, in the same revision,
     so the file holds the path the page draws. Any other item you did not touch keeps its bytes.
 12. `item.clip` keeps a copy of items and the files their kinds name, for a day. `item.paste`

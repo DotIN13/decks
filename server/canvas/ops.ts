@@ -28,7 +28,7 @@ export function findId(doc: PenDocument, ref: string, where: Where): string | un
 	const want = pageKey(ref, where.canvas);
 	for (const node of nodes) {
 		const item = where.kinds.toItem(node, where.canvas);
-		for (const path of [item.card, item.path]) if (typeof path === "string" && pageKey(path, where.canvas) === want) return node.id;
+		for (const path of [item.card, item.path, (item as { board?: unknown }).board]) if (typeof path === "string" && pageKey(path, where.canvas) === want) return node.id;
 	}
 	if (ref.includes("/") && boxes(doc).has(ref)) return ref;
 	return undefined;
