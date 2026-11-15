@@ -98,11 +98,22 @@ const CARD = { list: card.list, get: card.get, create: card.create, claim: card.
 
 export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] {
 	return handleAll(CARD, {
-		list: async (ctx) => Promise.all((await listCards(ctx.deck)).map((path) => describe(ctx.deck, ctx.store, path))),
+		list: async (ctx) => {
+			const placed = new Map<string, S.Placement[]>();
+			return Promise.all(
+				(await listCards(ctx.deck)).map(async (path) => {
+					const found = await describe(ctx.deck, ctx.store, path);
+					const canvas = canvasOf(path);
+					if (!placed.has(canvas)) placed.set(canvas, placementsOn(ctx, canvas));
+					const here = placed.get(canvas)!.filter((p) => p.card === path);
+					return here.length ? { ...found, placements: here } : found;
+				}),
+			);
+		},
 		get: async (ctx, { card: name }) => {
 			const path = cardPath(name);
 			const found = await describe(ctx.deck, ctx.store, path);
-			const placements = placementsOf(ctx, path);
+			const placements = placementsOn(ctx, canvasOf(path)).filter((p) => p.card === path);
 			return placements.length ? { ...found, placements } : found;
 		},
 		create: async (ctx, { title, w, h, canvas }) => {
@@ -145,14 +156,14 @@ function canvasNamed(ctx: Context, canvas: string | undefined): string {
 	return on;
 }
 
-function placementsOf(ctx: Context, path: string): S.Placement[] {
-	const canvas = canvasOf(path);
+/** Every card placed on a canvas, read once; none when the canvas cannot be read. */
+function placementsOn(ctx: Context, canvas: string): S.Placement[] {
 	try {
 		return ctx
 			.canvas(canvas)
 			.read()
-			.filter((item) => item.type === "card" && item.card === path && item.box)
-			.map((item) => ({ card: path, canvas, box: item.box! }));
+			.filter((item) => item.type === "card" && typeof item.card === "string" && item.box)
+			.map((item) => ({ card: item.card!, canvas, box: item.box! }));
 	} catch {
 		return [];
 	}

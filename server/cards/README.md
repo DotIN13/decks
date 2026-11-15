@@ -36,7 +36,8 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
 8. `file.url` is `/files/<path>`: the address this feature serves the file at.
 9. A card is `canvases/<canvas>/cards/<name>/index.html`, its folder holding what it keeps beside it.
    A card is named by its folder or its index.html; both mean the index.html.
-10. A card's title is its `<title>`, else its first `<h1>`, else its folder's name. Its writer is
+10. `card.list` and `card.get` say where each card sits on its canvas (`placements`), each canvas
+   read once. A card's title is its `<title>`, else its first `<h1>`, else its folder's name. Its writer is
    who last wrote its index.html through a call, or claimed it.
 11. `card.create` writes a blank card from the title, in the named canvas or the caller's here. Its
    folder name is the title made plain (40 letters at most), with `-2`, `-3` when taken.

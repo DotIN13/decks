@@ -44,6 +44,8 @@ test("a card with a script and a data file, three lines changed by file.edit, re
 	assert.deepEqual([placed.type, placed.card], ["card", card.path]);
 	const got = await s.value<{ title: string; by: string; placements?: { canvas: string }[] }>("card.get", { card: folder });
 	assert.deepEqual([got.title, got.by, got.placements?.map((p) => p.canvas)], ["Sales rose in February", "ann", ["work"]]);
+	const listed = await s.value<{ path: string; placements?: { canvas: string }[] }[]>("card.list", {}, ann);
+	assert.deepEqual(listed.find((c) => c.path === card.path)?.placements?.map((p) => p.canvas), ["work"]);
 	await s.close();
 });
 
