@@ -92,39 +92,13 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	};
 	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
 	const places = () => [...pages(), ...items()];
+	/** Where each card is, read off the drawing at each change (`createCardPlacer`). */
+	const placer = createCardPlacer({ drawn: () => made?.handle.drawn(), pages: () => untrack(pages), setPages, own, ...(studio ? {} : { read: () => backend.drawing() }) });
+	const placeCards = placer.place;
 	const changed = () => {
 		setRevision((n) => n + 1);
 		queueMicrotask(placeCards);
 	};
-	/*
-	 * Where each card is, read off the drawing at each change: the same boxes the harness gives
-	 * (`StagePens.boards`). A card placed or taken off that the list does not know yet is read again.
-	 */
-	let cardsReading = false;
-	/** How often the card list was read again from the harness (`placeCards`): for the checks. */
-	let cardsReads = 0;
-	function placeCards(): void {
-		const doc = made?.handle.drawn();
-		if (!doc) return;
-		const boxes = new Map(pageItems(doc).map((item) => [item.path!, item.box]));
-		const now = untrack(pages);
-		const same = now.length === boxes.size && now.every((page) => boxes.has(page.path));
-		// Studio keeps no records of cards: the drawing is all there is of them.
-		if (!same && studio) return void setPages(cardsOf(doc, own));
-		if (!same) {
-			if (cardsReading) return;
-			cardsReading = true;
-			cardsReads++;
-			void backend
-				.drawing()
-				.then((read) => setPages(read.cards.map((card) => ({ ...card, ...(boxes.get(card.path) ?? {}), trust: own(card.path) }))))
-				.catch(() => undefined)
-				.finally(() => (cardsReading = false));
-			return;
-		}
-		if (now.some((page) => { const box = boxes.get(page.path)!; return box.x !== page.x || box.y !== page.y || box.w !== page.w || box.h !== page.h; }))
-			setPages(now.map((page) => ({ ...page, ...boxes.get(page.path)! })));
-	}
 	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
 	if (start.look.insets) useInsets(start.look.insets);
 	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
@@ -185,7 +159,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
 	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
-		cardsReads: () => cardsReads,
+		cardsReads: placer.reads,
 		appStored,
 		appWatchers,
 		root,
@@ -249,4 +223,56 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 /** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
 function cardsOf(doc: PenDocument, trust: (path: string) => FramePage["trust"]): FramePage[] {
 	return pageItems(doc).map((item) => ({ path: item.path!, title: item.name ?? item.path!.split("/").slice(-2).join("/"), rev: 0, ...item.box, inContext: [], ...(item.type === "decks.card" ? { card: true as const } : {}), trust: trust(item.path!) }));
+}
+
+/** What `createCardPlacer` reads and writes, so it runs, and is tested, without a frame. */
+export interface CardPlacerDeps {
+	drawn(): PenDocument | undefined;
+	pages(): FramePage[];
+	setPages(next: FramePage[]): void;
+	own(path: string): FramePage["trust"];
+	/** The host's card records; none for Studio, which keeps no records of cards. */
+	read?: () => Promise<{ cards: Page[] }>;
+}
+
+/**
+ * The frame's card list kept in step with the drawing, which says what is on the canvas: a card the
+ * drawing no longer has leaves the list at once; a card it has that the list lacks is read again from
+ * the host, one read at a time, and once more when the drawing changed while a read was out.
+ */
+export function createCardPlacer(deps: CardPlacerDeps): { place(): void; reads(): number } {
+	let reading = false;
+	let again = false;
+	let reads = 0;
+	const boxesOf = (doc: PenDocument) => new Map(pageItems(doc).map((item) => [item.path!, item.box]));
+	const read = (doc: PenDocument) => {
+		if (reading) return void (again = true);
+		reading = true;
+		reads++;
+		void deps.read!()
+			.then((answer) => {
+				// What the drawing has when the answer comes: a read that crossed a removal does not bring the card back.
+				const boxes = boxesOf(deps.drawn() ?? doc);
+				deps.setPages(answer.cards.filter((card) => boxes.has(card.path)).map((card) => ({ ...card, ...boxes.get(card.path)!, trust: deps.own(card.path) })));
+			})
+			.catch(() => undefined)
+			.finally(() => {
+				reading = false;
+				if (again) { again = false; place(); }
+			});
+	};
+	function place(): void {
+		const doc = deps.drawn();
+		if (!doc) return;
+		const boxes = boxesOf(doc);
+		const now = deps.pages();
+		const kept = now.filter((page) => boxes.has(page.path));
+		const lacking = kept.length < boxes.size;
+		if (!deps.read) return void ((lacking || kept.length < now.length) && deps.setPages(cardsOf(doc, deps.own)));
+		const placed = kept.map((page) => ({ ...page, ...boxes.get(page.path)! }));
+		const moved = placed.some((page, i) => page.x !== kept[i]!.x || page.y !== kept[i]!.y || page.w !== kept[i]!.w || page.h !== kept[i]!.h);
+		if (kept.length < now.length || moved) deps.setPages(placed);
+		if (lacking) read(doc);
+	}
+	return { place, reads: () => reads };
 }
