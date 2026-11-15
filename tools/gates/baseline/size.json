@@ -184,7 +184,6 @@
 	"tools/checks/perf-canvas.mjs: function perfCanvas over 80 lines": 1,
 	"tools/checks/pictures/awake.mjs: over 400 lines": 1,
 	"ui/agent-marks.tsx: function AgentMark over 80 lines": 1,
-	"ui/float/float-math.ts: over 400 lines": 1,
 	"ui/float/float.ts: function makeFloat over 80 lines": 1,
 	"ui/float/float.ts: over 400 lines": 1,
 	"ui/Popover.tsx: function (anonymous) over 80 lines": 1,

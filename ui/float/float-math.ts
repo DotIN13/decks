@@ -1,3 +1,8 @@
+import type { Velocity } from "../velocity.ts";
+import { type Saved } from "./saved.ts";
+export { type Saved, FLOATS_KEY, fromSaved, fromAnchor, loadFloats, saveFloat } from "./saved.ts";
+export { stowsRight, type Side, stowsLeft, stowSide, stowedAt, stowY, STOWED_KEY, type Stowed, loadStowed, saveStowed } from "./stowed.ts";
+
 /**
  * The geometry of a float: a small panel the person may drag around a surface.
  *
@@ -15,36 +20,18 @@ export interface Point {
 	x: number;
 	y: number;
 }
-
 export interface Size {
 	w: number;
 	h: number;
 }
-
 export interface Box {
 	x: number;
 	y: number;
 	w: number;
 	h: number;
 }
-
 export type Anchor = "tl" | "tr" | "bl" | "br";
-
-/**
- * `"home"` means the CSS places it. Otherwise **where in the column it sits, as a fraction
- * of the room it has** (`fx`, `fy` in 0..1): 0 is against the left or top margin, 1 against
- * the right or bottom, ½ centred. A column that narrows (the sidebar opened) moves a float
- * by a share of the change, the way its home does, rather than by all of it or none.
- *
- * The corner-and-offset form is what an earlier build stored; it is still read.
- */
-export type Saved = "home" | { fx: number; fy: number } | { anchor: Anchor; dx: number; dy: number };
-
-/** Where every float's position is remembered, as one JSON object keyed by float. */
-export const FLOATS_KEY = "decks.floats";
-
-const ANCHORS: readonly Anchor[] = ["tl", "tr", "bl", "br"];
-
+export const ANCHORS: readonly Anchor[] = ["tl", "tr", "bl", "br"];
 /**
  * Keep the whole float inside the bounds, `margin` in from every edge. When the float is
  * wider or taller than the room it has, the top-left edge wins: the handle is usually there.
@@ -56,18 +43,15 @@ export function clamp(p: Point, size: Size, bounds: Box, margin = 6): Point {
 	const maxY = Math.max(minY, bounds.y + bounds.h - size.h - margin);
 	return { x: Math.min(maxX, Math.max(minX, p.x)), y: Math.min(maxY, Math.max(minY, p.y)) };
 }
-
 /** Within `radius` of home is home. Straight-line distance, so the snap zone is a circle. */
 export function snapHome(p: Point, home: Point, radius = 24): { p: Point; home: boolean } {
 	const d = Math.hypot(p.x - home.x, p.y - home.y);
 	return d <= radius ? { p: { x: home.x, y: home.y }, home: true } : { p, home: false };
 }
-
 /** The room a float has to move in, each axis, once the margin is taken off both sides. */
-function room(size: Size, bounds: Box, margin: number): Size {
+export function room(size: Size, bounds: Box, margin: number): Size {
 	return { w: Math.max(0, bounds.w - size.w - 2 * margin), h: Math.max(0, bounds.h - size.h - 2 * margin) };
 }
-
 /**
  * Which edge a float's vertical share is measured from. `"bottom"` is for a float whose
  * height changes while it stands (the composer's status row comes and goes above its
@@ -75,7 +59,6 @@ function room(size: Size, bounds: Box, margin: number): Size {
  * puts the box in the same place whatever the row is doing at the time.
  */
 export type Pin = "top" | "bottom";
-
 /** Where the float sits, as a fraction of the room it has. */
 export function toFraction(p: Point, size: Size, bounds: Box, margin = 6, pin: Pin = "top"): Saved {
 	const r = room(size, bounds, margin);
@@ -93,102 +76,12 @@ export function toFraction(p: Point, size: Size, bounds: Box, margin = 6, pin: P
 					: unit((p.y - bounds.y - margin) / r.h),
 	};
 }
-
 /** The vertical share alone: how far down its room a float is, which is all a stowed float keeps. */
 export function verticalShare(p: Point, size: Size, bounds: Box, margin = 6, pin: Pin = "top"): number {
 	const saved = toFraction(p, size, bounds, margin, pin);
 	return typeof saved === "object" && "fy" in saved ? saved.fy : 0;
 }
-
-/** Any saved form back to a point; `"home"` is wherever the caller says home is today. */
-export function fromSaved(saved: Saved, size: Size, bounds: Box, home: Point, margin = 6, pin: Pin = "top"): Point {
-	if (saved === "home") return { x: home.x, y: home.y };
-	if ("fx" in saved) {
-		const r = room(size, bounds, margin);
-		const span = Math.max(0, bounds.h - 2 * margin);
-		return {
-			x: bounds.x + margin + saved.fx * r.w,
-			y: pin === "bottom" ? bounds.y + margin + saved.fy * span - size.h : bounds.y + margin + saved.fy * r.h,
-		};
-	}
-	return fromAnchor(saved, size, bounds, home);
-}
-
-/** A corner-anchored save back to a point, for the older saved form. */
-export function fromAnchor(saved: Saved, size: Size, bounds: Box, home: Point): Point {
-	if (saved === "home") return { x: home.x, y: home.y };
-	if ("fx" in saved) return fromSaved(saved, size, bounds, home);
-	const right = saved.anchor === "tr" || saved.anchor === "br";
-	const bottom = saved.anchor === "bl" || saved.anchor === "br";
-	return {
-		x: right ? bounds.x + bounds.w - size.w - saved.dx : bounds.x + saved.dx,
-		y: bottom ? bounds.y + bounds.h - size.h - saved.dy : bounds.y + saved.dy,
-	};
-}
-
-function isSaved(value: unknown): value is Saved {
-	if (value === "home") return true;
-	if (typeof value !== "object" || value === null) return false;
-	const v = value as Record<string, unknown>;
-	if (typeof v.fx === "number" && Number.isFinite(v.fx) && typeof v.fy === "number" && Number.isFinite(v.fy)) return true;
-	return (
-		(ANCHORS as readonly unknown[]).includes(v.anchor) &&
-		typeof v.dx === "number" &&
-		Number.isFinite(v.dx) &&
-		typeof v.dy === "number" &&
-		Number.isFinite(v.dy)
-	);
-}
-
-function defaultStorage(): Storage | undefined {
-	try {
-		return typeof localStorage === "undefined" ? undefined : localStorage;
-	} catch {
-		return undefined;
-	}
-}
-
-/**
- * Every remembered float. Garbage in storage, whether unparseable or the wrong shape, is
- * treated as nothing remembered; a corrupt entry must never stop the app from drawing.
- */
-export function loadFloats(storage?: Pick<Storage, "getItem">): Record<string, Saved> {
-	let raw: string | null;
-	try {
-		raw = (storage ?? defaultStorage())?.getItem(FLOATS_KEY) ?? null;
-	} catch {
-		return {};
-	}
-	if (raw === null) return {};
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(raw);
-	} catch {
-		return {};
-	}
-	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-	const out: Record<string, Saved> = {};
-	for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-		if (isSaved(value)) out[key] = value;
-	}
-	return out;
-}
-
-export function saveFloat(key: string, saved: Saved, storage?: Storage): void {
-	const store = storage ?? defaultStorage();
-	if (!store) return;
-	const floats = loadFloats(store);
-	floats[key] = saved;
-	try {
-		store.setItem(FLOATS_KEY, JSON.stringify(floats));
-	} catch {
-		// Storage full or refused; the float still moved, it just will not be remembered.
-	}
-}
-
 export { velocityFrom, type Sample, type Velocity } from "../velocity.ts";
-import type { Velocity } from "../velocity.ts";
-
 /**
  * Where a thrown float comes to rest on its own: the release point plus the velocity
  * carried for `tau` milliseconds of exponential slowdown, and never further than `max`.
@@ -200,7 +93,6 @@ export function fling(p: Point, v: Velocity, tau = 260, max = 640, min = 0.25): 
 	const distance = Math.min(max, speed * tau);
 	return { x: p.x + (v.vx / speed) * distance, y: p.y + (v.vy / speed) * distance };
 }
-
 /**
  * The resting place for a point: home if it is near home, else inside the bounds, with an
  * edge it comes close to taking it the rest of the way. Home has the larger radius,
@@ -230,60 +122,6 @@ export function settle(
 		home: false,
 	};
 }
-
-/**
- * Whether a release is a throw at the right edge, hard enough to put the float away.
- *
- * The gesture a phone uses for a video in a corner: flung at the side of the screen, it
- * tucks behind the edge and leaves a tab. Three things have to be true, and each one keeps
- * an ordinary drop from being read as this. It is **fast** (`minSpeed`, in px/ms; a
- * placement has no velocity at all, and a gentle throw towards the right is how a float is
- * parked against that edge). It is **mostly sideways**, so a throw down into the corner is
- * still a throw home. And, carried on, it **reaches the edge**, so a flick from the far
- * side of a wide window moves the float rather than hiding it.
- */
-export function stowsRight(p: Point, v: Velocity, size: Size, bounds: Box, options: { minSpeed?: number; tau?: number } = {}): boolean {
-	const { minSpeed = 1.2, tau = 260 } = options;
-	if (v.vx < minSpeed || v.vx < Math.abs(v.vy) * 1.5) return false;
-	return p.x + size.w + v.vx * tau >= bounds.x + bounds.w;
-}
-
-/** Which edge a float is put away behind. */
-export type Side = "left" | "right";
-
-/** The same throw at the left edge: fast, mostly sideways, and carried on it reaches it. */
-export function stowsLeft(p: Point, v: Velocity, _size: Size, bounds: Box, options: { minSpeed?: number; tau?: number } = {}): boolean {
-	const { minSpeed = 1.2, tau = 260 } = options;
-	if (-v.vx < minSpeed || -v.vx < Math.abs(v.vy) * 1.5) return false;
-	return p.x + v.vx * tau <= bounds.x;
-}
-
-/** Which edge a release puts the float away behind, if either: every float can go either way. */
-export function stowSide(p: Point, v: Velocity, size: Size, bounds: Box): Side | undefined {
-	if (stowsRight(p, v, size, bounds)) return "right";
-	if (stowsLeft(p, v, size, bounds)) return "left";
-	return undefined;
-}
-
-/** Where a stowed float stands: past its edge, with `tab` pixels of it still showing. */
-export function stowedAt(y: number, size: Size, bounds: Box, tab: number, margin = 12, side: Side = "right"): Point {
-	const inside = clamp({ x: bounds.x, y }, size, bounds, margin);
-	return { x: side === "left" ? bounds.x - size.w + tab : bounds.x + bounds.w - tab, y: inside.y };
-}
-
-/**
- * How far down its edge a thrown float lands: where the line of the throw meets the edge.
- * The direction is the release velocity's, carried on in a straight line from where the
- * float was let go until its leading side reaches the edge (the right side for the right
- * edge, the left for the left), so a throw up and to the right tucks it higher than it
- * started. Kept inside the height.
- */
-export function stowY(p: Point, v: Velocity, size: Size, bounds: Box, side: Side, margin = 12): number {
-	const run = side === "right" ? bounds.x + bounds.w - (p.x + size.w) : p.x - bounds.x;
-	const along = Math.abs(v.vx) > 0 ? (v.vy / Math.abs(v.vx)) * Math.max(0, run) : 0;
-	return clamp({ x: bounds.x, y: p.y + along }, size, bounds, margin).y;
-}
-
 /**
  * A tucked float that would cover another, turned up a little at a time: the throw's
  * direction bends upward in `step` pixel steps along the edge until it is clear. Only the
@@ -300,7 +138,6 @@ export function clearUpward(p: Point, size: Size, others: readonly Box[], bounds
 	for (let y = p.y; y + inset >= bounds.y + margin - 0.5; y -= step) if (!hits({ x: p.x, y })) return { x: p.x, y };
 	return p;
 }
-
 /**
  * Keep a float off the others. `p` is where it would rest; `others` are the boxes the other
  * floats stand in (only the part inside the bounds, so a put-away one is just its tab). If
@@ -334,7 +171,6 @@ export function avoid(p: Point, size: Size, others: readonly Box[], bounds: Box,
 	}
 	return best ?? p;
 }
-
 /** A box cut to the bounds: what of it can be run into. `undefined` when none of it is inside. */
 export function within(box: Box, bounds: Box): Box | undefined {
 	const x1 = Math.max(box.x, bounds.x);
@@ -343,58 +179,6 @@ export function within(box: Box, bounds: Box): Box | undefined {
 	const y2 = Math.min(box.y + box.h, bounds.y + bounds.h);
 	return x2 > x1 && y2 > y1 ? { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } : undefined;
 }
-
-/**
- * Which floats are put away, behind which edge, and how far down it each one's tab is: a
- * share of the height, measured the way `toFraction` measures `fy`. Kept beside the
- * positions rather than in them, because the position is where the float comes *back* to.
- * A bare number is what an earlier build stored, when the right edge was the only one.
- */
-export const STOWED_KEY = "decks.stowed";
-
-export interface Stowed {
-	fy: number;
-	side: Side;
-}
-
-export function loadStowed(storage?: Pick<Storage, "getItem">): Record<string, Stowed> {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse((storage ?? defaultStorage())?.getItem(STOWED_KEY) ?? "null");
-	} catch {
-		return {};
-	}
-	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-	const out: Record<string, Stowed> = {};
-	const share = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : undefined);
-	for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-		const bare = share(value);
-		if (bare !== undefined) {
-			out[key] = { fy: bare, side: "right" };
-			continue;
-		}
-		if (typeof value !== "object" || value === null) continue;
-		const { fy, side } = value as { fy?: unknown; side?: unknown };
-		const at = share(fy);
-		if (at !== undefined && (side === "left" || side === "right")) out[key] = { fy: at, side };
-	}
-	return out;
-}
-
-/** `undefined` takes the float out again. */
-export function saveStowed(key: string, stowed: Stowed | undefined, storage?: Storage): void {
-	const store = storage ?? defaultStorage();
-	if (!store) return;
-	const all = loadStowed(store);
-	if (stowed === undefined) delete all[key];
-	else all[key] = stowed;
-	try {
-		store.setItem(STOWED_KEY, JSON.stringify(all));
-	} catch {
-		// Not remembered; it is still put away for now.
-	}
-}
-
 /** How long the glide to a resting place takes: longer for a longer way, within limits. */
 export function glideMs(from: Point, to: Point, min = 180, max = 420): number {
 	const distance = Math.hypot(to.x - from.x, to.y - from.y);
