@@ -23,6 +23,7 @@ export class CanvasStore {
 	private stop: Stop | undefined;
 	clock: () => number = Date.now;
 
+	// Binding to the kernel, loading, waiting for writes
 	bind(kernel: Kernel): this {
 		this.kernel = kernel;
 		this.kinds = new Kinds(kernel.kinds);
@@ -44,6 +45,12 @@ export class CanvasStore {
 		return () => this.stop?.();
 	}
 
+	/** Wait for every write to land. */
+	async flush(): Promise<void> {
+		await Promise.all([...this.drawings.values()].map((kept) => kept.queue));
+	}
+
+	// Names and titles
 	/** Every canvas's name, own and shared, sorted. */
 	list(): string[] {
 		return [...this.titles.keys()].sort();
@@ -62,6 +69,17 @@ export class CanvasStore {
 		throw new Refused("not_found", `There is no canvas called ${nameOrTitle}.`, "canvas.list");
 	}
 
+	async setTitle(name: string, title: string, by: Caller): Promise<void> {
+		this.titles.set(name, title);
+		await this.deck.write(this.metaFile(name), enc.encode(`${JSON.stringify({ title }, null, "\t")}\n`), by);
+		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: by.id, rev: 0 });
+	}
+
+	private metaFile(name: string): DeckPath {
+		return toDeckPath(`${layout.canvasFolder(name)}/canvas.json`);
+	}
+
+	// Drawings: a canvas, its frames, its file, its shape
 	doc(name: string): PenCanvas {
 		return this.drawing(this.file(name)).doc;
 	}
@@ -100,18 +118,18 @@ export class CanvasStore {
 		};
 	}
 
+	private drawing(file: DeckPath): Kept {
+		const kept = this.drawings.get(file);
+		if (!kept) throw new Refused("not_found", `There is no drawing at ${file}.`, "frame.list");
+		return kept;
+	}
+
 	/** A new drawing file, written now. */
 	async create(file: DeckPath, canvas: string, text: string, by: Caller): Promise<PenCanvas> {
 		const kept = this.keep(file, canvas, text);
 		kept.mine.push(text);
 		await this.deck.write(file, enc.encode(text), by);
 		return kept.doc;
-	}
-
-	async setTitle(name: string, title: string, by: Caller): Promise<void> {
-		this.titles.set(name, title);
-		await this.deck.write(this.metaFile(name), enc.encode(`${JSON.stringify({ title }, null, "\t")}\n`), by);
-		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: by.id, rev: 0 });
 	}
 
 	/** Open a canvas newly made or found: its drawing, its frames, its title. */
@@ -128,17 +146,6 @@ export class CanvasStore {
 		for (const [file, kept] of this.drawings) if (kept.canvas === name) this.drawings.delete(file);
 	}
 
-	/** Wait for every write to land. */
-	async flush(): Promise<void> {
-		await Promise.all([...this.drawings.values()].map((kept) => kept.queue));
-	}
-
-	private drawing(file: DeckPath): Kept {
-		const kept = this.drawings.get(file);
-		if (!kept) throw new Refused("not_found", `There is no drawing at ${file}.`, "frame.list");
-		return kept;
-	}
-
 	private keep(file: DeckPath, canvas: string, text: string): Kept {
 		const kept: Kept = { canvas, file, mine: [], queue: Promise.resolve(), doc: undefined as never };
 		kept.doc = new PenCanvas(canvas, text, this.kinds, (out, change, ids, by) => this.save(kept, out, change, ids, by), () => this.clock());
@@ -146,6 +153,7 @@ export class CanvasStore {
 		return kept;
 	}
 
+	// Writing a change, and hearing one from outside
 	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller): void {
 		kept.mine.push(text);
 		if (kept.mine.length > 20) kept.mine.shift();
@@ -185,10 +193,7 @@ export class CanvasStore {
 		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by, rev: 0 });
 	}
 
-	private metaFile(name: string): DeckPath {
-		return toDeckPath(`${layout.canvasFolder(name)}/canvas.json`);
-	}
-
+	// Reading the deck
 	private async names(): Promise<string[]> {
 		const own = (await this.dirs(toDeckPath(layout.CANVASES))).map((dir) => dir.split("/").pop()!);
 		const shared: string[] = [];

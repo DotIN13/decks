@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { sourceOf, writeLike } from "./spans.ts";
 
+// Writing a drawing back: unchanged items keep their bytes, at any depth.
+
 const FIXTURE = new URL("../../tools/fixtures/deck/canvases/auth-refresh/canvas.pen", import.meta.url);
 
 test("an unchanged drawing is written back byte for byte", () => {

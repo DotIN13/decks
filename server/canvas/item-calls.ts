@@ -11,29 +11,6 @@ import type { CanvasStore } from "./store.ts";
 
 type On = { canvas?: string; frame?: string };
 
-/** The canvas a call means: the one named, or the caller's here. */
-export function canvasOf(store: CanvasStore, ctx: Context, named: string | undefined): string {
-	const name = named ?? ctx.caller.canvas;
-	if (!name) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
-	return store.name(name);
-}
-
-function drawingOf(store: CanvasStore, ctx: Context, on: On): PenCanvas {
-	const name = canvasOf(store, ctx, on.canvas);
-	return on.frame ? store.frame(name, on.frame) : store.doc(name);
-}
-
-const one = async (store: CanvasStore, doc: PenCanvas, op: ItemOp, ctx: Context): Promise<Item> => {
-	const items = doc.apply(await store.kindsOf().prepare([op], prepping(doc, ctx)), ctx.caller).items;
-	if (!items[0]) throw new Refused("not_found", "The item is not on the canvas after the change.", "item.list");
-	return items[0];
-};
-
-/** What a kind's prepare is handed: the canvas, the caller, a way to add a note, the deck. */
-const prepping = (doc: PenCanvas, ctx: Context) => ({ canvas: doc.name, caller: ctx.caller, note: ctx.note, deck: ctx.deck });
-
-const isArrow = (item: Item) => (item as { metadata?: { type?: unknown } }).metadata?.type === "decks.arrow";
-
 export function itemCalls(store: CanvasStore, clips: Clips) {
 	const at = (ctx: Context, on: On) => drawingOf(store, ctx, on);
 	const written = async <T>(value: T): Promise<T> => { await store.flush(); return value; };
@@ -71,6 +48,29 @@ export function itemCalls(store: CanvasStore, clips: Clips) {
 		},
 	});
 }
+
+/** The canvas a call means: the one named, or the caller's here. */
+export function canvasOf(store: CanvasStore, ctx: Context, named: string | undefined): string {
+	const name = named ?? ctx.caller.canvas;
+	if (!name) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
+	return store.name(name);
+}
+
+function drawingOf(store: CanvasStore, ctx: Context, on: On): PenCanvas {
+	const name = canvasOf(store, ctx, on.canvas);
+	return on.frame ? store.frame(name, on.frame) : store.doc(name);
+}
+
+const one = async (store: CanvasStore, doc: PenCanvas, op: ItemOp, ctx: Context): Promise<Item> => {
+	const items = doc.apply(await store.kindsOf().prepare([op], prepping(doc, ctx)), ctx.caller).items;
+	if (!items[0]) throw new Refused("not_found", "The item is not on the canvas after the change.", "item.list");
+	return items[0];
+};
+
+/** What a kind's prepare is handed: the canvas, the caller, a way to add a note, the deck. */
+const prepping = (doc: PenCanvas, ctx: Context) => ({ canvas: doc.name, caller: ctx.caller, note: ctx.note, deck: ctx.deck });
+
+const isArrow = (item: Item) => (item as { metadata?: { type?: unknown } }).metadata?.type === "decks.arrow";
 
 /** Only the fields that were given, so an op carries no undefined. */
 function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {

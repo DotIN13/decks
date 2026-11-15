@@ -30,13 +30,6 @@ export function cornerOf(place: PlaceArgs, boxOf: (id: string) => Box | undefine
 export const besideOf = (box: Box): Corner => ({ x: Math.round(box.x2 + GAP), y: Math.round(box.y1) });
 export const belowOf = (box: Box): Corner => ({ x: Math.round(box.x1), y: Math.round(box.y2 + GAP) });
 
-const touches = (a: Box, b: Box) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
-
-function inWay(items: readonly Box[], x: number, y: number, size: Size, margin: number): Box[] {
-	const grown = { x1: x - margin, y1: y - margin, x2: x + size.w + margin, y2: y + size.h + margin };
-	return items.filter((b) => touches(grown, b));
-}
-
 /** Room for a box of size: on one side of near, or nearest the middle of everything. */
 export function freeCorner(items: readonly Box[], size: Size, options: { near?: Box; side?: Side; margin?: number } = {}): Corner {
 	const margin = options.margin ?? GAP;
@@ -80,3 +73,10 @@ export function joinCorner(size: Size, newest: Box | undefined, taken: readonly 
 	if (best) return { x: Math.round(best.x), y: Math.round(best.y) };
 	return { x: Math.round(Math.max(...taken.map((b) => b.x2)) + GAP), y: Math.round(newest.y1) };
 }
+
+function inWay(items: readonly Box[], x: number, y: number, size: Size, margin: number): Box[] {
+	const grown = { x1: x - margin, y1: y - margin, x2: x + size.w + margin, y2: y + size.h + margin };
+	return items.filter((b) => touches(grown, b));
+}
+
+const touches = (a: Box, b: Box) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;

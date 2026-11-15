@@ -5,10 +5,10 @@ It answers `item.*` (13 calls), `canvas.*` (8 of 10) and `frame.*` (4).
 
 ## Owns
 
-- `doc.ts`: `PenCanvas`, the `CanvasDoc` of one drawing; `log.ts` its changes and undo.
+- `doc.ts`: `PenCanvas`, one drawing's `CanvasDoc`; `log.ts` its changes and undo; `arrows.ts` reroutes.
 - `ops.ts` (ops into pen's edits), `place.ts` (at, beside, below, space), `kinds.ts` (who owns a node).
-- `spans.ts`: writes a file back so untouched items keep their bytes.
-- `store.ts`: every canvas in the deck, its title, its file; `clips.ts` for clip and paste.
+- `spans.ts` writes a file back keeping untouched items' bytes; `store.ts` holds every canvas,
+  its title and file; `clips.ts` keeps clips for paste.
 - `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`. Not answered here:
   `canvas.screenshot` and `export` (pictures), `versions`, `version`, `restore` (Studio's history).
 

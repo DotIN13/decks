@@ -10,15 +10,6 @@ import { emptyDrawing, type CanvasStore } from "./store.ts";
 const { list, get, here, create, update, remove, copy, undo } = calls.canvas;
 const mine = { list, get, here, create, update, remove, copy, undo };
 
-/** A folder name from a title: lower case words joined by dashes, made unique. */
-export function nameFor(title: string, taken: (name: string) => boolean): string {
-	const base = title.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 48).replace(/-+$/, "") || "canvas";
-	for (let n = 1; ; n++) {
-		const name = n === 1 ? base : `${base}-${n}`;
-		if (!taken(name)) return name;
-	}
-}
-
 export function canvasCalls(store: CanvasStore) {
 	const named = (ctx: Context, canvas: string | undefined) => canvasOf(store, ctx, canvas);
 	const changed = (ctx: Context, name: string) => ctx.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: ctx.caller.id, rev: 0 });
@@ -69,6 +60,15 @@ async function make(store: CanvasStore, title: string, by: Caller): Promise<stri
 	await store.create(store.file(name), name, emptyDrawing(), by);
 	await store.setTitle(name, title.trim(), by);
 	return name;
+}
+
+/** A folder name from a title: lower case words joined by dashes, made unique. */
+export function nameFor(title: string, taken: (name: string) => boolean): string {
+	const base = title.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 48).replace(/-+$/, "") || "canvas";
+	for (let n = 1; ; n++) {
+		const name = n === 1 ? base : `${base}-${n}`;
+		if (!taken(name)) return name;
+	}
 }
 
 async function copyFolder(deck: Deck, from: DeckPath, to: DeckPath, by: Caller): Promise<void> {

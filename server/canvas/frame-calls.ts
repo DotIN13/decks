@@ -9,22 +9,6 @@ import type { CanvasStore } from "./store.ts";
 
 type FrameShape = { path: string; id: string; ref?: string };
 
-function shape(path: string, doc: PenCanvas): FrameShape {
-	const first = doc.read({ depth: 0 })[0];
-	return { path, id: first?.id ?? "", ref: path };
-}
-
-/** A frame file's text: one item, marked reusable. */
-function frameText(item: Item | undefined): string {
-	const children = item ? [{ ...stripBox(item), reusable: true }] : [];
-	return `${JSON.stringify({ version: "2.14", children }, null, 2)}\n`;
-}
-
-function stripBox(item: Item): Item {
-	const { box: _box, ...rest } = item;
-	return { ...rest, ...(Array.isArray(rest.children) ? { children: (rest.children as Item[]).map(stripBox) } : {}) } as Item;
-}
-
 export function frameCalls(store: CanvasStore) {
 	const named = (ctx: Context, canvas: string | undefined) => canvasOf(store, ctx, canvas);
 	const create = async (ctx: Context, name: string, path: string, item: Item | undefined): Promise<FrameShape> => {
@@ -51,6 +35,22 @@ export function frameCalls(store: CanvasStore) {
 			return made;
 		},
 	});
+}
+
+function shape(path: string, doc: PenCanvas): FrameShape {
+	const first = doc.read({ depth: 0 })[0];
+	return { path, id: first?.id ?? "", ref: path };
+}
+
+/** A frame file's text: one item, marked reusable. */
+function frameText(item: Item | undefined): string {
+	const children = item ? [{ ...stripBox(item), reusable: true }] : [];
+	return `${JSON.stringify({ version: "2.14", children }, null, 2)}\n`;
+}
+
+function stripBox(item: Item): Item {
+	const { box: _box, ...rest } = item;
+	return { ...rest, ...(Array.isArray(rest.children) ? { children: (rest.children as Item[]).map(stripBox) } : {}) } as Item;
 }
 
 function findDeep(doc: PenCanvas, id: string): Item {

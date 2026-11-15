@@ -49,3 +49,13 @@ test("an older page is named by its file, with or without the canvas's folder", 
 	assert.equal((await s.value<Item>("item.get", { id: "canvases/plan/leaves/old.html" }, ann)).id, "b1");
 	await s.close();
 });
+
+test("a page is named by its path, with or without the canvas's folder, or by its own folder", async () => {
+	const s = await testServer({ features: [canvasFeature(), stickerFeature()], deck: DECK });
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	for (const name of ["canvases/plan/stickers/s1/index.html", "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1/"]) {
+		assert.equal((await s.value<Item>("item.get", { id: name }, ann)).id, "st", name);
+	}
+	assert.deepEqual(await s.value("item.delete", { id: "canvases/plan/stickers/s1" }, ann), { deleted: "canvases/plan/stickers/s1" });
+	await s.close();
+});

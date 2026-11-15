@@ -5,19 +5,13 @@ import { toDeckPath, type Item } from "../kernel/types.ts";
 import { canvasFeature } from "./feature.ts";
 import { DECK, NOTE, stickerFeature } from "./test-deck.ts";
 
+// The canvas feature's calls, made through the kernel's test server on an
+// in-memory deck, one case per README rule, in the README's order.
+
 const ann = callers.agent("ann", "plan");
 const bob = callers.agent("bob", "plan");
 const start = (deck: Record<string, string> = DECK) => testServer({ features: [canvasFeature({ clock: () => 5 }), stickerFeature()], deck });
 const text = async (s: Awaited<ReturnType<typeof start>>, path: string) => new TextDecoder().decode(await s.deck.read(toDeckPath(path)));
-
-test("item.list reads everything with its box; a canvas is named by folder or title; none named is here", async () => {
-	const s = await start();
-	const items = await s.value<Item[]>("item.list", {}, ann);
-	assert.deepEqual(items.map((i) => [i.id, i.box]), [["a", { x1: 0, y1: 0, x2: 200, y2: 100 }], ["b", { x1: 360, y1: 0, x2: 560, y2: 100 }]]);
-	assert.equal((await s.value<Item[]>("item.list", { canvas: "The plan" }, "agent")).length, 2);
-	assert.equal((await s.call("item.list", {}, "agent")).ok, false);
-	await s.close();
-});
 
 test("insert, update, replace, move, copy and delete each answer the item as it now is", async () => {
 	const s = await start();
@@ -54,6 +48,53 @@ test("two callers' edits get rising revisions, each with its author, announced a
 	await s.close();
 });
 
+test("item.changed comes after the file is written, so a listener reads the new drawing", async () => {
+	const s = await start();
+	let seen = "";
+	s.kernel.events.on((await import("../../protocol/index.ts")).events.itemChanged, () => {
+		void s.deck.read(toDeckPath("canvases/plan/canvas.pen")).then((b) => { seen = new TextDecoder().decode(b); });
+	});
+	await s.value("item.update", { id: "a", set: { content: "fresh" } }, ann);
+	await new Promise((r) => setTimeout(r, 5));
+	assert.match(seen, /"fresh"/);
+	await s.close();
+});
+
+test("a size with only a width leaves the height to the item", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "frame", id: "f", layout: "vertical", width: 200, height: "fit_content(48)" }, at: { x: 0, y: 600 } }, ann);
+	await s.value("item.update", { id: "f", size: { w: 320 } }, ann);
+	const node = JSON.parse(await text(s, "canvases/plan/canvas.pen")).children.find((n: { id: string }) => n.id === "f");
+	assert.deepEqual([node.width, node.height], [320, "fit_content(48)"]);
+	await s.close();
+});
+
+test("an item given no place joins right of the newest page, in the nearest open slot", async () => {
+	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x", "canvases/plan/stickers/s2/index.html": "y" });
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
+	assert.deepEqual((await s.value<Item>("item.insert", { item: { type: "note", id: "n", width: 240, height: 120 } }, ann)).box!.x1, 460);
+	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s2/index.html", id: "s2" } }, ann);
+	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
+	await s.close();
+});
+
+test("a page already on the canvas is not inserted again", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const again = await s.call("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" } }, ann);
+	assert.ok(!again.ok && again.error.code === "conflict" && /already on this canvas/.test(again.error.message));
+	assert.equal((await s.value<Item[]>("item.list", {}, ann)).filter((i) => i.type === "sticker").length, 1);
+	await s.close();
+});
+
+test("item.space finds room clear of everything, and nothing is placed", async () => {
+	const s = await start();
+	const corner = await s.value<{ x: number; y: number }>("item.space", { size: { w: 100, h: 100 }, near: "b" }, ann);
+	assert.deepEqual(corner, { x: 720, y: 0 });
+	assert.equal((await s.value<Item[]>("item.list", {}, ann)).length, 2);
+	await s.close();
+});
+
 test("canvas.undo takes back the person's edit, and refuses naming who when an agent changed it since", async () => {
 	const s = await start();
 	await s.value("item.update", { id: "a", set: { content: "mine" }, canvas: "plan" });
@@ -68,33 +109,6 @@ test("canvas.undo takes back the person's edit, and refuses naming who when an a
 	await s.close();
 });
 
-test("an item you did not touch is byte for byte the same in the file after an edit", async () => {
-	const s = await start();
-	const before = await text(s, "canvases/plan/canvas.pen");
-	await s.value("item.update", { id: "b", set: { content: "changed" } }, ann);
-	await s.kernel.canvas("plan");
-	const after = await waitFor(() => text(s, "canvases/plan/canvas.pen"), (t) => t !== before);
-	const a = before.slice(before.indexOf("{", 30), before.indexOf("}") + 1);
-	assert.ok(after.includes(a));
-	await s.close();
-});
-
-test("item.space finds room clear of everything, and nothing is placed", async () => {
-	const s = await start();
-	const corner = await s.value<{ x: number; y: number }>("item.space", { size: { w: 100, h: 100 }, near: "b" }, ann);
-	assert.deepEqual(corner, { x: 720, y: 0 });
-	assert.equal((await s.value<Item[]>("item.list", {}, ann)).length, 2);
-	await s.close();
-});
-
-test("item.variables sets a colour that follows the theme, and the change is in the log", async () => {
-	const s = await start();
-	const canvas = await s.value<{ variables: Record<string, unknown> }>("item.variables", { set: { brand: { light: "#111111", dark: "#eeeeee" } } }, ann);
-	assert.deepEqual(canvas.variables.brand, { light: "#111111", dark: "#eeeeee" });
-	assert.equal(s.kernel.canvas("plan").since(0)[0]!.ops[0]!.op, "variables");
-	await s.close();
-});
-
 test("a kind another feature registers owns its nodes; clip and paste carry its files and give new ids", async () => {
 	const s = await start();
 	const st = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 400 } }, ann);
@@ -106,6 +120,58 @@ test("a kind another feature registers owns its nodes; clip and paste carry its 
 	assert.ok(pasted.every((i) => i.id !== "a" && i.id !== st.id));
 	assert.equal(await text(s, "canvases/other/stickers/s1/index.html"), "<p>sticker</p>");
 	assert.equal(pasted.find((i) => i.type === "sticker")!.path, "canvases/other/stickers/s1/index.html");
+	await s.close();
+});
+
+test("before a kind's item is inserted, the kind may prepare it", async () => {
+	const s = await start();
+	const st = await s.value<Item>("item.insert", { item: { type: "sticker", title: "new one" }, at: { x: 0, y: 600 } }, ann);
+	assert.equal(st.path, "canvases/plan/stickers/new-one/index.html");
+	assert.equal(await text(s, "canvases/plan/stickers/new-one/index.html"), "<p>new one</p>");
+	await s.close();
+});
+
+test("a box a kind's prepare adds is a size: the item is still placed beside the newest page", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const made = await s.value<Item>("item.insert", { item: { type: "sticker", title: "sized" } }, ann);
+	assert.deepEqual(made.box, { x1: 460, y1: 600, x2: 760, y2: 800 });
+	await s.close();
+});
+
+test("an arrow whose end names a card by its deck path is routed to it", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const arrow = await s.value<Item>("item.insert", { item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "canvases/plan/stickers/s1/index.html" } } }, ann);
+	assert.ok(arrow.box && arrow.box.y2 > 550, JSON.stringify(arrow.box));
+	await s.close();
+});
+
+test("an item you did not touch is byte for byte the same in the file after an edit", async () => {
+	const s = await start();
+	const before = await text(s, "canvases/plan/canvas.pen");
+	await s.value("item.update", { id: "b", set: { content: "changed" } }, ann);
+	await s.kernel.canvas("plan");
+	const after = await waitFor(() => text(s, "canvases/plan/canvas.pen"), (t) => t !== before);
+	const a = before.slice(before.indexOf("{", 30), before.indexOf("}") + 1);
+	assert.ok(after.includes(a));
+	await s.close();
+});
+
+test("item.variables sets a colour that follows the theme, and the change is in the log", async () => {
+	const s = await start();
+	const canvas = await s.value<{ variables: Record<string, unknown> }>("item.variables", { set: { brand: { light: "#111111", dark: "#eeeeee" } } }, ann);
+	assert.deepEqual(canvas.variables.brand, { light: "#111111", dark: "#eeeeee" });
+	assert.equal(s.kernel.canvas("plan").since(0)[0]!.ops[0]!.op, "variables");
+	await s.close();
+});
+
+test("item.list reads everything with its box; a canvas is named by folder or title; none named is here", async () => {
+	const s = await start();
+	const items = await s.value<Item[]>("item.list", {}, ann);
+	assert.deepEqual(items.map((i) => [i.id, i.box]), [["a", { x1: 0, y1: 0, x2: 200, y2: 100 }], ["b", { x1: 360, y1: 0, x2: 560, y2: 100 }]]);
+	assert.equal((await s.value<Item[]>("item.list", { canvas: "The plan" }, "agent")).length, 2);
+	assert.equal((await s.call("item.list", {}, "agent")).ok, false);
 	await s.close();
 });
 
@@ -125,16 +191,16 @@ test("canvas.list, create, update, copy, delete and here", async () => {
 	await s.close();
 });
 
-test("frame.create, list, get and save: a frame file holds one reusable item, placed as a ref", async () => {
+test("a canvas made from outside takes its title from canvas.json, and a rename from outside is read in", async () => {
 	const s = await start();
-	const made = await s.value<{ path: string; id: string }>("frame.create", { path: "frames/ui/chip", item: { type: "note", id: "chip", content: "Chip" } }, ann);
-	assert.deepEqual(made, { path: "frames/ui/chip", id: "chip", ref: "frames/ui/chip" });
-	const saved = await s.value<{ path: string; id: string }>("frame.save", { id: "b", path: "frames/b" }, ann);
-	assert.equal(saved.id, "b");
-	assert.equal((await s.value<Item>("item.get", { id: "b" }, ann)).type, "ref");
-	assert.deepEqual((await s.value<{ path: string }[]>("frame.list", {}, ann)).map((f) => f.path).sort(), ["frames/b", "frames/ui/chip"]);
-	assert.equal((await s.value<{ id: string }>("frame.get", { path: "frames/b" }, ann)).id, "b");
-	assert.equal((await s.value<Item[]>("item.list", { frame: "frames/b" }, ann))[0]!.id, "b");
+	const put = (path: string, body: string) => s.deck.write(toDeckPath(path), new TextEncoder().encode(body), callers.agent("studio"));
+	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Garden plan" }));
+	await put("canvases/garden/canvas.pen", `${JSON.stringify({ version: "2.14", children: [] })}\n`);
+	const titleOf = async () => (await s.value<{ name: string; title: string }[]>("canvas.list")).find((c) => c.name === "garden")?.title;
+	assert.equal(await waitFor(titleOf, (t) => t !== undefined), "Garden plan");
+	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Kitchen garden" }));
+	assert.equal(await waitFor(titleOf, (t) => t === "Kitchen garden"), "Kitchen garden");
+	assert.ok(s.heard.some((e) => e.name === "canvas.changed" && e.payload.canvas === "garden" && e.payload.by === "studio"));
 	await s.close();
 });
 
@@ -157,60 +223,6 @@ async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promis
 	return read();
 }
 
-test("item.changed comes after the file is written, so a listener reads the new drawing", async () => {
-	const s = await start();
-	let seen = "";
-	s.kernel.events.on((await import("../../protocol/index.ts")).events.itemChanged, () => {
-		void s.deck.read(toDeckPath("canvases/plan/canvas.pen")).then((b) => { seen = new TextDecoder().decode(b); });
-	});
-	await s.value("item.update", { id: "a", set: { content: "fresh" } }, ann);
-	await new Promise((r) => setTimeout(r, 5));
-	assert.match(seen, /"fresh"/);
-	await s.close();
-});
-
-test("a size with only a width leaves the height to the item", async () => {
-	const s = await start();
-	await s.value("item.insert", { item: { type: "frame", id: "f", layout: "vertical", width: 200, height: "fit_content(48)" }, at: { x: 0, y: 600 } }, ann);
-	await s.value("item.update", { id: "f", size: { w: 320 } }, ann);
-	const node = JSON.parse(await text(s, "canvases/plan/canvas.pen")).children.find((n: { id: string }) => n.id === "f");
-	assert.deepEqual([node.width, node.height], [320, "fit_content(48)"]);
-	await s.close();
-});
-
-test("an arrow whose end names a card by its deck path is routed to it", async () => {
-	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	const arrow = await s.value<Item>("item.insert", { item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "canvases/plan/stickers/s1/index.html" } } }, ann);
-	assert.ok(arrow.box && arrow.box.y2 > 550, JSON.stringify(arrow.box));
-	await s.close();
-});
-
-test("before a kind's item is inserted, the kind may prepare it", async () => {
-	const s = await start();
-	const st = await s.value<Item>("item.insert", { item: { type: "sticker", title: "new one" }, at: { x: 0, y: 600 } }, ann);
-	assert.equal(st.path, "canvases/plan/stickers/new-one/index.html");
-	assert.equal(await text(s, "canvases/plan/stickers/new-one/index.html"), "<p>new one</p>");
-	await s.close();
-});
-
-test("an item given no place joins right of the newest page, in the nearest open slot", async () => {
-	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x", "canvases/plan/stickers/s2/index.html": "y" });
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
-	assert.deepEqual((await s.value<Item>("item.insert", { item: { type: "note", id: "n", width: 240, height: 120 } }, ann)).box!.x1, 460);
-	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s2/index.html", id: "s2" } }, ann);
-	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
-	await s.close();
-});
-
-test("a box a kind's prepare adds is a size: the item is still placed beside the newest page", async () => {
-	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	const made = await s.value<Item>("item.insert", { item: { type: "sticker", title: "sized" } }, ann);
-	assert.deepEqual(made.box, { x1: 460, y1: 600, x2: 760, y2: 800 });
-	await s.close();
-});
-
 test("a drawing written back to an earlier text of its own is read in, not taken for an echo", async () => {
 	const s = await start();
 	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
@@ -224,34 +236,15 @@ test("a drawing written back to an earlier text of its own is read in, not taken
 	await s.close();
 });
 
-test("a canvas made from outside takes its title from canvas.json, and a rename from outside is read in", async () => {
+test("frame.create, list, get and save: a frame file holds one reusable item, placed as a ref", async () => {
 	const s = await start();
-	const put = (path: string, body: string) => s.deck.write(toDeckPath(path), new TextEncoder().encode(body), callers.agent("studio"));
-	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Garden plan" }));
-	await put("canvases/garden/canvas.pen", `${JSON.stringify({ version: "2.14", children: [] })}\n`);
-	const titleOf = async () => (await s.value<{ name: string; title: string }[]>("canvas.list")).find((c) => c.name === "garden")?.title;
-	assert.equal(await waitFor(titleOf, (t) => t !== undefined), "Garden plan");
-	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Kitchen garden" }));
-	assert.equal(await waitFor(titleOf, (t) => t === "Kitchen garden"), "Kitchen garden");
-	assert.ok(s.heard.some((e) => e.name === "canvas.changed" && e.payload.canvas === "garden" && e.payload.by === "studio"));
-	await s.close();
-});
-
-test("a page already on the canvas is not inserted again", async () => {
-	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	const again = await s.call("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" } }, ann);
-	assert.ok(!again.ok && again.error.code === "conflict" && /already on this canvas/.test(again.error.message));
-	assert.equal((await s.value<Item[]>("item.list", {}, ann)).filter((i) => i.type === "sticker").length, 1);
-	await s.close();
-});
-
-test("a page is named by its path, with or without the canvas's folder, or by its own folder", async () => {
-	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	for (const name of ["canvases/plan/stickers/s1/index.html", "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1/"]) {
-		assert.equal((await s.value<Item>("item.get", { id: name }, ann)).id, "st", name);
-	}
-	assert.deepEqual(await s.value("item.delete", { id: "canvases/plan/stickers/s1" }, ann), { deleted: "canvases/plan/stickers/s1" });
+	const made = await s.value<{ path: string; id: string }>("frame.create", { path: "frames/ui/chip", item: { type: "note", id: "chip", content: "Chip" } }, ann);
+	assert.deepEqual(made, { path: "frames/ui/chip", id: "chip", ref: "frames/ui/chip" });
+	const saved = await s.value<{ path: string; id: string }>("frame.save", { id: "b", path: "frames/b" }, ann);
+	assert.equal(saved.id, "b");
+	assert.equal((await s.value<Item>("item.get", { id: "b" }, ann)).type, "ref");
+	assert.deepEqual((await s.value<{ path: string }[]>("frame.list", {}, ann)).map((f) => f.path).sort(), ["frames/b", "frames/ui/chip"]);
+	assert.equal((await s.value<{ id: string }>("frame.get", { path: "frames/b" }, ann)).id, "b");
+	assert.equal((await s.value<Item[]>("item.list", { frame: "frames/b" }, ann))[0]!.id, "b");
 	await s.close();
 });

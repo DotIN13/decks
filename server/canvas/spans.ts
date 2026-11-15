@@ -8,63 +8,12 @@ type Span = { start: number; end: number; value: Json };
 /** The old text, its items' spans by id, and the indent it uses. */
 export type Source = { text: string; items: Map<string, Span>; indent: string };
 
+// Reading the old text
 export function sourceOf(text: string): Source {
 	const items = new Map<string, Span>();
 	const scan = new Scanner(text, items);
 	scan.value();
 	return { text, items, indent: indentOf(text) };
-}
-
-/** The file for `doc`, reusing the old text of every unchanged item. */
-export function writeLike(source: Source | undefined, doc: Record<string, unknown>): string {
-	if (!source) return `${JSON.stringify(doc, null, 2)}\n`;
-	const out = new Writer(source);
-	return `${out.node(doc as Json, 0, true)}\n`;
-}
-
-function indentOf(text: string): string {
-	const m = /\n([ \t]+)"/.exec(text);
-	return m ? m[1]! : "  ";
-}
-
-function same(a: Json, b: Json): boolean {
-	if (a === b) return true;
-	if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-	if (Array.isArray(a) !== Array.isArray(b)) return false;
-	if (Array.isArray(a)) return a.length === (b as Json[]).length && a.every((v, i) => same(v, (b as Json[])[i]!));
-	const ka = Object.keys(a), kb = Object.keys(b as object);
-	if (ka.length !== kb.length) return false;
-	return ka.every((k, i) => k === kb[i] && same(a[k]!, (b as Record<string, Json>)[k]!));
-}
-
-class Writer {
-	constructor(private source: Source) {}
-
-	node(value: Json, depth: number, root = false): string {
-		if (!root && value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string") {
-			const old = this.source.items.get(value.id);
-			if (old && same(old.value, value)) return this.source.text.slice(old.start, old.end);
-		}
-		if (!value || typeof value !== "object" || Array.isArray(value)) return this.plain(value, depth);
-		const pad = this.source.indent.repeat(depth + 1);
-		const fields = Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => {
-			const body = k === "children" && Array.isArray(v) ? this.list(v, depth + 1) : this.plain(v, depth + 1);
-			return `${pad}${JSON.stringify(k)}: ${body}`;
-		});
-		if (!fields.length) return "{}";
-		return `{\n${fields.join(",\n")}\n${this.source.indent.repeat(depth)}}`;
-	}
-
-	private list(items: Json[], depth: number): string {
-		if (!items.length) return "[]";
-		const pad = this.source.indent.repeat(depth + 1);
-		return `[\n${items.map((one) => pad + this.node(one, depth + 1)).join(",\n")}\n${this.source.indent.repeat(depth)}]`;
-	}
-
-	private plain(value: Json, depth: number): string {
-		const text = JSON.stringify(value, null, this.source.indent);
-		return text.split("\n").join(`\n${this.source.indent.repeat(depth)}`);
-	}
 }
 
 /** A JSON reader that notes where each object with an id starts and ends. */
@@ -130,4 +79,57 @@ class Scanner {
 	private space(): void {
 		while (/\s/.test(this.text[this.at] ?? "")) this.at++;
 	}
+}
+
+function indentOf(text: string): string {
+	const m = /\n([ \t]+)"/.exec(text);
+	return m ? m[1]! : "  ";
+}
+
+// Writing it back
+/** The file for `doc`, reusing the old text of every unchanged item. */
+export function writeLike(source: Source | undefined, doc: Record<string, unknown>): string {
+	if (!source) return `${JSON.stringify(doc, null, 2)}\n`;
+	const out = new Writer(source);
+	return `${out.node(doc as Json, 0, true)}\n`;
+}
+
+class Writer {
+	constructor(private source: Source) {}
+
+	node(value: Json, depth: number, root = false): string {
+		if (!root && value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string") {
+			const old = this.source.items.get(value.id);
+			if (old && same(old.value, value)) return this.source.text.slice(old.start, old.end);
+		}
+		if (!value || typeof value !== "object" || Array.isArray(value)) return this.plain(value, depth);
+		const pad = this.source.indent.repeat(depth + 1);
+		const fields = Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => {
+			const body = k === "children" && Array.isArray(v) ? this.list(v, depth + 1) : this.plain(v, depth + 1);
+			return `${pad}${JSON.stringify(k)}: ${body}`;
+		});
+		if (!fields.length) return "{}";
+		return `{\n${fields.join(",\n")}\n${this.source.indent.repeat(depth)}}`;
+	}
+
+	private list(items: Json[], depth: number): string {
+		if (!items.length) return "[]";
+		const pad = this.source.indent.repeat(depth + 1);
+		return `[\n${items.map((one) => pad + this.node(one, depth + 1)).join(",\n")}\n${this.source.indent.repeat(depth)}]`;
+	}
+
+	private plain(value: Json, depth: number): string {
+		const text = JSON.stringify(value, null, this.source.indent);
+		return text.split("\n").join(`\n${this.source.indent.repeat(depth)}`);
+	}
+}
+
+function same(a: Json, b: Json): boolean {
+	if (a === b) return true;
+	if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+	if (Array.isArray(a) !== Array.isArray(b)) return false;
+	if (Array.isArray(a)) return a.length === (b as Json[]).length && a.every((v, i) => same(v, (b as Json[])[i]!));
+	const ka = Object.keys(a), kb = Object.keys(b as object);
+	if (ka.length !== kb.length) return false;
+	return ka.every((k, i) => k === kb[i] && same(a[k]!, (b as Record<string, Json>)[k]!));
 }

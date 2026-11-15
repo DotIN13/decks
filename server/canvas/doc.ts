@@ -3,7 +3,8 @@ import { Refused, type Caller } from "../../protocol/index.ts";
 import type { CanvasDoc, Change, Item, ItemOp, ItemQuery } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
 import { Log, opsBetween } from "./log.ts";
-import { findId as findIn, routeArrows, step } from "./ops.ts";
+import { routeArrows } from "./arrows.ts";
+import { findId as findIn, step } from "./ops.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
 
 // One drawing in memory: read, changed only by apply (all or none), and
@@ -18,6 +19,7 @@ export class PenCanvas implements CanvasDoc {
 	private log = new Log();
 	rev = 0;
 
+	// Reading the drawing
 	constructor(readonly name: string, text: string, private kinds: Kinds, private saved: Saved, private clock: () => number = Date.now) {
 		this.doc = parseOrRefuse(text, name);
 		this.source = sourceOf(text);
@@ -39,6 +41,15 @@ export class PenCanvas implements CanvasDoc {
 		}
 	}
 
+	private items(nodes: PenNode[]): Item[] {
+		return nodes.map((node) => {
+			const item = this.kinds.toItem(node, this.name);
+			if (item !== (node as Item)) return { ...item, box: (node as Item).box };
+			const kids = (node as { children?: PenNode[] }).children;
+			return Array.isArray(kids) ? { ...item, children: this.items(kids) } : item;
+		});
+	}
+
 	/** An id from an id or a card's path; refused when nothing has it. */
 	idOf(ref: string): string {
 		const where = { canvas: this.name, kinds: this.kinds };
@@ -47,6 +58,7 @@ export class PenCanvas implements CanvasDoc {
 		return found;
 	}
 
+	// Changing it: all or none, one revision per change
 	apply(ops: ItemOp[], by: Caller): { items: Item[]; rev: number } {
 		if (!Array.isArray(ops) || !ops.length) throw new Refused("invalid", "Give at least one op.", "item.batch");
 		let work = this.doc;
@@ -70,6 +82,17 @@ export class PenCanvas implements CanvasDoc {
 		return { items: kept.flatMap((id) => this.read({ ids: [id] })), rev: this.rev };
 	}
 
+	private commit(next: PenDocument, ops: ItemOp[], by: Caller, ids: string[], own = by.kind === "person"): void {
+		this.doc = next;
+		this.rev++;
+		const change: Change = { rev: this.rev, ops, by: by.id, at: this.clock() };
+		this.log.add(change, own || by.kind === "card");
+		const text = writeLike(this.source, next as unknown as Record<string, unknown>);
+		this.source = sourceOf(text);
+		this.saved(text, change, [...new Set(ids)], by);
+	}
+
+	// Its log: since, undo and redo, and edits from outside
 	since(rev: number): Change[] {
 		return this.log.since(rev);
 	}
@@ -98,25 +121,6 @@ export class PenCanvas implements CanvasDoc {
 		const change = { rev: this.rev, ops, by, at: this.clock() };
 		this.log.add(change, false);
 		return change;
-	}
-
-	private commit(next: PenDocument, ops: ItemOp[], by: Caller, ids: string[], own = by.kind === "person"): void {
-		this.doc = next;
-		this.rev++;
-		const change: Change = { rev: this.rev, ops, by: by.id, at: this.clock() };
-		this.log.add(change, own || by.kind === "card");
-		const text = writeLike(this.source, next as unknown as Record<string, unknown>);
-		this.source = sourceOf(text);
-		this.saved(text, change, [...new Set(ids)], by);
-	}
-
-	private items(nodes: PenNode[]): Item[] {
-		return nodes.map((node) => {
-			const item = this.kinds.toItem(node, this.name);
-			if (item !== (node as Item)) return { ...item, box: (node as Item).box };
-			const kids = (node as { children?: PenNode[] }).children;
-			return Array.isArray(kids) ? { ...item, children: this.items(kids) } : item;
-		});
 	}
 }
 
