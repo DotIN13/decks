@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/styles/canvas.css",
+	"file": "canvas/styles/canvas.css",
 	"at": "canvas/styles/canvas.css",
 	"pattern": "styles, one sheet per part, beside the part; the same selectors in the same `@layer decks.surface`, so the layer decides the order, not the files",
 	"scope": null,
@@ -27,5 +27,6 @@
 		]
 	},
 	"rest": "view/canvas.css",
-	"note": "The parts named by the map, by what each rule styles: the card editor's words (`cards/card-editor.css`) and its bar, menus and dragged pieces (`cards/card-editor-bar.css`), the media player, the bar over a card (`chrome/bar.css`), the drawn overlay (`.world > .pen-*`), apps and documents, and cards; `view/canvas.css` keeps `.stage*`, `.world` and the engine's own layers. Each sheet opens `@layer decks.surface {`, counted in its lines. `harness/page/index.css` imports each new sheet where it imported `canvas.css`, in the same place, and `cascade-order.json` is regenerated."
+	"note": "The parts named by the map, by what each rule styles: the card editor's words (`cards/card-editor.css`) and its bar, menus and dragged pieces (`cards/card-editor-bar.css`), the media player, the bar over a card (`chrome/bar.css`), the drawn overlay (`.world > .pen-*`), apps and documents, and cards; `view/canvas.css` keeps `.stage*`, `.world` and the engine's own layers. Each sheet opens `@layer decks.surface {`, counted in its lines. `harness/page/index.css` imports each new sheet where it imported `canvas.css`, in the same place, and `cascade-order.json` is regenerated.",
+	"was": "packages/canvas/styles/canvas.css"
 }

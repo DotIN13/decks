@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/cards/CardEditor.tsx",
+	"file": "canvas/cards/CardEditor.tsx",
 	"at": "canvas/cards/CardEditor.tsx",
 	"pattern": "a page part: model, view and actions in cards/editor/; the CardEditor component keeps its props, its signals and the wiring, and each part takes them as one ctx",
 	"scope": "CardEditor",
@@ -89,5 +89,6 @@
 		]
 	},
 	"rest": "CardEditor.tsx",
-	"note": "Beside map.md: a block's inline runs (editor/inline.ts), styling a block (editor/style.ts) and presses, keys and drags (editor/actions-press.ts) are files of their own. The mount effect (today's statement at line 1249) goes with the presses it wires. CardEditor.tsx keeps the props, the signals and calls each part."
+	"note": "Beside map.md: a block's inline runs (editor/inline.ts), styling a block (editor/style.ts) and presses, keys and drags (editor/actions-press.ts) are files of their own. The mount effect (today's statement at line 1249) goes with the presses it wires. CardEditor.tsx keeps the props, the signals and calls each part.",
+	"was": "packages/canvas/src/cards/CardEditor.tsx"
 }

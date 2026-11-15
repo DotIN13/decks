@@ -1,5 +1,5 @@
 {
-	"file": "packages/docs/src/page/gview.ts",
+	"file": "canvas/documents/gview.ts",
 	"at": "canvas/documents/gview.ts",
 	"pattern": "part in plain DOM: the GoogleView class keeps its state, load and render; geometry, editing, lists, tables and history leave as functions given the view",
 	"scope": "GoogleView",
@@ -116,5 +116,6 @@
 		]
 	},
 	"rest": "google/view.ts",
-	"note": "map.md's view, paragraph (here `paginate.ts`, with pagination), geometry, edit, history and units, with three changes: the text-unit helpers go to `google/text-units.ts`, since `google/units.ts` already holds the 167 lines of `gdoc/units.ts`; keys and the clipboard leave `edit.ts` for `keys.ts`; lists, tables, links and comments get `lists.ts`. `gview.ts` stays as `export { GoogleView } from \"./google/view.ts\"`."
+	"note": "map.md's view, paragraph (here `paginate.ts`, with pagination), geometry, edit, history and units, with three changes: the text-unit helpers go to `google/text-units.ts`, since `google/units.ts` already holds the 167 lines of `gdoc/units.ts`; keys and the clipboard leave `edit.ts` for `keys.ts`; lists, tables, links and comments get `lists.ts`. `gview.ts` stays as `export { GoogleView } from \"./google/view.ts\"`.",
+	"was": "packages/docs/src/page/gview.ts"
 }

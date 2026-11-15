@@ -1,13 +1,50 @@
 {
-	"file": "packages/canvas/src/stage/input.ts",
+	"file": "canvas/input/canvas-input.ts",
 	"at": "canvas/input/canvas-input.ts",
 	"pattern": "a page part's actions, by kind of input, beside it in input/; createStageInput (createCanvasInput in step 6) keeps its state and returns the handlers, each part given that state as one ctx",
 	"scope": "createStageInput",
 	"targets": {
-		"keys-shortcuts.ts": ["TOOL_KEYS", "/^ExpressionStatement@(63|95)$/", "shortcut", "local", "onHidden", "onBlur"],
-		"wheel.ts": ["wheel", "gesturing", "nativeWheel", "wheelCarry", "onWheel", "onDrawn", "onCanvas", "centre"],
-		"canvas-touch.ts": ["KeptTouches", "touches", "keptTouches", "claimed", "carried", "pinched", "caught", "poolPans", "panned", "fingerOf", "touch", "onTouchMove", "onTouchEnd", "releaseCarried", "beginTouch", "lostTouches", "gestures", "panFrom", "/^ExpressionStatement@61[4-6]$/"]
+		"keys-shortcuts.ts": [
+			"TOOL_KEYS",
+			"/^ExpressionStatement@(63|95)$/",
+			"shortcut",
+			"local",
+			"onHidden",
+			"onBlur"
+		],
+		"wheel.ts": [
+			"wheel",
+			"gesturing",
+			"nativeWheel",
+			"wheelCarry",
+			"onWheel",
+			"onDrawn",
+			"onCanvas",
+			"centre"
+		],
+		"canvas-touch.ts": [
+			"KeptTouches",
+			"touches",
+			"keptTouches",
+			"claimed",
+			"carried",
+			"pinched",
+			"caught",
+			"poolPans",
+			"panned",
+			"fingerOf",
+			"touch",
+			"onTouchMove",
+			"onTouchEnd",
+			"releaseCarried",
+			"beginTouch",
+			"lostTouches",
+			"gestures",
+			"panFrom",
+			"/^ExpressionStatement@61[4-6]$/"
+		]
 	},
 	"rest": "canvas-input.ts",
-	"note": "As map.md, but the touch file is canvas-touch.ts, since input/pointer/touch.ts and camera/touch.ts already name touch. The key handler (today's statement at line 95, 214 lines) is one function: the sheet cuts it."
+	"note": "As map.md, but the touch file is canvas-touch.ts, since input/pointer/touch.ts and camera/touch.ts already name touch. The key handler (today's statement at line 95, 214 lines) is one function: the sheet cuts it.",
+	"was": "packages/canvas/src/stage/input.ts"
 }

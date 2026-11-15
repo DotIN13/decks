@@ -1,13 +1,67 @@
 {
-	"file": "packages/canvas/src/stage/items-layer.tsx",
+	"file": "canvas/view/items-layer.tsx",
 	"at": "canvas/view/items-layer.tsx",
 	"pattern": "a page part: model, view and actions in items/layer/ (map.md); createItemsLayer keeps its signals and returns the layer, each part given them as one ctx",
 	"scope": "createItemsLayer",
 	"targets": {
-		"../items/layer/model.ts": ["ItemsLayerDeps", "BUDGET", "PINCH_ON_PICTURES", "COVER", "LAYER_BUDGET", "LiveFile", "LIVE_FILES", "cardsOnScreen", "pageCamera", "nearPaths", "isNear", "isVisible", "liveNow", "pageIndex", "pageSlot", "reach", "awakeItems", "cardChoice", "livePaths", "keptPaths", "leavingPaths", "isLeaving", "isPictured", "isKept", "isLive", "rendered", "slotPaths", "isRendered", "renderedPaths", "layered", "restCamera", "SIZE_MS", "SETTLE_MS", "covering", "draggedAsPicture", "cardsHidden"],
-		"../items/layer/actions.ts": ["markLive", "toggleMedia", "/^ExpressionStatement@/", "Block@80", "openLiveFile", "playingBox"],
-		"../items/layer/view.tsx": ["liveFiles", "fileHoles", "liveBox", "pageNode", "presented", "slots", "fileNodes", "player"]
+		"../items/layer/model.ts": [
+			"ItemsLayerDeps",
+			"BUDGET",
+			"PINCH_ON_PICTURES",
+			"COVER",
+			"LAYER_BUDGET",
+			"LiveFile",
+			"LIVE_FILES",
+			"cardsOnScreen",
+			"pageCamera",
+			"nearPaths",
+			"isNear",
+			"isVisible",
+			"liveNow",
+			"pageIndex",
+			"pageSlot",
+			"reach",
+			"awakeItems",
+			"cardChoice",
+			"livePaths",
+			"keptPaths",
+			"leavingPaths",
+			"isLeaving",
+			"isPictured",
+			"isKept",
+			"isLive",
+			"rendered",
+			"slotPaths",
+			"isRendered",
+			"renderedPaths",
+			"layered",
+			"restCamera",
+			"SIZE_MS",
+			"SETTLE_MS",
+			"covering",
+			"draggedAsPicture",
+			"cardsHidden"
+		],
+		"../items/layer/actions.ts": [
+			"markLive",
+			"toggleMedia",
+			"/^ExpressionStatement@/",
+			"Block@80",
+			"openLiveFile",
+			"playingBox"
+		],
+		"../items/layer/view.tsx": [
+			"liveFiles",
+			"fileHoles",
+			"liveBox",
+			"pageNode",
+			"presented",
+			"slots",
+			"fileNodes",
+			"player"
+		]
 	},
 	"rest": "items-layer.tsx",
-	"note": "The parts go to items/layer/ as map.md says; view/items-layer.tsx keeps createItemsLayer, its signals and the returned layer, so CanvasView imports it as before."
+	"note": "The parts go to items/layer/ as map.md says; view/items-layer.tsx keeps createItemsLayer, its signals and the returned layer, so CanvasView imports it as before.",
+	"was": "packages/canvas/src/stage/items-layer.tsx"
 }

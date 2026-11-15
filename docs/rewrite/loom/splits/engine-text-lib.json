@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/text/src/lib.rs",
+	"file": "engine/crates/text/src/lib.rs",
 	"at": "engine/crates/text/src/lib.rs",
 	"pattern": "Rust modules by topic; the plain types leave, Text and its methods stay",
 	"scope": null,
@@ -20,5 +20,6 @@
 		]
 	},
 	"rest": "lib.rs",
-	"note": "lib.rs keeps Text and its impl blocks and adds `mod types; pub use types::*;` so every public name stays. map.md named lay.rs; moving the types alone is enough to fall under 400, and `lay` (about 120 lines) is cut in phase 2 in place."
+	"note": "lib.rs keeps Text and its impl blocks and adds `mod types; pub use types::*;` so every public name stays. map.md named lay.rs; moving the types alone is enough to fall under 400, and `lay` (about 120 lines) is cut in phase 2 in place.",
+	"was": "packages/stage/crates/text/src/lib.rs"
 }

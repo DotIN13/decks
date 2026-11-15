@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/scene/src/layout.rs",
+	"file": "engine/crates/scene/src/layout.rs",
 	"at": "engine/crates/scene/src/layout.rs",
 	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
 	"scope": "impl Ctx",
@@ -18,5 +18,6 @@
 		]
 	},
 	"rest": "layout.rs",
-	"note": "layout.rs keeps Ctx, place, frame_content, layout and the constants, declares `mod layout_size;` (in `layout/`) and says `pub use layout_size::{Estimate, Measure, TextStyle};`. frame_content (100 lines) is cut in phase 2 at its axes (main, cross, wrap)."
+	"note": "layout.rs keeps Ctx, place, frame_content, layout and the constants, declares `mod layout_size;` (in `layout/`) and says `pub use layout_size::{Estimate, Measure, TextStyle};`. frame_content (100 lines) is cut in phase 2 at its axes (main, cross, wrap).",
+	"was": "packages/stage/crates/scene/src/layout.rs"
 }

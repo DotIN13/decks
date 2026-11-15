@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/model/drawing.ts",
+	"file": "canvas/drawing/drawing.ts",
 	"at": "canvas/drawing/drawing.ts",
 	"pattern": "model: `createDrawing` keeps its signals and returns the same object; its long steps become functions given a `ctx` of that state",
 	"scope": "createDrawing",
@@ -42,5 +42,6 @@
 		]
 	},
 	"rest": "drawing.ts",
-	"note": "`drawing.ts` keeps `Drawing`, `DrawingOptions` and `createDrawing`: its signals, the pending queue and the returned object. The returned object (54 lines) is built by `drawingApi(ctx)` in `api.ts`, so the closure keeps only its state and that one call."
+	"note": "`drawing.ts` keeps `Drawing`, `DrawingOptions` and `createDrawing`: its signals, the pending queue and the returned object. The returned object (54 lines) is built by `drawingApi(ctx)` in `api.ts`, so the closure keeps only its state and that one call.",
+	"was": "packages/canvas/src/model/drawing.ts"
 }

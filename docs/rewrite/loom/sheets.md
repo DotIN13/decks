@@ -28,7 +28,7 @@ given the instance. Behaviour, markup and class names stay.
 | [*canvas/chrome/Properties.tsx*](#canvas-chrome-Properties) | 1249 | 9 | 270 | 0 |
 | [*canvas/documents/gview.ts*](#canvas-documents-gview) | 2091 | 8 | 367 | 1 |
 | [*canvas/documents/live.ts*](#canvas-documents-live-builder) | 2053 | 6 | 315 | 4 |
-| [*canvas/documents/live/editor.ts*](#canvas-documents-live-editor) | 2053 | 8 | 351 | 4 |
+| [*canvas/documents/live.ts*](#canvas-documents-live-editor) | 2053 | 8 | 351 | 4 |
 | [*canvas/documents/page.ts*](#canvas-documents-page) | 1751 | 9 | 352 | 1 |
 | [*canvas/documents/tex.ts*](#canvas-documents-tex) | 247 | 1 | 248 | 1 |
 | [*canvas/drawing/drawing.ts*](#canvas-drawing-drawing) | 576 | 5 | 187 | 0 |
@@ -41,7 +41,7 @@ given the instance. Behaviour, markup and class names stay.
 | [*canvas/editor/dom/effects.ts*](#canvas-editor-dom-effects) | 219 | 1 | 219 | 1 |
 | [*canvas/editor/editor.tsx*](#canvas-editor-editor) | 352 | 1 | 351 | 1 |
 | [*canvas/host/inside/backend.ts*](#canvas-host-inside-backend) | 196 | 1 | 196 | 1 |
-| [*canvas/host/inside/boot.ts*](#canvas-host-inside-boot) | 253 | 1 | 253 | 1 |
+| [*canvas/host/inside/boot.ts*](#canvas-host-inside-boot) | 279 | 1 | 279 | 1 |
 | [*canvas/host/inside/clipboard.ts*](#canvas-host-inside-clipboard) | 189 | 1 | 189 | 1 |
 | [*canvas/host/inside/events.ts*](#canvas-host-inside-events) | 299 | 1 | 299 | 1 |
 | [*canvas/host/inside/frame.tsx*](#canvas-host-inside-frame) | 207 | 1 | 207 | 2 |
@@ -59,7 +59,7 @@ given the instance. Behaviour, markup and class names stay.
 | [*canvas/items/item-surfaces.tsx*](#canvas-items-item-surfaces) | 248 | 1 | 251 | 1 |
 | [*canvas/render/engine.ts*](#canvas-render-engine) | 2481 | 12 | 343 | 2 |
 | [*canvas/styles/canvas.css*](#canvas-styles-canvas) | 1700 | 8 | 346 | 0 |
-| [*canvas/view/CanvasView.tsx*](#canvas-view-CanvasView) | 938 | 6 | 306 | 0 |
+| [*canvas/view/CanvasView.tsx*](#canvas-view-CanvasView) | 938 | 6 | 305 | 0 |
 | [*canvas/view/items-layer.tsx*](#canvas-view-items-layer) | 754 | 4 | 282 | 0 |
 | [*canvas/view/selection.tsx*](#canvas-view-selection) | 452 | 4 | 170 | 1 |
 | [*engine/crates/doc/src/lib.rs*](#engine-doc-lib) | 600 | 5 | 215 | 0 |
@@ -87,7 +87,7 @@ given the instance. Behaviour, markup and class names stay.
 
 <a id="canvas-camera-controller"></a>
 
-## *packages/canvas/src/camera/controller.ts* (490 lines) → *canvas/camera/controller.ts*
+## *canvas/camera/controller.ts* (490 lines) → *canvas/camera/controller.ts*
 
 Pattern: model: the controller keeps its signals and returns the same object; writing and motion leave it as functions given a `ctx`.
 
@@ -107,7 +107,7 @@ No function stays over 80 lines.
 
 <a id="canvas-camera-insets"></a>
 
-## *packages/canvas/src/camera/insets.ts* (284 lines) → *canvas/camera/insets.ts*
+## *canvas/camera/insets.ts* (284 lines) → *canvas/camera/insets.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -121,7 +121,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-camera-view-calls"></a>
 
-## *packages/canvas/src/camera/stage-ops.ts* (210 lines) → *canvas/camera/view-calls.ts*
+## *canvas/camera/view-calls.ts* (210 lines) → *canvas/camera/view-calls.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -135,7 +135,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-cards-CardEditor"></a>
 
-## *packages/canvas/src/cards/CardEditor.tsx* (1470 lines) → *canvas/cards/CardEditor.tsx*
+## *canvas/cards/CardEditor.tsx* (1470 lines) → *canvas/cards/CardEditor.tsx*
 
 Pattern: a page part: model, view and actions in cards/editor/; the CardEditor component keeps its props, its signals and the wiring, and each part takes them as one ctx.
 
@@ -162,7 +162,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-cards-card-surface"></a>
 
-## *packages/canvas/src/items/card-surface.tsx* (260 lines) → *canvas/cards/card-surface.tsx*
+## *canvas/cards/card-surface.tsx* (260 lines) → *canvas/cards/card-surface.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -176,7 +176,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-cards-card"></a>
 
-## *packages/canvas/src/items/card.ts* (760 lines) → *canvas/cards/card.ts*
+## *canvas/cards/card.ts* (760 lines) → *canvas/cards/card.ts*
 
 Pattern: logic by topic, top-level parts; card.ts keeps mountCard, the one thing its importers call.
 
@@ -196,7 +196,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-cards-markdown"></a>
 
-## *packages/canvas/src/model/markdown.ts* (366 lines) → *canvas/cards/markdown.ts*
+## *canvas/cards/markdown.ts* (366 lines) → *canvas/cards/markdown.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -211,7 +211,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-AgentCursor"></a>
 
-## *packages/canvas/src/ui/AgentCursor.tsx* (120 lines) → *canvas/chrome/AgentCursor.tsx*
+## *canvas/chrome/AgentCursor.tsx* (120 lines) → *canvas/chrome/AgentCursor.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -225,7 +225,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-Callout"></a>
 
-## *packages/canvas/src/ui/Callout.tsx* (345 lines) → *canvas/chrome/Callout.tsx*
+## *canvas/chrome/Callout.tsx* (345 lines) → *canvas/chrome/Callout.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -239,7 +239,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-ColorPicker"></a>
 
-## *packages/canvas/src/ui/ColorPicker.tsx* (249 lines) → *canvas/chrome/ColorPicker.tsx*
+## *canvas/chrome/ColorPicker.tsx* (249 lines) → *canvas/chrome/ColorPicker.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -253,7 +253,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-InkBar"></a>
 
-## *packages/canvas/src/ui/InkBar.tsx* (154 lines) → *canvas/chrome/InkBar.tsx*
+## *canvas/chrome/InkBar.tsx* (154 lines) → *canvas/chrome/InkBar.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -267,7 +267,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-Insert"></a>
 
-## *packages/canvas/src/ui/Insert.tsx* (212 lines) → *canvas/chrome/Insert.tsx*
+## *canvas/chrome/Insert.tsx* (212 lines) → *canvas/chrome/Insert.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -281,7 +281,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-InsertMenu"></a>
 
-## *packages/canvas/src/ui/InsertMenu.tsx* (195 lines) → *canvas/chrome/InsertMenu.tsx*
+## *canvas/chrome/InsertMenu.tsx* (195 lines) → *canvas/chrome/InsertMenu.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -295,7 +295,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-PenBar"></a>
 
-## *packages/canvas/src/ui/PenBar.tsx* (139 lines) → *canvas/chrome/PenBar.tsx*
+## *canvas/chrome/PenBar.tsx* (139 lines) → *canvas/chrome/PenBar.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -309,7 +309,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-chrome-Properties"></a>
 
-## *packages/canvas/src/ui/Properties.tsx* (1249 lines) → *canvas/chrome/Properties.tsx*
+## *canvas/chrome/Properties.tsx* (1249 lines) → *canvas/chrome/Properties.tsx*
 
 Pattern: a page part: model, view and actions in chrome/properties/; Properties keeps its signals and the panel's place, and returns the view.
 
@@ -334,7 +334,7 @@ No function stays over 80 lines.
 
 <a id="canvas-documents-gview"></a>
 
-## *packages/docs/src/page/gview.ts* (2091 lines) → *canvas/documents/gview.ts*
+## *canvas/documents/gview.ts* (2091 lines) → *canvas/documents/gview.ts*
 
 Pattern: part in plain DOM: the GoogleView class keeps its state, load and render; geometry, editing, lists, tables and history leave as functions given the view.
 
@@ -357,7 +357,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-documents-live-builder"></a>
 
-## *packages/docs/src/page/live.ts* (2053 lines) → *canvas/documents/live.ts*
+## *canvas/documents/live.ts* (2053 lines) → *canvas/documents/live.ts*
 
 Pattern: pure logic, split by topic: the Builder (source text to drawn blocks) leaves *live.ts* for `live/`; this spec is its half.
 
@@ -381,7 +381,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-documents-live-editor"></a>
 
-## *packages/docs/src/page/live.ts* (2053 lines) → *canvas/documents/live/editor.ts*
+## *canvas/documents/live.ts* (2053 lines) → *canvas/documents/live.ts*
 
 Pattern: part: the LiveEditor class keeps its state and its rendering; input, blocks and history leave as functions given the editor.
 
@@ -407,7 +407,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-documents-page"></a>
 
-## *packages/docs/src/page/page.ts* (1751 lines) → *canvas/documents/page.ts*
+## *canvas/documents/page.ts* (1751 lines) → *canvas/documents/page.ts*
 
 Pattern: part in plain DOM: model (the page's state), view (what it draws), actions (versions, PDF, git, Google), plus the toolbars, the elements it builds, and its sheet.
 
@@ -433,7 +433,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-documents-tex"></a>
 
-## *packages/docs/src/page/tex.ts* (247 lines) → *canvas/documents/tex.ts*
+## *canvas/documents/tex.ts* (247 lines) → *canvas/documents/tex.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -447,7 +447,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-drawing-drawing"></a>
 
-## *packages/canvas/src/model/drawing.ts* (576 lines) → *canvas/drawing/drawing.ts*
+## *canvas/drawing/drawing.ts* (576 lines) → *canvas/drawing/drawing.ts*
 
 Pattern: model: `createDrawing` keeps its signals and returns the same object; its long steps become functions given a `ctx` of that state.
 
@@ -468,7 +468,7 @@ No function stays over 80 lines.
 
 <a id="canvas-editor-core-gesture"></a>
 
-## *packages/canvas/src/edit/core/gesture.ts* (694 lines) → *canvas/editor/core/gesture.ts*
+## *canvas/editor/core/gesture.ts* (694 lines) → *canvas/editor/core/gesture.ts*
 
 Pattern: pure logic, split by topic: the gesture's types and `step` stay; each kind of press moves to a file of its own.
 
@@ -487,7 +487,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-editor-core-overlay-json"></a>
 
-## *packages/canvas/src/edit/core/overlay-json.ts* (119 lines) → *canvas/editor/core/overlay-json.ts*
+## *canvas/editor/core/overlay-json.ts* (119 lines) → *canvas/editor/core/overlay-json.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -501,7 +501,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-editor-core-overlay"></a>
 
-## *packages/canvas/src/edit/core/overlay.ts* (547 lines) → *canvas/editor/core/overlay.ts*
+## *canvas/editor/core/overlay.ts* (547 lines) → *canvas/editor/core/overlay.ts*
 
 Pattern: pure logic, split by topic.
 
@@ -519,7 +519,7 @@ No function stays over 80 lines.
 
 <a id="canvas-editor-dom-OverlayLayer"></a>
 
-## *packages/canvas/src/edit/dom/OverlayLayer.tsx* (431 lines) → *canvas/editor/dom/OverlayLayer.tsx*
+## *canvas/editor/dom/OverlayLayer.tsx* (431 lines) → *canvas/editor/dom/OverlayLayer.tsx*
 
 Pattern: view: the component's 366-line JSX is cut at its top-level children into three components; the model is *editor/core/overlay.ts* already.
 
@@ -538,7 +538,7 @@ No function stays over 80 lines.
 
 <a id="canvas-editor-dom-TextEditing"></a>
 
-## *packages/canvas/src/edit/dom/TextEditing.tsx* (483 lines) → *canvas/editor/dom/TextEditing.tsx*
+## *canvas/editor/dom/TextEditing.tsx* (483 lines) → *canvas/editor/dom/TextEditing.tsx*
 
 Pattern: part: model (the editing state and what it returns), view (`TextEditor`), actions (opening, typing, committing).
 
@@ -559,7 +559,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-editor-dom-controller"></a>
 
-## *packages/canvas/src/edit/dom/controller.ts* (305 lines) → *canvas/editor/dom/controller.ts*
+## *canvas/editor/dom/controller.ts* (305 lines) → *canvas/editor/dom/controller.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -573,7 +573,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-editor-dom-effects"></a>
 
-## *packages/canvas/src/edit/dom/effects.ts* (219 lines) → *canvas/editor/dom/effects.ts*
+## *canvas/editor/dom/effects.ts* (219 lines) → *canvas/editor/dom/effects.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -587,7 +587,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-editor-editor"></a>
 
-## *packages/canvas/src/editor.tsx* (352 lines) → *canvas/editor/editor.tsx*
+## *canvas/editor/editor.tsx* (352 lines) → *canvas/editor/editor.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -601,7 +601,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-backend"></a>
 
-## *packages/canvas/src/frame/inside/backend.ts* (196 lines) → *canvas/host/inside/backend.ts*
+## *canvas/host/inside/backend.ts* (196 lines) → *canvas/host/inside/backend.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -615,21 +615,21 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-boot"></a>
 
-## *packages/canvas/src/frame/inside/boot.ts* (253 lines) → *canvas/host/inside/boot.ts*
+## *canvas/host/inside/boot.ts* (279 lines) → *canvas/host/inside/boot.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
 | new file | lines | what goes there |
 |---|---|---|
-| boot.ts | 253 | `FrameContext`, `openFrame`, `cardsOf` |
+| boot.ts | 279 | `FrameContext`, `openFrame`, `cardsOf`, `CardPlacerDeps`, `createCardPlacer` |
 
 Functions still over 80 lines, and where each is cut (line numbers in today's file):
 
-- `openFrame` (221 lines, in boot.ts): L88 `const items = () => {`; L144 `const storage = {`; L187 `return {`
+- `openFrame` (195 lines, in boot.ts): L88 `const items = () => {`; L148 `function cardItem(path: string): { id: string; metadata?: { `; L161 `return {`
 
 <a id="canvas-host-inside-clipboard"></a>
 
-## *packages/canvas/src/frame/inside/clipboard.ts* (189 lines) → *canvas/host/inside/clipboard.ts*
+## *canvas/host/inside/clipboard.ts* (189 lines) → *canvas/host/inside/clipboard.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -643,7 +643,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-events"></a>
 
-## *packages/canvas/src/frame/inside/events.ts* (299 lines) → *canvas/host/inside/events.ts*
+## *canvas/host/inside/events.ts* (299 lines) → *canvas/host/inside/events.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -657,7 +657,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-frame"></a>
 
-## *packages/canvas/src/frame/inside/frame.tsx* (207 lines) → *canvas/host/inside/frame.tsx*
+## *canvas/host/inside/frame.tsx* (207 lines) → *canvas/host/inside/frame.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -672,7 +672,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-line"></a>
 
-## *packages/canvas/src/frame/inside/line.ts* (125 lines) → *canvas/host/inside/line.ts*
+## *canvas/host/inside/line.ts* (125 lines) → *canvas/host/inside/line.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -686,7 +686,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-options"></a>
 
-## *packages/canvas/src/frame/inside/options.ts* (309 lines) → *canvas/host/inside/options.ts*
+## *canvas/host/inside/options.ts* (309 lines) → *canvas/host/inside/options.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -701,7 +701,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-presence"></a>
 
-## *packages/canvas/src/frame/inside/presence.ts* (163 lines) → *canvas/host/inside/presence.ts*
+## *canvas/host/inside/presence.ts* (163 lines) → *canvas/host/inside/presence.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -715,7 +715,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-inside-studio-line"></a>
 
-## *packages/canvas/src/frame/inside/studio-line.ts* (115 lines) → *canvas/host/inside/studio-line.ts*
+## *canvas/host/inside/studio-line.ts* (115 lines) → *canvas/host/inside/studio-line.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -729,7 +729,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-host-outside-framed-editor"></a>
 
-## *packages/canvas/src/frame/outside/host.tsx* (660 lines) → *canvas/host/outside/framed-editor.tsx*
+## *canvas/host/outside/framed-editor.tsx* (660 lines) → *canvas/host/outside/framed-editor.tsx*
 
 Pattern: a page part: model, view and actions beside it in host/outside/; createFramedEditor keeps its state and returns the handle, each part given that state as one ctx.
 
@@ -753,7 +753,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-ink-InkLayer"></a>
 
-## *packages/canvas/src/ink/StageInk.tsx* (704 lines) → *canvas/ink/InkLayer.tsx*
+## *canvas/ink/InkLayer.tsx* (704 lines) → *canvas/ink/InkLayer.tsx*
 
 Pattern: a page part: model, view and actions in ink/layer/; StageInk (InkLayer in step 6) keeps its signals and wires the parts, each given them as one ctx.
 
@@ -774,7 +774,7 @@ No function stays over 80 lines.
 
 <a id="canvas-ink-shaper"></a>
 
-## *packages/ink/src/ink.ts* (421 lines) → *canvas/ink/shaper.ts*
+## *canvas/ink/shaper.ts* (421 lines) → *canvas/ink/shaper.ts*
 
 Pattern: pure logic, split by topic; `inkShaper` (112 lines) is cut in two.
 
@@ -792,7 +792,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-input-canvas-input"></a>
 
-## *packages/canvas/src/stage/input.ts* (687 lines) → *canvas/input/canvas-input.ts*
+## *canvas/input/canvas-input.ts* (687 lines) → *canvas/input/canvas-input.ts*
 
 Pattern: a page part's actions, by kind of input, beside it in input/; createStageInput (createCanvasInput in step 6) keeps its state and returns the handlers, each part given that state as one ctx.
 
@@ -813,7 +813,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-input-pointer"></a>
 
-## *packages/canvas/src/edit/dom/pointer.ts* (900 lines) → *canvas/input/pointer.ts*
+## *canvas/input/pointer.ts* (900 lines) → *canvas/input/pointer.ts*
 
 Pattern: a page part: model and actions in input/pointer/; createPointer keeps its state and returns the handlers, each part given that state as one ctx.
 
@@ -836,7 +836,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-items-MediaPlayer"></a>
 
-## *packages/canvas/src/items/MediaPlayer.tsx* (288 lines) → *canvas/items/MediaPlayer.tsx*
+## *canvas/items/MediaPlayer.tsx* (288 lines) → *canvas/items/MediaPlayer.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -850,7 +850,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-items-item-slot"></a>
 
-## *packages/canvas/src/items/item-slot.tsx* (289 lines) → *canvas/items/item-slot.tsx*
+## *canvas/items/item-slot.tsx* (289 lines) → *canvas/items/item-slot.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -864,7 +864,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-items-item-surfaces"></a>
 
-## *packages/canvas/src/items/item-surfaces.tsx* (248 lines) → *canvas/items/item-surfaces.tsx*
+## *canvas/items/item-surfaces.tsx* (248 lines) → *canvas/items/item-surfaces.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -878,7 +878,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-render-engine"></a>
 
-## *packages/canvas/src/render/engine.ts* (2481 lines) → *canvas/render/engine.ts*
+## *canvas/render/engine.ts* (2481 lines) → *canvas/render/engine.ts*
 
 Pattern: pure logic around one class, split by topic; the class keeps its fields and constructor, and each method that leaves it becomes a function given the engine (its fields as one ctx).
 
@@ -906,7 +906,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="canvas-styles-canvas"></a>
 
-## *packages/canvas/styles/canvas.css* (1700 lines) → *canvas/styles/canvas.css*
+## *canvas/styles/canvas.css* (1700 lines) → *canvas/styles/canvas.css*
 
 Pattern: styles, one sheet per part, beside the part; the same selectors in the same `@layer decks.surface`, so the layer decides the order, not the files.
 
@@ -928,7 +928,7 @@ No function stays over 80 lines.
 
 <a id="canvas-view-CanvasView"></a>
 
-## *packages/canvas/src/stage/Stage.tsx* (938 lines) → *canvas/view/CanvasView.tsx*
+## *canvas/view/CanvasView.tsx* (938 lines) → *canvas/view/CanvasView.tsx*
 
 Pattern: a page part: model, view and actions in view/; the Stage component (CanvasView in step 6) keeps its signals and elements and wires the parts, each given them as one ctx.
 
@@ -937,7 +937,7 @@ Beside map.md: the effects that keep the engine, the overlays and the ink in ste
 | new file | lines | what goes there |
 |---|---|---|
 | CanvasView.tsx | 95 | `ExportDeclaration@62`, `element`, `worldEl`, `cameraChanged`, `[view, setView]`, `[worldOrigin, setWorldOrigin]`, `[worldPlaced, setWorldPlaced]`, `{ moving, scaling, gliding, panning }`, `[holdMenu, setHoldMenu]`, `{ grabbing }`, `ExpressionStatement@373`, `[engineNotice, setEngineNotice]`, `ExpressionStatement@376`, `ExpressionStatement@377`, `ExpressionStatement@383`, `ExpressionStatement@384`, `[penDrawn, setPenDrawn]`, `[engineOverlays, setEngineOverlays]` |
-| model.ts | 306 | `StageProps`, `Frame`, `origin`, `worldFor`, `ownScroll`, `placeWorld`, `placeScroll`, `zoomScroll`, `zoomStill`, `placedZoom`, `worldAt`, `freshId`, `freshIds`, `penNode`, `scenePages`, `scene`, `resolvedColours`, `resolveColour`, `colourProbe`, `colours`, `coloursFor`, `inkStrokes`, `readFor`, `frameUnder`, `dropSlot`, `overLink`, `fitted` |
+| model.ts | 305 | `StageProps`, `Frame`, `origin`, `worldFor`, `ownScroll`, `placeWorld`, `placeScroll`, `zoomScroll`, `zoomStill`, `placedZoom`, `worldAt`, `freshId`, `freshIds`, `penNode`, `scenePages`, `scene`, `resolvedColours`, `resolveColour`, `colourProbe`, `colours`, `coloursFor`, `inkStrokes`, `readFor`, `frameUnder`, `dropSlot`, `overLink`, `fitted` |
 | actions.ts | 194 | `ctl`, `ExpressionStatement@275`, `ExpressionStatement@284`, `ExpressionStatement@300`, `scrolled`, `frame`, `penEdit`, `input`, `penLayer`, `ExpressionStatement@390`, `items`, `armPenTool`, `penMoveBy` |
 | effects.ts | 159 | `ExpressionStatement@558`, `ExpressionStatement@579`, `ExpressionStatement@611`, `ExpressionStatement@618`, `ExpressionStatement@634`, `ExpressionStatement@647`, `ExpressionStatement@649`, `ExpressionStatement@660`, `Block@665`, `ExpressionStatement@684`, `ExpressionStatement@694`, `ExpressionStatement@707`, `ExpressionStatement@713`, `ExpressionStatement@728`, `ExpressionStatement@770` |
 | editor-wiring.ts | 145 | `editor`, `selection` |
@@ -950,7 +950,7 @@ No function stays over 80 lines.
 
 <a id="canvas-view-items-layer"></a>
 
-## *packages/canvas/src/stage/items-layer.tsx* (754 lines) → *canvas/view/items-layer.tsx*
+## *canvas/view/items-layer.tsx* (754 lines) → *canvas/view/items-layer.tsx*
 
 Pattern: a page part: model, view and actions in items/layer/ (map.md); createItemsLayer keeps its signals and returns the layer, each part given them as one ctx.
 
@@ -970,7 +970,7 @@ No function stays over 80 lines.
 
 <a id="canvas-view-selection"></a>
 
-## *packages/canvas/src/stage/selection.tsx* (452 lines) → *canvas/view/selection.tsx*
+## *canvas/view/selection.tsx* (452 lines) → *canvas/view/selection.tsx*
 
 Pattern: part: model (what the selection derives), view (the pills, the overlay it feeds), actions (delete, duplicate).
 
@@ -991,7 +991,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="engine-doc-lib"></a>
 
-## *packages/stage/crates/doc/src/lib.rs* (600 lines) → *engine/crates/doc/src/lib.rs*
+## *engine/crates/doc/src/lib.rs* (600 lines) → *engine/crates/doc/src/lib.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1010,7 +1010,7 @@ No function stays over 80 lines.
 
 <a id="engine-gpu-lib"></a>
 
-## *packages/stage/crates/gpu/src/lib.rs* (402 lines) → *engine/crates/gpu/src/lib.rs*
+## *engine/crates/gpu/src/lib.rs* (402 lines) → *engine/crates/gpu/src/lib.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1027,7 +1027,7 @@ No function stays over 80 lines.
 
 <a id="engine-gpu-tests"></a>
 
-## *packages/stage/crates/gpu/src/tests.rs* (651 lines) → *engine/crates/gpu/src/tests.rs*
+## *engine/crates/gpu/src/tests.rs* (651 lines) → *engine/crates/gpu/src/tests.rs*
 
 Pattern: test modules by subject, under tests/; shared helpers in tests/mod.rs.
 
@@ -1046,7 +1046,7 @@ No function stays over 80 lines.
 
 <a id="engine-paint-painter"></a>
 
-## *packages/stage/crates/paint/src/painter.rs* (1174 lines) → *engine/crates/paint/src/painter.rs*
+## *engine/crates/paint/src/painter.rs* (1174 lines) → *engine/crates/paint/src/painter.rs*
 
 Pattern: Rust modules by topic; free functions move whole.
 
@@ -1066,7 +1066,7 @@ No function stays over 80 lines.
 
 <a id="engine-scene-layout"></a>
 
-## *packages/stage/crates/scene/src/layout.rs* (433 lines) → *engine/crates/scene/src/layout.rs*
+## *engine/crates/scene/src/layout.rs* (433 lines) → *engine/crates/scene/src/layout.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1082,7 +1082,7 @@ No function stays over 80 lines.
 
 <a id="engine-scene-lib"></a>
 
-## *packages/stage/crates/scene/src/lib.rs* (517 lines) → *engine/crates/scene/src/lib.rs*
+## *engine/crates/scene/src/lib.rs* (517 lines) → *engine/crates/scene/src/lib.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1101,7 +1101,7 @@ No function stays over 80 lines.
 
 <a id="engine-shot-lib"></a>
 
-## *packages/stage/crates/shot/src/lib.rs* (579 lines) → *engine/crates/shot/src/lib.rs*
+## *engine/crates/shot/src/lib.rs* (579 lines) → *engine/crates/shot/src/lib.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1119,7 +1119,7 @@ No function stays over 80 lines.
 
 <a id="engine-text-card"></a>
 
-## *packages/stage/crates/text/src/card.rs* (545 lines) → *engine/crates/text/src/card.rs*
+## *engine/crates/text/src/card.rs* (545 lines) → *engine/crates/text/src/card.rs*
 
 Pattern: Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate.
 
@@ -1137,7 +1137,7 @@ No function stays over 80 lines.
 
 <a id="engine-text-lib"></a>
 
-## *packages/stage/crates/text/src/lib.rs* (432 lines) → *engine/crates/text/src/lib.rs*
+## *engine/crates/text/src/lib.rs* (432 lines) → *engine/crates/text/src/lib.rs*
 
 Pattern: Rust modules by topic; the plain types leave, Text and its methods stay.
 
@@ -1153,7 +1153,7 @@ No function stays over 80 lines.
 
 <a id="engine-web-bind"></a>
 
-## *packages/stage/crates/web/src/bind.rs* (1137 lines) → *engine/crates/web/src/bind.rs*
+## *engine/crates/web/src/bind.rs* (1137 lines) → *engine/crates/web/src/bind.rs*
 
 Pattern: Rust modules by topic; the `#[wasm_bindgen] impl PageEngine` is split into several `#[wasm_bindgen] impl PageEngine` blocks, which wasm-bindgen allows, so the JavaScript class keeps every method.
 
@@ -1173,7 +1173,7 @@ No function stays over 80 lines.
 
 <a id="engine-web-engine"></a>
 
-## *packages/stage/crates/web/src/engine.rs* (2485 lines) → *engine/crates/web/src/engine.rs*
+## *engine/crates/web/src/engine.rs* (2485 lines) → *engine/crates/web/src/engine.rs*
 
 Pattern: Rust modules by topic; `impl Page` is split across modules as several `impl Page` blocks in one crate, the struct and its fields stay in engine.rs.
 
@@ -1194,7 +1194,7 @@ No function stays over 80 lines.
 
 <a id="pen-diff"></a>
 
-## *packages/pen/src/diff.ts* (301 lines) → *pen/diff.ts*
+## *pen/diff.ts* (301 lines) → *pen/diff.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1209,7 +1209,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="pen-geometry"></a>
 
-## *packages/pen/src/geometry.ts* (266 lines) → *pen/geometry.ts*
+## *pen/geometry.ts* (266 lines) → *pen/geometry.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1223,7 +1223,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="pen-html"></a>
 
-## *packages/pen/src/html.ts* (705 lines) → *pen/html.ts*
+## *pen/html.ts* (705 lines) → *pen/html.ts*
 
 Pattern: pure logic, split by topic; the Writer class keeps its state and its walk, and the methods that leave it become functions given the writer.
 
@@ -1242,7 +1242,7 @@ No function stays over 80 lines.
 
 <a id="pen-layout"></a>
 
-## *packages/pen/src/layout.ts* (419 lines) → *pen/layout.ts*
+## *pen/layout.ts* (419 lines) → *pen/layout.ts*
 
 Pattern: pure logic, split by topic; `layout` (217 lines) is cut into its steps.
 
@@ -1261,7 +1261,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="pen-ops"></a>
 
-## *packages/pen/src/ops.ts* (356 lines) → *pen/ops.ts*
+## *pen/ops.ts* (356 lines) → *pen/ops.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1275,7 +1275,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="pen-outline"></a>
 
-## *packages/pen/src/outline.ts* (165 lines) → *pen/outline.ts*
+## *pen/outline.ts* (165 lines) → *pen/outline.ts*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1289,7 +1289,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="ui-Popover"></a>
 
-## *packages/ui/src/Popover.tsx* (306 lines) → *ui/Popover.tsx*
+## *ui/Popover.tsx* (306 lines) → *ui/Popover.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1304,7 +1304,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="ui-agent-marks"></a>
 
-## *packages/ui/src/agent-marks.tsx* (312 lines) → *ui/agent-marks.tsx*
+## *ui/agent-marks.tsx* (312 lines) → *ui/agent-marks.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 
@@ -1318,7 +1318,7 @@ Functions still over 80 lines, and where each is cut (line numbers in today's fi
 
 <a id="ui-float-float-math"></a>
 
-## *packages/ui/src/float/float-math.ts* (403 lines) → *ui/float/float-math.ts*
+## *ui/float/float-math.ts* (403 lines) → *ui/float/float-math.ts*
 
 Pattern: pure logic, split by topic.
 
@@ -1335,7 +1335,7 @@ No function stays over 80 lines.
 
 <a id="ui-float-float"></a>
 
-## *packages/ui/src/float/float.ts* (586 lines) → *ui/float/float.ts*
+## *ui/float/float.ts* (586 lines) → *ui/float/float.ts*
 
 Pattern: part with no markup of its own: `makeFloat` keeps its state; dragging, the tab and placing leave it as functions given a `ctx`.
 
@@ -1356,7 +1356,7 @@ No function stays over 80 lines.
 
 <a id="ui-scribble"></a>
 
-## *packages/ui/src/scribble.tsx* (206 lines) → *ui/scribble.tsx*
+## *ui/scribble.tsx* (206 lines) → *ui/scribble.tsx*
 
 Pattern: functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below.
 

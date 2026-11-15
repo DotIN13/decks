@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/text/src/card.rs",
+	"file": "engine/crates/text/src/card.rs",
 	"at": "engine/crates/text/src/card.rs",
 	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
 	"scope": "impl Setter",
@@ -26,5 +26,6 @@
 		]
 	},
 	"rest": "card.rs",
-	"note": "card.rs keeps Brush, CardOp, Card, Frame, Opts, Setter, Para, `para`, `place`, `stack` and `layout`, and declares `mod card_one; mod card_table; mod card_marks;` (as children of `card`, in `card/`), with `pub use card_marks::{check_colours, bar_colours};`. map.md named a `card_setter.rs`; `para` and `one` are the setter's bulk, so they split as card.rs and card_one.rs instead. `one` (138) and `para` (110) are cut in phase 2 by block kind."
+	"note": "card.rs keeps Brush, CardOp, Card, Frame, Opts, Setter, Para, `para`, `place`, `stack` and `layout`, and declares `mod card_one; mod card_table; mod card_marks;` (as children of `card`, in `card/`), with `pub use card_marks::{check_colours, bar_colours};`. map.md named a `card_setter.rs`; `para` and `one` are the setter's bulk, so they split as card.rs and card_one.rs instead. `one` (138) and `para` (110) are cut in phase 2 by block kind.",
+	"was": "packages/stage/crates/text/src/card.rs"
 }

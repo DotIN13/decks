@@ -1,12 +1,33 @@
 {
-	"file": "packages/ui/src/float/float-math.ts",
+	"file": "ui/float/float-math.ts",
 	"at": "ui/float/float-math.ts",
 	"pattern": "pure logic, split by topic",
 	"scope": null,
 	"targets": {
-		"stowed.ts": ["stowsRight", "Side", "stowsLeft", "stowSide", "stowedAt", "stowY", "STOWED_KEY", "Stowed", "loadStowed", "saveStowed"],
-		"saved.ts": ["Saved", "FLOATS_KEY", "fromSaved", "fromAnchor", "isSaved", "defaultStorage", "loadFloats", "saveFloat"]
+		"stowed.ts": [
+			"stowsRight",
+			"Side",
+			"stowsLeft",
+			"stowSide",
+			"stowedAt",
+			"stowY",
+			"STOWED_KEY",
+			"Stowed",
+			"loadStowed",
+			"saveStowed"
+		],
+		"saved.ts": [
+			"Saved",
+			"FLOATS_KEY",
+			"fromSaved",
+			"fromAnchor",
+			"isSaved",
+			"defaultStorage",
+			"loadFloats",
+			"saveFloat"
+		]
 	},
 	"rest": "float-math.ts",
-	"note": "map.md put loadFloats with the stowed code; the saved places get a file of their own instead, so both stay small."
+	"note": "map.md put loadFloats with the stowed code; the saved places get a file of their own instead, so both stay small.",
+	"was": "packages/ui/src/float/float-math.ts"
 }

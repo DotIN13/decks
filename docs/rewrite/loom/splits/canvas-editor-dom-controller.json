@@ -1,8 +1,9 @@
 {
-	"file": "packages/canvas/src/edit/dom/controller.ts",
+	"file": "canvas/editor/dom/controller.ts",
 	"at": "canvas/editor/dom/controller.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "controller.ts"
+	"rest": "controller.ts",
+	"was": "packages/canvas/src/edit/dom/controller.ts"
 }

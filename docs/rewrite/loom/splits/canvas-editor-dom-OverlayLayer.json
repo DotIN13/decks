@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/edit/dom/OverlayLayer.tsx",
+	"file": "canvas/editor/dom/OverlayLayer.tsx",
 	"at": "canvas/editor/dom/OverlayLayer.tsx",
 	"pattern": "view: the component's 366-line JSX is cut at its top-level children into three components; the model is `editor/core/overlay.ts` already",
 	"scope": "OverlayLayer",
@@ -18,5 +18,6 @@
 		"overlay/handles.tsx": 95,
 		"overlay/guides.tsx": 135
 	},
-	"note": "The JSX moves by its top-level children (line numbers today): lines 64 to 216 (kin, outlines, selection frame, grip, hover, joins, drop, slots, insert, sides) stay in `view.tsx`; anchors 221-238, handles 350-367, radius 369-384 and page handles 385-403 become `<OverlayHandles>` in `handles.tsx`; guides 239-276, distances 281-299, arrow 300-335, route 336-342, end draft 343-349 and draft 404-427 become `<OverlayGuides>` in `guides.tsx`. `extra` carries those line counts, since the tool measures the JSX as one statement. `OverlayLayer.tsx` stays as a one-line re-export so importers do not change. The tool counts the JSX whole as the scope's own lines; after the cut `OverlayLayer` returns four components, and the 64-216 block it keeps is itself two, `<OverlayOutlines>` (64-147) and `<OverlayMarks>` (148-216), so no function stays over 80."
+	"note": "The JSX moves by its top-level children (line numbers today): lines 64 to 216 (kin, outlines, selection frame, grip, hover, joins, drop, slots, insert, sides) stay in `view.tsx`; anchors 221-238, handles 350-367, radius 369-384 and page handles 385-403 become `<OverlayHandles>` in `handles.tsx`; guides 239-276, distances 281-299, arrow 300-335, route 336-342, end draft 343-349 and draft 404-427 become `<OverlayGuides>` in `guides.tsx`. `extra` carries those line counts, since the tool measures the JSX as one statement. `OverlayLayer.tsx` stays as a one-line re-export so importers do not change. The tool counts the JSX whole as the scope's own lines; after the cut `OverlayLayer` returns four components, and the 64-216 block it keeps is itself two, `<OverlayOutlines>` (64-147) and `<OverlayMarks>` (148-216), so no function stays over 80.",
+	"was": "packages/canvas/src/edit/dom/OverlayLayer.tsx"
 }

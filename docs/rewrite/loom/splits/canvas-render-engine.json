@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/render/engine.ts",
+	"file": "canvas/render/engine.ts",
 	"at": "canvas/render/engine.ts",
 	"pattern": "pure logic around one class, split by topic; the class keeps its fields and constructor, and each method that leaves it becomes a function given the engine (its fields as one ctx)",
 	"scope": "StageEngine",
@@ -214,5 +214,6 @@
 		]
 	},
 	"rest": "engine.ts",
-	"note": "The class is renamed CanvasEngine in step 6, not here. `engine.ts` keeps the fields, the constructor and one-line methods that delegate to the topic files, so `entries/` and `view/` import it as today. Beside map.md: the worker's messages (engine-worker.ts), drawing a frame (engine-draw.ts) and fetching pictures (engine-fetch.ts) are files of their own, to stay under 370."
+	"note": "The class is renamed CanvasEngine in step 6, not here. `engine.ts` keeps the fields, the constructor and one-line methods that delegate to the topic files, so `entries/` and `view/` import it as today. Beside map.md: the worker's messages (engine-worker.ts), drawing a frame (engine-draw.ts) and fetching pictures (engine-fetch.ts) are files of their own, to stay under 370.",
+	"was": "packages/canvas/src/render/engine.ts"
 }

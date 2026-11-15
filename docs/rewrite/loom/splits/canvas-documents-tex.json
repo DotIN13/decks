@@ -1,8 +1,9 @@
 {
-	"file": "packages/docs/src/page/tex.ts",
+	"file": "canvas/documents/tex.ts",
 	"at": "canvas/documents/tex.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "tex.ts"
+	"rest": "tex.ts",
+	"was": "packages/docs/src/page/tex.ts"
 }

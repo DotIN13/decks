@@ -1,15 +1,47 @@
 {
-	"file": "packages/canvas/src/frame/outside/host.tsx",
+	"file": "canvas/host/outside/framed-editor.tsx",
 	"at": "canvas/host/outside/framed-editor.tsx",
 	"pattern": "a page part: model, view and actions beside it in host/outside/; createFramedEditor keeps its state and returns the handle, each part given that state as one ctx",
 	"scope": "createFramedEditor",
 	"targets": {
-		"model.ts": ["PASSED_ON", "frameAddress", "FrameHostOptions", "CanvasPass", "RETRY_MS", "FramedEditorOptions", "FramedHandle", "FramedEditor", "Options", "APP_STORE", "FRAME_VIEWS", "appStoredNow", "onPage", "frameLeftAt", "frameHadFocus", "FOCUS_GRACE", "frameFocused", "pressed", "frameInUse"],
-		"frame-life.ts": ["startFrame", "renew", "IfStatement@228"],
-		"wire.ts": ["wire"],
-		"in-step.ts": ["keepInStep"],
-		"view.tsx": ["surface", "handle"]
+		"model.ts": [
+			"PASSED_ON",
+			"frameAddress",
+			"FrameHostOptions",
+			"CanvasPass",
+			"RETRY_MS",
+			"FramedEditorOptions",
+			"FramedHandle",
+			"FramedEditor",
+			"Options",
+			"APP_STORE",
+			"FRAME_VIEWS",
+			"appStoredNow",
+			"onPage",
+			"frameLeftAt",
+			"frameHadFocus",
+			"FOCUS_GRACE",
+			"frameFocused",
+			"pressed",
+			"frameInUse"
+		],
+		"frame-life.ts": [
+			"startFrame",
+			"renew",
+			"IfStatement@228"
+		],
+		"wire.ts": [
+			"wire"
+		],
+		"in-step.ts": [
+			"keepInStep"
+		],
+		"view.tsx": [
+			"surface",
+			"handle"
+		]
 	},
 	"rest": "framed-editor.tsx",
-	"note": "As map.md. wire (84 lines) and keepInStep (112) are cut where the sheet says, one helper per message kind."
+	"note": "As map.md. wire (84 lines) and keepInStep (112) are cut where the sheet says, one helper per message kind.",
+	"was": "packages/canvas/src/frame/outside/host.tsx"
 }

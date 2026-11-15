@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/doc/src/lib.rs",
+	"file": "engine/crates/doc/src/lib.rs",
 	"at": "engine/crates/doc/src/lib.rs",
 	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
 	"scope": "impl Document",
@@ -45,5 +45,6 @@
 		]
 	},
 	"rest": "lib.rs",
-	"note": "lib.rs keeps Document, its constructor and its reads (len, get, walk, positions), declares `mod json; mod apply; mod node; mod history;` beside `pub mod edits; pub mod frac;`, and says `pub use node::{Handle, Node, Change, DocError, Applied, Props}; pub use history::{History, Ids};` so the crate's public names stay. apply_one (114 lines) is cut in phase 2 by op (insert, update, replace, delete, move, copy)."
+	"note": "lib.rs keeps Document, its constructor and its reads (len, get, walk, positions), declares `mod json; mod apply; mod node; mod history;` beside `pub mod edits; pub mod frac;`, and says `pub use node::{Handle, Node, Change, DocError, Applied, Props}; pub use history::{History, Ids};` so the crate's public names stay. apply_one (114 lines) is cut in phase 2 by op (insert, update, replace, delete, move, copy).",
+	"was": "packages/stage/crates/doc/src/lib.rs"
 }

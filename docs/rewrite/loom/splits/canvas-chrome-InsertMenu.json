@@ -1,8 +1,9 @@
 {
-	"file": "packages/canvas/src/ui/InsertMenu.tsx",
+	"file": "canvas/chrome/InsertMenu.tsx",
 	"at": "canvas/chrome/InsertMenu.tsx",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "InsertMenu.tsx"
+	"rest": "InsertMenu.tsx",
+	"was": "packages/canvas/src/ui/InsertMenu.tsx"
 }

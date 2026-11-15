@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/camera/controller.ts",
+	"file": "canvas/camera/controller.ts",
 	"at": "canvas/camera/controller.ts",
 	"pattern": "model: the controller keeps its signals and returns the same object; writing and motion leave it as functions given a `ctx`",
 	"scope": "createCameraController",
@@ -35,5 +35,6 @@
 		]
 	},
 	"rest": "controller.ts",
-	"note": "The 48-line statement at line 336 is a listener set up in the closure; it moves with the motion code as an `installMotion(ctx)` call. The returned controller (24 lines) and the effect at line 376 are built by `controllerApi(ctx)` in `controller-api.ts`."
+	"note": "The 48-line statement at line 336 is a listener set up in the closure; it moves with the motion code as an `installMotion(ctx)` call. The returned controller (24 lines) and the effect at line 376 are built by `controllerApi(ctx)` in `controller-api.ts`.",
+	"was": "packages/canvas/src/camera/controller.ts"
 }

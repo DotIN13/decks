@@ -1,6 +1,6 @@
 {
-	"file": "packages/docs/src/page/live.ts",
-	"at": "canvas/documents/live/editor.ts",
+	"file": "canvas/documents/live.ts",
+	"at": "canvas/documents/live.ts",
 	"pattern": "part: the LiveEditor class keeps its state and its rendering; input, blocks and history leave as functions given the editor",
 	"scope": "LiveEditor",
 	"targets": {
@@ -91,5 +91,6 @@
 	"extra": {
 		"live/builder.ts": -793,
 		"live/builder-tex.ts": 240
-	}
+	},
+	"was": "packages/docs/src/page/live.ts"
 }

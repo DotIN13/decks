@@ -1,8 +1,9 @@
 {
-	"file": "packages/canvas/src/edit/core/overlay-json.ts",
+	"file": "canvas/editor/core/overlay-json.ts",
 	"at": "canvas/editor/core/overlay-json.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "overlay-json.ts"
+	"rest": "overlay-json.ts",
+	"was": "packages/canvas/src/edit/core/overlay-json.ts"
 }

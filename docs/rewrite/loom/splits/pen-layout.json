@@ -1,12 +1,33 @@
 {
-	"file": "packages/pen/src/layout.ts",
+	"file": "pen/layout.ts",
 	"at": "pen/layout.ts",
 	"pattern": "pure logic, split by topic; `layout` (217 lines) is cut into its steps",
 	"scope": null,
 	"targets": {
-		"layout-kinds.ts": ["MARKDOWN", "isMarkdown", "isMarkdownText", "CARD", "OLD_CARD", "isCard", "MEDIA", "MediaItem", "mediaOf"],
-		"layout-text.ts": ["TextStyle", "estimateText", "textStyleOf", "TEXTY", "DEFAULT_FONT", "DEFAULT_FONT_SIZE", "NOTE_PAD", "NOTE_WIDTH", "MeasureText"]
+		"layout-kinds.ts": [
+			"MARKDOWN",
+			"isMarkdown",
+			"isMarkdownText",
+			"CARD",
+			"OLD_CARD",
+			"isCard",
+			"MEDIA",
+			"MediaItem",
+			"mediaOf"
+		],
+		"layout-text.ts": [
+			"TextStyle",
+			"estimateText",
+			"textStyleOf",
+			"TEXTY",
+			"DEFAULT_FONT",
+			"DEFAULT_FONT_SIZE",
+			"NOTE_PAD",
+			"NOTE_WIDTH",
+			"MeasureText"
+		]
 	},
 	"rest": "layout.ts",
-	"note": "map.md named `layout-frame.ts` for frameContent; frameContent is a function inside `layout`, so it leaves at the cuts below, into `layout-frame.ts`, beside the other pieces of `layout`."
+	"note": "map.md named `layout-frame.ts` for frameContent; frameContent is a function inside `layout`, so it leaves at the cuts below, into `layout-frame.ts`, beside the other pieces of `layout`.",
+	"was": "packages/pen/src/layout.ts"
 }

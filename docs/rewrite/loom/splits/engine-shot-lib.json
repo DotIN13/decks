@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/shot/src/lib.rs",
+	"file": "engine/crates/shot/src/lib.rs",
 	"at": "engine/crates/shot/src/lib.rs",
 	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
 	"scope": "impl Shooter",
@@ -36,5 +36,6 @@
 		]
 	},
 	"rest": "lib.rs",
-	"note": "lib.rs keeps the constants, Laid and the Shooter struct, declares `mod shooter; mod shoot; mod request;` and says `pub use request::{Font, Card, Request, Needs, Picture, request_of}; pub use shoot::encode;` so the crate's public names stay. shoot (144 lines) is cut in phase 2 at its stages (lay out, upload, draw, read back)."
+	"note": "lib.rs keeps the constants, Laid and the Shooter struct, declares `mod shooter; mod shoot; mod request;` and says `pub use request::{Font, Card, Request, Needs, Picture, request_of}; pub use shoot::encode;` so the crate's public names stay. shoot (144 lines) is cut in phase 2 at its stages (lay out, upload, draw, read back).",
+	"was": "packages/stage/crates/shot/src/lib.rs"
 }

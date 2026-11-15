@@ -1,5 +1,5 @@
 {
-	"file": "packages/docs/src/page/live.ts",
+	"file": "canvas/documents/live.ts",
 	"at": "canvas/documents/live.ts",
 	"pattern": "pure logic, split by topic: the Builder (source text to drawn blocks) leaves `live.ts` for `live/`; this spec is its half",
 	"scope": "Builder",
@@ -60,5 +60,6 @@
 	"note": "The Builder's methods split three ways (inline Markdown, TeX, blocks); the LiveEditor class lands whole in `live/editor.ts` here and is split by `canvas-documents-live-editor.json`. `live.ts` stays as a re-export of `LiveEditor`. `inlineMd` (154 lines) and `inlineTex` (133) are cut below. `extra` subtracts the LiveEditor's own split, so `live/editor.ts` reads as that spec leaves it.",
 	"extra": {
 		"live/editor.ts": -988
-	}
+	},
+	"was": "packages/docs/src/page/live.ts"
 }

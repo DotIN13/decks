@@ -1,15 +1,68 @@
 {
-	"file": "packages/canvas/src/edit/dom/pointer.ts",
+	"file": "canvas/input/pointer.ts",
 	"at": "canvas/input/pointer.ts",
 	"pattern": "a page part: model and actions in input/pointer/; createPointer keeps its state and returns the handlers, each part given that state as one ctx",
 	"scope": "createPointer",
 	"targets": {
-		"pointer/model.ts": ["Client", "PageView", "Openers", "PointerHost", "TEXTY", "pressTarget", "Pointer", "worldAt", "pickAtHere", "pictureUnder", "onDrawn", "onCanvas", "pageItemId", "pageView", "blockUnder", "cameraWatchers", "pannedAt", "pressedOn", "notePress"],
-		"pointer/actions.ts": ["follow", "followEditor", "penPress", "onPointerDown", "onDblClick"],
-		"pointer/drag.ts": ["fingerIn", "dragPage", "selectPage", "resizeFrom", "radiusFrom", "resizePage", "dragArrowEnd", "dragArrowBend", "dragBlock"],
-		"pointer/hover.ts": ["hoverFrame", "hoverAt", "hoverPoint", "hoverLights", "hoverNode", "onHover", "altKey", "altGone", "/^ExpressionStatement@(487|499|500|501|502)$/", "onLeave"],
-		"pointer/touch.ts": ["tapToDeselect", "touchOnDrawing", "lastBareTap", "lastTap"]
+		"pointer/model.ts": [
+			"Client",
+			"PageView",
+			"Openers",
+			"PointerHost",
+			"TEXTY",
+			"pressTarget",
+			"Pointer",
+			"worldAt",
+			"pickAtHere",
+			"pictureUnder",
+			"onDrawn",
+			"onCanvas",
+			"pageItemId",
+			"pageView",
+			"blockUnder",
+			"cameraWatchers",
+			"pannedAt",
+			"pressedOn",
+			"notePress"
+		],
+		"pointer/actions.ts": [
+			"follow",
+			"followEditor",
+			"penPress",
+			"onPointerDown",
+			"onDblClick"
+		],
+		"pointer/drag.ts": [
+			"fingerIn",
+			"dragPage",
+			"selectPage",
+			"resizeFrom",
+			"radiusFrom",
+			"resizePage",
+			"dragArrowEnd",
+			"dragArrowBend",
+			"dragBlock"
+		],
+		"pointer/hover.ts": [
+			"hoverFrame",
+			"hoverAt",
+			"hoverPoint",
+			"hoverLights",
+			"hoverNode",
+			"onHover",
+			"altKey",
+			"altGone",
+			"/^ExpressionStatement@(487|499|500|501|502)$/",
+			"onLeave"
+		],
+		"pointer/touch.ts": [
+			"tapToDeselect",
+			"touchOnDrawing",
+			"lastBareTap",
+			"lastTap"
+		]
 	},
 	"rest": "pointer.ts",
-	"note": "As map.md, with drags and hovers as files of their own (pointer/drag.ts, pointer/hover.ts). pointer.ts keeps createPointer, its state and the returned handlers."
+	"note": "As map.md, with drags and hovers as files of their own (pointer/drag.ts, pointer/hover.ts). pointer.ts keeps createPointer, its state and the returned handlers.",
+	"was": "packages/canvas/src/edit/dom/pointer.ts"
 }

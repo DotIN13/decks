@@ -1,5 +1,5 @@
 {
-	"file": "packages/canvas/src/edit/dom/TextEditing.tsx",
+	"file": "canvas/editor/dom/TextEditing.tsx",
 	"at": "canvas/editor/dom/TextEditing.tsx",
 	"pattern": "part: model (the editing state and what it returns), view (`TextEditor`), actions (opening, typing, committing)",
 	"scope": "createTextEditing",
@@ -29,5 +29,6 @@
 		]
 	},
 	"rest": "text/model.ts",
-	"note": "`text/model.ts` keeps `TextHost`, `createTextEditing`'s signals and its returned object; `TextEditing.tsx` stays as a re-export of the three so importers do not change. `TextEditor`'s JSX (110 lines from line 368) is cut by hand: its toolbar and its editable box become two components."
+	"note": "`text/model.ts` keeps `TextHost`, `createTextEditing`'s signals and its returned object; `TextEditing.tsx` stays as a re-export of the three so importers do not change. `TextEditor`'s JSX (110 lines from line 368) is cut by hand: its toolbar and its editable box become two components.",
+	"was": "packages/canvas/src/edit/dom/TextEditing.tsx"
 }

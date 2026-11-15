@@ -1,8 +1,9 @@
 {
-	"file": "packages/canvas/src/frame/inside/backend.ts",
+	"file": "canvas/host/inside/backend.ts",
 	"at": "canvas/host/inside/backend.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "backend.ts"
+	"rest": "backend.ts",
+	"was": "packages/canvas/src/frame/inside/backend.ts"
 }

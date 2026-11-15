@@ -1,5 +1,5 @@
 {
-	"file": "packages/stage/crates/scene/src/lib.rs",
+	"file": "engine/crates/scene/src/lib.rs",
 	"at": "engine/crates/scene/src/lib.rs",
 	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
 	"scope": "impl Scene",
@@ -34,5 +34,6 @@
 		]
 	},
 	"rest": "lib.rs",
-	"note": "lib.rs keeps VERSIONS, Scene, new, update and build, adds `mod scene_query; mod rect; mod root; mod blur;` beside its six `pub mod`s, and says `pub use rect::Rect; pub use root::{Root, Updated, Hit}; pub use blur::{blur_radius, blur_spill};`. update (103 lines) is cut in phase 2 at its passes (diff, rebuild, index)."
+	"note": "lib.rs keeps VERSIONS, Scene, new, update and build, adds `mod scene_query; mod rect; mod root; mod blur;` beside its six `pub mod`s, and says `pub use rect::Rect; pub use root::{Root, Updated, Hit}; pub use blur::{blur_radius, blur_spill};`. update (103 lines) is cut in phase 2 at its passes (diff, rebuild, index).",
+	"was": "packages/stage/crates/scene/src/lib.rs"
 }

@@ -1,8 +1,9 @@
 {
-	"file": "packages/canvas/src/camera/insets.ts",
+	"file": "canvas/camera/insets.ts",
 	"at": "canvas/camera/insets.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "insets.ts"
+	"rest": "insets.ts",
+	"was": "packages/canvas/src/camera/insets.ts"
 }

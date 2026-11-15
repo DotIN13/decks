@@ -1,15 +1,64 @@
 {
-	"file": "packages/stage/crates/paint/src/painter.rs",
+	"file": "engine/crates/paint/src/painter.rs",
 	"at": "engine/crates/paint/src/painter.rs",
 	"pattern": "Rust modules by topic; free functions move whole",
 	"scope": null,
 	"targets": {
-		"paint_fill.rs": ["fills_of", "paint_of", "color", "fade", "rrect", "to_affine", "shadows", "inner_shadows", "layer_blur", "opacity"],
-		"paint_stroke.rs": ["Stroke", "stroke_of", "dash_of", "shape_stroke", "path_ops", "halfway", "dashes"],
-		"paint_ops.rs": ["own_ops", "meta_type", "ARROW", "CARD", "OLD_CARD", "MARKDOWN", "MEDIA", "LiveInk", "paint_ink"],
-		"paint_marks.rs": ["/^PLACEHOLDER_/", "placeholder_mark", "arrow_label", "card_paper", "card_paper_colour", "browser_frame", "frame_parts", "has_frame", "card_edge"],
-		"paint_words.rs": ["text_ink", "words", "label", "MAX_GLYPH_PX", "draw_laid", "card_words", "draw_card", "icon"]
+		"paint_fill.rs": [
+			"fills_of",
+			"paint_of",
+			"color",
+			"fade",
+			"rrect",
+			"to_affine",
+			"shadows",
+			"inner_shadows",
+			"layer_blur",
+			"opacity"
+		],
+		"paint_stroke.rs": [
+			"Stroke",
+			"stroke_of",
+			"dash_of",
+			"shape_stroke",
+			"path_ops",
+			"halfway",
+			"dashes"
+		],
+		"paint_ops.rs": [
+			"own_ops",
+			"meta_type",
+			"ARROW",
+			"CARD",
+			"OLD_CARD",
+			"MARKDOWN",
+			"MEDIA",
+			"LiveInk",
+			"paint_ink"
+		],
+		"paint_marks.rs": [
+			"/^PLACEHOLDER_/",
+			"placeholder_mark",
+			"arrow_label",
+			"card_paper",
+			"card_paper_colour",
+			"browser_frame",
+			"frame_parts",
+			"has_frame",
+			"card_edge"
+		],
+		"paint_words.rs": [
+			"text_ink",
+			"words",
+			"label",
+			"MAX_GLYPH_PX",
+			"draw_laid",
+			"card_words",
+			"draw_card",
+			"icon"
+		]
 	},
 	"rest": "painter.rs",
-	"note": "painter.rs keeps the icon types, Context, Writer, Scope, paint_area, ancestors, open and close, and adds `mod paint_fill; mod paint_stroke; mod paint_ops; mod paint_marks; mod paint_words;` as private siblings (`use super::*` inside each), with `pub use paint_ops::{LiveInk, paint_ink};` so the crate's public names stay. own_ops (140 lines) is cut in phase 2 by item kind (frame, shape, text, card, media)."
+	"note": "painter.rs keeps the icon types, Context, Writer, Scope, paint_area, ancestors, open and close, and adds `mod paint_fill; mod paint_stroke; mod paint_ops; mod paint_marks; mod paint_words;` as private siblings (`use super::*` inside each), with `pub use paint_ops::{LiveInk, paint_ink};` so the crate's public names stay. own_ops (140 lines) is cut in phase 2 by item kind (frame, shape, text, card, media).",
+	"was": "packages/stage/crates/paint/src/painter.rs"
 }

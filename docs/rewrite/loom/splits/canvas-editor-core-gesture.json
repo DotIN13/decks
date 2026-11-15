@@ -1,13 +1,36 @@
 {
-	"file": "packages/canvas/src/edit/core/gesture.ts",
+	"file": "canvas/editor/core/gesture.ts",
 	"at": "canvas/editor/core/gesture.ts",
 	"pattern": "pure logic, split by topic: the gesture's types and `step` stay; each kind of press moves to a file of its own",
 	"scope": null,
 	"targets": {
-		"gesture-carry.ts": ["carry", "moveCarry", "releaseCarry", "holdPages", "landPageDrag", "settle", "isFree", "done"],
-		"gesture-handle.ts": ["pressHandle", "move", "release", "landPageResize", "handleTap", "landed"],
-		"gesture-press.ts": ["pressCanvas", "pressPage", "withSelection", "selectMade", "prunePages"]
+		"gesture-carry.ts": [
+			"carry",
+			"moveCarry",
+			"releaseCarry",
+			"holdPages",
+			"landPageDrag",
+			"settle",
+			"isFree",
+			"done"
+		],
+		"gesture-handle.ts": [
+			"pressHandle",
+			"move",
+			"release",
+			"landPageResize",
+			"handleTap",
+			"landed"
+		],
+		"gesture-press.ts": [
+			"pressCanvas",
+			"pressPage",
+			"withSelection",
+			"selectMade",
+			"prunePages"
+		]
 	},
 	"rest": "gesture.ts",
-	"note": "`gesture.ts` keeps the types, the constants, `initialState` and `step`, which dispatches to the three files; the entry re-exports as before."
+	"note": "`gesture.ts` keeps the types, the constants, `initialState` and `step`, which dispatches to the three files; the entry re-exports as before.",
+	"was": "packages/canvas/src/edit/core/gesture.ts"
 }

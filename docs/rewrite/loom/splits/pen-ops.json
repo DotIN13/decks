@@ -1,8 +1,9 @@
 {
-	"file": "packages/pen/src/ops.ts",
+	"file": "pen/ops.ts",
 	"at": "pen/ops.ts",
 	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
 	"scope": null,
 	"targets": {},
-	"rest": "ops.ts"
+	"rest": "ops.ts",
+	"was": "packages/pen/src/ops.ts"
 }
