@@ -3,7 +3,7 @@ import type { Context, Route, RouteAnswer } from "../kernel/index.ts";
 import type { Machine } from "./machine.ts";
 import { take, type ShotArgs } from "./shot.ts";
 
-// A picture to download (rule 13): GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&name=.
+// A picture to download (rule 13): GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&live=&name=.
 // Taken as canvas.screenshot takes it, answered as bytes and kept nowhere.
 
 export const SHOT = "/pictures/shot";
@@ -16,7 +16,8 @@ export function shotArgs(query: URLSearchParams): Omit<ShotArgs, "canvas"> {
 	const of = box && box.length === 4 && box.every(Number.isFinite) ? { x1: box[0]!, y1: box[1]!, x2: box[2]!, y2: box[3]! } : listed?.length === 1 ? listed[0] : listed?.length ? listed : undefined;
 	const format = query.get("format") === "jpeg" || query.get("format") === "pdf" ? (query.get("format") as "jpeg" | "pdf") : "png";
 	const scale = Number(query.get("scale") ?? 2);
-	return { ...(of !== undefined ? { of } : {}), format, scale: Number.isFinite(scale) && scale > 0 ? scale : 2, scheme: query.get("scheme") === "dark" ? "dark" : "light" };
+	const live = query.get("live") === "1" || query.get("live") === "true";
+	return { ...(of !== undefined ? { of } : {}), format, scale: Number.isFinite(scale) && scale > 0 ? scale : 2, scheme: query.get("scheme") === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
 }
 
 async function canvasOf(ctx: Context, query: URLSearchParams): Promise<string | undefined> {

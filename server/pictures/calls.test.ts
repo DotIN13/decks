@@ -294,3 +294,9 @@ test("rule 16: fit answers from a fresh frame report at the card's width, withou
 	await served.close();
 	await s.close();
 });
+
+test("rule 13: live=1 on a picture to download asks for the browser", async () => {
+	const { shotArgs } = await import("./download.ts");
+	assert.equal(shotArgs(new URLSearchParams("live=1")).live, true);
+	assert.equal(shotArgs(new URLSearchParams("scale=1")).live, undefined);
+});
