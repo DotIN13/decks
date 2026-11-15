@@ -51,7 +51,7 @@ async function answer(ctx: Context, m: Machine, path: string, query: URLSearchPa
 		const asked = Number(query.get("w") ?? 480);
 		const scheme = query.get("scheme") === "dark" ? "dark" : "light";
 		const bytes = await cardPicture(ctx, m, card, Number.isFinite(asked) && asked > 0 ? asked : 480, scheme);
-		return { type: "image/png", body: bytes, headers: { "cache-control": "no-cache" } };
+		return { type: "image/png", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
 	} catch (error) {
 		if (!(error instanceof Refused)) return { status: 503, type: "text/plain", body: (error as Error).message };
 		return { status: error.code === "not_found" ? 404 : error.code === "unavailable" ? 503 : 400, type: "text/plain", body: error.message };

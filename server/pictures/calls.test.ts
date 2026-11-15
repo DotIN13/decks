@@ -139,6 +139,9 @@ test("rule 11: a card's picture is taken once per version and rung", async () =>
 	const get = () => fetch(`${served.url}/pictures/${CARD}?w=300&pass=${served.token}`);
 	const first = await get();
 	assert.equal(first.headers.get("content-type"), "image/png");
+	assert.equal(first.headers.get("cache-control"), "no-cache");
+	const versioned = await fetch(`${served.url}/pictures/${CARD}?w=300&v=0&whole=1&pass=${served.token}`);
+	assert.match(versioned.headers.get("cache-control") ?? "", /immutable/);
 	await get();
 	assert.equal(fake.seen.length, 1, "the second is from the store");
 	assert.equal(fake.seen[0]!.options.scale, 480 / 800);
