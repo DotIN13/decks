@@ -125,3 +125,29 @@ The checkout is shared, so the tree holds other agents' unsaved edits. Never und
 whole tree: no `git restore .`, no `git restore` over `git ls-files -m`, no `git checkout -- .`,
 `git stash`, `git clean` or `git reset --hard`. Undo by naming your own files, one list, read before you
 run it. Added on 2026-11-15 after one such restore reverted another agent's edits in two files.
+
+## More checkouts (the person allowed them on 2026-11-15)
+
+An agent whose work would break another's checks in the shared tree gets a checkout of its own:
+`zsh docs/rewrite/new-checkout.sh <agent>` makes `../decks-dev-checkouts/<agent>` on branch
+`rewrite-<agent>`, with `node_modules` and the built files cloned in (no disk used). Mason makes them.
+
+- Work and commit there as in the main checkout: your own paths, `REWRITE_AGENT`, the folder's check and
+  the gates after each commit. The heavy lock and the two check slots are the machine's: the same rules.
+- **Landing.** Take the landing turn (`mkdir /tmp/decks-rewrite-land.lock`; if it exists and is younger
+  than ten minutes, wait). In your checkout: `git rebase rewrite`, then the folder's check and the gates.
+  In the main checkout: `git merge --ff-only rewrite-<agent>`. Then `rmdir` the lock and send Mason a
+  done line. If the merge is refused because a file of yours is edited in the main tree, stop and tell
+  Mason; never force it.
+- A conflict in `tools/gates/baseline/*` on the rebase: take `rewrite`'s side and carry your split's
+  exceptions again, as below.
+- Engine builds stay in the main checkout (`engine/target` is not cloned).
+
+## A split carries its exceptions, in one turn
+
+A file that is split takes its listed exceptions (retired words, long comments, long functions) to the
+new files; the total may not grow. The splitter carries them in the same commit as the split, with the
+recipe Loom wrote in `docs/rewrite/loom/` (ask Loom for the commands), and commits the baseline files
+by name at once. In the main checkout, hold the baseline turn while you do it
+(`mkdir /tmp/decks-rewrite-baseline.lock` … `rmdir`), so two agents never have that file open together.
+The gates pass after every commit: "do not edit the baselines" was wrong for a split and is withdrawn.

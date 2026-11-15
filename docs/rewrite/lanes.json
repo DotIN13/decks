@@ -47,7 +47,8 @@
 	"Folio": [
 		"server/cards/",
 		"server/documents/",
-		"tools/checks/cards/"
+		"tools/checks/cards/",
+		"canvas/documents/"
 	],
 	"Roster": [
 		"server/people/",
@@ -79,7 +80,9 @@
 		"canvas/drawing/drawing.test.ts",
 		"canvas/drawing/drawing-tests/",
 		"pen/pen.test.ts",
-		"pen/tests/"
+		"pen/tests/",
+		"canvas/chrome/Properties.tsx",
+		"canvas/chrome/properties/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
