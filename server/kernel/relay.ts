@@ -33,11 +33,6 @@ export class Relay {
 		};
 	}
 
-	/** The host's reply to a request it was sent; anything else is ignored. */
-	reply(client: string, id: string, envelope: Envelope<unknown>): void {
-		if (this.pending.get(id)?.client === client) this.finish(id, envelope);
-	}
-
 	forward(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>> {
 		const client = this.answerer?.(name, caller);
 		const send = client ? this.sockets.get(client) : undefined;
@@ -48,6 +43,11 @@ export class Relay {
 			this.pending.set(id, { client, done, timer });
 			send({ type: "ask", id, name, args, caller });
 		});
+	}
+
+	/** The host's reply to a request it was sent; anything else is ignored. */
+	reply(client: string, id: string, envelope: Envelope<unknown>): void {
+		if (this.pending.get(id)?.client === client) this.finish(id, envelope);
 	}
 
 	private finish(id: string, envelope: Envelope<unknown>): void {
