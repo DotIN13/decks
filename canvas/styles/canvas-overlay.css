@@ -1,0 +1,254 @@
+/* The drawn overlay: hits, selection, hover, guides, measures, handles and arrow anchors. */
+@layer decks.surface {
+	.world > .pen-hits {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-hits > .pen-hit {
+	pointer-events: all;
+}
+	.world > :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-measure, .pen-measure-tag, .pen-hover, .pen-join, .pen-insert, .pen-slots, .pen-slot-frame, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	z-index: 3;
+}
+	/*
+	 * What the selection, or the item under the pointer, sits in and holds (`editor/core/overlay.ts`,
+	 * `kinOutlines`): its parents in a light solid line, its children in a light dashed one. Lighter
+	 * than a hover and a selection, so the item itself is still the line that reads first.
+	 */
+	.world > .pen-kin {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+	outline: 1px solid var(--canvas-accent);
+	outline-offset: 0;
+	opacity: 0.45;
+}
+	.world > .pen-kin[data-kin="child"] {
+	outline-style: dashed;
+	opacity: 0.55;
+}
+	.world > .pen-kin[data-round="true"] {
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
+}
+	/* One box round everything selected, when there is more than one thing (each has its own thin line). */
+	.world > .pen-selection-box {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+}
+	/* The selection's size in pixels, under it, in the accent: drawn at screen size whatever the zoom. */
+	.world > .pen-size {
+	position: absolute;
+	transform-origin: 0 0;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: var(--canvas-accent);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
+}
+	/*
+	 * What the pointer is over, before a press (`CanvasView.tsx`): a thin line, thinner than a selection's,
+	 * the way a design tool answers "what would I pick here". What an arrow's end would join, while it
+	 * is carried, is the same box drawn heavier with a wash inside.
+	 */
+	.world > :is(.pen-hover, .pen-join) {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+}
+	.world > .pen-join {
+	background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
+}
+	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
+	/* A card's block's grip, in the card's margin, to drag the block by (`CanvasView.tsx`, `gripBox`). */
+	.world > .pen-grip {
+	position: absolute;
+	z-index: 3;
+	width: 16px;
+	height: 24px;
+	transform-origin: 0 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--canvas-faint);
+	border-radius: 4px;
+	cursor: grab;
+	touch-action: none;
+}
+	.world > .pen-grip:hover { color: var(--canvas-fg); background: var(--canvas-line); }
+	.world > .pen-grip:active { cursor: grabbing; }
+	.world > .pen-grip[data-hidden] { visibility: hidden; }
+	.world > .pen-grip svg { stroke-width: 1.75; flex: none; }
+	.world > .pen-insert {
+	position: absolute;
+	border-radius: 999px;
+	background: var(--canvas-accent);
+	pointer-events: none;
+}
+	/* The other places a drag could land near the pointer: dashed slot lines, and dashed frames that place what they hold. */
+	.world > .pen-slots {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-slots line {
+	stroke: var(--canvas-accent);
+	stroke-linecap: round;
+	opacity: 0.7;
+}
+	.world > .pen-slot-frame {
+	position: absolute;
+	border-radius: 4px;
+	outline: 1.5px dashed var(--canvas-accent);
+	opacity: 0.6;
+	pointer-events: none;
+}
+	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
+	.world > :is(.pen-hover, .pen-selection):is([data-page="true"], [data-round="true"]) {
+	border-radius: var(--canvas-item-corners, var(--canvas-card-radius, 12px));
+}
+	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
+	.world > .pen-guides {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-guides :is(line, path) {
+	stroke: #f24e1e;
+}
+	/* What Alt shows between the selection and the item under the pointer: red lines, and their lengths. */
+	.world > .pen-measure {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-measure :is(line, rect) {
+	stroke: #f24e1e;
+}
+	.world > .pen-measure-tag {
+	position: absolute;
+	transform-origin: 0 0;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: #f24e1e;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
+}
+	/* The drawn item picked up in edit mode, and the box its words are edited in (`CanvasView.tsx`). */
+	.world > .pen-selection {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+	/* A selection fades in over 120 ms rather than appearing (`touch-rules.ts`, SELECTION_FADE_MS). */
+	animation: pen-select-in 120ms ease-out;
+}
+	@keyframes pen-select-in {
+	from {
+		opacity: 0;
+	}
+}
+	/* A single selection's eight handles, and what a tool is drawing before it is made. */
+	/*
+	 * Drawn at its screen size and scaled to the world by the zoom (`OverlayLayer.tsx`, `knob`), so its
+	 * 1.5px line and 2px corner are screen pixels at every zoom. The line is an inset shadow, not a
+	 * border, which a browser rounds to whole pixels.
+	 */
+	.world > .pen-handle {
+	position: absolute;
+	box-sizing: border-box;
+	border: 0;
+	border-radius: 2px;
+	background: var(--canvas-panel);
+	box-shadow: inset 0 0 0 1.5px var(--canvas-accent);
+	/* A finger on a handle resizes: the stage's native scroll (`touch-action: pan-x pan-y`) must not take it and cancel the press. */
+	touch-action: none;
+}
+	/* A resize handle answers a press 15 screen pixels across, whatever its drawn size (`--hit`, `editor/core/overlay.ts`, `hitReach`). */
+	.world > .pen-handle[data-handle]:not([data-handle="radius"])::before {
+	content: "";
+	position: absolute;
+	inset: calc(-1 * var(--hit));
+}
+	.world > .pen-handle:is([data-handle="nw"], [data-handle="se"]) {
+	cursor: nwse-resize;
+}
+	.world > .pen-handle:is([data-handle="ne"], [data-handle="sw"]) {
+	cursor: nesw-resize;
+}
+	.world > .pen-handle:is([data-handle="n"], [data-handle="s"]) {
+	cursor: ns-resize;
+}
+	.world > .pen-handle:is([data-handle="e"], [data-handle="w"]) {
+	cursor: ew-resize;
+}
+	/* The corner radius: a round handle inside the corner, to tell it from the square sizing ones. */
+	.world > .pen-handle[data-handle="radius"] {
+	border-radius: 50%;
+	cursor: nwse-resize;
+}
+	/*
+	 * Under a finger a handle is a small dot, answering a finger's width round it (`OverlayLayer.tsx`,
+	 * --hit). Only the four corners are drawn: the edges still answer a press (their hit zones stay),
+	 * but as bands with nothing to see, and the size label and the arrow anchors are not shown, so
+	 * a selection is a box with four dots and nothing else round it.
+	 */
+	@media (pointer: coarse) {
+	.world > .pen-handle {
+		border-radius: 50%;
+	}
+	.world > .pen-handle:is([data-handle="n"], [data-handle="s"], [data-handle="e"], [data-handle="w"]) {
+		background: transparent;
+		box-shadow: none;
+	}
+	.world > :is(.pen-size, .pen-anchor) {
+		display: none;
+	}
+}
+	/* Where an arrow end can keep to: the four sides' middles, the one it is near filled. */
+	/* Drawn at screen size and scaled to the world (`OverlayLayer.tsx`, `knob`); the ring an inset line, not a border a browser rounds. */
+	.world > .pen-side,
+	.world > .pen-anchor {
+		position: absolute;
+		z-index: 3;
+		box-sizing: border-box;
+		border: 0;
+		border-radius: 50%;
+		background: var(--canvas-panel);
+		box-shadow: inset 0 0 0 1.5px var(--canvas-accent);
+	}
+	.world > .pen-side {
+		pointer-events: none;
+	}
+	.world > .pen-side[data-on="true"] {
+		background: var(--canvas-accent);
+	}
+	.world > .pen-anchor {
+		background: color-mix(in srgb, var(--canvas-accent) 22%, var(--canvas-panel));
+		cursor: crosshair;
+		opacity: 0.85;
+	}
+	.world > .pen-anchor:hover {
+		background: var(--canvas-accent);
+		opacity: 1;
+	}
+}

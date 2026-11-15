@@ -1,0 +1,209 @@
+/* The canvas's scroll area and the world inside it, the engine's own layers, and its notice. */
+@layer decks.surface {
+	/* --- the stage --------------------------------------------------------------- */
+
+.stage {
+	position: absolute;
+	inset: 0;
+	/*
+	 * The stage scrolls, and its scroll is the camera's position (`camera/scroll-area.ts`): a pan is
+	 * the browser scrolling it on its compositor, with no frame of ours in the way. It used to be
+	 * `clip`, which cannot scroll, because the browser scrolls a scroll container to show a focused
+	 * caret and the camera did not know: a card opened for typing slid the stage up for good. Now
+	 * such a scroll is a scroll like any other, and the camera follows it (`CanvasView.tsx`, `onScroll`).
+	 * No bars, no rubber band, and no swipe back a page at an edge.
+	 */
+	overflow: scroll;
+	scrollbar-width: none;
+	overscroll-behavior: none;
+	background: var(--canvas-stage);
+	/* Fingers pan the stage natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
+	touch-action: pan-x pan-y;
+}
+	.stage::-webkit-scrollbar {
+	display: none;
+}
+	/* What scrolls: room to scroll in, the world placed in it, and the stage's own chrome held to the window. */
+	.stage-content {
+	position: relative;
+	width: 200000px;
+	height: 200000px;
+	/* Room, not a target: a press on bare canvas lands on the stage itself, as it always has. */
+	pointer-events: none;
+}
+	.stage-content > .world {
+	pointer-events: auto;
+}
+	/*
+	 * The stage's chrome over the canvas (pills, the insert menu, the ink sheet, a notice), in the
+	 * window's coordinates as before: held to the window while the content scrolls under it. Only
+	 * what is in it takes the pointer.
+	 */
+	.stage-fixed {
+	position: sticky;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+}
+	.stage-fixed > * {
+	pointer-events: auto;
+}
+	.stage[data-panning="true"] {
+	cursor: grabbing;
+}
+	/*
+ * While the camera's scale is moving, every board gets a layer of its own.
+ *
+ * A pan is a transform over pictures the compositor already holds, which is why it stays
+ * smooth with a dozen boards on the canvas. A zoom asks for every one of them to be drawn
+ * again at a size it has never been drawn at, and a board is an iframe — a whole document
+ * to redraw, per board, per frame. `will-change: transform` hands the board to the
+ * compositor, which stretches the picture it has rather than waking the main thread.
+ *
+ * Measured, 12 boards in view at 4× CPU throttle: 134ms of work per finger movement
+ * becomes 56ms — the same as a pan. At rest the two are the same picture: 0.2% of pixels
+ * differ, at the edges of letters, because the layer is redrawn once the scale settles.
+ *
+ * Only while it is moving. A layer is a texture that has to be kept, and a deck of them
+ * held forever is memory nobody asked for — `CanvasView.tsx` turns the attribute off 300ms
+ * after the last change of scale.
+ *
+ * Not in WebKit: `data-scaling` and `data-sliding` below are set only where `LAYERS` in
+ * `render/device.ts` says the engine takes them. WebKit paints cards inside a frame, so building and
+ * dropping these layers only cost it a long frame at each end of a zoom.
+ */
+/*
+ * The same for what is not a frame and is drawn in the stage's own page: a card's root (`card.ts`), a
+ * document's editor and an app's window (`item-surfaces.tsx`). Each is as much a page to redraw at every
+ * step of a zoom, and was redrawn at each one before it was named here.
+ */
+/* Not an app's window: its frame is a layer of its own already, and adding and dropping one round it at each zoom made the app repaint, a white flash at its edges. */
+.stage[data-scaling="true"] .card-node :is(.card-host, .document-surface) {
+	will-change: transform;
+}
+/*
+ * A pinch on pictures (`?card-pictures=1`, `items-layer.tsx`): the awake cards are hidden while the scale
+ * moves, and the sheet draws their pictures over where they are, so no card is laid out, painted or
+ * given a layer at any step. They stay mounted, and show again at rest under their pictures.
+ */
+.stage[data-card-pictures="true"] .card-node .card-surface {
+	visibility: hidden;
+}
+.stage[data-card-pictures="true"] .card-node .card-host {
+	will-change: auto;
+}
+/*
+ * A card let go lately and kept asleep with its root (`items/awake.ts`, `kept`): not laid out, painted
+ * or pressed, while the sheet draws its picture over it; shown again at once when it wakes.
+ */
+.card-node[data-asleep] :is(.card-surface, .document-surface, .app-surface) {
+	content-visibility: hidden;
+}
+	/*
+ * While the camera moves at one zoom, the world is one layer the compositor slides: without it,
+ * every live page in it was painted and layered again on every pan step (726 ms of 2.7 s of
+ * panning, 11 live pages at 22%). Never across a change of scale — `data-sliding` goes off in the
+ * frame the zoom changes — so the layer is never a stretched picture; see the note below for the
+ * gesture-wide version this is not.
+ */
+.stage[data-sliding="true"] .world {
+	will-change: transform;
+}
+	/*
+ * ### What is left of the boards being soft at high zoom
+ *
+ * This box used to say it was *not* the layers, on the strength of a measurement taken in a
+ * headless Chrome on a software rasterizer: removing the world's `will-change`, re-taking that
+ * layer, and putting each iframe on a layer of its own all produced byte-identical pixels. Half
+ * of that is still true and half of it is a GPU behaviour that a software rasterizer does not
+ * have.
+ *
+ * **The world carries no `will-change` at rest or while the scale moves, and that is the fix.**
+ * (It does while the camera pans at one zoom, `data-sliding` above, where the matrix is exact.) On a 2× display at 400%,
+ * taking it off sharpens the board at once — because the declaration is a promise to hold the
+ * raster and apply the camera to it as a matrix, and a zoom is then the same picture stretched.
+ * It used to be permanent, so every zoom was paid for that way.
+ *
+ * **What was tried in between, and why it is not here.** Scoping the promise to a *gesture*
+ * (`.stage[data-moving="true"] .world`, with a 300ms tail, then narrowed to gestures that change
+ * the scale) does restore the cheap pan — and it flashes: a layer built and torn down under the
+ * pointer, worst over a board, where the frame's own layer is recomposed at the same moment. It
+ * also leaked: a camera moved without a gesture (an agent's `decks.view.focus`, a restored view) could
+ * leave the promise held over a scale it no longer matched, which is the softness back through a
+ * side door. Two bugs for one optimisation, so the promise is gone and the pan pays for itself.
+ *
+ * **The cost, so it is not rediscovered as a mystery.** A pan is now a transform the main thread
+ * paints rather than a matrix over pictures the compositor holds. That was measured once, for the
+ * opposite decision: 16.6 documents repainted and 28ms of main thread per pan step against 0 —
+ * with twelve boards in view at 4× CPU throttle. With a handful of boards on screen it is the
+ * same work the app did before the promotion was ever added; if a deck with many boards open pans
+ * badly, the answer is `[data-scaling]` above plus a *scale*-only promise, or the canvas
+ * renderers, and both are worth measuring rather than guessing.
+ *
+ * What remains is the frame's own raster: an iframe draws its document at its own scale, and the
+ * compositor upscales that picture past some zoom. The levers are the same three they were — lay
+ * the boards out at the new zoom instead of scaling them (a document reflow per step), or accept it.
+ */
+
+/*
+ * There is deliberately no ring around the stage in edit mode, and this is where it was.
+ *
+ * It was an inset ring of the accent at 55%, around the whole canvas — the standing sign that
+ * a click was going to move something, standing in for a confirmation dialog on the pencil.
+ * The argument for it was that a mode which changes what a click does has to be visible the
+ * whole time it is on. The person who works in this app asked for it gone: a border painted
+ * around everything is read the way a border is read, as the edge of the app, and it was on
+ * screen for the whole session rather than for the moment that mattered.
+ *
+ * What carries the sign now is the pencil's own pressed state and the palette's five tools —
+ * both in the chrome, neither over the work. A browser check (since cut from the
+ * suite) asserted that *neither* mode draws a ring and that the tools are the difference in the
+ * one place they are drawn.
+ */
+
+.world {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: 0 0;
+}
+	/*
+	 * The engine's canvas (`render/engine.ts`): the size of the window, under the world, drawn with the
+	 * camera rather than moved by it. A page asleep over a picture there has no paper of its own, or
+	 * it would cover the picture it is asleep over.
+	 */
+	.stage-engine {
+	position: absolute;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+}
+	.stage-engine-over {
+	transform-origin: 0 0;
+}
+	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
+	.stage-notice {
+	position: absolute;
+	z-index: var(--canvas-z-float);
+	top: 50%;
+	left: 50%;
+	max-width: min(420px, calc(100% - 48px));
+	padding: 14px 18px;
+	transform: translate(-50%, -50%);
+	border: 1px solid var(--canvas-line-strong);
+	border-radius: var(--canvas-radius, 12px);
+	background: var(--canvas-panel);
+	box-shadow: var(--canvas-shadow);
+	color: var(--canvas-fg);
+	font-size: var(--canvas-type-copy);
+	line-height: 1.45;
+	text-align: center;
+	text-wrap: balance;
+	pointer-events: none;
+}
+	/* A slot's surface has no ground of its own: a board's, or a sleeping card's, covered the picture the sheet draws under it. */
+	.stage[data-engine] .card-node > .surface {
+	background: transparent;
+}
+}

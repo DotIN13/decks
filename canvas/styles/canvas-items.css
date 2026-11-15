@@ -1,0 +1,94 @@
+/* A document or an app item, in its slot on the canvas. */
+@layer decks.surface {
+	/*
+	 * An app's body: the page's part of the window, below the bar the engine paints (`engine.rs`,
+	 * `paint_window`; `APP_BAR` sets its top). The engine paints the window's paper, bar, lights, name,
+	 * status and hairline in every state, so nothing here draws chrome: only the app's iframe, or the
+	 * words and Open where it cannot run here.
+	 */
+	:where(.decks-canvas, .decks-layer) .app-surface {
+		--app-bg: #ffffff;
+		--app-fg: #1d1d1f;
+		--app-muted: rgb(60 60 67 / 60%);
+		--app-edge: rgb(0 0 0 / 10%);
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		background: var(--app-bg);
+		color: var(--app-fg);
+		font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--canvas-font-sans, system-ui), sans-serif;
+	}
+	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface {
+		--app-bg: #1f1f21;
+		--app-fg: #f5f5f7;
+		--app-muted: rgb(235 235 245 / 55%);
+		--app-edge: rgb(255 255 255 / 12%);
+	}
+	/* The painted bar's place on the page: what an app is dragged by, over the body's top edge (`item-slot.tsx`). */
+	:where(.decks-canvas, .decks-layer) .card-node > .app-grip {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 2;
+		cursor: grab;
+		touch-action: none;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-body {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 14px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-body p {
+		margin: 0;
+		color: var(--app-muted);
+		font-size: 14px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-open {
+		padding: 7px 22px;
+		border: 0;
+		border-radius: 999px;
+		background: #0a84ff;
+		color: #fff;
+		cursor: pointer;
+		font: inherit;
+		font-size: 14px;
+		font-weight: 500;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-open:hover {
+		background: #0077ed;
+	}
+	/* The app itself, running inside the canvas (`AppSurface`): the window's body, edge to edge. */
+	:where(.decks-canvas, .decks-layer) .app-surface-frame {
+		display: block;
+		flex: 1;
+		width: 100%;
+		min-height: 0;
+		border: 0;
+		/* The window's own colour while the app loads or repaints, never a white edge on a dark canvas. */
+		background: var(--app-bg);
+		color-scheme: light;
+	}
+	/* A document covered by its picture while the camera moves (`items-layer.tsx`): its editor is not painted under it, and lays out nothing at each step. */
+	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .document-surface {
+		visibility: hidden;
+	}
+	/* While the camera moves, or asleep, the sheet draws the app's picture over it (`items-layer.tsx`): once it does, the window is not drawn under it. */
+	:where(.decks-canvas, .decks-layer) .card-node[data-covered] .app-surface-frame {
+		/* Not drawn at all: hidden by visibility, its page went on painting each frame; a frame not displayed is not rendered, and is not reloaded either. */
+		display: none;
+	}
+	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-frame {
+		color-scheme: dark;
+	}
+	:where(.decks-canvas, .decks-layer) .document-surface .dp {
+		height: 100%;
+	}
+}
