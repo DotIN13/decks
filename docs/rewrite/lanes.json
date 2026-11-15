@@ -84,7 +84,9 @@
 		"packages/stage/crates/apple/",
 		"packages/stage/Cargo.toml",
 		"packages/stage/Cargo.lock",
-		"engine/crates/apple/"
+		"engine/crates/apple/",
+		"engine/Cargo.toml",
+		"engine/Cargo.lock"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
