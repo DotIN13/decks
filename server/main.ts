@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { appsFeature } from "./apps/feature.ts";
@@ -56,7 +55,7 @@ function cardLib(): FeatureOptions["lib"] {
 async function main(): Promise<void> {
 	const args = argsOf(process.argv.slice(2));
 	const lib = cardLib();
-	const running = await startServer({ ...args, features: features({ appRun: join(args.deck, ".decks", "app-run"), ...(lib ? { lib } : {}) }) });
+	const running = await startServer({ ...args, features: features(lib ? { lib } : {}) });
 	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
 	const stop = () => {
 		setTimeout(() => process.exit(0), 3000).unref();
