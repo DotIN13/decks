@@ -52,7 +52,7 @@ const call = async <T>(tab: Tab, name: string, args: Record<string, unknown>): P
 async function inPlay(tab: Tab, canvas: string | undefined): Promise<string[]> {
 	if (!canvas) return [];
 	const read = await readDrawing(tab.deck(), canvas, "");
-	return read ? pagesOf(canvas, read.doc).map((page) => String(page.path)) : [];
+	return read ? pagesOf(canvas, read.doc, true).map((page) => String(page.path)) : [];
 }
 
 /** The roster today's page and checks read: every agent as a chat row, and which is focused. */

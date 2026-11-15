@@ -51,7 +51,7 @@ export function drawingRoute(deck: () => Deck): Route {
 			const got = bound && bound !== canvas ? undefined : await ctx.call<{ rev?: number }>("canvas.get", { canvas }).catch(() => undefined);
 			const read = got ? await readDrawing(deck(), canvas, base) : undefined;
 			if (!read) return void res.writeHead(404, { "content-type": "text/plain" }).end(`There is no canvas called ${canvas}.`);
-			const body = JSON.stringify({ doc: read.doc, base, rev: got?.rev ?? 0, cards: pagesOf(canvas, read.doc) });
+			const body = JSON.stringify({ doc: read.doc, base, rev: got?.rev ?? 0, cards: pagesOf(canvas, read.doc, true) });
 			res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(body);
 		},
 	};
