@@ -19,7 +19,7 @@ export interface Machine {
 	shutdown?(): void;
 }
 
-export function machine(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined): Machine {
+export function machine(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined, useNative = true): Machine {
 	const known = () => {
 		const at = origin();
 		if (!at) throw new Refused("unavailable", "This server has not said its own address, so its browser cannot load a page from it.", "card.get");
@@ -31,7 +31,7 @@ export function machine(browser: Browser, origin: () => string | undefined, kern
 		origin: known,
 		shutdown: () => tool?.stop(),
 		native() {
-			const binary = nativeBinary();
+			const binary = useNative ? nativeBinary() : undefined;
 			if (!binary) return undefined;
 			if (tool?.binary !== binary) tool = new Native(binary);
 			return tool;

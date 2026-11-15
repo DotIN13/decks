@@ -1,9 +1,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The engine's native screenshot tool, stage-shot (rule 17): one JSON request a line on its
+// The engine's native screenshot tool (rule 17): one JSON request a line on its
 // stdin, one answer a line on stdout. Kept running, stopped ten minutes after its last picture.
 
 const ANSWER_MS = 30_000;
@@ -12,9 +12,9 @@ const IDLE_MS = 10 * 60_000;
 export type Answer = { ok: boolean; error?: string; fontNeeds?: FontNeed[]; needs?: { cards: string[]; pictures: string[]; icons: string[]; math: string[] }; problems?: string[]; file?: string; width?: number; height?: number };
 export type FontNeed = { family: string; weight: number; italic: boolean; text: string };
 
-/** The release binary: DECKS_STAGE_SHOT, else the engine crate's own build. */
+/** The release binary: DECKS_NATIVE_SHOT, else the engine crate's own build. */
 export function nativeBinary(): string | undefined {
-	const named = process.env.DECKS_STAGE_SHOT;
+	const named = process.env.DECKS_NATIVE_SHOT;
 	if (named) return existsSync(named) ? named : undefined;
 	const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/stage/target/release/stage-shot");
 	return existsSync(built) ? built : undefined;
@@ -102,5 +102,3 @@ export class Native {
 		child?.kill();
 	}
 }
-
-export const tempDir = (root: string) => join(root, "decks-native-shots");

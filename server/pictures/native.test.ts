@@ -18,10 +18,10 @@ test("rule 17: words beyond Latin are the browser's, with the character named", 
 	assert.ok("why" in files && /你/.test(files.why));
 });
 
-test("rule 17: DECKS_STAGE_SHOT names the binary, and a missing one is none", () => {
-	const was = process.env.DECKS_STAGE_SHOT;
-	process.env.DECKS_STAGE_SHOT = "/nowhere/stage-shot";
+test("rule 17: DECKS_NATIVE_SHOT names the binary, and a missing one is none", () => {
+	const was = process.env.DECKS_NATIVE_SHOT;
+	process.env.DECKS_NATIVE_SHOT = "/nowhere/shot";
 	assert.equal(nativeBinary(), undefined);
-	if (was === undefined) delete process.env.DECKS_STAGE_SHOT;
-	else process.env.DECKS_STAGE_SHOT = was;
+	if (was === undefined) delete process.env.DECKS_NATIVE_SHOT;
+	else process.env.DECKS_NATIVE_SHOT = was;
 });

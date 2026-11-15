@@ -50,9 +50,9 @@ HTML; `playwright` for the browser. No other feature.
     edge in its last writer's colour (the accent for the person).
 16. `POST /pictures/extent { path, w, h, ... }` keeps what a canvas frame measured; card.fit
     answers from it while it is under 2 min old, at the card's width and newer than its last write.
-17. A canvas picture is drawn by the engine's native tool (`stage-shot`, DECKS_STAGE_SHOT or its
-    release build), `how` "native", each card as its picture; a PDF, `live`, a lone card, non-Latin
-    words, maths, markdown cards or icons fall back to the browser, and the notes say why.
+17. A canvas picture is drawn by the engine's native screenshot tool (DECKS_NATIVE_SHOT, else the
+    crate's release build), `how` "native", each card as its picture. A PDF, `live`, a lone card,
+    words beyond Latin, maths, markdown cards or icons fall back to the browser; the notes say why.
 ## Check
 
 - `node tools/check.mjs server`
