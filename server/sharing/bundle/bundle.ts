@@ -6,6 +6,7 @@ import { zip, type ZipEntry } from "./zip.ts";
 // A canvas as one .decks file, for a Decks with no server: a manifest, the
 // canvas's folder, lib/, and every file its cards name. No transcript, no
 // settings, no other canvas. Card pictures are left out until pictures exist.
+// Version 2 names the canvas and its cards by those words, unlike version 1.
 
 export const BUNDLE_PREFIX = "/api/bundle/";
 const MAX_FILE = 40 * 1024 * 1024;
@@ -71,7 +72,7 @@ export async function buildBundle(ctx: Context, asked: string): Promise<{ bytes:
 	await namedFiles(ctx, cards.map((c) => c.path), files);
 	const penBytes = await read(ctx, `${folder}/canvas.pen`);
 	const doc = penBytes ? JSON.parse(new TextDecoder().decode(penBytes)) : { children: [] };
-	const manifest = { decks: 1, made: new Date().toISOString(), from: "Decks", stage: { name, title: canvas.title, rev: canvas.rev ?? 0 }, pen: { doc, base: `${folder}/` }, boards: cards, pictures: {} };
+	const manifest = { decks: 2, made: new Date().toISOString(), from: "Decks", canvas: { name, title: canvas.title, rev: canvas.rev ?? 0 }, pen: { doc, base: `${folder}/` }, cards, pictures: {} };
 	const entries: ZipEntry[] = [{ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") }];
 	for (const file of [...files].sort()) {
 		const bytes = await read(ctx, file);

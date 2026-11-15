@@ -58,8 +58,8 @@ test("a person downloads a canvas as one .decks zip", async () => {
 		assert.match(res.headers.get("content-disposition") ?? "", /The Plan\.decks/);
 		const files = unzip(Buffer.from(await res.arrayBuffer()));
 		const manifest = JSON.parse(files.get("manifest.json")!.toString("utf8"));
-		assert.deepEqual(manifest.stage, { name: "plan", title: "The Plan", rev: 7 });
-		assert.deepEqual([manifest.boards[0].path, manifest.boards[0].w, manifest.boards[0].h], [card, 400, 300]);
+		assert.deepEqual(manifest.canvas, { name: "plan", title: "The Plan", rev: 7 });
+		assert.deepEqual([manifest.cards[0].path, manifest.cards[0].w, manifest.cards[0].h], [card, 400, 300]);
 		assert.equal(manifest.pen.base, "canvases/plan/");
 		const names = [...files.keys()].filter((n) => n !== "manifest.json").sort();
 		assert.ok(names.includes("deck/assets/logo.png") && names.includes("deck/lib/cards.css") && names.includes(`deck/${card}`));
