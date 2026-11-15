@@ -1,5 +1,6 @@
 import { defineEvent } from "./event.ts";
 import { any, arr, bool, int, lit, nul, opt, str, union } from "./schema.ts";
+import { ChangeAuthor } from "./page.ts";
 import { Box, Camera, ChatItem, Message, Point, Splice } from "./shapes.ts";
 
 // Every event, on one stream. Each says which ids changed, who changed them
@@ -12,6 +13,7 @@ export const itemChanged = defineEvent("item.changed", "Items on a canvas change
 	base: opt(int("The revision the edits apply to.")),
 	edits: opt(arr(any())),
 	made: opt(arr(str("A client's own name for an edit this revision is the first to have."))),
+	author: opt(ChangeAuthor),
 });
 export const cardChanged = defineEvent("card.changed", "A card's files changed, or it went.", { removed: opt(bool()), sized: opt(bool()) });
 export const fileCreated = defineEvent("file.created", "A file was made, answering a client's request when it named one.", { request: opt(str()) });

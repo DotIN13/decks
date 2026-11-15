@@ -1,3 +1,9 @@
+import type * as eventsModule from "./events.ts";
+import type { Infer } from "./schema.ts";
+import type { Payload } from "./event.ts";
+import type * as shapesModule from "./shapes.ts";
+import type * as syncModule from "./sync.ts";
+import type * as wireModule from "./wire.ts";
 // @decks-next/protocol: what every program agrees on. Touches no disk and
 // no network, and imports nothing outside this folder.
 
@@ -13,10 +19,17 @@ export * as wire from "./wire.ts";
 export { API, ENV, FILES_PATH, MCP_PATH, LOCK_FILE, LOGIN_PATH, SOCKET_PATH, callPath } from "./wire.ts";
 export { SYNC_ROUTES } from "./sync.ts";
 export { PROTOCOL_VERSION, compatible, major } from "./version.ts";
-export { CALLS, CALL_BY_NAME, byNoun } from "./calls/index.ts";
+export { CALLS, CALL_BY_NAME, byNoun, callsFor } from "./calls/index.ts";
 export * as calls from "./calls/index.ts";
 export * as events from "./events.ts";
 export { EVENTS } from "./events.ts";
 export * as chat from "./chat.ts";
 export { THINKING_LEVELS } from "./chat.ts";
 export type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, ClaudeAccount, Identity, MessageMention, MessagePart, ModelOption, SlashCommand, ThinkingLevel } from "./chat.ts";
+export * as page from "./page.ts";
+export type { ChangeAuthor, Page, Presence } from "./page.ts";
+export type Camera = Infer<typeof shapesModule.Camera>;
+export type PresenceBy = Infer<typeof syncModule.PresenceBy>;
+export type ClientMessage = Infer<typeof wireModule.ClientMessage>;
+export type ServerMessage = Infer<typeof wireModule.ServerMessage>;
+export type ViewRequest = Payload<typeof eventsModule.viewRequested>;

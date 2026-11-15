@@ -104,3 +104,11 @@ test("8: one geometry: no width or height, no { x, y, w, h } box", () => {
 		}
 	}
 });
+
+test("callsFor gives the calls a kind of caller may make", async () => {
+	const { callsFor } = await import("./calls/index.ts");
+	const card = callsFor("card");
+	assert.ok(card.has("item.insert") && card.has("card.fit") && card.has("view.focus"));
+	assert.ok(!card.has("agent.create") && !card.has("chat.send") && !card.has("canvas.delete"));
+	for (const name of card) assert.ok(CALLS.find((c) => c.name === name)!.who.includes("card"), name);
+});

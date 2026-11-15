@@ -354,6 +354,22 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `line.hello` | The socket's greeting, part of the envelope. |
 | `stage.pen.refused` | A refused edit is the call's own refusal, code conflict. |
 
+## The canvas library's old types (0.19.0, for Loom)
+
+`packages/canvas` still imports these from the old `@decks/protocol` and `@decks/api`. Each has a new name in
+`@decks-next/protocol`; nothing in the old packages changes, and Loom rewires the 37 files later.
+
+| Old (where) | New name (where) | What changed |
+|---|---|---|
+| `Page` (`@decks/protocol`, deck.ts) | `Page` (`protocol/page.ts`, type export) | Its place is a `box: Box`, not `x, y, w, h`; `lastWrittenBy`, `namedAt`, `modifiedAt`, `seenAt` are `by`, `named`, `changed`, `seen`, as on `Card`; `inContext` is `inPlay`; `card: true` is `item: "card"`; `content` is a `Size`. |
+| `Presence` (wire.ts) | `Presence` (`protocol/page.ts`) | Adds `gone`. It is what `view.update` takes and `view.changed` says. |
+| `PresenceBy` (wire.ts) | `PresenceBy` (`protocol/sync.ts`, type export) | The same fields. On the main stream, `view.changed` carries `by`, `name`, `kind` and `color` beside the presence. |
+| `ChangeAuthor` (wire.ts) | `ChangeAuthor` (`protocol/page.ts`) | The same fields. `item.changed` gains `author` to carry it. |
+| `StageCall` (stage.ts) | `ViewRequest`, the payload of `view.requested` (`protocol/events.ts`, type export) | `op` is `call`, the view call's name (`view.focus`, `view.goto`, `view.screenshot`, ...); `agentId` is `by`; the screen answers with `view.answer { id, value }` in place of `view.answered`. |
+| `LineClientMessage` (wire.ts) | `ClientMessage` (`protocol/wire.ts`, type export) | `line.hello` is `hello`, `line.call` is `call` with `args` as one object, `canvas.watch` is `watch { canvas }`. `view.answered` became the call `view.answer`, `card.seen` the call `card.seen`, `presence.set` the call `view.update`; `card.extent` is what `card.fit` measures. |
+| `Camera` as a type (stage.ts) | `Camera` (`protocol/shapes.ts`, type export) | `x, y, zoom`. The old optional `width` and `height` are the screen's size, `View.screen`, a `Size`. |
+| `cardCalls(route)` (`@decks/api`, verbs.ts) | `callsFor("card")` (`protocol/calls/index.ts`) | The calls a card may make, by who may call. The old route is the frame's to choose: `view.*` it answers itself, `agent.*` goes through the page, and the rest go to the server on the canvas's pass. |
+
 ## Where the grammar bends, and what is still open
 
 - `view.reload` and `chat.restore` answer a count, not a thing: each changes many things at once (rule 5).

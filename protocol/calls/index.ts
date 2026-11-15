@@ -1,4 +1,4 @@
-import type { AnyCall } from "../call.ts";
+import type { AnyCall, Who } from "../call.ts";
 import * as account from "./account.ts";
 import * as agent from "./agent.ts";
 import * as app from "./app.ts";
@@ -23,3 +23,8 @@ export { account, agent, app, canvas, card, chat, deck, file, frame, google, ite
 
 export const CALLS: readonly AnyCall[] = Object.values(byNoun).flatMap((noun) => Object.values(noun) as AnyCall[]);
 export const CALL_BY_NAME: ReadonlyMap<string, AnyCall> = new Map(CALLS.map((call) => [call.name, call]));
+
+/** The names of the calls a kind of caller may make: callsFor("card") is what a card's script may call. */
+export function callsFor(who: Who): ReadonlySet<string> {
+	return new Set(CALLS.filter((call) => call.who.includes(who)).map((call) => call.name));
+}

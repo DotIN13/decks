@@ -29,7 +29,8 @@ export function parseTable(text: string): { rows: Row[]; news: string[]; who: Ma
 	let section = "";
 	for (const line of text.split("\n")) {
 		if (line.startsWith("## ")) section = line.slice(3);
-		if (!line.startsWith("| `") && !line.startsWith("| new")) continue;
+		const listed = section.startsWith("Calls") || section.startsWith("Events");
+		if (!listed || (!line.startsWith("| `") && !line.startsWith("| new"))) continue;
 		const c = cells(line);
 		const events = section.startsWith("Events");
 		const dropped = section.endsWith("dropped");
