@@ -49,14 +49,8 @@ function fieldsOf(node: PenNode): Record<string, unknown> {
 
 /** The edits that make `prev` into `next`, in an order that applies one after another. */
 export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
-	const edits: PenEdit[] = [];
+	const edits: PenEdit[] = metaEdits(prev, next);
 	const emptied: PenEdit[] = [];
-	// The document's own fields.
-	for (const key of new Set([...Object.keys(prev), ...Object.keys(next)])) {
-		if (key === "children") continue;
-		if (!(key in next)) edits.push({ op: "meta", key });
-		else if (!same(prev[key], next[key])) edits.push({ op: "meta", key, value: next[key] });
-	}
 	const before = index(prev);
 	const after = index(next);
 	// What each parent's list looks like once the removals and moves out of it are done.
@@ -98,12 +92,7 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 					}
 					have.splice(previous === null ? 0 : have.indexOf(previous) + 1, 0, id);
 				}
-				const a = fieldsOf(was.node);
-				const b = fieldsOf(node);
-				for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-					if (!(key in b)) edits.push({ op: "set", id, key });
-					else if (!same(a[key], b[key])) edits.push({ op: "set", id, key, value: b[key] });
-				}
+				edits.push(...fieldEdits(id, fieldsOf(was.node), fieldsOf(node)));
 				// A children list appearing is a field of its own in the file; one going goes last, once
 				// what was in it has moved out or gone.
 				if (Array.isArray(node.children) && !Array.isArray(was.node.children)) edits.push({ op: "set", id, key: "children", value: [] });
@@ -123,14 +112,39 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 		}
 	}
 	visit(next.children ?? [], null);
-	// Gone, last, once what stays has been moved out of them: only the topmost of what went, since
-	// removing an item removes what is under it.
+	edits.push(...removals(before, after), ...emptied);
+	return edits;
+}
+
+/** The document's own fields that changed. */
+function metaEdits(prev: PenDocument, next: PenDocument): PenEdit[] {
+	const edits: PenEdit[] = [];
+	for (const key of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+		if (key === "children") continue;
+		if (!(key in next)) edits.push({ op: "meta", key });
+		else if (!same(prev[key], next[key])) edits.push({ op: "meta", key, value: next[key] });
+	}
+	return edits;
+}
+
+/** One item's fields that changed, children aside. */
+function fieldEdits(id: string, a: Record<string, unknown>, b: Record<string, unknown>): PenEdit[] {
+	const edits: PenEdit[] = [];
+	for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+		if (!(key in b)) edits.push({ op: "set", id, key });
+		else if (!same(a[key], b[key])) edits.push({ op: "set", id, key, value: b[key] });
+	}
+	return edits;
+}
+
+/** Gone, last, once what stays has moved out: only the topmost of what went, since removing an item removes what is under it. */
+function removals(before: Map<string, Entry>, after: Map<string, Entry>): PenEdit[] {
+	const edits: PenEdit[] = [];
 	for (const [id, { parent }] of before) {
 		if (after.has(id)) continue;
 		if (parent !== null && !after.has(parent) && before.has(parent)) continue;
 		edits.push({ op: "remove", id });
 	}
-	edits.push(...emptied);
 	return edits;
 }
 
@@ -213,8 +227,25 @@ export function applyEdits(doc: PenDocument, edits: readonly PenEdit[]): PenDocu
  * The answer shares items with `doc`, so neither may be changed in place afterwards.
  */
 export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDocument {
-	const out: PenDocument = { ...doc, children: [...(doc.children ?? [])] };
+	const copy = sharedCopy(doc);
+	for (const edit of edits) applyShared(copy, edit);
+	return copy.out;
+}
+
+/** A copy of a document that copies an item, and the lists above it, only when an edit reaches it. */
+type SharedCopy = {
+	out: PenDocument;
 	/** Where each item is now: the object in `out` (or still `doc`'s) and its parent's id. */
+	where: Map<string, { node: PenNode; parent: string | null }>;
+	/** The items and children lists that are this answer's own, safe to change. */
+	own: Set<object>;
+	ownList(parent: string | null): PenNode[];
+	ownNode(id: string): PenNode;
+	take(id: string): PenNode;
+};
+
+function sharedCopy(doc: PenDocument): SharedCopy {
+	const out: PenDocument = { ...doc, children: [...(doc.children ?? [])] };
 	const where = new Map<string, { node: PenNode; parent: string | null }>();
 	const visit = (list: readonly PenNode[], parent: string | null) => {
 		for (const node of list) {
@@ -223,7 +254,6 @@ export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDo
 		}
 	};
 	visit(out.children, null);
-	/** The items and children lists that are this answer's own, safe to change. */
 	const own = new Set<object>([out.children]);
 	const ownList = (parent: string | null): PenNode[] => {
 		if (parent === null) return out.children;
@@ -246,15 +276,6 @@ export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDo
 		where.set(id, { node: copy, parent: at.parent });
 		return copy;
 	};
-	const put = (list: PenNode[], node: PenNode, after: string | null) => {
-		const at = after === null ? 0 : list.findIndex((n) => n.id === after) + 1;
-		if (after !== null && at === 0) throw new Error(`no sibling "${after}"`);
-		list.splice(at, 0, node);
-	};
-	const forget = (node: PenNode) => {
-		where.delete(node.id);
-		if (Array.isArray(node.children)) for (const child of node.children) forget(child);
-	};
 	const take = (id: string) => {
 		const at = where.get(id);
 		if (!at) throw new Error(`no item "${id}"`);
@@ -262,39 +283,52 @@ export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDo
 		list.splice(list.indexOf(at.node), 1);
 		return at.node;
 	};
-	for (const edit of edits) {
-		switch (edit.op) {
-			case "meta":
-				if (edit.value === undefined) delete out[edit.key];
-				else out[edit.key] = edit.value;
-				break;
-			case "insert": {
-				const node = { ...edit.props, id: edit.id } as PenNode;
-				if (edit.list) own.add((node.children = []));
-				own.add(node);
-				put(ownList(edit.parent), node, edit.after);
-				where.set(node.id, { node, parent: edit.parent });
-				break;
-			}
-			case "remove":
-				forget(take(edit.id));
-				break;
-			case "place": {
-				const node = take(edit.id);
-				put(ownList(edit.parent), node, edit.after);
-				where.set(edit.id, { node, parent: edit.parent });
-				break;
-			}
-			case "set": {
-				const node = ownNode(edit.id);
-				if (edit.key === "children") {
-					if (edit.value === undefined) delete node.children;
-					else if (!Array.isArray(node.children)) own.add((node.children = []));
-				} else if (edit.value === undefined) delete node[edit.key];
-				else node[edit.key] = edit.value;
-				break;
-			}
+	return { out, where, own, ownList, ownNode, take };
+}
+
+function putAfter(list: PenNode[], node: PenNode, after: string | null): void {
+	const at = after === null ? 0 : list.findIndex((n) => n.id === after) + 1;
+	if (after !== null && at === 0) throw new Error(`no sibling "${after}"`);
+	list.splice(at, 0, node);
+}
+
+function forgetIn(where: Map<string, unknown>, node: PenNode): void {
+	where.delete(node.id);
+	if (Array.isArray(node.children)) for (const child of node.children) forgetIn(where, child);
+}
+
+/** One edit, on the shared copy. */
+function applyShared(c: SharedCopy, edit: PenEdit): void {
+	switch (edit.op) {
+		case "meta":
+			if (edit.value === undefined) delete c.out[edit.key];
+			else c.out[edit.key] = edit.value;
+			break;
+		case "insert": {
+			const node = { ...edit.props, id: edit.id } as PenNode;
+			if (edit.list) c.own.add((node.children = []));
+			c.own.add(node);
+			putAfter(c.ownList(edit.parent), node, edit.after);
+			c.where.set(node.id, { node, parent: edit.parent });
+			break;
+		}
+		case "remove":
+			forgetIn(c.where, c.take(edit.id));
+			break;
+		case "place": {
+			const node = c.take(edit.id);
+			putAfter(c.ownList(edit.parent), node, edit.after);
+			c.where.set(edit.id, { node, parent: edit.parent });
+			break;
+		}
+		case "set": {
+			const node = c.ownNode(edit.id);
+			if (edit.key === "children") {
+				if (edit.value === undefined) delete node.children;
+				else if (!Array.isArray(node.children)) c.own.add((node.children = []));
+			} else if (edit.value === undefined) delete node[edit.key];
+			else node[edit.key] = edit.value;
+			break;
 		}
 	}
-	return out;
 }
