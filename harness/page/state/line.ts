@@ -1,5 +1,6 @@
 import { clientFor, DecksError, Line, type Client, type Heard, type Typed } from "@decks-next/sdk/browser";
 import { batch } from "solid-js";
+import { openOldLine } from "./compat/line.ts";
 
 // The page's one line to the server: every call through @decks-next/sdk, and
 // one socket (the sdk's Line) for the events, handed to listeners by name in
@@ -21,14 +22,14 @@ const line = {
 };
 
 /** The server and token the page calls with: /page.json, else ?token= in the address, kept for this tab. */
-export async function findServer(): Promise<{ url: string; token: string | undefined }> {
+export async function findServer(): Promise<{ url: string; token: string | undefined; compat?: boolean }> {
 	const fromAddress = new URLSearchParams(location.search).get("token");
 	if (fromAddress) sessionStorage.setItem("decks-token", fromAddress);
 	try {
 		const response = await fetch("/page.json", { cache: "no-store" });
 		if (response.ok) {
-			const page = (await response.json()) as { url?: string; token?: string };
-			if (page.token) return { url: page.url || location.origin, token: page.token };
+			const page = (await response.json()) as { url?: string; token?: string; compat?: boolean };
+			if (page.token) return { url: page.url || location.origin, token: page.token, ...(page.compat ? { compat: true } : {}) };
 		}
 	} catch {
 		// No /page.json: the token from the address, below.
@@ -38,8 +39,9 @@ export async function findServer(): Promise<{ url: string; token: string | undef
 
 /** Open the line: a client, then the event stream, reopened when it drops. `onUp` runs each time it comes up. */
 export async function start(onUp: (up: boolean) => void): Promise<Client> {
-	const { url, token } = await findServer();
+	const { url, token, compat } = await findServer();
 	line.client = clientFor(url, token);
+	if (compat && token) openOldLine(url, token);
 	line.up = onUp;
 	line.stopped = false;
 	listen();

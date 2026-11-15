@@ -38,7 +38,7 @@ function pageJson(): Plugin {
 				if ((req.url ?? "").split("?")[0] !== "/page.json") return next();
 				res.setHeader("Content-Type", "application/json");
 				res.setHeader("Cache-Control", "no-store");
-				res.end(JSON.stringify({ url: "", token: server().token }));
+				res.end(JSON.stringify({ url: "", token: server().token, ...(process.env.DECKS_PAGE_COMPAT === "1" ? { compat: true } : {}) }));
 			});
 		},
 	};

@@ -3,6 +3,8 @@ import { canvasOf } from "../state/canvases.ts";
 import { setState, state } from "../state/deck.ts";
 import { ensureHistory } from "../state/history.ts";
 import { keepFocus } from "../state/focus.ts";
+import { oldCall, oldLineOpen } from "../state/compat/line.ts";
+import { notice } from "../state/notices.ts";
 import { setDraft, setUnread } from "../state/ui.ts";
 import type { AgentMode, ThinkingLevel } from "../state/types/index.ts";
 
@@ -34,9 +36,15 @@ export function changeAgent(id: string, change: Record<string, unknown>): void {
 	void call("agent.update", { agent: id, change }).then(warnIfFailed);
 }
 
-export const renameAgent = (id: string, name: string) => changeAgent(id, { name });
-export const tagAgent = (id: string, tags: string[]) => changeAgent(id, { tags });
-export const moveAgentTo = (id: string, workspace: string | null) => changeAgent(id, { workspace });
+/** In compat mode a name, tags or workspace goes as today's agent.set, on today's line (state/compat). */
+function setAgent(id: string, change: Record<string, unknown>): void {
+	if (!oldLineOpen()) return changeAgent(id, change);
+	void oldCall("agent.set", [id, change]).then((answer) => !answer.ok && notice("warn", answer.error ?? "The change was refused."));
+}
+
+export const renameAgent = (id: string, name: string) => setAgent(id, { name });
+export const tagAgent = (id: string, tags: string[]) => setAgent(id, { tags });
+export const moveAgentTo = (id: string, workspace: string | null) => setAgent(id, { workspace });
 export const setAgentMode = (id: string, mode: AgentMode) => changeAgent(id, { mode });
 export const setAgentThinking = (id: string, thinking: ThinkingLevel) => changeAgent(id, { thinking });
 export const setAgentModel = (id: string, provider: string, model: string, thinking?: ThinkingLevel) => changeAgent(id, { model: provider ? `${provider}/${model}` : model, ...(thinking ? { thinking } : {}) });

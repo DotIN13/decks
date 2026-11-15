@@ -3,6 +3,7 @@ import { canvasBox } from "@decks/canvas/camera";
 import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { callOnLine } from "../state/line.ts";
+import { oldCall, oldLineOpen } from "../state/compat/line.ts";
 import { deviceId } from "../state/device.ts";
 import { stageOf } from "../state/canvases.ts";
 
@@ -42,6 +43,8 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
 	const stage = stageOf(agentId)?.name;
 	void callOnLine("view.move", { x: sized.x, y: sized.y, zoom: sized.zoom, agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId });
+	// In compat mode, today's frame as well, on today's line (state/compat): the same camera said twice.
+	if (oldLineOpen()) void oldCall("view.remember", [sized, { agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId }]);
 }
 
 /**
