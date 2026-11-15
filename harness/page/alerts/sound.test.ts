@@ -6,10 +6,7 @@ import { test } from "node:test";
 import { isSound, SILENT, SOUND_FAMILIES, SOUND_IDS, soundLabel, soundName, soundUrl } from "./sound.ts";
 
 /*
- * The cues are files now, so the assertion worth having is that the list and the directory
- * agree. Everything else in this module is naming, and naming is only interesting where a
- * saved preference could name something that is not there — which is exactly the state a
- * browser is in after this build, since the ids changed under it.
+ * The cues are files now, so the assertion worth having is that the list and the directory agree.
  */
 
 const sounds = join(dirname(fileURLToPath(import.meta.url)), "sounds");
