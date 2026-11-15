@@ -29,6 +29,10 @@
 	],
 	"mentions": [
 		[
+			"stage-ops.test.ts",
+			"view-calls.test.ts"
+		],
+		[
 			"stage-ops.ts",
 			"view-calls.ts"
 		]

@@ -1,6 +1,6 @@
 # Step 4e-04-input: Regroup canvas: pointer, keys and touch rules into input/
 
-Dry run on db94b341, on top of 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view. Nothing was moved.
+Dry run on 04115c50, on top of 4e-02-camera, 4e-03-view. Nothing was moved.
 
 - files moved by git mv: 6
 - files taken out of git (moved on disk): 0

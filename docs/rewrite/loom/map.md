@@ -53,7 +53,7 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 | `index.ts`, `types.ts`, `theme.ts`, `debug.ts` | the entry and shared types | `src/index.ts`, `src/types.ts`, `src/theme.ts`, `src/debug.ts` |
 | `entries/` | the package's other doors: camera, comments, tools, host | `src/public/*` |
 | `view/` | the canvas element: its layers and the selection | `src/stage/Stage.tsx` → *view/CanvasView.tsx*, `src/stage/items-layer.tsx`, `src/stage/selection.tsx` |
-| `camera/` | where the canvas looks, glides, insets, landing, agents' views | `src/camera/*`; `stage-ops.ts` → `view-calls.ts` (and its test) |
+| `camera/` | where the canvas looks, glides, insets, landing, agents' views | `src/camera/*`; *stage-ops.ts* → `view-calls.ts` (and its test) |
 | `input/` | pointer, wheel, touch and keys, before they mean an edit | `src/stage/input.ts`, `src/edit/dom/pointer.ts`, `src/edit/dom/keys.ts`, `src/edit/dom/touch-rules.ts` (+test), `src/items/input.ts` → *input/item-keys.ts* |
 | `editor/` | the TypeScript editor: gestures, ops, overlays, text | `src/editor.tsx` → `editor/editor.tsx`; `src/edit/index.ts`, `held.ts`, `pen-tools.ts`, `snap.ts`, `scene-ts.ts` and tests → `editor/`; `src/edit/core/*` → `editor/core/*`; `src/edit/dom/{controller,effects,OverlayLayer,TextEditing,colours}` → `editor/dom/` |
 | `drawing/` | the drawing as the page holds it | `src/model/{drawing,boxes,bounds,layers,doc-index,comment-text}` (+tests) |
@@ -327,7 +327,7 @@ of docs excluded:
 |---|---|
 | `canvas/src/camera/controller.ts` | `createCameraController` 450 |
 | `canvas/src/camera/insets.ts` | `watchInsets` 163 |
-| `canvas/src/camera/stage-ops.ts` | `runStageCall` 104 |
+| *canvas/src/camera/stage-ops.ts* | `runStageCall` 104 |
 | `canvas/src/cards/CardEditor.tsx` | `CardEditor` 1384, `inline` 101, `block` 82, `(anonymous)` 122 |
 | `canvas/src/edit/core/gesture.ts` | `step` 82 |
 | `canvas/src/edit/core/overlay-json.ts` | `overlayJson` 87 |
