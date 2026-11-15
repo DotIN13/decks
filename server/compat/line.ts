@@ -55,7 +55,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		if (message.type === "canvas.watch") return watch(String(message.canvas ?? ""), message.since, message.whole);
 		if (message.type === "canvas.unwatch") state.watched.get(String(message.canvas))?.();
 		if (message.type === "presence.set") return screen(message);
-		if (message.type === "card.seen") return void (await door.call("card.seen", { card: String(message.path ?? "") }, state.caller!, client));
+		if (message.type === "card.seen") return seen(String(message.path ?? ""));
 		if (message.type === "view.answered") return answered(message);
 		if (QUIET.has(String(message.type)) || message.type === "line.token") return;
 		send({ type: "harness.notice", level: "warn", text: `The line does not know ${String(message.type)}.` });
@@ -80,6 +80,16 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		const camera = message.camera as { x?: number; y?: number; zoom?: number } | null | undefined;
 		if (!camera || typeof camera.x !== "number" || typeof camera.y !== "number" || typeof camera.zoom !== "number") return;
 		await door.call("view.move", { x: camera.x, y: camera.y, zoom: camera.zoom, canvas, device: "frame" }, state.caller!, client);
+	}
+
+	/** The person read a card: recorded, and the frame told the card's page again, its dot gone. */
+	async function seen(path: string): Promise<void> {
+		const answer = await door.call("card.seen", { card: path }, state.caller!, client);
+		const canvas = boundTo(state.caller!) ?? [...state.watched.keys()][0];
+		if (!answer.ok || !canvas) return;
+		const read = await readDrawing(deck(), canvas, "");
+		const page = read ? pagesOf(canvas, read.doc as { children?: [] }, true, new Map([[path, answer.value as News]])).find((one) => one.path === path) : undefined;
+		if (page) send({ type: "card.changed", path, rev: 0, card: page });
 	}
 
 	/** The frame's answer to a picture: a shot as the value, or why it could not as the error. */
