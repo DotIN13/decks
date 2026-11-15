@@ -1,6 +1,6 @@
 # Step 4e-08-cards: Regroup canvas: card files from items/ and model/ join cards/
 
-Dry run on f233ce1f, on top of 4e-04-input, 4e-03-view, 4e-05-editor, 4e-06-drawing, 4e-07-items. Nothing was moved.
+Dry run on 55e68320, on top of 4e-03-view, 4e-05-editor, 4e-06-drawing, 4e-07-items. Nothing was moved.
 
 - files moved by git mv: 12
 - files taken out of git (moved on disk): 0

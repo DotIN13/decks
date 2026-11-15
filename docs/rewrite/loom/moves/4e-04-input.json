@@ -79,5 +79,27 @@
 		"node tools/gates/run.mjs",
 		"node tools/checks/run.mjs: wheel-diagonal, card-keys, pencil-then-finger, drop-lands (one slot each)",
 		"commit with REWRITE_AGENT=Loom: Regroup canvas: pointer, keys and touch rules into input/"
+	],
+	"paths": [
+		{
+			"file": "canvas/cards/runtime/lib/card.css",
+			"replace": [
+				{
+					"from": "(`stage/input.ts`)",
+					"to": "(`input/canvas-input.ts`)"
+				}
+			],
+			"why": "a comment in the card runtime's own sheet, which the tables do not read"
+		},
+		{
+			"file": "harness/page/index.css",
+			"replace": [
+				{
+					"from": "`stage/input.ts`",
+					"to": "`input/canvas-input.ts`"
+				}
+			],
+			"why": "a line inside a block comment that does not start with *, so the comment-only mentions miss it"
+		}
 	]
 }

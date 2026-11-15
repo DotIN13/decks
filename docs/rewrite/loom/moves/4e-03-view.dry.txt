@@ -1,6 +1,6 @@
 # Step 4e-03-view: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx
 
-Dry run on f233ce1f, on top of 4e-04-input. Nothing was moved.
+Dry run on 55e68320. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0

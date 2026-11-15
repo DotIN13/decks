@@ -52,9 +52,9 @@ Folders named by what a reader looks for. `stage` is renamed wherever it is a fi
 |---|---|---|
 | `index.ts`, `types.ts`, `theme.ts`, `debug.ts` | the entry and shared types | `src/index.ts`, `src/types.ts`, `src/theme.ts`, `src/debug.ts` |
 | `entries/` | the package's other doors: camera, comments, tools, host | `src/public/*` |
-| `view/` | the canvas element: its layers and the selection | `src/stage/Stage.tsx` → *view/CanvasView.tsx*, `src/stage/items-layer.tsx`, `src/stage/selection.tsx` |
+| `view/` | the canvas element: its layers and the selection | *src/stage/Stage.tsx* → *view/CanvasView.tsx*, `src/stage/items-layer.tsx`, `src/stage/selection.tsx` |
 | `camera/` | where the canvas looks, glides, insets, landing, agents' views | `src/camera/*`; *stage-ops.ts* → `view-calls.ts` (and its test) |
-| `input/` | pointer, wheel, touch and keys, before they mean an edit | `src/stage/input.ts`, `src/edit/dom/pointer.ts`, `src/edit/dom/keys.ts`, `src/edit/dom/touch-rules.ts` (+test), `src/items/input.ts` → *input/item-keys.ts* |
+| `input/` | pointer, wheel, touch and keys, before they mean an edit | *src/stage/input.ts*, `src/edit/dom/pointer.ts`, `src/edit/dom/keys.ts`, `src/edit/dom/touch-rules.ts` (+test), *src/items/input.ts* → *input/item-keys.ts* |
 | `editor/` | the TypeScript editor: gestures, ops, overlays, text | `src/editor.tsx` → `editor/editor.tsx`; `src/edit/index.ts`, `held.ts`, `pen-tools.ts`, `snap.ts`, `scene-ts.ts` and tests → `editor/`; `src/edit/core/*` → `editor/core/*`; `src/edit/dom/{controller,effects,OverlayLayer,TextEditing,colours}` → `editor/dom/` |
 | `drawing/` | the drawing as the page holds it | `src/model/{drawing,boxes,bounds,layers,doc-index,comment-text}` (+tests) |
 | `items/` | what sits on the canvas and when it wakes | `src/items/{awake,item-slot,item-surfaces,MediaPlayer,missing,natural-size,news}` (+tests), `src/model/{file-drop,file-kinds}` (+test) |
@@ -118,7 +118,7 @@ Where a file is a part of the page (a Solid component or a `create…` closure w
 | `view/items-layer.tsx` (753; `createItemsLayer` 704) | `items/layer/model.ts` (slots, rendered, liveFiles, playingBox), `items/layer/view.tsx` (pageNode, fileNodes, player), `items/layer/actions.ts` (mount and unmount on awake changes) |
 | *ink/InkLayer.tsx* (703; `StageInk` 668) | `ink/layer/model.ts` (the stroke in progress, paintInk's maths), `ink/layer/view.tsx`, `ink/layer/actions.ts` (onDown, onMove, onUp) |
 | `editor/core/gesture.ts` (693) | `editor/core/gesture.ts` (types, `step` under 80), *editor/core/gesture-carry.ts* (carry, moveCarry, releaseCarry), *editor/core/gesture-handle.ts* (pressHandle, move, release), *editor/core/gesture-press.ts* (pressCanvas) |
-| *input/canvas-input.ts* (from `stage/input.ts`, 686; `createStageInput` 619) | *input/keys-shortcuts.ts* (keydown, shortcut), *input/wheel.ts* (onWheel), `input/touch.ts` (touch, beginTouch, panFrom, KeptTouches), `input/index.ts` (`createCanvasInput` assembling them) |
+| *input/canvas-input.ts* (from *stage/input.ts*, 686; `createStageInput` 619) | *input/keys-shortcuts.ts* (keydown, shortcut), *input/wheel.ts* (onWheel), `input/touch.ts` (touch, beginTouch, panFrom, KeptTouches), `input/index.ts` (`createCanvasInput` assembling them) |
 | *host/outside/framed-editor.tsx* (659; `createFramedEditor` 494) | `host/outside/model.ts` (FrameHostOptions, the handle's state), *host/outside/frame-life.ts* (startFrame, renew), `host/outside/wire.ts` (wire), *host/outside/in-step.ts* (keepInStep 108, in two), `host/outside/view.tsx` (surface) |
 | `drawing/drawing.ts` (575; `createDrawing` 358) | `drawing/drawing.ts` (Drawing, createDrawing assembling), *drawing/pages.ts* (pagesOf, pagesAhead, together, onTop), *drawing/edits.ts* (edit, step, flush), *drawing/receive.ts* (receive, follow) |
 | `editor/core/overlay.ts` (546) | `editor/core/overlay.ts` (Overlay, deriveOverlay), *editor/core/outlines.ts* (selectionOutlines, kinOutlines, hover), `editor/core/measure.ts` (measure) |
@@ -356,8 +356,8 @@ of docs excluded:
 | `canvas/src/model/drawing.ts` | `createDrawing` 358 |
 | `canvas/src/model/markdown.ts` | `blocksOf` 81, `runsOf` 103 |
 | `canvas/src/render/engine.ts` | `receive` 87, `fetchPicture` 94 |
-| `canvas/src/stage/Stage.tsx` | `Stage` 758 |
-| `canvas/src/stage/input.ts` | `createStageInput` 619, `(anonymous)` 214 |
+| *canvas/src/stage/Stage.tsx* | `Stage` 758 |
+| *canvas/src/stage/input.ts* | `createStageInput` 619, `(anonymous)` 214 |
 | `canvas/src/stage/items-layer.tsx` | `createItemsLayer` 704 |
 | `canvas/src/stage/selection.tsx` | `createSelection` 389, `pills` 135 |
 | `canvas/src/ui/AgentCursor.tsx` | `AgentCursor` 83 |
@@ -417,7 +417,7 @@ imports by package and folder, top-level outlines and inner function sizes of ea
   end in leaves no backticked file name pointing nowhere in `canvas/`, `pen/`, `ui/`, `engine/`.
 - **New table fields**: `remove` (files deleted; a file the table moves out of a removed folder still
   moves), `localize` (inside a folder, a package name becomes a relative path to one file, never in
-  JSON), `mentions` with an optional third field (the folder it applies in: a bare `input.ts` in
+  JSON), `mentions` with an optional third field (the folder it applies in: a bare *input.ts* in
   `items/` means another file than in `view/`), `set` keys that reach inside (`dependencies.@decks/ink`,
   or a JSON list for names with dots).
 - **4c differs from section 5**: the card runtime's own files (`card.js`, `card.css`, `theme.css`,

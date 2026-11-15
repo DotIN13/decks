@@ -1,6 +1,6 @@
 # Step 4e-04-input: Regroup canvas: pointer, keys and touch rules into input/
 
-Dry run on f233ce1f. Nothing was moved.
+Dry run on 55e68320. Nothing was moved.
 
 - files moved by git mv: 6
 - files taken out of git (moved on disk): 0
