@@ -178,7 +178,7 @@ export interface Tokens {
 	issue(who: Caller, label?: string): string;
 	revoke(id: string): void;
 	/** Who a caller of this kind is now; undefined refuses its tokens. */
-	describe(kind: Who, now: (id: string) => Caller | undefined): void;
+	describe(kind: Who, now: (id: string, issued: Caller) => Caller | undefined): void;
 }
 
 /** One live connection: a socket or an MCP session. */

@@ -18,7 +18,7 @@ const hashOf = (token: string) => createHash("sha256").update(token).digest("hex
 
 export class Callers implements Tokens {
 	private kept = new Map<string, Kept>();
-	private now = new Map<Who, (id: string) => Caller | undefined>();
+	private now = new Map<Who, (id: string, issued: Caller) => Caller | undefined>();
 	private pairings: Pairing[] = [];
 	private saving: Promise<void> = Promise.resolve();
 
@@ -44,7 +44,7 @@ export class Callers implements Tokens {
 		this.save();
 	}
 
-	describe(kind: Who, now: (id: string) => Caller | undefined): void {
+	describe(kind: Who, now: (id: string, issued: Caller) => Caller | undefined): void {
 		this.now.set(kind, now);
 	}
 
@@ -54,7 +54,7 @@ export class Callers implements Tokens {
 		const kept = this.kept.get(hashOf(token));
 		if (!kept) return undefined;
 		const now = this.now.get(kept.who.kind);
-		return now ? now(kept.who.id) : { ...kept.who };
+		return now ? now(kept.who.id, { ...kept.who }) : { ...kept.who };
 	}
 
 	/** Ids that hold tokens, with their labels, for the person. */
