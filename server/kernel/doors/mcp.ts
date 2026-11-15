@@ -1,4 +1,4 @@
-import { MCP_PATH as PATH, PROTOCOL_VERSION, type AnyCall, type Caller, type Node } from "../../../protocol/index.ts";
+import { MCP_PATH as PATH, PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope, type Node } from "../../../protocol/index.ts";
 import type { Built } from "../kernel.ts";
 import { SERVER_VERSION } from "../own-calls.ts";
 
@@ -37,6 +37,17 @@ export function jsonSchemaOf(node: Node): Record<string, unknown> {
 
 const tool = (call: AnyCall) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) });
 
+/** What an MCP client reads: the value then its notes, or the refusal, its hint, then notes; as clients/mcp writes it. */
+export function textOf(envelope: Envelope<unknown>): string {
+	if (!envelope.ok) {
+		const { message, code, hint } = envelope.error;
+		return [`${message} (${code})`, ...(hint ? [`Try ${hint}.`] : []), ...envelope.notes].join("\n");
+	}
+	const { value } = envelope;
+	const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
+	return [text, ...envelope.notes].join("\n");
+}
+
 /** One JSON-RPC message in, its answer out; undefined for a notification. */
 export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise<Record<string, unknown> | undefined> {
 	if (rpc.id === undefined || rpc.id === null) return undefined;
@@ -50,7 +61,7 @@ export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise
 			return reply({ tools: built.router.callable(caller).map(tool) });
 		case "tools/call": {
 			const envelope = await built.router.call(String(rpc.params?.name), rpc.params?.arguments ?? {}, caller);
-			const text = JSON.stringify(envelope.ok ? envelope.value : envelope.error);
+			const text = textOf(envelope);
 			return reply({ content: [{ type: "text", text }], structuredContent: envelope, isError: !envelope.ok });
 		}
 		default:
