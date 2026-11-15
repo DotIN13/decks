@@ -27,7 +27,7 @@ export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = fal
 		.map((node) => ({
 			path: /^(canvases|shared)\//.test(node.metadata!.path!) ? node.metadata!.path! : `${folderOf(canvas)}/${node.metadata!.path!}`,
 			title: node.name ?? node.metadata!.path!,
-			card: true,
+			...(node.metadata!.type === "decks.card" ? { card: true } : {}),
 			x: node.x ?? 0,
 			y: node.y ?? 0,
 			w: node.width ?? 1000,
