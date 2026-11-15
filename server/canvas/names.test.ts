@@ -3,17 +3,17 @@ import { test } from "node:test";
 import { callers, testServer } from "../kernel/testing.ts";
 import type { Item } from "../kernel/types.ts";
 import { canvasFeature } from "./feature.ts";
-import { boardFeature, DECK, stickerFeature } from "./test-deck.ts";
+import { leafFeature, DECK, stickerFeature } from "./test-deck.ts";
 
 // README rule 10: anywhere an item's id is taken, a page's path is too: a
-// card's as its folder or its index.html, an old board's as its file.
+// card's as its folder or its index.html, an older page's as its file.
 
 const ann = callers.agent("ann", "plan");
 const FULL = "canvases/plan/stickers/s1/index.html";
 const NAMES = [FULL, "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1"];
 
 async function withPage() {
-	const s = await testServer({ features: [canvasFeature({ clock: () => 5 }), stickerFeature(), boardFeature()], deck: DECK });
+	const s = await testServer({ features: [canvasFeature({ clock: () => 5 }), stickerFeature(), leafFeature()], deck: DECK });
 	await s.value("item.insert", { item: { type: "sticker", id: "st", path: FULL }, at: { x: 0, y: 600 } }, ann);
 	return s;
 }
@@ -42,10 +42,10 @@ for (const name of NAMES) {
 	});
 }
 
-test("an old board is named by its file, with or without the canvas's folder", async () => {
-	const s = await testServer({ features: [canvasFeature(), boardFeature()], deck: DECK });
-	await s.value("item.insert", { item: { type: "board", id: "b1", board: "boards/old.html" }, at: { x: 0, y: 600 } }, ann);
-	assert.equal((await s.value<Item>("item.get", { id: "boards/old.html" }, ann)).id, "b1");
-	assert.equal((await s.value<Item>("item.get", { id: "canvases/plan/boards/old.html" }, ann)).id, "b1");
+test("an older page is named by its file, with or without the canvas's folder", async () => {
+	const s = await testServer({ features: [canvasFeature(), leafFeature()], deck: DECK });
+	await s.value("item.insert", { item: { type: "leaf", id: "b1", file: "leaves/old.html" }, at: { x: 0, y: 600 } }, ann);
+	assert.equal((await s.value<Item>("item.get", { id: "leaves/old.html" }, ann)).id, "b1");
+	assert.equal((await s.value<Item>("item.get", { id: "canvases/plan/leaves/old.html" }, ann)).id, "b1");
 	await s.close();
 });

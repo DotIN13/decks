@@ -1,6 +1,6 @@
 import { apply as penApply, baseTheme, expandVariables, indexOf, isArrow, reroute, boxOf as penBox, placements, walk, withDecksColors, type Op as PenOp, type PenDocument, type PenNode } from "@decks/pen";
 import { Refused } from "../../protocol/index.ts";
-import type { ItemOp } from "../kernel/types.ts";
+import type { Item, ItemOp } from "../kernel/types.ts";
 import { sizedOnly, type Kinds } from "./kinds.ts";
 import { cornerOf, joinCorner, type Box, type Corner } from "./place.ts";
 
@@ -28,11 +28,14 @@ export function findId(doc: PenDocument, ref: string, where: Where): string | un
 	const want = pageKey(ref, where.canvas);
 	for (const node of nodes) {
 		const item = where.kinds.toItem(node, where.canvas);
-		for (const path of [item.card, item.path, (item as { board?: unknown }).board]) if (typeof path === "string" && pageKey(path, where.canvas) === want) return node.id;
+		if (where.kinds.of(node) && pathsOf(item).some((path) => pageKey(path, where.canvas) === want)) return node.id;
 	}
 	if (ref.includes("/") && boxes(doc).has(ref)) return ref;
 	return undefined;
 }
+
+/** The deck paths a kind's item names: its string fields but its id, type and title. */
+const pathsOf = (item: Item): string[] => Object.entries(item).filter(([key, value]) => typeof value === "string" && !["id", "type", "title", "html"].includes(key)).map(([, value]) => value as string);
 
 /** A page's path in one spelling: no canvas prefix, no trailing /index.html, so its folder names it too. */
 function pageKey(path: string, canvas: string): string {

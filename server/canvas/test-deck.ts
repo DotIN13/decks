@@ -16,15 +16,15 @@ export const DECK = {
 	"canvases/other/canvas.pen": pen([]),
 };
 
-/** An old board: a browser node tagged decks.board, answered as { type: board, board }. */
-export function boardFeature(): Feature {
+/** An older page kind: a browser node tagged decks.leaf, answered as { type: leaf, file }. */
+export function leafFeature(): Feature {
 	return defineFeature({
-		name: "boards",
+		name: "leaves",
 		calls: [],
 		items: [{
-			type: "board",
-			fromPen: (node: PenNode) => ({ type: "board", id: node.id, board: (node.metadata as { path: string }).path }) as Item,
-			toPen: (item: Item) => ({ type: "browser", ...(item.id ? { id: item.id } : {}), width: 400, height: 300, metadata: { type: "decks.board", path: (item as { board?: string }).board } }),
+			type: "leaf",
+			fromPen: (node: PenNode) => ({ type: "leaf", id: node.id, file: (node.metadata as { path: string }).path }) as Item,
+			toPen: (item: Item) => ({ type: "browser", ...(item.id ? { id: item.id } : {}), width: 400, height: 300, metadata: { type: "decks.leaf", path: (item as { file?: string }).file } }),
 		}],
 	});
 }
