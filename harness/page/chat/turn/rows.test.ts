@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { ChatItem } from "@decks/protocol";
 import { floatRows } from "./rows.ts";
 
+// The rows as the column floats them, a tool call among them.
+
 const user = (id: string, text = "hello"): ChatItem => ({ kind: "user", id, text, at: 1 });
 const assistant = (id: string, text: string, streaming = false, thinking?: string): ChatItem => ({ kind: "assistant", id, text, at: 2, streaming, ...(thinking ? { thinking } : {}) });
 const tool = (id: string, name: string, state: "running" | "done" | "error" = "done"): ChatItem => ({ kind: "tool", id, name, title: name, state });

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { clampHeight, dragSpeed, foldWords, keyStep, revealInset, sheetFling, sheetGoes, stateWords } from "./model.ts";
 
+// The section's rules: its words, its height, then the phone's sheet.
+
 test("an agent's state is said after its name only while it works or waits", () => {
 	assert.equal(stateWords("waiting", "Sable"), "waiting for you");
 	assert.equal(stateWords("idle", "Sable"), undefined);

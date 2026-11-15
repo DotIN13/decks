@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { ChatItem } from "@decks/protocol";
 import { earlierLabel, hasEarlier, hiddenCount, prepend, windowOf, windowStart, WINDOW } from "./model.ts";
 
+// The drawn span: how much is shown, how it reaches back, then the day lines.
+
 const rows = (n: number, prefix = "u") =>
 	Array.from({ length: n }, (_, i) => ({ kind: "user", id: `${prefix}${i}`, text: `${i}`, at: i }) as ChatItem);
 

@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { focusedFacts } from "./model.ts";
 
+// What the focused stream says of its agent, with the defaults for none.
+
 test("with no agent, the stream is idle, says It, and uses the default runtime", () => {
 	assert.deepEqual(focusedFacts(undefined, undefined, "claude"), { state: "idle", name: "It", agent: "claude" });
 });

@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { ChatItem } from "@decks/protocol";
 import { turnCards } from "./model.ts";
 
+// The rows folded into one card per speaker's turn.
+
 /**
  * The fold both surfaces draw: a message is a card, a turn is the parts inside one.
  *

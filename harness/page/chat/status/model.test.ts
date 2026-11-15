@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isWorking, signPlacement, workingWords } from "./model.ts";
 
+// The working sign: where it goes, then what it says.
+
 /** Where the working sign goes, and what it says. */
 test("idle shows no sign anywhere", () => {
 	for (const historyOpen of [false, true]) {

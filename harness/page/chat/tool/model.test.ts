@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { ToolItem } from "../turn/rows.ts";
 import { distinctNames, toolSlots } from "./model.ts";
 
+// Which tool calls fold behind a count, and the names a header shows.
+
 const call = (id: string, name: string, state: ToolItem["state"] = "done"): ToolItem => ({
 	kind: "tool",
 	id,

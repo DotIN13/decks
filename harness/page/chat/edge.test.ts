@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { closeHistory, edgeOwner, historyButton, setInspectable, toggleHistory } from "./edge.ts";
 
+// Who owns the right edge: the cases a bare toggle gets wrong, in turn.
+
 /** Back to nothing wanted, nothing selected, and the inspector holding the claim, through the public calls. */
 function resetEdge(): void {
 	closeHistory();

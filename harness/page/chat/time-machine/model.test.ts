@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { actRows, endsPreview, previewTarget } from "./model.ts";
 
+// The time machine's acts, and which end a preview first.
+
 test("four acts, in order, with restore last", () => {
 	assert.deepEqual(actRows(false).map((r) => r.act), ["preview", "rewind", "fork", "restore"]);
 });

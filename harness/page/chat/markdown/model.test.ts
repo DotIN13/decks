@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { blocks, inline, type Block, type Inline } from "./model.ts";
 
+// Markdown read into blocks, then into inline spans, then the links that stay text.
+
 /** A span tree as a readable string, so a failure says what it got. */
 function shape(spans: Inline[]): string {
 	return spans
