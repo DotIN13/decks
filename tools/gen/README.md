@@ -11,7 +11,8 @@ git), and the proof that `docs/rewrite/calls.md` is whole. Lexicon owns it.
   (`sdk/calls.json`).
 - `docs.ts`: the `decks` command's help (`cli/help.txt`) and the agents' reference (`reference.md`).
 - `mcp.ts`: the MCP tool list (`mcp/tools.json`), every server call an agent may make, as JSON Schema.
-- `swift.ts`, `swift-types.ts`: `swift/Shapes.swift`, `Calls.swift`, `Events.swift` for the iPad app.
+- `swift.ts`, `swift-types.ts`: `swift/Shapes.swift`, `Calls.swift`, `Events.swift` and `Wire.swift` (the
+  envelope, login, the lock, the socket's messages as enums on type, and the wire's paths) for the iPad app.
 - `table.ts`: `node tools/gen/table.ts` proves `calls.md` whole against today's three files.
 - `paths.ts`: where they read and write.
 
@@ -31,7 +32,7 @@ switch-over removes them; then it checks only the declared side.
 4. A required string or number argument is a word on the command line; every other is a flag.
 5. In Swift a named object is a struct, an object that takes other keys keeps them in `extra`, a union of
    objects told apart by one literal field is an enum switched on it, and any other mixed union is
-   `JSONValue`. The three files must pass `swiftc -typecheck` together.
+   `JSONValue`. The four files must pass `swiftc -typecheck` together.
 6. `calls.md` lists each of today's names exactly once, and every declared call and event; each call's
    Who column says what its declaration says.
 
@@ -40,5 +41,5 @@ switch-over removes them; then it checks only the declared side.
 ```
 node tools/gen/index.ts && node tools/gen/index.ts --check && node tools/gen/table.ts
 node --import tsx --test tools/gen/*.test.ts
-(cd dist-gen/swift && swiftc -typecheck Shapes.swift Calls.swift Events.swift)
+(cd dist-gen/swift && swiftc -typecheck *.swift)
 ```

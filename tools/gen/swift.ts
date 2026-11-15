@@ -1,8 +1,8 @@
-import { CALLS, EVENTS, type AnyCall } from "../../protocol/index.ts";
+import { API, CALLS, EVENTS, FILES_PATH, LOGIN_PATH, MCP_PATH, PROTOCOL_VERSION, SOCKET_PATH, wire, type AnyCall, type Node } from "../../protocol/index.ts";
 import { SwiftTypes, upper } from "./swift-types.ts";
 import { namedShapes } from "./ts.ts";
 
-// Shapes.swift, Calls.swift and Events.swift for the iPad app. One SwiftTypes
+// Shapes.swift, Calls.swift, Events.swift and Wire.swift for the iPad app. One SwiftTypes
 // collects every declaration; each file holds the ones its part added.
 
 const JSON_VALUE = `public enum JSONValue: Codable, Equatable, Sendable {
@@ -64,6 +64,13 @@ function callDecl(types: SwiftTypes, call: AnyCall): string {
 	return `public enum ${base}Call: DecksCall {\n\tpublic typealias Args = ${args}\n\tpublic typealias Answer = ${answer}\n\tpublic static let name = ${JSON.stringify(call.name)}\n}`;
 }
 
+/** The wire's constants: where calls, the socket, login, MCP and files are. */
+function constants(): string {
+	const pairs = { protocolVersion: PROTOCOL_VERSION, api: API, socketPath: SOCKET_PATH, loginPath: LOGIN_PATH, mcpPath: MCP_PATH, filesPath: FILES_PATH };
+	const lines = Object.entries(pairs).map(([key, value]) => `\tpublic static let ${key} = ${JSON.stringify(value)}`);
+	return `/** How a call travels: protocol/wire.ts. */\npublic enum Wire {\n${lines.join("\n")}\n\tpublic static func callPath(_ name: String) -> String { "\\(api)/\\(name)" }\n}`;
+}
+
 export function swiftFiles(version: string): Record<string, string> {
 	const types = new SwiftTypes();
 	const shapes = added(types, () => {
@@ -72,11 +79,17 @@ export function swiftFiles(version: string): Record<string, string> {
 	});
 	const calls = added(types, () => CALLS.map((call) => callDecl(types, call)));
 	const events = added(types, () => EVENTS.map((e) => upper(e.name)).map((n, i) => types.typeOf({ ...EVENTS[i]!.payload, name: n }, n) && ""));
+	const wireShapes: [string, Node][] = [["Refusal", wire.Refusal], ["Envelope", wire.Envelope], ["Login", wire.Login], ["LoginAnswer", wire.LoginAnswer], ["Lock", wire.Lock], ["ClientMessage", wire.ClientMessage], ["ServerMessage", wire.ServerMessage]];
+	const wired = added(types, () => {
+		for (const [name, node] of wireShapes) types.typeOf(node, name);
+		return [];
+	});
 	const names = CALLS.map((c) => `\tcase ${JSON.stringify(c.name)}`.replace(/\tcase "(.+)"/, (_, n: string) => `\tcase ${upper(n).replace(/^\w/, (c) => c.toLowerCase())} = "${n}"`));
 	const eventNames = EVENTS.map((e) => `\tcase ${upper(e.name).replace(/^\w/, (c) => c.toLowerCase())} = "${e.name}"`);
 	return {
 		"Shapes.swift": [header(version), JSON_VALUE, ...shapes.decls].join("\n\n") + "\n",
 		"Calls.swift": [header(version), CALL_PROTOCOL, `public enum CallName: String, CaseIterable, Sendable {\n${names.join("\n")}\n}`, ...calls.decls, ...calls.extra].join("\n\n") + "\n",
+		"Wire.swift": [header(version), constants(), ...wired.decls].join("\n\n") + "\n",
 		"Events.swift": [header(version), `public enum EventName: String, CaseIterable, Sendable {\n${eventNames.join("\n")}\n}`, ...events.decls].join("\n\n") + "\n",
 	};
 }

@@ -40,7 +40,7 @@ test("the SDK's types compile, and the Swift files pass swiftc -typecheck", () =
 	try {
 		write(dir);
 		execFileSync(`${ROOT}/node_modules/.bin/tsc`, ["--noEmit", "--strict", "--target", "es2023", "--module", "nodenext", `${dir}/sdk/types.ts`]);
-		const swift = spawnSync("swiftc", ["-typecheck", "Shapes.swift", "Calls.swift", "Events.swift"], { cwd: `${dir}/swift`, encoding: "utf8" });
+		const swift = spawnSync("swiftc", ["-typecheck", "Shapes.swift", "Calls.swift", "Events.swift", "Wire.swift"], { cwd: `${dir}/swift`, encoding: "utf8" });
 		if (swift.error) return console.log("swiftc is not here; Swift not checked");
 		assert.equal(swift.status, 0, swift.stderr);
 	} finally {
