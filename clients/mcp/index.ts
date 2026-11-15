@@ -11,54 +11,8 @@ import { jsonSchema } from "./schema.ts";
 type Rpc = { jsonrpc?: string; id?: number | string; method?: string; params?: Record<string, unknown> };
 type Content = { type: "text"; text: string };
 
-/** The tools shown, after the DECKS_TOOLS filter. */
-export function shownCalls(filter = process.env[ENV.tools] ?? ""): AnyCall[] {
-	const wanted = filter.split(",").map((one) => one.trim()).filter(Boolean);
-	const forAgents = CALLS.filter((call) => call.side === "server" && call.who.includes("agent"));
-	return wanted.length ? forAgents.filter((call) => wanted.includes(call.name) || wanted.includes(call.name.split(".")[0]!)) : forAgents;
-}
-
 type Tool = { name: string; description: string; inputSchema: Record<string, unknown> };
 const GENERATED = new URL("../../dist-gen/mcp/tools.json", import.meta.url);
-
-/** The tool list the generators wrote, else the same list made here. */
-export function tools(filter?: string): Tool[] {
-	const all: Tool[] = existsSync(GENERATED)
-		? (JSON.parse(readFileSync(GENERATED, "utf8")) as Tool[])
-		: CALLS.map((call) => ({ name: call.name, description: call.summary, inputSchema: jsonSchema(call.input) }));
-	const shown = new Set(shownCalls(filter).map((call) => call.name));
-	return all.filter((tool) => shown.has(tool.name));
-}
-
-/** One tool call's content: the value and its notes, or the refusal with its code and hint. */
-export async function callTool(client: Client, name: string, input: unknown, filter?: string): Promise<{ content: Content[]; isError: boolean }> {
-	if (!shownCalls(filter).some((call) => call.name === name)) {
-		return { content: [{ type: "text", text: `There is no tool called ${name}. (not_found)` }], isError: true };
-	}
-	try {
-		const { value, notes } = await client.call(name, input ?? {});
-		const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
-		return { content: [{ type: "text", text: [text, ...notes].join("\n") }], isError: false };
-	} catch (error) {
-		const e = error instanceof DecksError ? error : new DecksError({ code: "unavailable", message: String((error as Error)?.message ?? error) });
-		const text = [`${e.message} (${e.code})`, ...(e.hint ? [`Try ${e.hint}.`] : []), ...e.notes].join("\n");
-		return { content: [{ type: "text", text }], isError: true };
-	}
-}
-
-/** The answer to one JSON-RPC message, or undefined for a notification. */
-export async function answer(message: Rpc, client: () => Promise<Client>): Promise<object | undefined> {
-	const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result });
-	if (message.method === "initialize") {
-		const version = typeof message.params?.protocolVersion === "string" ? message.params.protocolVersion : "2025-06-18";
-		return reply({ protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: "decks", version: PROTOCOL_VERSION } });
-	}
-	if (message.id === undefined) return undefined;
-	if (message.method === "tools/list") return reply({ tools: tools() });
-	if (message.method === "tools/call") return reply(await callTool(await client(), String(message.params?.name), message.params?.arguments));
-	if (message.method === "ping") return reply({});
-	return { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: `No method ${message.method}.` } };
-}
 
 /** Serve on stdin and stdout until stdin ends. */
 export function serve(): void {
@@ -81,4 +35,50 @@ export function serve(): void {
 			void answer(message, get).then((out) => out && process.stdout.write(`${JSON.stringify(out)}\n`));
 		}
 	});
+}
+
+/** The answer to one JSON-RPC message, or undefined for a notification. */
+export async function answer(message: Rpc, client: () => Promise<Client>): Promise<object | undefined> {
+	const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result });
+	if (message.method === "initialize") {
+		const version = typeof message.params?.protocolVersion === "string" ? message.params.protocolVersion : "2025-06-18";
+		return reply({ protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: "decks", version: PROTOCOL_VERSION } });
+	}
+	if (message.id === undefined) return undefined;
+	if (message.method === "tools/list") return reply({ tools: tools() });
+	if (message.method === "tools/call") return reply(await callTool(await client(), String(message.params?.name), message.params?.arguments));
+	if (message.method === "ping") return reply({});
+	return { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: `No method ${message.method}.` } };
+}
+
+/** The tool list the generators wrote, else the same list made here. */
+export function tools(filter?: string): Tool[] {
+	const all: Tool[] = existsSync(GENERATED)
+		? (JSON.parse(readFileSync(GENERATED, "utf8")) as Tool[])
+		: CALLS.map((call) => ({ name: call.name, description: call.summary, inputSchema: jsonSchema(call.input) }));
+	const shown = new Set(shownCalls(filter).map((call) => call.name));
+	return all.filter((tool) => shown.has(tool.name));
+}
+
+/** The tools shown, after the DECKS_TOOLS filter. */
+export function shownCalls(filter = process.env[ENV.tools] ?? ""): AnyCall[] {
+	const wanted = filter.split(",").map((one) => one.trim()).filter(Boolean);
+	const forAgents = CALLS.filter((call) => call.side === "server" && call.who.includes("agent"));
+	return wanted.length ? forAgents.filter((call) => wanted.includes(call.name) || wanted.includes(call.name.split(".")[0]!)) : forAgents;
+}
+
+/** One tool call's content: the value and its notes, or the refusal with its code and hint. */
+export async function callTool(client: Client, name: string, input: unknown, filter?: string): Promise<{ content: Content[]; isError: boolean }> {
+	if (!shownCalls(filter).some((call) => call.name === name)) {
+		return { content: [{ type: "text", text: `There is no tool called ${name}. (not_found)` }], isError: true };
+	}
+	try {
+		const { value, notes } = await client.call(name, input ?? {});
+		const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
+		return { content: [{ type: "text", text: [text, ...notes].join("\n") }], isError: false };
+	} catch (error) {
+		const e = error instanceof DecksError ? error : new DecksError({ code: "unavailable", message: String((error as Error)?.message ?? error) });
+		const text = [`${e.message} (${e.code})`, ...(e.hint ? [`Try ${e.hint}.`] : []), ...e.notes].join("\n");
+		return { content: [{ type: "text", text }], isError: true };
+	}
 }

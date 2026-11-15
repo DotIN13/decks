@@ -11,31 +11,6 @@ export type Setup = { url: string; token: string; agent: string; cli: string; mc
 
 const REFERENCE = new URL("../../dist-gen/reference.md", import.meta.url);
 
-/** A small script that runs the decks command as this agent. */
-function shim(s: Setup): string {
-	return `#!/bin/sh\n# decks, as ${s.agent}. Written by decks attach; decks detach removes it.\nDECKS_URL='${s.url}' DECKS_TOKEN='${s.token}' exec '${process.execPath}' '${s.cli}' "$@"\n`;
-}
-
-/** The Decks skill: how to call, then every call, from the generated reference. */
-function skill(s: Setup, command: string): string {
-	const reference = existsSync(REFERENCE) ? readFileSync(REFERENCE, "utf8").replace(/^# .*\n/, "") : "Run decks help for every call.\n";
-	return [
-		"---",
-		"name: decks",
-		"description: Work on a Decks canvas: read and change items, make cards, hand work to other agents. Use for anything on the canvas.",
-		"---",
-		"",
-		`# Decks, as ${s.agent}`,
-		"",
-		`Run \`${command} <noun> <verb>\` in the shell: \`${command} help\` lists every call, \`${command} help item.move\` explains one.`,
-		"A plain argument is a word; an object's keys are flags, `--at.x 5`. The value comes on stdout, notes on stderr.",
-		"",
-		reference,
-	].join("\n");
-}
-
-const news = (command: string) => `${command} agent news`;
-
 export function plan(tool: Tool, s: Setup): Planned[] {
 	if (tool === "claude") {
 		const command = ".claude/decks";
@@ -69,3 +44,28 @@ export function plan(tool: Tool, s: Setup): Planned[] {
 		{ path: "opencode.json", merge: (old) => ({ ...old, mcp: { ...((old.mcp ?? {}) as object), decks: mcp } }) },
 	];
 }
+
+/** A small script that runs the decks command as this agent. */
+function shim(s: Setup): string {
+	return `#!/bin/sh\n# decks, as ${s.agent}. Written by decks attach; decks detach removes it.\nDECKS_URL='${s.url}' DECKS_TOKEN='${s.token}' exec '${process.execPath}' '${s.cli}' "$@"\n`;
+}
+
+/** The Decks skill: how to call, then every call, from the generated reference. */
+function skill(s: Setup, command: string): string {
+	const reference = existsSync(REFERENCE) ? readFileSync(REFERENCE, "utf8").replace(/^# .*\n/, "") : "Run decks help for every call.\n";
+	return [
+		"---",
+		"name: decks",
+		"description: Work on a Decks canvas: read and change items, make cards, hand work to other agents. Use for anything on the canvas.",
+		"---",
+		"",
+		`# Decks, as ${s.agent}`,
+		"",
+		`Run \`${command} <noun> <verb>\` in the shell: \`${command} help\` lists every call, \`${command} help item.move\` explains one.`,
+		"A plain argument is a word; an object's keys are flags, `--at.x 5`. The value comes on stdout, notes on stderr.",
+		"",
+		reference,
+	].join("\n");
+}
+
+const news = (command: string) => `${command} agent news`;

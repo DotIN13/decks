@@ -3,7 +3,6 @@ import { ALLOWED_CHROME_COMMANDS, CHROME_EVENT_METHODS, log, REATTACH_COOLDOWN_M
 // The socket to the server, as Playwright's relayConnection.ts (Apache-2.0,
 // Microsoft): five commands down, Chrome's events up, decks.ping answered.
 
-
 export class RelayConnection {
 	constructor(ws) {
 		this._ws = ws;
@@ -209,6 +208,3 @@ async function invokeChromeMethod(fullMethod, args) {
 	if (typeof fn !== "function") throw new Error(`Not a function: ${fullMethod}`);
 	return await fn.apply(obj, args);
 }
-
-// --- the tab group -------------------------------------------------------------------
-

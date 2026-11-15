@@ -3,58 +3,12 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { Duplex } from "node:stream";
 import { API, CALL_BY_NAME, check, LOGIN_PATH, PROTOCOL_VERSION, Refused, SOCKET_PATH } from "../../../protocol/index.ts";
 
-// A small server that speaks the wire, for the clients' tests until Keel's
-// doors run: it checks each call's arguments against the protocol, answers
-// with the handlers given, and refuses the rest as unavailable.
+// A small server that speaks the wire, a test double for the clients' tests:
+// it checks each call's arguments against the protocol, answers with the
+// handlers given, and refuses the rest as unavailable.
 
 export type FakeHandler = (args: Record<string, unknown>, token: string | undefined) => unknown;
 export type Fake = { url: string; token: string; calls: { name: string; args: unknown; token?: string }[]; emit(name: string, payload: unknown): void; close(): Promise<void> };
-
-const read = (req: IncomingMessage) =>
-	new Promise<string>((resolve) => {
-		let body = "";
-		req.on("data", (chunk) => (body += chunk));
-		req.on("end", () => resolve(body));
-	});
-
-function envelope(name: string, args: unknown, token: string | undefined, handlers: Record<string, FakeHandler>, known: string): object {
-	const call = CALL_BY_NAME.get(name);
-	if (!call) return { ok: false, error: { code: "not_found", message: `There is no call named ${name}.`, hint: "deck.get" }, notes: [] };
-	if (token !== known) return { ok: false, error: { code: "refused", message: "That token is not one this server gave.", hint: "agent.attach" }, notes: [] };
-	const problems = check(call.input, args);
-	if (problems.length) return { ok: false, error: { code: "invalid", message: problems.join(" "), hint: name }, notes: [] };
-	const handler = handlers[name];
-	if (!handler) return { ok: false, error: { code: "unavailable", message: `${name} is not handled here yet.` }, notes: [] };
-	try {
-		return { ok: true, value: handler(args as Record<string, unknown>, token), notes: [`${name} answered by the fake server.`] };
-	} catch (error) {
-		const r = error as Refused;
-		return { ok: false, error: { code: r.code ?? "unavailable", message: r.message, ...(r.hint ? { hint: r.hint } : {}) }, notes: [] };
-	}
-}
-
-/** A text frame from server to client, unmasked. */
-function frame(text: string): Buffer {
-	const data = Buffer.from(text);
-	const head = data.length < 126 ? Buffer.from([0x81, data.length]) : Buffer.from([0x81, 126, data.length >> 8, data.length & 255]);
-	return Buffer.concat([head, data]);
-}
-
-/** The text of each whole client frame in a chunk (masked, under 64 KB); null for a close. */
-function texts(chunk: Buffer): (string | null)[] {
-	const out: (string | null)[] = [];
-	for (let at = 0; at + 2 <= chunk.length; ) {
-		let length = chunk[at + 1]! & 127;
-		let start = at + 2;
-		if (length === 126) [length, start] = [chunk.readUInt16BE(at + 2), at + 4];
-		const mask = chunk.subarray(start, start + 4);
-		const data = chunk.subarray(start + 4, start + 4 + length).map((b, i) => b ^ mask[i % 4]!);
-		if ((chunk[at]! & 15) === 1) out.push(Buffer.from(data).toString());
-		if ((chunk[at]! & 15) === 8) out.push(null);
-		at = start + 4 + length;
-	}
-	return out;
-}
 
 export async function fakeServer(port: number, handlers: Record<string, FakeHandler> = {}): Promise<Fake> {
 	const token = "test-token";
@@ -101,4 +55,50 @@ export async function fakeServer(port: number, handlers: Record<string, FakeHand
 			server.closeAllConnections();
 		});
 	return { url: `http://127.0.0.1:${port}`, token, calls, emit, close };
+}
+
+const read = (req: IncomingMessage) =>
+	new Promise<string>((resolve) => {
+		let body = "";
+		req.on("data", (chunk) => (body += chunk));
+		req.on("end", () => resolve(body));
+	});
+
+function envelope(name: string, args: unknown, token: string | undefined, handlers: Record<string, FakeHandler>, known: string): object {
+	const call = CALL_BY_NAME.get(name);
+	if (!call) return { ok: false, error: { code: "not_found", message: `There is no call named ${name}.`, hint: "deck.get" }, notes: [] };
+	if (token !== known) return { ok: false, error: { code: "refused", message: "That token is not one this server gave.", hint: "agent.attach" }, notes: [] };
+	const problems = check(call.input, args);
+	if (problems.length) return { ok: false, error: { code: "invalid", message: problems.join(" "), hint: name }, notes: [] };
+	const handler = handlers[name];
+	if (!handler) return { ok: false, error: { code: "unavailable", message: `${name} is not handled here yet.` }, notes: [] };
+	try {
+		return { ok: true, value: handler(args as Record<string, unknown>, token), notes: [`${name} answered by the fake server.`] };
+	} catch (error) {
+		const r = error as Refused;
+		return { ok: false, error: { code: r.code ?? "unavailable", message: r.message, ...(r.hint ? { hint: r.hint } : {}) }, notes: [] };
+	}
+}
+
+/** A text frame from server to client, unmasked. */
+function frame(text: string): Buffer {
+	const data = Buffer.from(text);
+	const head = data.length < 126 ? Buffer.from([0x81, data.length]) : Buffer.from([0x81, 126, data.length >> 8, data.length & 255]);
+	return Buffer.concat([head, data]);
+}
+
+/** The text of each whole client frame in a chunk (masked, under 64 KB); null for a close. */
+function texts(chunk: Buffer): (string | null)[] {
+	const out: (string | null)[] = [];
+	for (let at = 0; at + 2 <= chunk.length; ) {
+		let length = chunk[at + 1]! & 127;
+		let start = at + 2;
+		if (length === 126) [length, start] = [chunk.readUInt16BE(at + 2), at + 4];
+		const mask = chunk.subarray(start, start + 4);
+		const data = chunk.subarray(start + 4, start + 4 + length).map((b, i) => b ^ mask[i % 4]!);
+		if ((chunk[at]! & 15) === 1) out.push(Buffer.from(data).toString());
+		if ((chunk[at]! & 15) === 8) out.push(null);
+		at = start + 4 + length;
+	}
+	return out;
 }

@@ -8,7 +8,7 @@ The `decks` command: `decks <noun> <verb>` for every call of the protocol, and `
 - `index.ts`: `run(argv, io)`, the whole command. `main.ts`: the entry a shell runs.
 - `args.ts`: a command line's words as one call's arguments.
 - `help.ts`: `decks help`, read from `dist-gen/cli/help.txt`, which the generators write.
-- `login.ts`, `tokens.ts`: `decks login [code]` and `decks logout`, kept in `~/.decks/tokens.json`.
+- `login.ts`: `decks login [code]` and `decks logout`, kept in `~/.decks/tokens.json`.
 
 ## May import
 

@@ -20,35 +20,6 @@ const nodeIo: Io = {
 	stdin: () => readFileSync(0, "utf8"),
 };
 
-/** The call a command line names: decks item move ... is item.move. */
-const callOf = (words: string[]) => CALL_BY_NAME.get(`${words[0]}.${words[1]}`) ?? CALL_BY_NAME.get(words[0] ?? "");
-
-async function special(words: string[], io: Io): Promise<number | undefined> {
-	const [first, ...rest] = words;
-	if (first === "login") return io.err(await login(rest, await tokensFile())), 0;
-	if (first === "logout") return io.err(logout((await find({})).url, await tokensFile())), 0;
-	if (first === "attach" || first === "detach") {
-		const attach = await import("../attach/index.ts");
-		io.err(await (first === "attach" ? attach.attach(rest) : attach.detach(rest)));
-		return 0;
-	}
-	if (first === "serve") return serve(rest);
-	if (first === "events") {
-		const client = await connect();
-		const stream = client.events((event) => io.out(JSON.stringify(event)), rest.length ? { events: rest } : {});
-		await stream.done;
-		return 0;
-	}
-	return undefined;
-}
-
-/** decks serve: Decks-local in the foreground, on a deck folder; tsx loads the old packages it still uses. */
-function serve(words: string[]): Promise<number> {
-	const main = new URL("../../server/main.ts", import.meta.url);
-	const child = spawn(process.execPath, ["--import", import.meta.resolve("tsx"), main.pathname, ...words], { stdio: "inherit" });
-	return new Promise((resolve) => child.on("exit", (code) => resolve(code ?? 1)));
-}
-
 export async function run(argv: string[], io: Io = nodeIo): Promise<number> {
 	const words = argv.filter((word) => word !== "--help" && word !== "-h");
 	try {
@@ -76,4 +47,33 @@ export async function run(argv: string[], io: Io = nodeIo): Promise<number> {
 		else io.err(`decks: ${(error as Error)?.message ?? String(error)}`);
 		return 1;
 	}
+}
+
+/** The call a command line names: decks item move ... is item.move. */
+const callOf = (words: string[]) => CALL_BY_NAME.get(`${words[0]}.${words[1]}`) ?? CALL_BY_NAME.get(words[0] ?? "");
+
+async function special(words: string[], io: Io): Promise<number | undefined> {
+	const [first, ...rest] = words;
+	if (first === "login") return io.err(await login(rest, await tokensFile())), 0;
+	if (first === "logout") return io.err(logout((await find({})).url, await tokensFile())), 0;
+	if (first === "attach" || first === "detach") {
+		const attach = await import("../attach/index.ts");
+		io.err(await (first === "attach" ? attach.attach(rest) : attach.detach(rest)));
+		return 0;
+	}
+	if (first === "serve") return serve(rest);
+	if (first === "events") {
+		const client = await connect();
+		const stream = client.events((event) => io.out(JSON.stringify(event)), rest.length ? { events: rest } : {});
+		await stream.done;
+		return 0;
+	}
+	return undefined;
+}
+
+/** decks serve: Decks-local in the foreground, on a deck folder; tsx loads the old packages it still uses. */
+function serve(words: string[]): Promise<number> {
+	const main = new URL("../../server/main.ts", import.meta.url);
+	const child = spawn(process.execPath, ["--import", import.meta.resolve("tsx"), main.pathname, ...words], { stdio: "inherit" });
+	return new Promise((resolve) => child.on("exit", (code) => resolve(code ?? 1)));
 }

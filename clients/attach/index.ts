@@ -10,15 +10,6 @@ import { plan, TOOLS, type Tool } from "./tools.ts";
 const CLI = fileURLToPath(new URL("../cli/main.ts", import.meta.url));
 const MCP = fileURLToPath(new URL("../mcp/main.ts", import.meta.url));
 
-function flags(words: string[]): Record<string, string> {
-	const out: Record<string, string> = {};
-	for (let i = 0; i < words.length; i++) {
-		const word = words[i]!;
-		if (word.startsWith("--")) out[word.slice(2)] = words[++i] ?? "";
-	}
-	return out;
-}
-
 export async function attach(words: string[], client?: Client): Promise<string> {
 	const f = flags(words);
 	const tool = (f.tool ?? "claude") as Tool;
@@ -46,4 +37,13 @@ export async function detach(words: string[], client?: Client): Promise<string> 
 	}
 	undo(dir, manifest);
 	return `Detached: the ${manifest.tool} files are gone${revoked}.`;
+}
+
+function flags(words: string[]): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (let i = 0; i < words.length; i++) {
+		const word = words[i]!;
+		if (word.startsWith("--")) out[word.slice(2)] = words[++i] ?? "";
+	}
+	return out;
 }

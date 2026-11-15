@@ -124,6 +124,3 @@ async function retryOnDrag(fn) {
 	}
 	throw lastError;
 }
-
-// --- pairing, sharing, and coming back ------------------------------------------------
-

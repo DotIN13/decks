@@ -10,6 +10,7 @@ import { isNonDebuggableUrl, RETRY_MS } from "./shared.js";
 /** What the worker holds: the one connection, why the last one ended, and the retry. */
 const state = { current: null, lastError: "", retryIndex: 0, retryTimer: undefined };
 
+// Pairing: the address and code, kept in storage.
 async function settings() {
 	const stored = await chrome.storage.local.get(["address", "code", "sharing"]);
 	return { address: stored.address ?? "", code: stored.code ?? "", sharing: stored.sharing ?? null };
@@ -33,6 +34,7 @@ async function pair(address, code) {
 	state.lastError = "";
 }
 
+// Sharing a tab, and coming back after the socket drops.
 /** Share a tab: attach, connect, and remember that we want to. */
 async function share(tabId) {
 	const { address, code } = await settings();
@@ -118,6 +120,7 @@ async function resume() {
 	}
 }
 
+// Stopping, and what the popup and the tests read.
 async function stop() {
 	clearTimeout(state.retryTimer);
 	state.retryTimer = undefined;

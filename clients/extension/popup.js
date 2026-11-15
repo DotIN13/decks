@@ -1,3 +1,6 @@
+// The toolbar popup: pair with an address and a code, share this tab, stop
+// sharing, and show which tabs are shared. It asks the worker for each.
+
 /** The popup: pair once, share the current tab, see what is shared, stop. */
 /** @type {(id: string) => any} */
 const $ = (id) => document.getElementById(id);

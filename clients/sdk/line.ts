@@ -36,14 +36,6 @@ export class Line {
 		});
 	}
 
-	private send(message: object): void {
-		this.socket.send(JSON.stringify(message));
-	}
-
-	private async answer(ask: Ask): Promise<void> {
-		this.send({ type: "reply", id: ask.id, envelope: await this.asked(ask) });
-	}
-
 	/** A call over the line, tied to this connection (as agent.host must be). */
 	async call(name: string, args: unknown = {}): Promise<Answered> {
 		await this.caller;
@@ -79,5 +71,13 @@ export class Line {
 
 	close(): void {
 		this.socket.close();
+	}
+
+	private send(message: object): void {
+		this.socket.send(JSON.stringify(message));
+	}
+
+	private async answer(ask: Ask): Promise<void> {
+		this.send({ type: "reply", id: ask.id, envelope: await this.asked(ask) });
 	}
 }

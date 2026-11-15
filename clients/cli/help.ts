@@ -15,10 +15,6 @@ const EXTRA = [
 	"decks detach [--tool ...]    undo decks attach",
 ];
 
-function generated(): string | undefined {
-	return existsSync(GENERATED) ? readFileSync(GENERATED, "utf8") : undefined;
-}
-
 /** All of it, or one call's entry. */
 export function help(call?: AnyCall): string {
 	const text = generated();
@@ -30,4 +26,8 @@ export function help(call?: AnyCall): string {
 	}
 	const body = text ?? `decks, protocol ${PROTOCOL_VERSION}. (Run node tools/gen/index.ts for the full help.)\n\n${CALLS.filter((c) => c.side === "server").map((c) => `  decks ${c.name.replace(".", " ")}`).join("\n")}\n`;
 	return `${body}\n${EXTRA.join("\n")}\n\nDECKS_URL says where Decks is; DECKS_TOKEN, a token decks login kept, or the deck's lock file says who calls.`;
+}
+
+function generated(): string | undefined {
+	return existsSync(GENERATED) ? readFileSync(GENERATED, "utf8") : undefined;
 }

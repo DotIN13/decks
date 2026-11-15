@@ -7,10 +7,6 @@ export type Heard = { name: string; payload: unknown };
 export type Stream = { stop(): void; done: Promise<void> };
 export type Watch = { events?: string[]; canvas?: string };
 
-export function socketUrl(url: string): string {
-	return `${url.replace(/^http/, "ws")}${SOCKET_PATH}`;
-}
-
 /** Hear every event the caller may see, or those named, until stop(). */
 export function listen(url: string, token: string, hear: (event: Heard) => void, watch: Watch = {}): Stream {
 	const socket = new WebSocket(socketUrl(url));
@@ -31,4 +27,8 @@ export function listen(url: string, token: string, hear: (event: Heard) => void,
 	socket.addEventListener("close", () => finish());
 	socket.addEventListener("error", () => fail(new Error(`The socket to ${url} failed.`)));
 	return { stop: () => socket.close(), done };
+}
+
+export function socketUrl(url: string): string {
+	return `${url.replace(/^http/, "ws")}${SOCKET_PATH}`;
 }

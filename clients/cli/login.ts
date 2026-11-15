@@ -3,7 +3,6 @@ import { hostname } from "node:os";
 import { dirname } from "node:path";
 import { LOGIN_PATH } from "../../protocol/index.ts";
 import { DecksError, find } from "../sdk/index.ts";
-import { tokensFromFile } from "./tokens.ts";
 
 // decks login [code]: the person at a terminal gets a token of its own,
 // with a code from decks deck pair, or on the server's machine with the
@@ -43,3 +42,13 @@ export function logout(url: string, file: string): string {
 }
 
 export const readText = (file: string) => readFileSync(file, "utf8");
+
+/** The tokens decks login kept, by server address. */
+function tokensFromFile(file: string): Record<string, string> {
+	try {
+		const saved = JSON.parse(readFileSync(file, "utf8")) as unknown;
+		return saved && typeof saved === "object" ? (saved as Record<string, string>) : {};
+	} catch {
+		return {};
+	}
+}

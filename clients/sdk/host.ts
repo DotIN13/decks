@@ -28,18 +28,6 @@ export type Host = { caller: Caller; line: Line; tell(name: string, payload: unk
 
 type Refusing = { code?: string; message?: string; hint?: string };
 
-async function reply(answers: Record<string, Answerer>, request: Ask) {
-	const answer = answers[request.name];
-	if (!answer) return { ok: false as const, error: { code: "unavailable" as const, message: `This host does not answer ${request.name}.` }, notes: [] };
-	try {
-		return { ok: true as const, value: await answer((request.args ?? {}) as Record<string, unknown>, request.caller), notes: [] };
-	} catch (error) {
-		const e = error as Refusing;
-		const code = (["invalid", "not_found", "refused", "conflict", "unavailable"].includes(e.code ?? "") ? e.code : "unavailable") as "unavailable";
-		return { ok: false as const, error: { code, message: e.message ?? String(error), ...(e.hint ? { hint: e.hint } : {}) }, notes: [] };
-	}
-}
-
 export async function host(options: HostOptions): Promise<Host> {
 	const found = await find(options);
 	if (!found.token) throw new DecksError({ code: "refused", message: "A host needs the person's token.", hint: "deck.pair" });
@@ -56,4 +44,16 @@ export async function host(options: HostOptions): Promise<Host> {
 	line.watch(["agent.requested", "agent.mailed"]);
 	await line.call("agent.host", { kinds: options.kinds ?? [], calls: Object.keys(answers) });
 	return { caller, line, tell: (name, payload) => line.tell(name, payload), close: () => line.close(), closed: line.closed };
+}
+
+async function reply(answers: Record<string, Answerer>, request: Ask) {
+	const answer = answers[request.name];
+	if (!answer) return { ok: false as const, error: { code: "unavailable" as const, message: `This host does not answer ${request.name}.` }, notes: [] };
+	try {
+		return { ok: true as const, value: await answer((request.args ?? {}) as Record<string, unknown>, request.caller), notes: [] };
+	} catch (error) {
+		const e = error as Refusing;
+		const code = (["invalid", "not_found", "refused", "conflict", "unavailable"].includes(e.code ?? "") ? e.code : "unavailable") as "unavailable";
+		return { ok: false as const, error: { code, message: e.message ?? String(error), ...(e.hint ? { hint: e.hint } : {}) }, notes: [] };
+	}
 }

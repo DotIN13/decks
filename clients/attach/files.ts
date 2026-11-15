@@ -11,13 +11,6 @@ export const MANIFEST = ".decks-attach.json";
 export type Planned = { path: string; text?: string; merge?: (old: Record<string, unknown>) => Record<string, unknown>; mode?: number };
 export type Manifest = { tool: string; agent: string; url: string; made: string[]; dirs: string[]; before: Record<string, string> };
 
-function makeDirs(root: string, dir: string, dirs: string[]): void {
-	if (existsSync(dir)) return;
-	makeDirs(root, dirname(dir), dirs);
-	mkdirSync(dir);
-	dirs.push(relative(root, dir));
-}
-
 export function apply(root: string, plan: Planned[], meta: { tool: string; agent: string; url: string }): Manifest {
 	if (existsSync(join(root, MANIFEST))) throw new Error(`${root} is already attached: run decks detach first.`);
 	const manifest: Manifest = { ...meta, made: [], dirs: [], before: {} };
@@ -33,6 +26,13 @@ export function apply(root: string, plan: Planned[], meta: { tool: string; agent
 	}
 	writeFileSync(join(root, MANIFEST), `${JSON.stringify(manifest, null, "\t")}\n`, { mode: 0o600 });
 	return manifest;
+}
+
+function makeDirs(root: string, dir: string, dirs: string[]): void {
+	if (existsSync(dir)) return;
+	makeDirs(root, dirname(dir), dirs);
+	mkdirSync(dir);
+	dirs.push(relative(root, dir));
 }
 
 export function readManifest(root: string): Manifest {
