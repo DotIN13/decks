@@ -16,7 +16,14 @@ export async function told(
 	name: string,
 	payload: Record<string, unknown>,
 	drawing: (canvas: string) => Promise<{ doc: unknown; base: string } | undefined>,
+	cardPage: (path: string) => Promise<Record<string, unknown> | undefined> = async () => undefined,
 ): Promise<Record<string, unknown> | undefined> {
+	// A card changed: today's card.changed carried its page, news included, which the frame keeps.
+	if (name === "card.changed" && Array.isArray(payload.ids) && typeof payload.ids[0] === "string") {
+		const path = payload.ids[0];
+		const card = payload.removed ? undefined : await cardPage(path);
+		return { type: "card.changed", path, rev: payload.rev ?? 0, ...(card ? { card } : {}), ...(payload.removed ? { removed: true } : {}), ...(payload.sized ? { sized: true } : {}) };
+	}
 	if (name === "item.changed") {
 		const canvas = String(payload.canvas ?? "");
 		const read = await drawing(canvas);

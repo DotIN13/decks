@@ -78,7 +78,7 @@ test("every old event name is told as one the server emits", async () => {
 	for (const [old, now] of OLD_EVENTS) assert.ok(names.has(now), `${old} -> ${now}`);
 	const said = await told("item.changed", { canvas: "c", rev: 3, by: "x", ids: [] }, async () => ({ doc: { children: [] }, base: "/b/" }));
 	assert.deepEqual(said, { type: "canvas.changed", canvas: "c", rev: 3, doc: { children: [] }, base: "/b/", by: "x" });
-	assert.deepEqual(await told("card.changed", { canvas: "c", ids: ["p"] }, async () => undefined), { type: "card.changed", canvas: "c", ids: ["p"] });
+	assert.deepEqual(await told("card.changed", { canvas: "c", ids: ["p"], rev: 2 }, async () => undefined, async () => ({ path: "p", modifiedAt: 5 })), { type: "card.changed", path: "p", rev: 2, card: { path: "p", modifiedAt: 5 } });
 });
 
 test("an old name posted to /api/v1 answers through the kernel's translator", async () => {

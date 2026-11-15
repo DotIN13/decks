@@ -2,7 +2,7 @@ import type { Caller } from "../../protocol/index.ts";
 import type { Deck, Peer, Route, SocketDoor, Stop } from "../kernel/index.ts";
 import { answerBack, turn } from "./args.ts";
 import { HEARD, told } from "./events.ts";
-import { readDrawing } from "./drawing.ts";
+import { pagesOf, readDrawing, type News } from "./drawing.ts";
 
 // Today's line at /compat/v1/socket: line.hello with a token first, then line.call with old
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
@@ -117,9 +117,15 @@ async function watchOn(w: Watching, canvas: string, since: unknown, whole: unkno
 	if (!got.ok) return w.send({ type: "harness.error", text: `There is no canvas called ${canvas}.` });
 	const base = filesBase(w.state, canvas);
 	const drawing = (name: string) => readDrawing(w.deck(), name, base);
+	const cardPage = async (path: string) => {
+		const read = await drawing(canvas);
+		const news = (await w.door.call("card.get", { card: path }, caller, w.client as never)) as { ok: boolean; value?: News };
+		const pages = read ? pagesOf(canvas, read.doc as { children?: [] }, true, new Map(news.ok && news.value ? [[path, news.value]] : [])) : [];
+		return pages.find((page) => page.path === path);
+	};
 	w.state.watched.get(canvas)?.();
 	w.state.watched.set(canvas, w.door.subscribe({ caller, client: w.client.id, events: HEARD, canvas }, (event) => {
-		void told(event.name, event.payload, drawing).then((said) => said && w.send(said));
+		void told(event.name, event.payload, drawing, cardPage).then((said) => said && w.send(said));
 	}));
 	const rev = (got.value as { rev?: number }).rev ?? 0;
 	if (whole === true || (typeof since === "number" && since !== rev)) {
