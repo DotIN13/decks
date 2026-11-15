@@ -1,12 +1,13 @@
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { appsFeature } from "./apps/feature.ts";
 import { canvasFeature } from "./canvas/feature.ts";
 import { cards, type CardsOptions } from "./cards/feature.ts";
 import { compatFeature } from "./compat/feature.ts";
 import { documents, type DocumentsOptions } from "./documents/feature.ts";
 import { frameFeature } from "./frame/feature.ts";
-import { startServer, type Feature } from "./kernel/index.ts";
+import { FolderDeck, startServer, type Feature } from "./kernel/index.ts";
 import { peopleFeature } from "./people/feature.ts";
 import { picturesFeature } from "./pictures/feature.ts";
 import { sharingFeature } from "./sharing/feature.ts";
@@ -46,9 +47,16 @@ function argsOf(argv: string[]): { deck: string; port: number; host: string } {
 	return { deck, port: Number(value("port") ?? 4620), host: value("host") ?? "127.0.0.1" };
 }
 
+/** The card runtime cards copy into a deck's lib/: today's card-host, until it moves at the switch-over. */
+function cardLib(): FeatureOptions["lib"] {
+	const folder = fileURLToPath(new URL("../packages/card-host/lib", import.meta.url));
+	return existsSync(folder) ? new FolderDeck(folder) : undefined;
+}
+
 async function main(): Promise<void> {
 	const args = argsOf(process.argv.slice(2));
-	const running = await startServer({ ...args, features: features({ appRun: join(args.deck, ".decks", "app-run") }) });
+	const lib = cardLib();
+	const running = await startServer({ ...args, features: features({ appRun: join(args.deck, ".decks", "app-run"), ...(lib ? { lib } : {}) }) });
 	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
 	const stop = () => {
 		setTimeout(() => process.exit(0), 3000).unref();
