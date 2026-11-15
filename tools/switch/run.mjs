@@ -5,7 +5,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
-import { compatNames, lanesNeeded, plan, ROOT, rootFiles, specifier } from "./plan.mjs";
+import { compatNames, lanesNeeded, plan, REPLACED, ROOT, rootFiles, specifier } from "./plan.mjs";
+
+const REPLACED_GONE = REPLACED.map((r) => r.old);
 import { render } from "./render.mjs";
 
 const PLAN_FILE = "docs/rewrite/switch-plan.md";
@@ -135,12 +137,14 @@ async function main(argv) {
 		return 0;
 	}
 	if (!argv.includes("--stop-3-passed")) return console.error("Refused: run --dry, or wait for Mason's 'stop 3 passed' and pass --stop-3-passed."), 2;
-	writeFileSync(join(ROOT, PLAN_FILE), text);
-	moveChecks(p);
-	const gone = deleteOld(p);
-	rename(p);
-	root(gone);
-	console.log("switch-over done: run node tools/check.mjs for every folder, the whole type check, and the 76 checks.");
+	// --step move|delete|rename|root runs one step (each re-plans from the tree as it is now); none runs all four.
+	const step = argv.includes("--step") ? argv[argv.indexOf("--step") + 1] : undefined;
+	const gone = () => REPLACED_GONE.filter((d) => !existsSync(join(ROOT, d)));
+	const steps = { move: () => moveChecks(p), delete: () => deleteOld(p), rename: () => rename(p), root: () => root(gone()) };
+	if (step && !steps[step]) return console.error(`--step is one of ${Object.keys(steps).join(", ")}`), 2;
+	if (!step) writeFileSync(join(ROOT, PLAN_FILE), text);
+	for (const [name, run] of Object.entries(steps)) if (!step || step === name) (run(), console.log(`switch-over: ${name} committed`));
+	if (!step) console.log("switch-over done: run node tools/check.mjs for every folder, the whole type check, and the 76 checks.");
 	return 0;
 }
 
