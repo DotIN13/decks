@@ -32,6 +32,7 @@ export class FolderDeck implements Deck {
 		this.rev = Math.max(this.rev, rev);
 	}
 
+	// The Deck: read, write, list, remove, move, watch.
 	async read(path: DeckPath): Promise<Bytes> {
 		const { full } = await this.real(path);
 		try {
@@ -67,15 +68,6 @@ export class FolderDeck implements Deck {
 		return entries.sort((a, b) => a.path.localeCompare(b.path));
 	}
 
-	watch(on: (change: FileChange) => void): Stop {
-		this.watchers.add(on);
-		if (!this.fsWatchers.size) this.watchFolder(this.root, "");
-		return () => {
-			this.watchers.delete(on);
-			if (this.watchers.size === 0) this.close();
-		};
-	}
-
 	async remove(path: DeckPath, by: Caller): Promise<Revision> {
 		const where = await this.real(path);
 		const files = await this.filesUnder(path, where);
@@ -101,6 +93,15 @@ export class FolderDeck implements Deck {
 		return this.tellAll(changes, to, by.id);
 	}
 
+	watch(on: (change: FileChange) => void): Stop {
+		this.watchers.add(on);
+		if (!this.fsWatchers.size) this.watchFolder(this.root, "");
+		return () => {
+			this.watchers.delete(on);
+			if (this.watchers.size === 0) this.close();
+		};
+	}
+
 	close(): void {
 		for (const one of this.fsWatchers.values()) one.close();
 		this.fsWatchers.clear();
@@ -108,6 +109,7 @@ export class FolderDeck implements Deck {
 		this.pending.clear();
 	}
 
+	// Where a path is on the disk.
 	private where(path: string): Where {
 		return { full: join(this.root, path), base: this.root, basePath: "" };
 	}
@@ -156,6 +158,7 @@ export class FolderDeck implements Deck {
 		return new Refused("unavailable", `${path} could not be read: ${(error as Error).message}`);
 	}
 
+	// Telling watchers, and hearing changes made on the disk.
 	private tellAll(changes: readonly (readonly [DeckPath, FileChange["kind"]])[], path: DeckPath, by: string): Revision {
 		const rev = ++this.rev;
 		const at = this.clock();

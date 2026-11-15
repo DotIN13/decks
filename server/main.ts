@@ -36,6 +36,19 @@ export function features(options: FeatureOptions = {}): Feature[] {
 	];
 }
 
+async function main(): Promise<void> {
+	const args = argsOf(process.argv.slice(2));
+	const lib = cardLib();
+	const running = await startServer({ ...args, features: features(lib ? { lib } : {}) });
+	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
+	const stop = () => {
+		setTimeout(() => process.exit(0), 3000).unref();
+		void running.close().then(() => process.exit(0));
+	};
+	process.on("SIGINT", stop);
+	process.on("SIGTERM", stop);
+}
+
 function argsOf(argv: string[]): { deck: string; port: number; host: string } {
 	const value = (name: string) => {
 		const at = argv.indexOf(`--${name}`);
@@ -50,19 +63,6 @@ function argsOf(argv: string[]): { deck: string; port: number; host: string } {
 function cardLib(): FeatureOptions["lib"] {
 	const folder = fileURLToPath(new URL("../canvas/cards/runtime/lib", import.meta.url));
 	return existsSync(folder) ? new FolderDeck(folder) : undefined;
-}
-
-async function main(): Promise<void> {
-	const args = argsOf(process.argv.slice(2));
-	const lib = cardLib();
-	const running = await startServer({ ...args, features: features(lib ? { lib } : {}) });
-	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
-	const stop = () => {
-		setTimeout(() => process.exit(0), 3000).unref();
-		void running.close().then(() => process.exit(0));
-	};
-	process.on("SIGINT", stop);
-	process.on("SIGTERM", stop);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

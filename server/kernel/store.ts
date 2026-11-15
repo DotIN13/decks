@@ -3,6 +3,9 @@ import type { Bytes, Store, VersionFile } from "./types.ts";
 // A feature's private state. MemoryStore keeps it in a Map, for tests; the
 // folder's store is in disk.ts. A key is any string; prefix filters keys().
 
+/** Every feature's store, made once per name. */
+export type Stores = (feature: string) => Store;
+
 export class MemoryStore implements Store {
 	private kept = new Map<string, Bytes>();
 
@@ -23,9 +26,6 @@ export class MemoryStore implements Store {
 	}
 }
 
-/** Every feature's store, made once per name. */
-export type Stores = (feature: string) => Store;
-
 export function memoryStores(): Stores {
 	const all = new Map<string, Store>();
 	return (feature) => {
@@ -35,6 +35,7 @@ export function memoryStores(): Stores {
 }
 
 const encoder = new TextEncoder();
+
 const decoder = new TextDecoder();
 
 export async function readJson<T>(store: Store, key: string, fallback: T): Promise<T> {

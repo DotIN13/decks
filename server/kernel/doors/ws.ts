@@ -8,9 +8,12 @@ import type { Peer } from "../types.ts";
 // over 16 MB closes the connection.
 
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
 const MAX = 16 * 1024 * 1024;
 
 export type { Peer } from "../types.ts";
+
+type Parsed = { fin: boolean; opcode: number; payload: Buffer; used: number };
 
 /** Answer the upgrade; undefined if the request is not a WebSocket one. */
 export function accept(req: IncomingMessage, socket: Duplex): Peer | undefined {
@@ -19,47 +22,6 @@ export function accept(req: IncomingMessage, socket: Duplex): Peer | undefined {
 	const answer = createHash("sha1").update(key + GUID).digest("base64");
 	socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${answer}\r\n\r\n`);
 	return peerOn(socket);
-}
-
-function frame(opcode: number, payload: Buffer): Buffer {
-	const head = payload.length < 126 ? Buffer.from([0x80 | opcode, payload.length]) : payload.length < 65536 ? Buffer.alloc(4) : Buffer.alloc(10);
-	if (payload.length >= 126 && payload.length < 65536) {
-		head[0] = 0x80 | opcode;
-		head[1] = 126;
-		head.writeUInt16BE(payload.length, 2);
-	} else if (payload.length >= 65536) {
-		head[0] = 0x80 | opcode;
-		head[1] = 127;
-		head.writeBigUInt64BE(BigInt(payload.length), 2);
-	}
-	return Buffer.concat([head, payload]);
-}
-
-type Parsed = { fin: boolean; opcode: number; payload: Buffer; used: number };
-
-function parse(buf: Buffer): Parsed | undefined | "too big" {
-	if (buf.length < 2) return undefined;
-	const fin = (buf[0]! & 0x80) !== 0;
-	const opcode = buf[0]! & 0x0f;
-	const masked = (buf[1]! & 0x80) !== 0;
-	let length = buf[1]! & 0x7f;
-	let at = 2;
-	if (length === 126) {
-		if (buf.length < 4) return undefined;
-		length = buf.readUInt16BE(2);
-		at = 4;
-	} else if (length === 127) {
-		if (buf.length < 10) return undefined;
-		length = Number(buf.readBigUInt64BE(2));
-		at = 10;
-	}
-	if (length > MAX) return "too big";
-	const mask = masked ? buf.subarray(at, at + 4) : undefined;
-	at += masked ? 4 : 0;
-	if (buf.length < at + length) return undefined;
-	const payload = Buffer.from(buf.subarray(at, at + length));
-	if (mask) for (let i = 0; i < payload.length; i++) payload[i] = payload[i]! ^ mask[i % 4]!;
-	return { fin, opcode, payload, used: at + length };
 }
 
 function peerOn(socket: Duplex): Peer {
@@ -105,4 +67,43 @@ function peerOn(socket: Duplex): Peer {
 		onText: (hear) => void texts.push(hear),
 		onClose: (hear) => void closes.push(hear),
 	};
+}
+
+function parse(buf: Buffer): Parsed | undefined | "too big" {
+	if (buf.length < 2) return undefined;
+	const fin = (buf[0]! & 0x80) !== 0;
+	const opcode = buf[0]! & 0x0f;
+	const masked = (buf[1]! & 0x80) !== 0;
+	let length = buf[1]! & 0x7f;
+	let at = 2;
+	if (length === 126) {
+		if (buf.length < 4) return undefined;
+		length = buf.readUInt16BE(2);
+		at = 4;
+	} else if (length === 127) {
+		if (buf.length < 10) return undefined;
+		length = Number(buf.readBigUInt64BE(2));
+		at = 10;
+	}
+	if (length > MAX) return "too big";
+	const mask = masked ? buf.subarray(at, at + 4) : undefined;
+	at += masked ? 4 : 0;
+	if (buf.length < at + length) return undefined;
+	const payload = Buffer.from(buf.subarray(at, at + length));
+	if (mask) for (let i = 0; i < payload.length; i++) payload[i] = payload[i]! ^ mask[i % 4]!;
+	return { fin, opcode, payload, used: at + length };
+}
+
+function frame(opcode: number, payload: Buffer): Buffer {
+	const head = payload.length < 126 ? Buffer.from([0x80 | opcode, payload.length]) : payload.length < 65536 ? Buffer.alloc(4) : Buffer.alloc(10);
+	if (payload.length >= 126 && payload.length < 65536) {
+		head[0] = 0x80 | opcode;
+		head[1] = 126;
+		head.writeUInt16BE(payload.length, 2);
+	} else if (payload.length >= 65536) {
+		head[0] = 0x80 | opcode;
+		head[1] = 127;
+		head.writeBigUInt64BE(BigInt(payload.length), 2);
+	}
+	return Buffer.concat([head, payload]);
 }

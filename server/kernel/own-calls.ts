@@ -8,26 +8,11 @@ import { defineFeature, handleAll, type Feature, type Store } from "./types.ts";
 // Only the person on this machine may make a pairing code.
 
 export const SERVER_VERSION = "0.1.0";
+
 /** The deck calls this feature answers, named, so a call added to the noun later is unhandled, not a start error. */
 const MINE = { get: calls.deck.get, update: calls.deck.update, now: calls.deck.now, pair: calls.deck.pair, revoke: calls.deck.revoke };
+
 type Settings = { timezone?: string; requireCode?: boolean; rev: number };
-
-export function zoneOf(settings: { timezone?: string }): string {
-	return settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-/** The time in a zone: an ISO string with its offset, and in words. */
-export function nowIn(timezone: string, epoch: number) {
-	const parts = Object.fromEntries(
-		new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZoneName: "longOffset" })
-			.formatToParts(epoch)
-			.map((p) => [p.type, p.value]),
-	);
-	const offset = String(parts.timeZoneName ?? "GMT").replace("GMT", "") || "+00:00";
-	const iso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
-	const words = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(epoch);
-	return { iso, timezone, words, epoch };
-}
 
 export function ownFeature(callers: Callers, clock: () => number = Date.now): Feature {
 	let store: Store | undefined;
@@ -69,6 +54,23 @@ export function ownFeature(callers: Callers, clock: () => number = Date.now): Fe
 
 function pick(settings: Settings) {
 	return { ...(settings.timezone ? { timezone: settings.timezone } : {}), ...(settings.requireCode !== undefined ? { requireCode: settings.requireCode } : {}) };
+}
+
+export function zoneOf(settings: { timezone?: string }): string {
+	return settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** The time in a zone: an ISO string with its offset, and in words. */
+export function nowIn(timezone: string, epoch: number) {
+	const parts = Object.fromEntries(
+		new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZoneName: "longOffset" })
+			.formatToParts(epoch)
+			.map((p) => [p.type, p.value]),
+	);
+	const offset = String(parts.timeZoneName ?? "GMT").replace("GMT", "") || "+00:00";
+	const iso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
+	const words = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(epoch);
+	return { iso, timezone, words, epoch };
 }
 
 function checkZone(zone: string): string {

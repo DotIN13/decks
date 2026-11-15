@@ -7,8 +7,33 @@ import { SERVER_VERSION } from "../own-calls.ts";
 // arguments as JSON Schema. A tool's result carries the envelope.
 
 export const MCP_PATH = PATH;
+
 const MCP_VERSION = "2025-06-18";
+
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
+
+/** One JSON-RPC message in, its answer out; undefined for a notification. */
+export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise<Record<string, unknown> | undefined> {
+	if (rpc.id === undefined || rpc.id === null) return undefined;
+	const reply = (result: unknown) => ({ jsonrpc: "2.0", id: rpc.id, result });
+	switch (rpc.method) {
+		case "initialize":
+			return reply({ protocolVersion: MCP_VERSION, capabilities: { tools: {} }, serverInfo: { name: "decks", version: SERVER_VERSION }, instructions: `Decks protocol ${PROTOCOL_VERSION}.` });
+		case "ping":
+			return reply({});
+		case "tools/list":
+			return reply({ tools: built.router.callable(caller).map(tool) });
+		case "tools/call": {
+			const envelope = await built.router.call(String(rpc.params?.name), rpc.params?.arguments ?? {}, caller);
+			const text = textOf(envelope);
+			return reply({ content: [{ type: "text", text }], structuredContent: envelope, isError: !envelope.ok });
+		}
+		default:
+			return { jsonrpc: "2.0", id: rpc.id, error: { code: -32601, message: `There is no method ${rpc.method}.` } };
+	}
+}
+
+const tool = (call: AnyCall) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) });
 
 export function jsonSchemaOf(node: Node): Record<string, unknown> {
 	const doc = node.doc ? { description: node.doc } : {};
@@ -35,8 +60,6 @@ export function jsonSchemaOf(node: Node): Record<string, unknown> {
 	}
 }
 
-const tool = (call: AnyCall) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) });
-
 /** What an MCP client reads: the value then its notes, or the refusal, its hint, then notes; as clients/mcp writes it. */
 export function textOf(envelope: Envelope<unknown>): string {
 	if (!envelope.ok) {
@@ -46,25 +69,4 @@ export function textOf(envelope: Envelope<unknown>): string {
 	const { value } = envelope;
 	const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
 	return [text, ...envelope.notes].join("\n");
-}
-
-/** One JSON-RPC message in, its answer out; undefined for a notification. */
-export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise<Record<string, unknown> | undefined> {
-	if (rpc.id === undefined || rpc.id === null) return undefined;
-	const reply = (result: unknown) => ({ jsonrpc: "2.0", id: rpc.id, result });
-	switch (rpc.method) {
-		case "initialize":
-			return reply({ protocolVersion: MCP_VERSION, capabilities: { tools: {} }, serverInfo: { name: "decks", version: SERVER_VERSION }, instructions: `Decks protocol ${PROTOCOL_VERSION}.` });
-		case "ping":
-			return reply({});
-		case "tools/list":
-			return reply({ tools: built.router.callable(caller).map(tool) });
-		case "tools/call": {
-			const envelope = await built.router.call(String(rpc.params?.name), rpc.params?.arguments ?? {}, caller);
-			const text = textOf(envelope);
-			return reply({ content: [{ type: "text", text }], structuredContent: envelope, isError: !envelope.ok });
-		}
-		default:
-			return { jsonrpc: "2.0", id: rpc.id, error: { code: -32601, message: `There is no method ${rpc.method}.` } };
-	}
 }

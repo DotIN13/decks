@@ -7,8 +7,104 @@ import type { Client, Context, Feature, Filter, Guard, Translator } from "./type
 // unavailable; a name the protocol does not declare, not_found.
 
 type Entry = { call: AnyCall; run: Handled<Context>["run"]; feature: string };
+
 export type MakeContext = (feature: string, caller: Caller, notes: string[], client?: Client) => Context;
 
+export class Router {
+	constructor(
+		private entries: Map<string, Entry>,
+		private makeContext: MakeContext,
+		private checkAnswers = false,
+		private forward?: (name: string, args: unknown, caller: Caller) => Promise<Envelope<unknown>>,
+		private declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME,
+	) {}
+
+	private translator: Translator | undefined;
+	private guards: Guard[] = [];
+	private filters: Filter[] = [];
+
+	// Answering a call: find it, check it, run or relay it, trim and check the answer.
+	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
+		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
+		const notes: string[] = [];
+		const found = this.find(name, caller, args ?? {}, notes);
+		if ("error" in found) return found.error;
+		try {
+			for (const guard of this.guards) await guard(name, args ?? {}, caller);
+			if ("relay" in found) return await this.relayed(found.relay, args ?? {}, caller, notes);
+			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
+			return await this.answer(found.entry.call, value, notes, caller);
+		} catch (error) {
+			if (error instanceof Refused) return fail(error.code, error.message, notes, error.hint);
+			return fail("unavailable", `${name} failed on the server: ${(error as Error).message}`, notes);
+		}
+	}
+
+	private find(name: string, caller: Caller, args: unknown, notes: string[]): { entry: Entry } | { error: Envelope<never> } | { relay: AnyCall } {
+		const call = this.declared.get(name);
+		if (!call) return { error: fail("not_found", `There is no call named ${name}.`, notes) };
+		if (!call.who.includes(caller.kind)) return { error: fail("refused", `A ${caller.kind} may not call ${name}; it is for: ${call.who.join(", ")}.`, notes) };
+		const problems = check(call.input, args, "the arguments");
+		if (problems.length) return { error: fail("invalid", problems.join(" "), notes) };
+		const entry = this.entries.get(name);
+		if (entry) return { entry };
+		if (this.forward) return { relay: call };
+		return { error: fail("unavailable", `${name} is declared, but no feature on this server answers it yet.`, notes) };
+	}
+
+	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
+		const turned = this.translator!(name, args);
+		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
+		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
+		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
+		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
+		const answer = await this.call(turned.name, turned.args, caller, client, true);
+		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
+	}
+
+	private async relayed(call: AnyCall, args: unknown, caller: Caller, notes: string[]): Promise<Envelope<unknown>> {
+		const answer = await this.forward!(call.name, args, caller);
+		const merged = { ...answer, notes: [...notes, ...(answer.notes ?? [])] };
+		return merged.ok ? this.answer(call, merged.value, merged.notes, caller) : merged;
+	}
+
+	private async answer(call: AnyCall, value: unknown, notes: string[], caller: Caller): Promise<Envelope<unknown>> {
+		for (const filter of this.filters) value = await filter(call.name, value, caller);
+		const problems = this.checkAnswers ? check(call.answer, value, `the answer of ${call.name}`) : [];
+		if (problems.length) return fail("unavailable", problems.join(" "), notes);
+		return { ok: true, value, notes };
+	}
+
+	// Hooks a feature adds through the kernel.
+	/** Given once, by the feature that knows old names; asked for an undeclared name or the old form. */
+	translate(translator: Translator): void {
+		if (this.translator) throw new Error("Only one feature may translate old call names.");
+		this.translator = translator;
+	}
+
+	/** A check run before every handler or relay, after the who and argument checks; it throws Refused. */
+	guard(guard: Guard): void {
+		this.guards.push(guard);
+	}
+
+	/** Trims a call's value before it is answered, from a handler or a host; several run in order. */
+	filter(filter: Filter): void {
+		this.filters.push(filter);
+	}
+
+	// For the doors.
+	/** A handler's context for a feature's route. */
+	context(feature: string, caller: Caller, notes: string[], client?: Client): Context {
+		return this.makeContext(feature, caller, notes, client);
+	}
+
+	/** The calls this caller may make here: handled, and open to its kind. */
+	callable(caller: Caller): AnyCall[] {
+		return [...this.entries.values()].map((entry) => entry.call).filter((call) => call.who.includes(caller.kind));
+	}
+}
+
+// Building the tables of declared and handled calls, from the features.
 /** The protocol's calls, and those a feature declares itself (Studio's); a name declared twice stops the server. */
 export function declaredOf(features: Feature[]): ReadonlyMap<string, AnyCall> {
 	const declared = new Map(CALL_BY_NAME);
@@ -45,94 +141,3 @@ const fail = (code: Refused["code"], message: string, notes: string[], hint?: st
 	error: { code, message, ...(hint ? { hint } : {}) },
 	notes,
 });
-
-export class Router {
-	constructor(
-		private entries: Map<string, Entry>,
-		private makeContext: MakeContext,
-		private checkAnswers = false,
-		private forward?: (name: string, args: unknown, caller: Caller) => Promise<Envelope<unknown>>,
-		private declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME,
-	) {}
-
-	private translator: Translator | undefined;
-	private guards: Guard[] = [];
-	private filters: Filter[] = [];
-
-	/** Trims a call's value before it is answered, from a handler or a host; several run in order. */
-	filter(filter: Filter): void {
-		this.filters.push(filter);
-	}
-
-	/** A check run before every handler or relay, after the who and argument checks; it throws Refused. */
-	guard(guard: Guard): void {
-		this.guards.push(guard);
-	}
-
-	/** Given once, by the feature that knows old names; asked for an undeclared name or the old form. */
-	translate(translator: Translator): void {
-		if (this.translator) throw new Error("Only one feature may translate old call names.");
-		this.translator = translator;
-	}
-
-	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
-		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
-		const notes: string[] = [];
-		const found = this.find(name, caller, args ?? {}, notes);
-		if ("error" in found) return found.error;
-		try {
-			for (const guard of this.guards) await guard(name, args ?? {}, caller);
-			if ("relay" in found) return await this.relayed(found.relay, args ?? {}, caller, notes);
-			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
-			return await this.answer(found.entry.call, value, notes, caller);
-		} catch (error) {
-			if (error instanceof Refused) return fail(error.code, error.message, notes, error.hint);
-			return fail("unavailable", `${name} failed on the server: ${(error as Error).message}`, notes);
-		}
-	}
-
-	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
-		const turned = this.translator!(name, args);
-		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
-		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
-		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
-		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
-		const answer = await this.call(turned.name, turned.args, caller, client, true);
-		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
-	}
-
-	/** A handler's context for a feature's route. */
-	context(feature: string, caller: Caller, notes: string[], client?: Client): Context {
-		return this.makeContext(feature, caller, notes, client);
-	}
-
-	/** The calls this caller may make here: handled, and open to its kind. */
-	callable(caller: Caller): AnyCall[] {
-		return [...this.entries.values()].map((entry) => entry.call).filter((call) => call.who.includes(caller.kind));
-	}
-
-	private find(name: string, caller: Caller, args: unknown, notes: string[]): { entry: Entry } | { error: Envelope<never> } | { relay: AnyCall } {
-		const call = this.declared.get(name);
-		if (!call) return { error: fail("not_found", `There is no call named ${name}.`, notes) };
-		if (!call.who.includes(caller.kind)) return { error: fail("refused", `A ${caller.kind} may not call ${name}; it is for: ${call.who.join(", ")}.`, notes) };
-		const problems = check(call.input, args, "the arguments");
-		if (problems.length) return { error: fail("invalid", problems.join(" "), notes) };
-		const entry = this.entries.get(name);
-		if (entry) return { entry };
-		if (this.forward) return { relay: call };
-		return { error: fail("unavailable", `${name} is declared, but no feature on this server answers it yet.`, notes) };
-	}
-
-	private async relayed(call: AnyCall, args: unknown, caller: Caller, notes: string[]): Promise<Envelope<unknown>> {
-		const answer = await this.forward!(call.name, args, caller);
-		const merged = { ...answer, notes: [...notes, ...(answer.notes ?? [])] };
-		return merged.ok ? this.answer(call, merged.value, merged.notes, caller) : merged;
-	}
-
-	private async answer(call: AnyCall, value: unknown, notes: string[], caller: Caller): Promise<Envelope<unknown>> {
-		for (const filter of this.filters) value = await filter(call.name, value, caller);
-		const problems = this.checkAnswers ? check(call.answer, value, `the answer of ${call.name}`) : [];
-		if (problems.length) return fail("unavailable", problems.join(" "), notes);
-		return { ok: true, value, notes };
-	}
-}

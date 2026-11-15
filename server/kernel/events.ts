@@ -7,16 +7,10 @@ import type { EmitOptions, Events, Sees, Stop } from "./types.ts";
 // its event is a bug, and throws.
 
 export type Heard = { name: string; payload: Record<string, unknown> };
+
 export type Subscriber = { caller: Caller; client?: string; events?: string[]; canvas?: string };
 
 const BY_NAME = new Map<string, AnyEvent>(EVENTS.map((event) => [event.name, event]));
-
-/** Whether a caller may hear this event at all. */
-export function mayHear(caller: Caller, event: AnyEvent, payload: Record<string, unknown>): boolean {
-	if (event.to === "person") return caller.kind === "person";
-	if (caller.kind === "card") return payload.canvas !== undefined && payload.canvas === caller.canvas;
-	return true;
-}
 
 export class EventBus implements Events {
 	/** Checks of who may see a canvas, added by a feature (Studio's sharing). */
@@ -53,4 +47,11 @@ export class EventBus implements Events {
 		this.subscribers.add(entry);
 		return () => void this.subscribers.delete(entry);
 	}
+}
+
+/** Whether a caller may hear this event at all. */
+export function mayHear(caller: Caller, event: AnyEvent, payload: Record<string, unknown>): boolean {
+	if (event.to === "person") return caller.kind === "person";
+	if (caller.kind === "card") return payload.canvas !== undefined && payload.canvas === caller.canvas;
+	return true;
 }

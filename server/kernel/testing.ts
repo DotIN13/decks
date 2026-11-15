@@ -6,19 +6,13 @@ import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { MemoryStore, memoryStores, memoryVersion } from "./store.ts";
+
 export { memoryVersion };
 import type { CanvasDoc, Client, Context, Deck, Feature, VersionFile } from "./types.ts";
 
 // For a feature's tests: the real kernel and router on an in-memory deck.
 // Make a call by name as any caller, read every event it emitted, read the
 // deck. Answers are checked against their declared shape here.
-
-export const callers = {
-	person: { kind: "person", id: "person", name: "you" } as Caller,
-	agent: (id: string, canvas?: string): Caller => ({ kind: "agent", id, name: id, ...(canvas ? { canvas } : {}) }),
-	card: (path: string, canvas: string): Caller => ({ kind: "card", id: path, name: path, canvas }),
-	app: (name: string): Caller => ({ kind: "app", id: name, name }),
-};
 
 export type TestServer = Built & {
 	deck: Deck;
@@ -34,12 +28,11 @@ export type TestServer = Built & {
 	close(): Promise<void>;
 };
 
-const asCaller = (as: Caller | Who | undefined): Caller => {
-	if (as === undefined || as === "person") return callers.person;
-	if (as === "agent") return callers.agent("agent-1");
-	if (as === "card") return callers.card("canvases/test/cards/one/index.html", "test");
-	if (as === "app") return callers.app("test-app");
-	return as;
+export const callers = {
+	person: { kind: "person", id: "person", name: "you" } as Caller,
+	agent: (id: string, canvas?: string): Caller => ({ kind: "agent", id, name: id, ...(canvas ? { canvas } : {}) }),
+	card: (path: string, canvas: string): Caller => ({ kind: "card", id: path, name: path, canvas }),
+	app: (name: string): Caller => ({ kind: "app", id: name, name }),
 };
 
 export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number; version?: VersionFile } = {}): Promise<TestServer> {
@@ -72,10 +65,12 @@ export async function testServer(options: { features?: Feature[]; deck?: Deck | 
 	};
 }
 
-const noCanvas: CanvasDoc = {
-	read: () => [],
-	apply: () => ({ items: [], rev: 0 }),
-	since: () => [],
+const asCaller = (as: Caller | Who | undefined): Caller => {
+	if (as === undefined || as === "person") return callers.person;
+	if (as === "agent") return callers.agent("agent-1");
+	if (as === "card") return callers.card("canvases/test/cards/one/index.html", "test");
+	if (as === "app") return callers.app("test-app");
+	return as;
 };
 
 /** A hand-made Context for testing a module alone; override any part. */
@@ -96,3 +91,9 @@ export function testContext(over: Partial<Context> = {}): Context & { notes: str
 		...over,
 	};
 }
+
+const noCanvas: CanvasDoc = {
+	read: () => [],
+	apply: () => ({ items: [], rev: 0 }),
+	since: () => [],
+};

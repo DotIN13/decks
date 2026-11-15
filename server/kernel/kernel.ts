@@ -15,13 +15,8 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Sto
 // the router, and every feature started in order before the first call.
 
 export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string };
-export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
-function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undefined {
-	const givers = features.filter((one) => one.canvases);
-	if (givers.length > 1) throw new Error(`Only one feature may keep canvases; ${givers.map((one) => one.name).join(" and ")} both do.`);
-	return givers[0]?.canvases?.(kernel);
-}
+export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
 export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const clock = options.clock ?? Date.now;
@@ -72,6 +67,21 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	return { kernel, router, events, callers, history, relay, features, stop, setUrl: (url) => void (address.url = url) };
 }
 
+/** The deck's id: read from the kernel's store, made once. */
+async function idOf(store: Store): Promise<string> {
+	const kept = await readJson<{ id?: string }>(store, "deck.json", {});
+	if (kept.id) return kept.id;
+	const id = randomUUID();
+	await writeJson(store, "deck.json", { id });
+	return id;
+}
+
+function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undefined {
+	const givers = features.filter((one) => one.canvases);
+	if (givers.length > 1) throw new Error(`Only one feature may keep canvases; ${givers.map((one) => one.name).join(" and ")} both do.`);
+	return givers[0]?.canvases?.(kernel);
+}
+
 type ContextParts = { feature: string; caller: Caller; notes: string[]; kernel: Kernel; canvas: (name: string) => CanvasDoc; nameOf: (name: string) => string;
 	call: (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => Promise<Envelope<unknown>>; client?: Context["client"] };
 
@@ -99,13 +109,4 @@ function asked(caller: Caller, name: string | undefined): string {
 	const named = name ?? caller.canvas;
 	if (!named) throw new Refused("invalid", "Name a canvas; this caller has no here.", "canvas.list");
 	return named;
-}
-
-/** The deck's id: read from the kernel's store, made once. */
-async function idOf(store: Store): Promise<string> {
-	const kept = await readJson<{ id?: string }>(store, "deck.json", {});
-	if (kept.id) return kept.id;
-	const id = randomUUID();
-	await writeJson(store, "deck.json", { id });
-	return id;
 }

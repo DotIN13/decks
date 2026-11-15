@@ -31,6 +31,7 @@ export class Callers implements Tokens {
 		for (const one of await readJson<Kept[]>(this.store, "tokens.json", [])) this.kept.set(one.hash, one);
 	}
 
+	// Tokens, and who they stand for.
 	issue(who: Caller, label?: string): string {
 		const token = `dk_${randomBytes(24).toString("base64url")}`;
 		const kept: Kept = { hash: hashOf(token), who: { ...who }, at: this.clock(), ...(label ? { label } : {}) };
@@ -64,6 +65,7 @@ export class Callers implements Tokens {
 		return [...seen.values()];
 	}
 
+	// Pairing another front end, or a terminal.
 	/** A six-digit code, good for ten minutes, once. */
 	pair(): Pairing {
 		const at = this.clock();
@@ -88,6 +90,7 @@ export class Callers implements Tokens {
 		return { token: this.issue(who, label), who };
 	}
 
+	// Keeping them.
 	/** Waits until every change is on disk. */
 	flush(): Promise<void> {
 		return this.saving;

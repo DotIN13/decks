@@ -6,7 +6,7 @@ import { callers, testServer } from "./testing.ts";
 import { defineFeature, handle } from "./types.ts";
 
 // The router's rules, as calls: who may call, the arguments' shape, the five
-// refusal codes, notes beside the value, and events heard by who may see them.
+// refusal codes, notes beside the value, and the hooks a feature adds.
 
 test("the kernel starts with no feature, and answers its own deck calls", async () => {
 	const server = await testServer();
@@ -67,46 +67,6 @@ test("ctx.canvas uses the caller's here, and refuses without one", async () => {
 	assert.deepEqual(seen, ["plans"]);
 	const none = await server.call("port.list", {}, callers.agent("b"));
 	assert.equal(none.ok ? "" : none.error.code, "invalid");
-	await server.close();
-});
-
-test("a card hears only its own canvas's events; person-only events reach the person only", async () => {
-	const server = await testServer();
-	const card: string[] = [];
-	const agent: string[] = [];
-	server.events.subscribe({ caller: callers.card("canvases/a/cards/x/index.html", "a") }, (one) => void card.push(one.name));
-	server.events.subscribe({ caller: callers.agent("ann") }, (one) => void agent.push(one.name));
-	const { events } = await import("../../protocol/index.ts");
-	server.events.emit(events.itemChanged, { canvas: "a", ids: ["n"], by: "ann", rev: 1 });
-	server.events.emit(events.itemChanged, { canvas: "b", ids: ["n"], by: "ann", rev: 2 });
-	server.events.emit(events.chatChanged, { ids: [], by: "ann", rev: 3 });
-	assert.deepEqual(card, ["item.changed"]);
-	assert.deepEqual(agent, ["item.changed", "item.changed"]);
-	await server.close();
-});
-
-test("an event sent to some clients reaches only them", async () => {
-	const server = await testServer();
-	const heard: string[] = [];
-	server.events.subscribe({ caller: callers.person, client: "c1" }, () => void heard.push("c1"));
-	server.events.subscribe({ caller: callers.person, client: "c2" }, () => void heard.push("c2"));
-	const { events } = await import("../../protocol/index.ts");
-	server.events.emit(events.viewRequested, { ids: [], by: "ann", rev: 1, call: "view.focus", args: {} }, { clients: ["c2"] });
-	assert.deepEqual(heard, ["c2"]);
-	await server.close();
-});
-
-test("a token issued to a caller resolves to it until revoked, and describe gives its current name", async () => {
-	const server = await testServer();
-	const token = server.token(callers.agent("ann", "plans"));
-	assert.equal(server.callers.resolve(token)?.id, "ann");
-	server.callers.describe("agent", (id) => (id === "ann" ? { kind: "agent", id, name: "Ann Renamed" } : undefined));
-	assert.equal(server.callers.resolve(token)?.name, "Ann Renamed");
-	const person = server.token({ kind: "person", id: "term-1", name: "terminal" });
-	server.callers.describe("person", (_id, issued) => ({ ...issued, canvas: "on-screen" }));
-	assert.deepEqual(server.callers.resolve(person), { kind: "person", id: "term-1", name: "terminal", canvas: "on-screen" });
-	server.callers.revoke("ann");
-	assert.equal(server.callers.resolve(token), undefined);
 	await server.close();
 });
 

@@ -36,6 +36,7 @@ export class HistoryDeck implements Deck {
 		return this.log.reduce((top, one) => Math.max(top, one.rev), 0);
 	}
 
+	// The Deck, each change recorded.
 	async read(path: DeckPath): Promise<Bytes> {
 		const bytes = await this.inner.read(path);
 		if (!this.latest(path, Infinity) && !this.seen.has(path)) {
@@ -90,6 +91,7 @@ export class HistoryDeck implements Deck {
 		};
 	}
 
+	// Reading and restoring the past.
 	async revisions(path: DeckPath): Promise<Revision[]> {
 		return this.log.filter((one) => one.path === path).map(({ path: p, rev, by, at }) => ({ path: p, rev, by, at }));
 	}
@@ -124,6 +126,7 @@ export class HistoryDeck implements Deck {
 		return changed;
 	}
 
+	// Recording.
 	private latest(path: DeckPath, rev: number): Kept | undefined {
 		let found: Kept | undefined;
 		for (const one of this.log) if (one.path === path && one.rev <= rev && (!found || one.rev >= found.rev)) found = one;

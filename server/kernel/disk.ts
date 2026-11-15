@@ -4,9 +4,9 @@ import { dirname, join, relative, sep } from "node:path";
 import type { Stores } from "./store.ts";
 import type { Bytes, Store, VersionFile } from "./types.ts";
 
-// A feature's private store on a folder: <deck>/.decks/<feature>/, one file
-// per key, each part of the key encoded, so no key can climb out. Hidden from
-// file calls because toDeckPath refuses .decks.
+// The kernel's own things on disk, outside what file calls reach: each feature's
+// store in <deck>/.decks/<feature>/ (one file per key, encoded so none climbs
+// out), the deck's version record, the machine folder, temporary folders.
 
 const encode = (key: string) => key.split("/").map((part) => encodeURIComponent(part) || "%00").join(sep);
 

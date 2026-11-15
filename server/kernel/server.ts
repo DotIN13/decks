@@ -16,7 +16,10 @@ import type { Deck, Feature, VersionFile } from "./types.ts";
 // with a sentence before anything is left half started.
 
 export type ServerOptions = { deck: string; port: number; host?: string; features: Feature[]; clock?: () => number };
+
 export type Running = { url: string; port: number; token: string; built: Built; close(): Promise<void> };
+
+export type KernelServerOptions = { deck: Deck; stores: Stores; version?: VersionFile; features: Feature[]; port: number; host?: string; clock?: () => number };
 
 export async function startServer(options: ServerOptions): Promise<Running> {
 	const root = resolve(options.deck);
@@ -43,8 +46,6 @@ export async function startServer(options: ServerOptions): Promise<Running> {
 	};
 	return { url: served.url, port: served.port, token, built, close };
 }
-
-export type KernelServerOptions = { deck: Deck; stores: Stores; version?: VersionFile; features: Feature[]; port: number; host?: string; clock?: () => number };
 
 /** The kernel and its doors on a deck and stores a host brings (Studio): no folder, no lock file. */
 export async function startKernel(options: KernelServerOptions): Promise<{ url: string; port: number; built: Built; close(): Promise<void> }> {
