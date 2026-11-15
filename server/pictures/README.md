@@ -8,7 +8,7 @@ Pictures of what is on a canvas, and the one feature that drives a browser.
   browser found said in the notes (fit.ts, reading.ts).
 - `canvas.screenshot`: a picture of a canvas, part of it, or one card (shot.ts).
 - `canvas.export`: items as one self-contained web page (export.ts).
-- A card's picture for the canvas: `GET /pictures/<card>?w=&scheme=` (picture.ts).
+- Pictures served by address: `/pictures/<card>`, `canvas-tile/`, `shot`, `snapshot` (rules 11 to 14).
 - The browser (browser.ts): one Chromium, started on first use, closed a minute after the last.
 
 ## May import
@@ -33,7 +33,8 @@ HTML; `playwright` for the browser. No other feature.
    One unit is one pixel, shrunk until the long side is at most 1,600 px; `scale` multiplies.
 8. `of` is an id, a list of ids, a card's path, or a box. A box shows what touches it, cut to it;
    items (or the whole canvas) are framed with 24 px of paper, out to whole units.
-   A card's path alone is that card as a screen showing it has it now (view.screenshot), else its file.
+   In a list a card's path names its item. A card's path alone is the card as a screen showing it
+   has it now (view.screenshot), else its file; as a PDF, the card on its canvas.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
     A card in it is an iframe of its page, addressed from where the page is written.
@@ -46,8 +47,8 @@ HTML; `playwright` for the browser. No other feature.
     download, taken as `canvas.screenshot` takes it, answered as bytes and kept nowhere.
 14. `POST /pictures/snapshot?path=&w=&h=&scheme=` draws a card from markup its page posted, at
     the card's own address with a pass for that origin only, and answers the PNG.
-15. A picture draws what the canvas adds: a card's own corner, outline and shadow, and a
-    placeholder frame's dashed edge in its last writer's colour (the accent for the person).
+15. A picture draws a card's own corner, outline and shadow, and a placeholder frame's dashed
+    edge in its last writer's colour (the accent for the person).
 
 ## Not here
 

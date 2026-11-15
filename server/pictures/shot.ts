@@ -57,7 +57,7 @@ export async function seenCard(ctx: Context, card: string, canvas: string): Prom
 	const asked = ctx.call<Seen>("view.screenshot", { card, canvas }).catch(() => undefined);
 	const seen = await Promise.race([asked, late]).finally(() => clearTimeout(timer));
 	if (!seen || (seen.how !== "canvas" && seen.how !== "snapshot") || typeof seen.data !== "string") return undefined;
-	return { bytes: new Uint8Array(Buffer.from(seen.data, "base64")), how: `the person's browser: ${seen.how}` };
+	return { bytes: new Uint8Array(Buffer.from(seen.data, "base64")), how: seen.how };
 }
 
 /** One card's own page at its width on the canvas, or 1000 when it is not there. */
@@ -102,13 +102,14 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 }
 
 /** Take the picture and keep nothing: its bytes, size, box and how it was made. */
-export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean }> {
+export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean; live?: boolean }> {
 	const canvas = ctx.canvasName(args.canvas);
-	const card = isCard(args.of) ? cardPath(args.of) : undefined;
-	if (card && args.format !== "pdf") {
+	// A card's PDF is the card on its canvas with paper round it, as today; its picture its own page.
+	const card = isCard(args.of) && args.format !== "pdf" ? cardPath(args.of) : undefined;
+	if (card) {
 		const seen = await seenCard(ctx, card, canvas);
 		const on = seen ? ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card) : undefined;
-		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, how: seen.how };
+		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, live: true, how: seen.how };
 	}
 	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
 	return { ...taken, canvas, card: !!card, how: card ? "chromium: the card's page" : "chromium: composed from the drawing's file" };
@@ -119,7 +120,7 @@ export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now =
 	const taken = await take(ctx, m, args);
 	const { canvas, card } = taken;
 	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
-	if (card && !taken.how.startsWith("the person")) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
+	if (card && !taken.live) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
 	if (args.live === false) ctx.note("Every picture here is the browser's; the engine's native tool is not used yet.");
 	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
 }

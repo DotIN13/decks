@@ -27,8 +27,23 @@ function renamed(node: PenNode): PenNode {
 	return copy;
 }
 
+/** A card's index.html from its folder or path, to match against what the drawing names. */
+const asCard = (path: string) => (/\/cards\/[^/]+\/?$/.test(path) ? `${path.replace(/\/$/, "")}/index.html` : path);
+
+/** A top-level item by its id, or a card by its path in the deck. */
+function findTop(tops: PenNode[], canvas: string, ref: string): PenNode | undefined {
+	const byId = tops.find((node) => node.id === ref);
+	if (byId) return byId;
+	return tops.find((node) => {
+		const written = (node.metadata as { type?: unknown; path?: unknown } | undefined)?.path;
+		if (typeof written !== "string") return false;
+		const got = layout.resolveReference(canvas, written);
+		return "path" in got && got.path === asCard(ref);
+	});
+}
+
 /** The top-level items to show and the box round them. */
-function chosen(doc: PenDocument, boxes: Map<string, S.Box>, of: Of): { nodes: PenNode[]; box: S.Box; clip: boolean } {
+function chosen(doc: PenDocument, boxes: Map<string, S.Box>, of: Of, canvas: string): { nodes: PenNode[]; box: S.Box; clip: boolean } {
 	const tops = doc.children.filter((node) => node.id && boxes.has(node.id));
 	let nodes: PenNode[];
 	let box: S.Box | undefined;
@@ -36,7 +51,7 @@ function chosen(doc: PenDocument, boxes: Map<string, S.Box>, of: Of): { nodes: P
 	else if (typeof of === "string" || Array.isArray(of)) {
 		const ids = typeof of === "string" ? [of] : of;
 		nodes = ids.map((id) => {
-			const found = tops.find((node) => node.id === id);
+			const found = findTop(tops, canvas, id);
 			if (!found) throw new Refused("not_found", `There is no item ${id} at the top of the canvas.`, "item.list");
 			return found;
 		});
@@ -65,7 +80,7 @@ export function compose(text: string, canvas: string, of: Of, options: { scale?:
 	const placed = placements(doc, { theme: baseTheme(doc, scheme) });
 	const boxes = new Map<string, S.Box>();
 	for (const node of doc.children) if (node.id && placed.get(node.id)) boxes.set(node.id, boxOfNode(placed.get(node.id)!.box));
-	const { nodes, box, clip } = chosen(doc, boxes, of);
+	const { nodes, box, clip } = chosen(doc, boxes, of, canvas);
 	const w = Math.max(1, Math.round(box.x2 - box.x1));
 	const h = Math.max(1, Math.round(box.y2 - box.y1));
 	const children = nodes.map((node) => {

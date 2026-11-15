@@ -227,7 +227,7 @@ test("rule 8: a card's picture comes from a screen showing it when one answers, 
 	const png = Buffer.from("89504e470d0a1a0a0000000d49484452000000100000000801", "hex").toString("base64");
 	const answered = testContext({ call: (async (name: string) => (name === "view.screenshot" ? { how: "canvas", data: png, mime: "image/png" } : undefined)) as never });
 	const seen = await seenCard(answered, CARD, "work");
-	assert.equal(seen?.how, "the person's browser: canvas");
+	assert.equal(seen?.how, "canvas", "how is the screen's own word, canvas or snapshot");
 	assert.equal(seen?.bytes[0], 0x89);
 	assert.equal(await seenCard(testContext(), CARD, "work"), undefined, "no screen: the file is used");
 });
@@ -243,4 +243,15 @@ test("rule 15: a card's own frame and a placeholder's dashed edge are drawn in t
 	assert.match(named, /border: 2px dashed #2eaf5a/);
 	assert.match(named, /::before \{ content: "Ann";[^}]*background: #2eaf5a/);
 	assert.equal(marks([{ type: "browser", id: "plain", metadata: { type: "decks.card" } }], undefined), "", "a plain card keeps pen's frame");
+});
+
+test("rule 8: a card's path in a list names its item; a card alone as a PDF is the card on its canvas", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	const both = await s.value<{ box: unknown }>("canvas.screenshot", { of: [CARD, "n1"] }, ann);
+	assert.deepEqual(both.box, { x1: 76, y1: 26, x2: 1324, y2: 974 });
+	const pdf = await s.value<{ box: unknown }>("canvas.screenshot", { of: CARD, format: "pdf" }, ann);
+	assert.deepEqual(pdf.box, { x1: 76, y1: 26, x2: 924, y2: 974 }, "the card's box with 24 px of paper");
+	assert.match(fake.seen.at(-1)!.html[0]!, /<iframe/);
+	await s.close();
 });
