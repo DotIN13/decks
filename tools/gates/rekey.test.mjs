@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moved, rekey } from "./rekey.mjs";
+import { moved, rekey, splitKeys } from "./rekey.mjs";
 
 const scratch = (baselines) => {
 	const root = mkdtempSync(join(tmpdir(), "rekey-"));
@@ -49,4 +49,14 @@ test("an imports key's old unit moves with the package's files: its name in the 
 		"harness/x.ts: harness may not import pen (pen)": 2,
 		"harness/y.ts: harness may not import pen (packages/penny)": 1,
 	});
+});
+
+test("a split's new files carry its exceptions, never above its total", () => {
+	const before = { "canvas/gesture.ts: board": 106, "canvas/gesture.ts: over 400 lines": 1 };
+	const split = { added: ["canvas/a.ts", "canvas/b.ts"], modified: ["canvas/gesture.ts"] };
+	const kept = { "canvas/gesture.ts: board": 50, "canvas/a.ts: board": 30, "canvas/b.ts: board": 20, "canvas/a.ts: over 400 lines": 1 };
+	assert.deepEqual([...splitKeys(before, kept, split)].sort(), ["canvas/a.ts: board", "canvas/a.ts: over 400 lines", "canvas/b.ts: board"]);
+	const more = { "canvas/gesture.ts: board": 90, "canvas/a.ts: board": 30 };
+	assert.deepEqual([...splitKeys(before, more, split)], [], "120 of a kind the file had 106 of is growth");
+	assert.deepEqual([...splitKeys(before, { "canvas/a.ts: stage": 1 }, split)], [], "a kind the file never had is growth");
 });

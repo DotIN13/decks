@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { MOVED, ROOT, adoptBaseline, compare, context, readBaseline, writeBaseline } from "./lib.mjs";
-import { rekeyed, stagedRenames, units } from "./rekey.mjs";
+import { rekeyed, splitKeys, stagedRenames, stagedSplit, units } from "./rekey.mjs";
 
 export const GATES = ["size", "names", "imports", "calls", "readme", "comments", "commits", "parts", "state", "built", "lanes", "agents-md", "legacy"];
 
@@ -27,7 +27,9 @@ export function grown(root, name) {
 		before = Object.entries(before).reduce((all, [k, n]) => ((all[rekeyed(k, pairs, moving)] = (all[rekeyed(k, pairs, moving)] ?? 0) + n), all), {});
 	}
 	const now = readBaseline(root, name);
-	return Object.keys(now).filter((k) => now[k] > (before[k] ?? 0)).map((k) => `baseline gained ${k}`);
+	// A file split into new ones, all staged: its exceptions moved onto them, not gained, while their total holds.
+	const split = splitKeys(before, now, stagedSplit(root));
+	return Object.keys(now).filter((k) => now[k] > (before[k] ?? 0) && !split.has(k)).map((k) => `baseline gained ${k}`);
 }
 
 export async function runGates({ root = ROOT, only, shrink = false, init = false, adopt, quiet = false } = {}) {

@@ -63,6 +63,31 @@ export function rekey(root, pairs) {
 	return count;
 }
 
+/** The files staged as added and as modified (renames aside), for the growth check's reading of a split. */
+export function stagedSplit(root) {
+	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
+	const rows = out.split("\n").filter(Boolean).map((l) => l.split("\t"));
+	return { added: rows.filter((r) => r[0] === "A").map((r) => r[1]), modified: rows.filter((r) => r[0] === "M").map((r) => r[1]) };
+}
+
+/**
+ * Keys gained on files staged as new that a split explains: for each kind of exception (the key's text
+ * after its path), the new and the modified files hold no more of it than the modified files held before.
+ * A split moves exceptions onto its new files (DESIGN.md section 9); it never adds one.
+ */
+export function splitKeys(before, now, split) {
+	const pathOf = (k) => PREFIX.exec(k)?.[2];
+	const kindOf = (k) => k.slice(k.indexOf(pathOf(k) ?? "") + (pathOf(k) ?? "").length);
+	const added = new Set(split.added), modified = new Set(split.modified);
+	const total = (counts, files) => {
+		const out = new Map();
+		for (const [k, n] of Object.entries(counts)) if (files.has(pathOf(k))) out.set(kindOf(k), (out.get(kindOf(k)) ?? 0) + n);
+		return out;
+	};
+	const was = total(before, modified), is = total(now, new Set([...added, ...modified]));
+	return new Set(Object.keys(now).filter((k) => added.has(pathOf(k)) && (is.get(kindOf(k)) ?? 0) <= (was.get(kindOf(k)) ?? 0)));
+}
+
 /** The renames staged in git, as [old, new] pairs. */
 export function stagedRenames(root) {
 	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
