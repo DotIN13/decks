@@ -35,7 +35,7 @@ const GUTTER = 6;
 /** Never closer than this to a window edge. */
 const MARGIN = 8;
 
-export function Popover(props: {
+export type PopoverProps = {
 	/** The button. Given `open` so it can draw itself pressed. */
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	children: JSX.Element;
@@ -48,7 +48,9 @@ export function Popover(props: {
 	class?: string;
 	/** Named for screen readers, since the trigger is usually an icon. */
 	label?: string;
-}) {
+};
+
+export function Popover(props: PopoverProps) {
 	// A submenu opens beside its row (`right-start`), and the menu it came from treats it as its own.
 	const sub = () => props.placement === "right-start";
 	const [open, setOpen] = createSignal(false);
@@ -69,88 +71,13 @@ export function Popover(props: {
 		if (!next && refocus) trigger?.focus();
 	};
 
-	/*
-	 * Measured after mount rather than positioned in CSS.
-	 *
-	 * The card's own size is what decides whether `top-end` fits, and only the browser
-	 * knows it — a `bottom: 100%` rule would place it correctly and then let it hang off
-	 * the left edge of a narrow window with no way to notice.
-	 */
+	/** Measured after mount: only the browser knows the card's size, which decides whether a side fits. */
 	const place = () => {
 		if (!trigger || !card) return;
-		/*
-		 * What the card hangs from is not always the button that opened it.
-		 *
-		 * A button in a toolbar pill sits 6px inside the pill's edge, so a card placed from
-		 * the button's own box landed flush against the pill's bottom and, for the corner's
-		 * menu, 7px short of the pill's corner. In a pill the vertical gap is measured from
-		 * the pill, and an `-end` card lines up with the pill's edge. A `[data-popover-anchor]`
-		 * around the trigger says what a `-start` card should line up with: the agents menu
-		 * opens from a chevron but belongs to the face and name beside it.
-		 */
-		const pill = trigger.closest(".pill");
-		const group = trigger.closest("[data-popover-anchor]");
-		const t = trigger.getBoundingClientRect();
-		const bar = (pill ?? trigger).getBoundingClientRect();
-		const along = (group ?? trigger).getBoundingClientRect();
-		/*
-		 * The card's own size, not its box on screen: it opens with a grow animation, and a box read
-		 * mid-grow is a few percent short, which put a tall menu's foot over its button and a wide one
-		 * past the screen's edge. The full height even when a ceiling below has cut it short.
-		 */
-		const c = { width: card.offsetWidth, height: Math.max(card.offsetHeight, card.scrollHeight + 2) };
-		const placement = props.placement ?? "top-start";
-		if (placement === "right-start") {
-			/*
-			 * Beside the menu it came from, level with the row that opened it; on the left when the
-			 * right has no room. A phone has room on neither side, and a submenu over its own menu
-			 * hid the row that opened it, so there it stands above that menu, or below it.
-			 */
-			const menu = (trigger.closest(".popover") ?? trigger).getBoundingClientRect();
-			const fitsRight = menu.right + GUTTER + c.width <= window.innerWidth - MARGIN;
-			const fitsLeft = menu.left - GUTTER - c.width >= MARGIN;
-			let left: number;
-			let top: number;
-			if (fitsRight || fitsLeft) {
-				left = fitsRight ? menu.right + GUTTER : menu.left - c.width - GUTTER;
-				top = t.top - 5;
-			} else {
-				left = menu.left;
-				top = menu.top - GUTTER - c.height >= MARGIN ? menu.top - GUTTER - c.height : menu.bottom + GUTTER;
-			}
-			left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
-			top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
-			setSide("beside");
-			setAt({ left, top });
-			return;
-		}
-		const above = placement.startsWith("top");
-
-		let left: number;
-		if (placement.endsWith("-end")) left = (pill ? bar : t).right - c.width;
-		else if (placement.endsWith("-start")) left = along.left;
-		else left = t.left + t.width / 2 - c.width / 2;
-		const width = Math.min(c.width, window.innerWidth - MARGIN * 2);
-		left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - width - MARGIN));
-
-		/*
-		 * The side asked for when the whole card fits there; else the side with more room, the card cut
-		 * to that room and scrolling. A menu always ends GUTTER from its bar, so every menu off the same
-		 * bar starts at the same height whatever its length.
-		 */
-		const roomAbove = bar.top - GUTTER - MARGIN;
-		const roomBelow = window.innerHeight - bar.bottom - GUTTER - MARGIN;
-		let up = above;
-		if (above && c.height > roomAbove && roomBelow > roomAbove) up = false;
-		if (!above && c.height > roomBelow && roomAbove > roomBelow) up = true;
-		const room = Math.max(0, up ? roomAbove : roomBelow);
-		const height = Math.min(c.height, room);
-		let top = up ? bar.top - GUTTER - height : bar.bottom + GUTTER;
-		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - height - MARGIN));
-		setCeiling(c.height > room ? room : undefined);
-
-		setSide(top + height <= t.top + 1 ? "above" : "below");
-		setAt({ left, top });
+		const placed = measure(trigger, card, props.placement ?? "top-start");
+		setCeiling(placed.ceiling);
+		setSide(placed.side);
+		setAt({ left: placed.left, top: placed.top });
 	};
 
 	createEffect(() => {
@@ -158,99 +85,7 @@ export function Popover(props: {
 			setAt(undefined);
 			return;
 		}
-		// Two frames: one for the card to exist, one for fonts to have settled its height.
-		/*
-		 * And again whenever the card changes size: a row that fills in after it opens (the board
-		 * pictures' progress in the ⋯ menu) widened the card past the edge it was lined up with.
-		 */
-		let sized: ResizeObserver | undefined;
-		let closed = false;
-		requestAnimationFrame(() => {
-			place();
-			requestAnimationFrame(place);
-			if (closed || !card || typeof ResizeObserver !== "function") return;
-			sized = new ResizeObserver(() => place());
-			sized.observe(card);
-		});
-		onCleanup(() => {
-			closed = true;
-			sized?.disconnect();
-		});
-		/*
-		 * Picking a row closes the menu.
-		 *
-		 * It used to be the caller's job, and only `AgentPill` did it — so the corner's
-		 * overflow stayed open behind whatever its rows had opened. That is worse than
-		 * untidy: this component owns Escape while it is open and calls `preventDefault`, so
-		 * a menu left open under the Settings modal *swallowed the key that closes the
-		 * modal*. The keyboard had no way out of a dialog, and the cause was two surfaces
-		 * up.
-		 *
-		 * `click` rather than `pointerdown`, so it lands after the row's own handler and a
-		 * keyboard's Enter counts too.
-		 *
-		 * Three rows do not close it, and each exclusion is a row that is not a choice:
-		 *
-		 * - `data-keep-open` — the zoom steppers, since pressing "Zoom in" three times is the
-		 *   point of having them in a menu;
-		 * - `aria-haspopup="menu"` — a row that opens a menu of its own, or picking inside a
-		 *   submenu would take its parent with it;
-		 * - **`aria-expanded`** — a disclosure *within* this menu, like the runtime chevron
-		 *   beside "New agent", which reveals two more rows in place. Missing this one closed
-		 *   the agent menu on the press that was meant to open its second half, and took
-		 *   `newAgent` in the e2e suite with it: "New pi agent" had become unreachable.
-		 */
-		const picked = (event: MouseEvent) => {
-			const row = (event.target as HTMLElement | null)?.closest?.("[data-row]");
-			if (!row || row.hasAttribute("data-keep-open") || row.hasAttribute("aria-expanded")) return;
-			if (row.getAttribute("aria-haspopup") === "menu") return;
-			change(false);
-		};
-
-		const away = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (card?.contains(target ?? null) || trigger?.contains(target ?? null)) return;
-			// A press inside a submenu opened from this card is a press in this menu.
-			if (!sub() && (target as Element | null)?.closest?.(".popover[data-sub]")) return;
-			change(false);
-		};
-		const keys = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				// A submenu that is open takes the Escape, and its menu stays.
-				if (!sub() && document.querySelector(".popover[data-sub]")) return;
-				event.preventDefault();
-				change(false);
-				return;
-			}
-			const list = rows();
-			if (list.length === 0) return;
-			const here = list.indexOf(document.activeElement as HTMLElement);
-			const go = (index: number) => {
-				event.preventDefault();
-				list[Math.min(Math.max(0, index), list.length - 1)]?.focus();
-			};
-			if (event.key === "ArrowDown") go(here + 1);
-			else if (event.key === "ArrowUp") go(here <= 0 ? 0 : here - 1);
-			else if (event.key === "Home") go(0);
-			else if (event.key === "End") go(list.length - 1);
-			else if (event.key === "Tab" && here >= 0) {
-				event.preventDefault();
-				list[here]?.click();
-			}
-		};
-		document.addEventListener("pointerdown", away);
-		// A press or Escape in the other document of the canvas frame (`dismiss.ts`).
-		const stopDismiss = onDismiss(() => change(false, false));
-		document.addEventListener("keydown", keys);
-		document.addEventListener("click", picked);
-		window.addEventListener("resize", place);
-		onCleanup(() => {
-			document.removeEventListener("pointerdown", away);
-			stopDismiss();
-			document.removeEventListener("keydown", keys);
-			document.removeEventListener("click", picked);
-			window.removeEventListener("resize", place);
-		});
+		whileOpen({ card: () => card, trigger: () => trigger, rows, sub, place, close: (refocus) => change(false, refocus) });
 	});
 
 	return (
@@ -264,19 +99,8 @@ export function Popover(props: {
 			})}
 			<Show when={open()}>
 				{/*
-				 * Into the body, and this is not tidiness — it is the difference between the
-				 * card appearing under its trigger and appearing 478px away.
-				 *
-				 * The card is `position: fixed` and placed from `getBoundingClientRect`, which
-				 * is viewport-relative. But a fixed element inside a **transformed** ancestor is
-				 * positioned against that ancestor instead of the viewport, and the dock carries
-				 * `translateX(-50%)` to centre itself — so the model picker was laid out in the
-				 * dock's coordinate space and landed up and to the right of everything.
-				 *
-				 * A portal is the fix rather than compensating for the transform, because the
-				 * next surface to grow one would break this again silently. Dismissal already
-				 * listens on the document and asks `card.contains`, so nothing here depends on
-				 * where the node sits.
+				 * Into the body: the card is `position: fixed` from viewport boxes, and a transformed
+				 * ancestor (the dock's `translateX(-50%)`) would place it in its own space instead.
 				 */}
 				<Portal mount={portalLayer()}>
 				<div
@@ -302,4 +126,156 @@ export function Popover(props: {
 			</Show>
 		</>
 	);
+}
+
+type Rect = Pick<DOMRect, "left" | "top" | "right" | "bottom" | "width" | "height">;
+
+/**
+ * Beside the menu it came from, level with the row that opened it; on the left when the right has no
+ * room. With room on neither side (a phone), above that menu or below it, so its row stays seen.
+ */
+export function placeBeside(menu: Rect, t: Rect, c: { width: number; height: number }): { left: number; top: number } {
+	const fitsRight = menu.right + GUTTER + c.width <= window.innerWidth - MARGIN;
+	const fitsLeft = menu.left - GUTTER - c.width >= MARGIN;
+	let left: number;
+	let top: number;
+	if (fitsRight || fitsLeft) {
+		left = fitsRight ? menu.right + GUTTER : menu.left - c.width - GUTTER;
+		top = t.top - 5;
+	} else {
+		left = menu.left;
+		top = menu.top - GUTTER - c.height >= MARGIN ? menu.top - GUTTER - c.height : menu.bottom + GUTTER;
+	}
+	left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
+	top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
+	return { left, top };
+}
+
+/**
+ * Above or below its bar: lined up by `-start`, `-end` or the middle, on the side asked for when the
+ * whole card fits there, else the side with more room, the card cut to it (`ceiling`) and scrolling.
+ * A menu always ends GUTTER from its bar, so every menu off the same bar starts at the same height.
+ */
+export function placeAlong(placement: Placement, at: { t: Rect; bar: Rect; along: Rect; gapFrom: Rect }, c: { width: number; height: number }): { left: number; top: number; ceiling: number | undefined; side: "above" | "below" } {
+	const { t, along, gapFrom: bar } = at;
+	const above = placement.startsWith("top");
+	let left: number;
+	if (placement.endsWith("-end")) left = at.bar.right - c.width;
+	else if (placement.endsWith("-start")) left = along.left;
+	else left = t.left + t.width / 2 - c.width / 2;
+	const width = Math.min(c.width, window.innerWidth - MARGIN * 2);
+	left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - width - MARGIN));
+	const roomAbove = bar.top - GUTTER - MARGIN;
+	const roomBelow = window.innerHeight - bar.bottom - GUTTER - MARGIN;
+	let up = above;
+	if (above && c.height > roomAbove && roomBelow > roomAbove) up = false;
+	if (!above && c.height > roomBelow && roomAbove > roomBelow) up = true;
+	const room = Math.max(0, up ? roomAbove : roomBelow);
+	const height = Math.min(c.height, room);
+	let top = up ? bar.top - GUTTER - height : bar.bottom + GUTTER;
+	top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - height - MARGIN));
+	return { left, top, ceiling: c.height > room ? room : undefined, side: top + height <= t.top + 1 ? "above" : "below" };
+}
+
+/**
+ * Whether a click picked a row, which closes the menu. Not a row that is no choice: `data-keep-open`
+ * (the zoom steppers), `aria-haspopup="menu"` (it opens a menu of its own), or `aria-expanded` (a
+ * disclosure within this menu). A menu left open under a modal swallowed the Escape that closes it.
+ */
+function isChoice(event: MouseEvent): boolean {
+	const row = (event.target as HTMLElement | null)?.closest?.("[data-row]");
+	if (!row || row.hasAttribute("data-keep-open") || row.hasAttribute("aria-expanded")) return false;
+	return row.getAttribute("aria-haspopup") !== "menu";
+}
+
+/** Whether a press landed outside the card and its trigger; a press in its own submenu is inside. */
+function pressedAway(event: PointerEvent, card: HTMLElement | undefined, trigger: HTMLElement | undefined, sub: boolean): boolean {
+	const target = event.target as Node | null;
+	if (card?.contains(target ?? null) || trigger?.contains(target ?? null)) return false;
+	return sub || !(target as Element | null)?.closest?.(".popover[data-sub]");
+}
+
+/** Escape closes (an open submenu takes it first); arrows, Home and End rove; Tab picks the focused row. */
+function menuKeys(event: KeyboardEvent, list: HTMLElement[], sub: boolean, close: () => void): void {
+	if (event.key === "Escape") {
+		if (!sub && document.querySelector(".popover[data-sub]")) return;
+		event.preventDefault();
+		close();
+		return;
+	}
+	if (list.length === 0) return;
+	const here = list.indexOf(document.activeElement as HTMLElement);
+	const go = (index: number) => {
+		event.preventDefault();
+		list[Math.min(Math.max(0, index), list.length - 1)]?.focus();
+	};
+	if (event.key === "ArrowDown") go(here + 1);
+	else if (event.key === "ArrowUp") go(here <= 0 ? 0 : here - 1);
+	else if (event.key === "Home") go(0);
+	else if (event.key === "End") go(list.length - 1);
+	else if (event.key === "Tab" && here >= 0) {
+		event.preventDefault();
+		list[here]?.click();
+	}
+}
+
+/**
+ * Where the card goes, from what it hangs off: in a toolbar pill the gap is measured from the pill
+ * and an `-end` card lines up with its edge; a `[data-popover-anchor]` round the trigger is what a
+ * `-start` card lines up with. The card's own size, not its box mid-grow, and its full height.
+ */
+function measure(trigger: HTMLElement, card: HTMLElement, placement: Placement): { left: number; top: number; ceiling: number | undefined; side: "above" | "below" | "beside" } {
+	const pill = trigger.closest(".pill");
+	const group = trigger.closest("[data-popover-anchor]");
+	const t = trigger.getBoundingClientRect();
+	const bar = (pill ?? trigger).getBoundingClientRect();
+	const along = (group ?? trigger).getBoundingClientRect();
+	const c = { width: card.offsetWidth, height: Math.max(card.offsetHeight, card.scrollHeight + 2) };
+	if (placement === "right-start") return { ...placeBeside((trigger.closest(".popover") ?? trigger).getBoundingClientRect(), t, c), ceiling: undefined, side: "beside" };
+	return placeAlong(placement, { t, bar: pill ? bar : t, along, gapFrom: bar }, c);
+}
+
+/** What runs while a popover is open: placing it as it settles and resizes, and the ways it closes. */
+function whileOpen(o: { card: () => HTMLElement | undefined; trigger: () => HTMLElement | undefined; rows: () => HTMLElement[]; sub: () => boolean; place: () => void; close: (refocus?: boolean) => void }): void {
+	const { card, trigger, rows, sub, place, close } = o;
+	// Two frames: one for the card to exist, one for fonts to have settled its height.
+	/*
+	 * And again whenever the card changes size: a row that fills in after it opens (the board
+	 * pictures' progress in the ⋯ menu) widened the card past the edge it was lined up with.
+	 */
+	let sized: ResizeObserver | undefined;
+	let closed = false;
+	requestAnimationFrame(() => {
+		place();
+		requestAnimationFrame(place);
+		const el = card();
+		if (closed || !el || typeof ResizeObserver !== "function") return;
+		sized = new ResizeObserver(() => place());
+		sized.observe(el);
+	});
+	onCleanup(() => {
+		closed = true;
+		sized?.disconnect();
+	});
+	// Picking a row closes the menu: `click`, so it lands after the row's own handler and Enter counts too.
+	const picked = (event: MouseEvent) => {
+		if (isChoice(event)) close();
+	};
+	const away = (event: PointerEvent) => {
+		if (pressedAway(event, card(), trigger(), sub())) close();
+	};
+	const keys = (event: KeyboardEvent) => menuKeys(event, rows(), sub(), () => close());
+	document.addEventListener("pointerdown", away);
+	// A press or Escape in the other document of the canvas frame (`dismiss.ts`).
+	const stopDismiss = onDismiss(() => close(false));
+	document.addEventListener("keydown", keys);
+	document.addEventListener("click", picked);
+	window.addEventListener("resize", place);
+	onCleanup(() => {
+		document.removeEventListener("pointerdown", away);
+		stopDismiss();
+		document.removeEventListener("keydown", keys);
+		document.removeEventListener("click", picked);
+		window.removeEventListener("resize", place);
+	});
 }
