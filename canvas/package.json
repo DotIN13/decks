@@ -14,7 +14,8 @@
 		"./card": "./items/card.ts",
 		"./styles.css": "./styles/surface.css",
 		"./surface.css": "./dist/surface.css",
-		"./styles/*": "./styles/*"
+		"./styles/*": "./styles/*",
+		"./ink": "./ink/index.ts"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
@@ -24,7 +25,6 @@
 	},
 	"dependencies": {
 		"@decks/api": "*",
-		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/protocol-old": "*",
 		"@decks/engine": "*",

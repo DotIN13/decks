@@ -16,7 +16,6 @@
 		"@decks/protocol": "0.0.0",
 		"@decks/sdk": "0.0.0",
 		"@decks/canvas": "*",
-		"@decks/ink": "*",
 		"@decks/pen": "*",
 		"@decks/ui": "*",
 		"lucide-solid": "^1.37.0",

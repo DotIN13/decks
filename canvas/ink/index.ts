@@ -4,4 +4,4 @@
  * A leaf package: no dependencies, nothing to configure.
  */
 
-export * from "./ink.ts";
+export * from "./shaper.ts";

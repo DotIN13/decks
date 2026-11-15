@@ -13,7 +13,7 @@ import {
 	simplify,
 	strokeShape,
 	type InkStroke,
-} from "./ink.ts";
+} from "./shaper.ts";
 
 const stroke = (id: string, points: number[], extra: Partial<InkStroke> = {}): InkStroke => ({ id, tool: "pen", color: "red", size: 4, points, ...extra });
 
