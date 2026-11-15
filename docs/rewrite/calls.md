@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 124 calls (104 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 126 calls (106 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -223,6 +223,8 @@ The Google sign-in the server edits Google Docs with.
 |---|---|---|---|---|
 | `account.googleCode` | person | `google.connect` | person | Renamed. |
 | `account.googleSignOut` | person | `google.disconnect` | person | Renamed. |
+| new | | `google.list` | person | Added in 0.10.0 for Folio: the person's Google Docs, for the page's file picker. |
+| new | | `google.link` | person | Added in 0.10.0: link a Google Doc, making its mirror in docs/; today's doc.place took a link. |
 | `account.google` | person | `google.status` | person | Google's sign-in is the server's, for Google Docs; see the decision. |
 
 ### chat

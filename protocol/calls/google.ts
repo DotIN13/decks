@@ -1,5 +1,6 @@
 import { defineCall } from "../call.ts";
-import { bool, obj, opt, str } from "../schema.ts";
+import { arr, bool, named, num, obj, opt, str } from "../schema.ts";
+import { File } from "../shapes.ts";
 import { PERSON } from "./parts.ts";
 
 // The Google sign-in the server edits Google Docs with, shaped like studio.*.
@@ -18,3 +19,16 @@ export const connect = defineCall({
 });
 
 export const disconnect = defineCall({ name: "google.disconnect", summary: "Sign out of Google.", who: PERSON, args: {}, answer: Google, effect: "change" });
+
+const GoogleDoc = named("GoogleDoc", obj({ id: str(), title: str(), url: str(), modified: opt(num()) }), "A Google Doc the person can link.");
+
+export const list = defineCall({ name: "google.list", summary: "The person's Google Docs, those matching query when given.", who: PERSON, args: { query: opt(str()) }, answer: arr(GoogleDoc), effect: "read" });
+
+export const link = defineCall({
+	name: "google.link",
+	summary: "Link a Google Doc: its mirror in docs/ is made and kept in step, and a document item can then name it.",
+	who: PERSON,
+	args: { url: str(), canvas: opt(str()) },
+	answer: File,
+	effect: "change",
+});
