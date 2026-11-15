@@ -41,6 +41,8 @@ HTML; `playwright` for the browser. No other feature.
     unchanged page is pictured once. With `v` in the address it is cached for a year.
 12. A canvas's tile picture is `GET /pictures/canvas-tile/<canvas>?scheme=&v=`: the whole canvas,
    its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
+13. `GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&name=` is a picture to
+    download, taken as `canvas.screenshot` takes it, answered as bytes and kept nowhere.
 
 ## Not here
 

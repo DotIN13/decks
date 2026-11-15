@@ -180,3 +180,19 @@ test("rule 11: a page from before cards, any other .html in the deck, is picture
 	await served.close();
 	await s.close();
 });
+
+test("rule 13: a picture to download is answered as bytes, with its box, and kept nowhere", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	const served = await s.listen();
+	const before = (await s.value<unknown[]>("file.list", { path: "", deep: true })).length;
+	const got = await fetch(`${served.url}/pictures/shot?canvas=work&scale=1&format=png&name=pic&pass=${served.token}`);
+	assert.equal(got.status, 200, await got.clone().text());
+	assert.equal(got.headers.get("content-type"), "image/png");
+	assert.match(got.headers.get("content-disposition") ?? "", /filename="pic\.png"/);
+	assert.ok(JSON.parse(got.headers.get("x-shot-box") ?? "null"), "it says the box it pictured");
+	assert.equal((await s.value<unknown[]>("file.list", { path: "", deep: true })).length, before, "nothing written to the deck");
+	assert.equal((await fetch(`${served.url}/pictures/shot?pass=${served.token}`)).status, 404, "no canvas named");
+	await served.close();
+	await s.close();
+});

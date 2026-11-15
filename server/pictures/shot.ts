@@ -71,14 +71,20 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 	}
 }
 
-/** Take the picture, keep it in the deck, answer where and how big. */
-export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
+/** Take the picture and keep nothing: its bytes, size, box and how it was made. */
+export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean }> {
 	const canvas = ctx.canvasName(args.canvas);
-	const format = args.format ?? "png";
 	const card = isCard(args.of) ? cardPath(args.of) : undefined;
 	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
-	const file = await keep(ctx, shotPath(canvas, format, args.to, now), taken.bytes);
+	return { ...taken, canvas, card: !!card, how: card ? "chromium: the card's page" : "chromium: composed from the drawing's file" };
+}
+
+/** Take the picture, keep it in the deck, answer where and how big. */
+export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
+	const taken = await take(ctx, m, args);
+	const { canvas, card } = taken;
+	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
 	if (card) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
 	if (args.live === false) ctx.note("Every picture here is the browser's; the engine's native tool is not used yet.");
-	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: card ? "chromium: the card's page" : "chromium: composed from the drawing's file" };
+	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
 }
