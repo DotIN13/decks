@@ -163,7 +163,7 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 /** The first line of a check's output that says it failed, else the exit. */
 function firstFailure(log, code) {
 	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
-	const bad = lines.find((l) => /✗|FAIL|not ok|Error|refusing/i.test(l));
+	const bad = lines.find((l) => /✗|FAIL|not ok|Error|refusing/i.test(l)) ?? (code !== 0 ? `exit ${code} with no failing line; see the log` : undefined);
 	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
 }
 
@@ -177,12 +177,18 @@ async function main(argv) {
 	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
 	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [join(ROOT, "e2e/fake-model.mjs")] }, []);
 	let failed = 0;
+	const seen = new Map();
 	for (const file of files) {
 		const result = await runCheck(file, 0, { onlyServer });
 		if (!result.ok) failed++;
 		console.log(`${result.ok ? "pass" : "FAIL"}  ${file}${result.ok ? "" : `  ${result.why}`}`);
 		if (!result.ok && process.env.CHECKS_VERBOSE === "1") console.log(result.log?.join("").split("\n").slice(-40).join("\n"));
-		if (process.env.CHECKS_LOG_DIR) writeFileSync(join(process.env.CHECKS_LOG_DIR, `${file}.log`), result.log?.join("") ?? "");
+		// One log per run of a check: a check named twice keeps both (file.log, file.2.log, ...).
+		if (process.env.CHECKS_LOG_DIR) {
+			seen.set(file, (seen.get(file) ?? 0) + 1);
+			const n = seen.get(file);
+			writeFileSync(join(process.env.CHECKS_LOG_DIR, n === 1 ? `${file}.log` : `${file}.${n}.log`), result.log?.join("") ?? "");
+		}
 	}
 	if (model) stop(model);
 	if (RUN.dist) rmSync(join(RUN.dist, ".."), { recursive: true, force: true });
