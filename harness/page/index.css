@@ -37,7 +37,15 @@
 @import "./panel/lists/panel.css";
 @import "./agents/menu/forms.css";
 @import "./panel/lists/inspector.css";
-@import "./styles/stream.css";
+@import "./chat/stream/stream.css";
+@import "./chat/turn/turn.css";
+@import "./chat/tool/tool.css";
+@import "./chat/turn/content.css";
+@import "./chat/stream/foot.css";
+@import "./chat/status/status.css";
+@import "./chat/status/marks.css";
+@import "./chat/turn/thinking.css";
+@import "./chat/time-machine/acts.css";
 @import "./shell/dock.css";
 @import "./settings/usage/style.css";
 @import "@decks/canvas/styles/surface-tokens.css";
@@ -51,8 +59,8 @@
 @import "./styles/kit/comment.css";
 @import "./settings/window/style.css";
 @import "@decks/canvas/styles/marks.css";
-@import "./styles/markdown.css";
-@import "./styles/composer.css";
+@import "./chat/markdown/markdown.css";
+@import "./composer/bar/composer.css";
 @import "./shell/connections.css";
 @import "./styles/kit/properties.css";
 /* The tokens are the canvas's (`@decks/canvas`), after every sheet, where they always were. */
