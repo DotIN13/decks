@@ -1,5 +1,5 @@
 import type { Caller } from "../../protocol/index.ts";
-import type { Client, Deck, Peer, Route, SocketDoor, Stop } from "../kernel/index.ts";
+import { toDeckPath, type Client, type Deck, type Peer, type Route, type SocketDoor, type Stop } from "../kernel/index.ts";
 import { itemOp } from "./args.ts";
 import { pagesOf, readDrawing } from "./drawing.ts";
 
@@ -154,6 +154,10 @@ function identity(tab: Tab, agent: AgentRow): void {
 }
 
 async function documentCreate(tab: Tab, m: Said, canvas: string | undefined): Promise<void> {
+	// Today's picker opened only a file that is there; canvas insert (a call) still makes a missing one.
+	if (typeof m.document === "string" && !(await tab.deck().read(toDeckPath(m.document)).then(() => true, () => false))) {
+		return tab.send({ type: "notice", level: "error", text: `There is no file ${m.document} in the deck to open as a document.` });
+	}
 	const at = m.at && typeof m.at === "object" ? { at: m.at } : {};
 	const item = (await call<{ id?: string }>(tab, "item.insert", { item: { type: "document", ...(typeof m.document === "string" ? { path: m.document } : {}) }, canvas, ...at })) ?? {};
 	// Today's answer named the item on the canvas, item:<id>, which the page selects and flies to.

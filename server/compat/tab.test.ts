@@ -66,3 +66,20 @@ test("a hidden card leaves inPlay and stays held, as today's context kept it", a
 	await doors.close();
 	await server.close();
 });
+
+test("a document asked for over the tab socket must be a file that is there", async () => {
+	const server = await testServer({ features: features(), deck });
+	await server.value("agent.attach", { name: "Ada", kind: "claude" });
+	const doors = await server.listen(0);
+	const ws = new WebSocket(`${doors.url.replace("http", "ws")}/ws?decks_token=${doors.token}`);
+	const heard: Array<Record<string, unknown>> = [];
+	ws.onmessage = (m) => heard.push(JSON.parse(String(m.data)));
+	await new Promise((r) => (ws.onopen = r));
+	ws.send(JSON.stringify({ type: "document.create", stage: "plan", document: "docs/no-such-file.md", request: "r1" }));
+	for (let i = 0; i < 60 && !heard.some((m) => m.type === "notice"); i++) await new Promise((r) => setTimeout(r, 50));
+	assert.match(String(heard.find((m) => m.type === "notice")?.text), /no-such-file/);
+	assert.ok(!heard.some((m) => m.request === "r1"));
+	ws.close();
+	await doors.close();
+	await server.close();
+});
