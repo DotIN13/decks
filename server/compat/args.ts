@@ -95,6 +95,11 @@ export function answerBack(old: string, value: unknown): unknown {
 	if (old === "canvas.read" && Array.isArray(value)) return { items: value };
 	if (old === "canvas.space" && isObject(value) && typeof value.x === "number") return { x1: value.x, y1: value.y };
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
+	// apps.create answered the item that shows the app and the command that places it.
+	if ((old === "apps.create" || old === "apps.clone") && isObject(value) && typeof value.name === "string") {
+		const item = { type: "app", app: value.name };
+		return { ...value, item, next: `decks canvas insert '${JSON.stringify(item)}'` };
+	}
 	return value;
 }
 
