@@ -50,10 +50,11 @@ export function itemOp(raw: unknown): unknown {
 	const parts = boxParts(box);
 	const place = { ...(parts.at ? { at: parts.at } : at !== undefined ? { at: point(at) } : {}) };
 	if (op === "insert" && isObject(node)) {
-		const item: Args = { ...node };
-		if (parts.at) Object.assign(item, { x: parts.at.x, y: parts.at.y });
-		if (parts.size?.w !== undefined) item.width = parts.size.w;
-		if (parts.size?.h !== undefined) item.height = parts.size.h;
+		// A whole box goes as item.box, which the canvas makes pen's own box (a frame's height a floor);
+		// a corner alone goes as x and y.
+		const whole = box && [box.x1, box.y1, box.x2, box.y2].every((n) => typeof n === "number");
+		const item: Args = whole ? { ...node, box: { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 } } : { ...node };
+		if (!whole && parts.at) Object.assign(item, { x: parts.at.x, y: parts.at.y });
 		return { op, item, ...rest };
 	}
 	if (op === "replace" && isObject(node)) return { op, item: node, ...rest };

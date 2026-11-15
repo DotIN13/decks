@@ -50,8 +50,9 @@ test("old arguments in order become the new call's, options spread", () => {
 });
 
 test("pen.dev's own ops become item ops", () => {
-	assert.deepEqual(itemOp({ op: "insert", node: { type: "note", id: "n" }, box: { x1: 10, y1: 20, x2: 110, y2: 70 } }), { op: "insert", item: { type: "note", id: "n", x: 10, y: 20, width: 100, height: 50 } });
+	assert.deepEqual(itemOp({ op: "insert", node: { type: "note", id: "n" }, box: { x1: 10, y1: 20, x2: 110, y2: 70 } }), { op: "insert", item: { type: "note", id: "n", box: { x1: 10, y1: 20, x2: 110, y2: 70 } } });
 	assert.deepEqual(itemOp({ op: "update", id: "n", set: { content: "a" }, box: { x1: 5, y1: 6 } }), { op: "update", id: "n", set: { content: "a" }, at: { x: 5, y: 6 } });
+	assert.deepEqual(itemOp({ op: "insert", node: { type: "note" }, box: { x1: 5, y1: 6 } }), { op: "insert", item: { type: "note", x: 5, y: 6 } });
 	assert.deepEqual(itemOp({ op: "delete", id: "n" }), { op: "delete", id: "n" });
 });
 
