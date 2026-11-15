@@ -16,7 +16,8 @@ function kept(p) {
 
 function renamed(p) {
 	const rows = p.renames.map((r) => `\`${r.from}\` to \`${r.to}\` (${r.dir}): ${r.files} file(s) name it`);
-	return `## Renamed\n\nAfter the deletions, so no new name meets an old package's:\n\n${list(rows)}\n\nThen one install under the heavy lock, so node_modules links the new names.`;
+	const clash = p.clashes.map((c) => `\`${c.dir}\` (\`${c.name}\`) is a kept package whose name a new one takes: first it becomes \`${c.to}\` until Loom moves it (map step 4a), and its ${c.files.length} importers get that specifier, nothing else in them changed: ${c.files.join(", ")}`);
+	return `## Renamed\n\nAfter the deletions, so no new name meets a deleted package's:\n\n${list(rows)}${clash.length ? `\n\nTwo workspaces cannot share a name:\n\n${list(clash)}` : ""}\n\nThen one install under the heavy lock, so node_modules links the new names.`;
 }
 
 function moved(p) {

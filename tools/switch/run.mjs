@@ -5,7 +5,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { compatNames, lanesNeeded, plan, ROOT, rootFiles } from "./plan.mjs";
+import { compatNames, lanesNeeded, plan, ROOT, rootFiles, specifier } from "./plan.mjs";
 import { render } from "./render.mjs";
 
 const PLAN_FILE = "docs/rewrite/switch-plan.md";
@@ -64,7 +64,21 @@ function deleteOld(p) {
 	return gone;
 }
 
+/** The kept old package that a new name takes is renamed first (to <name>-old), with every specifier of it. */
+function renameOld(p) {
+	const touched = [];
+	for (const c of p.clashes) {
+		for (const f of c.files) {
+			const text = readFileSync(join(ROOT, f), "utf8");
+			const next = text.replace(specifier(c.name), `$1${c.to}`);
+			if (next !== text) (writeFileSync(join(ROOT, f), next), touched.push(f));
+		}
+	}
+	return touched;
+}
+
 function rename(p) {
+	const old = renameOld(p);
 	const files = git("ls-files").split("\n").filter((f) => /\.(ts|tsx|mjs|mts|js|json|md)$/.test(f) && !f.endsWith("package-lock.json") && existsSync(join(ROOT, f)));
 	const touched = [];
 	for (const f of files) {
@@ -74,7 +88,8 @@ function rename(p) {
 	}
 	execFileSync(process.execPath, ["tools/heavy.mjs", "--wait", "--", "npm", "install", "--include=dev", "--no-audit", "--no-fund"], { cwd: ROOT, stdio: "inherit" });
 	gates();
-	commit([...touched, "package-lock.json"], "Rename the new packages from @decks-next to @decks", `${p.renames.map((r) => r.to).join(", ")}; ${touched.length} files.`);
+	const clash = p.clashes.map((c) => `${c.dir} is called ${c.to} until Loom moves it, its ${c.files.length} importers' specifiers renamed and nothing else`).join("; ");
+	commit([...new Set([...old, ...touched, "package-lock.json"])], "Rename the new packages from @decks-next to @decks", `${p.renames.map((r) => r.to).join(", ")}; ${touched.length} files.${clash ? ` First, so no two workspaces share a name: ${clash}.` : ""}`);
 }
 
 function root(gone) {

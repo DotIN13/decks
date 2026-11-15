@@ -2,9 +2,10 @@
 // Moves gate baseline keys with the files they name, same counts: a moved file's exceptions stay its own.
 // node tools/gates/rekey.mjs <old> <new> [<old> <new> ...]   a file or a folder (every key under it)
 // node tools/gates/rekey.mjs --staged                         every rename staged in git (git mv)
+// node tools/gates/rekey.mjs --file <moves.renames.json>       a list of { from, to }, as Loom's move tables give
 // Commit the baselines with the move; until then the gates read the new keys as grown since HEAD.
 import { execFileSync } from "node:child_process";
-import { readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, readBaseline } from "./lib.mjs";
 
@@ -47,9 +48,10 @@ export function stagedRenames(root) {
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
 	const args = process.argv.slice(2);
-	const pairs = args.includes("--staged") ? stagedRenames(ROOT) : args.reduce((all, a, i) => (i % 2 ? all : [...all, [a, args[i + 1]]]), []);
+	const file = args.includes("--file") ? args[args.indexOf("--file") + 1] : undefined;
+	const pairs = file ? JSON.parse(readFileSync(file, "utf8")).map((m) => [m.from, m.to]) : args.includes("--staged") ? stagedRenames(ROOT) : args.reduce((all, a, i) => (i % 2 ? all : [...all, [a, args[i + 1]]]), []);
 	if (!pairs.length || pairs.some(([from, to]) => !from || !to)) {
-		console.error("usage: node tools/gates/rekey.mjs <old> <new> [<old> <new> ...] | --staged");
+		console.error("usage: node tools/gates/rekey.mjs <old> <new> [<old> <new> ...] | --staged | --file <renames.json>");
 		process.exitCode = 2;
 	} else console.log(`re-keyed ${rekey(ROOT, pairs)} baseline key(s) for ${pairs.length} move(s)`);
 }

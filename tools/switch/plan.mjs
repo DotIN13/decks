@@ -86,9 +86,31 @@ function checkMoves() {
 	return { moved, left: [] };
 }
 
+/** A specifier of one package name in code or a package.json, not a longer name that starts with it. */
+export const specifier = (name) => new RegExp(`(["'])${name.replace("/", "\\/")}(?=["'/])`, "g");
+
+/**
+ * A kept old package whose name a new one takes at the rename (@decks/protocol): two workspaces cannot
+ * share a name, so the old one is called <name>-old until Loom moves it, and every surviving file that
+ * names it gets that specifier, nothing else changed.
+ */
+function clashes(files, renamed, deleted) {
+	const gone = (f) => deleted.some((d) => f === d || f.startsWith(`${d}/`));
+	const survivors = files.filter((f) => !gone(f) && /\.(ts|tsx|mjs|mts|js|json)$/.test(f) && !f.endsWith("package-lock.json") && !f.startsWith("docs/"));
+	return renamed.flatMap((r) => {
+		const old = files.filter((f) => f.endsWith("/package.json") && !gone(f) && f !== `${r.dir}/package.json` && nameOf(f.replace(/\/package\.json$/, "")) === r.to).map((f) => f.replace(/\/package\.json$/, ""));
+		return old.map((dir) => {
+			const users = survivors.filter((f) => specifier(r.to).test(readFileSync(join(ROOT, f), "utf8")));
+			return { dir, name: r.to, to: `${r.to}-old`, files: users };
+		});
+	});
+}
+
 export function plan() {
 	const files = tracked();
-	return { deletions: deletions(files), kept: KEPT.filter((k) => existsSync(join(ROOT, k))), renames: renames(files), checks: checkMoves() };
+	const dels = deletions(files);
+	const rens = renames(files);
+	return { deletions: dels, kept: KEPT.filter((k) => existsSync(join(ROOT, k))), renames: rens, clashes: clashes(files, rens, dels.filter((d) => d.delete).map((d) => d.old)), checks: checkMoves() };
 }
 
 /** Each old name of compat's table: who in the repo still speaks it after the switch (kept code, the moved checks). */
