@@ -62,7 +62,13 @@
 		"scripts/",
 		"packages/hub/",
 		"SECURITY.md",
-		"examples/"
+		"examples/",
+		"packages/api/",
+		"packages/pen/",
+		"packages/card-host/",
+		"packages/docs/",
+		"packages/stage/crates/shot/",
+		"packages/sync-client/"
 	],
 	"Keel": [
 		"server/kernel/",
