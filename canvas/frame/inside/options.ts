@@ -7,7 +7,7 @@ import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
 import { drawing } from "../../ink/ink.ts";
 import { canvasBox } from "../../camera/insets.ts";
 import { fitInto } from "../../camera/camera.ts";
-import { placedItems } from "../../model/boxes.ts";
+import { placedItems } from "../../drawing/boxes.ts";
 import { cardCalls } from "./card-calls.ts";
 import type { FrameContext } from "./boot.ts";
 import type { Rect } from "../protocol.ts";

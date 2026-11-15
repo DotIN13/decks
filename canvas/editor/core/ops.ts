@@ -219,7 +219,7 @@ export const FRAME_RADIUS = NOTE_CORNER + FRAME_PAD;
 /**
  * What each tool makes, before its box: pen's own items, with nothing of ours in them but their
  * colours, the drawing's own light/dark variables (`@decks/pen` `DECKS_COLORS`), which the drawing's
- * edit defines when it does not have them yet (`withDecksColors`, `model/drawing.ts`).
+ * edit defines when it does not have them yet (`withDecksColors`, `drawing/drawing.ts`).
  */
 const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
 	rectangle: { node: { type: "rectangle", fill: "$decks-fill-slate", cornerRadius: 8 }, w: 160, h: 100 },

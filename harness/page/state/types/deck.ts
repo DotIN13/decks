@@ -97,7 +97,7 @@ export interface Page {
 	app?: string;
 	/**
 	 * Its item's own corners, from its `cornerRadius`, top-left clockwise in stage units; absent, the
-	 * canvas's 12 px. Read off the drawing (`model/drawing.ts`, `pagesOf`), as its place is.
+	 * canvas's 12 px. Read off the drawing (`drawing/drawing.ts`, `pagesOf`), as its place is.
 	 */
 	corners?: [number, number, number, number];
 	/**

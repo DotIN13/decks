@@ -228,7 +228,7 @@ export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 				transform: shift(),
 				width: `${size().w}px`,
 				height: `${size().h}px`,
-				// Its item's own corners, as the drawing's hole for it has them (`model/drawing.ts`, `cardFrame`).
+				// Its item's own corners, as the drawing's hole for it has them (`drawing/drawing.ts`, `cardFrame`).
 				...(props.board.corners ? { "--canvas-item-corners": props.board.corners.map((r) => `${r}px`).join(" ") } : {}),
 			}}
 		>

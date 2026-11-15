@@ -10,7 +10,7 @@ import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "..
 import { missing } from "../items/missing.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { SceneCard } from "../render/types.ts";
-import { docIndex } from "../model/doc-index.ts";
+import { docIndex } from "../drawing/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
 import { AWAKE, DEVICE, ENGINE, MOVING } from "../render/device.ts";
 import { drawing } from "../ink/ink.ts";

@@ -3,7 +3,7 @@ import { viewToPark } from "./agent-view.ts";
 import type { AgentViews } from "./agent-views.ts";
 import { frames as showsAny, type Viewport } from "./camera.ts";
 import { landingCamera, sameOwner, type CameraOwner } from "./land.ts";
-import type { Box } from "../model/boxes.ts";
+import type { Box } from "../drawing/boxes.ts";
 
 /**
  * The camera, and whose it is: parking a view and landing one, for every host that keeps views per

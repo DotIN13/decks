@@ -15,7 +15,7 @@ import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
  * The points are in the path's own box, from its top-left corner, so moving the path moves the
  * stroke with it. Every colour follows the stage's light or dark look through a pen variable, one of
  * Decks's own (`@decks/pen` `DECKS_COLORS`), which the stroke's edit defines when the drawing lacks
- * it (`withDecksColors`, `model/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
+ * it (`withDecksColors`, `drawing/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
  * and red, blue, green and yellow are a shade lighter on dark.
  */
 

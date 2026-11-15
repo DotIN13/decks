@@ -9,7 +9,7 @@ import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin 
 import { stagePoint } from "../camera/coords.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
-import { docIndex } from "../model/doc-index.ts";
+import { docIndex } from "../drawing/doc-index.ts";
 import { StageInk } from "../ink/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../editor/pen-tools.ts";
