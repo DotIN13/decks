@@ -42,7 +42,7 @@
 	"canvas/cards/card.ts: stage": 4,
 	"canvas/cards/CardEditor.tsx: board": 1,
 	"canvas/cards/CardEditor.tsx: stage": 3,
-	"canvas/cards/markdown.ts: stage": 2,
+	"canvas/cards/markdown.ts: stage": 1,
 	"canvas/cards/runtime/cards.ts: stage": 2,
 	"canvas/cards/runtime/index.ts: board": 4,
 	"canvas/cards/runtime/runtime.test.ts: board": 5,

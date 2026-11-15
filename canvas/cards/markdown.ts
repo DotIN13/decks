@@ -129,19 +129,9 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 				break;
 			}
 			case "paragraph":
-			case "text": {
-				const t = token as Tokens.Paragraph | Tokens.Text;
-				const runs = t.tokens ? runsOf(t.tokens, notes) : textRuns(t.text, {}, notes);
-				// An image or an embed on a line of its own is drawn as the picture, or the file.
-				const only = runs.filter((run) => run.image || run.text.trim());
-				const embed = embedOf(t.tokens);
-				if (embed) out.push(embed);
-				else if (only.length === 1 && only[0]!.image) {
-					const { url, alt, width } = only[0]!.image;
-					out.push({ kind: "image", url, alt, ...(width ? { width } : {}) });
-				} else if (runs.some((run) => run.image || run.text.trim())) out.push({ kind: "paragraph", runs });
+			case "text":
+				paragraphBlock(token as Tokens.Paragraph | Tokens.Text, notes, out);
 				break;
-			}
 			case "list": {
 				const t = token as Tokens.List;
 				out.push({
@@ -153,23 +143,9 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 				});
 				break;
 			}
-			case "blockquote": {
-				const t = token as Tokens.Blockquote;
-				const inner = blocksOf(t.tokens, notes);
-				// Obsidian's callouts: a quote whose first line is [!type], maybe folded (+ or -), maybe titled.
-				// GitHub's five alerts are among them.
-				const first = inner[0];
-				const mark = first?.kind === "paragraph" ? /^\[!([a-z-]+)\][+-]?[ \t]*([^\n]*)\n?/i.exec(first.runs[0]?.text ?? "") : null;
-				if (mark && first?.kind === "paragraph") {
-					const type = mark[1]!.toLowerCase();
-					first.runs[0] = { ...first.runs[0]!, text: first.runs[0]!.text.slice(mark[0].length) };
-					if (!first.runs[0].text) first.runs.shift();
-					if (!first.runs.some((run) => run.text.trim() || run.image)) inner.shift();
-					const title = mark[2]!.trim() || type.charAt(0).toUpperCase() + type.slice(1);
-					out.push({ kind: "quote", alert: (CALLOUTS[type] ?? "blue") as Alert, title, blocks: inner });
-				} else out.push({ kind: "quote", blocks: inner });
+			case "blockquote":
+				out.push(quoteBlock(token as Tokens.Blockquote, notes));
 				break;
-			}
 			case "code": {
 				const t = token as Tokens.Code;
 				out.push({ kind: "code", lang: (t.lang ?? "").trim().split(/\s+/)[0]!.toLowerCase(), text: t.text });
@@ -199,6 +175,32 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 		}
 	}
 	return out;
+}
+
+/** A paragraph; an image or an embed on a line of its own is drawn as the picture, or the file. */
+function paragraphBlock(t: Tokens.Paragraph | Tokens.Text, notes: Map<string, number>, out: Block[]): void {
+	const runs = t.tokens ? runsOf(t.tokens, notes) : textRuns(t.text, {}, notes);
+	const only = runs.filter((run) => run.image || run.text.trim());
+	const embed = embedOf(t.tokens);
+	if (embed) out.push(embed);
+	else if (only.length === 1 && only[0]!.image) {
+		const { url, alt, width } = only[0]!.image;
+		out.push({ kind: "image", url, alt, ...(width ? { width } : {}) });
+	} else if (runs.some((run) => run.image || run.text.trim())) out.push({ kind: "paragraph", runs });
+}
+
+/** A quote, or one of Obsidian's callouts: a first line of [!type], maybe folded (+ or -), maybe titled; GitHub's alerts are among them. */
+function quoteBlock(t: Tokens.Blockquote, notes: Map<string, number>): Block {
+	const inner = blocksOf(t.tokens, notes);
+	const first = inner[0];
+	const mark = first?.kind === "paragraph" ? /^\[!([a-z-]+)\][+-]?[ \t]*([^\n]*)\n?/i.exec(first.runs[0]?.text ?? "") : null;
+	if (!mark || first?.kind !== "paragraph") return { kind: "quote", blocks: inner };
+	const type = mark[1]!.toLowerCase();
+	first.runs[0] = { ...first.runs[0]!, text: first.runs[0]!.text.slice(mark[0].length) };
+	if (!first.runs[0].text) first.runs.shift();
+	if (!first.runs.some((run) => run.text.trim() || run.image)) inner.shift();
+	const title = mark[2]!.trim() || type.charAt(0).toUpperCase() + type.slice(1);
+	return { kind: "quote", alert: (CALLOUTS[type] ?? "blue") as Alert, title, blocks: inner };
 }
 
 type Style = Omit<Run, "text" | "image">;
@@ -275,46 +277,50 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 				out.push(t.embed ? { text: `📄 ${t.alias ?? t.target}`, ...style } : { text: t.alias ?? t.target, ...style, wiki: t.target });
 				break;
 			}
-			case "critic": {
-				const t = token as CriticToken;
-				if (t.op === "comment") {
-					// The reason belongs to the suggestion just before it.
-					const last = out.at(-1);
-					if (last && (last.added || last.removed)) for (let i = out.length - 1; i >= 0 && (out[i]!.added || out[i]!.removed); i--) out[i]!.reason = t.new;
-				} else if (t.op === "highlight") out.push(...textRuns(t.old, { ...style, mark: "default" }, notes));
-				else {
-					if (t.old) out.push(...textRuns(t.old, { ...style, removed: true }, notes));
-					if (t.new) out.push(...textRuns(t.new, { ...style, added: true }, notes));
-				}
+			case "critic":
+				criticRuns(token as CriticToken, style, notes, out);
 				break;
-			}
 			case "hidden":
 				break;
-			case "html": {
-				const raw = token.raw;
-				// <u> and </u> open and close an underline over what is between them.
-				if (/^<u>$/i.test(raw)) {
-					style = { ...style, underline: true };
-					break;
-				}
-				if (/^<\/u>$/i.test(raw)) {
-					const { underline: _, ...rest } = style;
-					style = rest;
-					break;
-				}
-				if (/^<br\s*\/?>$/i.test(raw)) out.push({ text: "\n", ...style });
-				else if (!/^<\/?[a-z][^>]*>$/i.test(raw)) out.push(...textRuns(raw.replace(/<[^>]+>/g, ""), style, notes));
+			case "html":
+				style = htmlRuns(token.raw, style, notes, out);
 				break;
-			}
 			default:
 				if ("text" in token && typeof token.text === "string") out.push(...textRuns(token.text, style, notes));
 		}
 	}
-	// Neighbours in the same style become one run.
+	return mergeRuns(out);
+}
+
+/** A suggestion's old and new words, a highlight, or a comment that gives the suggestion before it its reason. */
+function criticRuns(t: CriticToken, style: Style, notes: Map<string, number>, out: Run[]): void {
+	if (t.op === "comment") {
+		const last = out.at(-1);
+		if (last && (last.added || last.removed)) for (let i = out.length - 1; i >= 0 && (out[i]!.added || out[i]!.removed); i--) out[i]!.reason = t.new;
+	} else if (t.op === "highlight") out.push(...textRuns(t.old, { ...style, mark: "default" }, notes));
+	else {
+		if (t.old) out.push(...textRuns(t.old, { ...style, removed: true }, notes));
+		if (t.new) out.push(...textRuns(t.new, { ...style, added: true }, notes));
+	}
+}
+
+/** Inline HTML: `<u>` and `</u>` open and close an underline (the style after it is answered), `<br>` is a line break, other tags go. */
+function htmlRuns(raw: string, style: Style, notes: Map<string, number>, out: Run[]): Style {
+	if (/^<u>$/i.test(raw)) return { ...style, underline: true };
+	if (/^<\/u>$/i.test(raw)) {
+		const { underline: _, ...rest } = style;
+		return rest;
+	}
+	if (/^<br\s*\/?>$/i.test(raw)) out.push({ text: "\n", ...style });
+	else if (!/^<\/?[a-z][^>]*>$/i.test(raw)) out.push(...textRuns(raw.replace(/<[^>]+>/g, ""), style, notes));
+	return style;
+}
+
+/** Neighbours in the same style become one run; a picture or a formula is a run of its own. */
+function mergeRuns(out: Run[]): Run[] {
 	const merged: Run[] = [];
 	for (const run of out) {
 		const last = merged.at(-1);
-		// A picture or a formula is a run of its own.
 		if (last && !last.image && !run.image && !last.math && !run.math && sameStyle(last, run)) last.text += run.text;
 		else merged.push({ ...run });
 	}
