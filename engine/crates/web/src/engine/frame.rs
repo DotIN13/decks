@@ -3,189 +3,6 @@
 
 use super::*;
 
-/// A card as the app places it (`SceneCard`).
-#[derive(Clone, Debug, Default)]
-pub struct CardPlace {
-	pub path: String,
-	/// The id of its item on the drawing: what a glide's offset is kept under (`offsets`).
-	pub id: String,
-	/// The address its picture is held under (`card:<path>`), made once with the place.
-	pub picture: String,
-	pub x: f64,
-	pub y: f64,
-	pub w: f64,
-	pub h: f64,
-	/// Its page is showing: nothing is drawn for it here.
-	pub live: bool,
-	/// The writer's colour when the board is news, and whether to draw its outline here.
-	pub news: Option<[f32; 4]>,
-	pub glow: bool,
-	/// Its title and kind ("card", "app", "document", "board"), painted on its paper while it has no picture.
-	pub title: String,
-	pub kind: String,
-	/// An app's status ("running", "asleep", "stopped", …), for the dot on its window's bar.
-	pub status: String,
-	/// Its item's own corners in stage units, top-left clockwise, as the page read them off the
-	/// drawing (`Page.corners`); none, the scene's or 12 (`card_radii`).
-	pub corners: Option<[f32; 4]>,
-}
-
-/// An app's window bar, in stage units: the page's iframe sits below it (`items/item-surfaces.tsx`, `APP_BAR`).
-pub const APP_BAR: f64 = 44.0;
-
-/// An app's window as `frame` found it, on the screen: its bar, lights, name and status are painted
-/// over whatever its body is (the page's iframe, its picture, its placeholder).
-pub(crate) struct Window {
-	pub(crate) x: f32,
-	pub(crate) y: f32,
-	pub(crate) w: f32,
-	pub(crate) h: f32,
-	pub(crate) title: String,
-	pub(crate) status: String,
-}
-
-/// A card with no picture yet, as `frame` found it: its paper on the screen, to paint its title and kind on.
-pub(crate) struct Placeholder {
-	pub(crate) x: f32,
-	pub(crate) y: f32,
-	pub(crate) w: f32,
-	pub(crate) h: f32,
-	pub(crate) title: String,
-	pub(crate) kind: String,
-	/// Its corners on the screen, as its picture's would be.
-	pub(crate) radii: [f32; 4],
-}
-
-/// A placeholder's words: the kind small and faint at the top-left, the title under it, cut to the paper.
-///
-/// Laid in the paper's own units, so the layout is the same at every zoom: kept in `titles` by kind, title
-/// and the width it was laid to (`ph:` keys), as the titles are. Laying it fresh each frame cost a zoom over
-/// 100 pictureless cards a fifth of its main-thread time, nearly all of it text shaping and the allocation under it.
-/// `scale` is the screen's (zoom times the device's pixels), `p` the paper in screen pixels.
-pub(crate) fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
-	let Some(text) = ctx.text else { return };
-	// In the paper's own units (stage units at zoom 1), inset from its corner; nothing on a paper too small for a word.
-	let (w, h) = (p.w as f64 / scale, p.h as f64 / scale);
-	let pad = 40.0_f64.min(w / 8.0).min(h / 8.0);
-	if w - pad * 2.0 < 60.0 || h - pad * 2.0 < 40.0 {
-		return;
-	}
-	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
-	let faint = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
-	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, p.y as f64]);
-	// A hairline round the paper: on a dark canvas the paper is nearly the ground's colour, and the words alone would float.
-	ops.push(Op::Shape { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: p.radii, ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y), paint: stage_paint::list::Paint::Solid(Color::straight([faint[0], faint[1], faint[2], 0.35], 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
-	let kind = match p.kind.as_str() {
-		"app" => "App",
-		"document" => "Document",
-		"board" => "Board",
-		// A card its host has no copy of and nothing to send it from (`items/missing.ts`): said, so it is not taken for one still loading; why is under the title.
-		"missing" => "Card · missing",
-		_ => "Card",
-	};
-	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };
-	let big = stage_scene::layout::TextStyle { family: "Inter".into(), size: 26.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
-	// The width the words are laid to, to the unit: the paper's edges are snapped to the screen's pixels, so its width in paper units wavers by a fraction with the zoom.
-	let room = (w - pad * 2.0).round() as f32;
-	let mut titles = titles.borrow_mut();
-	let kind_height = {
-		let kind_laid = titles.entry(format!("ph-kind:{kind}:{room}")).or_insert_with(|| text.lay_words(kind, &small, Some(room), stage_text::Align::Left, false, false));
-		stage_paint::painter::draw_laid(ctx, kind_laid, (pad, pad), &[Color::straight(faint, 1.0)], &m, ops);
-		kind_laid.height as f64
-	};
-	let title_top = pad + kind_height + 8.0;
-	if h - title_top - pad < 20.0 {
-		return;
-	}
-	let title = titles.entry(format!("ph:{kind}:{room}:{}", p.title)).or_insert_with(|| text.lay_words(&p.title, &big, Some(room), stage_text::Align::Left, false, false));
-	let title_height = title.height as f64;
-	// Cut at the paper's foot: a long title on a short paper shows its first lines.
-	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
-	stage_paint::painter::draw_laid(ctx, title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
-	// A missing card says why under its title, as large as reads from a little way off: nothing is coming until a source has it.
-	if p.kind == "missing" {
-		let note = stage_scene::layout::TextStyle { family: "Inter".into(), size: 20.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
-		let why = "Studio has no copy of this card yet, and no harness of yours with it is in reach.";
-		let laid = titles.entry(format!("ph-missing:{room}")).or_insert_with(|| text.lay_words(why, &note, Some(room), stage_text::Align::Left, false, false));
-		stage_paint::painter::draw_laid(ctx, laid, (pad, title_top + title_height + 14.0), &[Color::straight(faint, 1.0)], &m, ops);
-	}
-	ops.push(Op::PopClip);
-}
-
-/// A sleeping item's title, 12 px in the stage's units above its picture, as the bar over an awake
-/// item reads it: one line, cut at the item's width. Laid once per title and kept (`titles`).
-pub(crate) fn paint_title(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
-	let Some(text) = ctx.text else { return };
-	let muted = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
-	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
-	let mut titles = titles.borrow_mut();
-	let laid = titles.entry(p.title.clone()).or_insert_with(|| text.lay_words(&p.title, &style, None, stage_text::Align::Left, false, false));
-	let height = laid.height as f64;
-	// Above the item, its foot 4 units over the item's top, as the bar sits; cut at the item's width.
-	let top = p.y as f64 - (height + 4.0) * scale;
-	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, top]);
-	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: (height * scale) as f32 + 1.0, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, top as f32) }));
-	stage_paint::painter::draw_laid(ctx, laid, (2.0, 0.0), &[Color::straight(muted, 1.0)], &m, ops);
-	ops.push(Op::PopClip);
-}
-
-/// An app's window: a bar `APP_BAR` tall at the top of its box with three lights, its name in the
-/// middle and a status dot at the right, and a hairline round the whole box; the same in every state,
-/// as today's macOS draws a window. The name is laid once per name (`titles`).
-pub(crate) fn paint_window(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, win: &Window, scale: f64, dark: bool, ops: &mut Vec<Op>) {
-	use stage_paint::list::{Affine, Paint, Shape};
-	let r = 12.0 * scale as f32;
-	let bar_h = (APP_BAR * scale).round() as f32;
-	if bar_h < 2.0 || win.w < 8.0 {
-		return;
-	}
-	let bar_fill = if dark { [0.16, 0.16, 0.17, 1.0] } else { [0.965, 0.965, 0.97, 1.0] };
-	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.10] };
-	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
-	// The bar: the top of the box, its top corners round, cut to the box.
-	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y) }));
-	ops.push(Op::Shape { shape: Shape { w: win.w, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(bar_fill, 1.0)), stroke: None });
-	ops.push(Op::Shape { shape: Shape { w: win.w, h: 1.0_f32.max(scale as f32 * 0.5), radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y + bar_h - 1.0), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: None });
-	// The three lights.
-	let d = (12.0 * scale) as f32;
-	let cy = win.y + (bar_h - d) / 2.0;
-	for (i, colour) in [[1.0, 0.373, 0.341, 1.0], [0.996, 0.737, 0.18, 1.0], [0.157, 0.784, 0.251, 1.0]].iter().enumerate() {
-		let cx = win.x + (14.0 * scale) as f32 + i as f32 * (20.0 * scale) as f32;
-		ops.push(Op::Shape { shape: Shape { w: d, h: d, radii: [d / 2.0; 4], ellipse: true }, transform: Affine::translate(cx, cy), paint: Paint::Solid(Color::straight(*colour, 1.0)), stroke: None });
-	}
-	// The status dot at the right: green while it runs, grey asleep or on its way, nothing stopped.
-	let dot = match win.status.as_str() {
-		"running" => Some([0.157, 0.784, 0.251, 1.0]),
-		"asleep" | "starting" | "building" | "installing" => Some([0.6, 0.6, 0.64, 1.0]),
-		_ => None,
-	};
-	if let Some(colour) = dot {
-		let dd = (8.0 * scale) as f32;
-		ops.push(Op::Shape { shape: Shape { w: dd, h: dd, radii: [dd / 2.0; 4], ellipse: true }, transform: Affine::translate(win.x + win.w - (16.0 * scale) as f32 - dd, win.y + (bar_h - dd) / 2.0), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
-	}
-	ops.push(Op::PopClip);
-	// The hairline round the window.
-	ops.push(Op::Shape { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
-	// The name in the middle, where a 13 px line is more than a smudge.
-	if scale * 13.0 < 5.0 || win.title.is_empty() {
-		return;
-	}
-	let Some(text) = ctx.text else { return };
-	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
-	let mut titles = titles.borrow_mut();
-	let laid = titles.entry(format!("app:{}", win.title)).or_insert_with(|| text.lay_words(&win.title, &style, None, stage_text::Align::Left, false, false));
-	let room = (win.w as f64 / scale) - 160.0;
-	if room < 20.0 {
-		return;
-	}
-	let left = ((win.w as f64 / scale) - (laid.width as f64).min(room)) / 2.0;
-	let top = (APP_BAR - laid.height as f64) / 2.0;
-	let m = Mat([scale, 0.0, 0.0, scale, win.x as f64, win.y as f64]);
-	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: (room * scale) as f32, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x + (80.0 * scale) as f32, win.y) }));
-	stage_paint::painter::draw_laid(ctx, laid, (left, top), &[Color::straight(ink, 1.0)], &m, ops);
-	ops.push(Op::PopClip);
-}
-
 impl Page {
 	/// Draw `place` from the tiles of scale `sc`, cut to it, if they cover it whole: one coarser tile,
 	/// two or four where it straddles them, or the sharper ones that lie in it. False, and nothing
@@ -478,4 +295,187 @@ impl Page {
 		}
 		over
 	}
+}
+
+/// A card as the app places it (`SceneCard`).
+#[derive(Clone, Debug, Default)]
+pub struct CardPlace {
+	pub path: String,
+	/// The id of its item on the drawing: what a glide's offset is kept under (`offsets`).
+	pub id: String,
+	/// The address its picture is held under (`card:<path>`), made once with the place.
+	pub picture: String,
+	pub x: f64,
+	pub y: f64,
+	pub w: f64,
+	pub h: f64,
+	/// Its page is showing: nothing is drawn for it here.
+	pub live: bool,
+	/// The writer's colour when the board is news, and whether to draw its outline here.
+	pub news: Option<[f32; 4]>,
+	pub glow: bool,
+	/// Its title and kind ("card", "app", "document", "board"), painted on its paper while it has no picture.
+	pub title: String,
+	pub kind: String,
+	/// An app's status ("running", "asleep", "stopped", …), for the dot on its window's bar.
+	pub status: String,
+	/// Its item's own corners in stage units, top-left clockwise, as the page read them off the
+	/// drawing (`Page.corners`); none, the scene's or 12 (`card_radii`).
+	pub corners: Option<[f32; 4]>,
+}
+
+/// An app's window bar, in stage units: the page's iframe sits below it (`items/item-surfaces.tsx`, `APP_BAR`).
+pub const APP_BAR: f64 = 44.0;
+
+/// An app's window as `frame` found it, on the screen: its bar, lights, name and status are painted
+/// over whatever its body is (the page's iframe, its picture, its placeholder).
+pub(crate) struct Window {
+	pub(crate) x: f32,
+	pub(crate) y: f32,
+	pub(crate) w: f32,
+	pub(crate) h: f32,
+	pub(crate) title: String,
+	pub(crate) status: String,
+}
+
+/// A card with no picture yet, as `frame` found it: its paper on the screen, to paint its title and kind on.
+pub(crate) struct Placeholder {
+	pub(crate) x: f32,
+	pub(crate) y: f32,
+	pub(crate) w: f32,
+	pub(crate) h: f32,
+	pub(crate) title: String,
+	pub(crate) kind: String,
+	/// Its corners on the screen, as its picture's would be.
+	pub(crate) radii: [f32; 4],
+}
+
+/// A placeholder's words: the kind small and faint at the top-left, the title under it, cut to the paper.
+///
+/// Laid in the paper's own units, so the layout is the same at every zoom: kept in `titles` by kind, title
+/// and the width it was laid to (`ph:` keys), as the titles are. Laying it fresh each frame cost a zoom over
+/// 100 pictureless cards a fifth of its main-thread time, nearly all of it text shaping and the allocation under it.
+/// `scale` is the screen's (zoom times the device's pixels), `p` the paper in screen pixels.
+pub(crate) fn paint_placeholder(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	// In the paper's own units (stage units at zoom 1), inset from its corner; nothing on a paper too small for a word.
+	let (w, h) = (p.w as f64 / scale, p.h as f64 / scale);
+	let pad = 40.0_f64.min(w / 8.0).min(h / 8.0);
+	if w - pad * 2.0 < 60.0 || h - pad * 2.0 < 40.0 {
+		return;
+	}
+	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
+	let faint = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
+	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, p.y as f64]);
+	// A hairline round the paper: on a dark canvas the paper is nearly the ground's colour, and the words alone would float.
+	ops.push(Op::Shape { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: p.radii, ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y), paint: stage_paint::list::Paint::Solid(Color::straight([faint[0], faint[1], faint[2], 0.35], 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
+	let kind = match p.kind.as_str() {
+		"app" => "App",
+		"document" => "Document",
+		"board" => "Board",
+		// A card its host has no copy of and nothing to send it from (`items/missing.ts`): said, so it is not taken for one still loading; why is under the title.
+		"missing" => "Card · missing",
+		_ => "Card",
+	};
+	let small = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.6, line_height: None };
+	let big = stage_scene::layout::TextStyle { family: "Inter".into(), size: 26.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	// The width the words are laid to, to the unit: the paper's edges are snapped to the screen's pixels, so its width in paper units wavers by a fraction with the zoom.
+	let room = (w - pad * 2.0).round() as f32;
+	let mut titles = titles.borrow_mut();
+	let kind_height = {
+		let kind_laid = titles.entry(format!("ph-kind:{kind}:{room}")).or_insert_with(|| text.lay_words(kind, &small, Some(room), stage_text::Align::Left, false, false));
+		stage_paint::painter::draw_laid(ctx, kind_laid, (pad, pad), &[Color::straight(faint, 1.0)], &m, ops);
+		kind_laid.height as f64
+	};
+	let title_top = pad + kind_height + 8.0;
+	if h - title_top - pad < 20.0 {
+		return;
+	}
+	let title = titles.entry(format!("ph:{kind}:{room}:{}", p.title)).or_insert_with(|| text.lay_words(&p.title, &big, Some(room), stage_text::Align::Left, false, false));
+	let title_height = title.height as f64;
+	// Cut at the paper's foot: a long title on a short paper shows its first lines.
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: p.h, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, p.y) }));
+	stage_paint::painter::draw_laid(ctx, title, (pad, title_top), &[Color::straight(ink, 1.0)], &m, ops);
+	// A missing card says why under its title, as large as reads from a little way off: nothing is coming until a source has it.
+	if p.kind == "missing" {
+		let note = stage_scene::layout::TextStyle { family: "Inter".into(), size: 20.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+		let why = "Studio has no copy of this card yet, and no harness of yours with it is in reach.";
+		let laid = titles.entry(format!("ph-missing:{room}")).or_insert_with(|| text.lay_words(why, &note, Some(room), stage_text::Align::Left, false, false));
+		stage_paint::painter::draw_laid(ctx, laid, (pad, title_top + title_height + 14.0), &[Color::straight(faint, 1.0)], &m, ops);
+	}
+	ops.push(Op::PopClip);
+}
+
+/// A sleeping item's title, 12 px in the stage's units above its picture, as the bar over an awake
+/// item reads it: one line, cut at the item's width. Laid once per title and kept (`titles`).
+pub(crate) fn paint_title(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, p: &Placeholder, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let muted = if dark { [0.62, 0.62, 0.66, 1.0] } else { [0.50, 0.50, 0.54, 1.0] };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let mut titles = titles.borrow_mut();
+	let laid = titles.entry(p.title.clone()).or_insert_with(|| text.lay_words(&p.title, &style, None, stage_text::Align::Left, false, false));
+	let height = laid.height as f64;
+	// Above the item, its foot 4 units over the item's top, as the bar sits; cut at the item's width.
+	let top = p.y as f64 - (height + 4.0) * scale;
+	let m = Mat([scale, 0.0, 0.0, scale, p.x as f64, top]);
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: stage_paint::list::Shape { w: p.w, h: (height * scale) as f32 + 1.0, radii: [0.0; 4], ellipse: false }, transform: stage_paint::list::Affine::translate(p.x, top as f32) }));
+	stage_paint::painter::draw_laid(ctx, laid, (2.0, 0.0), &[Color::straight(muted, 1.0)], &m, ops);
+	ops.push(Op::PopClip);
+}
+
+/// An app's window: a bar `APP_BAR` tall at the top of its box with three lights, its name in the
+/// middle and a status dot at the right, and a hairline round the whole box; the same in every state,
+/// as today's macOS draws a window. The name is laid once per name (`titles`).
+pub(crate) fn paint_window(ctx: &Context, titles: &RefCell<HashMap<String, Laid>>, win: &Window, scale: f64, dark: bool, ops: &mut Vec<Op>) {
+	use stage_paint::list::{Affine, Paint, Shape};
+	let r = 12.0 * scale as f32;
+	let bar_h = (APP_BAR * scale).round() as f32;
+	if bar_h < 2.0 || win.w < 8.0 {
+		return;
+	}
+	let bar_fill = if dark { [0.16, 0.16, 0.17, 1.0] } else { [0.965, 0.965, 0.97, 1.0] };
+	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.10] };
+	let ink = if dark { [0.93, 0.93, 0.94, 1.0] } else { [0.11, 0.11, 0.12, 1.0] };
+	// The bar: the top of the box, its top corners round, cut to the box.
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y) }));
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(bar_fill, 1.0)), stroke: None });
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: 1.0_f32.max(scale as f32 * 0.5), radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x, win.y + bar_h - 1.0), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: None });
+	// The three lights.
+	let d = (12.0 * scale) as f32;
+	let cy = win.y + (bar_h - d) / 2.0;
+	for (i, colour) in [[1.0, 0.373, 0.341, 1.0], [0.996, 0.737, 0.18, 1.0], [0.157, 0.784, 0.251, 1.0]].iter().enumerate() {
+		let cx = win.x + (14.0 * scale) as f32 + i as f32 * (20.0 * scale) as f32;
+		ops.push(Op::Shape { shape: Shape { w: d, h: d, radii: [d / 2.0; 4], ellipse: true }, transform: Affine::translate(cx, cy), paint: Paint::Solid(Color::straight(*colour, 1.0)), stroke: None });
+	}
+	// The status dot at the right: green while it runs, grey asleep or on its way, nothing stopped.
+	let dot = match win.status.as_str() {
+		"running" => Some([0.157, 0.784, 0.251, 1.0]),
+		"asleep" | "starting" | "building" | "installing" => Some([0.6, 0.6, 0.64, 1.0]),
+		_ => None,
+	};
+	if let Some(colour) = dot {
+		let dd = (8.0 * scale) as f32;
+		ops.push(Op::Shape { shape: Shape { w: dd, h: dd, radii: [dd / 2.0; 4], ellipse: true }, transform: Affine::translate(win.x + win.w - (16.0 * scale) as f32 - dd, win.y + (bar_h - dd) / 2.0), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
+	}
+	ops.push(Op::PopClip);
+	// The hairline round the window.
+	ops.push(Op::Shape { shape: Shape { w: win.w, h: win.h, radii: [r; 4], ellipse: false }, transform: Affine::translate(win.x, win.y), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, stage_paint::list::Align::Inside)) });
+	// The name in the middle, where a 13 px line is more than a smudge.
+	if scale * 13.0 < 5.0 || win.title.is_empty() {
+		return;
+	}
+	let Some(text) = ctx.text else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let mut titles = titles.borrow_mut();
+	let laid = titles.entry(format!("app:{}", win.title)).or_insert_with(|| text.lay_words(&win.title, &style, None, stage_text::Align::Left, false, false));
+	let room = (win.w as f64 / scale) - 160.0;
+	if room < 20.0 {
+		return;
+	}
+	let left = ((win.w as f64 / scale) - (laid.width as f64).min(room)) / 2.0;
+	let top = (APP_BAR - laid.height as f64) / 2.0;
+	let m = Mat([scale, 0.0, 0.0, scale, win.x as f64, win.y as f64]);
+	ops.push(Op::PushClip(stage_paint::list::Clip { shape: Shape { w: (room * scale) as f32, h: bar_h, radii: [0.0; 4], ellipse: false }, transform: Affine::translate(win.x + (80.0 * scale) as f32, win.y) }));
+	stage_paint::painter::draw_laid(ctx, laid, (left, top), &[Color::straight(ink, 1.0)], &m, ops);
+	ops.push(Op::PopClip);
 }

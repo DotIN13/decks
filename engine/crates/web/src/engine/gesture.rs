@@ -3,77 +3,6 @@
 
 use super::*;
 
-/// The arrows one gesture bends: each with an end on what it moves (or in it), or on a board it
-/// carries, and not itself moved. Found once per gesture; only the routing runs at each step.
-pub(crate) struct Bent {
-	pub(crate) key: String,
-	pub(crate) arrows: Vec<BentArrow>,
-	/// Each item the gesture moves, and everything in one, to the moved item whose offset it takes.
-	pub(crate) carried: HashMap<String, String>,
-	/// Where each arrow end and parent is in the scene, so a step does not search for it.
-	pub(crate) at: HashMap<String, (usize, u32)>,
-}
-
-pub(crate) struct BentArrow {
-	pub(crate) id: String,
-	pub(crate) meta: Value,
-	pub(crate) stroke: f64,
-	pub(crate) parent: Option<String>,
-}
-
-impl Bent {
-	fn find(scene: &Scene, moving: &[(String, Preview)], boards: &HashSet<String>, key: String) -> Bent {
-		let moved: HashSet<&str> = moving.iter().map(|(id, _)| id.as_str()).collect();
-		let mut carried = HashMap::new();
-		for root in &scene.roots {
-			let items = &root.tree.items;
-			for (i, item) in items.iter().enumerate() {
-				let mut at = Some(i as u32);
-				while let Some(a) = at {
-					let up = &items[a as usize];
-					if moved.contains(up.id.as_str()) {
-						carried.insert(item.id.clone(), up.id.clone());
-						break;
-					}
-					at = up.parent;
-				}
-			}
-		}
-		let mut arrows = Vec::new();
-		let mut at = HashMap::new();
-		for root in &scene.roots {
-			let items = &root.tree.items;
-			for item in items {
-				// Arrows in the document itself: an instance's copies are routed where they are defined.
-				if item.handle.is_none() || carried.contains_key(&item.id) || !arrows::is_arrow(&item.props) {
-					continue;
-				}
-				let Some(meta) = item.get("metadata") else { continue };
-				let ends = arrows::end_items(meta);
-				if !ends.iter().flatten().any(|e| carried.contains_key(*e) || boards.contains(*e)) {
-					continue;
-				}
-				let parent = item.parent.map(|p| items[p as usize].id.clone());
-				for name in ends.iter().flatten().map(|e| e.to_string()).chain(parent.clone()) {
-					if let Some(found) = scene.find(&name) {
-						at.insert(name, found);
-					}
-				}
-				arrows.push(BentArrow { id: item.id.clone(), meta: meta.clone(), stroke: item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0), parent });
-			}
-		}
-		Bent { key, arrows, carried, at }
-	}
-}
-
-/// A gesture's preview of one item (`PenPreview` in the app): moved by `dx dy`, and fields shown.
-#[derive(Clone, Debug, Default)]
-pub struct Preview {
-	pub dx: f64,
-	pub dy: f64,
-	pub set: Vec<(String, Option<Value>)>,
-}
-
 impl Page {
 	/// What the editor draws over the canvas, as `edit/core/overlay-json.ts` writes it; empty or bad JSON clears it.
 	pub fn set_overlay(&mut self, json: &str) {
@@ -214,4 +143,75 @@ impl Page {
 			self.lifted.remove(id);
 		}
 	}
+}
+
+/// The arrows one gesture bends: each with an end on what it moves (or in it), or on a board it
+/// carries, and not itself moved. Found once per gesture; only the routing runs at each step.
+pub(crate) struct Bent {
+	pub(crate) key: String,
+	pub(crate) arrows: Vec<BentArrow>,
+	/// Each item the gesture moves, and everything in one, to the moved item whose offset it takes.
+	pub(crate) carried: HashMap<String, String>,
+	/// Where each arrow end and parent is in the scene, so a step does not search for it.
+	pub(crate) at: HashMap<String, (usize, u32)>,
+}
+
+pub(crate) struct BentArrow {
+	pub(crate) id: String,
+	pub(crate) meta: Value,
+	pub(crate) stroke: f64,
+	pub(crate) parent: Option<String>,
+}
+
+impl Bent {
+	fn find(scene: &Scene, moving: &[(String, Preview)], boards: &HashSet<String>, key: String) -> Bent {
+		let moved: HashSet<&str> = moving.iter().map(|(id, _)| id.as_str()).collect();
+		let mut carried = HashMap::new();
+		for root in &scene.roots {
+			let items = &root.tree.items;
+			for (i, item) in items.iter().enumerate() {
+				let mut at = Some(i as u32);
+				while let Some(a) = at {
+					let up = &items[a as usize];
+					if moved.contains(up.id.as_str()) {
+						carried.insert(item.id.clone(), up.id.clone());
+						break;
+					}
+					at = up.parent;
+				}
+			}
+		}
+		let mut arrows = Vec::new();
+		let mut at = HashMap::new();
+		for root in &scene.roots {
+			let items = &root.tree.items;
+			for item in items {
+				// Arrows in the document itself: an instance's copies are routed where they are defined.
+				if item.handle.is_none() || carried.contains_key(&item.id) || !arrows::is_arrow(&item.props) {
+					continue;
+				}
+				let Some(meta) = item.get("metadata") else { continue };
+				let ends = arrows::end_items(meta);
+				if !ends.iter().flatten().any(|e| carried.contains_key(*e) || boards.contains(*e)) {
+					continue;
+				}
+				let parent = item.parent.map(|p| items[p as usize].id.clone());
+				for name in ends.iter().flatten().map(|e| e.to_string()).chain(parent.clone()) {
+					if let Some(found) = scene.find(&name) {
+						at.insert(name, found);
+					}
+				}
+				arrows.push(BentArrow { id: item.id.clone(), meta: meta.clone(), stroke: item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0), parent });
+			}
+		}
+		Bent { key, arrows, carried, at }
+	}
+}
+
+/// A gesture's preview of one item (`PenPreview` in the app): moved by `dx dy`, and fields shown.
+#[derive(Clone, Debug, Default)]
+pub struct Preview {
+	pub dx: f64,
+	pub dy: f64,
+	pub set: Vec<(String, Option<Value>)>,
 }
