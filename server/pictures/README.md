@@ -31,7 +31,8 @@ HTML; `playwright` for the browser. No other feature.
 6. Limits: one screen is 0.72 of the width tall; 170 words; type under 14px.
 7. A screenshot is drawn from the drawing's file and its cards' pages, in one composed page.
    One unit is one pixel, shrunk until the long side is at most 1,600 px; `scale` multiplies.
-8. `of` is an id, a list of ids, a card's path, or a box. A box shows what touches it, cut to it.
+8. `of` is an id, a list of ids, a card's path, or a box. A box shows what touches it, cut to it;
+   items (or the whole canvas) are framed with 24 px of paper, out to whole units.
    A card's path alone is that card's own page, without the drawing round it.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.

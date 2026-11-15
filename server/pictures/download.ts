@@ -24,7 +24,7 @@ async function canvasOf(ctx: Context, query: URLSearchParams): Promise<string | 
 	if (named) return named;
 	const agent = query.get("agent");
 	if (!agent) return undefined;
-	return (await ctx.call<{ canvas?: string }>("agent.get", { name: agent }).catch(() => undefined))?.canvas;
+	return (await ctx.call<{ canvas?: string }>("agent.get", { agent }).catch(() => undefined))?.canvas;
 }
 
 async function answer(ctx: Context, m: Machine, query: URLSearchParams): Promise<RouteAnswer> {

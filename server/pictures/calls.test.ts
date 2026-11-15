@@ -91,8 +91,8 @@ test("rules 7 and 9: the whole canvas, composed with each card's page, kept in e
 	const s = await start(fake.browser);
 	const shot = await s.value<{ file: string; size: { w: number; h: number }; box: unknown; how: string }>("canvas.screenshot", {}, ann);
 	assert.match(shot.file, /^exports\/screenshots\/work-.*\.png$/);
-	assert.deepEqual(shot.box, { x1: 100, y1: 50, x2: 1300, y2: 950 });
-	assert.deepEqual(shot.size, { w: 1200, h: 900 });
+	assert.deepEqual(shot.box, { x1: 76, y1: 26, x2: 1324, y2: 974 }, "24 px of paper round the items");
+	assert.deepEqual(shot.size, { w: 1248, h: 948 });
 	assert.match(fake.seen[0]!.html[0]!, /<iframe[^>]+src="http:\/\/127\.0\.0\.1:4664\/files\/canvases\/work\/cards\/sales\/index\.html\?pass=/);
 	assert.match(fake.seen[0]!.html[0]!, /Look here/);
 	assert.ok((await s.deck.read(shot.file as never)).length > 0);
@@ -104,7 +104,9 @@ test("rule 7: the long side is 1,600 px at most, and scale multiplies it", async
 	const big = await s.value<{ size: { w: number } }>("canvas.screenshot", { of: { x1: 0, y1: 0, x2: 4000, y2: 1000 }, to: "exports/big.jpg", format: "jpeg" }, ann);
 	assert.equal(big.size.w, 1600);
 	const twice = await s.value<{ size: { w: number } }>("canvas.screenshot", { of: "n1", scale: 2 }, ann);
-	assert.equal(twice.size.w, 400);
+	assert.equal(twice.size.w, (200 + 48) * 2, "an item is framed with 24 px each side, then scaled");
+	const boxed = await s.value<{ box: unknown }>("canvas.screenshot", { of: { x1: 10, y1: 20, x2: 310, y2: 220 } }, ann);
+	assert.deepEqual(boxed.box, { x1: 10, y1: 20, x2: 310, y2: 220 }, "a box is taken as given");
 	await s.close();
 });
 
@@ -194,8 +196,14 @@ test("rule 13: a picture to download is answered as bytes, with its box, and kep
 	assert.ok(JSON.parse(got.headers.get("x-shot-box") ?? "null"), "it says the box it pictured");
 	assert.equal((await s.value<unknown[]>("file.list", { path: "", deep: true })).length, before, "nothing written to the deck");
 	assert.equal((await fetch(`${served.url}/pictures/shot?pass=${served.token}`)).status, 404, "no canvas named");
-	await served.close();
-	await s.close();
+	try {
+		const bob = await s.value<{ id: string }>("agent.attach", { name: "Bob", canvas: "work" });
+		const byAgent = await fetch(`${served.url}/pictures/shot?agent=${bob.id}&scale=1&pass=${served.token}`);
+		assert.equal(byAgent.status, 200, `agent= by id finds that agent's home: ${await byAgent.clone().text()}`);
+	} finally {
+		await served.close();
+		await s.close();
+	}
 });
 
 test("rule 14: posted markup is drawn at the card's own address, with a pass for that origin only", async () => {

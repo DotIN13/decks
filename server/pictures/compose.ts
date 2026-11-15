@@ -45,8 +45,12 @@ function chosen(doc: PenDocument, boxes: Map<string, S.Box>, of: Of): { nodes: P
 		nodes = tops.filter((node) => touches(boxes.get(node.id!)!, box!));
 	}
 	if (nodes.length === 0 && !box) throw new Refused("invalid", "The canvas has nothing on it to picture.", "item.insert");
-	return { nodes, box: box ?? round(nodes.map((n) => boxes.get(n.id!)!)), clip: box !== undefined };
+	return { nodes, box: box ?? framed(round(nodes.map((n) => boxes.get(n.id!)!))), clip: box !== undefined };
 }
+
+/** Items are framed with 24 px of paper round them, out to whole units; a box is taken as given. */
+export const MARGIN = 24;
+const framed = (b: S.Box): S.Box => ({ x1: Math.floor(b.x1 - MARGIN), y1: Math.floor(b.y1 - MARGIN), x2: Math.ceil(b.x2 + MARGIN), y2: Math.ceil(b.y2 + MARGIN) });
 
 function round(boxes: S.Box[]): S.Box {
 	if (!boxes.length) return { x1: 0, y1: 0, x2: 1, y2: 1 };
