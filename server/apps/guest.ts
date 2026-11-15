@@ -1,4 +1,4 @@
-// decks-canvas.js (rule 13): what an app's page needs inside the canvas frame. A sandboxed frame
+// decks-canvas.js (rule 12): what an app's page needs inside the canvas frame. A sandboxed frame
 // has no localStorage, so one stands in: values come in after # as decks-storage and go up as
 // decks-storage messages. A wheel the page cannot use goes up as decks-wheel, so the canvas pans.
 

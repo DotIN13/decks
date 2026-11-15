@@ -3,7 +3,7 @@ import { homedir, tmpdir } from "node:os";
 import { isAbsolute, normalize, sep } from "node:path";
 import { Refused, type Caller } from "../../protocol/index.ts";
 
-// Where an app lives (rules 15 to 18): a source folder outside the deck, which only the person
+// Where an app lives (rules 14 to 17): a source folder outside the deck, which only the person
 // names, because the server runs commands there. File calls never reach it.
 
 export type Source = { path: string; repo?: string };

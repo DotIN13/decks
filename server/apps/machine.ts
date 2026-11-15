@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { watch } from "node:fs";
+import { mkdirSync, watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { connect, createServer } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
@@ -46,6 +46,7 @@ export class Machine {
 		const root = join(this.workdir, name);
 		let watcher: ReturnType<typeof watch> | undefined;
 		try {
+			mkdirSync(join(root, sub), { recursive: true });
 			watcher = watch(join(root, sub), { recursive: true }, (_kind, file) => file && hear(`${sub}/${String(file).split(sep).join("/")}`));
 			watcher.on("error", () => watcher?.close());
 		} catch {
@@ -72,6 +73,12 @@ export class Machine {
 		await mkdir(dirname(file), { recursive: true });
 		await writeFile(file, bytes);
 		return true;
+	}
+
+	/** Remove a file of the copy, when its deck file went. */
+	async drop(name: string, path: string): Promise<void> {
+		const file = this.inside(name, path);
+		if (file && !this.isOutside(name)) await rm(file, { force: true });
 	}
 
 	async read(name: string, path: string): Promise<Uint8Array | undefined> {

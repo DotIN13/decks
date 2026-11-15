@@ -6,7 +6,7 @@ import { pipeTo, send, withoutPass } from "./proxy.ts";
 import type { Apps } from "./service.ts";
 
 // /app/<name>/<path>: a static app's files from the deck, a built app's from
-// its running copy, a server app proxied. Rule 7 of the README.
+// its running copy, a server app proxied. Rule 6 of the README.
 
 const TYPES: Record<string, string> = {
 	html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8",

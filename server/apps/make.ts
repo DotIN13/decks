@@ -8,7 +8,7 @@ import { outsideFolder, personOnly, type Source } from "./source.ts";
 import { starterFiles, type Starter } from "./starters.ts";
 
 // Making an app: from a starter, by cloning, or moving its source out of the deck.
-// A source outside the deck (rules 15 to 18) is named only by the person.
+// A source outside the deck (rules 14 to 17) is named only by the person.
 
 type App = Infer<typeof shapes.App>;
 type Describe = (ctx: Context, apps: Apps, name: string, withRepo?: boolean) => Promise<App>;

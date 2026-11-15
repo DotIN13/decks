@@ -5,7 +5,7 @@ import { sourceOf, type Source } from "./source.ts";
 // An app's name and app.json, read from the deck. Rule 1 of the README.
 
 export type AppKind = "static" | "build" | "server";
-export type Manifest = { title?: string; kind: AppKind; root?: string; install?: string; build?: string; start?: string; prefix?: boolean; idleMinutes?: number; source?: Source };
+export type Manifest = { title?: string; kind: AppKind; root?: string; install?: string; build?: string; start?: string; prefix?: boolean; idleMinutes?: number; source?: Source; data?: string };
 
 export const APP_NAME = /^[a-z0-9][a-z0-9-]{0,47}$/;
 export const APPS = "apps";
@@ -34,6 +34,11 @@ export function parseManifest(name: string, raw: string): Manifest {
 	}
 	if (read.prefix === true) manifest.prefix = true;
 	if (typeof read.idleMinutes === "number" && read.idleMinutes > 0) manifest.idleMinutes = read.idleMinutes;
+	const data = text(read.data)?.replace(/^\.\/|\/+$/g, "");
+	if (data) {
+		if (data.startsWith("/") || data.split("/").some((part) => part === ".." || part.startsWith("."))) throw new Refused("invalid", `apps/${name}/app.json names a data folder outside the app.`, "file.edit");
+		manifest.data = data;
+	}
 	const source = sourceOf(read.source);
 	if (source) manifest.source = source;
 	if (manifest.root && (manifest.root.startsWith("/") || manifest.root.split("/").includes(".."))) {

@@ -3,7 +3,7 @@ import { layout } from "../../protocol/index.ts";
 import type { Context, Kernel, Route, RouteAnswer } from "../kernel/index.ts";
 import { APP_NAME, manifestOf } from "./manifest.ts";
 
-// POST /app-pass/<name> (rule 14): a canvas's frame, on its canvas pass, opens an app placed on
+// POST /app-pass/<name> (rule 13): a canvas's frame, on its canvas pass, opens an app placed on
 // that canvas inside it. The answer is the app's address with an app pass in its path.
 
 export const OPEN = "/app-pass/";

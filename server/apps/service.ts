@@ -4,7 +4,7 @@ import { Logs } from "./logs.ts";
 import { freePort, kill, listening, Machine } from "./machine.ts";
 import { folderOf, manifestOf, sourceFiles, type Manifest } from "./manifest.ts";
 
-// Apps built and run: their state, their jobs and their processes. Rules 2 to 6.
+// Apps built and run: their state, their jobs and their processes. Rules 2 to 5.
 
 export type AppStatus = "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken" | "missing";
 export type Kept = { status?: AppStatus; port?: number; error?: string; at?: number; seenAt?: number; seen?: number };
@@ -31,7 +31,7 @@ export class Apps {
 		this.clock = options.clock ?? Date.now;
 	}
 
-	/** The app's manifest, with where it builds and runs told to the machine. Rule 15. */
+	/** The app's manifest, with where it builds and runs told to the machine. Rule 14. */
 	async manifest(name: string): Promise<Manifest> {
 		const manifest = await manifestOf(this.deck, name);
 		this.machine.place(name, manifest.source?.path);
@@ -171,7 +171,7 @@ export class Apps {
 		const ready = listening(port, START_MS, () => gone);
 		const live: Running = { child, port, ready };
 		this.running.set(name, live);
-		this.keepData(name, live);
+		this.keepData(name, live, manifest.data ?? "data");
 		child.on("exit", (code, signal) => {
 			gone = true;
 			if (this.running.get(name) !== live) return;
@@ -188,13 +188,29 @@ export class Apps {
 		return true;
 	}
 
-	/** An in-deck app's data/ folder, written in its copy while it runs, is written back to the deck. */
-	private keepData(name: string, live: Running): void {
+	/** An in-deck app's data folder (rule 2) is the deck's: what the app writes there in its copy is
+	 *  written to the deck, and what a call writes there in the deck reaches the copy, while it runs. */
+	private keepData(name: string, live: Running, data: string): void {
 		if (this.machine.isOutside(name)) return;
 		const by = { kind: "app" as const, id: name, name };
-		live.unwatch = this.machine.watchCopy(name, "data", (path) => {
-			void this.machine.read(name, path).then((bytes) => bytes && this.deck.write(toDeckPath(`${folderOf(name)}/${path}`), bytes, by)).catch(() => {});
+		const folder = `${folderOf(name)}/${data}/`;
+		const toDeck = this.machine.watchCopy(name, data, (path) => void this.backToDeck(name, path, by));
+		const fromDeck = this.deck.watch((change) => {
+			if (!change.path.startsWith(folder) || change.by === name) return;
+			const inner = change.path.slice(folderOf(name).length + 1);
+			if (change.kind === "deleted") void this.machine.drop(name, inner);
+			else void this.deck.read(change.path).then((bytes) => this.machine.put(name, inner, bytes)).catch(() => {});
 		});
+		live.unwatch = () => (toDeck(), fromDeck());
+	}
+
+	private async backToDeck(name: string, path: string, by: { kind: "app"; id: string; name: string }): Promise<void> {
+		const at = toDeckPath(`${folderOf(name)}/${path}`);
+		const bytes = await this.machine.read(name, path);
+		if (!bytes) return void (await this.deck.remove(at, by).catch(() => {}));
+		const had = await this.deck.read(at).catch(() => undefined);
+		if (had && Buffer.compare(Buffer.from(had), Buffer.from(bytes)) === 0) return;
+		await this.deck.write(at, bytes, by).catch(() => {});
 	}
 
 	/** Stop a server app's process group; answers whether one was running. */
@@ -222,7 +238,7 @@ export class Apps {
 		return (await this.run(name)) ? this.running.get(name)?.port : undefined;
 	}
 
-	/** Put to sleep every server app unseen for its idleMinutes. Rule 6. */
+	/** Put to sleep every server app unseen for its idleMinutes. Rule 5. */
 	async sleepUnseen(): Promise<void> {
 		for (const name of [...this.running.keys()]) {
 			const minutes = (await this.manifest(name).catch(() => undefined))?.idleMinutes ?? IDLE_MINUTES;
