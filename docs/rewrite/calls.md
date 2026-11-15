@@ -161,7 +161,7 @@ Who works on the deck: its name, avatar, home canvas, tags and inbox.
 | new | | `agent.host` | person | New: a client says which kinds of agent it can start. |
 | `agent.inbox` | agents | `agent.inbox` | agent | Unchanged. |
 | `agent.list` | agents | `agent.list` | anyone | Unchanged. |
-| `agent.me` | agents | `agent.me` | agent | Unchanged. |
+| `agent.me` | agents | `agent.me` | person, agent | For the person (since 0.13.0), the agent whose conversation is on their screen. |
 | new | | `agent.news` | agent | New: what changed on your canvas since you last asked, and your mail. |
 | `agent.queue` | agents | `agent.queue` | person, agent, app | Answers the Message, with its place in the queue. |
 | `agent.remove` | person | `agent.delete` | person | Renamed. |

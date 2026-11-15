@@ -8,7 +8,7 @@ import { AGENT, ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
 const Name = str("An agent's name or id.");
 
-export const me = defineCall({ name: "agent.me", summary: "You: name, avatar, colour, workspace, tags and home canvas.", who: AGENT, args: {}, answer: Agent, effect: "read" });
+export const me = defineCall({ name: "agent.me", summary: "You: name, avatar, colour, workspace, tags and home canvas; for the person, the agent whose conversation is on their screen.", who: PEOPLE, args: {}, answer: Agent, effect: "read" });
 
 export const list = defineCall({
 	name: "agent.list",
