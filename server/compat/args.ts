@@ -72,7 +72,10 @@ function shaped(now: string, old: string, args: Args): Args {
 	if (now === "item.batch" && Array.isArray(args.ops)) args.ops = args.ops.map(itemOp);
 	if (now === "canvas.undo") return { ...(args.canvas ? { canvas: args.canvas } : {}), redo: args.direction === "redo" };
 	if (old === "canvas.edit" && Array.isArray(args.ops)) args.ops = args.ops.map(itemOp);
-	if (now === "file.url" && typeof args.file === "string" && args.path === undefined) args.path = args.file;
+	if (now === "file.url" && typeof args.file === "string") {
+		if (args.path === undefined) args.path = args.file;
+		delete args.file;
+	}
 	// Today's view.move took the camera as one object; the new call takes x, y and zoom.
 	if (now === "view.move" && isObject(args.camera)) {
 		const { camera, ...rest } = args;

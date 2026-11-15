@@ -42,6 +42,8 @@ test("old arguments in order become the new call's, options spread", () => {
 	assert.ok(!("refusal" in insert) && (insert.args.at as { x: number }).x === 1);
 	const upd = turn("canvas.update", ["n", { set: { fill: "#fff" }, at: { x1: 1, y1: 2 } }]);
 	assert.ok(!("refusal" in upd) && (upd.args.set as { fill: string }).fill === "#fff" && (upd.args.at as { x: number }).x === 1 && upd.args.change === undefined);
+	const url = turn("file.url", ["exports/a.html"]);
+	assert.ok(!("refusal" in url) && url.args.path === "exports/a.html" && url.args.file === undefined);
 	const one = turn("canvas.read", [{ canvas: "c", of: "n", depth: 0 }]);
 	assert.ok(!("refusal" in one) && one.name === "item.get" && one.args.id === "n" && one.args.of === undefined);
 	assert.deepEqual(answerBack("canvas.read", { id: "n" }), { items: [{ id: "n" }] });
