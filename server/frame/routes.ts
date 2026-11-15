@@ -49,8 +49,8 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 		async serve(_ctx, req, res) {
 			const [path, query = ""] = (req.url ?? "").split("?");
 			const [pass = "", kind = "", ...parts] = path!.slice(PASS_ROOT.length).split("/");
-			// A card's folder at a revision (cards/plan@3/) is the folder.
-			const rest = decodeURIComponent(parts.join("/")).replace(/@\d+(?=\/)/g, "");
+			// A canvas's lib/ is the deck's lib/, as today (servedAs); a card's folder at a revision is the folder.
+			const rest = decodeURIComponent(parts.join("/")).replace(/@\d+(?=\/)/g, "").replace(/^(?:shared\/)?canvases\/(?:[^/]+\/)+?lib\//, "lib/");
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];

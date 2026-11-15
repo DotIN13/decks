@@ -54,3 +54,13 @@ test("a card asked at a revision is the card's folder", async () => {
 	await doors.close();
 	await server.close();
 });
+
+test("a canvas's lib/ on a pass is the deck's lib/", async () => {
+	const server = await testServer({ features: features(), deck: { ...deck, "lib/card.css": "body{}" } });
+	const doors = await server.listen(0);
+	const got = (await (await fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify({ canvas: "plan" }) })).json()) as { pass: string };
+	const css = await fetch(`${doors.url}/api/t/${got.pass}/card/canvases/plan/lib/card.css`);
+	assert.equal(css.status, 200);
+	await doors.close();
+	await server.close();
+});
