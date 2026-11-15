@@ -14,7 +14,7 @@ const RUNS = "/Users/dotin13/Documents/DotGit/dotty-programs/decks/data/decks/ca
 /** Today's code the new folders replaced, each with its new home and what proves it. */
 export const REPLACED = [
 	{ old: "apps/server", home: "server/ (Decks-local) and harness/ (agents)", proof: "node tools/check.mjs server, node tools/check.mjs harness; the 76 browser checks of stop 3" },
-	{ old: "apps/web", home: "harness/page", proof: "the page checks of stop 3 (shell, panel, chrome, agents-tab, ...)" },
+	{ old: "apps/web", home: "harness/page", proof: "the page checks of stop 3 (shell, panel, chrome, agents-tab, ...)", keep: { "apps/web/scripts/stage-backends.ts": "the engine's goldens on three backends, which the stage-goldens check runs; it goes with packages/stage (Loom's step 3)", "apps/web/scripts/gen-font-coverage.mjs": "writes packages/canvas/src/look/font-coverage.ts; it goes with the canvas library (Loom's step 4a)" } },
 	{ old: "packages/api", home: "protocol/ (calls/, the one table)", proof: "node tools/check.mjs protocol; server/compat/names.test.ts (all 117 old calls)" },
 	{ old: "packages/protocol", home: "protocol/ (events, wire)", proof: "node tools/check.mjs protocol; compat's 43 old events" },
 	{ old: "packages/sync-protocol", home: "protocol/sync.ts", proof: "node tools/check.mjs protocol" },

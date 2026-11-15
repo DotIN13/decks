@@ -3,8 +3,8 @@
 // Without --dry it carries the plan out as commits, the gates passing after each; it refuses to
 // unless given --stop-3-passed, which Mason says when stop 3 passes. Nothing in any deck is touched.
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, posix } from "node:path";
 import { compatNames, lanesNeeded, plan, ROOT, rootFiles, specifier } from "./plan.mjs";
 import { render } from "./render.mjs";
 
@@ -23,37 +23,55 @@ function gates() {
 	if (r.status !== 0) throw new Error(`the gates fail; stopping here:\n${r.stdout.split("\n").filter((l) => /FAIL|^\s{6}\S/.test(l)).slice(0, 20).join("\n")}`);
 }
 
-/** A moved check's ../ imports point at tools/checks, where the helpers they name now live. */
-function rewriteImports(file, helpers) {
-	const text = readFileSync(join(ROOT, file), "utf8");
-	const next = text.replace(/(["'])\.\.\/([\w.-]+\.mjs)\1/g, (all, q, name) => {
-		helpers.add(name);
-		const to = relative(dirname(join(ROOT, file)), join(ROOT, "tools/checks", name));
-		return `${q}${to.startsWith(".") ? to : `./${to}`}${q}`;
-	});
-	writeFileSync(join(ROOT, file), next);
+/** Where a target the old place named lives after the switch: moved files, the fixture, the page's icon. */
+const RETARGET = [["e2e/fixture/decks/", "tools/fixtures/deck/"], ["apps/web/public/", "harness/page/public/"]];
+
+/**
+ * A moved file's relative paths, read from its old place and written from its new one: imports and
+ * dynamic imports, and the paths it joins to its own address (new URL(…, import.meta.url),
+ * join/resolve(dirname(fileURLToPath(import.meta.url)), …)). A path to another moved file names its new place.
+ */
+export function relocate(text, from, to, moves) {
+	const fix = (rel) => {
+		let target = posix.normalize(posix.join(posix.dirname(from), rel));
+		if (target.startsWith("..")) return rel;
+		target = moves.get(target) ?? target;
+		for (const [old, now] of RETARGET) if (target.startsWith(old)) target = now + target.slice(old.length);
+		const back = posix.relative(posix.dirname(to), target) || ".";
+		return `${back.startsWith(".") ? back : `./${back}`}${rel.endsWith("/") && !back.endsWith("/") ? "/" : ""}`;
+	};
+	const quoted = (q, rel) => `${q}${fix(rel)}${q}`;
+	return text
+		.replace(/(\bfrom\s*|\bimport\s*\(\s*|^import\s*)(["'])(\.\.?\/[^"']*)\2/gm, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`)
+		.replace(/(new URL\(\s*)(["'`])(\.\.?\/[^"'`]*)\2(\s*,\s*import\.meta\.url)/g, (all, lead, q, rel, tail) => `${lead}${quoted(q, rel)}${tail}`)
+		.replace(/((?:join|resolve)\(\s*dirname\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)\s*,\s*)(["'`])(\.\.?\/[^"'`]*)\2/g, (all, lead, q, rel) => `${lead}${quoted(q, rel)}`);
 }
 
+/** The helpers every check shares, beside the runner after the switch. */
+const HELPERS = ["harness.mjs", "backends-kit.mjs", "awake-canvas.mjs", "perf-canvas.mjs", "fake-model.mjs"];
+
 function moveChecks(p) {
-	const helpers = new Set(["harness.mjs"]);
-	for (const m of p.checks.moved) {
-		mkdirSync(dirname(join(ROOT, m.to)), { recursive: true });
-		git("mv", `e2e/checks/${m.check}.mjs`, m.to);
-		rewriteImports(m.to, helpers);
+	const moves = new Map([...p.checks.moved.map((m) => [`e2e/checks/${m.check}.mjs`, m.to]), ...HELPERS.filter((h) => existsSync(join(ROOT, "e2e", h))).map((h) => [`e2e/${h}`, `tools/checks/${h}`])]);
+	for (const [from, to] of moves) {
+		mkdirSync(dirname(join(ROOT, to)), { recursive: true });
+		git("mv", from, to);
 	}
-	for (const name of helpers) if (existsSync(join(ROOT, "e2e", name))) copyFileSync(join(ROOT, "e2e", name), join(ROOT, "tools/checks", name));
-	// The fake model and agent the agent checks drive Pi with move beside the runner, which looks there first.
-	for (const name of ["fake-model.mjs", "fake-agent"]) git("mv", `e2e/${name}`, `tools/checks/${name}`);
-	const harness = join(ROOT, "tools/checks/harness.mjs");
-	writeFileSync(harness, readFileSync(harness, "utf8").replace("./fixture/decks/", "../fixtures/deck/"));
-	// Each check's place is a field beside its others in checks.json.
+	git("mv", "e2e/fake-agent", "tools/checks/fake-agent");
+	for (const [from, to] of moves) {
+		const file = join(ROOT, to);
+		const text = readFileSync(file, "utf8");
+		const next = relocate(text, from, to, moves);
+		if (next !== text) writeFileSync(file, next);
+	}
+	// Each check's place is a field beside its others in checks.json; its baseline keys move with it.
 	const file = join(ROOT, "tools/checks/checks.json");
 	const json = JSON.parse(readFileSync(file, "utf8"));
 	for (const m of p.checks.moved) json.checks[m.check] = { ...(json.checks[m.check] ?? {}), path: m.to };
 	writeFileSync(file, `${JSON.stringify(json, null, "\t")}\n`);
+	execFileSync(process.execPath, ["tools/gates/rekey.mjs", ...[...moves].flat(), "e2e/fake-agent", "tools/checks/fake-agent"], { cwd: ROOT, stdio: "inherit" });
 	gates();
-	const paths = [...p.checks.moved.flatMap((m) => [m.to, `e2e/checks/${m.check}.mjs`]), ...[...helpers].map((h) => `tools/checks/${h}`), "e2e/fake-model.mjs", "e2e/fake-agent", "tools/checks/fake-model.mjs", "tools/checks/fake-agent", "tools/checks/checks.json"];
-	commit(paths, "Move every browser check to the feature that owns it", "Stop 3's checks go to their owners' features, the agent checks to tools/checks/agent, the benches to tools/checks/bench, the rest by what they exercise; each ../ import points at tools/checks, and nothing else in a check changes. tools/checks/checks.json gives each its path; the fake model and agent move beside the runner.");
+	const paths = [...[...moves].flat(), "e2e/fake-agent", "tools/checks/fake-agent", "tools/checks/checks.json", "tools/gates/baseline"];
+	commit(paths, "Move every browser check to the feature that owns it", "Stop 3's checks go to their owners' features, the agent checks to tools/checks/agent, the benches to tools/checks/bench, the rest by what they exercise; the shared helpers, the fake model and agent go beside the runner. Each moved file's relative paths are read from its old place and written from its new one, the fixture now tools/fixtures/deck and the page's icon harness/page/public; nothing else in a check changes. tools/checks/checks.json gives each its path, and the gate baselines' keys move with the files.");
 }
 
 function deleteOld(p) {
