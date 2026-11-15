@@ -34,7 +34,8 @@
 		"harness/README.md",
 		"server/frame/",
 		"server/compat/",
-		"server/upgrade/"
+		"server/upgrade/",
+		"tools/switch/"
 	],
 	"Keel": [
 		"server/kernel/",
@@ -79,5 +80,8 @@
 		"packages/stage/crates/apple/",
 		"packages/stage/Cargo.toml",
 		"packages/stage/Cargo.lock"
+	],
+	"Loom": [
+		"docs/rewrite/loom/"
 	]
 }

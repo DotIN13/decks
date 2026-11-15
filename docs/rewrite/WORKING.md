@@ -103,3 +103,14 @@ with an avatar you draw. Then read `DESIGN.md`, this file, and your brief.
   each commit. Neither is heavy.
 - **Ports**: Lexicon 4600 to 4609, Keel 4620 to 4629, Easel 4630 to 4639, Folio 4640 to 4649, Roster
   4650 to 4659.
+
+## Say when you are done, and do not hold the lock
+
+Mason sees your commits and your messages, not your state. Two rules, added on 2026-11-14 after work
+sat waiting for an hour:
+
+- When a step someone waits on is done, send it at once:
+  `decks agent send Mason --task '<your name> done: <what, the commit, what you ran>'`.
+  A report at the end of a turn does not reach Mason.
+- Take the heavy lock for one run, never for a loop of runs. Ten runs are ten takes, so others get a
+  turn between them. Write what you wait for in your progress file's `doing` before you wait.
