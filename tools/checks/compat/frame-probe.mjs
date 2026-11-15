@@ -21,10 +21,11 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	page.on("requestfailed", (r) => said.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText ?? ""}`));
 	page.on("response", (r) => r.status() >= 400 && said.push(`${r.status()}: ${r.url().slice(0, 160)}`));
 	// The page's own /canvas-frame.html is replaced by the one server/frame serves.
+	// Sent on to Decks-local rather than fulfilled here: a fulfilled answer has no address, and
+	// the browser then treats the frame as a public page that may not reach loopback.
 	await page.route("**/canvas-frame.html*", async (route) => {
-		const answer = await fetch(`http://127.0.0.1:${ports.server}/canvas-frame.html`);
-		served.push(answer.status);
-		await route.fulfill({ status: answer.status, headers: Object.fromEntries(answer.headers), body: Buffer.from(await answer.arrayBuffer()) });
+		served.push(new URL(route.request().url()).port);
+		await route.continue({ url: `http://127.0.0.1:${ports.server}/canvas-frame.html` });
 	});
 	await page.goto(`http://127.0.0.1:${ports.web}/`);
 	let frame;
@@ -33,7 +34,7 @@ const result = await runPrograms(async ({ ports, deck }) => {
 		if (frame && !(await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) frame = undefined;
 		if (!frame) await page.waitForTimeout(150);
 	}
-	if (!frame) throw new Error(`the frame never showed its stage (frame page answered ${served.join(",") || "never"})\n${said.slice(0, 30).join("\n")}`);
+	if (!frame) throw new Error(`the frame never showed its stage (frame page asked ${served.length} times)\n${said.slice(0, 30).join("\n")}`);
 	const before = xOf(deck);
 	const host = await frame.evaluate((path) => {
 		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === path);
