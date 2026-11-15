@@ -1,0 +1,12 @@
+{
+	"file": "packages/ink/src/ink.ts",
+	"at": "canvas/ink/shaper.ts",
+	"pattern": "pure logic, split by topic; `inkShaper` (112 lines) is cut in two",
+	"scope": null,
+	"targets": {
+		"outline.ts": ["outline", "centreLine", "strokeShape", "widthAt", "toPts", "Pt", "f", "round1", "simplify", "segmentDistance", "InkBox", "inkBounds"],
+		"history.ts": ["InkHistory", "HISTORY_DEPTH", "inkHistory", "inkCommit", "inkUndo", "inkRedo", "hitStroke", "insidePolygon", "lassoPick", "moveStroke"]
+	},
+	"rest": "shaper.ts",
+	"note": "`shaper.ts` keeps the colours, `InkStroke` and `inkShaper`; picking (hit, lasso) goes with the history, the edits made to strokes after they are drawn."
+}

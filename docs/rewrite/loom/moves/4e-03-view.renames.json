@@ -1,0 +1,14 @@
+[
+	{
+		"from": "canvas/stage/Stage.tsx",
+		"to": "canvas/view/CanvasView.tsx"
+	},
+	{
+		"from": "canvas/stage/items-layer.tsx",
+		"to": "canvas/view/items-layer.tsx"
+	},
+	{
+		"from": "canvas/stage/selection.tsx",
+		"to": "canvas/view/selection.tsx"
+	}
+]

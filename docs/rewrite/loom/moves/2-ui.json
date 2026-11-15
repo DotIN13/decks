@@ -48,7 +48,7 @@
 			"values": {
 				"scripts": {
 					"typecheck": "tsc -p tsconfig.json --noEmit",
-					"test": "node --import tsx --test \"*.test.ts\" \"float/*.test.ts\""
+					"test": "node --import tsx --test \"**/*.test.ts\""
 				}
 			}
 		}
@@ -61,11 +61,11 @@
 	"create": [
 		{
 			"file": "ui/README.md",
-			"from": "readmes/ui.md"
+			"from": "readmes/ui.txt"
 		},
 		{
 			"file": "ui/float/README.md",
-			"from": "readmes/ui-float.md"
+			"from": "readmes/ui-float.txt"
 		}
 	],
 	"then": [

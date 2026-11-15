@@ -1,0 +1,93 @@
+{
+	"file": "packages/canvas/src/cards/CardEditor.tsx",
+	"at": "canvas/cards/CardEditor.tsx",
+	"pattern": "a page part: model, view and actions in cards/editor/; the CardEditor component keeps its props, its signals and the wiring, and each part takes them as one ctx",
+	"scope": "CardEditor",
+	"targets": {
+		"editor/model.ts": [
+			"ZW",
+			"h",
+			"atom",
+			"fontSpan",
+			"block",
+			"build",
+			"INLINE",
+			"BLOCKS",
+			"STYLES",
+			"Style",
+			"CUT",
+			"BLOCK",
+			"BLOCK_NAMES",
+			"blockKind",
+			"splitAround",
+			"cut"
+		],
+		"editor/inline.ts": [
+			"inline",
+			"piece",
+			"url",
+			"suggestion",
+			"list"
+		],
+		"editor/style.ts": [
+			"restyle",
+			"style",
+			"setBlock",
+			"insertBlock",
+			"unwrap"
+		],
+		"editor/markup.ts": [
+			"out",
+			"outList",
+			"wrapNode",
+			"outBlock",
+			"serialise",
+			"sel",
+			"topOf",
+			"placeAfter"
+		],
+		"editor/view.tsx": [
+			"ReturnStatement@1372",
+			"placeBar",
+			"showBar",
+			"toggleMenu",
+			"closeMenus",
+			"settleBar",
+			"lineSlot",
+			"textSlot",
+			"hideMarks",
+			"BLOCK_MENU",
+			"SIZE_MENU",
+			"SIX",
+			"SELECTION_PAUSE_MS"
+		],
+		"editor/actions.ts": [
+			"onInput",
+			"changed",
+			"travel",
+			"onPaste",
+			"wanted",
+			"selecting",
+			"onClick",
+			"onDblClick",
+			"caretInto",
+			"commit",
+			"onFocusOut",
+			"appendWords"
+		],
+		"editor/actions-press.ts": [
+			"onKeyDown",
+			"onPointerDown",
+			"onPointerMove",
+			"endDrag",
+			"dragging",
+			"ghost",
+			"press",
+			"target",
+			"local",
+			"ExpressionStatement@1249"
+		]
+	},
+	"rest": "CardEditor.tsx",
+	"note": "Beside map.md: a block's inline runs (editor/inline.ts), styling a block (editor/style.ts) and presses, keys and drags (editor/actions-press.ts) are files of their own. The mount effect (today's statement at line 1249) goes with the presses it wires. CardEditor.tsx keeps the props, the signals and calls each part."
+}

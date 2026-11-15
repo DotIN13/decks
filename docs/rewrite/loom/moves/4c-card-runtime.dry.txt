@@ -1,0 +1,198 @@
+# Step 4c-card-runtime: canvas/cards/runtime/: card-host folds into the canvas library; vendored libraries leave git, copied at install
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing was moved.
+
+- files moved by git mv: 18
+- files taken out of git (moved on disk): 99
+- files deleted: 2
+- files edited or created: 14
+- import lines rewritten: 10
+- warnings: 0
+
+## Taken out of git
+
+- packages/card-host/lib/VENDORED.md
+- packages/card-host/lib/d3.min.js
+- packages/card-host/lib/fonts/KaTeX_AMS-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_AMS-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_AMS-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Bold.ttf
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Bold.woff
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Bold.woff2
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Caligraphic-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Bold.ttf
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Bold.woff
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Bold.woff2
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Fraktur-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Main-Bold.ttf
+- packages/card-host/lib/fonts/KaTeX_Main-Bold.woff
+- packages/card-host/lib/fonts/KaTeX_Main-Bold.woff2
+- packages/card-host/lib/fonts/KaTeX_Main-BoldItalic.ttf
+- packages/card-host/lib/fonts/KaTeX_Main-BoldItalic.woff
+- packages/card-host/lib/fonts/KaTeX_Main-BoldItalic.woff2
+- packages/card-host/lib/fonts/KaTeX_Main-Italic.ttf
+- packages/card-host/lib/fonts/KaTeX_Main-Italic.woff
+- packages/card-host/lib/fonts/KaTeX_Main-Italic.woff2
+- packages/card-host/lib/fonts/KaTeX_Main-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Main-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Main-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Math-BoldItalic.ttf
+- packages/card-host/lib/fonts/KaTeX_Math-BoldItalic.woff
+- packages/card-host/lib/fonts/KaTeX_Math-BoldItalic.woff2
+- packages/card-host/lib/fonts/KaTeX_Math-Italic.ttf
+- packages/card-host/lib/fonts/KaTeX_Math-Italic.woff
+- packages/card-host/lib/fonts/KaTeX_Math-Italic.woff2
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Bold.ttf
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Bold.woff
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Bold.woff2
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Italic.ttf
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Italic.woff
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Italic.woff2
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_SansSerif-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Script-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Script-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Script-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Size1-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Size1-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Size1-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Size2-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Size2-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Size2-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Size3-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Size3-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Size3-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Size4-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Size4-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Size4-Regular.woff2
+- packages/card-host/lib/fonts/KaTeX_Typewriter-Regular.ttf
+- packages/card-host/lib/fonts/KaTeX_Typewriter-Regular.woff
+- packages/card-host/lib/fonts/KaTeX_Typewriter-Regular.woff2
+- packages/card-host/lib/hljs.bundle.mjs
+- packages/card-host/lib/katex-auto-render.min.js
+- packages/card-host/lib/katex.min.css
+- packages/card-host/lib/katex.min.js
+- packages/card-host/lib/marked.umd.js
+- packages/card-host/lib/mermaid.bundle.mjs
+- packages/card-host/lib/pdf.min.mjs
+- packages/card-host/lib/pdf.worker.min.mjs
+- packages/card-host/lib/standard_fonts/FoxitDingbats.pfb
+- packages/card-host/lib/standard_fonts/FoxitFixed.pfb
+- packages/card-host/lib/standard_fonts/FoxitFixedBold.pfb
+- packages/card-host/lib/standard_fonts/FoxitFixedBoldItalic.pfb
+- packages/card-host/lib/standard_fonts/FoxitFixedItalic.pfb
+- packages/card-host/lib/standard_fonts/FoxitSerif.pfb
+- packages/card-host/lib/standard_fonts/FoxitSerifBold.pfb
+- packages/card-host/lib/standard_fonts/FoxitSerifBoldItalic.pfb
+- packages/card-host/lib/standard_fonts/FoxitSerifItalic.pfb
+- packages/card-host/lib/standard_fonts/FoxitSymbol.pfb
+- packages/card-host/lib/standard_fonts/LICENSE_FOXIT
+- packages/card-host/lib/standard_fonts/LICENSE_LIBERATION
+- packages/card-host/lib/standard_fonts/LiberationSans-Bold.ttf
+- packages/card-host/lib/standard_fonts/LiberationSans-BoldItalic.ttf
+- packages/card-host/lib/standard_fonts/LiberationSans-Italic.ttf
+- packages/card-host/lib/standard_fonts/LiberationSans-Regular.ttf
+- packages/card-host/lib/wasm/LICENSE_JBIG2
+- packages/card-host/lib/wasm/LICENSE_OPENJPEG
+- packages/card-host/lib/wasm/LICENSE_PDFJS_JBIG2
+- packages/card-host/lib/wasm/LICENSE_PDFJS_OPENJPEG
+- packages/card-host/lib/wasm/LICENSE_PDFJS_QCMS
+- packages/card-host/lib/wasm/LICENSE_QCMS
+- packages/card-host/lib/wasm/jbig2.wasm
+- packages/card-host/lib/wasm/jbig2_nowasm_fallback.js
+- packages/card-host/lib/wasm/openjpeg.wasm
+- packages/card-host/lib/wasm/openjpeg_nowasm_fallback.js
+- packages/card-host/lib/wasm/qcms_bg.wasm
+- packages/card-host/lib/wasm/quickjs-eval.js
+- packages/card-host/lib/wasm/quickjs-eval.wasm
+
+## Deleted
+
+- packages/card-host/package.json
+- packages/card-host/tsconfig.json
+
+## Moved
+
+- packages/card-host/lib/card.css -> canvas/cards/runtime/lib/card.css
+- packages/card-host/lib/card.js -> canvas/cards/runtime/lib/card.js
+- packages/card-host/lib/live-app.js -> canvas/cards/runtime/lib/live-app.js
+- packages/card-host/lib/live-doc.js -> canvas/cards/runtime/lib/live-doc.js
+- packages/card-host/lib/live-web.js -> canvas/cards/runtime/lib/live-web.js
+- packages/card-host/lib/theme.css -> canvas/cards/runtime/lib/theme.css
+- packages/card-host/lib/type/InterVariable-Italic.woff2 -> canvas/cards/runtime/lib/type/InterVariable-Italic.woff2
+- packages/card-host/lib/type/InterVariable.woff2 -> canvas/cards/runtime/lib/type/InterVariable.woff2
+- packages/card-host/lib/type/JetBrainsMono-Bold.woff2 -> canvas/cards/runtime/lib/type/JetBrainsMono-Bold.woff2
+- packages/card-host/lib/type/JetBrainsMono-Italic.woff2 -> canvas/cards/runtime/lib/type/JetBrainsMono-Italic.woff2
+- packages/card-host/lib/type/JetBrainsMono-Medium.woff2 -> canvas/cards/runtime/lib/type/JetBrainsMono-Medium.woff2
+- packages/card-host/lib/type/JetBrainsMono-Regular.woff2 -> canvas/cards/runtime/lib/type/JetBrainsMono-Regular.woff2
+- packages/card-host/lib/type/NOTICE.md -> canvas/cards/runtime/lib/type/NOTICE.md
+- packages/card-host/src/cards.ts -> canvas/cards/runtime/cards.ts
+- packages/card-host/src/index.ts -> canvas/cards/runtime/index.ts
+- packages/card-host/src/sandbox.ts -> canvas/cards/runtime/sandbox.ts
+- packages/card-host/test/card-host.test.ts -> canvas/cards/runtime/runtime.test.ts
+- scripts/vendor.mjs -> canvas/cards/runtime/vendor.mjs
+
+## Lines rewritten
+
+canvas/items/card-surface.tsx:62
+  - * `@decks/card-host`): what it imports beside it is then a new address at each version. A page keeps
+  + * `@decks/canvas/cards-runtime`): what it imports beside it is then a new address at each version. A page keeps
+examples/share-site/packed/site.mjs:12
+  - import { libFile, LIVE_CARD_HEADERS } from "@decks/card-host";
+  + import { libFile, LIVE_CARD_HEADERS } from "@decks/canvas/cards-runtime";
+examples/share-site/src/server.ts:5
+  - import { LIVE_CARD_HEADERS, libFile } from "@decks/card-host";
+  + import { LIVE_CARD_HEADERS, libFile } from "@decks/canvas/cards-runtime";
+canvas/cards/runtime/runtime.test.ts:3
+  - import { libFile, libName, passes } from "../src/index.ts";
+  + import { libFile, libName, passes } from "./index.ts";
+scripts/live-doc.mjs:2
+  - * Bundle the document page into `packages/card-host/lib/live-doc.js`, the one module a `[data-live="doc"]`
+  + * Bundle the document page into `canvas/cards/runtime/lib/live-doc.js`, the one module a `[data-live="doc"]`
+scripts/live-doc.mjs:23
+  - console.log("[live-doc] packages/card-host/lib/live-doc.js");
+  + console.log("[live-doc] canvas/cards/runtime/lib/live-doc.js");
+scripts/public-entries.test.mjs:50
+  - "@decks/card-host": ["LIVE_CARD_HEADERS", "cardModuleOf", "cardModules", "contentType", "libFile", "passes", "unstampCard"],
+  + "@decks/canvas/cards-runtime": ["LIVE_CARD_HEADERS", "cardModuleOf", "cardModules", "contentType", "libFile", "passes", "unstampCard"],
+canvas/cards/runtime/vendor.mjs:2
+  - * Put the board primitives into `card-host/lib`, from the packages in node_modules.
+  + * Put the board primitives into `canvas/cards/runtime/lib`, from the packages in node_modules.
+server/cards/cards.test.ts:104
+  - const root = new URL("../../packages/card-host/lib/", import.meta.url).pathname;
+  + const root = new URL("../../canvas/cards/runtime/lib/", import.meta.url).pathname;
+server/main.ts:51
+  - const folder = fileURLToPath(new URL("../packages/card-host/lib", import.meta.url));
+  + const folder = fileURLToPath(new URL("../canvas/cards/runtime/lib", import.meta.url));
+
+## Files the table edits or creates
+
+- canvas/cards/runtime/index.ts
+- canvas/package.json
+- examples/share-site/package.json
+- package.json
+- canvas/cards/runtime/lib/.gitignore
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- docs/REORGANIZATION.md: 2
+- scripts/README.md: 2
+
+## Then run
+
+- before: scripts/vendor.mjs and scripts/live-doc.mjs kept by the switch-over (or found at their tools/ home and the table's from paths changed)
+- node tools/heavy.mjs --wait -- npm install (its postinstall copies the vendored libraries into canvas/cards/runtime/lib)
+- diff the copied files against git's last copy: the same bytes (pinned versions)
+- node tools/check.mjs canvas && node tools/check.mjs server
+- node tools/gates/run.mjs (built: the 8 card-host lib entries gone)
+- node tools/checks/run.mjs card-tab, card-links, card-keys, card-copy, media (one slot each)
+- commit with REWRITE_AGENT=Loom: Fold the card runtime into canvas/cards/runtime/

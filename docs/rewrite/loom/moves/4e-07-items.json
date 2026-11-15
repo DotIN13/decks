@@ -1,0 +1,61 @@
+{
+	"step": "4e-07-items",
+	"title": "Regroup canvas: file drops and kinds join items/",
+	"moves": [
+		{
+			"from": "canvas/model/file-drop.ts",
+			"to": "canvas/items/file-drop.ts"
+		},
+		{
+			"from": "canvas/model/file-drop.test.ts",
+			"to": "canvas/items/file-drop.test.ts"
+		},
+		{
+			"from": "canvas/model/file-kinds.ts",
+			"to": "canvas/items/file-kinds.ts"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"paths": [
+		{
+			"file": "canvas/editor/core/imports.test.ts",
+			"replace": [
+				{
+					"from": "\"../../model/file-kinds.ts\"",
+					"to": "\"../../items/file-kinds.ts\""
+				},
+				{
+					"from": "model/file-kinds.ts and",
+					"to": "items/file-kinds.ts and"
+				}
+			]
+		}
+	],
+	"create": [
+		{
+			"file": "canvas/items/README.md",
+			"from": "readmes/canvas-items.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-07-items.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: drop-lands, media (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: file drops and kinds join items/"
+	]
+}

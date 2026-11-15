@@ -1,0 +1,45 @@
+{
+	"step": "4e-12-readmes",
+	"title": "Regroup canvas: READMEs for render/, look/, documents/ and the whole folder",
+	"moves": [],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"create": [
+		{
+			"file": "canvas/render/README.md",
+			"from": "readmes/canvas-render.txt"
+		},
+		{
+			"file": "canvas/look/README.md",
+			"from": "readmes/canvas-look.txt"
+		},
+		{
+			"file": "canvas/documents/README.md",
+			"from": "readmes/canvas-documents.txt"
+		},
+		{
+			"file": "canvas/README.md",
+			"from": "readmes/canvas-final.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-12-readmes.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: none (READMEs only) (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: READMEs for render/, look/, documents/ and t"
+	]
+}

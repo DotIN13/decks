@@ -1,0 +1,56 @@
+# Step 4e-02-camera: Regroup canvas: camera/stage-ops.ts becomes camera/view-calls.ts
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries. Nothing was moved.
+
+- files moved by git mv: 2
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 6
+- import lines rewritten: 6
+- warnings: 0
+
+## Moved
+
+- canvas/camera/stage-ops.test.ts -> canvas/camera/view-calls.test.ts
+- canvas/camera/stage-ops.ts -> canvas/camera/view-calls.ts
+
+## Lines rewritten
+
+canvas/camera/view-calls.test.ts:4
+  - import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
+  + import { runStageCall, type StageOpsHost } from "./view-calls.ts";
+canvas/camera/touched.ts:6
+  - * (`canvas/stage-ops.ts`), which is right when you are waiting for it and wrong when you are in the
+  + * (`canvas/view-calls.ts`), which is right when you are waiting for it and wrong when you are in the
+canvas/entries/host.ts:9
+  - export * from "../camera/stage-ops.ts";
+  + export * from "../camera/view-calls.ts";
+canvas/frame/inside/events.ts:10
+  - import { runStageCall } from "../../camera/stage-ops.ts";
+  + import { runStageCall } from "../../camera/view-calls.ts";
+canvas/frame/inside/events.ts:109
+  - * for a canvas it holds (`stage-ops.ts`), and answered to the harness.
+  + * for a canvas it holds (`view-calls.ts`), and answered to the harness.
+harness/page/state/notices.ts:45
+  - * held while they were using the canvas (`canvas/stage-ops.ts`). A newer offer with the same `key`
+  + * held while they were using the canvas (`canvas/view-calls.ts`). A newer offer with the same `key`
+
+## Files the table edits or creates
+
+- canvas/camera/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-02-camera.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: camera, camera-roundtrip, glide, opening-lands (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: camera/stage-ops.ts becomes camera/view-call

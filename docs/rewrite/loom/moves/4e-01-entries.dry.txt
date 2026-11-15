@@ -1,0 +1,52 @@
+# Step 4e-01-entries: Regroup canvas: public/ becomes entries/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents. Nothing was moved.
+
+- files moved by git mv: 4
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 2
+- import lines rewritten: 4
+- warnings: 0
+
+## Moved
+
+- canvas/public/camera.ts -> canvas/entries/camera.ts
+- canvas/public/comments.ts -> canvas/entries/comments.ts
+- canvas/public/host.ts -> canvas/entries/host.ts
+- canvas/public/tools.ts -> canvas/entries/tools.ts
+
+## Lines rewritten
+
+canvas/package.json:9
+  - "./comments": "./public/comments.ts",
+  + "./comments": "./entries/comments.ts",
+canvas/package.json:10
+  - "./tools": "./public/tools.ts",
+  + "./tools": "./entries/tools.ts",
+canvas/package.json:11
+  - "./camera": "./public/camera.ts",
+  + "./camera": "./entries/camera.ts",
+canvas/package.json:12
+  - "./host": "./public/host.ts",
+  + "./host": "./entries/host.ts",
+
+## Files the table edits or creates
+
+- canvas/entries/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-01-entries.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: canvas-frame, chrome (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: public/ becomes entries/

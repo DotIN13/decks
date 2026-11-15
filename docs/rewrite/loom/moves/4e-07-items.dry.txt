@@ -1,0 +1,58 @@
+# Step 4e-07-items: Regroup canvas: file drops and kinds join items/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing. Nothing was moved.
+
+- files moved by git mv: 3
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 8
+- import lines rewritten: 6
+- warnings: 0
+
+## Moved
+
+- canvas/model/file-drop.test.ts -> canvas/items/file-drop.test.ts
+- canvas/model/file-drop.ts -> canvas/items/file-drop.ts
+- canvas/model/file-kinds.ts -> canvas/items/file-kinds.ts
+
+## Lines rewritten
+
+canvas/editor/core/pick.ts:6
+  - import { isFile, isLiveFile } from "../../model/file-kinds.ts";
+  + import { isFile, isLiveFile } from "../../items/file-kinds.ts";
+canvas/editor/core/text.test.ts:4
+  - import { FILE } from "../../model/file-kinds.ts";
+  + import { FILE } from "../../items/file-kinds.ts";
+canvas/editor/core/text.ts:11
+  - import { isFile } from "../../model/file-kinds.ts";
+  + import { isFile } from "../../items/file-kinds.ts";
+canvas/entries/tools.ts:11
+  - export * from "../model/file-drop.ts";
+  + export * from "../items/file-drop.ts";
+canvas/model/card-frame.ts:4
+  - import { FILE, isFile, isLiveFile, LIVE_FILE } from "./file-kinds.ts";
+  + import { FILE, isFile, isLiveFile, LIVE_FILE } from "../items/file-kinds.ts";
+canvas/items/file-drop.ts:2
+  - import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "./card-frame.ts";
+  + import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "../model/card-frame.ts";
+
+## Files the table edits or creates
+
+- canvas/editor/core/imports.test.ts
+- canvas/items/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-07-items.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: drop-lands, media (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: file drops and kinds join items/

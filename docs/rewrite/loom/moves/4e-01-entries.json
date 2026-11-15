@@ -1,0 +1,38 @@
+{
+	"step": "4e-01-entries",
+	"title": "Regroup canvas: public/ becomes entries/",
+	"moves": [
+		{
+			"from": "canvas/public/",
+			"to": "canvas/entries/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"create": [
+		{
+			"file": "canvas/entries/README.md",
+			"from": "readmes/canvas-entries.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-01-entries.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: canvas-frame, chrome (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: public/ becomes entries/"
+	]
+}

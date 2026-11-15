@@ -1,0 +1,15 @@
+{
+	"file": "packages/stage/crates/web/src/bind.rs",
+	"at": "engine/crates/web/src/bind.rs",
+	"pattern": "Rust modules by topic; the `#[wasm_bindgen] impl PageEngine` is split into several `#[wasm_bindgen] impl PageEngine` blocks, which wasm-bindgen allows, so the JavaScript class keeps every method",
+	"scope": "impl PageEngine",
+	"targets": {
+		"bind_page_doc.rs": ["new", "set_gpu", "add_font", "lay_out", "apply_edits", "set_dark", "set_document", "apply", "undo", "redo", "generation", "text", "new_id", "pick", "within", "placed", "roots", "extent", "box_of", "layout", "layout_changes", "pick_all", "cards", "font_needs", "font_needs_changed", "measure", "set_markdown_reader", "set_math", "put_icon"],
+		"bind_page_pictures.rs": ["put_tile", "put_tile_pixels", "put_picture", "free_dropped", "fade_pictures", "compressed_pictures", "put_compressed_picture", "shrink_picture", "lay_out_pictures", "wanted_pictures", "forget_picture", "has_wanted", "pictured", "forget_tiles", "evict", "shown_scale", "show_wanted", "tile_count"],
+		"bind_page_view.rs": ["set_preview", "set_view", "set_cards", "set_live", "set_overlay", "carry", "card_marks", "carrying", "lift", "landed", "set_ink", "frame", "last_meshes", "warm", "show_lifted", "frame_lifted", "lost"],
+		"bind_worker.rs": ["WorkerEngine", "impl WorkerEngine", "READ_TILE", "READ_STRIDE", "scale_for", "wasm_module"],
+		"bind_text.rs": ["TextMeasure", "impl TextMeasure", "measure_words", "route_arrow", "Fixtures", "impl Fixtures"]
+	},
+	"rest": "bind.rs",
+	"note": "bind.rs keeps start, err, GpuHandle and its impl, the copy_in helpers, reader, typesetter, parse_edits, previews and the PageEngine struct, and adds `mod bind_page_doc; mod bind_page_pictures; mod bind_page_view; mod bind_worker; mod bind_text;` with `pub use bind_worker::WorkerEngine; pub use bind_text::{TextMeasure, Fixtures};`. The JavaScript names wasm-bindgen exports do not change, so `pkg/stage_web.js` and the canvas's imports stay as they are."
+}

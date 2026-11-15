@@ -393,7 +393,7 @@ imports by package and folder, top-level outlines and inner function sizes of ea
   docs/rewrite/loom/move.test.mjs`, on the fixture tree in `moves/fixtures/`. A URL is rewritten only
   when made from `import.meta.url`; a card's own address is left alone.
 - **The tables**: `moves/1-pen.json`, `2-ui.json`, `3-engine.json`, `4a-canvas.json`, each with its dry
-  run (`<step>.dry.md`) and the old-to-new list for Warden's re-key command (`<step>.renames.json`),
+  run (`<step>.dry.txt`) and the old-to-new list for Warden's re-key command (`<step>.renames.json`),
   made on today's tree. At go time each is planned again on the tree as it then is (the switch-over
   moves the checks), dry first, then `--go`.
 - **The tables' own fields**: `moves`, `skip` (folders the switch-over deletes, and Warden's and
@@ -408,3 +408,26 @@ imports by package and folder, top-level outlines and inner function sizes of ea
 - **A clash for the switch-over**: `switch-plan.md` keeps `packages/protocol` (named
   `@decks/protocol`) and also renames `@decks-next/protocol` to `@decks/protocol`. Two workspaces
   cannot share a name; the kept one needs another name until step 4a (Warden's call).
+
+## 11. Steps 4b to 5 prepared (2026-11-14)
+
+- **Every table is planned on top of the ones before it**: `node docs/rewrite/loom/dry-all.mjs` runs
+  `moves/order.json` in order (1, 2, 3, 4a, 4b, 4c, 4d, then 4e-01 to 4e-12, one table per folder) and
+  writes each `<step>.dry.txt` and `<step>.renames.json`. All 19 plan with no warning, and the tree they
+  end in leaves no backticked file name pointing nowhere in `canvas/`, `pen/`, `ui/`, `engine/`.
+- **New table fields**: `remove` (files deleted; a file the table moves out of a removed folder still
+  moves), `localize` (inside a folder, a package name becomes a relative path to one file, never in
+  JSON), `mentions` with an optional third field (the folder it applies in: a bare `input.ts` in
+  `items/` means another file than in `view/`), `set` keys that reach inside (`dependencies.@decks/ink`,
+  or a JSON list for names with dots).
+- **4c differs from section 5**: the card runtime's own files (`card.js`, `card.css`, `theme.css`,
+  `live-app.js`, `live-web.js`, `type/`) stay in `cards/runtime/lib/`, which the server serves whole;
+  only the vendored files leave git, listed in `lib/.gitignore` and copied in by `vendor.mjs` (today's
+  `scripts/vendor.mjs`) as the canvas package's `postinstall`, from the six packages pinned to the
+  versions in today's `VENDORED.md`. 4d adds `live-doc.js` to that build.
+- **The switch-over must keep three files** it would otherwise delete or move: `scripts/vendor.mjs`,
+  `scripts/live-doc.mjs` and `runtime/live-doc.ts` (the source of `lib/live-doc.js`). 4c and 4d move them
+  into the canvas library. If they move to `tools/` instead, only the tables' `from` paths change.
+- **Step 5's sheets**: `sheets.md`, made by `node docs/rewrite/loom/sheets.mjs` from `splits/*.json`
+  through `split.mjs` (which measures TypeScript by the compiler, Rust and CSS by braces). It fails when
+  a new file would pass 400 lines.

@@ -61,19 +61,19 @@
 	"create": [
 		{
 			"file": "engine/README.md",
-			"from": "readmes/engine.md"
+			"from": "readmes/engine.txt"
 		},
 		{
 			"file": "engine/crates/README.md",
-			"from": "readmes/engine-crates.md"
+			"from": "readmes/engine-crates.txt"
 		},
 		{
 			"file": "engine/demo/README.md",
-			"from": "readmes/engine-demo.md"
+			"from": "readmes/engine-demo.txt"
 		},
 		{
 			"file": "engine/fonts/README.md",
-			"from": "readmes/engine-fonts.md"
+			"from": "readmes/engine-fonts.txt"
 		}
 	],
 	"then": [

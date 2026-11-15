@@ -1,0 +1,180 @@
+# Step 4e-04-input: Regroup canvas: pointer, keys and touch rules into input/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view. Nothing was moved.
+
+- files moved by git mv: 6
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 23
+- import lines rewritten: 46
+- warnings: 0
+
+## Moved
+
+- canvas/edit/dom/keys.ts -> canvas/input/keys.ts
+- canvas/edit/dom/pointer.ts -> canvas/input/pointer.ts
+- canvas/edit/dom/touch-rules.test.ts -> canvas/input/touch-rules.test.ts
+- canvas/edit/dom/touch-rules.ts -> canvas/input/touch-rules.ts
+- canvas/items/input.ts -> canvas/input/item-keys.ts
+- canvas/stage/input.ts -> canvas/input/canvas-input.ts
+
+## Lines rewritten
+
+canvas/camera/touch.ts:4
+  - * The camera's touch gestures have two sources — the stage's own finger pool (`stage/input.ts`)
+  + * The camera's touch gestures have two sources — the stage's own finger pool (`input/canvas-input.ts`)
+canvas/camera/touch.ts:38
+  - * So the sources release what they hold (`stage/input.ts` on teardown, `Stage` when
+  + * So the sources release what they hold (`input/canvas-input.ts` on teardown, `Stage` when
+canvas/cards/runtime/lib/card.css:784
+  - * what makes the canvas (`stage/input.ts`) give it the wheel while it has room and hand the scroll
+  + * what makes the canvas (`input/canvas-input.ts`) give it the wheel while it has room and hand the scroll
+canvas/edit/dom/OverlayLayer.tsx:14
+  - import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "./touch-rules.ts";
+  + import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "../../input/touch-rules.ts";
+canvas/input/keys.ts:9
+  - import { penKey as penKeyOf, type KeyAct } from "../core/keys.ts";
+  + import { penKey as penKeyOf, type KeyAct } from "../edit/core/keys.ts";
+canvas/input/keys.ts:10
+  - import type { PenTool } from "../core/model.ts";
+  + import type { PenTool } from "../edit/core/model.ts";
+canvas/input/keys.ts:11
+  - import type { NextId } from "../core/ops.ts";
+  + import type { NextId } from "../edit/core/ops.ts";
+canvas/input/keys.ts:12
+  - import type { SceneQuery } from "../core/scene.ts";
+  + import type { SceneQuery } from "../edit/core/scene.ts";
+canvas/input/keys.ts:13
+  - import type { Editor } from "./controller.ts";
+  + import type { Editor } from "../edit/dom/controller.ts";
+canvas/input/pointer.ts:16
+  - import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
+  + import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../edit/core/dispatch.ts";
+canvas/input/pointer.ts:18
+  - import type { ArrowHandles } from "../core/arrows.ts";
+  + import type { ArrowHandles } from "../edit/core/arrows.ts";
+canvas/input/pointer.ts:19
+  - import type { PageBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
+  + import type { PageBox, Offset, PenTool, Pt, Rect } from "../edit/core/model.ts";
+canvas/input/pointer.ts:20
+  - import type { PageHandles, Outline, RadiusHandle } from "../core/overlay.ts";
+  + import type { PageHandles, Outline, RadiusHandle } from "../edit/core/overlay.ts";
+canvas/input/pointer.ts:21
+  - import { glideShift } from "../core/overlay.ts";
+  + import { glideShift } from "../edit/core/overlay.ts";
+canvas/input/pointer.ts:22
+  - import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
+  + import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../edit/core/pick.ts";
+canvas/input/pointer.ts:23
+  - import type { Handle } from "../core/resize.ts";
+  + import type { Handle } from "../edit/core/resize.ts";
+canvas/input/pointer.ts:24
+  - import type { SceneQuery } from "../core/scene.ts";
+  + import type { SceneQuery } from "../edit/core/scene.ts";
+canvas/input/pointer.ts:25
+  - import { pointerInput, type Editor } from "./controller.ts";
+  + import { pointerInput, type Editor } from "../edit/dom/controller.ts";
+canvas/input/pointer.ts:224
+  - * from here (`input.ts`): the press is abandoned, not released where it was, so a resize or a
+  + * from here (`canvas-input.ts`): the press is abandoned, not released where it was, so a resize or a
+canvas/input/touch-rules.ts:1
+  - import type { PointerKind } from "../core/model.ts";
+  + import type { PointerKind } from "../edit/core/model.ts";
+canvas/edit/index.ts:10
+  - import { createKeys, type KeysHost } from "./dom/keys.ts";
+  + import { createKeys, type KeysHost } from "../input/keys.ts";
+canvas/edit/index.ts:11
+  - import { createPointer, type Pointer, type PointerHost } from "./dom/pointer.ts";
+  + import { createPointer, type Pointer, type PointerHost } from "../input/pointer.ts";
+canvas/edit/index.ts:52
+  - export type { PageView, Openers } from "./dom/pointer.ts";
+  + export type { PageView, Openers } from "../input/pointer.ts";
+canvas/items/card-surface.tsx:4
+  - import { ownInput } from "./input.ts";
+  + import { ownInput } from "../input/item-keys.ts";
+canvas/items/card-surface.tsx:22
+  - * the one rule every awake item follows (`input.ts`, `ownInput`), decided on the card's root, not its
+  + * the one rule every awake item follows (`item-keys.ts`, `ownInput`), decided on the card's root, not its
+canvas/items/card.ts:643
+  - // Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`items/input.ts`).
+  + // Focusable, so a press anywhere in the card puts the focus in it rather than on the canvas behind: the keys typed then are the card's (`input/item-keys.ts`).
+canvas/input/item-keys.ts:2
+  - import { INTERACTIVE, scrollsInside } from "./card.ts";
+  + import { INTERACTIVE, scrollsInside } from "../items/card.ts";
+canvas/input/item-keys.ts:60
+  - // The canvas's zoom, wherever the focus is (`stage/input.ts`).
+  + // The canvas's zoom, wherever the focus is (`input/canvas-input.ts`).
+canvas/items/item-slot.tsx:8
+  - import { COARSE, HOLD_MS, slopFor } from "../edit/dom/touch-rules.ts";
+  + import { COARSE, HOLD_MS, slopFor } from "../input/touch-rules.ts";
+canvas/items/item-surfaces.tsx:3
+  - import { ownInput } from "./input.ts";
+  + import { ownInput } from "../input/item-keys.ts";
+canvas/items/item-surfaces.tsx:49
+  - // A press, a wheel or a key inside the document: the one rule every awake item follows (`input.ts`).
+  + // A press, a wheel or a key inside the document: the one rule every awake item follows (`item-keys.ts`).
+canvas/items/item-surfaces.tsx:125
+  - * The same rule on the window's bar and body (`input.ts`); the app's own page inside the iframe is the
+  + * The same rule on the window's bar and body (`item-keys.ts`); the app's own page inside the iframe is the
+canvas/items/item-surfaces.tsx:193
+  - * zooms with it as it does over a card whose insides cannot scroll (`input.ts`, `ownInput`). The point
+  + * zooms with it as it does over a card whose insides cannot scroll (`item-keys.ts`, `ownInput`). The point
+canvas/ui/Callout.tsx:5
+  - import { COARSE } from "../edit/dom/touch-rules.ts";
+  + import { COARSE } from "../input/touch-rules.ts";
+canvas/ui/HoldMenu.tsx:13
+  - * The menu a hold opens on a touch screen (`edit/dom/pointer.ts`, `touch-rules.ts` HOLD_MS), as iOS
+  + * The menu a hold opens on a touch screen (`input/pointer.ts`, `touch-rules.ts` HOLD_MS), as iOS
+canvas/ui/Properties.tsx:47
+  - import { COARSE } from "../edit/dom/touch-rules.ts";
+  + import { COARSE } from "../input/touch-rules.ts";
+canvas/view/CanvasView.tsx:19
+  - import { COARSE, HANDLE_DOT_PX } from "../edit/dom/touch-rules.ts";
+  + import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
+canvas/view/CanvasView.tsx:37
+  - import { createStageInput } from "../stage/input.ts";
+  + import { createStageInput } from "../input/canvas-input.ts";
+canvas/view/CanvasView.tsx:177
+  - * The stage is four files: this one, which wires the pieces together and draws the tree; `input.ts`,
+  + * The stage is four files: this one, which wires the pieces together and draws the tree; `canvas-input.ts`,
+canvas/view/CanvasView.tsx:349
+  - /* What the stage hears from the person (`input.ts`): made where its listeners were, before the engine. */
+  + /* What the stage hears from the person (`canvas-input.ts`): made where its listeners were, before the engine. */
+canvas/view/items-layer.tsx:41
+  - /** What an item's slot asks of the stage's fingers (`input.ts`). */
+  + /** What an item's slot asks of the stage's fingers (`canvas-input.ts`). */
+canvas/view/selection.tsx:54
+  - /** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
+  + /** A press is held on the canvas (`canvas-input.ts`): the drawn items' pill steps aside. */
+e2e/checks/card-keys.mjs:5
+  - * in it (`items/input.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
+  + * in it (`input/item-keys.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
+harness/page/canvases/CanvasOps.tsx:25
+  - * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
+  + * Every row is checked against the code that implements it, in `@decks/canvas`: `input/canvas-input.ts`
+harness/page/index.css:130
+  - The stage sets `none` for itself (`stage/input.ts`). */
+  + The stage sets `none` for itself (`input/canvas-input.ts`). */
+scripts/card-zoom.mjs:16
+  - * events in WebKit, which has no CDP (`stage/input.ts`, the same events a trackpad pinch sends there).
+  + * events in WebKit, which has no CDP (`input/canvas-input.ts`, the same events a trackpad pinch sends there).
+
+## Files the table edits or creates
+
+- canvas/input/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-04-input.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: wheel-diagonal, card-keys, pencil-then-finger, drop-lands (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: pointer, keys and touch rules into input/

@@ -1,0 +1,62 @@
+[
+	{
+		"from": "canvas/ui/AgentCursor.tsx",
+		"to": "canvas/chrome/AgentCursor.tsx"
+	},
+	{
+		"from": "canvas/ui/Callout.tsx",
+		"to": "canvas/chrome/Callout.tsx"
+	},
+	{
+		"from": "canvas/ui/ColorPicker.tsx",
+		"to": "canvas/chrome/ColorPicker.tsx"
+	},
+	{
+		"from": "canvas/ui/HoldMenu.tsx",
+		"to": "canvas/chrome/HoldMenu.tsx"
+	},
+	{
+		"from": "canvas/ui/InkBar.tsx",
+		"to": "canvas/chrome/InkBar.tsx"
+	},
+	{
+		"from": "canvas/ui/Insert.tsx",
+		"to": "canvas/chrome/Insert.tsx"
+	},
+	{
+		"from": "canvas/ui/InsertMenu.tsx",
+		"to": "canvas/chrome/InsertMenu.tsx"
+	},
+	{
+		"from": "canvas/ui/PenBar.tsx",
+		"to": "canvas/chrome/PenBar.tsx"
+	},
+	{
+		"from": "canvas/ui/Properties.tsx",
+		"to": "canvas/chrome/Properties.tsx"
+	},
+	{
+		"from": "canvas/ui/adaptive.test.ts",
+		"to": "canvas/chrome/adaptive.test.ts"
+	},
+	{
+		"from": "canvas/ui/adaptive.ts",
+		"to": "canvas/chrome/adaptive.ts"
+	},
+	{
+		"from": "canvas/ui/keycaps.test.ts",
+		"to": "canvas/chrome/keycaps.test.ts"
+	},
+	{
+		"from": "canvas/ui/keycaps.ts",
+		"to": "canvas/chrome/keycaps.ts"
+	},
+	{
+		"from": "canvas/ui/menu-place.test.ts",
+		"to": "canvas/chrome/menu-place.test.ts"
+	},
+	{
+		"from": "canvas/ui/menu-place.ts",
+		"to": "canvas/chrome/menu-place.ts"
+	}
+]

@@ -1,0 +1,78 @@
+[
+	{
+		"from": "packages/docs/src/client.ts",
+		"to": "canvas/documents/client.ts"
+	},
+	{
+		"from": "packages/docs/src/gdoc/types.ts",
+		"to": "canvas/documents/google/types.ts"
+	},
+	{
+		"from": "packages/docs/src/gdoc/units.ts",
+		"to": "canvas/documents/google/units.ts"
+	},
+	{
+		"from": "packages/docs/src/index.ts",
+		"to": "canvas/documents/model.ts"
+	},
+	{
+		"from": "packages/docs/src/merge.test.ts",
+		"to": "canvas/documents/merge.test.ts"
+	},
+	{
+		"from": "packages/docs/src/merge.ts",
+		"to": "canvas/documents/merge.ts"
+	},
+	{
+		"from": "packages/docs/src/page/blocks.test.ts",
+		"to": "canvas/documents/blocks.test.ts"
+	},
+	{
+		"from": "packages/docs/src/page/blocks.ts",
+		"to": "canvas/documents/blocks.ts"
+	},
+	{
+		"from": "packages/docs/src/page/gview.ts",
+		"to": "canvas/documents/gview.ts"
+	},
+	{
+		"from": "packages/docs/src/page/live.ts",
+		"to": "canvas/documents/live.ts"
+	},
+	{
+		"from": "packages/docs/src/page/marks.test.ts",
+		"to": "canvas/documents/marks.test.ts"
+	},
+	{
+		"from": "packages/docs/src/page/marks.ts",
+		"to": "canvas/documents/marks.ts"
+	},
+	{
+		"from": "packages/docs/src/page/page.ts",
+		"to": "canvas/documents/page.ts"
+	},
+	{
+		"from": "packages/docs/src/page/reading.ts",
+		"to": "canvas/documents/reading.ts"
+	},
+	{
+		"from": "packages/docs/src/page/render.ts",
+		"to": "canvas/documents/render.ts"
+	},
+	{
+		"from": "packages/docs/src/page/tex.test.ts",
+		"to": "canvas/documents/tex.test.ts"
+	},
+	{
+		"from": "packages/docs/src/page/tex.ts",
+		"to": "canvas/documents/tex.ts"
+	},
+	{
+		"from": "runtime/live-doc.ts",
+		"to": "canvas/documents/live-doc.ts"
+	},
+	{
+		"from": "scripts/live-doc.mjs",
+		"to": "canvas/documents/build-live-doc.mjs"
+	}
+]

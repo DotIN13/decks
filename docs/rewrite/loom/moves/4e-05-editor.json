@@ -1,0 +1,56 @@
+{
+	"step": "4e-05-editor",
+	"title": "Regroup canvas: edit/ and editor.tsx become editor/",
+	"moves": [
+		{
+			"from": "canvas/editor.tsx",
+			"to": "canvas/editor/editor.tsx"
+		},
+		{
+			"from": "canvas/edit/",
+			"to": "canvas/editor/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"edit/core",
+			"editor/core"
+		],
+		[
+			"edit/dom/",
+			"editor/dom/"
+		],
+		[
+			"edit/snap.ts",
+			"editor/snap.ts"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/editor/README.md",
+			"from": "readmes/canvas-editor.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-05-editor.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: selection, bent-arrows, note-edges, drop-lands (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: edit/ and editor.tsx become editor/"
+	]
+}

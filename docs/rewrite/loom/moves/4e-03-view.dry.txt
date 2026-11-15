@@ -1,0 +1,198 @@
+# Step 4e-03-view: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera. Nothing was moved.
+
+- files moved by git mv: 3
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 29
+- import lines rewritten: 53
+- warnings: 0
+
+## Moved
+
+- canvas/stage/Stage.tsx -> canvas/view/CanvasView.tsx
+- canvas/stage/items-layer.tsx -> canvas/view/items-layer.tsx
+- canvas/stage/selection.tsx -> canvas/view/selection.tsx
+
+## Lines rewritten
+
+canvas/camera/controller.ts:18
+  - * Moved out of `Stage.tsx` whole, its comments with it, so the stage keeps the drawing and the
+  + * Moved out of `CanvasView.tsx` whole, its comments with it, so the stage keeps the drawing and the
+canvas/camera/scroll-area.ts:10
+  - * camera back from the scroll (`Stage.tsx`, `camera/controller.ts`, `scrolled`).
+  + * camera back from the scroll (`CanvasView.tsx`, `camera/controller.ts`, `scrolled`).
+canvas/cards/CardEditor.tsx:28
+  - * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
+  + * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back
+canvas/cards/runtime/lib/card.js:1421
+  - * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/Stage.tsx`). A board is in the app's own
+  + * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/view/CanvasView.tsx`). A board is in the app's own
+canvas/edit/dom/pointer.ts:50
+  - /** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
+  + /** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
+canvas/edit/index.ts:2
+  - * The editor, as the stage (`canvas/Stage.tsx`) uses it: the one way in. `createStageEditor` puts
+  + * The editor, as the stage (`canvas/view/CanvasView.tsx`) uses it: the one way in. `createStageEditor` puts
+canvas/edit/pen-tools.ts:48
+  - /** Whether a card is open for typing (`Stage.tsx`): the properties panel stands aside. */
+  + /** Whether a card is open for typing (`CanvasView.tsx`): the properties panel stands aside. */
+canvas/edit/pen-tools.ts:84
+  - * The stage draws it without saving it (`canvas/Stage.tsx`, `penLayer.preview`), so the colour
+  + * The stage draws it without saving it (`canvas/view/CanvasView.tsx`, `penLayer.preview`), so the colour
+canvas/edit/pen-tools.ts:91
+  - * The hand: while it is on, a press on the canvas pans it, as holding Space does (`Stage.tsx`).
+  + * The hand: while it is on, a press on the canvas pans it, as holding Space does (`CanvasView.tsx`).
+canvas/editor.tsx:18
+  - import { Stage, type InkRequest, type StageComment } from "./stage/Stage.tsx";
+  + import { Stage, type InkRequest, type StageComment } from "./view/CanvasView.tsx";
+canvas/frame/outside/host.tsx:13
+  - * `stage/items-layer.tsx`), run in the frame, where the stage is.
+  + * `view/items-layer.tsx`), run in the frame, where the stage is.
+canvas/items/MediaPlayer.tsx:5
+  - * The one live player, laid over the film or sound it plays (`Stage.tsx` `playing`).
+  + * The one live player, laid over the film or sound it plays (`CanvasView.tsx` `playing`).
+canvas/model/card-frame.ts:76
+  - * file (`FILE`), so pen.dev shows the same card, and a click opens the file (`Stage.tsx`).
+  + * file (`FILE`), so pen.dev shows the same card, and a click opens the file (`CanvasView.tsx`).
+canvas/model/card-frame.ts:110
+  - * image under a hole in the sheet where it is (`Stage.tsx`, file items). A web page is a board.
+  + * image under a hole in the sheet where it is (`CanvasView.tsx`, file items). A web page is a board.
+canvas/render/device.ts:72
+  - * `stage/Stage.tsx`): `scaling`, each awake card, document and app while the zoom changes, so it is
+  + * `view/CanvasView.tsx`): `scaling`, each awake card, document and app while the zoom changes, so it is
+canvas/render/engine.ts:171
+  - * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet it replaced had
+  + * The stage's drawing for `CanvasView.tsx`, with the same calls the CanvasKit sheet it replaced had
+canvas/render/engine.ts:779
+  - * A gesture was let go and its edit sent (`Stage.tsx`, `settleGesture`). When the drawing that
+  + * A gesture was let go and its edit sent (`CanvasView.tsx`, `settleGesture`). When the drawing that
+canvas/render/engine.ts:1006
+  - * The canvas sits in the world (`Stage.tsx`), after the board pages, so it is placed in stage
+  + * The canvas sits in the world (`CanvasView.tsx`), after the board pages, so it is placed in stage
+canvas/render/engine.ts:2155
+  - * A picture of what a drag carries, for the ghost a drag over a card shows (`Stage.tsx`): the lifted
+  + * A picture of what a drag carries, for the ghost a drag over a card shows (`CanvasView.tsx`): the lifted
+canvas/view/CanvasView.tsx:37
+  - import { createStageInput } from "./input.ts";
+  + import { createStageInput } from "../stage/input.ts";
+canvas/stage/input.ts:15
+  - import type { StageProps } from "./Stage.tsx";
+  + import type { StageProps } from "../view/CanvasView.tsx";
+canvas/stage/input.ts:31
+  - /** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+  + /** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
+canvas/stage/input.ts:35
+  - /** The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`). */
+  + /** The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`). */
+canvas/stage/input.ts:114
+  - // The stage scrolled: the camera follows (`Stage.tsx`, `scrolled`).
+  + // The stage scrolled: the camera follows (`CanvasView.tsx`, `scrolled`).
+canvas/view/items-layer.tsx:22
+  - import type { StageProps } from "./Stage.tsx";
+  + import type { StageProps } from "./CanvasView.tsx";
+canvas/view/items-layer.tsx:37
+  - /** A writer's colour as the sheet can paint it (`Stage.tsx`). */
+  + /** A writer's colour as the sheet can paint it (`CanvasView.tsx`). */
+canvas/view/items-layer.tsx:39
+  - /** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+  + /** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
+canvas/view/selection.tsx:35
+  - import type { StageProps } from "./Stage.tsx";
+  + import type { StageProps } from "./CanvasView.tsx";
+canvas/view/selection.tsx:47
+  - /** Fit boxes into the canvas column (`Stage.tsx`, `frame`). */
+  + /** Fit boxes into the canvas column (`CanvasView.tsx`, `frame`). */
+canvas/view/selection.tsx:49
+  - /** Send the person's edits to the drawing (`Stage.tsx`, `penEdit`). */
+  + /** Send the person's edits to the drawing (`CanvasView.tsx`, `penEdit`). */
+canvas/view/selection.tsx:52
+  - /** An item as the file has it (`Stage.tsx`, `penNode`). */
+  + /** An item as the file has it (`CanvasView.tsx`, `penNode`). */
+canvas/styles/canvas.css:18
+  - * such a scroll is a scroll like any other, and the camera follows it (`Stage.tsx`, `onScroll`).
+  + * such a scroll is a scroll like any other, and the camera follows it (`CanvasView.tsx`, `onScroll`).
+canvas/styles/canvas.css:74
+  - * held forever is memory nobody asked for — `Stage.tsx` turns the attribute off 300ms
+  + * held forever is memory nobody asked for — `CanvasView.tsx` turns the attribute off 300ms
+canvas/styles/canvas.css:559
+  - * An SVG shown live (`Stage.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
+  + * An SVG shown live (`CanvasView.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
+canvas/styles/canvas.css:659
+  - * What the pointer is over, before a press (`Stage.tsx`): a thin line, thinner than a selection's,
+  + * What the pointer is over, before a press (`CanvasView.tsx`): a thin line, thinner than a selection's,
+canvas/styles/canvas.css:672
+  - /* A card's block's grip, in the card's margin, to drag the block by (`Stage.tsx`, `gripBox`). */
+  + /* A card's block's grip, in the card's margin, to drag the block by (`CanvasView.tsx`, `gripBox`). */
+canvas/styles/canvas.css:757
+  - /* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
+  + /* The drawn item picked up in edit mode, and the box its words are edited in (`CanvasView.tsx`). */
+canvas/styles/canvas.css:828
+  - * The one film or sound playing, laid over the item it belongs to (`Stage.tsx`, `playingBox`).
+  + * The one film or sound playing, laid over the item it belongs to (`CanvasView.tsx`, `playingBox`).
+canvas/styles/canvas.css:1030
+  - * The editor over a drawn item's words (`Stage.tsx`, `textLookOf`): its font, size, spacing,
+  + * The editor over a drawn item's words (`CanvasView.tsx`, `textLookOf`): its font, size, spacing,
+canvas/styles/canvas.css:1333
+  - * What a drag carries, over a card (`Stage.tsx`, `ghostShow`): a picture of it beside the pointer,
+  + * What a drag carries, over a card (`CanvasView.tsx`, `ghostShow`): a picture of it beside the pointer,
+canvas/types.ts:11
+  - * (`editor.tsx`, `createEditor`), and what the stage reports (`stage/Stage.tsx`).
+  + * (`editor.tsx`, `createEditor`), and what the stage reports (`view/CanvasView.tsx`).
+canvas/ui/AgentCursor.tsx:15
+  - * - **Stay.** It is drawn one level up, on the stage (`Stage.tsx`), for as long as the agent is
+  + * - **Stay.** It is drawn one level up, on the stage (`CanvasView.tsx`), for as long as the agent is
+e2e/checks/glide.mjs:115
+  - * browser sends before the next frame (`Stage.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+  + * browser sends before the next frame (`CanvasView.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+e2e/checks/item-pill.mjs:90
+  - // The stage says which board's picture is under a point (`Stage.tsx`).
+  + // The stage says which board's picture is under a point (`CanvasView.tsx`).
+e2e/checks/render-perf.mjs:177
+  - /** Pinch to `zoom` exactly: 64 scroll units per e-fold (`Stage.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
+  + /** Pinch to `zoom` exactly: 64 scroll units per e-fold (`CanvasView.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
+e2e/checks/shapes.mjs:176
+  - // A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `Stage.tsx`).
+  + // A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `CanvasView.tsx`).
+e2e/checks/stage-gestures.mjs:178
+  - // A board is its picture: the stage says which board is under a point (`Stage.tsx`), or its node's inert surface is there.
+  + // A board is its picture: the stage says which board is under a point (`CanvasView.tsx`), or its node's inert surface is there.
+e2e/checks/stage-gestures.mjs:576
+  - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+  + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
+e2e/checks/stage-gestures.mjs:609
+  - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+  + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
+e2e/checks/stage-gestures.mjs:741
+  - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+  + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
+e2e/checks/stage-shot.mjs:6
+  - * canvas exactly as the canvas does (`StageEngine.place`, `Stage.tsx`). When the two disagreed the
+  + * canvas exactly as the canvas does (`StageEngine.place`, `CanvasView.tsx`). When the two disagreed the
+e2e/checks/wheel-diagonal.mjs:4
+  - * The stage pans by the wheel's own deltas (`Stage.tsx`, `onWheel`), and the browser keeps whole
+  + * The stage pans by the wheel's own deltas (`CanvasView.tsx`, `onWheel`), and the browser keeps whole
+e2e/harness.mjs:377
+  - // Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
+  + // Below the live zoom a board has no node, only its picture (`CanvasView.tsx`): the stage lists them.
+
+## Files the table edits or creates
+
+- canvas/view/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-03-view.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: selection, stage-scroll, placement-at (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasVie

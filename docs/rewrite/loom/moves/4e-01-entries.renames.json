@@ -1,0 +1,18 @@
+[
+	{
+		"from": "canvas/public/camera.ts",
+		"to": "canvas/entries/camera.ts"
+	},
+	{
+		"from": "canvas/public/comments.ts",
+		"to": "canvas/entries/comments.ts"
+	},
+	{
+		"from": "canvas/public/host.ts",
+		"to": "canvas/entries/host.ts"
+	},
+	{
+		"from": "canvas/public/tools.ts",
+		"to": "canvas/entries/tools.ts"
+	}
+]

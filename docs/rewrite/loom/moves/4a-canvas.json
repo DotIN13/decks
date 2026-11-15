@@ -52,7 +52,7 @@
 			"values": {
 				"scripts": {
 					"typecheck": "tsc -p tsconfig.json --noEmit",
-					"test": "node --import tsx --test \"*.test.ts\" \"camera/**/*.test.ts\" \"edit/**/*.test.ts\" \"frame/**/*.test.ts\" \"ink/**/*.test.ts\" \"items/**/*.test.ts\" \"look/**/*.test.ts\" \"model/**/*.test.ts\" \"render/**/*.test.ts\" \"ui/**/*.test.ts\"",
+					"test": "node --import tsx --test \"**/*.test.ts\"",
 					"build:css": "node scripts/build-css.mjs",
 					"build:lib": "node ../scripts/build-solid-lib.mjs ."
 				},
@@ -68,7 +68,7 @@
 	"create": [
 		{
 			"file": "canvas/README.md",
-			"from": "readmes/canvas.md"
+			"from": "readmes/canvas.txt"
 		}
 	],
 	"then": [

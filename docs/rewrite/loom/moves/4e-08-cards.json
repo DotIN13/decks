@@ -1,0 +1,96 @@
+{
+	"step": "4e-08-cards",
+	"title": "Regroup canvas: card files from items/ and model/ join cards/",
+	"moves": [
+		{
+			"from": "canvas/items/card.ts",
+			"to": "canvas/cards/card.ts"
+		},
+		{
+			"from": "canvas/items/card-load.ts",
+			"to": "canvas/cards/card-load.ts"
+		},
+		{
+			"from": "canvas/items/card-load.test.ts",
+			"to": "canvas/cards/card-load.test.ts"
+		},
+		{
+			"from": "canvas/items/card-reading.ts",
+			"to": "canvas/cards/card-reading.ts"
+		},
+		{
+			"from": "canvas/items/card-snapshot.ts",
+			"to": "canvas/cards/card-snapshot.ts"
+		},
+		{
+			"from": "canvas/items/card-snapshot.test.ts",
+			"to": "canvas/cards/card-snapshot.test.ts"
+		},
+		{
+			"from": "canvas/items/card-surface.tsx",
+			"to": "canvas/cards/card-surface.tsx"
+		},
+		{
+			"from": "canvas/model/card-frame.ts",
+			"to": "canvas/cards/card-frame.ts"
+		},
+		{
+			"from": "canvas/model/card-frame.test.ts",
+			"to": "canvas/cards/card-frame.test.ts"
+		},
+		{
+			"from": "canvas/model/card-syntax.ts",
+			"to": "canvas/cards/card-syntax.ts"
+		},
+		{
+			"from": "canvas/model/markdown.ts",
+			"to": "canvas/cards/markdown.ts"
+		},
+		{
+			"from": "canvas/model/markdown.test.ts",
+			"to": "canvas/cards/markdown.test.ts"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"items/card.ts",
+			"cards/card.ts"
+		],
+		[
+			"items/card-surface.tsx",
+			"cards/card-surface.tsx"
+		],
+		[
+			"model/markdown.ts",
+			"cards/markdown.ts"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/cards/README.md",
+			"from": "readmes/canvas-cards.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-08-cards.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: card-tab, card-links, card-copy, card-phone (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: card files from items/ and model/ join cards"
+	]
+}

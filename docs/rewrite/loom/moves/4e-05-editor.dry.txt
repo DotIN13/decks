@@ -1,0 +1,317 @@
+# Step 4e-05-editor: Regroup canvas: edit/ and editor.tsx become editor/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input. Nothing was moved.
+
+- files moved by git mv: 43
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 27
+- import lines rewritten: 79
+- warnings: 0
+
+## Moved
+
+- canvas/edit/core/arrows.test.ts -> canvas/editor/core/arrows.test.ts
+- canvas/edit/core/arrows.ts -> canvas/editor/core/arrows.ts
+- canvas/edit/core/dispatch.test.ts -> canvas/editor/core/dispatch.test.ts
+- canvas/edit/core/dispatch.ts -> canvas/editor/core/dispatch.ts
+- canvas/edit/core/drop.test.ts -> canvas/editor/core/drop.test.ts
+- canvas/edit/core/drop.ts -> canvas/editor/core/drop.ts
+- canvas/edit/core/fake-scene.test-helper.ts -> canvas/editor/core/fake-scene.test-helper.ts
+- canvas/edit/core/gesture.test.ts -> canvas/editor/core/gesture.test.ts
+- canvas/edit/core/gesture.ts -> canvas/editor/core/gesture.ts
+- canvas/edit/core/imports.test.ts -> canvas/editor/core/imports.test.ts
+- canvas/edit/core/insert.test.ts -> canvas/editor/core/insert.test.ts
+- canvas/edit/core/insert.ts -> canvas/editor/core/insert.ts
+- canvas/edit/core/keys.test.ts -> canvas/editor/core/keys.test.ts
+- canvas/edit/core/keys.ts -> canvas/editor/core/keys.ts
+- canvas/edit/core/model.ts -> canvas/editor/core/model.ts
+- canvas/edit/core/ops.test.ts -> canvas/editor/core/ops.test.ts
+- canvas/edit/core/ops.ts -> canvas/editor/core/ops.ts
+- canvas/edit/core/overlay-json.ts -> canvas/editor/core/overlay-json.ts
+- canvas/edit/core/overlay.test.ts -> canvas/editor/core/overlay.test.ts
+- canvas/edit/core/overlay.ts -> canvas/editor/core/overlay.ts
+- canvas/edit/core/pick.test.ts -> canvas/editor/core/pick.test.ts
+- canvas/edit/core/pick.ts -> canvas/editor/core/pick.ts
+- canvas/edit/core/resize.test.ts -> canvas/editor/core/resize.test.ts
+- canvas/edit/core/resize.ts -> canvas/editor/core/resize.ts
+- canvas/edit/core/scene.ts -> canvas/editor/core/scene.ts
+- canvas/edit/core/snapping.test.ts -> canvas/editor/core/snapping.test.ts
+- canvas/edit/core/snapping.ts -> canvas/editor/core/snapping.ts
+- canvas/edit/core/text.test.ts -> canvas/editor/core/text.test.ts
+- canvas/edit/core/text.ts -> canvas/editor/core/text.ts
+- canvas/edit/dom/OverlayLayer.tsx -> canvas/editor/dom/OverlayLayer.tsx
+- canvas/edit/dom/TextEditing.tsx -> canvas/editor/dom/TextEditing.tsx
+- canvas/edit/dom/colours.ts -> canvas/editor/dom/colours.ts
+- canvas/edit/dom/controller.ts -> canvas/editor/dom/controller.ts
+- canvas/edit/dom/effects.ts -> canvas/editor/dom/effects.ts
+- canvas/edit/held.ts -> canvas/editor/held.ts
+- canvas/edit/index.ts -> canvas/editor/index.ts
+- canvas/edit/ops-constants.test.ts -> canvas/editor/ops-constants.test.ts
+- canvas/edit/pen-tools.test.ts -> canvas/editor/pen-tools.test.ts
+- canvas/edit/pen-tools.ts -> canvas/editor/pen-tools.ts
+- canvas/edit/scene-ts.ts -> canvas/editor/scene-ts.ts
+- canvas/edit/snap.test.ts -> canvas/editor/snap.test.ts
+- canvas/edit/snap.ts -> canvas/editor/snap.ts
+- canvas/editor.tsx -> canvas/editor/editor.tsx
+
+## Lines rewritten
+
+canvas/camera/glide.test.ts:3
+  - import { fakeScene } from "../edit/core/fake-scene.test-helper.ts";
+  + import { fakeScene } from "../editor/core/fake-scene.test-helper.ts";
+canvas/camera/glide.ts:7
+  - import type { Offset, Rect } from "../edit/core/model.ts";
+  + import type { Offset, Rect } from "../editor/core/model.ts";
+canvas/camera/glide.ts:8
+  - import type { SceneQuery } from "../edit/core/scene.ts";
+  + import type { SceneQuery } from "../editor/core/scene.ts";
+canvas/editor/core/imports.test.ts:5
+  - /** Core is the editor with no page under it: it may import itself, the pen types, edit/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
+  + /** Core is the editor with no page under it: it may import itself, the pen types, editor/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
+canvas/editor/core/imports.test.ts:6
+  - test("edit/core imports nothing from the page, Solid or the engine", () => {
+  + test("editor/core imports nothing from the page, Solid or the engine", () => {
+canvas/editor/editor.tsx:5
+  - import { fitInto, frames } from "./camera/camera.ts";
+  + import { fitInto, frames } from "../camera/camera.ts";
+canvas/editor/editor.tsx:6
+  - import { topBoxes } from "./model/boxes.ts";
+  + import { topBoxes } from "../model/boxes.ts";
+canvas/editor/editor.tsx:7
+  - import { viewToPark } from "./camera/agent-view.ts";
+  + import { viewToPark } from "../camera/agent-view.ts";
+canvas/editor/editor.tsx:8
+  - import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
+  + import { createAgentViews, type ViewStorage } from "../camera/agent-views.ts";
+canvas/editor/editor.tsx:9
+  - import { canvasBox } from "./camera/insets.ts";
+  + import { canvasBox } from "../camera/insets.ts";
+canvas/editor/editor.tsx:10
+  - import type { StageEngine } from "./render/engine.ts";
+  + import type { StageEngine } from "../render/engine.ts";
+canvas/editor/editor.tsx:11
+  - import { pagesAhead, pagesOf, createDrawing } from "./model/drawing.ts";
+  + import { pagesAhead, pagesOf, createDrawing } from "../model/drawing.ts";
+canvas/editor/editor.tsx:12
+  - import { stageMeasure } from "./render/measure.ts";
+  + import { stageMeasure } from "../render/measure.ts";
+canvas/editor/editor.tsx:13
+  - import type { DocEdits, DrawingWriter } from "./render/types.ts";
+  + import type { DocEdits, DrawingWriter } from "../render/types.ts";
+canvas/editor/editor.tsx:14
+  - import { InkBar } from "./ui/InkBar.tsx";
+  + import { InkBar } from "../ui/InkBar.tsx";
+canvas/editor/editor.tsx:15
+  - import { setCanvasScheme } from "./theme.ts";
+  + import { setCanvasScheme } from "../theme.ts";
+canvas/editor/editor.tsx:16
+  - import { PenBar } from "./ui/PenBar.tsx";
+  + import { PenBar } from "../ui/PenBar.tsx";
+canvas/editor/editor.tsx:17
+  - import { ItemSlot } from "./items/item-slot.tsx";
+  + import { ItemSlot } from "../items/item-slot.tsx";
+canvas/editor/editor.tsx:18
+  - import { Stage, type InkRequest, type StageComment } from "./view/CanvasView.tsx";
+  + import { Stage, type InkRequest, type StageComment } from "../view/CanvasView.tsx";
+canvas/editor/editor.tsx:19
+  - import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./ink/ink.ts";
+  + import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "../ink/ink.ts";
+canvas/editor/editor.tsx:20
+  - import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./edit/pen-tools.ts";
+  + import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./pen-tools.ts";
+canvas/editor/editor.tsx:22
+  - export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "./types.ts";
+  + export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
+canvas/editor/editor.tsx:23
+  - import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "./types.ts";
+  + import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
+canvas/entries/tools.ts:2
+  - export { insertPanel, setInsertPanel, type InsertPanel, type PenTool } from "../edit/pen-tools.ts";
+  + export { insertPanel, setInsertPanel, type InsertPanel, type PenTool } from "../editor/pen-tools.ts";
+canvas/entries/tools.ts:7
+  - export * from "../edit/pen-tools.ts";
+  + export * from "../editor/pen-tools.ts";
+canvas/frame/inside/frame.tsx:4
+  - import { createEditor } from "../../editor.tsx";
+  + import { createEditor } from "../../editor/editor.tsx";
+canvas/frame/inside/options.ts:5
+  - import type { createEditor } from "../../editor.tsx";
+  + import type { createEditor } from "../../editor/editor.tsx";
+canvas/frame/outside/host.tsx:5
+  - import type { PenTool } from "../../edit/pen-tools.ts";
+  + import type { PenTool } from "../../editor/pen-tools.ts";
+canvas/frame/protocol.ts:2
+  - import type { PenTool } from "../edit/pen-tools.ts";
+  + import type { PenTool } from "../editor/pen-tools.ts";
+canvas/index.ts:6
+  - export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor.tsx";
+  + export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor/editor.tsx";
+canvas/index.ts:11
+  - export type { PenTool } from "./edit/pen-tools.ts";
+  + export type { PenTool } from "./editor/pen-tools.ts";
+canvas/input/canvas-input.ts:10
+  - import { handTool } from "../edit/pen-tools.ts";
+  + import { handTool } from "../editor/pen-tools.ts";
+canvas/input/canvas-input.ts:11
+  - import { handPans } from "../edit/core/dispatch.ts";
+  + import { handPans } from "../editor/core/dispatch.ts";
+canvas/input/canvas-input.ts:12
+  - import { untilReleased } from "../edit/held.ts";
+  + import { untilReleased } from "../editor/held.ts";
+canvas/input/canvas-input.ts:13
+  - import type { StageEditor } from "../edit/index.ts";
+  + import type { StageEditor } from "../editor/index.ts";
+canvas/input/keys.ts:9
+  - import { penKey as penKeyOf, type KeyAct } from "../edit/core/keys.ts";
+  + import { penKey as penKeyOf, type KeyAct } from "../editor/core/keys.ts";
+canvas/input/keys.ts:10
+  - import type { PenTool } from "../edit/core/model.ts";
+  + import type { PenTool } from "../editor/core/model.ts";
+canvas/input/keys.ts:11
+  - import type { NextId } from "../edit/core/ops.ts";
+  + import type { NextId } from "../editor/core/ops.ts";
+canvas/input/keys.ts:12
+  - import type { SceneQuery } from "../edit/core/scene.ts";
+  + import type { SceneQuery } from "../editor/core/scene.ts";
+canvas/input/keys.ts:13
+  - import type { Editor } from "../edit/dom/controller.ts";
+  + import type { Editor } from "../editor/dom/controller.ts";
+canvas/input/pointer.ts:16
+  - import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../edit/core/dispatch.ts";
+  + import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../editor/core/dispatch.ts";
+canvas/input/pointer.ts:18
+  - import type { ArrowHandles } from "../edit/core/arrows.ts";
+  + import type { ArrowHandles } from "../editor/core/arrows.ts";
+canvas/input/pointer.ts:19
+  - import type { PageBox, Offset, PenTool, Pt, Rect } from "../edit/core/model.ts";
+  + import type { PageBox, Offset, PenTool, Pt, Rect } from "../editor/core/model.ts";
+canvas/input/pointer.ts:20
+  - import type { PageHandles, Outline, RadiusHandle } from "../edit/core/overlay.ts";
+  + import type { PageHandles, Outline, RadiusHandle } from "../editor/core/overlay.ts";
+canvas/input/pointer.ts:21
+  - import { glideShift } from "../edit/core/overlay.ts";
+  + import { glideShift } from "../editor/core/overlay.ts";
+canvas/input/pointer.ts:22
+  - import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../edit/core/pick.ts";
+  + import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../editor/core/pick.ts";
+canvas/input/pointer.ts:23
+  - import type { Handle } from "../edit/core/resize.ts";
+  + import type { Handle } from "../editor/core/resize.ts";
+canvas/input/pointer.ts:24
+  - import type { SceneQuery } from "../edit/core/scene.ts";
+  + import type { SceneQuery } from "../editor/core/scene.ts";
+canvas/input/pointer.ts:25
+  - import { pointerInput, type Editor } from "../edit/dom/controller.ts";
+  + import { pointerInput, type Editor } from "../editor/dom/controller.ts";
+canvas/input/touch-rules.ts:1
+  - import type { PointerKind } from "../edit/core/model.ts";
+  + import type { PointerKind } from "../editor/core/model.ts";
+canvas/items/item-slot.tsx:3
+  - import type { PageView } from "../edit/index.ts";
+  + import type { PageView } from "../editor/index.ts";
+canvas/render/engine.ts:23
+  - import { snapMove, type Box, type Guide } from "../edit/snap.ts";
+  + import { snapMove, type Box, type Guide } from "../editor/snap.ts";
+canvas/render/engine.ts:1080
+  - /** The editor's overlay as the engine paints it (`edit/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
+  + /** The editor's overlay as the engine paints it (`editor/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
+canvas/styles/canvas.css:229
+  - * (`stage_paint::overlay`, `edit/core/overlay-json.ts`): the elements stay for the checks and as
+  + * (`stage_paint::overlay`, `editor/core/overlay-json.ts`): the elements stay for the checks and as
+canvas/types.ts:7
+  - import type { PenTool } from "./edit/pen-tools.ts";
+  + import type { PenTool } from "./editor/pen-tools.ts";
+canvas/ui/Callout.tsx:6
+  - import { setPropsOpen } from "../edit/pen-tools.ts";
+  + import { setPropsOpen } from "../editor/pen-tools.ts";
+canvas/ui/Insert.tsx:4
+  - import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../edit/pen-tools.ts";
+  + import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../editor/pen-tools.ts";
+canvas/ui/InsertMenu.tsx:14
+  - import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../edit/pen-tools.ts";
+  + import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../editor/pen-tools.ts";
+canvas/ui/InsertMenu.tsx:17
+  - import type { Box } from "../edit/snap.ts";
+  + import type { Box } from "../editor/snap.ts";
+canvas/ui/InsertMenu.tsx:18
+  - import { joinAt as joinAtIn, newArrowEnds, type Join } from "../edit/core/arrows.ts";
+  + import { joinAt as joinAtIn, newArrowEnds, type Join } from "../editor/core/arrows.ts";
+canvas/ui/InsertMenu.tsx:19
+  - import { frameAt as frameAtIn } from "../edit/core/drop.ts";
+  + import { frameAt as frameAtIn } from "../editor/core/drop.ts";
+canvas/ui/InsertMenu.tsx:20
+  - import { drawHints, insertPick, opensWords } from "../edit/core/insert.ts";
+  + import { drawHints, insertPick, opensWords } from "../editor/core/insert.ts";
+canvas/ui/InsertMenu.tsx:21
+  - import type { PenTool, Pt } from "../edit/core/model.ts";
+  + import type { PenTool, Pt } from "../editor/core/model.ts";
+canvas/ui/InsertMenu.tsx:22
+  - import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../edit/core/ops.ts";
+  + import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../editor/core/ops.ts";
+canvas/ui/InsertMenu.tsx:23
+  - import type { Outline } from "../edit/core/overlay.ts";
+  + import type { Outline } from "../editor/core/overlay.ts";
+canvas/ui/InsertMenu.tsx:24
+  - import type { SceneQuery } from "../edit/core/scene.ts";
+  + import type { SceneQuery } from "../editor/core/scene.ts";
+canvas/ui/InsertMenu.tsx:25
+  - import type { Editor } from "../edit/dom/controller.ts";
+  + import type { Editor } from "../editor/dom/controller.ts";
+canvas/ui/InsertMenu.tsx:26
+  - import type { TextEditing } from "../edit/dom/TextEditing.tsx";
+  + import type { TextEditing } from "../editor/dom/TextEditing.tsx";
+canvas/ui/PenBar.tsx:16
+  - import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../edit/pen-tools.ts";
+  + import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../editor/pen-tools.ts";
+canvas/ui/Properties.tsx:43
+  - import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLive, setPenSelection, setPropsOpen } from "../edit/pen-tools.ts";
+  + import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLive, setPenSelection, setPropsOpen } from "../editor/pen-tools.ts";
+canvas/view/CanvasView.tsx:15
+  - import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
+  + import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../editor/pen-tools.ts";
+canvas/view/CanvasView.tsx:17
+  - import { overlayJson } from "../edit/core/overlay-json.ts";
+  + import { overlayJson } from "../editor/core/overlay-json.ts";
+canvas/view/CanvasView.tsx:18
+  - import { rgbOf } from "../edit/dom/colours.ts";
+  + import { rgbOf } from "../editor/dom/colours.ts";
+canvas/view/CanvasView.tsx:20
+  - import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
+  + import { ANCHOR_OUT, ANCHOR_PX } from "../editor/dom/OverlayLayer.tsx";
+canvas/view/CanvasView.tsx:36
+  - } from "../edit/index.ts";
+  + } from "../editor/index.ts";
+canvas/view/CanvasView.tsx:582
+  - * frame (`edit/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
+  + * frame (`editor/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
+canvas/view/items-layer.tsx:21
+  - import type { StageEditor } from "../edit/index.ts";
+  + import type { StageEditor } from "../editor/index.ts";
+canvas/view/selection.tsx:8
+  - import { setPenBoxes } from "../edit/pen-tools.ts";
+  + import { setPenBoxes } from "../editor/pen-tools.ts";
+canvas/view/selection.tsx:34
+  - } from "../edit/index.ts";
+  + } from "../editor/index.ts";
+
+## Files the table edits or creates
+
+- canvas/editor/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- canvas/editor/pen-tools.ts: 2
+- canvas/render/engine.ts: 1
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-05-editor.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: selection, bent-arrows, note-edges, drop-lands (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: edit/ and editor.tsx become editor/

@@ -70,10 +70,10 @@ function relativeFrom(file, target, slash) {
 function rewriteRelative(spec, ctx) {
 	const oldTarget = normalize(join(dirname(ctx.from), spec));
 	const newTarget = ctx.map(oldTarget);
-	if (normalize(join(dirname(ctx.to), spec)) === newTarget) return spec;
-	if (resolves(oldTarget, ctx.oldFiles, ctx.oldDirs) && !resolves(newTarget, ctx.newFiles, ctx.newDirs)) {
+	if (resolves(oldTarget, ctx.oldFiles, ctx.oldDirs) && !resolves(newTarget, ctx.onDisk, ctx.newDirs)) {
 		ctx.warnings.push(`${ctx.to}: ${spec} points at ${newTarget}, which is not in the tree after the move`);
 	}
+	if (normalize(join(dirname(ctx.to), spec)) === newTarget) return spec;
 	return relativeFrom(ctx.to, newTarget, spec.endsWith("/"));
 }
 
@@ -81,6 +81,9 @@ const CODE_PATH = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*|@im
 /** Only a URL made from this module's own address is a path in the tree; one from a card's address is not. */
 const MODULE_URL = /(\bnew\s+URL\s*\(\s*)(["'])(\.\.?\/[^"'\n]*)\2(?=\s*,\s*import\.meta\.url)/g;
 const JSON_PATH = /((?:^|[:[,])\s*)"(\.\.?\/[^"\n]*)"(?!\s*:)/g;
+
+/** A name npm can install: "name" or "@scope/name", with no subpath. A dependency key must be one. */
+const isPackageName = (name) => /^(@[^/]+\/)?[^/@]+$/.test(name);
 
 function bareRule(specifiers) {
 	const names = Object.keys(specifiers || {});
@@ -98,8 +101,9 @@ function rewriteLine(line, ctx, inScripts) {
 		const fix = (_m, head, q, spec) => `${head}${q}${rewriteRelative(spec, ctx)}${q}`;
 		out = out.replace(CODE_PATH, fix).replace(MODULE_URL, fix);
 	}
-	if (ctx.bare) out = out.replace(ctx.bare, (_m, q, name, sub) => `${q}${ctx.specifiers[name]}${sub}${q}`);
-	for (const [from, to] of ctx.mentions) out = out.split(from).join(to);
+	for (const l of ctx.localize) out = out.replace(l.rule, (_m, q) => `${q}${relativeFrom(ctx.to, l.target, false)}${q}`);
+	if (ctx.bare) out = out.replace(ctx.bare, (m, q, name, sub) => (ctx.from.endsWith("package.json") && !isPackageName(ctx.specifiers[name]) ? m : `${q}${ctx.specifiers[name]}${sub}${q}`));
+	for (const [from, to, within] of ctx.mentions) if (!within || ctx.to.startsWith(within)) out = out.split(from).join(to);
 	return out;
 }
 
@@ -133,14 +137,20 @@ function replacePaths(text, file, entries) {
 	return out;
 }
 
-/** Top-level values of a JSON file set or removed (null removes), written back in the file's own indent. */
+/** Values of a JSON file set or removed (null removes), written back in the file's own indent.
+ * A key with dots reaches inside ("dependencies.@decks/ink"); a key that is a JSON list is the path
+ * itself, for names with dots ('["exports","./ink"]'). */
 export function setJson(text, values, file = "a JSON file") {
 	if (text == null) throw new Error(`${file}: not in the tree after the move`);
 	const indent = /^\{\n(\t| +)/.exec(text)?.[1] ?? "\t";
 	const obj = JSON.parse(text);
-	for (const [k, v] of Object.entries(values)) {
-		if (v === null) delete obj[k];
-		else obj[k] = v;
+	for (const [key, v] of Object.entries(values)) {
+		const path = key.startsWith("[") ? JSON.parse(key) : key.split(".");
+		const last = path.pop();
+		let at = obj;
+		for (const k of path) at = at[k] ??= {};
+		if (v === null) delete at[last];
+		else at[last] = v;
 	}
 	return `${JSON.stringify(obj, null, indent)}\n`;
 }
@@ -185,13 +195,17 @@ function leftovers(table, files, current) {
 /** The whole plan for one table over one repo ({ files, read }). */
 export function plan(table, repo) {
 	const map = mapper(table.moves);
-	const untracked = new Set(repo.files.filter((f) => (table.untrack || []).some((p) => f.startsWith(p))));
+	const under = (list) => new Set(repo.files.filter((f) => (list || []).some((p) => f.startsWith(p))));
+	const removed = new Set([...under(table.remove)].filter((f) => map(f) === f));
+	const untracked = new Set([...under(table.untrack), ...removed]);
 	const moves = renames(repo.files, map, untracked);
 	const newOf = new Map(moves);
 	const newPaths = repo.files.filter((f) => !untracked.has(f)).map((f) => newOf.get(f) ?? f);
 	const oldFiles = new Set(repo.files);
 	const newFiles = new Set(newPaths);
-	const base = { map, oldFiles, newFiles, oldDirs: dirsOf(oldFiles), newDirs: dirsOf(newFiles), warnings: [], specifiers: table.specifiers || {}, bare: bareRule(table.specifiers), mentions: table.mentions || [] };
+	const onDisk = new Set([...newFiles, ...[...untracked].filter((f) => !removed.has(f)).map(map)]);
+	const base = { map, oldFiles, newFiles, onDisk, oldDirs: dirsOf(oldFiles), newDirs: dirsOf(onDisk), warnings: [], specifiers: table.specifiers || {}, bare: bareRule(table.specifiers), mentions: table.mentions || [], localize: [] };
+	const localizeAll = (table.localize || []).map((l) => ({ ...l, rule: new RegExp(`(["'])${l.name.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\1`, "g") }));
 	const texts = new Map();
 	const edits = new Map();
 	const changes = [];
@@ -200,8 +214,9 @@ export function plan(table, repo) {
 		const to = newOf.get(f) ?? f;
 		const text = MENTIONS.test(f) ? repo.read(f) : null;
 		if (text != null) texts.set(to, text);
-		if (text == null || !SCANNED.test(f) || skipped(f, table)) continue;
-		const r = rewriteFile(text, { ...base, from: f, to });
+		if (text == null || !SCANNED.test(f) || (skipped(f, table) && !newOf.has(f))) continue;
+		const localize = f.endsWith(".json") ? [] : localizeAll.filter((l) => to.startsWith(l.within));
+		const r = rewriteFile(text, { ...base, from: f, to, localize });
 		if (r.text !== text) { edits.set(to, r.text); changes.push(...r.changes); }
 	}
 	const oldOf = new Map(moves.map(([a, b]) => [b, a]));
@@ -212,5 +227,12 @@ export function plan(table, repo) {
 	};
 	const write = (f, text) => { if (text !== texts.get(f)) edits.set(f, text); else edits.delete(f); };
 	tableEdits(table, current, write);
-	return { moves, untrack: [...untracked], edits, changes, warnings: base.warnings, leftovers: leftovers(table, [...newFiles], current) };
+	return { moves, untrack: [...untracked].filter((f) => !removed.has(f)), remove: [...removed], newFiles, oldOf, edits, changes, warnings: base.warnings, leftovers: leftovers(table, [...newFiles], current) };
+}
+
+/** The tree as it is after a plan, for planning the next step on top of it without moving anything. */
+export function after(repo, p) {
+	const files = [...new Set([...p.newFiles, ...p.edits.keys()])].sort();
+	const read = (f) => (p.edits.has(f) ? p.edits.get(f) : repo.read(p.oldOf.get(f) ?? f));
+	return { files, read };
 }

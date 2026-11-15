@@ -1,0 +1,95 @@
+{
+	"file": "packages/docs/src/page/live.ts",
+	"at": "canvas/documents/live/editor.ts",
+	"pattern": "part: the LiveEditor class keeps its state and its rendering; input, blocks and history leave as functions given the editor",
+	"scope": "LiveEditor",
+	"targets": {
+		"live/editor-view.ts": [
+			"render",
+			"drawWidgets",
+			"highlight",
+			"chunks",
+			"offsetAt",
+			"selection",
+			"pointAt",
+			"place",
+			"reveal",
+			"scrollToCaret",
+			"readBack"
+		],
+		"live/editor-input.ts": [
+			"beforeInput",
+			"targetRange",
+			"lineAround",
+			"chunkKind",
+			"prefixOf",
+			"enter",
+			"backspaceAtLineStart",
+			"keydown",
+			"hiddenSourceAt",
+			"copy",
+			"paste",
+			"drop",
+			"pressed",
+			"clicked"
+		],
+		"live/editor-blocks.ts": [
+			"delimiters",
+			"CLASS",
+			"around",
+			"toggle",
+			"link",
+			"setBlock",
+			"inTexList",
+			"codeBlock",
+			"insertBlock"
+		],
+		"live/editor-history.ts": [
+			"apply",
+			"local",
+			"goto",
+			"replace",
+			"undo",
+			"redo",
+			"applicable",
+			"moveHistory",
+			"state",
+			"selectionMoved",
+			"remote"
+		],
+		"live/builder.ts": [
+			"Builder"
+		],
+		"live/shared.ts": [
+			"LiveHost",
+			"FormatState",
+			"InlineStyle",
+			"BlockStyle",
+			"Range2",
+			"UndoEntry",
+			"PUNCT",
+			"isSpace",
+			"isWord",
+			"h",
+			"mk",
+			"inl",
+			"widget",
+			"closeBrace",
+			"linkAt",
+			"textNodes",
+			"shown"
+		],
+		"live/builder-tex.ts": [
+			"TEX_STYLE",
+			"TEX_REF",
+			"TEX_HEADING",
+			"MATH_ENV"
+		]
+	},
+	"rest": "live/editor.ts",
+	"note": "map.md's editor, editor-input, editor-blocks and editor-view, plus `editor-history.ts` for apply, undo and redo. The Builder and the shared helpers land as in `canvas-documents-live-builder.json` (their sizes are measured there). `extra` stands in for the Builder's own split, so `live/builder.ts` and `live/builder-tex.ts` read as that spec leaves them.",
+	"extra": {
+		"live/builder.ts": -793,
+		"live/builder-tex.ts": 240
+	}
+}

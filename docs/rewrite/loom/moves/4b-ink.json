@@ -1,0 +1,79 @@
+{
+	"step": "4b-ink",
+	"title": "canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes",
+	"moves": [
+		{
+			"from": "packages/ink/src/ink.ts",
+			"to": "canvas/ink/shaper.ts"
+		},
+		{
+			"from": "packages/ink/src/ink.test.ts",
+			"to": "canvas/ink/shaper.test.ts"
+		},
+		{
+			"from": "packages/ink/src/index.ts",
+			"to": "canvas/ink/index.ts"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"remove": [
+		"packages/ink/"
+	],
+	"localize": [
+		{
+			"within": "canvas/",
+			"name": "@decks/ink",
+			"target": "canvas/ink/index.ts"
+		}
+	],
+	"specifiers": {
+		"@decks/ink": "@decks/canvas/ink"
+	},
+	"mentions": [
+		[
+			"packages/ink/src/ink.ts",
+			"canvas/ink/shaper.ts"
+		],
+		[
+			"packages/ink",
+			"canvas/ink"
+		]
+	],
+	"set": [
+		{
+			"file": "canvas/package.json",
+			"values": {
+				"dependencies.@decks/ink": null,
+				"[\"exports\",\"./ink\"]": "./ink/index.ts"
+			}
+		},
+		{
+			"file": "harness/page/package.json",
+			"values": {
+				"dependencies.@decks/ink": null
+			}
+		}
+	],
+	"then": [
+		"node tools/heavy.mjs --wait -- npm install",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/heavy.mjs --wait -- node server/frame/build.mjs",
+		"node tools/checks/run.mjs ink-long-stroke, then pencil-then-finger (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Fold the ink package into canvas/ink/"
+	]
+}

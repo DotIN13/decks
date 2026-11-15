@@ -1,0 +1,26 @@
+[
+	{
+		"from": "canvas/edit/dom/keys.ts",
+		"to": "canvas/input/keys.ts"
+	},
+	{
+		"from": "canvas/edit/dom/pointer.ts",
+		"to": "canvas/input/pointer.ts"
+	},
+	{
+		"from": "canvas/edit/dom/touch-rules.test.ts",
+		"to": "canvas/input/touch-rules.test.ts"
+	},
+	{
+		"from": "canvas/edit/dom/touch-rules.ts",
+		"to": "canvas/input/touch-rules.ts"
+	},
+	{
+		"from": "canvas/items/input.ts",
+		"to": "canvas/input/item-keys.ts"
+	},
+	{
+		"from": "canvas/stage/input.ts",
+		"to": "canvas/input/canvas-input.ts"
+	}
+]

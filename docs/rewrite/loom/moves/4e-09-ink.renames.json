@@ -1,0 +1,14 @@
+[
+	{
+		"from": "canvas/ink/StageInk.tsx",
+		"to": "canvas/ink/InkLayer.tsx"
+	},
+	{
+		"from": "canvas/model/ink.test.ts",
+		"to": "canvas/ink/model.test.ts"
+	},
+	{
+		"from": "canvas/model/ink.ts",
+		"to": "canvas/ink/model.ts"
+	}
+]

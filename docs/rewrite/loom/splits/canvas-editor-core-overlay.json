@@ -1,0 +1,13 @@
+{
+	"file": "packages/canvas/src/edit/core/overlay.ts",
+	"at": "canvas/editor/core/overlay.ts",
+	"pattern": "pure logic, split by topic",
+	"scope": null,
+	"targets": {
+		"outlines.ts": ["rounded", "NO_SHIFT", "glideShift", "outline", "OutlineInput", "selectionOutlines", "HoverInput", "hoverBox", "KinInput", "kinOutlines", "selectionFrame", "sizeLabel", "gripBox", "gripHidden", "dropBox", "insertBox", "draftBox", "draftCurve"],
+		"handles.ts": ["HANDLES_MIN_PX", "tooSmallForHandles", "itemHandles", "HandleInput", "arrowAnchors", "radiusHandle", "pageHandles", "arrowEnds", "pageHandleList", "HANDLE_HIT_PX", "hitReach", "handleAt", "anchorAt", "radiusInset", "radiusShown"],
+		"measure.ts": ["measure", "distances"]
+	},
+	"rest": "overlay.ts",
+	"note": "`overlay.ts` keeps the overlay's types and `deriveOverlay`, which calls the three; map.md named outlines and measure, and handles is added so each file stays small."
+}

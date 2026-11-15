@@ -1,0 +1,14 @@
+{
+	"file": "packages/pen/src/html.ts",
+	"at": "pen/html.ts",
+	"pattern": "pure logic, split by topic; the Writer class keeps its state and its walk, and the methods that leave it become functions given the writer",
+	"scope": "Writer",
+	"targets": {
+		"html-paint.ts": ["colour", "paint", "radius", "blurRadius", "shadows", "svgPaint", "conic", "rgbaText", "ink", "gradients", "themeVars", "variables", "themeOf"],
+		"html-svg.ts": ["outline", "svgShape", "shape", "icon", "iconsIn", "iconOf", "HtmlIcon"],
+		"html-text.ts": ["text", "note", "font", "fontFaces", "textSizes", "families", "FONT_CDN", "TEXTY", "escapeText", "escapeAttr"],
+		"html-tailwind.ts": ["tailwindClass", "arbitrary", "simple", "tailwind", "cssName", "Decl"]
+	},
+	"rest": "html.ts",
+	"note": "`html.ts` keeps `toHtml`, the options and the Writer's walk (element, place, layer, frame, sizing); `toHtml` stays the one export the entry re-exports, so no importer changes."
+}

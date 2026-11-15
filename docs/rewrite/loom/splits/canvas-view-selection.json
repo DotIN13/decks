@@ -1,0 +1,38 @@
+{
+	"file": "packages/canvas/src/stage/selection.tsx",
+	"at": "canvas/view/selection.tsx",
+	"pattern": "part: model (what the selection derives), view (the pills, the overlay it feeds), actions (delete, duplicate)",
+	"scope": "createSelection",
+	"targets": {
+		"selection/view.tsx": [
+			"pills"
+		],
+		"selection/overlay.ts": [
+			"overlay",
+			"penOutlines",
+			"penHandles",
+			"penAnchors",
+			"pageHandles",
+			"radiusHandle",
+			"arrowEnds",
+			"gripBox",
+			"hoverBox",
+			"kinBoxes",
+			"penFrame",
+			"penDistances",
+			"dropBox",
+			"routeShown",
+			"/^ExpressionStatement@110$/"
+		],
+		"selection/actions.ts": [
+			"penDeleteSelected",
+			"penDuplicate",
+			"quoteOf",
+			"lassoItems",
+			"calloutItems",
+			"pillObstacles"
+		]
+	},
+	"rest": "selection/model.ts",
+	"note": "map.md's model/view/actions, plus `overlay.ts` for the many small values that feed the overlay layer, so the model stays short. `pills` (135 lines) is cut below. `pills` is one JSX fragment (lines 315-448): each pill kind (drawn items, a card, a page, a callout) becomes its own component in `view.tsx`."
+}

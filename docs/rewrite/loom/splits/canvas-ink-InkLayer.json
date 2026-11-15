@@ -1,0 +1,14 @@
+{
+	"file": "packages/canvas/src/ink/StageInk.tsx",
+	"at": "canvas/ink/InkLayer.tsx",
+	"pattern": "a page part: model, view and actions in ink/layer/; StageInk (InkLayer in step 6) keeps its signals and wires the parts, each given them as one ctx",
+	"scope": "StageInk",
+	"targets": {
+		"layer/model.ts": ["STAGE_INK", "PALM_AFTER_MS", "Gesture", "pressureOf", "transform", "HOLD_MS", "startScale", "scaled", "palm", "liveOf", "shaper", "selection", "waiting", "settle", "hold", "handedOver", "handOver"],
+		"layer/paint.ts": ["paintInk", "sendInk", "clearLive", "paintLive", "sheet", "/^ExpressionStatement@(162|586|645)$/"],
+		"layer/actions.ts": ["onDown", "onMove", "onUp", "fingerDown", "fingerMove", "fingerUp", "erase", "cancel", "rest"],
+		"layer/view.tsx": ["ReturnStatement@654"]
+	},
+	"rest": "InkLayer.tsx",
+	"note": "As map.md, with painting the stroke (layer/paint.ts, including the two effects that repaint it) a file of its own."
+}

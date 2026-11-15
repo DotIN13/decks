@@ -1,0 +1,99 @@
+# Step 4e-06-drawing: Regroup canvas: the drawing's model files become drawing/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor. Nothing was moved.
+
+- files moved by git mv: 9
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 16
+- import lines rewritten: 18
+- warnings: 0
+
+## Moved
+
+- canvas/model/bounds.test.ts -> canvas/drawing/bounds.test.ts
+- canvas/model/bounds.ts -> canvas/drawing/bounds.ts
+- canvas/model/boxes.ts -> canvas/drawing/boxes.ts
+- canvas/model/comment-text.ts -> canvas/drawing/comment-text.ts
+- canvas/model/doc-index.ts -> canvas/drawing/doc-index.ts
+- canvas/model/drawing.test.ts -> canvas/drawing/drawing.test.ts
+- canvas/model/drawing.ts -> canvas/drawing/drawing.ts
+- canvas/model/layers.test.ts -> canvas/drawing/layers.test.ts
+- canvas/model/layers.ts -> canvas/drawing/layers.ts
+
+## Lines rewritten
+
+canvas/camera/landing.ts:6
+  - import type { Box } from "../model/boxes.ts";
+  + import type { Box } from "../drawing/boxes.ts";
+canvas/editor/core/ops.ts:222
+  - * edit defines when it does not have them yet (`withDecksColors`, `model/drawing.ts`).
+  + * edit defines when it does not have them yet (`withDecksColors`, `drawing/drawing.ts`).
+canvas/editor/editor.tsx:6
+  - import { topBoxes } from "../model/boxes.ts";
+  + import { topBoxes } from "../drawing/boxes.ts";
+canvas/editor/editor.tsx:11
+  - import { pagesAhead, pagesOf, createDrawing } from "../model/drawing.ts";
+  + import { pagesAhead, pagesOf, createDrawing } from "../drawing/drawing.ts";
+canvas/editor/scene-ts.ts:6
+  - import { docIndex } from "../model/doc-index.ts";
+  + import { docIndex } from "../drawing/doc-index.ts";
+canvas/entries/comments.ts:2
+  - export { commentBlock, commentItem, quoteOf, withComments, QUOTE_LIMIT, type CardComment } from "../model/comment-text.ts";
+  + export { commentBlock, commentItem, quoteOf, withComments, QUOTE_LIMIT, type CardComment } from "../drawing/comment-text.ts";
+canvas/entries/tools.ts:13
+  - export { canvasItems, type CanvasItem, type ItemKind } from "../model/layers.ts";
+  + export { canvasItems, type CanvasItem, type ItemKind } from "../drawing/layers.ts";
+canvas/frame/inside/boot.ts:9
+  - import { pagesOf } from "../../model/drawing.ts";
+  + import { pagesOf } from "../../drawing/drawing.ts";
+canvas/frame/inside/boot.ts:10
+  - import { pageItems } from "../../model/boxes.ts";
+  + import { pageItems } from "../../drawing/boxes.ts";
+canvas/frame/inside/options.ts:10
+  - import { placedItems } from "../../model/boxes.ts";
+  + import { placedItems } from "../../drawing/boxes.ts";
+canvas/items/item-slot.tsx:231
+  - // Its item's own corners, as the drawing's hole for it has them (`model/drawing.ts`, `cardFrame`).
+  + // Its item's own corners, as the drawing's hole for it has them (`drawing/drawing.ts`, `cardFrame`).
+canvas/model/ink.ts:18
+  - * it (`withDecksColors`, `model/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
+  + * it (`withDecksColors`, `drawing/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
+canvas/render/engine.ts:24
+  - import { boundsOf } from "../model/bounds.ts";
+  + import { boundsOf } from "../drawing/bounds.ts";
+canvas/render/engine.ts:25
+  - import { docIndex, drawnNodes } from "../model/doc-index.ts";
+  + import { docIndex, drawnNodes } from "../drawing/doc-index.ts";
+canvas/view/CanvasView.tsx:12
+  - import { docIndex } from "../model/doc-index.ts";
+  + import { docIndex } from "../drawing/doc-index.ts";
+canvas/view/items-layer.tsx:13
+  - import { docIndex } from "../model/doc-index.ts";
+  + import { docIndex } from "../drawing/doc-index.ts";
+e2e/checks/edits-wait.mjs:16
+  - * has them arrives (`canvas/model/drawing.ts`), so every case asks for no frame of the old
+  + * has them arrives (`canvas/drawing/drawing.ts`), so every case asks for no frame of the old
+harness/page/state/types/deck.ts:100
+  - * canvas's 12 px. Read off the drawing (`model/drawing.ts`, `pagesOf`), as its place is.
+  + * canvas's 12 px. Read off the drawing (`drawing/drawing.ts`, `pagesOf`), as its place is.
+
+## Files the table edits or creates
+
+- canvas/drawing/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-06-drawing.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: edits-wait, selection (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: the drawing's model files become drawing/

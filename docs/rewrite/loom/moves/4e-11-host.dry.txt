@@ -1,0 +1,181 @@
+# Step 4e-11-host: Regroup canvas: frame/ and host.ts become host/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome. Nothing was moved.
+
+- files moved by git mv: 18
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 34
+- import lines rewritten: 42
+- warnings: 0
+
+## Moved
+
+- canvas/frame/chrome.ts -> canvas/host/chrome.ts
+- canvas/frame/inside/backend.ts -> canvas/host/inside/backend.ts
+- canvas/frame/inside/boot.ts -> canvas/host/inside/boot.ts
+- canvas/frame/inside/card-calls.ts -> canvas/host/inside/card-calls.ts
+- canvas/frame/inside/clipboard.ts -> canvas/host/inside/clipboard.ts
+- canvas/frame/inside/events.ts -> canvas/host/inside/events.ts
+- canvas/frame/inside/frame.tsx -> canvas/host/inside/frame.tsx
+- canvas/frame/inside/life.ts -> canvas/host/inside/life.ts
+- canvas/frame/inside/line.ts -> canvas/host/inside/line.ts
+- canvas/frame/inside/marks.test.ts -> canvas/host/inside/marks.test.ts
+- canvas/frame/inside/marks.ts -> canvas/host/inside/marks.ts
+- canvas/frame/inside/options.ts -> canvas/host/inside/options.ts
+- canvas/frame/inside/presence.ts -> canvas/host/inside/presence.ts
+- canvas/frame/inside/studio-line.ts -> canvas/host/inside/studio-line.ts
+- canvas/frame/outside/host.tsx -> canvas/host/outside/framed-editor.tsx
+- canvas/frame/protocol.ts -> canvas/host/messages.ts
+- canvas/host-pass.test.ts -> canvas/host/host-pass.test.ts
+- canvas/host.ts -> canvas/host/host.ts
+
+## Lines rewritten
+
+canvas/cards/CardEditor.tsx:25
+  - import { pictureAddress } from "../host.ts";
+  + import { pictureAddress } from "../host/host.ts";
+canvas/cards/card-surface.tsx:9
+  - import { canvasHost, freshAddress, openInTab } from "../host.ts";
+  + import { canvasHost, freshAddress, openInTab } from "../host/host.ts";
+canvas/cards/card.ts:2
+  - import { freshAddress, passless } from "../host.ts";
+  + import { freshAddress, passless } from "../host/host.ts";
+canvas/chrome/Callout.tsx:9
+  - import { canvasHost, openInTab } from "../host.ts";
+  + import { canvasHost, openInTab } from "../host/host.ts";
+canvas/chrome/InsertMenu.tsx:13
+  - import { canvasHost } from "../host.ts";
+  + import { canvasHost } from "../host/host.ts";
+canvas/editor/dom/TextEditing.tsx:27
+  - import { openInTab, pictureAddress } from "../../host.ts";
+  + import { openInTab, pictureAddress } from "../../host/host.ts";
+canvas/editor/dom/effects.ts:8
+  - import { canvasHost, openInTab, type CanvasHost } from "../../host.ts";
+  + import { canvasHost, openInTab, type CanvasHost } from "../../host/host.ts";
+canvas/editor/editor.tsx:36
+  - * drawing's tools and properties, and ink. The canvas frame (`frame/inside/frame.tsx`) makes it where
+  + * drawing's tools and properties, and ink. The canvas frame (`host/inside/frame.tsx`) makes it where
+canvas/entries/host.ts:8
+  - export * from "../host.ts";
+  + export * from "../host/host.ts";
+canvas/host/chrome.ts:4
+  - import type { ComposerPart } from "./protocol.ts";
+  + import type { ComposerPart } from "./messages.ts";
+canvas/host/inside/boot.ts:15
+  - import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
+  + import type { FrameEnd, FramePage, Rect, Start } from "../messages.ts";
+canvas/host/inside/card-calls.ts:3
+  - import { CallRefused } from "../protocol.ts";
+  + import { CallRefused } from "../messages.ts";
+canvas/host/inside/events.ts:16
+  - import type { CardSlot } from "../protocol.ts";
+  + import type { CardSlot } from "../messages.ts";
+canvas/host/inside/frame.tsx:12
+  - import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../protocol.ts";
+  + import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../messages.ts";
+canvas/host/inside/frame.tsx:19
+  - * composer, your storage (`protocol.ts`).
+  + * composer, your storage (`messages.ts`).
+canvas/host/inside/options.ts:6
+  - import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
+  + import { passless, passOf, setCanvasHost, withPass } from "../host.ts";
+canvas/host/inside/options.ts:13
+  - import type { Rect } from "../protocol.ts";
+  + import type { Rect } from "../messages.ts";
+canvas/host/outside/framed-editor.tsx:8
+  - import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
+  + import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../messages.ts";
+canvas/host/outside/framed-editor.tsx:159
+  - * The editor in a sandboxed frame (`protocol.ts`): the canvas runs in the frame (`bootFrame`); this end
+  + * The editor in a sandboxed frame (`messages.ts`): the canvas runs in the frame (`bootFrame`); this end
+canvas/host/messages.ts:96
+  - /** A paste the page heard, with the focus on the page: a copy of items (a clip's JSON) or words, for the canvas (`frame/inside/clipboard.ts`). */
+  + /** A paste the page heard, with the focus on the page: a copy of items (a clip's JSON) or words, for the canvas (`host/inside/clipboard.ts`). */
+canvas/host/host.ts:1
+  - import { setIconSource, type IconSource } from "./look/icons.ts";
+  + import { setIconSource, type IconSource } from "../look/icons.ts";
+canvas/index.ts:8
+  - export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
+  + export { canvasHost, setCanvasHost, type CanvasHost } from "./host/host.ts";
+canvas/index.ts:14
+  - export { bootFrame } from "./frame/inside/frame.tsx";
+  + export { bootFrame } from "./host/inside/frame.tsx";
+canvas/index.ts:15
+  - export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
+  + export type { FrameChrome, FrameChromeView } from "./host/chrome.ts";
+canvas/index.ts:16
+  - export { CallRefused, type FrameCalls } from "./frame/protocol.ts";
+  + export { CallRefused, type FrameCalls } from "./host/messages.ts";
+canvas/index.ts:17
+  - export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./frame/outside/host.tsx";
+  + export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./host/outside/framed-editor.tsx";
+canvas/items/item-surfaces.tsx:5
+  - import { canvasHost } from "../host.ts";
+  + import { canvasHost } from "../host/host.ts";
+canvas/items/item-surfaces.tsx:177
+  - /* No more than the canvas frame around it has (`frame/outside/host.tsx`), and the same reasons for what is left out. */
+  + /* No more than the canvas frame around it has (`host/outside/framed-editor.tsx`), and the same reasons for what is left out. */
+canvas/render/backends/detect.ts:112
+  - // Once a frame: the next canvas it moves to in place (`frame/inside/frame.tsx`) finds the answer here. One that failed is asked again.
+  + // Once a frame: the next canvas it moves to in place (`host/inside/frame.tsx`) finds the answer here. One that failed is asked again.
+canvas/render/engine.ts:21
+  - import { pictureAddress } from "../host.ts";
+  + import { pictureAddress } from "../host/host.ts";
+canvas/render/engine.ts:115
+  - // `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `host.tsx`), for measuring one way on a device that takes the other.
+  + // `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `framed-editor.tsx`), for measuring one way on a device that takes the other.
+canvas/styles/marks.css:10
+  - * What an agent just drew (`frame/inside/marks.ts`): a mark on each item it touched, drawn in the
+  + * What an agent just drew (`host/inside/marks.ts`): a mark on each item it touched, drawn in the
+canvas/types.ts:220
+  - * framed editor (`frame/outside/host.tsx`) keeps all of it in step with its frame; `createEditor` itself
+  + * framed editor (`host/outside/framed-editor.tsx`) keeps all of it in step with its frame; `createEditor` itself
+canvas/view/items-layer.tsx:6
+  - import { canvasHost, openInTab } from "../host.ts";
+  + import { canvasHost, openInTab } from "../host/host.ts";
+e2e/checks/canvas-switch.mjs:3
+  - * otherwise (`frame/outside/host.tsx`, `inPlace`; `frame/inside/frame.tsx`, `reset`).
+  + * otherwise (`host/outside/framed-editor.tsx`, `inPlace`; `host/inside/frame.tsx`, `reset`).
+e2e/checks/card-copy.mjs:4
+  - * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`frame/inside/clipboard.ts`)
+  + * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`host/inside/clipboard.ts`)
+e2e/checks/news-seen.mjs:25
+  - // The frame's `card.seen` messages, counted: it says them on its line (`frame/inside/backend.ts`), not as a POST
+  + // The frame's `card.seen` messages, counted: it says them on its line (`host/inside/backend.ts`), not as a POST
+e2e/checks/presence.mjs:9
+  - * (`frame/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
+  + * (`host/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
+harness/page/canvases/pass.ts:12
+  - * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `frame/outside/host.tsx`).
+  + * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `host/outside/framed-editor.tsx`).
+harness/page/perf/probe.ts:8
+  - * to the frame's address (`@decks/canvas`, `frame/outside/host.tsx`), and keeps only a relay
+  + * to the frame's address (`@decks/canvas`, `host/outside/framed-editor.tsx`), and keeps only a relay
+harness/page/shell/v3.css:1636
+  - /* The row lives in the canvas frame, whose root carries the phone mark (`frame/inside/boot.ts`), not the app's. */
+  + /* The row lives in the canvas frame, whose root carries the phone mark (`host/inside/boot.ts`), not the app's. */
+ui/dismiss.ts:7
+  - * frame's bridge tells the other side (`frame/inside/frame.tsx`, `frame/outside/host.tsx`), which
+  + * frame's bridge tells the other side (`host/inside/frame.tsx`, `host/outside/framed-editor.tsx`), which
+
+## Files the table edits or creates
+
+- canvas/host/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- docs/REORGANIZATION.md: 2
+- docs/STUDIO-MIGRATION.md: 1
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-11-host.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: canvas-frame, context-loss (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: frame/ and host.ts become host/

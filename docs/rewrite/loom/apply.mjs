@@ -42,6 +42,7 @@ function removeEmptyParents(root, rel) {
 export function apply(root, table, p) {
 	const notes = [];
 	if (p.untrack.length) git(root, ["rm", "-r", "-q", "--cached", "--", ...(table.untrack || [])]);
+	if (p.remove.length) git(root, ["rm", "-r", "-q", "--", ...(table.remove || [])]);
 	for (const [from, to] of p.moves) {
 		mkdirSync(dirname(join(root, to)), { recursive: true });
 		git(root, ["mv", "--", from, to]);

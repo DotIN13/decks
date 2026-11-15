@@ -1,0 +1,31 @@
+# canvas
+
+The canvas page, a library (`@decks/canvas`): the canvas element, its camera, input, the TypeScript
+editor, the drawing, items, cards, documents, ink, the engine's page side, its controls, and the
+frame that holds it all.
+
+## Owns
+
+- `index.ts`, `entries/`: the package's doors. `types.ts`, `theme.ts`, `debug.ts`.
+- `view/`, `camera/`, `input/`, `editor/`, `drawing/`: the canvas, where it looks, presses, edits.
+- `items/`, `cards/`, `documents/`, `ink/`: what sits on it.
+- `render/`, `look/`: drawing it. `chrome/`: its controls. `host/`: the frame and its page.
+- `styles/`: the canvas surface sheets, in `@layer decks.surface`.
+
+## May import
+
+`protocol/`, `pen/`, `ui/`, `engine/`. Nothing above.
+
+## Rules
+
+1. Behaviour, markup and class names stay: the browser checks, Studio and cards select by them.
+2. The eight `stage` class names keep their word (DESIGN.md section 11); every other use is renamed.
+3. A part of the page is three files: model, view, actions.
+4. Nothing built is in git: the vendored card libraries and `live-doc.js` are made at install.
+
+## Check
+
+```
+node tools/check.mjs canvas
+node tools/check.mjs harness
+```

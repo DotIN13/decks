@@ -1,0 +1,76 @@
+{
+	"step": "4e-06-drawing",
+	"title": "Regroup canvas: the drawing's model files become drawing/",
+	"moves": [
+		{
+			"from": "canvas/model/drawing.ts",
+			"to": "canvas/drawing/drawing.ts"
+		},
+		{
+			"from": "canvas/model/drawing.test.ts",
+			"to": "canvas/drawing/drawing.test.ts"
+		},
+		{
+			"from": "canvas/model/boxes.ts",
+			"to": "canvas/drawing/boxes.ts"
+		},
+		{
+			"from": "canvas/model/bounds.ts",
+			"to": "canvas/drawing/bounds.ts"
+		},
+		{
+			"from": "canvas/model/bounds.test.ts",
+			"to": "canvas/drawing/bounds.test.ts"
+		},
+		{
+			"from": "canvas/model/layers.ts",
+			"to": "canvas/drawing/layers.ts"
+		},
+		{
+			"from": "canvas/model/layers.test.ts",
+			"to": "canvas/drawing/layers.test.ts"
+		},
+		{
+			"from": "canvas/model/doc-index.ts",
+			"to": "canvas/drawing/doc-index.ts"
+		},
+		{
+			"from": "canvas/model/comment-text.ts",
+			"to": "canvas/drawing/comment-text.ts"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"model/drawing.ts",
+			"drawing/drawing.ts"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/drawing/README.md",
+			"from": "readmes/canvas-drawing.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-06-drawing.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: edits-wait, selection (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: the drawing's model files become drawing/"
+	]
+}

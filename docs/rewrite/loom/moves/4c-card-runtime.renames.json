@@ -1,0 +1,74 @@
+[
+	{
+		"from": "packages/card-host/lib/card.css",
+		"to": "canvas/cards/runtime/lib/card.css"
+	},
+	{
+		"from": "packages/card-host/lib/card.js",
+		"to": "canvas/cards/runtime/lib/card.js"
+	},
+	{
+		"from": "packages/card-host/lib/live-app.js",
+		"to": "canvas/cards/runtime/lib/live-app.js"
+	},
+	{
+		"from": "packages/card-host/lib/live-doc.js",
+		"to": "canvas/cards/runtime/lib/live-doc.js"
+	},
+	{
+		"from": "packages/card-host/lib/live-web.js",
+		"to": "canvas/cards/runtime/lib/live-web.js"
+	},
+	{
+		"from": "packages/card-host/lib/theme.css",
+		"to": "canvas/cards/runtime/lib/theme.css"
+	},
+	{
+		"from": "packages/card-host/lib/type/InterVariable-Italic.woff2",
+		"to": "canvas/cards/runtime/lib/type/InterVariable-Italic.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/InterVariable.woff2",
+		"to": "canvas/cards/runtime/lib/type/InterVariable.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/JetBrainsMono-Bold.woff2",
+		"to": "canvas/cards/runtime/lib/type/JetBrainsMono-Bold.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/JetBrainsMono-Italic.woff2",
+		"to": "canvas/cards/runtime/lib/type/JetBrainsMono-Italic.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/JetBrainsMono-Medium.woff2",
+		"to": "canvas/cards/runtime/lib/type/JetBrainsMono-Medium.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/JetBrainsMono-Regular.woff2",
+		"to": "canvas/cards/runtime/lib/type/JetBrainsMono-Regular.woff2"
+	},
+	{
+		"from": "packages/card-host/lib/type/NOTICE.md",
+		"to": "canvas/cards/runtime/lib/type/NOTICE.md"
+	},
+	{
+		"from": "packages/card-host/src/cards.ts",
+		"to": "canvas/cards/runtime/cards.ts"
+	},
+	{
+		"from": "packages/card-host/src/index.ts",
+		"to": "canvas/cards/runtime/index.ts"
+	},
+	{
+		"from": "packages/card-host/src/sandbox.ts",
+		"to": "canvas/cards/runtime/sandbox.ts"
+	},
+	{
+		"from": "packages/card-host/test/card-host.test.ts",
+		"to": "canvas/cards/runtime/runtime.test.ts"
+	},
+	{
+		"from": "scripts/vendor.mjs",
+		"to": "canvas/cards/runtime/vendor.mjs"
+	}
+]

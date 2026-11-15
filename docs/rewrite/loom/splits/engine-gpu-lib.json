@@ -1,0 +1,26 @@
+{
+	"file": "packages/stage/crates/gpu/src/lib.rs",
+	"at": "engine/crates/gpu/src/lib.rs",
+	"pattern": "Rust modules by topic; methods that leave an impl stay methods, in a second `impl X` block in the new module, which Rust allows within one crate",
+	"scope": "impl Gpu",
+	"targets": {
+		"spares.rs": [
+			"warm",
+			"forget_to_spare",
+			"texture_from_spare",
+			"make_spares",
+			"texture_handle",
+			"read"
+		],
+		"pictures.rs": [
+			"picture_texture",
+			"compressed_pictures",
+			"compressed_picture",
+			"write_level",
+			"fill_levels",
+			"shrink"
+		]
+	},
+	"rest": "lib.rs",
+	"note": "lib.rs keeps Api, Gpu, the rest of its first `impl Gpu` and the `impl Backend for Gpu`, and declares `mod spares; mod pictures;` beside `pub mod exec; pub mod targets;`. Both new modules hold `impl Gpu` blocks, so no public name changes. The lister names both impl blocks `impl Gpu`; the spec splits the first (inherent) one."
+}

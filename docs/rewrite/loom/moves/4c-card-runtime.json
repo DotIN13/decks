@@ -1,0 +1,180 @@
+{
+	"step": "4c-card-runtime",
+	"title": "canvas/cards/runtime/: card-host folds into the canvas library; vendored libraries leave git, copied at install",
+	"moves": [
+		{
+			"from": "packages/card-host/src/",
+			"to": "canvas/cards/runtime/"
+		},
+		{
+			"from": "packages/card-host/test/card-host.test.ts",
+			"to": "canvas/cards/runtime/runtime.test.ts"
+		},
+		{
+			"from": "packages/card-host/lib/",
+			"to": "canvas/cards/runtime/lib/"
+		},
+		{
+			"from": "scripts/vendor.mjs",
+			"to": "canvas/cards/runtime/vendor.mjs"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"remove": [
+		"packages/card-host/package.json",
+		"packages/card-host/tsconfig.json"
+	],
+	"untrack": [
+		"packages/card-host/lib/d3.min.js",
+		"packages/card-host/lib/marked.umd.js",
+		"packages/card-host/lib/katex.min.js",
+		"packages/card-host/lib/katex.min.css",
+		"packages/card-host/lib/katex-auto-render.min.js",
+		"packages/card-host/lib/pdf.min.mjs",
+		"packages/card-host/lib/pdf.worker.min.mjs",
+		"packages/card-host/lib/mermaid.bundle.mjs",
+		"packages/card-host/lib/hljs.bundle.mjs",
+		"packages/card-host/lib/VENDORED.md",
+		"packages/card-host/lib/fonts/",
+		"packages/card-host/lib/standard_fonts/",
+		"packages/card-host/lib/wasm/"
+	],
+	"ignore": [
+		{
+			"file": "canvas/cards/runtime/lib/.gitignore",
+			"add": [
+				"# copied in at install by ../vendor.mjs (npm run vendor -w @decks/canvas)",
+				"/d3.min.js",
+				"/marked.umd.js",
+				"/katex.min.js",
+				"/katex.min.css",
+				"/katex-auto-render.min.js",
+				"/pdf.min.mjs",
+				"/pdf.worker.min.mjs",
+				"/mermaid.bundle.mjs",
+				"/hljs.bundle.mjs",
+				"/VENDORED.md",
+				"/fonts/",
+				"/standard_fonts/",
+				"/wasm/"
+			]
+		}
+	],
+	"localize": [
+		{
+			"within": "canvas/",
+			"name": "@decks/card-host",
+			"target": "canvas/cards/runtime/index.ts"
+		},
+		{
+			"within": "canvas/",
+			"name": "@decks/card-host/sandbox",
+			"target": "canvas/cards/runtime/sandbox.ts"
+		}
+	],
+	"specifiers": {
+		"@decks/card-host": "@decks/canvas/cards-runtime"
+	},
+	"mentions": [
+		[
+			"packages/card-host/lib",
+			"canvas/cards/runtime/lib"
+		],
+		[
+			"packages/card-host/src/",
+			"canvas/cards/runtime/"
+		],
+		[
+			"`card-host/lib`",
+			"`canvas/cards/runtime/lib`"
+		]
+	],
+	"paths": [
+		{
+			"file": "canvas/cards/runtime/index.ts",
+			"replace": [
+				{
+					"from": "resolve(dirname(fileURLToPath(import.meta.url)), \"..\", \"lib\")",
+					"to": "resolve(dirname(fileURLToPath(import.meta.url)), \"lib\")"
+				}
+			]
+		},
+		{
+			"file": "canvas/cards/runtime/vendor.mjs",
+			"replace": [
+				{
+					"from": "const root = resolve(dirname(fileURLToPath(import.meta.url)), \"..\");",
+					"to": "const root = resolve(dirname(fileURLToPath(import.meta.url)), \"..\", \"..\", \"..\");"
+				},
+				{
+					"from": "join(root, \"packages\", \"card-host\", \"lib\")",
+					"to": "join(root, \"canvas\", \"cards\", \"runtime\", \"lib\")"
+				}
+			]
+		},
+		{
+			"file": "scripts/live-doc.mjs",
+			"replace": [
+				{
+					"from": "join(root, \"packages\", \"card-host\", \"lib\", \"live-doc.js\")",
+					"to": "join(root, \"canvas\", \"cards\", \"runtime\", \"lib\", \"live-doc.js\")"
+				}
+			]
+		}
+	],
+	"set": [
+		{
+			"file": "canvas/package.json",
+			"values": {
+				"[\"exports\",\"./cards-runtime\"]": "./cards/runtime/index.ts",
+				"[\"exports\",\"./cards-runtime/sandbox\"]": "./cards/runtime/sandbox.ts",
+				"[\"exports\",\"./cards-runtime/lib/*\"]": "./cards/runtime/lib/*",
+				"dependencies.d3": "7.9.0",
+				"dependencies.marked": "15.0.12",
+				"dependencies.katex": "0.16.47",
+				"dependencies.mermaid": "11.17.2",
+				"dependencies.pdfjs-dist": "5.7.284",
+				"dependencies.highlight.js": null,
+				"[\"dependencies\",\"highlight.js\"]": "11.12.0",
+				"scripts.vendor": "node cards/runtime/vendor.mjs",
+				"scripts.postinstall": "node cards/runtime/vendor.mjs"
+			}
+		},
+		{
+			"file": "examples/share-site/package.json",
+			"values": {
+				"dependencies.@decks/card-host": null,
+				"dependencies.@decks/canvas": "*"
+			}
+		},
+		{
+			"file": "package.json",
+			"values": {
+				"scripts.vendor": "npm run vendor -w @decks/canvas"
+			}
+		}
+	],
+	"then": [
+		"before: scripts/vendor.mjs and scripts/live-doc.mjs kept by the switch-over (or found at their tools/ home and the table's from paths changed)",
+		"node tools/heavy.mjs --wait -- npm install (its postinstall copies the vendored libraries into canvas/cards/runtime/lib)",
+		"diff the copied files against git's last copy: the same bytes (pinned versions)",
+		"node tools/check.mjs canvas && node tools/check.mjs server",
+		"node tools/gates/run.mjs (built: the 8 card-host lib entries gone)",
+		"node tools/checks/run.mjs card-tab, card-links, card-keys, card-copy, media (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Fold the card runtime into canvas/cards/runtime/"
+	]
+}

@@ -1,0 +1,174 @@
+[
+	{
+		"from": "canvas/edit/core/arrows.test.ts",
+		"to": "canvas/editor/core/arrows.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/arrows.ts",
+		"to": "canvas/editor/core/arrows.ts"
+	},
+	{
+		"from": "canvas/edit/core/dispatch.test.ts",
+		"to": "canvas/editor/core/dispatch.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/dispatch.ts",
+		"to": "canvas/editor/core/dispatch.ts"
+	},
+	{
+		"from": "canvas/edit/core/drop.test.ts",
+		"to": "canvas/editor/core/drop.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/drop.ts",
+		"to": "canvas/editor/core/drop.ts"
+	},
+	{
+		"from": "canvas/edit/core/fake-scene.test-helper.ts",
+		"to": "canvas/editor/core/fake-scene.test-helper.ts"
+	},
+	{
+		"from": "canvas/edit/core/gesture.test.ts",
+		"to": "canvas/editor/core/gesture.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/gesture.ts",
+		"to": "canvas/editor/core/gesture.ts"
+	},
+	{
+		"from": "canvas/edit/core/imports.test.ts",
+		"to": "canvas/editor/core/imports.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/insert.test.ts",
+		"to": "canvas/editor/core/insert.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/insert.ts",
+		"to": "canvas/editor/core/insert.ts"
+	},
+	{
+		"from": "canvas/edit/core/keys.test.ts",
+		"to": "canvas/editor/core/keys.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/keys.ts",
+		"to": "canvas/editor/core/keys.ts"
+	},
+	{
+		"from": "canvas/edit/core/model.ts",
+		"to": "canvas/editor/core/model.ts"
+	},
+	{
+		"from": "canvas/edit/core/ops.test.ts",
+		"to": "canvas/editor/core/ops.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/ops.ts",
+		"to": "canvas/editor/core/ops.ts"
+	},
+	{
+		"from": "canvas/edit/core/overlay-json.ts",
+		"to": "canvas/editor/core/overlay-json.ts"
+	},
+	{
+		"from": "canvas/edit/core/overlay.test.ts",
+		"to": "canvas/editor/core/overlay.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/overlay.ts",
+		"to": "canvas/editor/core/overlay.ts"
+	},
+	{
+		"from": "canvas/edit/core/pick.test.ts",
+		"to": "canvas/editor/core/pick.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/pick.ts",
+		"to": "canvas/editor/core/pick.ts"
+	},
+	{
+		"from": "canvas/edit/core/resize.test.ts",
+		"to": "canvas/editor/core/resize.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/resize.ts",
+		"to": "canvas/editor/core/resize.ts"
+	},
+	{
+		"from": "canvas/edit/core/scene.ts",
+		"to": "canvas/editor/core/scene.ts"
+	},
+	{
+		"from": "canvas/edit/core/snapping.test.ts",
+		"to": "canvas/editor/core/snapping.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/snapping.ts",
+		"to": "canvas/editor/core/snapping.ts"
+	},
+	{
+		"from": "canvas/edit/core/text.test.ts",
+		"to": "canvas/editor/core/text.test.ts"
+	},
+	{
+		"from": "canvas/edit/core/text.ts",
+		"to": "canvas/editor/core/text.ts"
+	},
+	{
+		"from": "canvas/edit/dom/OverlayLayer.tsx",
+		"to": "canvas/editor/dom/OverlayLayer.tsx"
+	},
+	{
+		"from": "canvas/edit/dom/TextEditing.tsx",
+		"to": "canvas/editor/dom/TextEditing.tsx"
+	},
+	{
+		"from": "canvas/edit/dom/colours.ts",
+		"to": "canvas/editor/dom/colours.ts"
+	},
+	{
+		"from": "canvas/edit/dom/controller.ts",
+		"to": "canvas/editor/dom/controller.ts"
+	},
+	{
+		"from": "canvas/edit/dom/effects.ts",
+		"to": "canvas/editor/dom/effects.ts"
+	},
+	{
+		"from": "canvas/edit/held.ts",
+		"to": "canvas/editor/held.ts"
+	},
+	{
+		"from": "canvas/edit/index.ts",
+		"to": "canvas/editor/index.ts"
+	},
+	{
+		"from": "canvas/edit/ops-constants.test.ts",
+		"to": "canvas/editor/ops-constants.test.ts"
+	},
+	{
+		"from": "canvas/edit/pen-tools.test.ts",
+		"to": "canvas/editor/pen-tools.test.ts"
+	},
+	{
+		"from": "canvas/edit/pen-tools.ts",
+		"to": "canvas/editor/pen-tools.ts"
+	},
+	{
+		"from": "canvas/edit/scene-ts.ts",
+		"to": "canvas/editor/scene-ts.ts"
+	},
+	{
+		"from": "canvas/edit/snap.test.ts",
+		"to": "canvas/editor/snap.test.ts"
+	},
+	{
+		"from": "canvas/edit/snap.ts",
+		"to": "canvas/editor/snap.ts"
+	},
+	{
+		"from": "canvas/editor.tsx",
+		"to": "canvas/editor/editor.tsx"
+	}
+]

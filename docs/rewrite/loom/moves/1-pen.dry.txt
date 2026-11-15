@@ -1,9 +1,10 @@
 # Step 1-pen: pen/: packages/pen moved to the top, src/ flattened, the name @decks/pen kept
 
-Dry run on 111525a5. Nothing was moved.
+Dry run on e19152f7. Nothing was moved.
 
 - files moved by git mv: 29
 - files taken out of git (moved on disk): 0
+- files deleted: 0
 - files edited or created: 11
 - import lines rewritten: 17
 - warnings: 0

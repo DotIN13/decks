@@ -1,0 +1,14 @@
+{
+	"file": "packages/ui/src/float/float.ts",
+	"at": "ui/float/float.ts",
+	"pattern": "part with no markup of its own: `makeFloat` keeps its state; dragging, the tab and placing leave it as functions given a `ctx`",
+	"scope": "makeFloat",
+	"targets": {
+		"drag.ts": ["onPointerDown", "onPointerMove", "endDrag", "onWindowMove", "onWindowUp", "onWindowBlur", "listen", "onDoubleClick", "swallowClick", "following", "follow", "DRAG_THRESHOLD", "SAMPLES"],
+		"tab.ts": ["tabDrag", "onTabDown", "onTabWindowMove", "onTabWindowUp", "onTabBlur", "listenTab", "onTabMove", "onTabUp", "TAB_SAFE_ZONE", "PULL_OUT", "tabWidth"],
+		"place.ts": ["settle", "settling", "cancelSettle", "restore", "unstow", "sendHome", "placeAt", "remember", "clear", "place"],
+		"options.ts": ["FloatOptions"]
+	},
+	"rest": "float.ts",
+	"note": "map.md's drag and place, plus `tab.ts` for the pull-out tab and `options.ts` for the 81-line options type."
+}

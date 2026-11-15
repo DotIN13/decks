@@ -1,0 +1,8 @@
+{
+	"file": "packages/canvas/src/model/markdown.ts",
+	"at": "canvas/cards/markdown.ts",
+	"pattern": "functions only: the file stays whole, under 400 lines; each function over 80 lines is cut into named helpers in the same file, at the lines below",
+	"scope": null,
+	"targets": {},
+	"rest": "markdown.ts"
+}

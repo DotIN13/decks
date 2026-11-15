@@ -1,0 +1,16 @@
+{
+	"file": "packages/stage/crates/web/src/engine.rs",
+	"at": "engine/crates/web/src/engine.rs",
+	"pattern": "Rust modules by topic; `impl Page` is split across modules as several `impl Page` blocks in one crate, the struct and its fields stay in engine.rs",
+	"scope": "impl Page",
+	"targets": {
+		"page_edits.rs": ["apply", "undo", "redo", "apply_edits", "boxes", "reroute_after", "set_document", "set_dark"],
+		"page_layout.rs": ["add_font", "hold_font", "lay_out", "layout_json", "layout_changes", "root_json", "card_json", "pick_all", "cards_json", "font_needs", "font_needs_changed", "root_font_needs", "pick", "within", "card_radii", "carried_frame", "cards"],
+		"page_frame.rs": ["draw_at", "shown_scale", "show_wanted", "tile_texture", "frame"],
+		"page_preview.rs": ["set_overlay", "lift", "preview", "bend", "unpreview_fields", "unpreview", "landed"],
+		"pictures.rs": ["Pictures", "impl Pictures", "PICTURE_FADE_MS", "picture", "picture_unlaid", "fade_pictures", "forget_picture", "lay_out_pictures", "new_texture", "forget_tiles", "evict"],
+		"worker.rs": ["Worker", "impl Worker", "TILE_SIZE", "copy_extent"]
+	},
+	"rest": "engine.rs",
+	"note": "engine.rs keeps Camera, MIN_TILES, Page, SentRoot, `Page::new` and the tests, and gains `mod page_edits; mod page_layout; mod page_frame; mod page_preview; mod pictures; mod worker;` with `pub use pictures::Pictures; pub use worker::Worker;`, so `crate::engine::{Page, Worker, Pictures, Camera}` stay the same names. Fields of Page that the new modules read become `pub(crate)`. `Page::frame` (233 lines) and `reroute_after` (110) are long methods; Rust functions are not gated, but each is cut at its phases in phase 2 (frame: tiles, cards, overlays; reroute_after: find, route, write). worker.rs is at 370: if it grows, its painting methods (paint, ink_areas, invalidate, discard_stale, next: 171 lines) go to worker_paint.rs as a second `impl Worker`."
+}

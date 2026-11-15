@@ -1,0 +1,38 @@
+[
+	{
+		"from": "canvas/model/bounds.test.ts",
+		"to": "canvas/drawing/bounds.test.ts"
+	},
+	{
+		"from": "canvas/model/bounds.ts",
+		"to": "canvas/drawing/bounds.ts"
+	},
+	{
+		"from": "canvas/model/boxes.ts",
+		"to": "canvas/drawing/boxes.ts"
+	},
+	{
+		"from": "canvas/model/comment-text.ts",
+		"to": "canvas/drawing/comment-text.ts"
+	},
+	{
+		"from": "canvas/model/doc-index.ts",
+		"to": "canvas/drawing/doc-index.ts"
+	},
+	{
+		"from": "canvas/model/drawing.test.ts",
+		"to": "canvas/drawing/drawing.test.ts"
+	},
+	{
+		"from": "canvas/model/drawing.ts",
+		"to": "canvas/drawing/drawing.ts"
+	},
+	{
+		"from": "canvas/model/layers.test.ts",
+		"to": "canvas/drawing/layers.test.ts"
+	},
+	{
+		"from": "canvas/model/layers.ts",
+		"to": "canvas/drawing/layers.ts"
+	}
+]

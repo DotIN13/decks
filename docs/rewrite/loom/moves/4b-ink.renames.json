@@ -1,0 +1,14 @@
+[
+	{
+		"from": "packages/ink/src/index.ts",
+		"to": "canvas/ink/index.ts"
+	},
+	{
+		"from": "packages/ink/src/ink.test.ts",
+		"to": "canvas/ink/shaper.test.ts"
+	},
+	{
+		"from": "packages/ink/src/ink.ts",
+		"to": "canvas/ink/shaper.ts"
+	}
+]

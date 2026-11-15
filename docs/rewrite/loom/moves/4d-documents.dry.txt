@@ -1,0 +1,162 @@
+# Step 4d-documents: canvas/documents/: the page half of docs folds into the canvas library; the server half is already server/documents
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime. Nothing was moved.
+
+- files moved by git mv: 19
+- files taken out of git (moved on disk): 1
+- files deleted: 17
+- files edited or created: 16
+- import lines rewritten: 26
+- warnings: 0
+
+## Taken out of git
+
+- canvas/cards/runtime/lib/live-doc.js
+
+## Deleted
+
+- packages/docs/README.md
+- packages/docs/package.json
+- packages/docs/src/converge.test.ts
+- packages/docs/src/gdoc/fake.ts
+- packages/docs/src/gdoc/gdoc.test.ts
+- packages/docs/src/gdoc/index.ts
+- packages/docs/src/gdoc/markdown.ts
+- packages/docs/src/gdoc/plan.ts
+- packages/docs/src/server/fixtures.ts
+- packages/docs/src/server/index.ts
+- packages/docs/src/server/library.test.ts
+- packages/docs/src/server/library.ts
+- packages/docs/src/server/service.test.ts
+- packages/docs/src/server/service.ts
+- packages/docs/src/server/versions.ts
+- packages/docs/src/server/zip.ts
+- packages/docs/tsconfig.json
+
+## Moved
+
+- packages/docs/src/client.ts -> canvas/documents/client.ts
+- packages/docs/src/gdoc/types.ts -> canvas/documents/google/types.ts
+- packages/docs/src/gdoc/units.ts -> canvas/documents/google/units.ts
+- packages/docs/src/index.ts -> canvas/documents/model.ts
+- packages/docs/src/merge.test.ts -> canvas/documents/merge.test.ts
+- packages/docs/src/merge.ts -> canvas/documents/merge.ts
+- packages/docs/src/page/blocks.test.ts -> canvas/documents/blocks.test.ts
+- packages/docs/src/page/blocks.ts -> canvas/documents/blocks.ts
+- packages/docs/src/page/gview.ts -> canvas/documents/gview.ts
+- packages/docs/src/page/live.ts -> canvas/documents/live.ts
+- packages/docs/src/page/marks.test.ts -> canvas/documents/marks.test.ts
+- packages/docs/src/page/marks.ts -> canvas/documents/marks.ts
+- packages/docs/src/page/page.ts -> canvas/documents/page.ts
+- packages/docs/src/page/reading.ts -> canvas/documents/reading.ts
+- packages/docs/src/page/render.ts -> canvas/documents/render.ts
+- packages/docs/src/page/tex.test.ts -> canvas/documents/tex.test.ts
+- packages/docs/src/page/tex.ts -> canvas/documents/tex.ts
+- runtime/live-doc.ts -> canvas/documents/live-doc.ts
+- scripts/live-doc.mjs -> canvas/documents/build-live-doc.mjs
+
+## Lines rewritten
+
+canvas/items/item-surfaces.tsx:1
+  - import { mountDocPage } from "@decks/docs/page";
+  + import { mountDocPage } from "../documents/page.ts";
+canvas/items/item-surfaces.tsx:14
+  - * A document item (`decks.document`): the document editor (`@decks/docs/page`) in the item's place, its
+  + * A document item (`decks.document`): the document editor (`canvas/documents/page.ts`) in the item's place, its
+canvas/documents/client.ts:1
+  - import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./index.ts";
+  + import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./model.ts";
+canvas/documents/merge.test.ts:3
+  - import { applySplice, transformSplice as transform, transformSplices } from "./index.ts";
+  + import { applySplice, transformSplice as transform, transformSplices } from "./model.ts";
+canvas/documents/merge.ts:1
+  - import { applySplice, transformSplices, type Splice } from "./index.ts";
+  + import { applySplice, transformSplices, type Splice } from "./model.ts";
+canvas/documents/blocks.test.ts:3
+  - import { applySplice } from "../index.ts";
+  + import { applySplice } from "./model.ts";
+canvas/documents/blocks.ts:1
+  - import type { DocFormat, Splice } from "../index.ts";
+  + import type { DocFormat, Splice } from "./model.ts";
+canvas/documents/gview.ts:1
+  - import type { DocSync } from "../client.ts";
+  + import type { DocSync } from "./client.ts";
+canvas/documents/gview.ts:2
+  - import { applySplice, type Splice } from "../index.ts";
+  + import { applySplice, type Splice } from "./model.ts";
+canvas/documents/gview.ts:3
+  - import { spliceDiff } from "../merge.ts";
+  + import { spliceDiff } from "./merge.ts";
+canvas/documents/gview.ts:4
+  - import type { DocsColor, DocsDimension, DocsDocument, DocsParagraphElement, DocsParagraphStyle, DocsRequest, DocsStructuralElement, DocsTextStyle } from "../gdoc/types.ts";
+  + import type { DocsColor, DocsDimension, DocsDocument, DocsParagraphElement, DocsParagraphStyle, DocsRequest, DocsStructuralElement, DocsTextStyle } from "./google/types.ts";
+canvas/documents/gview.ts:5
+  - import { isStruct, OBJECT_UNIT, STRUCT } from "../gdoc/units.ts";
+  + import { isStruct, OBJECT_UNIT, STRUCT } from "./google/units.ts";
+canvas/documents/live.ts:1
+  - import { transformSplices, type DocChange, type Splice } from "../index.ts";
+  + import { transformSplices, type DocChange, type Splice } from "./model.ts";
+canvas/documents/live.ts:2
+  - import type { DocSync } from "../client.ts";
+  + import type { DocSync } from "./client.ts";
+canvas/documents/live.ts:3
+  - import { invert } from "../merge.ts";
+  + import { invert } from "./merge.ts";
+canvas/documents/marks.ts:1
+  - import type { DocChange, Splice } from "../index.ts";
+  + import type { DocChange, Splice } from "./model.ts";
+canvas/documents/page.ts:1
+  - import type { CompileError, DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
+  + import type { CompileError, DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "./model.ts";
+canvas/documents/page.ts:2
+  - import { DocSync } from "../client.ts";
+  + import { DocSync } from "./client.ts";
+canvas/documents/page.ts:3
+  - import { spliceDiff } from "../merge.ts";
+  + import { spliceDiff } from "./merge.ts";
+canvas/documents/page.ts:4
+  - import type { DocSync as Sync } from "../client.ts";
+  + import type { DocSync as Sync } from "./client.ts";
+canvas/documents/page.ts:10
+  - import type { DocsRequest } from "../gdoc/types.ts";
+  + import type { DocsRequest } from "./google/types.ts";
+canvas/documents/page.ts:13
+  - * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
+  + * `canvas/documents/page.ts`: a document drawn as a page you type into, in plain DOM.
+canvas/documents/reading.ts:1
+  - import type { Splice } from "../index.ts";
+  + import type { Splice } from "./model.ts";
+canvas/documents/reading.ts:2
+  - import type { DocSync } from "../client.ts";
+  + import type { DocSync } from "./client.ts";
+canvas/documents/live-doc.ts:1
+  - import { mountDocPage } from "@decks/docs/page";
+  + import { mountDocPage } from "./page.ts";
+canvas/documents/live-doc.ts:6
+  - * The page is `@decks/docs/page`; this is only how it talks. A board has no socket of its own:
+  + * The page is `canvas/documents/page.ts`; this is only how it talks. A board has no socket of its own:
+
+## Files the table edits or creates
+
+- canvas/documents/build-live-doc.mjs
+- canvas/package.json
+- package.json
+- canvas/cards/runtime/lib/.gitignore
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- docs/DESIGN.md: 2
+- docs/REORGANIZATION.md: 2
+
+## Then run
+
+- before: runtime/live-doc.ts and scripts/live-doc.mjs kept by the switch-over (they hold the source of lib/live-doc.js)
+- node tools/heavy.mjs --wait -- npm install (builds lib/live-doc.js)
+- node tools/check.mjs canvas && node tools/check.mjs server
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: the document checks (documents, doc-edit, gdoc) one slot each
+- commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/

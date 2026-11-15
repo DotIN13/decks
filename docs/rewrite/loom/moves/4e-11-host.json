@@ -1,0 +1,82 @@
+{
+	"step": "4e-11-host",
+	"title": "Regroup canvas: frame/ and host.ts become host/",
+	"moves": [
+		{
+			"from": "canvas/host.ts",
+			"to": "canvas/host/host.ts"
+		},
+		{
+			"from": "canvas/host-pass.test.ts",
+			"to": "canvas/host/host-pass.test.ts"
+		},
+		{
+			"from": "canvas/frame/protocol.ts",
+			"to": "canvas/host/messages.ts"
+		},
+		{
+			"from": "canvas/frame/chrome.ts",
+			"to": "canvas/host/chrome.ts"
+		},
+		{
+			"from": "canvas/frame/inside/",
+			"to": "canvas/host/inside/"
+		},
+		{
+			"from": "canvas/frame/outside/host.tsx",
+			"to": "canvas/host/outside/framed-editor.tsx"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"frame/outside/host.tsx",
+			"host/outside/framed-editor.tsx"
+		],
+		[
+			"frame/inside/",
+			"host/inside/"
+		],
+		[
+			"frame/protocol.ts",
+			"host/messages.ts"
+		],
+		[
+			"`protocol.ts`",
+			"`messages.ts`",
+			"canvas/host/"
+		],
+		[
+			"`host.tsx`",
+			"`framed-editor.tsx`",
+			"canvas/"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/host/README.md",
+			"from": "readmes/canvas-host.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-11-host.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: canvas-frame, context-loss (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: frame/ and host.ts become host/"
+	]
+}

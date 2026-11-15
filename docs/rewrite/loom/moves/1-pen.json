@@ -47,7 +47,7 @@
 			"values": {
 				"scripts": {
 					"typecheck": "tsc -p tsconfig.json --noEmit",
-					"test": "node --import tsx --test \"*.test.ts\""
+					"test": "node --import tsx --test \"**/*.test.ts\""
 				}
 			}
 		}
@@ -60,7 +60,7 @@
 	"create": [
 		{
 			"file": "pen/README.md",
-			"from": "readmes/pen.md"
+			"from": "readmes/pen.txt"
 		}
 	],
 	"then": [

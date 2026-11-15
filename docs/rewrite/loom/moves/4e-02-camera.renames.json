@@ -1,0 +1,10 @@
+[
+	{
+		"from": "canvas/camera/stage-ops.test.ts",
+		"to": "canvas/camera/view-calls.test.ts"
+	},
+	{
+		"from": "canvas/camera/stage-ops.ts",
+		"to": "canvas/camera/view-calls.ts"
+	}
+]

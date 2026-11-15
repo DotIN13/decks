@@ -1,9 +1,10 @@
 # Step 4a-canvas: canvas/: packages/canvas moved to the top, src/ flattened, nothing regrouped, the name @decks/canvas kept
 
-Dry run on 111525a5. Nothing was moved.
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine. Nothing was moved.
 
 - files moved by git mv: 195
 - files taken out of git (moved on disk): 0
+- files deleted: 0
 - files edited or created: 15
 - import lines rewritten: 365
 - warnings: 0

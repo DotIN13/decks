@@ -1,0 +1,15 @@
+{
+	"file": "packages/canvas/src/stage/Stage.tsx",
+	"at": "canvas/view/CanvasView.tsx",
+	"pattern": "a page part: model, view and actions in view/; the Stage component (CanvasView in step 6) keeps its signals and elements and wires the parts, each given them as one ctx",
+	"scope": "Stage",
+	"targets": {
+		"model.ts": ["StageProps", "Frame", "origin", "worldFor", "ownScroll", "placeWorld", "placeScroll", "zoomScroll", "zoomStill", "placedZoom", "worldAt", "freshId", "freshIds", "penNode", "scenePages", "scene", "resolvedColours", "resolveColour", "colourProbe", "colours", "coloursFor", "readFor", "frameUnder", "dropSlot", "overLink", "fitted", "inkStrokes"],
+		"actions.ts": ["ctl", "/^ExpressionStatement@(275|284|300|390)$/", "scrolled", "frame", "penEdit", "input", "penLayer", "items", "armPenTool", "penMoveBy"],
+		"effects.ts": ["/^ExpressionStatement@(5|6|7)\\d\\d$/", "Block@665"],
+		"editor-wiring.ts": ["editor", "selection"],
+		"markup.tsx": ["ReturnStatement@776"]
+	},
+	"rest": "CanvasView.tsx",
+	"note": "Beside map.md: the effects that keep the engine, the overlays and the ink in step (today's statements from line 558 to 775) are view/effects.ts, and the returned JSX is view/markup.tsx, so the component itself stays under 80 lines."
+}

@@ -1,0 +1,74 @@
+[
+	{
+		"from": "canvas/frame/chrome.ts",
+		"to": "canvas/host/chrome.ts"
+	},
+	{
+		"from": "canvas/frame/inside/backend.ts",
+		"to": "canvas/host/inside/backend.ts"
+	},
+	{
+		"from": "canvas/frame/inside/boot.ts",
+		"to": "canvas/host/inside/boot.ts"
+	},
+	{
+		"from": "canvas/frame/inside/card-calls.ts",
+		"to": "canvas/host/inside/card-calls.ts"
+	},
+	{
+		"from": "canvas/frame/inside/clipboard.ts",
+		"to": "canvas/host/inside/clipboard.ts"
+	},
+	{
+		"from": "canvas/frame/inside/events.ts",
+		"to": "canvas/host/inside/events.ts"
+	},
+	{
+		"from": "canvas/frame/inside/frame.tsx",
+		"to": "canvas/host/inside/frame.tsx"
+	},
+	{
+		"from": "canvas/frame/inside/life.ts",
+		"to": "canvas/host/inside/life.ts"
+	},
+	{
+		"from": "canvas/frame/inside/line.ts",
+		"to": "canvas/host/inside/line.ts"
+	},
+	{
+		"from": "canvas/frame/inside/marks.test.ts",
+		"to": "canvas/host/inside/marks.test.ts"
+	},
+	{
+		"from": "canvas/frame/inside/marks.ts",
+		"to": "canvas/host/inside/marks.ts"
+	},
+	{
+		"from": "canvas/frame/inside/options.ts",
+		"to": "canvas/host/inside/options.ts"
+	},
+	{
+		"from": "canvas/frame/inside/presence.ts",
+		"to": "canvas/host/inside/presence.ts"
+	},
+	{
+		"from": "canvas/frame/inside/studio-line.ts",
+		"to": "canvas/host/inside/studio-line.ts"
+	},
+	{
+		"from": "canvas/frame/outside/host.tsx",
+		"to": "canvas/host/outside/framed-editor.tsx"
+	},
+	{
+		"from": "canvas/frame/protocol.ts",
+		"to": "canvas/host/messages.ts"
+	},
+	{
+		"from": "canvas/host-pass.test.ts",
+		"to": "canvas/host/host-pass.test.ts"
+	},
+	{
+		"from": "canvas/host.ts",
+		"to": "canvas/host/host.ts"
+	}
+]

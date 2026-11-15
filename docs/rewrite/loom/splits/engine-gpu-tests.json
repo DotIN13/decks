@@ -1,0 +1,14 @@
+{
+	"file": "packages/stage/crates/gpu/src/tests.rs",
+	"at": "engine/crates/gpu/src/tests.rs",
+	"pattern": "test modules by subject, under tests/; shared helpers in tests/mod.rs",
+	"scope": null,
+	"targets": {
+		"tests/effects.rs": ["draw_shapes", "shapes_have_exact_soft_edges", "draw_effects", "layers_clips_gradients_shadows_and_meshes", "angular_gradients_go_round", "inner_shadows_lie_inside", "blurs_soften_an_item_and_nothing_else", "a_blur_across_tiles_has_no_seam"],
+		"tests/canvases.rs": ["stages", "draw_stage", "real_stages_draw", "fonts", "draw_words", "words_are_crisp", "draw_card", "cards_are_drawn", "webgl2_limits_draw_the_same", "one_sample_draws", "one_sample_draws_what_four_do"],
+		"tests/goldens.rs": ["read_golden", "GOLDEN_DELTA", "GOLDEN_SHARE", "differ", "golden", "fixtures_match_their_goldens"],
+		"tests/resources.rs": ["page_frame_cost", "kept_resources_draw_the_same", "draw_bench", "spares_come_back_and_warming_draws_the_same", "a_pictures_smaller_sizes_are_its_averages_and_shrinking_keeps_them", "astc_flat", "a_compressed_picture_is_written_as_it_came_and_shrinks_by_whole_blocks"]
+	},
+	"rest": "tests/mod.rs",
+	"note": "tests.rs becomes tests/mod.rs (gpu, px, save, write_png, webgl2_gpu) with `mod effects; mod canvases; mod goldens; mod resources;`; lib.rs's `mod tests;` is unchanged. The test names keep the word `stage` where they have it (crates are exempt)."
+}

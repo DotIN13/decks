@@ -1,0 +1,131 @@
+{
+	"step": "4d-documents",
+	"title": "canvas/documents/: the page half of docs folds into the canvas library; the server half is already server/documents",
+	"moves": [
+		{
+			"from": "packages/docs/src/page/",
+			"to": "canvas/documents/"
+		},
+		{
+			"from": "packages/docs/src/client.ts",
+			"to": "canvas/documents/client.ts"
+		},
+		{
+			"from": "packages/docs/src/merge.ts",
+			"to": "canvas/documents/merge.ts"
+		},
+		{
+			"from": "packages/docs/src/merge.test.ts",
+			"to": "canvas/documents/merge.test.ts"
+		},
+		{
+			"from": "packages/docs/src/index.ts",
+			"to": "canvas/documents/model.ts"
+		},
+		{
+			"from": "packages/docs/src/gdoc/types.ts",
+			"to": "canvas/documents/google/types.ts"
+		},
+		{
+			"from": "packages/docs/src/gdoc/units.ts",
+			"to": "canvas/documents/google/units.ts"
+		},
+		{
+			"from": "runtime/live-doc.ts",
+			"to": "canvas/documents/live-doc.ts"
+		},
+		{
+			"from": "scripts/live-doc.mjs",
+			"to": "canvas/documents/build-live-doc.mjs"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"remove": [
+		"packages/docs/"
+	],
+	"untrack": [
+		"canvas/cards/runtime/lib/live-doc.js"
+	],
+	"ignore": [
+		{
+			"file": "canvas/cards/runtime/lib/.gitignore",
+			"add": [
+				"# built at install by ../../documents/build-live-doc.mjs",
+				"/live-doc.js"
+			]
+		}
+	],
+	"localize": [
+		{
+			"within": "canvas/",
+			"name": "@decks/docs/page",
+			"target": "canvas/documents/page.ts"
+		}
+	],
+	"mentions": [
+		[
+			"packages/docs/src/page/",
+			"canvas/documents/"
+		],
+		[
+			"`@decks/docs/page`",
+			"`canvas/documents/page.ts`"
+		]
+	],
+	"paths": [
+		{
+			"file": "canvas/documents/build-live-doc.mjs",
+			"replace": [
+				{
+					"from": "const root = resolve(dirname(fileURLToPath(import.meta.url)), \"..\");",
+					"to": "const root = resolve(dirname(fileURLToPath(import.meta.url)), \"..\", \"..\");"
+				},
+				{
+					"from": "join(root, \"runtime\", \"live-doc.ts\")",
+					"to": "join(root, \"canvas\", \"documents\", \"live-doc.ts\")"
+				}
+			]
+		}
+	],
+	"set": [
+		{
+			"file": "canvas/package.json",
+			"values": {
+				"dependencies.@decks/docs": null,
+				"dependencies.diff": "^8.0.4",
+				"dependencies.docx-preview": "^0.4.1",
+				"dependencies.jszip": "^3.10.1",
+				"scripts.build:live-doc": "node documents/build-live-doc.mjs",
+				"scripts.postinstall": "node cards/runtime/vendor.mjs && node documents/build-live-doc.mjs"
+			}
+		},
+		{
+			"file": "package.json",
+			"values": {
+				"scripts.build:live-doc": "npm run build:live-doc -w @decks/canvas"
+			}
+		}
+	],
+	"then": [
+		"before: runtime/live-doc.ts and scripts/live-doc.mjs kept by the switch-over (they hold the source of lib/live-doc.js)",
+		"node tools/heavy.mjs --wait -- npm install (builds lib/live-doc.js)",
+		"node tools/check.mjs canvas && node tools/check.mjs server",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: the document checks (documents, doc-edit, gdoc) one slot each",
+		"commit with REWRITE_AGENT=Loom: Fold the page half of docs into canvas/documents/"
+	]
+}

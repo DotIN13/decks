@@ -1,9 +1,10 @@
 # Step 3-engine: engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git
 
-Dry run on 111525a5. Nothing was moved.
+Dry run on e19152f7, on top of 1-pen, 2-ui. Nothing was moved.
 
 - files moved by git mv: 112
 - files taken out of git (moved on disk): 8
+- files deleted: 0
 - files edited or created: 26
 - import lines rewritten: 31
 - warnings: 0
@@ -211,18 +212,18 @@ packages/canvas/styles/canvas.css:1189
 packages/canvas/styles/canvas.css:1199
   - /* The same colours as the engine draws them in the dark (`packages/stage/crates/text/src/card.rs`). */
   + /* The same colours as the engine draws them in the dark (`engine/crates/text/src/card.rs`). */
-packages/pen/src/arrow-fixtures.test.ts:9
-  - * The cases the stage engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
-  + * The cases the stage engine's Rust router is held to (`engine/crates/scene/src/arrows.rs`,
-packages/pen/src/arrow-fixtures.test.ts:14
-  - const FILE = fileURLToPath(new URL("../../stage/crates/scene/fixtures/arrows.json", import.meta.url));
-  + const FILE = fileURLToPath(new URL("../../../engine/crates/scene/fixtures/arrows.json", import.meta.url));
 engine/fetch-fonts.mjs:4
   - * `fonts/`, from Fontsource's CDN: `npm run fonts -w packages/stage`.
   + * `fonts/`, from Fontsource's CDN: `npm run fonts -w engine`.
 engine/package.json:2
   - "name": "@decks/stage",
   + "name": "@decks/engine",
+pen/arrow-fixtures.test.ts:9
+  - * The cases the stage engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
+  + * The cases the stage engine's Rust router is held to (`engine/crates/scene/src/arrows.rs`,
+pen/arrow-fixtures.test.ts:14
+  - const FILE = fileURLToPath(new URL("../packages/stage/crates/scene/fixtures/arrows.json", import.meta.url));
+  + const FILE = fileURLToPath(new URL("../engine/crates/scene/fixtures/arrows.json", import.meta.url));
 scripts/build-solid-lib.mjs:7
   - * the engine still `import("@decks/stage")`, so a host's bundler sees what it would see in the
   + * the engine still `import("@decks/engine")`, so a host's bundler sees what it would see in the

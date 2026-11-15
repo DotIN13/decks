@@ -1,0 +1,14 @@
+{
+	"file": "packages/canvas/src/items/card.ts",
+	"at": "canvas/cards/card.ts",
+	"pattern": "logic by topic, top-level parts; card.ts keeps mountCard, the one thing its importers call",
+	"scope": null,
+	"targets": {
+		"context.ts": ["CardDecks", "cardDecks", "CardContext", "CardCleanup", "CardSource", "MountedCard", "wordsSelectedInCards"],
+		"sheet.ts": ["RUNS", "runs", "DROPPED", "ADDRESSES", "inDeck", "clean", "cleanCss", "fromCard", "cssFromCard", "addressesFromCard", "cssInDeck", "sheets", "isCardSheet", "CARD_SHEET", "HOST_RESET", "fontsSaid", "textOf", "cardSheet", "asDocument", "rootStyle", "dedent"],
+		"parts.ts": ["cardMath", "cardCode", "cardMermaid", "drawParts"],
+		"imports.ts": ["loaded", "once", "modules", "importOnce", "pageScript", "pageModule", "deckImportsGiven", "giveDeckImports", "deckImports", "registryPerRoot", "openRoots"]
+	},
+	"rest": "card.ts",
+	"note": "As map.md, with mount.ts kept as card.ts so the `./card` export and its importers stay. card.ts re-exports what `entries/` names from the new files. mountCard (157 lines) is cut where the sheet says: load, run the scripts, wire."
+}

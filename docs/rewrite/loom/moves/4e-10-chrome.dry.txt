@@ -1,0 +1,84 @@
+# Step 4e-10-chrome: Regroup canvas: ui/ becomes chrome/
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink. Nothing was moved.
+
+- files moved by git mv: 15
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 8
+- import lines rewritten: 11
+- warnings: 0
+
+## Moved
+
+- canvas/ui/AgentCursor.tsx -> canvas/chrome/AgentCursor.tsx
+- canvas/ui/Callout.tsx -> canvas/chrome/Callout.tsx
+- canvas/ui/ColorPicker.tsx -> canvas/chrome/ColorPicker.tsx
+- canvas/ui/HoldMenu.tsx -> canvas/chrome/HoldMenu.tsx
+- canvas/ui/InkBar.tsx -> canvas/chrome/InkBar.tsx
+- canvas/ui/Insert.tsx -> canvas/chrome/Insert.tsx
+- canvas/ui/InsertMenu.tsx -> canvas/chrome/InsertMenu.tsx
+- canvas/ui/PenBar.tsx -> canvas/chrome/PenBar.tsx
+- canvas/ui/Properties.tsx -> canvas/chrome/Properties.tsx
+- canvas/ui/adaptive.test.ts -> canvas/chrome/adaptive.test.ts
+- canvas/ui/adaptive.ts -> canvas/chrome/adaptive.ts
+- canvas/ui/keycaps.test.ts -> canvas/chrome/keycaps.test.ts
+- canvas/ui/keycaps.ts -> canvas/chrome/keycaps.ts
+- canvas/ui/menu-place.test.ts -> canvas/chrome/menu-place.test.ts
+- canvas/ui/menu-place.ts -> canvas/chrome/menu-place.ts
+
+## Lines rewritten
+
+canvas/editor/editor.tsx:14
+  - import { InkBar } from "../ui/InkBar.tsx";
+  + import { InkBar } from "../chrome/InkBar.tsx";
+canvas/editor/editor.tsx:16
+  - import { PenBar } from "../ui/PenBar.tsx";
+  + import { PenBar } from "../chrome/PenBar.tsx";
+canvas/editor/index.ts:9
+  - import { createInsertMenu, type InsertHost } from "../ui/InsertMenu.tsx";
+  + import { createInsertMenu, type InsertHost } from "../chrome/InsertMenu.tsx";
+canvas/editor/index.ts:55
+  - export { InsertMenu } from "../ui/InsertMenu.tsx";
+  + export { InsertMenu } from "../chrome/InsertMenu.tsx";
+canvas/entries/host.ts:6
+  - export { PenBar } from "../ui/PenBar.tsx";
+  + export { PenBar } from "../chrome/PenBar.tsx";
+canvas/entries/host.ts:7
+  - export { InkBar } from "../ui/InkBar.tsx";
+  + export { InkBar } from "../chrome/InkBar.tsx";
+canvas/entries/host.ts:11
+  - export * from "../ui/keycaps.ts";
+  + export * from "../chrome/keycaps.ts";
+canvas/entries/tools.ts:15
+  - export { Insert } from "../ui/Insert.tsx";
+  + export { Insert } from "../chrome/Insert.tsx";
+canvas/frame/inside/frame.tsx:7
+  - import { AgentCursor } from "../../ui/AgentCursor.tsx";
+  + import { AgentCursor } from "../../chrome/AgentCursor.tsx";
+canvas/view/CanvasView.tsx:16
+  - import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
+  + import { HoldMenu, type HoldAction } from "../chrome/HoldMenu.tsx";
+canvas/view/selection.tsx:5
+  - import { PageCallout } from "../ui/Callout.tsx";
+  + import { PageCallout } from "../chrome/Callout.tsx";
+
+## Files the table edits or creates
+
+- canvas/chrome/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-10-chrome.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: chrome, walkthrough (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: ui/ becomes chrome/

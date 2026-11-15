@@ -1,0 +1,68 @@
+{
+	"step": "4e-03-view",
+	"title": "Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx",
+	"moves": [
+		{
+			"from": "canvas/stage/Stage.tsx",
+			"to": "canvas/view/CanvasView.tsx"
+		},
+		{
+			"from": "canvas/stage/items-layer.tsx",
+			"to": "canvas/view/items-layer.tsx"
+		},
+		{
+			"from": "canvas/stage/selection.tsx",
+			"to": "canvas/view/selection.tsx"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"canvas/Stage.tsx",
+			"canvas/view/CanvasView.tsx"
+		],
+		[
+			"stage/Stage.tsx",
+			"view/CanvasView.tsx"
+		],
+		[
+			"Stage.tsx",
+			"CanvasView.tsx"
+		],
+		[
+			"stage/items-layer.tsx",
+			"view/items-layer.tsx"
+		],
+		[
+			"stage/selection.tsx",
+			"view/selection.tsx"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/view/README.md",
+			"from": "readmes/canvas-view.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-03-view.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: selection, stage-scroll, placement-at (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasVie"
+	]
+}

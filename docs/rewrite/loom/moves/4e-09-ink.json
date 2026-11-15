@@ -1,0 +1,52 @@
+{
+	"step": "4e-09-ink",
+	"title": "Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink.ts is ink/model.ts",
+	"moves": [
+		{
+			"from": "canvas/ink/StageInk.tsx",
+			"to": "canvas/ink/InkLayer.tsx"
+		},
+		{
+			"from": "canvas/model/ink.ts",
+			"to": "canvas/ink/model.ts"
+		},
+		{
+			"from": "canvas/model/ink.test.ts",
+			"to": "canvas/ink/model.test.ts"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"mentions": [
+		[
+			"StageInk.tsx",
+			"InkLayer.tsx"
+		]
+	],
+	"create": [
+		{
+			"file": "canvas/ink/README.md",
+			"from": "readmes/canvas-ink.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-09-ink.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: ink-long-stroke, pencil-then-finger (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink."
+	]
+}

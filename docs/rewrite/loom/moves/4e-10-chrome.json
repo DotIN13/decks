@@ -1,0 +1,38 @@
+{
+	"step": "4e-10-chrome",
+	"title": "Regroup canvas: ui/ becomes chrome/",
+	"moves": [
+		{
+			"from": "canvas/ui/",
+			"to": "canvas/chrome/"
+		}
+	],
+	"skip": [
+		"apps/",
+		"packages/sync-protocol/",
+		"packages/sync-client/",
+		"packages/agent-ui/",
+		"packages/sdk/",
+		"packages/docs/src/server/",
+		"runtime/",
+		"tools/gates/",
+		"tools/switch/",
+		"docs/rewrite/",
+		"packages/protocol/",
+		"packages/api/",
+		"packages/hub/"
+	],
+	"create": [
+		{
+			"file": "canvas/chrome/README.md",
+			"from": "readmes/canvas-chrome.txt"
+		}
+	],
+	"then": [
+		"Warden's adopt command for the moved paths, with --renames 4e-10-chrome.renames.json",
+		"node tools/check.mjs canvas && node tools/check.mjs harness",
+		"node tools/gates/run.mjs",
+		"node tools/checks/run.mjs: chrome, walkthrough (one slot each)",
+		"commit with REWRITE_AGENT=Loom: Regroup canvas: ui/ becomes chrome/"
+	]
+}

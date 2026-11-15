@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { test } from "node:test";
 import { apply } from "./apply.mjs";
 import { checkout, format, loadTable } from "./move.mjs";
-import { mapper, plan, renames, setJson } from "./plan.mjs";
+import { after, mapper, plan, renames, setJson } from "./plan.mjs";
 
 const HERE = new URL(".", import.meta.url).pathname;
 const TREE = join(HERE, "moves/fixtures/tree");
@@ -117,7 +117,7 @@ test("an import that pointed at nothing before is not warned about; one that bre
 	const p = fixturePlan();
 	assert.equal(p.warnings.length, 0);
 	const table = loadTable(TABLE);
-	table.untrack.push("shared/");
+	table.remove = ["shared/"];
 	const broken = plan(table, tree());
 	assert.deepEqual(broken.warnings, ["lib/index.ts: ../../../shared/util.ts points at shared/util.ts, which is not in the tree after the move"]);
 });
@@ -160,4 +160,70 @@ test("--go on a git copy of the fixture moves, carries built files, writes and s
 		assert.match(status, /^A {2}lib\/README\.md$/m);
 		assert.doesNotMatch(status, /^.M /m);
 	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a table can delete files, and an import of a deleted file is warned about", () => {
+	const table = { step: "t", title: "t", moves: [], remove: ["shared/"] };
+	const p = plan(table, tree());
+	assert.deepEqual(p.remove, ["shared/util.ts"]);
+	assert.equal(p.untrack.length, 0);
+	assert.match(p.warnings[0], /shared\/util\.ts, which is not in the tree/);
+});
+
+test("inside a folder a package name can become a relative path to one file", () => {
+	const table = { step: "t", title: "t", moves: [], localize: [{ within: "packages/lib/", name: "@x/eng", target: "packages/eng/made/out.js" }] };
+	const p = plan(table, tree());
+	assert.equal(line(p, "packages/lib/src/index.ts", 3), 'import { draw } from "../../eng/made/out.js";');
+	assert.equal(line(p, "packages/lib/src/index.ts", 4), 'import { gl } from "@x/eng/gl";');
+	assert.equal(p.edits.has("server/main.ts"), false);
+});
+
+test("a dotted key sets or removes a value inside a JSON object", () => {
+	assert.equal(setJson('{\n\t"d": { "@a/b": "*", "c": "1" }\n}\n', { "d.@a/b": null, "e.f": 2 }), '{\n\t"d": {\n\t\t"c": "1"\n\t},\n\t"e": {\n\t\t"f": 2\n\t}\n}\n');
+});
+
+test("a step is planned on top of an earlier one without moving anything", () => {
+	const first = plan(loadTable(TABLE), tree());
+	const next = after(tree(), first);
+	assert.equal(next.files.includes("lib/extra.ts"), true);
+	assert.equal(next.files.includes("packages/eng/made/out.js"), false);
+	assert.match(next.read("server/main.ts"), /"\.\.\/lib\/extra\.ts"/);
+	const second = plan({ step: "t", title: "t", moves: [{ from: "lib/extra.ts", to: "lib/more/extra.ts" }] }, next);
+	assert.equal(second.edits.get("server/main.ts").split("\n")[1], 'import { extra } from "../lib/more/extra.ts";');
+	assert.equal(second.edits.get("lib/index.ts").split("\n")[0], 'export * from "./more/extra.ts";');
+});
+
+test("a package name mapped to a subpath is rewritten in code but never as a dependency key", () => {
+	const table = { step: "t", title: "t", moves: [], specifiers: { "@x/eng": "@x/lib/eng" } };
+	const p = plan(table, tree());
+	assert.equal(line(p, "packages/lib/src/index.ts", 3), 'import { draw } from "@x/lib/eng";');
+	assert.equal(p.edits.has("server/package.json"), false);
+});
+
+test("a key given as a JSON list reaches a name with dots in it", () => {
+	assert.equal(JSON.parse(setJson('{\n\t"exports": {}\n}\n', { '["exports","./ink"]': "./ink/index.ts" })).exports["./ink"], "./ink/index.ts");
+});
+
+test("a removed folder still gives up the files a table moves out of it", () => {
+	const table = { step: "t", title: "t", moves: [{ from: "packages/lib/src/extra.ts", to: "shared/extra.ts" }], remove: ["packages/lib/"] };
+	const p = plan(table, tree());
+	assert.deepEqual(p.moves, [["packages/lib/src/extra.ts", "shared/extra.ts"]]);
+	assert.equal(p.remove.includes("packages/lib/src/index.ts"), true);
+	assert.equal(p.remove.includes("packages/lib/src/extra.ts"), false);
+});
+
+test("a package name is never made relative in a JSON file, and a moved file is never skipped", () => {
+	const table = { step: "t", title: "t", moves: [{ from: "shared/util.ts", to: "packages/lib/src/util.ts" }], skip: ["shared/", "server/"], localize: [{ within: "server/", name: "@x/eng", target: "packages/eng/made/out.js" }] };
+	const r = tree();
+	const read = (f) => (f === "shared/util.ts" ? 'import { x } from "../server/main.ts";\n' : r.read(f));
+	const p = plan(table, { files: r.files, read });
+	assert.equal(p.edits.get("packages/lib/src/util.ts").trim(), 'import { x } from "../../../server/main.ts";');
+	assert.equal(p.edits.has("server/package.json"), false);
+});
+
+test("a mention can be limited to the files of one folder", () => {
+	const table = { step: "t", title: "t", moves: [], mentions: [["util", "tool", "shared/"]] };
+	const p = plan(table, tree());
+	assert.equal(p.edits.get("shared/util.ts").trim(), "export const tool = 1;");
+	assert.equal(p.edits.has("packages/lib/src/index.ts"), false);
 });

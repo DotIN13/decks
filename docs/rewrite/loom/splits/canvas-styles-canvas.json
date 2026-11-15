@@ -1,0 +1,31 @@
+{
+	"file": "packages/canvas/styles/canvas.css",
+	"at": "canvas/styles/canvas.css",
+	"pattern": "styles, one sheet per part, beside the part; the same selectors in the same `@layer decks.surface`, so the layer decides the order, not the files",
+	"scope": null,
+	"targets": {
+		"cards/card-editor-bar.css": [
+			"/\\.pce-(bar|tools|row|menu|piece|ghost|sug|why|caret|li|group|opt|sw|pick|sep|icon)|\\.pen-drag-ghost|data-ghosting/"
+		],
+		"cards/card-editor.css": [
+			"/\\.pen-card-editor|\\.pce-|\\.pen-drag-ghost|data-ghosting/"
+		],
+		"items/player.css": [
+			"/\\.pen-player/"
+		],
+		"chrome/bar.css": [
+			"/\\.bar-layer/"
+		],
+		"editor/dom/overlay.css": [
+			"/\\.world > (\\.pen-|:is\\(\\.pen)|\\.pen-side|\\.pen-anchor|data-pen-tool|data-engine-overlays|\\.pen-handle|\\.pen-selection/"
+		],
+		"items/items.css": [
+			"/\\.app|\\.doc|decks-layer\\)|\\.plain-card-bar|\\.card-scripts-off|\\.file-live|\\.agen/"
+		],
+		"cards/card.css": [
+			"/\\.card-node|\\.card-edge|\\.placeholder|data-card-pictures|data-previewing/"
+		]
+	},
+	"rest": "view/canvas.css",
+	"note": "The parts named by the map, by what each rule styles: the card editor's words (`cards/card-editor.css`) and its bar, menus and dragged pieces (`cards/card-editor-bar.css`), the media player, the bar over a card (`chrome/bar.css`), the drawn overlay (`.world > .pen-*`), apps and documents, and cards; `view/canvas.css` keeps `.stage*`, `.world` and the engine's own layers. Each sheet opens `@layer decks.surface {`, counted in its lines. `harness/page/index.css` imports each new sheet where it imported `canvas.css`, in the same place, and `cascade-order.json` is regenerated."
+}

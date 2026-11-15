@@ -1,0 +1,70 @@
+# Step 4b-ink: canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas. Nothing was moved.
+
+- files moved by git mv: 3
+- files taken out of git (moved on disk): 0
+- files deleted: 2
+- files edited or created: 10
+- import lines rewritten: 8
+- warnings: 0
+
+## Deleted
+
+- packages/ink/package.json
+- packages/ink/tsconfig.json
+
+## Moved
+
+- packages/ink/src/index.ts -> canvas/ink/index.ts
+- packages/ink/src/ink.test.ts -> canvas/ink/shaper.test.ts
+- packages/ink/src/ink.ts -> canvas/ink/shaper.ts
+
+## Lines rewritten
+
+canvas/ink/StageInk.tsx:1
+  - import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/ink";
+  + import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "./index.ts";
+canvas/ink/ink.ts:1
+  - import type { InkColor } from "@decks/ink";
+  + import type { InkColor } from "./index.ts";
+canvas/model/ink.ts:1
+  - import { strokeShape, type InkColor, type InkStroke } from "@decks/ink";
+  + import { strokeShape, type InkColor, type InkStroke } from "../ink/index.ts";
+canvas/ui/InkBar.tsx:1
+  - import { INK_COLORS } from "@decks/ink";
+  + import { INK_COLORS } from "../ink/index.ts";
+e2e/checks/ink-long-stroke.mjs:5
+  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `StageInk.tsx`),
+  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `StageInk.tsx`),
+harness/page/frame/PenTray.tsx:1
+  - import { INK_COLORS, type InkColor } from "@decks/ink";
+  + import { INK_COLORS, type InkColor } from "@decks/canvas/ink";
+canvas/ink/index.ts:7
+  - export * from "./ink.ts";
+  + export * from "./shaper.ts";
+canvas/ink/shaper.test.ts:16
+  - } from "./ink.ts";
+  + } from "./shaper.ts";
+
+## Files the table edits or creates
+
+- canvas/package.json
+- harness/page/package.json
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- node tools/heavy.mjs --wait -- npm install
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/heavy.mjs --wait -- node server/frame/build.mjs
+- node tools/checks/run.mjs ink-long-stroke, then pencil-then-finger (one slot each)
+- commit with REWRITE_AGENT=Loom: Fold the ink package into canvas/ink/

@@ -1,0 +1,14 @@
+[
+	{
+		"from": "canvas/model/file-drop.test.ts",
+		"to": "canvas/items/file-drop.test.ts"
+	},
+	{
+		"from": "canvas/model/file-drop.ts",
+		"to": "canvas/items/file-drop.ts"
+	},
+	{
+		"from": "canvas/model/file-kinds.ts",
+		"to": "canvas/items/file-kinds.ts"
+	}
+]

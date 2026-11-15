@@ -1,0 +1,87 @@
+# Step 4e-09-ink: Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink.ts is ink/model.ts
+
+Dry run on e19152f7, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards. Nothing was moved.
+
+- files moved by git mv: 3
+- files taken out of git (moved on disk): 0
+- files deleted: 0
+- files edited or created: 11
+- import lines rewritten: 16
+- warnings: 0
+
+## Moved
+
+- canvas/ink/StageInk.tsx -> canvas/ink/InkLayer.tsx
+- canvas/model/ink.test.ts -> canvas/ink/model.test.ts
+- canvas/model/ink.ts -> canvas/ink/model.ts
+
+## Lines rewritten
+
+canvas/ink/InkLayer.tsx:5
+  - import { inkHex, inkItem } from "../model/ink.ts";
+  + import { inkHex, inkItem } from "./model.ts";
+canvas/ink/ink.ts:4
+  - import { inkHex } from "../model/ink.ts";
+  + import { inkHex } from "./model.ts";
+canvas/ink/ink.ts:9
+  - * What is drawn goes on the stage, into its `.pen` file (`canvas/pen/StageInk.tsx`, `pen/ink.ts`),
+  + * What is drawn goes on the stage, into its `.pen` file (`canvas/pen/InkLayer.tsx`, `pen/ink.ts`),
+canvas/ink/ink.ts:54
+  - /** What the lasso holds: stroke ids on the stage (`canvas/pen/StageInk.tsx`). */
+  + /** What the lasso holds: stroke ids on the stage (`canvas/pen/InkLayer.tsx`). */
+canvas/ink/model.test.ts:4
+  - import { inkHex, inkItem, strokeOf } from "./ink.ts";
+  + import { inkHex, inkItem, strokeOf } from "./model.ts";
+canvas/styles/ink.css:9
+  - /* The glass over the stage while the draw tool is on (`pen/StageInk.tsx`). `touch-action:
+  + /* The glass over the stage while the draw tool is on (`pen/InkLayer.tsx`). `touch-action:
+canvas/styles/ink.css:24
+  - /* A pencil has been used: fingers go through to the stage and its cards; the pencil is caught on the stage (`StageInk.tsx`). The lasso's selection stays pressable. */
+  + /* A pencil has been used: fingers go through to the stage and its cards; the pencil is caught on the stage (`InkLayer.tsx`). The lasso's selection stays pressable. */
+canvas/ui/InkBar.tsx:34
+  - * What is drawn goes on the stage (`canvas/pen/StageInk.tsx`), so undo and redo are the stage's
+  + * What is drawn goes on the stage (`canvas/pen/InkLayer.tsx`), so undo and redo are the stage's
+canvas/view/CanvasView.tsx:13
+  - import { StageInk } from "../ink/StageInk.tsx";
+  + import { StageInk } from "../ink/InkLayer.tsx";
+canvas/view/CanvasView.tsx:14
+  - import { strokeOf } from "../model/ink.ts";
+  + import { strokeOf } from "../ink/model.ts";
+canvas/view/CanvasView.tsx:99
+  - /** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
+  + /** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/InkLayer.tsx`). */
+canvas/view/selection.tsx:6
+  - import { isInk } from "../model/ink.ts";
+  + import { isInk } from "../ink/model.ts";
+e2e/checks/ink-long-stroke.mjs:5
+  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `StageInk.tsx`),
+  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `InkLayer.tsx`),
+e2e/checks/pencil-then-finger.mjs:4
+  - * The glass a stroke is drawn on (`StageInk.tsx`) had `touch-action: none` and lay over the whole
+  + * The glass a stroke is drawn on (`InkLayer.tsx`) had `touch-action: none` and lay over the whole
+e2e/checks/pencil-then-finger.mjs:66
+  - // A touch within half a second of the pencil's lift is taken for a palm (`StageInk.tsx`, `PALM_AFTER_MS`): the finger comes after it.
+  + // A touch within half a second of the pencil's lift is taken for a palm (`InkLayer.tsx`, `PALM_AFTER_MS`): the finger comes after it.
+harness/page/canvases/CanvasOps.tsx:28
+  - * `ink/StageInk.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
+  + * `ink/InkLayer.tsx` and `model/comment-text.ts` for reading a card. A cheat sheet
+
+## Files the table edits or creates
+
+- canvas/ink/README.md
+
+## Warnings
+
+- none
+
+## Old paths still written (not rewritten: comments and docs)
+
+- none
+
+## Then run
+
+- Warden's adopt command for the moved paths, with --renames 4e-09-ink.renames.json
+- node tools/check.mjs canvas && node tools/check.mjs harness
+- node tools/gates/run.mjs
+- node tools/checks/run.mjs: ink-long-stroke, pencil-then-finger (one slot each)
+- commit with REWRITE_AGENT=Loom: Regroup canvas: StageInk.tsx is ink/InkLayer.tsx, model/ink.
