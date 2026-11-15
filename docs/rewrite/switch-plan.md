@@ -6,21 +6,20 @@ Written by `node tools/switch/run.mjs --dry` on 2026-11-15 from the tree as it i
 
 - `apps/server` (@decks/server): now server/ (Decks-local) and harness/ (agents). Proof: node tools/check.mjs server, node tools/check.mjs harness; the 76 browser checks of stop 3.
 - `apps/web` (@decks/web): now harness/page. Proof: the page checks of stop 3 (shell, panel, chrome, agents-tab, ...).
-- `packages/sync-protocol` (@decks/sync-protocol): now protocol/sync.ts. Proof: node tools/check.mjs protocol.
-- `packages/sync-client` (@decks/sync-client): now server/sharing/client. Proof: server/sharing/client tests.
+- `packages/agent-ui` (@decks/agent-ui): now harness/page (chat/, composer/). Proof: chat-content, slash, voice, working-marks checks.
 - `packages/sdk` (@decks/sdk): now clients/sdk, clients/cli. Proof: node tools/check.mjs clients/sdk, tools/clients/same.test.ts.
 - `runtime` (@decks/runtime): now harness/prompts, harness/runtimes. Proof: node tools/check.mjs harness; running, time-machine checks.
+- `extension`: already moved to clients/extension.
 
 ### Not deleted, and why
 
-- `packages/api`: **not deleted**, still imported by 1 file(s) that stay: packages/canvas/src/frame/inside/card-calls.ts. Its new home: protocol/ (calls/, the one table).
-- `packages/protocol`: **not deleted**, still imported by 38 file(s) that stay: packages/canvas/src/camera/agent-view.test.ts, packages/canvas/src/camera/agent-view.ts, packages/canvas/src/camera/agent-views.ts, packages/canvas/src/camera/camera.ts, .... Its new home: protocol/ (events, wire).
-- `packages/hub`: **not deleted**, still imported by 1 file(s) that stay: packages/canvas/src/frame/inside/studio-line.ts. Its new home: server/sharing/hub.
-- `packages/agent-ui`: **not deleted**, still imported by 6 file(s) that stay: harness/page/app/alerts.ts, harness/page/app/favicon.ts, harness/page/settings/AlertSettings.tsx, harness/page/settings/window/view.tsx, .... Its new home: harness/page (chat/, composer/).
-- `extension`: **not deleted**, clients/extension does not exist yet. Its new home: clients/extension.
+- `packages/sync-protocol`: **not deleted**, still imported by 8 file(s) that stay: packages/hub/src/commit.ts, packages/hub/src/follower.ts, packages/hub/src/handlers.ts, packages/hub/src/layout.ts, .... Its new home: protocol/sync.ts.
+- `packages/sync-client`: **not deleted**, still imported by 1 file(s) that stay: packages/hub/test/share-site.test.ts. Its new home: server/sharing/client.
 - `packages/docs`: its server half lives in server/documents, its page half is Loom's; the package goes whole with Loom.
 
 ## Kept until Loom moves them (wave 3)
+
+Decided in DESIGN.md section 11; they go at the map's step 4a.
 
 - `packages/canvas`
 - `packages/card-host`
@@ -29,6 +28,9 @@ Written by `node tools/switch/run.mjs --dry` on 2026-11-15 from the tree as it i
 - `packages/pen`
 - `packages/ui`
 - `packages/stage`
+- `packages/protocol`: the canvas library reads its old shapes (Page, Presence, StageCall, ...)
+- `packages/api`: the canvas library's card calls (cardCalls)
+- `packages/hub`: the canvas library's follower (studio-line.ts)
 
 ## Renamed
 
@@ -36,11 +38,12 @@ After the deletions, so no new name meets an old package's:
 
 - `@decks-next/attach` to `@decks/attach` (clients/attach): 1 file(s) name it
 - `@decks-next/cli` to `@decks/cli` (clients/cli): 1 file(s) name it
+- `@decks-next/extension` to `@decks/extension` (clients/extension): 1 file(s) name it
 - `@decks-next/mcp` to `@decks/mcp` (clients/mcp): 1 file(s) name it
 - `@decks-next/sdk` to `@decks/sdk` (clients/sdk): 19 file(s) name it
 - `@decks-next/harness` to `@decks/harness` (harness): 2 file(s) name it
 - `@decks-next/page` to `@decks/page` (harness/page): 1 file(s) name it
-- `@decks-next/protocol` to `@decks/protocol` (protocol): 61 file(s) name it
+- `@decks-next/protocol` to `@decks/protocol` (protocol): 62 file(s) name it
 - `@decks-next/server` to `@decks/server` (server): 1 file(s) name it
 - `@decks-next/tools` to `@decks/tools` (tools): 1 file(s) name it
 
@@ -53,9 +56,9 @@ The 76 browser checks of stop 3, each to its owner's feature (owners from the st
 - `server/cards/checks/` (7): empty-canvas-follows, board-links, placement, card-ground, card-tab, card-links, deck-imports
 - `harness/page/checks/` (17): panel (by subject: Pane), chat-content (by subject: Pane), slash (by subject: Pane), notifications (by subject: Pane), agents-tab, shell (by subject: Pane), focus, placement-views, context (by subject: Pane), per-agent (by subject: Pane), working-marks (by subject: Pane), panel-steady (by subject: Pane), item-pill, voice (by subject: Pane), canvas-switch (by subject: Pane), stages (by subject: Pane), new-agent-opens (by subject: Pane)
 - `server/people/checks/` (6): tiers, news-seen, old-board (by subject: Roster), view-calls, presence, agent-cursor
-- `server/canvas/checks/` (9): geometry, board-comment, pen-stage, card-editor, stage-gestures, shapes, same-drawing, frames, smooth-edits
+- `server/canvas/checks/` (8): geometry, board-comment, pen-stage, card-editor, stage-gestures, shapes, same-drawing, frames
 - `tools/checks/canvas/` (24): selection (by subject: Loom), camera (by subject: Loom), layers-webkit (by subject: Loom), placement-at (by subject: Loom), glide (by subject: Loom), stage-scroll (by subject: Loom), card-phone (by subject: Loom), bent-arrows (by subject: Loom), engine-slide (by subject: Loom), zoom-out-pictures (by subject: Loom), opening-lands (by subject: Loom), wheel-diagonal (by subject: Loom), backends (by subject: Loom), context-loss (by subject: Loom), note-edges (by subject: Loom), tile-pixels (by subject: Loom), stage-goldens (by subject: Loom), drop-lands (by subject: Loom), canvas-frame (by subject: Loom), pencil-then-finger (by subject: Loom), media (by subject: Loom), camera-roundtrip (by subject: Loom), card-copy (by subject: Loom), card-keys (by subject: Loom)
-- `tools/checks/e2e/` (5): items-made, card-shot, stage-shot, placeholder, ink-long-stroke
+- `tools/checks/e2e/` (6): items-made, card-shot, stage-shot, placeholder, ink-long-stroke, smooth-edits
 - `server/pictures/checks/` (8): apps-in-frame, card-fit, one-picture, export, export-pill, awake, card-frame, card-files-img
 
 `e2e/harness.mjs` becomes `tools/checks/harness.mjs`; each moved check's `../harness.mjs` import is rewritten to it, and nothing else in a check changes. `e2e/run.mjs` is replaced by `tools/checks/run.mjs`, which finds checks in their new places. The fixture moves from `e2e/fixture` to `tools/fixtures/deck` (already there).
@@ -149,7 +152,7 @@ Every old name answers until 2027-05-14. After the switch, today's canvas librar
 
 ## Root files
 
-- Workspaces: `packages/*`, `apps/*`, `extension`, `e2e`, `examples/*`, `protocol`, `server`, `harness`, `harness/page`, `clients/*`, `tools`.
+- Workspaces: `packages/*`, `apps/*`, `e2e`, `examples/*`, `protocol`, `server`, `harness`, `harness/page`, `clients/*`, `tools`.
 - Scripts: `dev`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}" & node --import tsx harness/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `start`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `build:page`: `npm run build --workspace @decks/page`; `typecheck`: `npm run typecheck --workspaces --if-present`; `test`: `node tools/check.mjs protocol && node tools/check.mjs server && node tools/check.mjs harness && node tools/check.mjs tools`; `gates`: `node tools/gates/run.mjs`; `test:e2e`: `node tools/checks/run.mjs`; `check`: `node tools/check.mjs`; `heavy`: `node tools/heavy.mjs`.
 - Scripts removed: `dev:server`, `dev:web`, `e2e:serve`, `e2e:serve:server`, `build`, `vendor`, `build:live-doc`, `css:order`, `gates:next`, `dev:example`, `build:packages`, `test:packages`.
 - CI: .github/workflows/test.yml: npm run test:e2e runs tools/checks/run.mjs; the typecheck and test steps stay.
