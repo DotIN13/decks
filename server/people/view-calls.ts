@@ -108,7 +108,8 @@ function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.i
 	return request(people, ctx, name, "view.move", { ...camera, canvas: name, ...(args.animate ? { animate: true } : {}) });
 }
 
-/** A line says where it points and what it selected; the canvas's other lines hear it, in its colour. */
+/** A line says where it points and what it selected; the canvas's other lines hear it, in its colour.
+ * A person's line goes unnamed: to them it is another window of their own. */
 function say(people: People, ctx: Context, args: Infer<typeof calls.view.update.input>): View {
 	const name = here(people, ctx, args.canvas);
 	const client = people.meet(ctx);
@@ -118,7 +119,7 @@ function say(people: People, ctx: Context, args: Infer<typeof calls.view.update.
 	const { canvas: _c, ...said } = args;
 	const others = people.screens.drawing(name).map((s) => s.client).filter((c) => c !== client);
 	const kind = ctx.caller.kind === "agent" ? "agent" : "person";
-	if (others.length) people.tell(ctx, events.viewChanged, { canvas: name, ids: args.selection ?? [], ...said, name: ctx.caller.name, kind, color }, others);
+	if (others.length) people.tell(ctx, events.viewChanged, { canvas: name, ids: args.selection ?? [], ...said, ...(kind === "agent" ? { name: ctx.caller.name } : {}), kind, color }, others);
 	return look(people, ctx, name);
 }
 
