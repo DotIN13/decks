@@ -163,7 +163,7 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 /** The first line of a check's output that says it failed, else the exit. */
 function firstFailure(log, code) {
 	const lines = log.join("").split("\n").filter((l) => l.startsWith("[check]"));
-	const bad = lines.find((l) => /✗|FAIL|not ok|Error|refusing/i.test(l)) ?? (code !== 0 ? `exit ${code} with no failing line; see the log` : undefined);
+	const bad = lines.find((l) => /✗|\bFAIL\b|not ok/.test(l)) ?? lines.find((l) => /\bError\b|refusing/.test(l)) ?? (code !== 0 ? `exit ${code} with no failing line; see the log` : undefined);
 	return (bad ?? lines.at(-1) ?? `exit ${code}`).replace(/^\[check\]\s*/, "").slice(0, 300);
 }
 
