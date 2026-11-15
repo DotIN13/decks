@@ -25,12 +25,20 @@ export async function told(
 		return { type: "canvas.changed", canvas, rev: payload.rev, doc: read.doc, base: read.base, by: payload.by, ...made };
 	}
 	if (name === "view.changed") return { type: "presence.changed", ...payload };
-	// A screen asked for a card's picture: today's frame shoots it on view.called "shot".
-	if (name === "view.requested") {
-		if (payload.call !== "view.screenshot" || typeof payload.id !== "string") return undefined;
-		const card = (payload.args as { card?: unknown } | undefined)?.card;
-		return { type: "view.called", call: { op: "shot", id: payload.id, args: { path: card } } };
-	}
+	// A view call for the frame's canvas, told as today's view.called: a card's picture, an agent's cursor, a reload.
+	if (name === "view.requested") return viewCalled(payload);
 	const old = OLD_OF.get(name);
 	return old ? { type: old, ...payload } : undefined;
+}
+
+/** Today's view.called for a view.requested the frame acts on, or undefined for one it does not. */
+function viewCalled(payload: Record<string, unknown>): Record<string, unknown> | undefined {
+	const args = (payload.args ?? {}) as { card?: unknown; at?: unknown; label?: unknown; color?: unknown };
+	const id = typeof payload.id === "string" ? payload.id : `v${Math.random().toString(36).slice(2, 10)}`;
+	const agentId = String(payload.by ?? "");
+	const call = (op: string, more: Record<string, unknown>) => ({ type: "view.called", call: { op, id, agentId, args: more } });
+	if (payload.call === "view.screenshot" && typeof payload.id === "string") return call("shot", { path: args.card });
+	if (payload.call === "view.cursor") return call("cursor", { path: args.card, at: args.at, label: args.label, ...(args.color ? { color: args.color } : {}) });
+	if (payload.call === "view.reload" && typeof args.card === "string") return call("reload", { path: args.card });
+	return undefined;
 }
