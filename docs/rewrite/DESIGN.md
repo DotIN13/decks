@@ -343,3 +343,24 @@ An app's source may live outside the deck, as long as the deck knows where it is
 - **On a machine where the path does not exist**, the app is `missing`: its item draws as its last
   picture, and `app.clone` takes it from `repo` to a folder the person names.
 - Studio runs no app; a call that needs one goes to a machine through the relay, as before.
+
+## 11. Wave 3 and the lock, as decided by Mason on 2026-11-14
+
+- **Two browser checks at a time.** The heavy lock has two classes: builds, installs and the whole type
+  check run alone; browser checks take one of two slots; a check that measures time runs alone. A slot
+  is taken for one run, never for a loop of runs.
+- **Done is said, not inferred.** An agent sends Mason a line the moment a step someone waits on is
+  done. An agent's state says nothing about its work.
+- **The map before the move.** Loom's map of the canvas libraries is `docs/rewrite/loom/map.md`. The
+  move is by a script with a dry run, one folder at a time, after the switch-over.
+- **Three old packages outlive the switch-over.** The canvas library still reads the old protocol
+  package, the old api package's card calls and the hub's follower. The switch-over keeps those three;
+  they go when the canvas library moves (the map's step 4a). Lexicon adds the shapes they hold to the
+  protocol now, by additions only, so the move can drop them.
+- **Eight class names keep the word `stage`.** The canvas's markup names (`.stage`, `.stage-fixed`,
+  `.stage-ink` and five more) stay: today's checks, Studio and cards people wrote select by them. The
+  names gate lists them by rule, not by baseline. Every other use of the word in these folders is
+  renamed.
+- **Package names stay**, except the engine's, which takes its folder's name.
+- **Vendored libraries leave git.** d3, KaTeX and pdf.js become npm dependencies pinned to the versions
+  vendored today and are copied in at install; the engine's built files are built, not kept.
