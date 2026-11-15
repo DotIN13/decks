@@ -88,6 +88,8 @@ export interface ItemKind {
 	toPen(item: Item, at?: { canvas: string }): PenNode;
 	files?(item: Item): DeckPath[];
 	picture?(item: Item, size: shapes.Box): Promise<Bytes>;
+	/** Run before an item of this kind is inserted or replaced; the canvas places what it answers. */
+	prepare?(item: Item, at: { canvas: string; caller: Caller }): Promise<Item>;
 }
 
 /** What a feature's start() is handed. */
