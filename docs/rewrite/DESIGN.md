@@ -402,3 +402,11 @@ once and passes alone.
 For wave 3, Loom's lane is wide on purpose: the move rewrites imports and paths across the repo in one
 commit per step, by a script with a dry run. Each owner keeps its folder; Loom changes in them only the
 lines a move's table lists. The lanes narrow again when `packages/` is gone.
+
+**Three agents on the splits (Mason, 2026-11-15, at the person's ask).** The long files are split by
+three agents on parts that check apart: Anvil the engine's 11 Rust files (cargo test, no TypeScript),
+Pane the canvas's style sheet (pictures before and after) and the two long TypeScript test files, Loom
+the 16 other TypeScript files of the canvas. The canvas's TypeScript has one type check and the tree is
+shared, so two agents mid-split there would break each other's checks: that part stays one at a time.
+Only Loom edits the gates' baselines during the splits; the others leave fixed keys for one shrink at
+the end.

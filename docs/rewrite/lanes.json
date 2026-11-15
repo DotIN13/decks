@@ -74,7 +74,12 @@
 	"Pane": [
 		"harness/page/",
 		"packages/canvas/src/ui/",
-		"tools/checks/page/"
+		"tools/checks/page/",
+		"canvas/styles/",
+		"canvas/drawing/drawing.test.ts",
+		"canvas/drawing/drawing-tests/",
+		"pen/pen.test.ts",
+		"pen/tests/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
@@ -86,7 +91,8 @@
 		"packages/stage/Cargo.lock",
 		"engine/crates/apple/",
 		"engine/Cargo.toml",
-		"engine/Cargo.lock"
+		"engine/Cargo.lock",
+		"engine/crates/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
