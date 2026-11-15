@@ -1,3 +1,5 @@
+// Today's line against the fixture deck: hello, watch, an edit in pen.dev's own form,
+// the change told back whole as canvas.changed, and the drawing's file written.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -5,9 +7,6 @@ import { join, relative } from "node:path";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
-
-// Today's line against the fixture deck: hello, watch, an edit in pen.dev's own form,
-// the change told back whole as canvas.changed, and the drawing's file written.
 
 const FIXTURE = new URL("../../tools/fixtures/deck/", import.meta.url).pathname;
 

@@ -1,10 +1,9 @@
+// Today's tab socket: the roster on connect, an agent sent to a canvas, its drawing whole,
+// and a card moved there, as resetStage in today's checks does it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
-
-// Today's tab socket: the roster on connect, an agent sent to a canvas, its drawing whole,
-// and a card moved there, as resetStage in today's checks does it.
 
 const deck = {
 	"canvases/plan/canvas.pen": JSON.stringify({ version: "2.14", children: [{ type: "browser", id: "one", name: "One", x: 0, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: "cards/one/index.html" } }] }),

@@ -1,7 +1,6 @@
-import { OLD_EVENTS } from "./table.ts";
-
 // A new event told as the old one today's line expects. Rule 4: a change to a drawing is told
 // whole, as today's canvas.changed with the drawing and its revision.
+import { OLD_EVENTS } from "./table.ts";
 
 /** The old name each new event is told as: the first old row that named it, never an alias. */
 const OLD_OF = new Map<string, string>();

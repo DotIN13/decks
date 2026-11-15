@@ -1,9 +1,8 @@
+// Today's GET /api/deck lists every card, and a friend's old board, with its deck path.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
-
-// Today's GET /api/deck lists every card, and a friend's old board, with its deck path.
 
 const card = (id: string, path: string, type = "decks.card") => ({ type: "browser", id, name: id, x: 0, y: 0, width: 100, height: 100, metadata: { type, path } });
 

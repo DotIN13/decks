@@ -1,8 +1,7 @@
-import type { IncomingMessage } from "node:http";
-import type { Route } from "../kernel/index.ts";
-
 // Today's picture routes, read from server/pictures with the same token, query and body:
 // a canvas's tile, a card's picture, a screenshot, and a card's posted page drawn.
+import type { IncomingMessage } from "node:http";
+import type { Route } from "../kernel/index.ts";
 
 /** Today's picture routes and where each is now: a canvas's tile, a card's picture. */
 const FORWARDS = [

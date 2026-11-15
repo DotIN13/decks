@@ -1,15 +1,8 @@
-import type { Route } from "../kernel/index.ts";
-
 // Today's POST <api>/apps/<name>/open: the canvas frame asks to open an app placed on its
 // canvas, on its pass; server/apps answers it at POST /app-pass/<name>.
+import type { Route } from "../kernel/index.ts";
 
 const OLD = ["/compat/apps/", "/api/apps/"];
-
-/** The app's name in /…/apps/<name>/open, or undefined for any other path. */
-export function appToOpen(path: string, prefix: string): string | undefined {
-	const m = /^([^/]+)\/open$/.exec(path.slice(prefix.length).split("?")[0] ?? "");
-	return m ? decodeURIComponent(m[1]!) : undefined;
-}
 
 export const appOpenRoutes = (url: () => string | undefined): Route[] =>
 	OLD.map((prefix) => ({
@@ -23,3 +16,9 @@ export const appOpenRoutes = (url: () => string | undefined): Route[] =>
 			res.writeHead(answer.status, { "content-type": answer.headers.get("content-type") ?? "application/json" }).end(Buffer.from(await answer.arrayBuffer()));
 		},
 	}));
+
+/** The app's name in /…/apps/<name>/open, or undefined for any other path. */
+export function appToOpen(path: string, prefix: string): string | undefined {
+	const m = /^([^/]+)\/open$/.exec(path.slice(prefix.length).split("?")[0] ?? "");
+	return m ? decodeURIComponent(m[1]!) : undefined;
+}

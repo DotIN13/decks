@@ -1,3 +1,4 @@
+// Today's names, answered from this one folder: the old line, the old drawing and tile routes.
 import { defineFeature, type Deck, type Feature, type Route } from "../kernel/index.ts";
 import { translate } from "./args.ts";
 import { appOpenRoutes } from "./apps.ts";
@@ -7,8 +8,6 @@ import { uploadRoute, whereRoute } from "./files.ts";
 import { lineRoute } from "./line.ts";
 import { pictureRoutes } from "./pictures.ts";
 import { tabRoute } from "./tab.ts";
-
-// Today's names, answered from this one folder: the old line, the old drawing and tile routes.
 
 /** leave: route prefixes the host serves itself (Studio its own /api/upload, which checks an edit role). */
 export type CompatOptions = { leave?: string[] };

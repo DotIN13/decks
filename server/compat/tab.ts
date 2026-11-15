@@ -1,15 +1,17 @@
+// Today's tab socket at /ws?decks_token=: the roster as "agents", an agent's drawing as
+// "stage.pen", its cards as "context.changed", and the dozen messages today's checks send.
+// Each message becomes a new call; nothing here keeps state but which agent this socket is on.
 import type { Caller } from "../../protocol/index.ts";
 import { toDeckPath, type Client, type Deck, type Peer, type Route, type SocketDoor, type Stop } from "../kernel/index.ts";
 import { itemOp } from "./args.ts";
 import { pagesOf, readDrawing } from "./drawing.ts";
 
-// Today's tab socket at /ws?decks_token=: the roster as "agents", an agent's drawing as
-// "stage.pen", its cards as "context.changed", and the dozen messages today's checks send.
-// Each message becomes a new call; nothing here keeps state but which agent this socket is on.
-
 export const TAB_PATH = "/ws";
+
 type Said = Record<string, unknown>;
+
 type AgentRow = { id: string; name: string; color?: string; kind?: string; state?: string; canvas?: string; workspace?: string; tags?: string[] };
+
 /** held: every card each agent has had in play, as today's context kept it (boards), for this server's life. */
 type Tab = { door: SocketDoor; deck: () => Deck; caller: Caller; client: Client; send(m: Said): void; focused?: string; held: Map<string, Set<string>>; agents?: AgentRow[]; sent?: Map<string, number> };
 
@@ -51,27 +53,7 @@ const call = async <T>(tab: Tab, name: string, args: Record<string, unknown>): P
 	return envelope.value as T;
 };
 
-/**
- * An agent's held cards (today's boards): what it has in play now, and every card it had before.
- * A card hidden from the canvas leaves inPlay and stays held, as today; the new protocol keeps no such list.
- */
-function heldBy(tab: Tab, agent: string, now: string[]): string[] {
-	const set = tab.held.get(agent) ?? new Set<string>();
-	for (const path of now) set.add(path);
-	tab.held.set(agent, set);
-	return [...set];
-}
-
-async function inPlay(tab: Tab, canvas: string | undefined, doc?: unknown): Promise<string[]> {
-	if (!canvas) return [];
-	const read = doc === undefined ? await readDrawing(tab.deck(), canvas, "") : { doc };
-	return read ? pagesOf(canvas, read.doc as never, true).map((page) => String(page.path)) : [];
-}
-
-async function context(tab: Tab, agent: string, canvas: string | undefined, doc?: unknown): Promise<{ boards: string[]; inPlay: string[] }> {
-	const now = await inPlay(tab, canvas, doc);
-	return { boards: heldBy(tab, agent, now), inPlay: now };
-}
+// The roster: every agent as a chat row, its state, and the canvases.
 
 /** The roster today's page and checks read: every agent as a chat row, and which is focused. */
 async function roster(tab: Tab): Promise<AgentRow[]> {
@@ -100,14 +82,29 @@ async function stages(tab: Tab, agents?: AgentRow[]): Promise<void> {
 	tab.send({ type: "stages", stages: list.map((c) => ({ name: c.name, title: c.title, rev: c.rev ?? 0, agents: on(c.name) })) });
 }
 
-/** An agent's drawing, whole, as today's stage.pen. */
-async function stagePen(tab: Tab, agentId: string): Promise<void> {
-	const agent = (await call<AgentRow[]>(tab, "agent.list", {})).find((a) => a.id === agentId);
-	if (!agent?.canvas) return;
-	const got = await call<{ rev?: number }>(tab, "canvas.get", { canvas: agent.canvas });
-	const read = await readDrawing(tab.deck(), agent.canvas, `/files/canvases/${agent.canvas}/`);
-	if (read) tab.send({ type: "stage.pen", agentId, stage: agent.canvas, rev: got.rev ?? 0, doc: read.doc, base: read.base });
+async function context(tab: Tab, agent: string, canvas: string | undefined, doc?: unknown): Promise<{ boards: string[]; inPlay: string[] }> {
+	const now = await inPlay(tab, canvas, doc);
+	return { boards: heldBy(tab, agent, now), inPlay: now };
 }
+
+/**
+ * An agent's held cards (today's boards): what it has in play now, and every card it had before.
+ * A card hidden from the canvas leaves inPlay and stays held, as today; the new protocol keeps no such list.
+ */
+function heldBy(tab: Tab, agent: string, now: string[]): string[] {
+	const set = tab.held.get(agent) ?? new Set<string>();
+	for (const path of now) set.add(path);
+	tab.held.set(agent, set);
+	return [...set];
+}
+
+async function inPlay(tab: Tab, canvas: string | undefined, doc?: unknown): Promise<string[]> {
+	if (!canvas) return [];
+	const read = doc === undefined ? await readDrawing(tab.deck(), canvas, "") : { doc };
+	return read ? pagesOf(canvas, read.doc as never, true).map((page) => String(page.path)) : [];
+}
+
+// An agent's drawing: stage.pen whole, then its cards in play.
 
 /**
  * A change of a canvas, as today's server pushed it: stage.pen to every agent on it at once, from one
@@ -127,11 +124,16 @@ async function drawingChanged(tab: Tab, canvas: string, rev?: number): Promise<v
 	for (const agent of agents) tab.send({ type: "context.changed", agentId: agent.id, ...(await context(tab, agent.id, canvas, read.doc)) });
 }
 
-async function canvasOf(tab: Tab, message: Said): Promise<string | undefined> {
-	if (typeof message.stage === "string") return message.stage;
-	const id = String(message.agentId ?? tab.focused ?? "");
-	return (await call<AgentRow[]>(tab, "agent.list", {})).find((a) => a.id === id)?.canvas;
+/** An agent's drawing, whole, as today's stage.pen. */
+async function stagePen(tab: Tab, agentId: string): Promise<void> {
+	const agent = (await call<AgentRow[]>(tab, "agent.list", {})).find((a) => a.id === agentId);
+	if (!agent?.canvas) return;
+	const got = await call<{ rev?: number }>(tab, "canvas.get", { canvas: agent.canvas });
+	const read = await readDrawing(tab.deck(), agent.canvas, `/files/canvases/${agent.canvas}/`);
+	if (read) tab.send({ type: "stage.pen", agentId, stage: agent.canvas, rev: got.rev ?? 0, doc: read.doc, base: read.base });
 }
+
+// The messages today's page sends, each as a new call.
 
 async function heard(tab: Tab, m: Said): Promise<void> {
 	const canvas = async () => ({ canvas: await canvasOf(tab, m) });
@@ -149,6 +151,12 @@ async function heard(tab: Tab, m: Said): Promise<void> {
 		case "agent.rename": return identity(tab, await call<AgentRow>(tab, "agent.update", { agent: m.id, change: { name: m.name } }));
 		case "document.create": return documentCreate(tab, m, (await canvas()).canvas);
 	}
+}
+
+async function canvasOf(tab: Tab, message: Said): Promise<string | undefined> {
+	if (typeof message.stage === "string") return message.stage;
+	const id = String(message.agentId ?? tab.focused ?? "");
+	return (await call<AgentRow[]>(tab, "agent.list", {})).find((a) => a.id === id)?.canvas;
 }
 
 /** A new agent, and this socket on it, as today: the browser that asked is focused on what it made. */

@@ -1,8 +1,7 @@
-import type { Deck, Route } from "../kernel/index.ts";
-import { newsOf, pagesOf, readDrawing } from "./drawing.ts";
-
 // Today's GET /api/deck: the deck's folder and every card and old board on its canvases,
 // friends' included, as today's checks read it (deckState, preflight).
+import type { Deck, Route } from "../kernel/index.ts";
+import { newsOf, pagesOf, readDrawing } from "./drawing.ts";
 
 export function deckRoute(deck: () => Deck, folder: () => string | undefined): Route {
 	return {

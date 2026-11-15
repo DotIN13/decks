@@ -1,16 +1,46 @@
-import { DROPPED, GOES, OLD_CALLS, type OldCall } from "./table.ts";
-
 // An old call made into its new one: the name, the arguments, and back the answer.
 // Rule 3 of the README: a list in the old order, options spread, old shapes turned.
+import { DROPPED, GOES, OLD_CALLS, type OldCall } from "./table.ts";
 
 type Args = Record<string, unknown>;
+
 type Box = { x1?: number; y1?: number; x2?: number; y2?: number };
+
 export type Refusal = { code: "not_found" | "refused" | "invalid"; message: string; hint?: string };
+
 export type Turned = { name: string; args: Args; old: OldCall } | { refusal: Refusal };
 
 const BY_OLD = new Map(OLD_CALLS.map((row) => [row[0], row]));
+
 const GONE = new Map(DROPPED.map((row) => [row[0], row[2]]));
+
 const isObject = (value: unknown): value is Args => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The kernel's translator: an old name the protocol does not declare, as its new call. */
+export function translate(name: string, args: unknown): { name: string; args: Args; back: (value: unknown) => unknown } | { refusal: Refusal } | undefined {
+	const raw = isObject(args) && Array.isArray(args.args) ? args.args : args;
+	const turned = turn(name, raw);
+	if ("refusal" in turned) return BY_OLD.has(name) || GONE.has(name) ? turned : undefined;
+	return { name: turned.name, args: turned.args, back: (value) => answerBack(name, value) };
+}
+
+// The call in: an old name and its arguments, made into the new call.
+
+/** An old name and its arguments, as the new call, or the refusal it answers with. */
+export function turn(old: string, raw: unknown, now = Date.now()): Turned {
+	const gone = GONE.get(old);
+	if (gone) return { refusal: { code: "not_found", message: `${old} is gone: ${gone}` } };
+	const row = BY_OLD.get(old);
+	if (!row) return { refusal: { code: "not_found", message: `There is no call ${old}, old or new.` } };
+	if (now > Date.parse(GOES)) return { refusal: { code: "refused", message: `${old} stopped answering on ${GOES}. Call ${row[2]}.`, hint: row[2] } };
+	const args = shaped(row[2], old, keyed(row[3], raw));
+	// canvas.read with of read one item and what is in it: item.get now.
+	if (old === "canvas.read" && typeof args.of === "string") {
+		const { of, ...rest } = args;
+		return { name: "item.get", args: { ...rest, id: of }, old: row };
+	}
+	return { name: row[2], args, old: row };
+}
 
 /** A list in the old order, or an object already keyed, as the new call's arguments. */
 export function keyed(params: readonly string[], raw: unknown): Args {
@@ -23,47 +53,6 @@ export function keyed(params: readonly string[], raw: unknown): Args {
 		else if (value !== undefined) out[param] = value;
 	});
 	return out;
-}
-
-/** A corner { x1, y1 } as a Point; a Point stays one. */
-export function point(at: unknown): unknown {
-	if (!isObject(at) || typeof at.x1 !== "number" || typeof at.y1 !== "number") return at;
-	return { x: at.x1, y: at.y1 };
-}
-
-function boxParts(box: Box | undefined): { at?: { x: number; y: number }; size?: { w: number; h: number }; set: Args } {
-	const set: Args = {};
-	if (!box) return { set };
-	const at = typeof box.x1 === "number" && typeof box.y1 === "number" ? { x: box.x1, y: box.y1 } : undefined;
-	if (!at && typeof box.x1 === "number") set.x = box.x1;
-	if (!at && typeof box.y1 === "number") set.y = box.y1;
-	const w = typeof box.x2 === "number" && typeof box.x1 === "number" ? box.x2 - box.x1 : undefined;
-	const h = typeof box.y2 === "number" && typeof box.y1 === "number" ? box.y2 - box.y1 : undefined;
-	const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-	return { ...(at ? { at } : {}), ...(size ? { size: size as { w: number; h: number } } : {}), set };
-}
-
-/** One of pen.dev's own ops ({ op, node, box }) as an item op; an item op stays one. */
-export function itemOp(raw: unknown): unknown {
-	if (!isObject(raw)) return raw;
-	const { op, node, box, set, at, ...rest } = raw as Args & { box?: Box; set?: Args };
-	const parts = boxParts(box);
-	const place = { ...(parts.at ? { at: parts.at } : at !== undefined ? { at: point(at) } : {}) };
-	if (op === "insert" && isObject(node)) {
-		// A whole box goes as item.box, which the canvas makes pen's own box (a frame's height a floor);
-		// a corner alone goes as x and y.
-		const whole = box && [box.x1, box.y1, box.x2, box.y2].every((n) => typeof n === "number");
-		const item: Args = whole ? { ...node, box: { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 } } : { ...node };
-		if (!whole && parts.at) Object.assign(item, { x: parts.at.x, y: parts.at.y });
-		return { op, item, ...rest };
-	}
-	if (op === "replace" && isObject(node)) return { op, item: node, ...rest };
-	if (op === "update") {
-		const merged = { ...(set ?? {}), ...parts.set };
-		return { op, ...rest, ...(Object.keys(merged).length ? { set: merged } : {}), ...place, ...(parts.size ? { size: parts.size } : {}) };
-	}
-	if (op === "move" || op === "copy") return { op, ...rest, ...place };
-	return raw;
 }
 
 /** The old arguments of one call, made into the new call's shapes. */
@@ -99,21 +88,50 @@ function shaped(now: string, old: string, args: Args): Args {
 	return args;
 }
 
-/** An old name and its arguments, as the new call, or the refusal it answers with. */
-export function turn(old: string, raw: unknown, now = Date.now()): Turned {
-	const gone = GONE.get(old);
-	if (gone) return { refusal: { code: "not_found", message: `${old} is gone: ${gone}` } };
-	const row = BY_OLD.get(old);
-	if (!row) return { refusal: { code: "not_found", message: `There is no call ${old}, old or new.` } };
-	if (now > Date.parse(GOES)) return { refusal: { code: "refused", message: `${old} stopped answering on ${GOES}. Call ${row[2]}.`, hint: row[2] } };
-	const args = shaped(row[2], old, keyed(row[3], raw));
-	// canvas.read with of read one item and what is in it: item.get now.
-	if (old === "canvas.read" && typeof args.of === "string") {
-		const { of, ...rest } = args;
-		return { name: "item.get", args: { ...rest, id: of }, old: row };
+// Old shapes made new: a pen op, a corner, a box.
+
+/** One of pen.dev's own ops ({ op, node, box }) as an item op; an item op stays one. */
+export function itemOp(raw: unknown): unknown {
+	if (!isObject(raw)) return raw;
+	const { op, node, box, set, at, ...rest } = raw as Args & { box?: Box; set?: Args };
+	const parts = boxParts(box);
+	const place = { ...(parts.at ? { at: parts.at } : at !== undefined ? { at: point(at) } : {}) };
+	if (op === "insert" && isObject(node)) {
+		// A whole box goes as item.box, which the canvas makes pen's own box (a frame's height a floor);
+		// a corner alone goes as x and y.
+		const whole = box && [box.x1, box.y1, box.x2, box.y2].every((n) => typeof n === "number");
+		const item: Args = whole ? { ...node, box: { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 } } : { ...node };
+		if (!whole && parts.at) Object.assign(item, { x: parts.at.x, y: parts.at.y });
+		return { op, item, ...rest };
 	}
-	return { name: row[2], args, old: row };
+	if (op === "replace" && isObject(node)) return { op, item: node, ...rest };
+	if (op === "update") {
+		const merged = { ...(set ?? {}), ...parts.set };
+		return { op, ...rest, ...(Object.keys(merged).length ? { set: merged } : {}), ...place, ...(parts.size ? { size: parts.size } : {}) };
+	}
+	if (op === "move" || op === "copy") return { op, ...rest, ...place };
+	return raw;
 }
+
+/** A corner { x1, y1 } as a Point; a Point stays one. */
+export function point(at: unknown): unknown {
+	if (!isObject(at) || typeof at.x1 !== "number" || typeof at.y1 !== "number") return at;
+	return { x: at.x1, y: at.y1 };
+}
+
+function boxParts(box: Box | undefined): { at?: { x: number; y: number }; size?: { w: number; h: number }; set: Args } {
+	const set: Args = {};
+	if (!box) return { set };
+	const at = typeof box.x1 === "number" && typeof box.y1 === "number" ? { x: box.x1, y: box.y1 } : undefined;
+	if (!at && typeof box.x1 === "number") set.x = box.x1;
+	if (!at && typeof box.y1 === "number") set.y = box.y1;
+	const w = typeof box.x2 === "number" && typeof box.x1 === "number" ? box.x2 - box.x1 : undefined;
+	const h = typeof box.y2 === "number" && typeof box.y1 === "number" ? box.y2 - box.y1 : undefined;
+	const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
+	return { ...(at ? { at } : {}), ...(size ? { size: size as { w: number; h: number } } : {}), set };
+}
+
+// The answer back, in the shape the old call gave it.
 
 /** A new answer as the old call expected it, where its shape changed. */
 export function answerBack(old: string, value: unknown): unknown {
@@ -148,12 +166,4 @@ export function answerBack(old: string, value: unknown): unknown {
 		return { ...value, item, next: `decks canvas insert '${JSON.stringify(item)}'` };
 	}
 	return value;
-}
-
-/** The kernel's translator: an old name the protocol does not declare, as its new call. */
-export function translate(name: string, args: unknown): { name: string; args: Args; back: (value: unknown) => unknown } | { refusal: Refusal } | undefined {
-	const raw = isObject(args) && Array.isArray(args.args) ? args.args : args;
-	const turned = turn(name, raw);
-	if ("refusal" in turned) return BY_OLD.has(name) || GONE.has(name) ? turned : undefined;
-	return { name: turned.name, args: turned.args, back: (value) => answerBack(name, value) };
 }

@@ -1,11 +1,10 @@
+// A second turn started right after the first ends: the tab socket never shows the agent idle
+// until the second turn ends, though a roster built for the first turn's end may finish late.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Client } from "../kernel/index.ts";
 import { features } from "../main.ts";
 import { callers, testServer } from "../kernel/testing.ts";
-
-// A second turn started right after the first ends: the tab socket never shows the agent idle
-// until the second turn ends, though a roster built for the first turn's end may finish late.
 
 const cards = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`canvases/plan/cards/c${i}/index.html`, `<title>C${i}</title>`]));
 const children = Array.from({ length: 30 }, (_, i) => ({ type: "browser", id: `c${i}`, x: i * 500, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: `cards/c${i}/index.html` } }));
