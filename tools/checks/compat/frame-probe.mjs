@@ -45,6 +45,10 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	const before = xOf(deck);
 	// As card-keys.mjs does it: a press on the card's words, Escape (the card stays selected),
 	// then an arrow; and Backspace, which takes the card off the drawing.
+	// Fit the canvas first (the key 0), so the card is on screen wherever the camera opened.
+	await frame.evaluate(() => document.querySelector(".stage")?.focus({ preventScroll: true }));
+	await page.keyboard.press("0");
+	await page.waitForTimeout(1200);
 	const host = await frame.evaluate((path) => {
 		const r = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === path)?.querySelector(".card-host")?.getBoundingClientRect();
 		return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null;
