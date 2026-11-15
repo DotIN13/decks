@@ -1,9 +1,8 @@
-import { toDeckPath, type Deck, type DeckPath } from "../kernel/index.ts";
-import type { Semver } from "./version.ts";
-
 // The migrations a deck may still need, oldest first. Today's seven (to 0.5.1) moved stages,
 // boards and leftovers once; every deck in use has run them, so they stay with today's server,
 // and an older shape is named and refused (OLD_SHAPES). New ones are added below FLOOR.
+import { toDeckPath, type Deck, type DeckPath } from "../kernel/index.ts";
+import type { Semver } from "./version.ts";
 
 /** The version every migration of today's server leaves a deck at. */
 export const FLOOR: Semver = "0.5.1";
@@ -14,16 +13,6 @@ export type Migration = { version: Semver; id: string; run(deck: Deck, say: (lin
 export const MIGRATIONS: readonly Migration[] = [];
 
 export const LATEST: Semver = MIGRATIONS.at(-1)?.version ?? FLOOR;
-
-const exists = async (deck: Deck, path: string) => {
-	try {
-		await deck.read(toDeckPath(path));
-		return true;
-	} catch {
-		return false;
-	}
-};
-const names = async (deck: Deck, dir: string): Promise<DeckPath[]> => (await deck.list(toDeckPath(dir)).catch(() => [])).map((e) => e.path);
 
 /** What of a shape before FLOOR this deck still holds, as sentences; none means it is at FLOOR. */
 export async function oldShapes(deck: Deck): Promise<string[]> {
@@ -44,3 +33,14 @@ export async function holdsADeck(deck: Deck): Promise<boolean> {
 	for (const name of ["deck.json", "boards", "stages", "canvases"]) if ((await names(deck, name)).length || (await exists(deck, name))) return true;
 	return false;
 }
+
+const exists = async (deck: Deck, path: string) => {
+	try {
+		await deck.read(toDeckPath(path));
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+const names = async (deck: Deck, dir: string): Promise<DeckPath[]> => (await deck.list(toDeckPath(dir)).catch(() => [])).map((e) => e.path);

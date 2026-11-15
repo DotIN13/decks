@@ -1,3 +1,4 @@
+// The page is public; a pass needs the person's token and opens one canvas's files only.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -6,8 +7,6 @@ import { join } from "node:path";
 import { testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
 import { frameFeature } from "./feature.ts";
-
-// The page is public; a pass needs the person's token and opens one canvas's files only.
 
 const deck = {
 	"canvases/plan/canvas.pen": JSON.stringify({ version: "2.14", children: [] }),

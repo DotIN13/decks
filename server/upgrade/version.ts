@@ -1,15 +1,9 @@
-import type { VersionFile } from "../kernel/index.ts";
 // The deck's version in .decks/migrations.json, read and written as today's server does,
 // through the kernel's raw record of that one file (a hidden path, which a Deck refuses).
+import type { VersionFile } from "../kernel/index.ts";
 
 export type Semver = string;
 export type { VersionFile };
-
-/** A version file in memory, for tests and for a deck with no folder. */
-export function memoryVersion(text?: string): VersionFile & { text?: string } {
-	const file: VersionFile & { text?: string } = { ...(text ? { text } : {}), read: async () => file.text, write: async (next) => void (file.text = next) };
-	return file;
-}
 
 export function parseSemver(version: unknown): [number, number, number] | undefined {
 	const m = typeof version === "string" ? /^(\d+)\.(\d+)\.(\d+)$/.exec(version) : null;
@@ -36,4 +30,10 @@ export async function readRecord(file: VersionFile): Promise<Record> {
 export async function writeVersion(file: VersionFile, version: Semver, more: Record = {}): Promise<void> {
 	const record = { ...(await readRecord(file)), ...more, version };
 	await file.write(`${JSON.stringify(record, null, "\t")}\n`);
+}
+
+/** A version file in memory, for tests and for a deck with no folder. */
+export function memoryVersion(text?: string): VersionFile & { text?: string } {
+	const file: VersionFile & { text?: string } = { ...(text ? { text } : {}), read: async () => file.text, write: async (next) => void (file.text = next) };
+	return file;
 }

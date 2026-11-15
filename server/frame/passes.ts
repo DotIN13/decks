@@ -1,8 +1,7 @@
-import type { Caller } from "../../protocol/index.ts";
-import type { Tokens } from "../kernel/index.ts";
-
 // Canvas passes (README rule 2): a kernel token for the asker on one canvas, an hour long,
 // kept in memory; revoked when it runs out. Its id is <asker id>~frame-<n>, so a guard reads who.
+import type { Caller } from "../../protocol/index.ts";
+import type { Tokens } from "../kernel/index.ts";
 
 export const PASS_MS = 3_600_000;
 

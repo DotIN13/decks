@@ -1,9 +1,8 @@
+// The canvas page clients frame, and the pass its frame calls with.
 import { defineFeature, type Feature, type Kernel, type Tokens } from "../kernel/index.ts";
 import { Passes } from "./passes.ts";
 import { passFilesRoute, passRoute } from "./routes.ts";
 import { DIST, staticRoutes } from "./static.ts";
-
-// The canvas page clients frame, and the pass its frame calls with.
 
 /** page: false leaves the canvas page to the host (Studio serves its own); the passes stay. */
 export type FrameOptions = { dist?: string; clock?: () => number; page?: boolean };

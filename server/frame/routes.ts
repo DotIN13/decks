@@ -1,44 +1,19 @@
+// POST /api/passes, /api/t/<pass>/card/<path> and /thumb/<path>, as today's server gives them
+// (README rules 2, 3). They are read through /files/ and /pictures/ on the same pass, so a card's
+// page, modules and picture come as those features make them.
 import { posix } from "node:path";
 import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
 
-// POST /api/passes, /api/t/<pass>/card/<path> and /thumb/<path>, as today's server gives them
-// (README rules 2, 3). They are read through /files/ and /pictures/ on the same pass, so a card's
-// page, modules and picture come as those features make them.
-
 const PASS_ROOT = "/api/t/";
+
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
+
 const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || ["assets/", "lib/", "docs/", "apps/"].some((root) => rest.startsWith(root));
 
-/**
- * The deck's import map as the frame reads it, as today (deckImportPaths): an https address as
- * it is; a relative one as a path under assets/; one that climbs, hides or leaves assets/ dropped.
- */
-export function importPaths(given: Record<string, unknown> | undefined): Record<string, string> {
-	const out: Record<string, string> = {};
-	for (const [name, address] of Object.entries(given ?? {})) {
-		if (typeof address !== "string") continue;
-		if (/^https:\/\//.test(address)) {
-			out[name] = address;
-			continue;
-		}
-		const path = posix.normalize(`assets/${address.replace(/^\.\//, "")}`);
-		if (!path.startsWith("assets/") || path.split("/").some((part) => part === ".." || part.startsWith("."))) continue;
-		out[name] = path;
-	}
-	return out;
-}
-
-/** The deck's map for the frame; {} when the deck has none, so the frame never looks for one itself. */
-async function importsOf(ctx: Context): Promise<Record<string, string>> {
-	try {
-		const text = new TextDecoder().decode(await ctx.deck.read(toDeckPath("assets/importmap.json")));
-		return importPaths((JSON.parse(text) as { imports?: Record<string, unknown> }).imports);
-	} catch {
-		return {};
-	}
-}
+/** Where a pass's kind of file is read: a file through cards' /files/, a picture through /pictures/. */
+const FORWARD: Record<string, string> = { card: "/files/", thumb: "/pictures/" };
 
 export function passRoute(passes: Passes): Route {
 	return {
@@ -60,8 +35,34 @@ export function passRoute(passes: Passes): Route {
 	};
 }
 
-/** Where a pass's kind of file is read: a file through cards' /files/, a picture through /pictures/. */
-const FORWARD: Record<string, string> = { card: "/files/", thumb: "/pictures/" };
+/** The deck's map for the frame; {} when the deck has none, so the frame never looks for one itself. */
+async function importsOf(ctx: Context): Promise<Record<string, string>> {
+	try {
+		const text = new TextDecoder().decode(await ctx.deck.read(toDeckPath("assets/importmap.json")));
+		return importPaths((JSON.parse(text) as { imports?: Record<string, unknown> }).imports);
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * The deck's import map as the frame reads it, as today (deckImportPaths): an https address as
+ * it is; a relative one as a path under assets/; one that climbs, hides or leaves assets/ dropped.
+ */
+export function importPaths(given: Record<string, unknown> | undefined): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [name, address] of Object.entries(given ?? {})) {
+		if (typeof address !== "string") continue;
+		if (/^https:\/\//.test(address)) {
+			out[name] = address;
+			continue;
+		}
+		const path = posix.normalize(`assets/${address.replace(/^\.\//, "")}`);
+		if (!path.startsWith("assets/") || path.split("/").some((part) => part === ".." || part.startsWith("."))) continue;
+		out[name] = path;
+	}
+	return out;
+}
 
 export function passFilesRoute(passes: Passes, url: () => string | undefined): Route {
 	return {

@@ -1,3 +1,5 @@
+// README rules: the fixture deck (its friend's canvas still holds an old board) opens and is
+// recorded at the floor; an older shape is refused naming it; migrations run once, in order.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
@@ -5,9 +7,6 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { upgradeDeck } from "./feature.ts";
 import { memoryVersion, readRecord } from "./version.ts";
-
-// README rules: the fixture deck (its friend's canvas still holds an old board) opens and is
-// recorded at the floor; an older shape is refused naming it; migrations run once, in order.
 
 const FIXTURE = new URL("../../tools/fixtures/deck/", import.meta.url).pathname;
 

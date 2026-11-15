@@ -1,8 +1,17 @@
+// Old decks brought up to date when the server opens them, before any feature starts.
 import { defineFeature, type Deck, type Feature } from "../kernel/index.ts";
 import { FLOOR, holdsADeck, LATEST, MIGRATIONS, oldShapes, type Migration } from "./migrations.ts";
 import { compareSemver, parseSemver, readRecord, writeVersion, type Semver, type VersionFile } from "./version.ts";
 
-// Old decks brought up to date when the server opens them, before any feature starts.
+export function upgradeFeature(): Feature {
+	return defineFeature({
+		name: "upgrade",
+		calls: [],
+		async upgrade(deck, file) {
+			for (const line of await upgradeDeck(deck, file)) console.log(`[upgrade] ${line}`);
+		},
+	});
+}
 
 /** Bring a deck up to date; the lines say what changed. Throws naming a migration that failed. */
 export async function upgradeDeck(deck: Deck, file: VersionFile, migrations: readonly Migration[] = MIGRATIONS, latest: Semver = LATEST): Promise<string[]> {
@@ -26,14 +35,4 @@ export async function upgradeDeck(deck: Deck, file: VersionFile, migrations: rea
 	}
 	if (record.version !== from) await writeVersion(file, from);
 	return said;
-}
-
-export function upgradeFeature(): Feature {
-	return defineFeature({
-		name: "upgrade",
-		calls: [],
-		async upgrade(deck, file) {
-			for (const line of await upgradeDeck(deck, file)) console.log(`[upgrade] ${line}`);
-		},
-	});
 }
