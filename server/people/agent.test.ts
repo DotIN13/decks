@@ -46,7 +46,7 @@ test("names are unique however capitalised, and default to the first free number
 	const one = await s.value<Agent>("agent.attach", {});
 	const two = await s.value<Agent>("agent.attach", { kind: "claude" });
 	assert.equal(one.name, "Agent 1");
-	assert.equal(two.name, "Claude 1");
+	assert.equal(two.name, "Agent 2", "the kind does not change the word");
 	assert.notEqual(one.color, two.color);
 	assert.equal((await s.value<Agent>("agent.attach", { canvas: "Title A" })).canvas, "a", "a title becomes the canvas's name");
 	const clash = await s.call("agent.attach", { name: "agent 1" });

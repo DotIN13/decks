@@ -36,7 +36,6 @@ export type NewAgent = { name?: string; kind?: AgentKind; workspace?: string; ta
 const KEY = "agents/";
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const KIND_WORD: Record<string, string> = { claude: "Claude", pi: "Pi", opencode: "OpenCode", opencode2: "OpenCode", antigravity: "Antigravity" };
 
 export class Roster {
 	private byId = new Map<string, AgentRecord>();
@@ -76,7 +75,7 @@ export class Roster {
 	}
 
 	async create(spec: NewAgent): Promise<AgentRecord> {
-		const name = spec.name === undefined ? numberedName(KIND_WORD[spec.kind ?? ""] ?? "Agent", (n) => this.taken(n)) : cleanName(spec.name);
+		const name = spec.name === undefined ? numberedName("Agent", (n) => this.taken(n)) : cleanName(spec.name);
 		if (this.taken(name)) throw new Refused("conflict", `Another agent is already called ${name}. Pick a different name.`, "agent.list");
 		const { name: _n, tags, workspace, ...rest } = spec;
 		const record: AgentRecord = {
