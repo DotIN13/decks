@@ -11,7 +11,8 @@ export const LINE_PATH = "/compat/v1/socket";
 const QUIET = new Set(["canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
-type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
+/** edits: the frame's names for its edits sent and not yet told back as made, oldest first. */
+type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: string[] };
 
 /** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
 export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
@@ -30,7 +31,7 @@ export function lineRoute(deck: () => Deck, url: () => string | undefined = () =
 
 function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => string | undefined): void {
 	const client = door.client();
-	const state: State = { watched: new Map() };
+	const state: State = { watched: new Map(), edits: [] };
 	const send = (message: Said) => peer.send(JSON.stringify(message));
 	const timer = setTimeout(() => !state.caller && peer.close(4401, "Say hello with a token first."), 5_000);
 	peer.onClose(() => {
@@ -84,6 +85,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 			return send({ type: "call.answered", id, ok: false, error: `This line is ${bound}'s: it calls on no other canvas.` });
 		}
 		if (bound && turned.args.canvas === undefined) turned.args.canvas = bound;
+		if (typeof message.edit === "string") state.edits.push(message.edit);
 		const envelope = await door.call(turned.name, turned.args, caller, client);
 		if (envelope.ok) return send({ type: "call.answered", id, ok: true, value: answerBack(turned.old[0], envelope.value), ...(envelope.notes.length ? { notes: envelope.notes } : {}) });
 		send({ type: "call.answered", id, ok: false, error: envelope.error.message, ...(envelope.notes.length ? { notes: envelope.notes } : {}) });
@@ -149,7 +151,10 @@ async function watchOn(w: Watching, canvas: string, since: unknown, whole: unkno
 	};
 	w.state.watched.get(canvas)?.();
 	w.state.watched.set(canvas, w.door.subscribe({ caller, client: w.client.id, events: HEARD, canvas }, (event) => {
-		void told(event.name, event.payload, drawing, cardPage).then((said) => said && w.send(said));
+		// The frame shows its own edits until a drawing says it has them: this line's change names them as made.
+		const mine = event.name === "item.changed" && event.payload.by === caller.id && w.state.edits.length;
+		const payload = mine ? { ...event.payload, made: w.state.edits.splice(0) } : event.payload;
+		void told(event.name, payload, drawing, cardPage).then((said) => said && w.send(said));
 	}));
 	const rev = (got.value as { rev?: number }).rev ?? 0;
 	if (whole === true || (typeof since === "number" && since !== rev)) {

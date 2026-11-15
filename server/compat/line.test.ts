@@ -54,11 +54,12 @@ test("today's line draws and edits the fixture canvas through compat", async () 
 	line.send({ type: "line.hello", token: doors.token, watch: [{ canvas: "auth-refresh", since: first.rev }] });
 	assert.equal((await line.next("line.hello")).who, "person");
 	const op = { op: "insert", node: { type: "note", id: "compat-note", content: "From today's line" }, box: { x1: 40, y1: 2000 } };
-	line.send({ type: "line.call", id: "1", verb: "canvas.batch", args: [[op], { canvas: "auth-refresh" }] });
+	line.send({ type: "line.call", id: "1", verb: "canvas.batch", args: [[op], { canvas: "auth-refresh" }], edit: "e1" });
 	const answered = await line.next("call.answered");
 	assert.equal(answered.ok, true, String(answered.error));
 	const changed = await line.next("canvas.changed");
 	assert.ok(JSON.stringify(changed.doc).includes("compat-note"), `rev ${String(changed.rev)} first ${first.rev}`);
+	assert.deepEqual(changed.made, ["e1"], "the line's own edit is named as made, so the frame stops showing it on top");
 	const file = new TextDecoder().decode(await server.deck.read("canvases/auth-refresh/canvas.pen" as never));
 	assert.match(file, /From today's line/);
 	line.close();
