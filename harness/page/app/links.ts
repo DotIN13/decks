@@ -65,7 +65,7 @@ export function createFraming(stagePages: () => Page[]) {
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
-		void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
+		if (!stagePages().some((one) => one.path === path)) void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
 		frameWhenPlaced(path);
 	};
 	createEffect(() => {

@@ -25,6 +25,15 @@ export function ensureHistory(agentId: string | undefined): void {
 	});
 }
 
+/** Read a held conversation again, as after a rewind: the latest page replaces what is held. */
+export async function reread(agentId: string): Promise<void> {
+	if (!scratch.of(agentId).historyHeld) return;
+	const answer = await call<ChatItem[]>("chat.list", { agent: agentId, limit: PAGE });
+	if (!answer.ok) return;
+	setState("agents", agentId, "transcript", answer.value);
+	setState("agents", agentId, "moreHistory", answer.value.length >= PAGE);
+}
+
 /** One page further back; answers how many entries it added. */
 export async function loadEarlier(agentId: string): Promise<number> {
 	const before = state.agents[agentId]?.transcript[0]?.id;

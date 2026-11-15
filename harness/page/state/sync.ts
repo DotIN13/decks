@@ -5,6 +5,7 @@ import { scratch } from "./agent.ts";
 import { setStages } from "./canvases.ts";
 import { ensureAgent, nameOf, setState, state } from "./deck.ts";
 import { call, on } from "./line.ts";
+import { reread } from "./history.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
 import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
@@ -169,7 +170,11 @@ export function listen(hooks: SyncHooks): () => void {
 			notice(event.level as "info" | "warn" | "error", String(event.text));
 			if (event.level === "error") hooks.raise("problem", { title: "Something went wrong", body: String(event.text), tag: "problem" });
 		}),
-		on("chat.changed", (event) => void Promise.all(((event.ids as string[]) ?? []).map(readExtra)).then(() => drawAgents(hooks))),
+		on("chat.changed", (event) => {
+			const ids = (event.ids as string[]) ?? [];
+			for (const id of ids) void reread(id);
+			void Promise.all(ids.map(readExtra)).then(() => drawAgents(hooks));
+		}),
 		...hearChat(hooks.raise),
 	];
 	return () => stops.forEach((stop) => stop());
