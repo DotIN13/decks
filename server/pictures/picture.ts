@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { layout, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
+import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
 import { cardPath, type Machine } from "./machine.ts";
 
 // A card's picture for the canvas (rule 11): its page at its own width,
@@ -46,12 +47,32 @@ export async function cardPicture(ctx: Context, m: Machine, card: string, asked:
 	const tab = await m.browser.page({ width, height: Math.round(width * 0.72), scale: rung / width, scheme });
 	try {
 		await tab.goto(page.url);
-		const bytes = await tab.screenshot({ type: "jpeg", full: true });
+		// The card's own width, so the picture is exactly the rung; what spills sideways is cut.
+		const tall = Math.max(1, Math.ceil(Number(await tab.evaluate("document.documentElement.scrollHeight")) || width * 0.72));
+		const bytes = await tab.screenshot({ type: "jpeg", full: true, clip: { x: 0, y: 0, width, height: tall } });
 		await ctx.store.put(key, bytes);
 		return bytes;
 	} finally {
 		await tab.close();
 		page.done();
+	}
+}
+
+/** The picture compressed for the GPU, kept beside it; undefined when this machine has no encoder. */
+export async function compressedPicture(ctx: Context, m: Machine, jpeg: Uint8Array, encode = encoder()): Promise<Uint8Array | undefined> {
+	if (!encode) return undefined;
+	const key = `${createHash("sha256").update(jpeg).digest("hex").slice(0, 24)}.astc`;
+	const kept = await ctx.store.get(key);
+	if (kept) return kept;
+	const tab = await m.browser.page({ width: 16, height: 16, scale: 1, scheme: "light" });
+	try {
+		const made = await tab.evaluate<{ width: number; height: number; b64: string }[]>(`(${LEVELS})(${JSON.stringify(Buffer.from(jpeg).toString("base64"))})`);
+		const levels = made.map((one) => ({ width: one.width, height: one.height, rgba: new Uint8Array(Buffer.from(one.b64, "base64")) }));
+		const packed = await compress(levels, encode);
+		await ctx.store.put(key, packed);
+		return packed;
+	} finally {
+		await tab.close();
 	}
 }
 
@@ -61,7 +82,10 @@ async function answer(ctx: Context, m: Machine, path: string, query: URLSearchPa
 		const asked = Number(query.get("w") ?? 480);
 		const scheme = query.get("scheme") === "dark" ? "dark" : "light";
 		const bytes = await cardPicture(ctx, m, card, Number.isFinite(asked) && asked > 0 ? asked : 480, scheme);
-		return { type: "image/jpeg", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
+		const cache = query.has("v") ? "private, max-age=31536000, immutable" : "no-cache";
+		const packed = query.get("astc") === "1" ? await compressedPicture(ctx, m, bytes).catch(() => undefined) : undefined;
+		if (packed) return { type: ASTC_TYPE, body: packed, headers: { "cache-control": cache } };
+		return { type: "image/jpeg", body: bytes, headers: { "cache-control": cache } };
 	} catch (error) {
 		if (!(error instanceof Refused)) return { status: 503, type: "text/plain", body: (error as Error).message };
 		return { status: error.code === "not_found" ? 404 : error.code === "unavailable" ? 503 : 400, type: "text/plain", body: error.message };

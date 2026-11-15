@@ -8,7 +8,7 @@ Pictures of what is on a canvas, and the one feature that drives a browser.
   browser found said in the notes (fit.ts, reading.ts).
 - `canvas.screenshot`: a picture of a canvas, part of it, or one card (shot.ts).
 - `canvas.export`: items as one self-contained web page (export.ts).
-- Pictures served by address: `/pictures/<card>`, `canvas-tile/`, `shot`, `snapshot` (rules 11 to 14).
+- Pictures by address: `/pictures/<card>`, `canvas-tile/`, `shot`, `snapshot` (rules 11 to 14).
 - The browser (browser.ts): one Chromium, started on first use, closed a minute after the last.
 
 ## May import
@@ -39,7 +39,8 @@ HTML; `playwright` for the browser. No other feature.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
     A card in it is an iframe of its page, addressed from where the page is written.
 11. `GET /pictures/<path>`: a JPEG of a card or any other `.html` page in the deck, kept by its
-    bytes, width and scheme, so it is pictured once; with `v`, cached for a year.
+    bytes, width and scheme, so it is pictured once; with `v`, cached for a year. With `astc=1`
+    it is every size in 4 x 4 ASTC blocks for the GPU (astcenc), when this machine has the encoder.
 12. A canvas's tile picture is `GET /pictures/canvas-tile/<canvas>?scheme=&v=`: the whole canvas,
    its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
 13. `GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&name=` is a picture to
@@ -49,9 +50,7 @@ HTML; `playwright` for the browser. No other feature.
 15. A picture draws a card's own corner, outline and shadow, and a placeholder frame's dashed
     edge in its last writer's colour (the accent for the person).
 
-## Not here
-
-The engine's native screenshot tool is not used yet: every picture is Chromium's (`how` says so).
+Not yet: the engine's native screenshot tool. Every picture is Chromium's, and `how` says so.
 
 ## Check
 

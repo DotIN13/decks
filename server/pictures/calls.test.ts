@@ -255,3 +255,12 @@ test("rule 8: a card's path in a list names its item; a card alone as a PDF is t
 	assert.match(fake.seen.at(-1)!.html[0]!, /<iframe/);
 	await s.close();
 });
+
+test("rule 11: with astc=1 a card's picture is every size in ASTC blocks, kept once", async () => {
+	const { pack, MAGIC, encoder } = await import("./astc.ts");
+	const packed = Buffer.from(pack([{ width: 16, height: 16, rgba: new Uint8Array(1024) }, { width: 8, height: 8, rgba: new Uint8Array(256) }], [new Uint8Array(256), new Uint8Array(64)]));
+	assert.equal(packed.toString("ascii", 0, 4), MAGIC);
+	assert.deepEqual([packed.readUInt32LE(4), packed.readUInt32LE(8), packed.readUInt32LE(12), packed.readUInt32LE(16), packed.readUInt32LE(20)], [16, 16, 2, 256, 64]);
+	assert.equal(packed.length, 24 + 256 + 64);
+	assert.ok(encoder(), "astcenc is installed for this machine");
+});
