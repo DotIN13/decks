@@ -8,7 +8,7 @@ Written by `node tools/switch/run.mjs --dry` on 2026-11-15 from the tree as it i
 - `apps/web` (@decks/web): now harness/page. Proof: the page checks of stop 3 (shell, panel, chrome, agents-tab, ...).
 - `packages/agent-ui` (@decks/agent-ui): now harness/page (chat/, composer/). Proof: chat-content, slash, voice, working-marks checks.
 - `packages/sdk` (@decks/sdk): now clients/sdk, clients/cli. Proof: node tools/check.mjs clients/sdk, tools/clients/same.test.ts.
-- `runtime` (@decks/runtime): now harness/prompts, harness/runtimes. Proof: node tools/check.mjs harness; running, time-machine checks.
+- `runtime` (@decks/runtime): now harness/prompts, harness/runtimes. Proof: node tools/check.mjs harness; running, time-machine checks. **Except `runtime/live-doc.ts`, kept where it is:** the source of packages/card-host/lib/live-doc.js, built by scripts/live-doc.mjs; Loom's step 4d moves it into canvas/.
 - `e2e` (@decks/e2e): now tools/checks (the runner, the harness, the fake model and agent) and the features' checks/ folders. Proof: every check moved first and started by node tools/checks/run.mjs.
 - `extension`: already moved to clients/extension.
 
@@ -32,6 +32,9 @@ Decided in DESIGN.md section 11; they go at the map's step 4a.
 - `packages/protocol`: the canvas library reads its old shapes (Page, Presence and the old call and author types)
 - `packages/api`: the canvas library's card calls (cardCalls)
 - `packages/hub`: the canvas library's follower (studio-line.ts)
+- `scripts/vendor.mjs`: fills packages/card-host/lib (Loom's step 4c moves it)
+- `scripts/live-doc.mjs`: builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)
+- `runtime/live-doc.ts`: see Deleted
 
 ## Renamed
 
@@ -59,11 +62,11 @@ Then one install under the heavy lock, so node_modules links the new names.
 All 95 browser checks move and start under `node tools/checks/run.mjs`; `e2e/run.mjs` goes with e2e/. Stop 3's go to their owners' features (owners from the stop 3 card's runs.json; with none, by what they exercise: the page's to Pane, the canvas library's to tools/checks/canvas until Loom moves the library); the agent checks to tools/checks/agent, the benches to tools/checks/bench:
 
 - `server/cards/checks/` (7): empty-canvas-follows, board-links, placement, card-ground, card-tab, card-links, deck-imports
-- `harness/page/checks/` (17): panel (by subject: Pane), chat-content (by subject: Pane), slash (by subject: Pane), notifications (by subject: Pane), agents-tab, shell (by subject: Pane), focus, placement-views, context (by subject: Pane), per-agent (by subject: Pane), working-marks (by subject: Pane), panel-steady (by subject: Pane), item-pill, voice (by subject: Pane), canvas-switch (by subject: Pane), stages (by subject: Pane), new-agent-opens (by subject: Pane)
+- `harness/page/checks/` (18): panel (by subject: Pane), chat-content (by subject: Pane), slash (by subject: Pane), notifications (by subject: Pane), agents-tab, shell (by subject: Pane), focus, placement-views, context (by subject: Pane), per-agent (by subject: Pane), working-marks (by subject: Pane), panel-steady (by subject: Pane), card-shot, item-pill, voice (by subject: Pane), canvas-switch (by subject: Pane), stages (by subject: Pane), new-agent-opens (by subject: Pane)
 - `server/people/checks/` (6): tiers, news-seen, old-board (by subject: Roster), view-calls, presence, agent-cursor
 - `server/canvas/checks/` (8): geometry, board-comment, pen-stage, card-editor, stage-gestures, shapes, same-drawing, frames
 - `tools/checks/canvas/` (34): selection (by subject: Loom), camera (by subject: Loom), layers-webkit (by subject: Loom), placement-at (by subject: Loom), glide (by subject: Loom), stage-scroll (by subject: Loom), card-phone (by subject: Loom), bent-arrows (by subject: Loom, timed), engine-slide (by subject: Loom), zoom-out-pictures (by subject: Loom), opening-lands (by subject: Loom), wheel-diagonal (by subject: Loom), backends (by subject: Loom), context-loss (by subject: Loom), note-edges (by subject: Loom), tile-pixels (by subject: Loom), stage-goldens (by subject: Loom), drop-lands (by subject: Loom), canvas-frame (by subject: Loom), pencil-then-finger (by subject: Loom), media (by subject: Loom), camera-roundtrip (by subject: Loom), card-copy (by subject: Loom), card-keys (by subject: Loom), arrow-label (not in stop 3, named), arrows-steady (not in stop 3, named), awake-drag (not in stop 3, named), card-frame-demo (not in stop 3, named), card-frame-drag (not in stop 3, named), cards-smoke (not in stop 3), edits-wait (not in stop 3, named), look-shots (not in stop 3, named), nudge (not in stop 3, named), text-shots (not in stop 3, named)
-- `tools/checks/e2e/` (6): items-made, card-shot, stage-shot, placeholder, ink-long-stroke (timed), smooth-edits (timed)
+- `tools/checks/e2e/` (5): items-made, stage-shot, placeholder, ink-long-stroke (timed), smooth-edits (timed)
 - `server/pictures/checks/` (8): apps-in-frame, card-fit, one-picture, export, export-pill, awake, card-frame, card-files-img
 - `tools/checks/agent/` (6): agent-rows (not in stop 3), chrome (not in stop 3), running (not in stop 3), stage-api (not in stop 3), time-machine (not in stop 3), walkthrough (not in stop 3)
 - `tools/checks/bench/` (3): awake-bench (not in stop 3, named), pan-heavy (not in stop 3, named), render-perf (not in stop 3, named)
