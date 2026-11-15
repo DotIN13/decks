@@ -19,9 +19,9 @@ export interface BundleManifest {
 	decks: number;
 	made: string;
 	from: string;
-	stage: { name: string; title: string; rev: number };
+	canvas: { name: string; title: string; rev: number };
 	pen: { doc: PenDocument; base: string };
-	boards: Page[];
+	cards: Page[];
 	pictures: Record<string, { light?: string; dark?: string }>;
 }
 
@@ -73,14 +73,14 @@ export async function openBundle(file: Blob): Promise<string> {
 	const manifestFile = files.find((one) => one.name === "manifest.json");
 	if (!manifestFile) throw new Error("This file has no manifest, so it is not a Decks canvas.");
 	const manifest = JSON.parse(new TextDecoder().decode(await manifestFile.bytes())) as BundleManifest;
-	if (manifest.decks !== 1) throw new Error(`This canvas was saved by a newer Decks (format ${manifest.decks}).`);
+	if (manifest.decks !== 2) throw new Error(manifest.decks > 2 ? `This canvas was saved by a newer Decks (format ${manifest.decks}).` : "This canvas was saved by an older Decks; save it again from a newer one.");
 	const id = newId();
 	const cache = await caches.open(cacheName(id));
 	for (const one of files) {
 		const bytes = await one.bytes();
 		await cache.put(`/c/${id}/${one.name}`, new Response(bytes as BodyInit, { headers: { "Content-Type": typeOf(one.name) } }));
 	}
-	const entry: Connection = { id, kind: "bundle", label: manifest.stage.title, from: manifest.from, added: Date.now(), boards: manifest.boards.length };
+	const entry: Connection = { id, kind: "bundle", label: manifest.canvas.title, from: manifest.from, added: Date.now(), boards: manifest.cards.length };
 	saveConnections([...connections(), entry]);
 	return id;
 }
