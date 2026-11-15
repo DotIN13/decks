@@ -149,7 +149,7 @@ export function starterFiles(starter: Starter, title: string): Record<string, st
 		case "static":
 			return {
 				"app.json": json({ title, kind: "static" }),
-				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n`),
+				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n	<!-- On the canvas: browser storage in a sandboxed frame, and wheels it cannot use go to the canvas. -->\n	<script src="decks-canvas.js"></script>\n`),
 				"style.css": STYLE,
 				"app.js": STATIC_JS,
 			};

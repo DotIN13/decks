@@ -82,8 +82,8 @@ test("a server app that exits at once is broken, with its error", async () => {
 test("an app shown on a canvas is an app item, and app.delete takes it off and trashes the folder", async () => {
 	const t = await start();
 	await t.s.value("app.create", { name: "gone" }, ann);
-	const placed = await t.s.value<{ type: string; app: string }>("item.insert", { item: { type: "app", app: "gone" }, at: { x: 0, y: 0 } }, ann);
-	assert.deepEqual([placed.type, placed.app], ["app", "gone"]);
+	const placed = await t.s.value<{ type: string; app: string; title?: string }>("item.insert", { item: { type: "app", app: "gone" }, at: { x: 0, y: 0 } }, ann);
+	assert.deepEqual([placed.type, placed.app, placed.title], ["app", "gone", "gone"], "placed with no title, it takes its app's");
 	assert.deepEqual(await t.s.value("app.delete", { name: "gone" }, ann), { deleted: "apps/gone" });
 	const items = await t.s.value<unknown[]>("item.list", { canvas: "work" });
 	assert.equal(items.length, 0);
@@ -106,5 +106,25 @@ test("a forwarded port is reached at /rnode with the path stripped and at /node 
 	await t.s.value("port.close", { port }, ann);
 	assert.equal((await t.s.value<unknown[]>("port.list")).length, 0);
 	local.close();
+	await t.close();
+});
+
+test("an app page gets decks-canvas.js, and a canvas pass opens a placed app inside its canvas", async () => {
+	const t = await start();
+	await t.s.value("app.create", { name: "inside" }, ann);
+	await t.s.value("file.write", { path: "apps/inside/sub/page.html", text: "<html><head><title>S</title></head><body>x</body></html>" }, ann);
+	assert.match(await (await t.page("/app/inside/sub/page.html")).text(), /<head><script src="\.\.\/decks-canvas\.js"><\/script>/);
+	const script = await t.page("/app/inside/decks-canvas.js");
+	assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8");
+	assert.match(await script.text(), /decks-storage[\s\S]*decks-wheel/);
+	const open = (as: string) => fetch(t.url("/app-pass/inside"), { method: "POST", headers: { authorization: `Bearer ${as}` } });
+	const pass = t.s.token({ kind: "person", id: "person~frame-1", name: "you", canvas: "work" });
+	assert.equal((await open(pass)).status, 403, "not placed on the canvas yet");
+	await t.s.value("item.insert", { item: { type: "app", app: "inside" }, at: { x: 0, y: 0 } }, ann);
+	const opened = (await (await open(pass)).json()) as { url: string };
+	assert.match(opened.url, /^\/app\/t\/[^/]+\/inside\/$/);
+	assert.equal((await fetch(t.url(opened.url))).status, 200, "the address with its pass loads the app");
+	const noCanvas = t.s.token({ kind: "app", id: "some-app", name: "some-app" });
+	assert.equal((await open(noCanvas)).status, 403, "a caller with no canvas opens nothing inside one");
 	await t.close();
 });

@@ -1,5 +1,5 @@
 import { toDeckPath, type DeckPath, type Item, type ItemKind } from "../kernel/index.ts";
-import { APP_NAME } from "./manifest.ts";
+import { APP_NAME, manifestOf } from "./manifest.ts";
 
 // The app as an item kind: { type: "app", app, title?, box } on a call, a
 // browser node tagged decks.app in canvas.pen. A node keeps every field it had.
@@ -42,6 +42,12 @@ export const appKind: ItemKind = {
 			x: b.x1,
 			y: b.y1,
 		};
+	},
+	/** An app placed with no title takes its app's title, as its pen name. */
+	async prepare(item, at) {
+		if (typeof item.title === "string" || !at.deck || !APP_NAME.test(String(item.app ?? ""))) return item;
+		const manifest = await manifestOf(at.deck, String(item.app)).catch(() => undefined);
+		return { ...item, title: manifest?.title ?? String(item.app) };
 	},
 	files(item): DeckPath[] {
 		const name = String(item.app ?? "");

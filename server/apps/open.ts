@@ -1,0 +1,31 @@
+import { randomUUID } from "node:crypto";
+import { layout } from "../../protocol/index.ts";
+import type { Context, Kernel, Route, RouteAnswer } from "../kernel/index.ts";
+import { APP_NAME, manifestOf } from "./manifest.ts";
+
+// POST /app-pass/<name> (rule 15): a canvas's frame, on its canvas pass, opens an app placed on
+// that canvas inside it. The answer is the app's address with an app pass in its path.
+
+export const OPEN = "/app-pass/";
+const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value), headers: { "cache-control": "no-store" } });
+
+async function placed(ctx: Context, canvas: string, name: string): Promise<boolean> {
+	const items = await ctx.call<{ type: string; app?: string }[]>("item.list", { canvas, depth: 0 }).catch(() => []);
+	return items.some((item) => item.type === "app" && item.app === name);
+}
+
+async function answer(ctx: Context, kernel: Kernel, path: string): Promise<RouteAnswer> {
+	const name = decodeURIComponent(path.slice(OPEN.length)).replace(/\/+$/, "");
+	if (!APP_NAME.test(name)) return json(404, { error: `There is no app called ${name}.` });
+	const canvas = ctx.caller.canvas;
+	if (!canvas) return json(403, { error: "An app is opened in a canvas by that canvas's frame, with its canvas pass." });
+	if (layout.isSharedCanvas(canvas)) return json(403, { error: "Apps open inside a canvas only on a canvas that is yours alone; on this one, open it in a tab.", tab: true });
+	const manifest = await manifestOf(ctx.deck, name).catch(() => undefined);
+	if (!manifest) return json(404, { error: `There is no app called ${name}.` });
+	if (!(await placed(ctx, canvas, name))) return json(403, { error: `${name} is not placed on this canvas.` });
+	if (manifest.prefix) return json(409, { error: `${name} is told its base path, so it loads by absolute addresses; open it in a tab.`, tab: true });
+	const pass = kernel.callers.issue({ kind: "app", id: `${name}~${canvas}~${randomUUID()}`, name, canvas }, `app ${name} on ${canvas}`);
+	return json(200, { url: `/app/t/${pass}/${name}/` });
+}
+
+export const openRoute = (kernel: () => Kernel): Route => ({ method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), path) });

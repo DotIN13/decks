@@ -9,6 +9,7 @@ import { upgradeTo } from "./proxy.ts";
 import { parseAppPath, passInPath, serverTarget, serveApp } from "./serve.ts";
 import { Apps } from "./service.ts";
 import { manifestOf } from "./manifest.ts";
+import { openRoute } from "./open.ts";
 
 // The apps feature: app folders served, built or run, and forwarded ports.
 
@@ -43,7 +44,7 @@ function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 			upgradeTo(req, socket, head, target.port, target.path, "");
 		},
 	});
-	return [app, forward("/node/"), forward("/rnode/")];
+	return [app, forward("/node/"), forward("/rnode/"), openRoute(kernel)];
 }
 
 /** Apps and ports. workdir is where the running copies live; on Decks-local, <deck>/.decks/app-run. */

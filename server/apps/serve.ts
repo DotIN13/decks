@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { toDeckPath, type Context, type RouteAnswer } from "../kernel/index.ts";
 import { APP_NAME, folderOf, manifestOf, type Manifest } from "./manifest.ts";
+import { asksGuest, guestScript, guestSrc, withGuest } from "./guest.ts";
 import { pipeTo, send, withoutPass } from "./proxy.ts";
 import type { Apps } from "./service.ts";
 
@@ -77,12 +78,17 @@ export async function serveApp(ctx: Context, apps: Apps, req: IncomingMessage, r
 	const manifest = await manifestOf(ctx.deck, at.name).catch(() => undefined);
 	if (!manifest) return send(res, plain(404, `There is no app called ${at.name}.`));
 	apps.seen(at.name);
+	const guest: RouteAnswer = { type: "text/javascript; charset=utf-8", body: guestScript(at.name), headers: { "cache-control": "no-cache" } };
 	if (manifest.kind === "server") {
+		if (asksGuest(at.inner)) return send(res, guest);
 		const target = await serverTarget(apps, at.name, manifest, at.inner, url.search);
 		if (!target) return send(res, plain(503, `The app ${at.name} could not start; app.logs says why.`));
 		return pipeTo(req, res, target.port, target.path, target.base);
 	}
 	if (req.method !== "GET" && req.method !== "HEAD") return send(res, plain(405, `${at.name} is a ${manifest.kind} app: it answers GET only.`));
 	const found = manifest.kind === "static" ? await fromDeck(ctx, at.name, manifest.root ?? "", at.inner) : await fromCopy(apps, at.name, manifest.root ?? "dist", at.inner);
-	send(res, found ?? plain(404, `${at.inner} is not in the app ${at.name}.`));
+	if (!found) return send(res, asksGuest(at.inner) ? guest : plain(404, `${at.inner} is not in the app ${at.name}.`));
+	if (!found.type.startsWith("text/html")) return send(res, found);
+	const page = typeof found.body === "string" ? found.body : new TextDecoder().decode(found.body);
+	send(res, { ...found, body: withGuest(page, guestSrc(at.inner)) });
 }

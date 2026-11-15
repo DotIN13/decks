@@ -5,11 +5,9 @@ card or an app may frame.
 
 ## Owns
 
-- `app.list get create update clone build run stop restart delete logs check`, `port.list open close`,
-  in calls.ts and port-calls.ts.
+- The app and port calls (calls.ts, port-calls.ts); `decks-canvas.js` (guest.ts); open.ts.
 - The app as an item kind (item.ts): `{ type: "app", app, box }`, a `browser` node tagged `decks.app`.
 - `/app/<name>/` (serve.ts) and `/node/<host>/<port>/`, `/rnode/<host>/<port>/` (ports.ts).
-- machine.ts: the app's running copy on this machine, its commands and its processes.
 
 ## May import
 
@@ -50,7 +48,10 @@ check.ts only. No other feature.
    failed requests, the title and the words.
 13. A port is forwarded by number, 1 to 65535, kept in the store. `/node/<host>/<port>/x` passes
    `/node/<host>/<port>/x` on; `/rnode/<host>/<port>/x` passes `/x`. A port not forwarded is 404.
-
+14. Every HTML page of a static or built app gets `decks-canvas.js` first in its head, and the
+   script is served at any path ending in that name: storage and wheels inside the canvas frame.
+15. `POST /app-pass/<name>`, on a canvas pass, opens an app placed on that canvas, not a shared one,
+   inside it: `{ url: /app/t/<pass>/<name>/ }`; an app told its base path answers 409, `tab`.
 
 ## Check
 
