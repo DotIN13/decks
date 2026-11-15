@@ -4,22 +4,6 @@ import { tsOf } from "./ts.ts";
 // The decks command's help, and the agents' command reference in markdown.
 // A required string or number argument is a word; every other is a flag.
 
-const isWord = (node: Node) => node.k === "str" || node.k === "num";
-
-function usage(call: AnyCall): string {
-	const input = call.input as Extract<Node, { k: "obj" }>;
-	const parts = [`decks ${call.name.replace(".", " ")}`];
-	for (const [name, node] of Object.entries(input.props)) {
-		const needed = input.required.includes(name);
-		if (needed && isWord(node)) parts.push(`<${name}>`);
-		else parts.push(needed ? `--${name} <${tsOf(node)}>` : `[--${name} <${tsOf(node)}>]`);
-	}
-	return parts.join(" ");
-}
-
-const whoText = (call: AnyCall) => (call.who.length === 4 ? "anyone" : call.who.join(", "));
-const calls = (mod: object) => Object.values(mod) as AnyCall[];
-
 /** dist-gen/cli/help.txt: every call the decks command makes, by noun. */
 export function cliHelp(version: string): string {
 	const out = [`decks: every call of protocol ${version}, by noun. decks help <noun.verb> explains one.`, ""];
@@ -49,3 +33,18 @@ export function reference(version: string): string {
 	}
 	return out.join("\n");
 }
+
+function usage(call: AnyCall): string {
+	const input = call.input as Extract<Node, { k: "obj" }>;
+	const parts = [`decks ${call.name.replace(".", " ")}`];
+	for (const [name, node] of Object.entries(input.props)) {
+		const needed = input.required.includes(name);
+		if (needed && isWord(node)) parts.push(`<${name}>`);
+		else parts.push(needed ? `--${name} <${tsOf(node)}>` : `[--${name} <${tsOf(node)}>]`);
+	}
+	return parts.join(" ");
+}
+
+const isWord = (node: Node) => node.k === "str" || node.k === "num";
+const whoText = (call: AnyCall) => (call.who.length === 4 ? "anyone" : call.who.join(", "));
+const calls = (mod: object) => Object.values(mod) as AnyCall[];
