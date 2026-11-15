@@ -7,10 +7,9 @@
 		"docs/rewrite/calls.md",
 		"clients/",
 		"tools/clients/",
-		"extension/"
+		"protocol/"
 	],
 	"Warden": [
-		"AGENTS.md",
 		"tools/gates/",
 		"tools/checks/",
 		"tools/fixtures/",
@@ -18,8 +17,6 @@
 		"tools/heavy.test.mjs",
 		"tools/check.mjs",
 		"tools/README.md",
-		"package.json",
-		"package-lock.json",
 		"tsconfig.base.json",
 		"tsconfig.folder.json",
 		".gitignore",
@@ -36,59 +33,32 @@
 		"server/compat/",
 		"server/upgrade/",
 		"tools/switch/",
-		"e2e/",
-		"harness/page/checks/",
-		"server/canvas/checks/",
-		"server/cards/checks/",
-		"server/people/checks/",
-		"server/pictures/checks/",
-		"apps/server/",
-		"apps/web/",
-		"packages/agent-ui/",
-		"packages/sdk/",
-		"runtime/",
-		"clients/attach/",
-		"clients/cli/",
-		"clients/extension/",
-		"clients/mcp/",
-		"clients/sdk/",
-		"docs/",
-		"harness/",
-		"protocol/",
-		"tools/",
-		"packages/protocol/",
-		"packages/canvas/",
-		"packages/ui/",
-		"scripts/",
-		"packages/hub/",
-		"SECURITY.md",
-		"examples/",
-		"packages/api/",
-		"packages/pen/",
-		"packages/card-host/",
-		"packages/docs/",
-		"packages/stage/crates/shot/",
-		"packages/sync-client/"
+		"tools/checks/agent/",
+		"tools/checks/bench/"
 	],
 	"Keel": [
 		"server/kernel/",
 		"server/main.ts"
 	],
 	"Easel": [
-		"server/canvas/"
+		"server/canvas/",
+		"tools/checks/canvas/"
 	],
 	"Folio": [
 		"server/cards/",
-		"server/documents/"
+		"server/documents/",
+		"tools/checks/cards/"
 	],
 	"Roster": [
 		"server/people/",
-		"server/sharing/"
+		"server/sharing/",
+		"tools/checks/people/"
 	],
 	"Depot": [
 		"server/apps/",
 		"server/pictures/",
-		"server/tab/"
+		"server/tab/",
+		"tools/checks/pictures/"
 	],
 	"Helm": [
 		"harness/main.ts",
@@ -103,7 +73,8 @@
 	],
 	"Pane": [
 		"harness/page/",
-		"packages/canvas/src/ui/"
+		"packages/canvas/src/ui/",
+		"tools/checks/page/"
 	],
 	"Scribe": [
 		"harness/page/chat/",
@@ -112,11 +83,27 @@
 	"Anvil": [
 		"packages/stage/crates/apple/",
 		"packages/stage/Cargo.toml",
-		"packages/stage/Cargo.lock"
+		"packages/stage/Cargo.lock",
+		"engine/crates/apple/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
-		"packages/canvas/src/frame/inside/boot.ts",
-		"packages/canvas/src/frame/inside/boot.test.ts"
+		"pen/",
+		"ui/",
+		"engine/",
+		"canvas/",
+		"packages/",
+		"scripts/",
+		"runtime/",
+		"apps/",
+		"server/",
+		"harness/",
+		"tools/",
+		"examples/",
+		"docs/",
+		"package.json",
+		"package-lock.json",
+		"AGENTS.md",
+		"CONTRIBUTING.md"
 	]
 }

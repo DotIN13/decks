@@ -390,3 +390,15 @@ switch-over follows `docs/rewrite/switch-plan.md`; Warden's lanes are opened for
 never inside `server/` or `harness/`: it drives three programs from outside, so it is a tool. The folder's
 name is its owner. A feature's own tests, with no browser, stay beside its code. This replaces "move each
 check to its feature" and keeps the imports rule without an exception.
+
+## 13. The switch-over landed (2026-11-15), and wave 3's lanes
+
+The old server and web page code, the old `agent-ui` and `sdk` packages, `runtime/` (but `live-doc.ts`)
+and `e2e/` are gone from the branch; the new packages are `@decks/<folder>`; all 95 browser checks are
+under `tools/checks/<feature>/`. The first full run from the new places was 74 of 76: the move had
+rewritten a path inside a string one check writes (fixed, 6989bfa8), and `pencil-then-finger` failed
+once and passes alone.
+
+For wave 3, Loom's lane is wide on purpose: the move rewrites imports and paths across the repo in one
+commit per step, by a script with a dry run. Each owner keeps its folder; Loom changes in them only the
+lines a move's table lists. The lanes narrow again when `packages/` is gone.
