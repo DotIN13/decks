@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
-import { arr, bool, int, nul, num, opt, str, union } from "../schema.ts";
+import { any, arr, bool, int, lit, named, nul, num, obj, opt, str, union } from "../schema.ts";
 import { Point, View } from "../shapes.ts";
-import { ANYONE, PEOPLE, onCanvas } from "./parts.ts";
+import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
 // What a screen shows. Only these calls move the person's screen, and only
 // while the caller's chat is on it; otherwise the person is offered a button.
@@ -57,5 +57,25 @@ export const reload = defineCall({
 	who: ANYONE,
 	args: { card: opt(str()), ...onCanvas },
 	answer: int(),
+	effect: "change",
+});
+
+const Shot = named("Shot", obj({ how: lit("canvas", "snapshot"), data: str("The picture, base64."), mime: str() }), "A card as a screen draws it now.");
+
+export const screenshot = defineCall({
+	name: "view.screenshot",
+	summary: "A card as the person's screen draws it now. Unavailable when no screen shows its canvas or none answers in 20 s.",
+	who: NOT_CARD,
+	args: { card: str(), ...onCanvas },
+	answer: Shot,
+	effect: "read",
+});
+
+export const answer = defineCall({
+	name: "view.answer",
+	summary: "A screen answers a view.requested that carried an id: its value, or why it could not.",
+	who: PERSON,
+	args: { id: str(), value: opt(any()), error: opt(str()) },
+	answer: obj({ ok: bool() }),
 	effect: "change",
 });
