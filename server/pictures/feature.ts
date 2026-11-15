@@ -25,7 +25,10 @@ export function picturesFeature(options: PicturesOptions = {}): Feature {
 		routes: [pictureRoute(() => m), tileRoute(() => m), shotRoute(() => m), snapshotRoute(() => m), extentRoute(extents)],
 		start(given) {
 			kernel = given;
-			return () => void browser.close();
+			return () => {
+				m.shutdown?.();
+				void browser.close();
+			};
 		},
 	});
 }

@@ -6,6 +6,7 @@ import { callers, testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
 import { chromium } from "./browser.ts";
 import { picturesFeature } from "./feature.ts";
+import { nativeBinary } from "./native.ts";
 
 // The real Chromium on the fixture deck, heavy: run with DECKS_HEAVY=1 under
 // node tools/heavy.mjs --wait. Skipped otherwise.
@@ -39,7 +40,8 @@ test("card.fit and canvas.screenshot in a real browser, on the fixture deck", { 
 		const h = box.y2 - box.y1;
 		assert.ok(h > 300 && h < 1500, `the content's height, not the 2000 set before: ${h}`);
 		assert.match(fitted.notes.join(" "), /This card is \d+ words.*smallest text is \d+px/);
-		const shot = await s.value<{ file: string; size: { w: number; h: number } }>("canvas.screenshot", {}, ann);
+		const shot = await s.value<{ file: string; size: { w: number; h: number }; how?: string }>("canvas.screenshot", {}, ann);
+		if (nativeBinary()) assert.equal(shot.how, "native", "with the engine's tool built, the canvas is drawn natively");
 		const bytes = await s.deck.read(shot.file as never);
 		assert.deepEqual([...bytes.slice(0, 4)], PNG);
 		assert.ok(Math.max(shot.size.w, shot.size.h) <= 1600);

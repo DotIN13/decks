@@ -2,6 +2,8 @@ import { layout, Refused } from "../../protocol/index.ts";
 import type * as S from "./shapes.ts";
 import { toDeckPath, type Bytes, type Context } from "../kernel/index.ts";
 import { compose, factorFor, type Of } from "./compose.ts";
+import { drawNatively } from "./native-shot.ts";
+import { cardPicture } from "./picture.ts";
 import { cardPath, keep, type Machine } from "./machine.ts";
 import type { Writer } from "./marks.ts";
 
@@ -30,7 +32,7 @@ async function drawingText(ctx: Context, canvas: string): Promise<string> {
 	}
 }
 
-export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box };
+export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
 
 /** A PNG's size from its header, else the box's. */
 function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
@@ -88,7 +90,19 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 		return page.url;
 	};
 	const writer = await writerOf(ctx, canvas);
-	const made = compose(await drawingText(ctx, canvas), canvas, args.of, { cardUrl, ...(writer ? { writer } : {}), ...(args.scale ? { scale: args.scale } : {}), ...(args.scheme ? { scheme: args.scheme } : {}) });
+	const text = await drawingText(ctx, canvas);
+	const made = compose(text, canvas, args.of, { cardUrl, ...(writer ? { writer } : {}), ...(args.scale ? { scale: args.scale } : {}), ...(args.scheme ? { scheme: args.scheme } : {}) });
+	const native = !args.live && args.format !== "pdf" ? m.native?.() : undefined;
+	if (native) {
+		const scheme = args.scheme ?? "light";
+		const cardPictureOf = (card: string, px: number) => cardPicture(ctx, m, card, px, scheme);
+		const drawn = await drawNatively(ctx, native, { canvas, text, box: made.box, factor: made.factor, scheme, format: args.format === "jpeg" ? "jpeg" : "png", ...(writer ? { writer } : {}), cardPicture: cardPictureOf });
+		if ("bytes" in drawn) {
+			for (const pass of passes) pass.done();
+			return { bytes: drawn.bytes, size: { w: Math.round(made.w * made.factor), h: Math.round(made.h * made.factor) }, box: made.box, how: "native" };
+		}
+		ctx.note(`Drawn in the browser: ${drawn.why}.`);
+	}
 	const tab = await m.browser.page({ width: made.w, height: made.h, scale: made.factor, scheme: args.scheme ?? "light" });
 	try {
 		await tab.show(made.html);
@@ -112,7 +126,7 @@ export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Ta
 		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, live: true, how: seen.how };
 	}
 	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
-	return { ...taken, canvas, card: !!card, how: card ? "chromium: the card's page" : "chromium: composed from the drawing's file" };
+	return { ...taken, canvas, card: !!card, how: taken.how ?? (card ? "chromium: the card's page" : "chromium: composed from the drawing's file") };
 }
 
 /** Take the picture, keep it in the deck, answer where and how big. */

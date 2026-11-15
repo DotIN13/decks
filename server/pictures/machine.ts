@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { layout, Refused, type Caller } from "../../protocol/index.ts";
 import { toDeckPath, type Bytes, type Context, type DeckPath, type Item, type Kernel } from "../kernel/index.ts";
 import type { Browser } from "./browser.ts";
+import { Native, nativeBinary } from "./native.ts";
 
 // What the pictures' calls need beyond ctx: the browser, the server's own
 // address, and a pass for a page. Rule 2.
@@ -12,6 +13,10 @@ export interface Machine {
 	origin(): string;
 	/** A card's page address with a fresh pass, and how to drop the pass after. */
 	cardPage(card: string, canvas: string): { url: string; done(): void };
+	/** The engine's native screenshot tool, when it is built here (rule 17). */
+	native?(): Native | undefined;
+	/** Stop the native tool, when the server stops. */
+	shutdown?(): void;
 }
 
 export function machine(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined): Machine {
@@ -20,9 +25,17 @@ export function machine(browser: Browser, origin: () => string | undefined, kern
 		if (!at) throw new Refused("unavailable", "This server has not said its own address, so its browser cannot load a page from it.", "card.get");
 		return at.replace(/\/+$/, "");
 	};
+	let tool: Native | undefined;
 	return {
 		browser,
 		origin: known,
+		shutdown: () => tool?.stop(),
+		native() {
+			const binary = nativeBinary();
+			if (!binary) return undefined;
+			if (tool?.binary !== binary) tool = new Native(binary);
+			return tool;
+		},
 		cardPage(card, canvas) {
 			const k = kernel();
 			if (!k) throw new Refused("unavailable", "The pictures feature has not started yet.", "card.get");
