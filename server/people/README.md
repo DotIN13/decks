@@ -26,8 +26,8 @@ model, a login or a transcript.
 6. An agent changes only itself. The person may change or delete any agent.
 7. `agent.attach` trades the person's call for a new agent and its own token. A call with that
    token runs as that agent, under its current name; a deleted agent's token stops working.
-   Attach and create give the agent a home: the canvas named, else a new one titled with its
-   name (`canvas.create`, through a call). A refused home takes the new record back.
+   Attach and create give a home: the canvas named; for the person's create, else its workspace's
+   canvas changed last; else a new one titled with its name. A refused home undoes the record.
 8. The server keeps each agent's mailbox and delivers nothing into a turn. Mail for an agent whose
    host is connected is told to that host alone (`agent.mailed`); otherwise it waits in the inbox.
 9. `agent.send` is delivered at once when a host holds the agent, and queued when none does.

@@ -165,3 +165,17 @@ test("a host that comes up takes the agents of its kinds with no host, each told
 	assert.equal((await s.value<Agent>("agent.send", { agent: "Rune", task: "hi" }) as unknown as { state: string }).state, "delivered");
 	await s.close();
 });
+
+test("the person's new agent joins its workspace's latest canvas, else gets its own", async () => {
+	const { s, on } = await peopleServer();
+	await on(fakeClient("host-1"), "agent.host", { kinds: ["pi"] }, person);
+	const first = await s.value<Agent>("agent.create", { name: "Pi One", kind: "pi" });
+	assert.equal(first.canvas, "pi-one", "no workspace agent has a canvas yet: a new one");
+	const second = await s.value<Agent>("agent.create", { name: "Pi Two", kind: "pi" });
+	assert.equal(second.canvas, "pi-one", "joins the latest canvas of its workspace");
+	const other = await s.value<Agent>("agent.create", { name: "Elsewhere", kind: "pi", workspace: "films" });
+	assert.equal(other.canvas, "elsewhere", "another workspace starts its own");
+	const asAgent = s.callers.resolve((await s.value<Agent>("agent.attach", { name: "Maker", canvas: "a" })).token)!;
+	assert.equal((await s.value<Agent>("agent.create", { name: "Helper", kind: "pi" }, asAgent)).canvas, "helper", "an agent's new agent gets its own");
+	await s.close();
+});

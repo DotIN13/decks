@@ -41,7 +41,8 @@ async function create(people: People, ctx: Context, spec: CreateArgs): Promise<s
 		host: host.client,
 		state: "starting",
 	});
-	const record = await giveHome(people, ctx, made, spec.canvas);
+	const joined = spec.canvas ?? (ctx.caller.kind === "person" ? latestCanvas(people, ctx, made) : undefined);
+	const record = await giveHome(people, ctx, made, joined);
 	const token = people.tokens.issue(people.roster.callerOf(record.id)!, "agent.create");
 	people.tell(ctx, events.agentRequested, { ids: [record.id], spec: { ...spec, id: record.id, name: record.name, kind: host.kind, canvas: record.canvas, token } }, [host.client]);
 	people.tell(ctx, events.agentChanged, { ids: [record.id], state: "starting" });
@@ -88,6 +89,27 @@ async function attach(people: People, ctx: Context, args: { name?: string; kind?
 	const token = people.tokens.issue(people.roster.callerOf(record.id)!, "agent.attach");
 	people.tell(ctx, events.agentChanged, { ids: [record.id] });
 	return { ...people.shown(record), token };
+}
+
+/** The person's new agent joins the canvas of its workspace changed last; no workspace is a group too. */
+function latestCanvas(people: People, ctx: Context, made: AgentRecord): string | undefined {
+	let best: { name: string; at: number; order: number } | undefined;
+	people.roster.all().forEach((one, order) => {
+		if (one.id === made.id || !one.canvas || one.workspace !== made.workspace) return;
+		const changes = safeSince(ctx, one.canvas);
+		if (!changes) return;
+		const at = changes.reduce((top, c) => Math.max(top, c.at ?? 0), 0);
+		if (!best || at > best.at || (at === best.at && order > best.order)) best = { name: one.canvas, at, order };
+	});
+	return best?.name;
+}
+
+function safeSince(ctx: Context, canvas: string) {
+	try {
+		return ctx.canvas(canvas).since(0);
+	} catch {
+		return undefined;
+	}
 }
 
 /** The canvas named, else a new one titled with the agent's name; a failure takes the record back. */
