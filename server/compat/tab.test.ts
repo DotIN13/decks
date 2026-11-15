@@ -39,3 +39,30 @@ test("the tab socket gives the roster, sends an agent to a canvas and moves a ca
 	await doors.close();
 	await server.close();
 });
+
+test("a hidden card leaves inPlay and stays held, as today's context kept it", async () => {
+	const server = await testServer({ features: features(), deck });
+	await server.value("agent.attach", { name: "Ada", kind: "claude" });
+	const doors = await server.listen(0);
+	const ws = new WebSocket(`${doors.url.replace("http", "ws")}/ws?decks_token=${doors.token}`);
+	const heard: Array<Record<string, unknown>> = [];
+	ws.onmessage = (m) => heard.push(JSON.parse(String(m.data)));
+	const next = async (type: string, test: (m: Record<string, unknown>) => boolean) => {
+		for (let i = 0; i < 100; i++) {
+			const found = heard.find((m) => m.type === type && test(m));
+			if (found) return found;
+			await new Promise((r) => setTimeout(r, 50));
+		}
+		throw new Error(`no ${type}`);
+	};
+	const card = "canvases/plan/cards/one/index.html";
+	const id = String((await next("agents", (m) => !!m.focused)).focused);
+	ws.send(JSON.stringify({ type: "agent.stage", id, stage: "plan" }));
+	await next("context.changed", (m) => (m.inPlay as string[]).includes(card));
+	ws.send(JSON.stringify({ type: "card.hide", stage: "plan", path: card }));
+	const after = await next("context.changed", (m) => !(m.inPlay as string[]).includes(card));
+	assert.ok((after.boards as string[]).includes(card));
+	ws.close();
+	await doors.close();
+	await server.close();
+});
