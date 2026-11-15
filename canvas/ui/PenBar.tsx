@@ -13,7 +13,7 @@ import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
 import { For, onMount, Show } from "solid-js";
-import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../edit/pen-tools.ts";
+import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../editor/pen-tools.ts";
 import { Icon } from "@decks/ui";
 import { Properties } from "./Properties.tsx";
 

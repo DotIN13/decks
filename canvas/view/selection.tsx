@@ -5,7 +5,7 @@ import type { CameraController } from "../camera/controller.ts";
 import { PageCallout } from "../ui/Callout.tsx";
 import { isInk } from "../model/ink.ts";
 import { inkSelection, setInkSelection } from "../ink/ink.ts";
-import { setPenBoxes } from "../edit/pen-tools.ts";
+import { setPenBoxes } from "../editor/pen-tools.ts";
 import { firstLine } from "../look/look.ts";
 import { parseMarkdown } from "../model/markdown.ts";
 import { walk, type PenNode } from "@decks/pen";
@@ -31,7 +31,7 @@ import {
 	type Overlay,
 	type StageEditor,
 	type tsScene,
-} from "../edit/index.ts";
+} from "../editor/index.ts";
 import type { StageProps } from "./CanvasView.tsx";
 
 /** What the selection's drawing needs of the stage around it. */

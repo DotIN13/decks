@@ -1,5 +1,5 @@
 import type { Page, Camera } from "@decks/protocol-old";
-import type { PenTool } from "../edit/pen-tools.ts";
+import type { PenTool } from "../editor/pen-tools.ts";
 import type { Insets } from "../camera/insets.ts";
 
 /**

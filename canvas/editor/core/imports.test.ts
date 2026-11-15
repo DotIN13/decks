@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
-/** Core is the editor with no page under it: it may import itself, the pen types, edit/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
+/** Core is the editor with no page under it: it may import itself, the pen types, editor/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
 test("edit/core imports nothing from the page, Solid or the engine", () => {
 	const dir = new URL(".", import.meta.url);
 	for (const file of readdirSync(dir).filter((name) => name.endsWith(".ts"))) {

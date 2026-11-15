@@ -2,7 +2,7 @@ import type { Camera } from "@decks/protocol-old";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { dismissMenus } from "@decks/ui";
 import type { EditorState, StageComment } from "../../types.ts";
-import type { PenTool } from "../../edit/pen-tools.ts";
+import type { PenTool } from "../../editor/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
 import { insets } from "../../camera/insets.ts";
 import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";

@@ -12,12 +12,12 @@ import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { StageInk } from "../ink/StageInk.tsx";
 import { strokeOf } from "../model/ink.ts";
-import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../edit/pen-tools.ts";
+import { penLive, penTool, setInsertPanel, setPenLive, setPenTool, setPropsOpen, type PenTool } from "../editor/pen-tools.ts";
 import { HoldMenu, type HoldAction } from "../ui/HoldMenu.tsx";
-import { overlayJson } from "../edit/core/overlay-json.ts";
-import { rgbOf } from "../edit/dom/colours.ts";
+import { overlayJson } from "../editor/core/overlay-json.ts";
+import { rgbOf } from "../editor/dom/colours.ts";
 import { COARSE, HANDLE_DOT_PX } from "../input/touch-rules.ts";
-import { ANCHOR_OUT, ANCHOR_PX } from "../edit/dom/OverlayLayer.tsx";
+import { ANCHOR_OUT, ANCHOR_PX } from "../editor/dom/OverlayLayer.tsx";
 import { scheme } from "../theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
@@ -33,7 +33,7 @@ import {
 	TextEditor,
 	tsScene,
 	tsSeam,
-} from "../edit/index.ts";
+} from "../editor/index.ts";
 import { createStageInput } from "../input/canvas-input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
@@ -579,7 +579,7 @@ export function Stage(props: StageProps) {
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
 	/*
 	 * The editor's outlines, handles and guides are painted by the engine with the drawing, in the same
-	 * frame (`edit/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
+	 * frame (`editor/core/overlay-json.ts`): written again when the overlay or the zoom changes, and the
 	 * DOM's own are made invisible once the engine has them (`data-engine-overlays`, `canvas.css`).
 	 */
 	const [engineOverlays, setEngineOverlays] = createSignal(false);

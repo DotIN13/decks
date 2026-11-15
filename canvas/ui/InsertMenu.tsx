@@ -11,19 +11,19 @@
 import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
 import { Show } from "solid-js";
 import { canvasHost } from "../host.ts";
-import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../edit/pen-tools.ts";
+import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../editor/pen-tools.ts";
 import { newCard } from "../model/card-frame.ts";
 import { Insert } from "./Insert.tsx";
-import type { Box } from "../edit/snap.ts";
-import { joinAt as joinAtIn, newArrowEnds, type Join } from "../edit/core/arrows.ts";
-import { frameAt as frameAtIn } from "../edit/core/drop.ts";
-import { drawHints, insertPick, opensWords } from "../edit/core/insert.ts";
-import type { PenTool, Pt } from "../edit/core/model.ts";
-import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../edit/core/ops.ts";
-import type { Outline } from "../edit/core/overlay.ts";
-import type { SceneQuery } from "../edit/core/scene.ts";
-import type { Editor } from "../edit/dom/controller.ts";
-import type { TextEditing } from "../edit/dom/TextEditing.tsx";
+import type { Box } from "../editor/snap.ts";
+import { joinAt as joinAtIn, newArrowEnds, type Join } from "../editor/core/arrows.ts";
+import { frameAt as frameAtIn } from "../editor/core/drop.ts";
+import { drawHints, insertPick, opensWords } from "../editor/core/insert.ts";
+import type { PenTool, Pt } from "../editor/core/model.ts";
+import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../editor/core/ops.ts";
+import type { Outline } from "../editor/core/overlay.ts";
+import type { SceneQuery } from "../editor/core/scene.ts";
+import type { Editor } from "../editor/dom/controller.ts";
+import type { TextEditing } from "../editor/dom/TextEditing.tsx";
 
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };

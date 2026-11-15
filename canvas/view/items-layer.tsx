@@ -18,7 +18,7 @@ import { scheme } from "../theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
 import { isLiveFile } from "../model/card-frame.ts";
 import type { StageEngine } from "../render/engine.ts";
-import type { StageEditor } from "../edit/index.ts";
+import type { StageEditor } from "../editor/index.ts";
 import type { StageProps } from "./CanvasView.tsx";
 
 /** What the items layer needs of the stage around it. */

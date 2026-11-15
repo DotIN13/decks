@@ -1,7 +1,7 @@
 import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
 import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../edit/pen-tools.ts";
+import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../editor/pen-tools.ts";
 import { Icon, onDismiss } from "@decks/ui";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "../look/icon-index.ts";
 import { iconUrl } from "../look/icons.ts";

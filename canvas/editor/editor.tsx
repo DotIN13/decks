@@ -2,25 +2,25 @@ import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, typ
 import type { Page, Camera } from "@decks/protocol-old";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { fitInto, frames } from "./camera/camera.ts";
-import { topBoxes } from "./model/boxes.ts";
-import { viewToPark } from "./camera/agent-view.ts";
-import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
-import { canvasBox } from "./camera/insets.ts";
-import type { StageEngine } from "./render/engine.ts";
-import { pagesAhead, pagesOf, createDrawing } from "./model/drawing.ts";
-import { stageMeasure } from "./render/measure.ts";
-import type { DocEdits, DrawingWriter } from "./render/types.ts";
-import { InkBar } from "./ui/InkBar.tsx";
-import { setCanvasScheme } from "./theme.ts";
-import { PenBar } from "./ui/PenBar.tsx";
-import { ItemSlot } from "./items/item-slot.tsx";
-import { Stage, type InkRequest, type StageComment } from "./view/CanvasView.tsx";
-import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./ink/ink.ts";
-import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./edit/pen-tools.ts";
+import { fitInto, frames } from "../camera/camera.ts";
+import { topBoxes } from "../model/boxes.ts";
+import { viewToPark } from "../camera/agent-view.ts";
+import { createAgentViews, type ViewStorage } from "../camera/agent-views.ts";
+import { canvasBox } from "../camera/insets.ts";
+import type { StageEngine } from "../render/engine.ts";
+import { pagesAhead, pagesOf, createDrawing } from "../model/drawing.ts";
+import { stageMeasure } from "../render/measure.ts";
+import type { DocEdits, DrawingWriter } from "../render/types.ts";
+import { InkBar } from "../ui/InkBar.tsx";
+import { setCanvasScheme } from "../theme.ts";
+import { PenBar } from "../ui/PenBar.tsx";
+import { ItemSlot } from "../items/item-slot.tsx";
+import { Stage, type InkRequest, type StageComment } from "../view/CanvasView.tsx";
+import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "../ink/ink.ts";
+import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./pen-tools.ts";
 
-export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "./types.ts";
-import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "./types.ts";
+export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
+import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
 
 /** A camera that shows everything on the drawing, in a host this big. */
 export function fitAll(doc: PenDocument, view: { width: number; height: number }, look: "light" | "dark" = "light"): Camera {

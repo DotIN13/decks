@@ -7,10 +7,10 @@ import type { CameraController } from "../camera/controller.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { zoomKey } from "../camera/zoom-keys.ts";
 import { createTouches, type Finger, type TouchStep } from "../camera/touch.ts";
-import { handTool } from "../edit/pen-tools.ts";
-import { handPans } from "../edit/core/dispatch.ts";
-import { untilReleased } from "../edit/held.ts";
-import type { StageEditor } from "../edit/index.ts";
+import { handTool } from "../editor/pen-tools.ts";
+import { handPans } from "../editor/core/dispatch.ts";
+import { untilReleased } from "../editor/held.ts";
+import type { StageEditor } from "../editor/index.ts";
 import type { ItemSlotProps } from "../items/item-slot.tsx";
 import type { StageProps } from "../view/CanvasView.tsx";
 

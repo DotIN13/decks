@@ -40,7 +40,7 @@ import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
 import { obsidianNote } from "../model/card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show, onMount, on, untrack } from "solid-js";
-import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLive, setPenSelection, setPropsOpen } from "../edit/pen-tools.ts";
+import { penBoxes, penSelection, penTyping, propsOpen, setInsertPanel, setPenLive, setPenSelection, setPropsOpen } from "../editor/pen-tools.ts";
 import { Icon } from "@decks/ui";
 import { adaptiveTitle, sameColor, swatchPaint } from "./adaptive.ts";
 import { ColorPicker } from "./ColorPicker.tsx";

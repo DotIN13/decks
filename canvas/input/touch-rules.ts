@@ -1,4 +1,4 @@
-import type { PointerKind } from "../edit/core/model.ts";
+import type { PointerKind } from "../editor/core/model.ts";
 
 /**
  * The numbers that make the canvas feel right under a finger, in one place: how far a press may

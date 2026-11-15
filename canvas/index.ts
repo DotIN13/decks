@@ -3,12 +3,12 @@
  * the page's end of it (`createFramedEditor`); `createEditor` makes the editor itself in a Solid tree,
  * as the frame does.
  */
-export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor.tsx";
+export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor/editor.tsx";
 export type { InkTool } from "./ink/ink.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
 export type { InkRequest, StageComment } from "./types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
-export type { PenTool } from "./edit/pen-tools.ts";
+export type { PenTool } from "./editor/pen-tools.ts";
 export type { DocEdits, DrawingWriter } from "./render/types.ts";
 // The canvas frame (`frame/`): the canvas in a sandboxed page of its own, and the protocol to it.
 export { bootFrame } from "./frame/inside/frame.tsx";

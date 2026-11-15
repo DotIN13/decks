@@ -20,7 +20,7 @@ import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, 
 import { iconUrl, parseIcon } from "../look/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { Recovery } from "./recovery.ts";
-import { snapMove, type Box, type Guide } from "../edit/snap.ts";
+import { snapMove, type Box, type Guide } from "../editor/snap.ts";
 import { boundsOf } from "../model/bounds.ts";
 import { docIndex, drawnNodes } from "../model/doc-index.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
@@ -1077,7 +1077,7 @@ export class StageEngine {
 		if (this.placed.size && this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8)) this.writeHits();
 	}
 
-	/** The editor's overlay as the engine paints it (`edit/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
+	/** The editor's overlay as the engine paints it (`editor/core/overlay-json.ts`); the same string again changes nothing. True once the engine has it. */
 	private overlayJson: string | undefined;
 	setOverlay(json: string): boolean {
 		if (!this.page) return false;

@@ -6,11 +6,11 @@
  * board being edited); a key that was one of the drawing's goes no further.
  */
 import type { Op } from "@decks/pen";
-import { penKey as penKeyOf, type KeyAct } from "../edit/core/keys.ts";
-import type { PenTool } from "../edit/core/model.ts";
-import type { NextId } from "../edit/core/ops.ts";
-import type { SceneQuery } from "../edit/core/scene.ts";
-import type { Editor } from "../edit/dom/controller.ts";
+import { penKey as penKeyOf, type KeyAct } from "../editor/core/keys.ts";
+import type { PenTool } from "../editor/core/model.ts";
+import type { NextId } from "../editor/core/ops.ts";
+import type { SceneQuery } from "../editor/core/scene.ts";
+import type { Editor } from "../editor/dom/controller.ts";
 
 export type KeysHost = {
 	scene: SceneQuery;

@@ -13,16 +13,16 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../edit/core/dispatch.ts";
+import { decideHover, decidePress, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../editor/core/dispatch.ts";
 import { HOLD_MS, slopFor } from "./touch-rules.ts";
-import type { ArrowHandles } from "../edit/core/arrows.ts";
-import type { PageBox, Offset, PenTool, Pt, Rect } from "../edit/core/model.ts";
-import type { PageHandles, Outline, RadiusHandle } from "../edit/core/overlay.ts";
-import { glideShift } from "../edit/core/overlay.ts";
-import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../edit/core/pick.ts";
-import type { Handle } from "../edit/core/resize.ts";
-import type { SceneQuery } from "../edit/core/scene.ts";
-import { pointerInput, type Editor } from "../edit/dom/controller.ts";
+import type { ArrowHandles } from "../editor/core/arrows.ts";
+import type { PageBox, Offset, PenTool, Pt, Rect } from "../editor/core/model.ts";
+import type { PageHandles, Outline, RadiusHandle } from "../editor/core/overlay.ts";
+import { glideShift } from "../editor/core/overlay.ts";
+import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../editor/core/pick.ts";
+import type { Handle } from "../editor/core/resize.ts";
+import type { SceneQuery } from "../editor/core/scene.ts";
+import { pointerInput, type Editor } from "../editor/dom/controller.ts";
 
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
