@@ -95,6 +95,8 @@ export function answerBack(old: string, value: unknown): unknown {
 	if (old === "canvas.read" && Array.isArray(value)) return { items: value };
 	if (old === "canvas.space" && isObject(value) && typeof value.x === "number") return { x1: value.x, y1: value.y };
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
+	// canvas.export answered { file }; the new call answers a File, its path in path.
+	if (old === "canvas.export" && isObject(value) && typeof value.path === "string") return { ...value, file: value.path };
 	// apps.create answered the item that shows the app and the command that places it.
 	if ((old === "apps.create" || old === "apps.clone") && isObject(value) && typeof value.name === "string") {
 		const item = { type: "app", app: value.name };
