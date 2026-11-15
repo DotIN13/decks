@@ -1,3 +1,5 @@
+// The OpenCode 2 runtime descriptor: its name, what it can do, whether it can run here,
+// and how to start a backend for it.
 import { OPENCODE2_CAPABILITIES, OPENCODE2_COMMANDS, Opencode2Backend } from "./backend.ts";
 import { opencode2Executable } from "./install.ts";
 import { NOT_INSTALLED } from "./manager.ts";

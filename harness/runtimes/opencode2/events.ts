@@ -1,3 +1,5 @@
+// Reads the OpenCode 2 server's event stream into the transcript's terms, for one session.
+// The only file that knows OpenCode 2's event shapes.
 import type { Translator } from "../shared/translator.ts";
 
 /**

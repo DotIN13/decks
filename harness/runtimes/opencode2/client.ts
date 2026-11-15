@@ -1,3 +1,5 @@
+// The OpenCode 2 client signed in to the shared server, and the one-time offer
+// of the person's opencode 1 API keys to it.
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

@@ -1,3 +1,5 @@
+// Finds the OpenCode 2 binary, and names the folders its server gets
+// so it never touches opencode 1's data.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";

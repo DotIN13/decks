@@ -1,3 +1,5 @@
+// The OpenCode 2 backend: one Decks agent as a session and a filtered event stream
+// on the shared OpenCode 2 server.
 import { skillsDir, opencode2PluginDir } from "../../prompts/paths.ts";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "../types/index.ts";
 import { DEFAULT_THINKING } from "../types/index.ts";
@@ -94,6 +96,8 @@ export class Opencode2Backend implements AgentBackend {
 	private lastUsage: AgentUsage | null = null;
 
 	private constructor(private readonly context: AgentBackendContext) {}
+
+	// --- starting, and the shared server ---------------------------------------------------
 
 	static async create(context: AgentBackendContext): Promise<Opencode2Backend> {
 		const backend = new Opencode2Backend(context);
