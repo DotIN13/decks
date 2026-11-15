@@ -89,3 +89,13 @@ test("the person's here is the canvas on their screen, and they act for the agen
 	assert.equal(s.callers.resolve(token)?.canvas, "b", "and here goes with it at once");
 	await s.close();
 });
+
+test("focus on another canvas's card goes there first, as goto does", async () => {
+	const { s } = await peopleServer();
+	const ann = await s.value<shapes.Agent>("agent.attach", { name: "Ann", canvas: "a" });
+	await s.value("item.insert", { item: { type: "card", card: "canvases/b/cards/x/index.html" }, canvas: "b" }, person);
+	const as = s.callers.resolve(ann.token)!;
+	await s.value<View>("view.focus", { target: "canvases/b/cards/x/index.html" }, as);
+	assert.equal((await s.value<shapes.Agent>("agent.get", { agent: "Ann" })).canvas, "b");
+	await s.close();
+});

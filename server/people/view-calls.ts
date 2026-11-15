@@ -15,7 +15,7 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 	return handleAll(calls.view, {
 		get: (ctx, { canvas }) => look(p(), ctx, here(p(), ctx, canvas)),
 		move: (ctx, args) => move(p(), ctx, args),
-		focus: (ctx, { target, highlight, animate, canvas }) => {
+		focus: async (ctx, { target, highlight, animate, canvas }) => {
 			const name = here(p(), ctx, canvas ?? canvasOfTarget(target));
 			const wanted = Array.isArray(target) ? target : [target];
 			if (!wanted.length) throw new Refused("invalid", "focus names an item's id or a card's path, or a list of them.", "item.list");
@@ -23,15 +23,12 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 			for (const one of wanted) {
 				if (!items.some((i) => i.id === one || i.card === one)) throw new Refused("not_found", `Nothing called ${one} is on the canvas ${name}.`, "item.list");
 			}
+			await goHome(p(), ctx, name);
 			return request(p(), ctx, name, "view.focus", { target, canvas: name, ...(highlight ? { highlight } : {}), ...(animate ? { animate } : {}) });
 		},
 		goto: async (ctx, { canvas }) => {
 			const name = canvasName(ctx, canvas);
-			const follows = ctx.caller.kind === "person" ? p().screens.newestOf(ctx.caller.id)?.follows : undefined;
-			if (ctx.caller.kind !== "agent" && !follows) return request(p(), ctx, name, "view.goto", { canvas: name });
-			const { record } = await p().roster.update(p().actor(ctx).id, { canvas: name });
-			p().tell(ctx, events.agentChanged, { ids: [record.id] });
-			followHome(p(), ctx, record);
+			if (!(await goHome(p(), ctx, name))) return request(p(), ctx, name, "view.goto", { canvas: name });
 			return answer(p(), ctx, name, recipients(p(), ctx, name));
 		},
 		cursor: (ctx, { card, at }) => {
@@ -48,6 +45,18 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 			return screens.length;
 		},
 	});
+}
+
+/** The agent acted for moves its home to the canvas, with the screens following it; false for no agent. */
+async function goHome(people: People, ctx: Context, canvas: string): Promise<boolean> {
+	const follows = ctx.caller.kind === "person" ? people.screens.newestOf(ctx.caller.id)?.follows : undefined;
+	if (ctx.caller.kind !== "agent" && !follows) return false;
+	const actor = people.actor(ctx);
+	if (actor.canvas === canvas) return true;
+	const { record } = await people.roster.update(actor.id, { canvas });
+	people.tell(ctx, events.agentChanged, { ids: [record.id] });
+	followHome(people, ctx, record);
+	return true;
 }
 
 /** The canvas a call means: the one named, else the caller's here, else its home. */
