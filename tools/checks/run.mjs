@@ -14,7 +14,12 @@ const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 const FIXTURE = join(ROOT, "tools/fixtures/deck");
 const BASE = Number(process.env.CHECKS_PORT ?? 4610);
 /** Checks that measure time run alone (e2e/run.mjs marks them alone: true; ink-long-stroke times the frame too). */
-export const ALONE = new Set(["bent-arrows.mjs", "smooth-edits.mjs", "ink-long-stroke.mjs"]);
+/** What tools/checks/checks.json says of a check (timed, agent, named, bench, path), by name. */
+export const traitsOf = (file) => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks[file.replace(/\.mjs$/, "")] ?? {};
+/** A check that measures time runs alone, on the dev server it was written for (DESIGN.md section 11). */
+export const timed = (file) => traitsOf(file).timed === true;
+/** The fake model and agent, in tools/checks after the switch-over, in e2e before. */
+const helper = (name) => (existsSync(join(ROOT, "tools/checks", name)) ? join(ROOT, "tools/checks", name) : join(ROOT, "e2e", name));
 const WAIT_MS = 60_000;
 /** What one run shares: the page built once. */
 const RUN = { dist: undefined };
@@ -23,7 +28,7 @@ const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 /** How each program starts, given its ports and the deck. Edit here when an owner changes theirs. */
 export const PROGRAMS = {
 	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
-	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: join(ROOT, "e2e/fake-agent"), DECKS_DATA_DIR: home } }),
+	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: helper("fake-agent"), DECKS_DATA_DIR: home } }),
 	// The built page on a plain static server with the dev server's proxy rules (page-server.mjs);
 	// CHECKS_PAGE=dev runs vite's dev server instead, directly, not through npm.
 	page: ({ deck, web, dist }) =>
@@ -113,11 +118,9 @@ async function stopAndWait(child) {
 }
 
 /** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
-/** Where a check is: its new place after the switch-over (where.json), else today's e2e/checks. */
+/** Where a check is: its path in checks.json after the switch-over, else today's e2e/checks. */
 export function checkPath(file) {
-	const where = join(ROOT, "tools/checks/where.json");
-	const moved = existsSync(where) ? JSON.parse(readFileSync(where, "utf8"))[file.replace(/\.mjs$/, "")] : undefined;
-	return join(ROOT, moved ?? `e2e/checks/${file}`);
+	return join(ROOT, traitsOf(file).path ?? `e2e/checks/${file}`);
 }
 
 /** The page built once for a run, into a scratch folder: vite build of harness/page. */
@@ -168,7 +171,7 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 				check.on("exit", (c) => (clearTimeout(timer), done(c)));
 			});
 			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
-		}, { i, onlyServer, log });
+		}, { i, onlyServer, log, dist: timed(file) ? null : RUN.dist });
 	} catch (error) {
 		return { file, ok: false, why: error.message, log };
 	}
@@ -183,8 +186,12 @@ function firstFailure(log, code) {
 
 async function main(argv) {
 	const onlyServer = argv.includes("--only-server");
-	const files = argv.filter((a) => !a.startsWith("--")).map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
-	if (!files.length) return console.error("usage: node tools/checks/run.mjs [--only-server] <check> ..."), 2;
+	const named = argv.filter((a) => !a.startsWith("--")).map((a) => (a.endsWith(".mjs") ? a : `${a}.mjs`));
+	// A check that starts an agent's turn runs only with --agent: it needs a model and may cost tokens.
+	const withAgent = argv.includes("--agent");
+	const files = named.filter((f) => withAgent || !traitsOf(f).agent);
+	for (const f of named.filter((f) => !files.includes(f))) console.log(`skip  ${f}  starts an agent's turn: pass --agent`);
+	if (!named.length) return console.error("usage: node tools/checks/run.mjs [--only-server] [--agent] <check> ..."), 2;
 	const missing = files.filter((f) => !existsSync(checkPath(f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
 	// A slot per run, never for the loop: a build alone, each check in a check slot (alone if it times).
@@ -195,13 +202,14 @@ async function main(argv) {
 		if (freeGb() < 8) throw new Error(`only ${freeGb().toFixed(1)} GB free, under 8 GB: free disk, then tell Mason`);
 		return withSlot(cls, work);
 	};
-	if (!onlyServer && process.env.CHECKS_PAGE !== "dev") RUN.dist = await inSlot("exclusive", () => buildPage());
+	// Checks that measure time run on the dev server, as they were written for (DESIGN.md section 11).
+	if (!onlyServer && process.env.CHECKS_PAGE !== "dev" && files.some((f) => !timed(f))) RUN.dist = await inSlot("exclusive", () => buildPage());
 	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
-	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [join(ROOT, "e2e/fake-model.mjs")] }, []);
+	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [helper("fake-model.mjs")] }, []);
 	let failed = 0;
 	const seen = new Map();
 	for (const file of files) {
-		const result = await inSlot(ALONE.has(file) ? "exclusive" : "check", (slot) => runCheck(file, slot, { onlyServer }));
+		const result = await inSlot(timed(file) ? "exclusive" : "check", (slot) => runCheck(file, slot, { onlyServer }));
 		if (!result.ok) failed++;
 		console.log(`${result.ok ? "pass" : "FAIL"}  ${file}${result.ok ? "" : `  ${result.why}`}`);
 		if (!result.ok && process.env.CHECKS_VERBOSE === "1") console.log(result.log?.join("").split("\n").slice(-40).join("\n"));
