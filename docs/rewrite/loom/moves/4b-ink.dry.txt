@@ -1,6 +1,6 @@
 # Step 4b-ink: canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes
 
-Dry run on 81832e3e, on top of 4a-canvas. Nothing was moved.
+Dry run on b8ce78d6, on top of 4a-canvas. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
