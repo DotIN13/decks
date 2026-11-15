@@ -71,6 +71,13 @@ test("no token answers 401, and a browser Origin with no token is refused", asyn
 	assert.equal(browser.status, 403);
 	assert.equal((await read(browser)).error.code, "refused");
 	assert.equal((await post(`${doors.url}/api/v1/deck.get`, doors.token, {}, { origin: "https://ok.example" })).status, 200);
+	const preflight = await fetch(`${doors.url}/api/v1/deck.get`, { method: "OPTIONS", headers: { origin: "null" } });
+	assert.equal(preflight.status, 204);
+	assert.equal(preflight.headers.get("access-control-allow-origin"), "null");
+	const framed = await post(`${doors.url}/api/v1/deck.get`, doors.token, {}, { origin: "null" });
+	assert.equal(framed.headers.get("access-control-allow-origin"), "null");
+	assert.equal((await post(`${doors.url}/api/v1/deck.get`, doors.token, {}, { origin: "https://ok.example" })).headers.get("access-control-allow-origin"), null);
+	assert.equal((await post(`${doors.url}/api/v1/deck.get`, undefined, {}, { origin: "null" })).status, 403);
 	await doors.close();
 	await server.close();
 });

@@ -41,7 +41,7 @@ no feature; only `server/main.ts` does. Keel owns it.
 ## Not here
 
 Serving the harness's page, upgrading old decks and old call names: later, in `upgrade/` and `compat/`.
-No CORS: a page in a browser calls from the server's own address.
+CORS only for a sandboxed frame (Origin null) that sends its token; a page on another site gets none.
 
 ## Check
 

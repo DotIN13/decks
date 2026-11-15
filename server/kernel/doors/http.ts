@@ -16,6 +16,13 @@ import { accept } from "./ws.ts";
 // with no token is refused before anything else. Feature routes and /mcp too.
 
 const LIMIT = 32 * 1024 * 1024;
+/** A sandboxed frame (origin null) may call with its token; a page on another site gets nothing. */
+const SANDBOXED = {
+	"access-control-allow-origin": "null",
+	"access-control-allow-headers": "authorization, content-type",
+	"access-control-allow-methods": "GET, POST, PUT, DELETE",
+	"access-control-max-age": "600",
+};
 export type Served = { url: string; port: number; server: Server; close(): Promise<void> };
 
 const refusal = (code: RefusalCode, message: string, hint?: string): Envelope<never> => ({ ok: false, error: { code, message, ...(hint ? { hint } : {}) }, notes: [] });
@@ -87,11 +94,13 @@ export function handler(built: Built) {
 	return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 		const url = new URL(req.url ?? "/", "http://decks.local");
 		const method = req.method ?? "GET";
+		if (req.headers.origin === "null" && method === "OPTIONS") return void res.writeHead(204, SANDBOXED).end();
 		const found = url.pathname.startsWith(`${API}/`) || url.pathname === MCP_PATH ? undefined : routeFor(routes, method, url.pathname);
 		const inPath = found?.route.tokenOf?.(url);
 		if (inPath) req.url = inPath.path + url.search;
 		const token = inPath?.token ?? tokenOf(req, url);
 		const open = found?.route.public === true && method === "GET";
+		if (req.headers.origin === "null" && token) res.setHeader("access-control-allow-origin", "null");
 		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
 		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
 		if (found) return caller ? serveRoute(built, found, caller, req, res) : json(res, 401, NO_TOKEN);
