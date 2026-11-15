@@ -46,10 +46,11 @@
     "test:e2e": "node tools/checks/run.mjs",
     "check": "node tools/check.mjs",
     "heavy": "node tools/heavy.mjs",
-    "vendor": "node scripts/vendor.mjs",
+    "vendor": "npm run vendor -w @decks/canvas",
     "build:live-doc": "node scripts/live-doc.mjs",
     "build:packages": "node scripts/build-packages.mjs",
-    "test:packages": "node scripts/test-packages.mjs"
+    "test:packages": "node scripts/test-packages.mjs",
+    "postinstall": "npm run vendor -w @decks/canvas"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

@@ -1,0 +1,14 @@
+# copied in at install by ../vendor.mjs (npm run vendor -w @decks/canvas)
+/d3.min.js
+/marked.umd.js
+/katex.min.js
+/katex.min.css
+/katex-auto-render.min.js
+/pdf.min.mjs
+/pdf.worker.min.mjs
+/mermaid.bundle.mjs
+/hljs.bundle.mjs
+/VENDORED.md
+/fonts/
+/standard_fonts/
+/wasm/

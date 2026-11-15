@@ -17,7 +17,7 @@ export { CARD_SANDBOX } from "./sandbox.ts";
 
 /** The card runtime's folder: card.css, theme.css, card.js, the live pages, their fonts and libraries. */
 export function libDir(): string {
-	return resolve(dirname(fileURLToPath(import.meta.url)), "..", "lib");
+	return resolve(dirname(fileURLToPath(import.meta.url)), "lib");
 }
 
 /** The sandbox a card from someone else runs in (`CARD_SANDBOX`), as a Content-Security-Policy. */

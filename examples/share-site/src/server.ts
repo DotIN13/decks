@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Live, MemoryStore, syncHandler, type HubStore, type Who } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
-import { LIVE_CARD_HEADERS, libFile } from "@decks/card-host";
+import { LIVE_CARD_HEADERS, libFile } from "@decks/canvas/cards-runtime";
 import { WebSocketServer } from "ws";
 
 /**

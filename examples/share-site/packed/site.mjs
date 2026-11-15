@@ -9,7 +9,7 @@ import { serialize, parse } from "@decks/pen";
 import { Live, MemoryStore, syncHandler } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
 import { HarnessSync } from "@decks/sync-client";
-import { libFile, LIVE_CARD_HEADERS } from "@decks/card-host";
+import { libFile, LIVE_CARD_HEADERS } from "@decks/canvas/cards-runtime";
 
 const store = new MemoryStore();
 const live = new Live(store);

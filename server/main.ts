@@ -48,7 +48,7 @@ function argsOf(argv: string[]): { deck: string; port: number; host: string } {
 
 /** The card runtime cards copy into a deck's lib/: today's card-host, until it moves at the switch-over. */
 function cardLib(): FeatureOptions["lib"] {
-	const folder = fileURLToPath(new URL("../packages/card-host/lib", import.meta.url));
+	const folder = fileURLToPath(new URL("../canvas/cards/runtime/lib", import.meta.url));
 	return existsSync(folder) ? new FolderDeck(folder) : undefined;
 }
 

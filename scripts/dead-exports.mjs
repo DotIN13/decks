@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 const ALLOW = new Set(["runtime/live-doc.ts", "runtime/opencode/plugin/decks-session.ts"]);
 const over = process.argv.includes("--over");
 const files = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter(Boolean)
-	.filter((f) => !/(^|\/)(node_modules|dist|dist-packages|pkg|pkg-gl|target)\//.test(f) && !/\.bundle\./.test(f) && !/^(packages\/card-host\/lib|runtime\/lib)\//.test(f));
+	.filter((f) => !/(^|\/)(node_modules|dist|dist-packages|pkg|pkg-gl|target)\//.test(f) && !/\.bundle\./.test(f) && !/^(canvas\/cards\/runtime\/lib|runtime\/lib)\//.test(f));
 const text = new Map();
 for (const f of files) if (/\.(ts|tsx|mjs|mts|js|html|json|md|css|rs|wgsl)$/.test(f)) text.set(f, readFileSync(f, "utf8"));
 const isEntry = (f) => /(^|\/)(index\.tsx?|public\/[^/]+\.tsx?)$/.test(f) || /\.d\.ts$/.test(f) || ALLOW.has(f);

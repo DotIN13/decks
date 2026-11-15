@@ -15,13 +15,17 @@
 		"./styles.css": "./styles/surface.css",
 		"./surface.css": "./dist/surface.css",
 		"./styles/*": "./styles/*",
-		"./ink": "./ink/index.ts"
+		"./ink": "./ink/index.ts",
+		"./cards-runtime": "./cards/runtime/index.ts",
+		"./cards-runtime/sandbox": "./cards/runtime/sandbox.ts",
+		"./cards-runtime/lib/*": "./cards/runtime/lib/*"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"**/*.test.ts\"",
 		"build:css": "node scripts/build-css.mjs",
-		"build:lib": "node ../scripts/build-solid-lib.mjs ."
+		"build:lib": "node ../scripts/build-solid-lib.mjs .",
+		"vendor": "node cards/runtime/vendor.mjs"
 	},
 	"dependencies": {
 		"@decks/api": "*",
@@ -29,13 +33,17 @@
 		"@decks/protocol-old": "*",
 		"@decks/engine": "*",
 		"@decks/ui": "*",
-		"highlight.js": "^11.12.0",
+		"highlight.js": "11.12.0",
 		"lucide-solid": "^1.37.0",
-		"marked": "^15.0.12",
+		"marked": "15.0.12",
 		"mathjax-full": "^3.2.2",
 		"solid-js": "^1.9.14",
 		"@decks/hub": "*",
-		"@decks/docs": "*"
+		"@decks/docs": "*",
+		"d3": "7.9.0",
+		"katex": "0.16.47",
+		"mermaid": "11.17.2",
+		"pdfjs-dist": "5.7.284"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.0",

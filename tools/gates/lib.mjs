@@ -10,7 +10,7 @@ export const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 /** Folders of today's code. Their breaks are in the baselines; every other folder starts at zero. */
 export const OLD = ["apps/", "packages/", "runtime/", "e2e/", "scripts/", "examples/", "docs/"];
 export const NEW = ["protocol/", "server/", "harness/", "clients/", "tools/", "canvas/", "engine/", "pen/", "ui/"];
-const NOT_SOURCE = /(^|\/)(node_modules|dist|dist-gen|dist-packages|pkg|pkg-gl|target|\.scratch|fixtures|baseline)\/|^packages\/card-host\/lib\/|^runtime\/lib\/|\.(bundle|min)\.|\.d\.ts$|package-lock\.json$/;
+const NOT_SOURCE = /(^|\/)(node_modules|dist|dist-gen|dist-packages|pkg|pkg-gl|target|\.scratch|fixtures|baseline)\/|^canvas\/cards\/runtime\/lib\/|^runtime\/lib\/|\.(bundle|min)\.|\.d\.ts$|package-lock\.json$/;
 
 export const isOld = (f) => OLD.some((p) => f.startsWith(p));
 export const isSource = (f) => !NOT_SOURCE.test(f);

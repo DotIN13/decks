@@ -1,5 +1,5 @@
 /**
- * Put the board primitives into `card-host/lib`, from the packages in node_modules.
+ * Put the board primitives into `canvas/cards/runtime/lib`, from the packages in node_modules.
  *
  * Boards are standalone documents: `lib/` is copied into every deck so a board
  * renders a paper, a diagram and a formula with no network and no server. That
@@ -25,9 +25,9 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFil
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const modules = join(root, "node_modules");
-const out = join(root, "packages", "card-host", "lib");
+const out = join(root, "canvas", "cards", "runtime", "lib");
 
 /** [from, to] — `to` is relative to card-host/lib. */
 const FILES = [

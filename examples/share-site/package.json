@@ -10,7 +10,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@decks/card-host": "*",
     "@decks/canvas": "*",
     "@decks/hub": "*",
     "@decks/pen": "*",

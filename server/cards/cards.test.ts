@@ -101,7 +101,7 @@ test("rule 15: lib/ follows the build, writing only what differs", async () => {
 });
 
 test("the real card runtime syncs into an empty deck", async () => {
-	const root = new URL("../../packages/card-host/lib/", import.meta.url).pathname;
+	const root = new URL("../../canvas/cards/runtime/lib/", import.meta.url).pathname;
 	const files: Record<string, Uint8Array> = {};
 	const walk = (dir: string) => {
 		for (const name of readdirSync(join(root, dir))) {

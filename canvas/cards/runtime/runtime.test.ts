@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { libFile, libName, passes } from "../src/index.ts";
+import { libFile, libName, passes } from "./index.ts";
 
 test("lib serves card.css and card.js, and nothing outside", () => {
 	assert.match(libFile("card.css")!.type, /text\/css/);
