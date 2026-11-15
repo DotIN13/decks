@@ -56,7 +56,7 @@ export const restart = act("restart", "Stop and start an app after a code change
 
 export const move = defineCall({
 	name: "app.move",
-	summary: "Move an app's source to a folder on this machine, outside the deck; the deck keeps its record and where it went.",
+	summary: "Move an app's source to a folder on this machine, outside the deck; the deck keeps its record and where it went. From then on its files are edited on disk, not through file calls.",
 	who: PERSON,
 	args: { name: Name, to: str("A folder on this machine.") },
 	answer: App,
