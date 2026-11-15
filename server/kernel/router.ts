@@ -1,5 +1,5 @@
 import { CALL_BY_NAME, check, Refused, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Feature, Guard, Translator } from "./types.ts";
+import type { Client, Context, Feature, Filter, Guard, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -57,6 +57,12 @@ export class Router {
 
 	private translator: Translator | undefined;
 	private guards: Guard[] = [];
+	private filters: Filter[] = [];
+
+	/** Trims a call's value before it is answered, from a handler or a host; several run in order. */
+	filter(filter: Filter): void {
+		this.filters.push(filter);
+	}
 
 	/** A check run before every handler or relay, after the who and argument checks; it throws Refused. */
 	guard(guard: Guard): void {
@@ -76,9 +82,9 @@ export class Router {
 		if ("error" in found) return found.error;
 		try {
 			for (const guard of this.guards) await guard(name, args ?? {}, caller);
-			if ("relay" in found) return this.relayed(found.relay, args ?? {}, caller, notes);
+			if ("relay" in found) return await this.relayed(found.relay, args ?? {}, caller, notes);
 			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
-			return this.answer(found.entry.call, value, notes);
+			return await this.answer(found.entry.call, value, notes, caller);
 		} catch (error) {
 			if (error instanceof Refused) return fail(error.code, error.message, notes, error.hint);
 			return fail("unavailable", `${name} failed on the server: ${(error as Error).message}`, notes);
@@ -120,10 +126,11 @@ export class Router {
 	private async relayed(call: AnyCall, args: unknown, caller: Caller, notes: string[]): Promise<Envelope<unknown>> {
 		const answer = await this.forward!(call.name, args, caller);
 		const merged = { ...answer, notes: [...notes, ...(answer.notes ?? [])] };
-		return merged.ok ? this.answer(call, merged.value, merged.notes) : merged;
+		return merged.ok ? this.answer(call, merged.value, merged.notes, caller) : merged;
 	}
 
-	private answer(call: AnyCall, value: unknown, notes: string[]): Envelope<unknown> {
+	private async answer(call: AnyCall, value: unknown, notes: string[], caller: Caller): Promise<Envelope<unknown>> {
+		for (const filter of this.filters) value = await filter(call.name, value, caller);
 		const problems = this.checkAnswers ? check(call.answer, value, `the answer of ${call.name}`) : [];
 		if (problems.length) return fail("unavailable", problems.join(" "), notes);
 		return { ok: true, value, notes };

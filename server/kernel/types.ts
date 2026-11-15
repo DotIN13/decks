@@ -109,6 +109,8 @@ export interface Kernel {
 	call(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>>;
 	/** A check before every handler or relay, after the who and argument checks; throw Refused to refuse. */
 	guard(guard: Guard): void;
+	/** Trim a call's value before it is answered (a list to what the caller may see); several run in order. */
+	filter(filter: Filter): void;
 	/** Whether a caller may see a canvas; an event of a canvas it may not see is not sent to it. */
 	sees(sees: Sees): void;
 	/** The deck's absolute folder on Decks-local; undefined in memory and on Studio. For old routes only. */
@@ -119,6 +121,8 @@ export interface Kernel {
 
 /** Refuses a call by throwing Refused; for a server with many people (Studio). */
 export type Guard = (name: string, args: unknown, caller: Caller) => void | Promise<void>;
+/** A call's value as the caller may have it. */
+export type Filter = (name: string, value: unknown, caller: Caller) => unknown | Promise<unknown>;
 /** Whether a caller may see a canvas. */
 export type Sees = (caller: Caller, canvas: string) => boolean;
 

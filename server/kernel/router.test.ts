@@ -162,6 +162,7 @@ test("a feature may declare calls of its own, guard every call, and say who sees
 			kernel.guard((name, _args, caller) => {
 				if (caller.id === "stranger" && name !== "account.signin") throw new Refused("refused", "No share.");
 			});
+			kernel.filter((name, value, caller) => (name === "port.list" && caller.id === "half" ? (value as unknown[]).slice(0, 1) : value));
 			kernel.sees((caller, canvas) => caller.id !== "stranger" || canvas === "open");
 		},
 	});
@@ -180,6 +181,9 @@ test("a feature may declare calls of its own, guard every call, and say who sees
 	await server.close();
 	assert.equal((await server.kernel.call("port.open", { port: 3 }, callers.person)).ok, true);
 	assert.equal((await server.kernel.call("port.open", { port: 3 }, callers.app("x"))).ok, false);
+	await server.value("port.open", { port: 4 });
+	assert.equal((await server.value<unknown[]>("port.list")).length, 2);
+	assert.equal((await server.value<unknown[]>("port.list", {}, { kind: "person", id: "half", name: "H" })).length, 1);
 	const twice = defineFeature({ name: "twice", declares: [calls.port.list], calls: [] });
 	await assert.rejects(testServer({ features: [twice] }), /declared already/);
 });
