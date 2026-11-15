@@ -195,10 +195,10 @@ test("before a kind's item is inserted, the kind may prepare it", async () => {
 });
 
 test("an item given no place joins right of the newest page, in the nearest open slot", async () => {
-	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x" });
+	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x", "canvases/plan/stickers/s2/index.html": "y" });
 	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
 	assert.deepEqual((await s.value<Item>("item.insert", { item: { type: "note", id: "n", width: 240, height: 120 } }, ann)).box!.x1, 460);
-	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html", id: "s2" } }, ann);
+	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s2/index.html", id: "s2" } }, ann);
 	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
 	await s.close();
 });
@@ -234,5 +234,14 @@ test("a canvas made from outside takes its title from canvas.json, and a rename 
 	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Kitchen garden" }));
 	assert.equal(await waitFor(titleOf, (t) => t === "Kitchen garden"), "Kitchen garden");
 	assert.ok(s.heard.some((e) => e.name === "canvas.changed" && e.payload.canvas === "garden" && e.payload.by === "studio"));
+	await s.close();
+});
+
+test("a page already on the canvas is not inserted again", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const again = await s.call("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" } }, ann);
+	assert.ok(!again.ok && again.error.code === "conflict" && /already on this canvas/.test(again.error.message));
+	assert.equal((await s.value<Item[]>("item.list", {}, ann)).filter((i) => i.type === "sticker").length, 1);
 	await s.close();
 });

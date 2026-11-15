@@ -132,6 +132,10 @@ const inside = (op: { parent?: string | null; index?: number }) => ({ ...(op.par
 function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where: Where, boxOf: Found): { pen: PenOp; written: ItemOp } {
 	if (!op.item || typeof op.item.type !== "string") throw new Refused("invalid", "insert needs an item with a type, as in { type: note, content: Hi }.", "item.insert");
 	if (op.item.id && findId(doc, op.item.id, where)) throw new Refused("conflict", `An item called ${op.item.id} is already on this canvas.`, "item.update");
+	for (const page of [op.item.card, op.item.path]) {
+		const there = typeof page === "string" ? findId(doc, page, where) : undefined;
+		if (there) throw new Refused("conflict", `${page} is already on this canvas, as ${there}: item.move moves it.`, "item.move");
+	}
 	let corner: Corner | undefined = cornerOf(op, boxOf);
 	const given = op.item.box;
 	if (!corner && given && !sizedOnly.has(op.item)) corner = { x: given.x1, y: given.y1 };
