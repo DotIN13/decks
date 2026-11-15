@@ -9,6 +9,7 @@ import { skipped } from "./records.ts";
 // One short handler per call: a document's own file calls, then google.*.
 
 const { file, google } = calls;
+const GOOGLE = { status: google.status, connect: google.connect, disconnect: google.disconnect, list: google.list, link: google.link };
 const DOC = { open: file.open, close: file.close, splice: file.splice, review: file.review, versions: file.versions, restore: file.restore };
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -45,7 +46,7 @@ export function documentCalls(docs: () => Documents | undefined): Handled<Contex
 }
 
 export function googleCalls(account: GoogleAccount | undefined, docs: GoogleDocs | undefined): Handled<Context>[] {
-	return handleAll(google, {
+	return handleAll(GOOGLE, {
 		status: async () => guarded(account, () => account!.status()),
 		connect: async (_ctx, { url }) => guarded(account, () => account!.connect(url)),
 		disconnect: async () => guarded(account, () => account!.disconnect()),
