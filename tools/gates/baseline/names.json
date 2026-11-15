@@ -729,7 +729,7 @@
 	"harness/page/markup/comments.ts: stage": 1,
 	"harness/page/panel/AppRow.tsx: board": 1,
 	"harness/page/panel/DecksLineMark.tsx: board": 1,
-	"harness/page/panel/LeftPanel.tsx: board": 30,
+	"harness/page/panel/LeftPanel.tsx: board": 23,
 	"harness/page/panel/LeftPanel.tsx: stage": 3,
 	"harness/page/panel/panel-groups.test.ts: board": 62,
 	"harness/page/panel/panel-groups.ts: board": 67,
