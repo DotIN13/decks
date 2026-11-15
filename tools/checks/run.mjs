@@ -20,7 +20,7 @@ export const PROGRAMS = {
 	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
 	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: join(ROOT, "e2e/fake-agent"), DECKS_DATA_DIR: home } }),
 	// vite itself, not through npm: npm reports the stop at the end of a check as an error.
-	page: ({ deck, web }) => ({ cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web) } }),
+	page: ({ deck, web }) => ({ cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web), DECKS_PAGE_COMPAT: "1" } }),
 };
 
 export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
