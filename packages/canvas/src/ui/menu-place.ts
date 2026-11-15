@@ -3,6 +3,6 @@
 
 type Edges = { left: number; right: number };
 
-export function menuLeft(stage: Edges, pill: { left: number }, button: { left: number }, width: number): number {
-	return Math.max(stage.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, stage.right - 8 - width - pill.left));
+export function menuLeft(canvas: Edges, pill: { left: number }, button: { left: number }, width: number): number {
+	return Math.max(canvas.left + 8 - pill.left, Math.min(button.left - 4 - pill.left, canvas.right - 8 - width - pill.left));
 }
