@@ -1,27 +1,27 @@
 # canvas
 
-The canvas page, a library: the canvas element, its camera, the TypeScript editor, cards,
-documents, ink, the engine's page side, and the frame that holds it all. Today's `packages/canvas`,
-moved with `src/` flattened; card-host, ink and docs' page half join it in later steps.
+The canvas page, a library (`@decks/canvas`): the canvas element, its camera, input, the TypeScript
+editor, the drawing, items, cards, documents, ink, the engine's page side, its controls, and the
+frame that holds it all.
 
 ## Owns
 
-- `index.ts`: the entry, `@decks/canvas`; `public/` holds its other doors (camera, tools, host,
-  comments).
-- the canvas element's folder (named view/ in step 4e), `camera/`, `edit/`, `editor.tsx`: the canvas, where it looks, the editor.
-- `items/`, `cards/`, `model/`, `ink/`, `look/`, `render/`, `ui/`, `frame/`, `host.ts`.
+- `index.ts`, `entries/`: the package's doors. `types.ts`, `theme.ts`, `debug.ts`.
+- `view/`, `camera/`, `input/`, `editor/`, `drawing/`: the canvas, where it looks, presses, edits.
+- `items/`, `cards/`, `documents/`, `ink/`: what sits on it.
+- `render/`, `look/`: drawing it. `chrome/`: its controls. `host/`: the frame and its page.
 - `styles/`: the canvas surface sheets, in `@layer decks.surface`.
 
 ## May import
 
-`protocol/`, `pen/`, `ui/`, `engine/`. Until step 4a of `docs/rewrite/loom/map.md` ends, also
-today's `packages/protocol`, `packages/api` and `packages/hub` (DESIGN.md section 11).
+`protocol/`, `pen/`, `ui/`, `engine/`. Nothing above.
 
 ## Rules
 
 1. Behaviour, markup and class names stay: the browser checks, Studio and cards select by them.
-2. The eight markup class names in tools/gates/markup-names.json keep their word; every other use of a retired word is renamed.
+2. The eight markup class names in tools/gates/markup-names.json keep their word (DESIGN.md section 11); every other use of a retired word is renamed.
 3. A part of the page is three files: model, view, actions.
+4. Nothing built is in git: the vendored card libraries and `live-doc.js` are made at install.
 
 ## Check
 
