@@ -9,24 +9,7 @@ import { take, type ShotArgs } from "./shot.ts";
 export const SHOT = "/pictures/shot";
 const TYPES = { png: "image/png", jpeg: "image/jpeg", pdf: "application/pdf" } as const;
 
-/** The screenshot's arguments from the address. of is ids or a card, comma separated; box is x1,y1,x2,y2. */
-export function shotArgs(query: URLSearchParams): Omit<ShotArgs, "canvas"> {
-	const box = query.get("box")?.split(",").map(Number);
-	const listed = query.get("of")?.split(",").filter(Boolean);
-	const of = box && box.length === 4 && box.every(Number.isFinite) ? { x1: box[0]!, y1: box[1]!, x2: box[2]!, y2: box[3]! } : listed?.length === 1 ? listed[0] : listed?.length ? listed : undefined;
-	const format = query.get("format") === "jpeg" || query.get("format") === "pdf" ? (query.get("format") as "jpeg" | "pdf") : "png";
-	const scale = Number(query.get("scale") ?? 2);
-	const live = query.get("live") === "1" || query.get("live") === "true";
-	return { ...(of !== undefined ? { of } : {}), format, scale: Number.isFinite(scale) && scale > 0 ? scale : 2, scheme: query.get("scheme") === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
-}
-
-async function canvasOf(ctx: Context, query: URLSearchParams): Promise<string | undefined> {
-	const named = query.get("canvas");
-	if (named) return named;
-	const agent = query.get("agent");
-	if (!agent) return undefined;
-	return (await ctx.call<{ canvas?: string }>("agent.get", { agent }).catch(() => undefined))?.canvas;
-}
+export const shotRoute = (m: () => Machine): Route => ({ method: "GET", prefix: SHOT, answer: (ctx, _path, query) => answer(ctx, m(), query) });
 
 async function answer(ctx: Context, m: Machine, query: URLSearchParams): Promise<RouteAnswer> {
 	const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });
@@ -45,4 +28,22 @@ async function answer(ctx: Context, m: Machine, query: URLSearchParams): Promise
 	}
 }
 
-export const shotRoute = (m: () => Machine): Route => ({ method: "GET", prefix: SHOT, answer: (ctx, _path, query) => answer(ctx, m(), query) });
+async function canvasOf(ctx: Context, query: URLSearchParams): Promise<string | undefined> {
+	const named = query.get("canvas");
+	if (named) return named;
+	const agent = query.get("agent");
+	if (!agent) return undefined;
+	return (await ctx.call<{ canvas?: string }>("agent.get", { agent }).catch(() => undefined))?.canvas;
+}
+
+/** The screenshot's arguments from the address. of is ids or a card, comma separated; box is x1,y1,x2,y2. */
+export function shotArgs(query: URLSearchParams): Omit<ShotArgs, "canvas"> {
+	const box = query.get("box")?.split(",").map(Number);
+	const listed = query.get("of")?.split(",").filter(Boolean);
+	const of = box && box.length === 4 && box.every(Number.isFinite) ? { x1: box[0]!, y1: box[1]!, x2: box[2]!, y2: box[3]! } : listed?.length === 1 ? listed[0] : listed?.length ? listed : undefined;
+	const format = query.get("format") === "jpeg" || query.get("format") === "pdf" ? (query.get("format") as "jpeg" | "pdf") : "png";
+	const scale = Number(query.get("scale") ?? 2);
+	const live = query.get("live") === "1" || query.get("live") === "true";
+	return { ...(of !== undefined ? { of } : {}), format, scale: Number.isFinite(scale) && scale > 0 ? scale : 2, scheme: query.get("scheme") === "dark" ? "dark" : "light", ...(live ? { live } : {}) };
+}
+

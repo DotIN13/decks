@@ -11,12 +11,7 @@ const LIMIT = 24 * 1024 * 1024;
 const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });
 const escapeAttr = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-/** The markup with a base at the card's folder, put first in its head. */
-export function based(html: string, base: string): string {
-	const tag = `<base href="${escapeAttr(base)}">`;
-	if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (head) => `${head}${tag}`);
-	return `<!doctype html><html><head><meta charset="utf-8">${tag}</head><body>${html}</body></html>`;
-}
+export const snapshotRoute = (m: () => Machine): Route => ({ method: "POST", prefix: SNAPSHOT, answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
 
 async function answer(ctx: Context, m: Machine, query: URLSearchParams, body: Bytes): Promise<RouteAnswer> {
 	try {
@@ -47,4 +42,10 @@ async function answer(ctx: Context, m: Machine, query: URLSearchParams, body: By
 	}
 }
 
-export const snapshotRoute = (m: () => Machine): Route => ({ method: "POST", prefix: SNAPSHOT, answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
+/** The markup with a base at the card's folder, put first in its head. */
+export function based(html: string, base: string): string {
+	const tag = `<base href="${escapeAttr(base)}">`;
+	if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (head) => `${head}${tag}`);
+	return `<!doctype html><html><head><meta charset="utf-8">${tag}</head><body>${html}</body></html>`;
+}
+

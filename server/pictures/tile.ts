@@ -10,6 +10,19 @@ import { canvasShot } from "./shot.ts";
 export const TILES = "/pictures/canvas-tile/";
 const LONG_SIDE = 480;
 
+export const tileRoute = (m: () => Machine): Route => ({ method: "GET", prefix: TILES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });
+
+async function answer(ctx: Context, m: Machine, path: string, query: URLSearchParams): Promise<RouteAnswer> {
+	try {
+		const scheme = query.get("scheme") === "dark" ? "dark" : "light";
+		const bytes = await canvasTile(ctx, m, decodeURIComponent(path.slice(TILES.length)), scheme);
+		return { type: "image/jpeg", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
+	} catch (error) {
+		const code = error instanceof Refused ? error.code : "unavailable";
+		return { status: code === "not_found" ? 404 : code === "invalid" ? 400 : 503, type: "text/plain", body: (error as Error).message };
+	}
+}
+
 /** The tile's JPEG bytes, taken once per drawing and scheme. */
 export async function canvasTile(ctx: Context, m: Machine, canvas: string, scheme: "light" | "dark"): Promise<Uint8Array> {
 	const name = ctx.canvasName(canvas);
@@ -23,15 +36,3 @@ export async function canvasTile(ctx: Context, m: Machine, canvas: string, schem
 	return taken.bytes;
 }
 
-async function answer(ctx: Context, m: Machine, path: string, query: URLSearchParams): Promise<RouteAnswer> {
-	try {
-		const scheme = query.get("scheme") === "dark" ? "dark" : "light";
-		const bytes = await canvasTile(ctx, m, decodeURIComponent(path.slice(TILES.length)), scheme);
-		return { type: "image/jpeg", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
-	} catch (error) {
-		const code = error instanceof Refused ? error.code : "unavailable";
-		return { status: code === "not_found" ? 404 : code === "invalid" ? 400 : 503, type: "text/plain", body: (error as Error).message };
-	}
-}
-
-export const tileRoute = (m: () => Machine): Route => ({ method: "GET", prefix: TILES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });

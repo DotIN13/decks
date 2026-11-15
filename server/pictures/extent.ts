@@ -26,21 +26,7 @@ export class Extents {
 	}
 }
 
-const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
-
-/** A report's reading, or undefined when it lacks path, w or h. */
-export function reportOf(body: unknown): { path: string; w: number; reading: Reading } | undefined {
-	const read = (body ?? {}) as Record<string, unknown>;
-	const w = num(read.w);
-	const h = num(read.h);
-	if (typeof read.path !== "string" || w === undefined || h === undefined) return undefined;
-	const reading: Reading = { h, words: num(read.words) ?? 0 };
-	for (const key of ["minFont", "overflowX", "cut", "overlaps"] as const) {
-		const value = num(read[key]);
-		if (value !== undefined) reading[key] = value;
-	}
-	return { path: read.path.replace(/^\/+/, ""), w, reading };
-}
+export const extentRoute = (extents: Extents): Route => ({ method: "POST", prefix: EXTENT, answer: (ctx, _path, _query, body) => answer(ctx, extents, body) });
 
 async function answer(ctx: Context, extents: Extents, body: Bytes): Promise<RouteAnswer> {
 	const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
@@ -57,4 +43,19 @@ async function answer(ctx: Context, extents: Extents, body: Bytes): Promise<Rout
 	return json(200, { ok: true });
 }
 
-export const extentRoute = (extents: Extents): Route => ({ method: "POST", prefix: EXTENT, answer: (ctx, _path, _query, body) => answer(ctx, extents, body) });
+const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
+
+/** A report's reading, or undefined when it lacks path, w or h. */
+export function reportOf(body: unknown): { path: string; w: number; reading: Reading } | undefined {
+	const read = (body ?? {}) as Record<string, unknown>;
+	const w = num(read.w);
+	const h = num(read.h);
+	if (typeof read.path !== "string" || w === undefined || h === undefined) return undefined;
+	const reading: Reading = { h, words: num(read.words) ?? 0 };
+	for (const key of ["minFont", "overflowX", "cut", "overlaps"] as const) {
+		const value = num(read[key]);
+		if (value !== undefined) reading[key] = value;
+	}
+	return { path: read.path.replace(/^\/+/, ""), w, reading };
+}
+
