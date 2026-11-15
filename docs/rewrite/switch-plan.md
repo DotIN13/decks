@@ -77,6 +77,12 @@ What the runner must know of a check is a field in `tools/checks/checks.json`: `
 
 agent-rows, chrome, running, time-machine, walkthrough: each starts an agent's turn through Pi with the fake model (`fake-agent`, `fake-model.mjs` on port 4700), which the runner starts; no signed-in Claude, no tokens. Run on 2026-11-14: all pass. stage-api: asks the agent to run the decks command, which the fake model cannot do; it needs a real model. The runner starts the harness with Pi on the fake model only, so that run needs the harness started with a signed-in Claude (`--kinds claude`), once, with Mason's yes.
 
+## Follow-ups after the checks move
+
+Checks run unchanged until the switch-over; these were written against the dev page's timing and run on the dev server (`dev` in checks.json) until their owner does this, then go back to the built page:
+
+- `card-shot` (now `harness/page/checks/card-shot.mjs`): It takes the first awake .card-surface over 100 px wide as its card (line 44); on the faster built page another fixture card is still awake off screen then, so it types into the wrong card. After the checks move: pick the card by its path, then back to the built page.
+
 ## Compat
 
 Every old name answers until 2027-05-14. After the switch, today's canvas library (kept until Loom), the page's compat mode and the moved checks still speak 43 of the 121 renamed names; those stay, and Studio and the iPad app may speak any of them until the date. 78 are spoken by nothing in this repo; they could go now, but stay until 2027-05-14 for Studio and the iPad app, which are not in this repo:
