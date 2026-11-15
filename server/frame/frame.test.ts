@@ -34,8 +34,9 @@ test("a pass opens its canvas's files, and nothing else", async () => {
 	const server = await testServer({ features: [...features().filter((f) => f.name !== "frame"), frameFeature()], deck });
 	const doors = await server.listen(0);
 	const ask = (token: string) => fetch(`${doors.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ canvas: "Plan" }) });
-	const got = (await (await ask(doors.token)).json()) as { pass: string; expires: number };
+	const got = (await (await ask(doors.token)).json()) as { pass: string; expires: number; imports?: unknown };
 	assert.ok(got.pass && got.expires > Date.now());
+	assert.deepEqual(got.imports, {}, "no map in the deck: an empty one, so the frame never looks for it");
 	assert.equal((await ask(got.pass)).status, 403, "a pass cannot ask for a pass");
 	const file = (path: string) => fetch(`${doors.url}/api/t/${got.pass}/card/${path}`);
 	assert.equal(await (await file("canvases/plan/files/a.txt")).text(), "hello");

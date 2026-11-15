@@ -30,12 +30,13 @@ export function importPaths(given: Record<string, unknown> | undefined): Record<
 	return out;
 }
 
-async function importsOf(ctx: Context): Promise<Record<string, string> | undefined> {
+/** The deck's map for the frame; {} when the deck has none, so the frame never looks for one itself. */
+async function importsOf(ctx: Context): Promise<Record<string, string>> {
 	try {
 		const text = new TextDecoder().decode(await ctx.deck.read(toDeckPath("assets/importmap.json")));
 		return importPaths((JSON.parse(text) as { imports?: Record<string, unknown> }).imports);
 	} catch {
-		return undefined;
+		return {};
 	}
 }
 
@@ -54,7 +55,7 @@ export function passRoute(passes: Passes): Route {
 			const got = await ctx.call<{ name: string }>("canvas.get", { canvas }).catch(() => undefined);
 			if (!got) return json(404, { error: `There is no canvas called ${canvas}.` });
 			const imports = await importsOf(ctx);
-			return json(200, { ...passes.issue(got.name, ctx.caller), ...(imports ? { imports } : {}) });
+			return json(200, { ...passes.issue(got.name, ctx.caller), imports });
 		},
 	};
 }
