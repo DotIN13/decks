@@ -15,6 +15,11 @@ const result = await runPrograms(async ({ ports, deck }) => {
 	const browser = await chromium.launch();
 	const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 	const served = [];
+	const said = [];
+	page.on("console", (m) => m.type() !== "debug" && said.push(`${m.type()}: ${m.text().slice(0, 200)}`));
+	page.on("pageerror", (e) => said.push(`pageerror: ${e.message.slice(0, 200)}`));
+	page.on("requestfailed", (r) => said.push(`failed: ${r.url().slice(0, 160)} ${r.failure()?.errorText ?? ""}`));
+	page.on("response", (r) => r.status() >= 400 && said.push(`${r.status()}: ${r.url().slice(0, 160)}`));
 	// The page's own /canvas-frame.html is replaced by the one server/frame serves.
 	await page.route("**/canvas-frame.html*", async (route) => {
 		const answer = await fetch(`http://127.0.0.1:${ports.server}/canvas-frame.html`);
@@ -28,7 +33,7 @@ const result = await runPrograms(async ({ ports, deck }) => {
 		if (frame && !(await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) frame = undefined;
 		if (!frame) await page.waitForTimeout(150);
 	}
-	if (!frame) throw new Error(`the frame never showed its stage (frame page answered ${served.join(",") || "never"})`);
+	if (!frame) throw new Error(`the frame never showed its stage (frame page answered ${served.join(",") || "never"})\n${said.slice(0, 30).join("\n")}`);
 	const before = xOf(deck);
 	const host = await frame.evaluate((path) => {
 		const node = [...document.querySelectorAll(".card-node")].find((one) => one.dataset.path === path);
