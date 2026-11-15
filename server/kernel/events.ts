@@ -1,5 +1,5 @@
 import { check, EVENTS, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
-import type { EmitOptions, Events, Stop } from "./types.ts";
+import type { EmitOptions, Events, Sees, Stop } from "./types.ts";
 
 // One stream. A feature hears everything with on(); a door subscribes for its
 // caller and hears only what that caller may see: person-only events go to
@@ -19,6 +19,8 @@ export function mayHear(caller: Caller, event: AnyEvent, payload: Record<string,
 }
 
 export class EventBus implements Events {
+	/** Checks of who may see a canvas, added by a feature (Studio's sharing). */
+	readonly sees: Sees[] = [];
 	private listeners = new Map<string, Set<(payload: never) => void>>();
 	private subscribers = new Set<{ sub: Subscriber; hear: (heard: Heard) => void }>();
 
@@ -32,6 +34,8 @@ export class EventBus implements Events {
 			if (options?.clients && (!sub.client || !options.clients.includes(sub.client))) continue;
 			if (sub.events && !sub.events.includes(event.name)) continue;
 			if (sub.canvas && record.canvas !== undefined && record.canvas !== sub.canvas) continue;
+			const canvas = typeof record.canvas === "string" ? record.canvas : undefined;
+			if (canvas && !this.sees.every((one) => one(sub.caller, canvas))) continue;
 			if (mayHear(sub.caller, event, record)) hear({ name: event.name, payload: record });
 		}
 	}

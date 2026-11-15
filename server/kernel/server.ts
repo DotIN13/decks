@@ -7,7 +7,8 @@ import { folderStores, folderVersion } from "./disk.ts";
 import { listen, type Served } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { checkLock, takeLock } from "./lockfile.ts";
-import type { Feature } from "./types.ts";
+import type { Stores } from "./store.ts";
+import type { Deck, Feature, VersionFile } from "./types.ts";
 
 // Starts Decks-local on a deck folder: the kernel with the features it is
 // given, the doors on a port, and the lock file with a fresh token for the
@@ -41,4 +42,17 @@ export async function startServer(options: ServerOptions): Promise<Running> {
 		deck.close();
 	};
 	return { url: served.url, port: served.port, token, built, close };
+}
+
+export type KernelServerOptions = { deck: Deck; stores: Stores; version?: VersionFile; features: Feature[]; port: number; host?: string; clock?: () => number };
+
+/** The kernel and its doors on a deck and stores a host brings (Studio): no folder, no lock file. */
+export async function startKernel(options: KernelServerOptions): Promise<{ url: string; port: number; built: Built; close(): Promise<void> }> {
+	const { deck, stores, features, version, clock } = options;
+	const built = await buildKernel({ deck, stores, features, ...(version ? { version } : {}), ...(clock ? { clock } : {}) });
+	const served = await listen(built, options.port, options.host).catch(async (error: Error) => {
+		await built.stop();
+		throw error;
+	});
+	return { url: served.url, port: served.port, built, close: async () => (await served.close(), await built.stop()) };
 }

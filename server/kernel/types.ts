@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import { handlersFor, layout, Refused, type AnyEvent, type Caller, type Envelope, type Handled, type RefusalCode, type Payload, type shapes, type Who } from "../../protocol/index.ts";
+import { handlersFor, layout, Refused, type AnyCall, type AnyEvent, type Caller, type Envelope, type Handled, type RefusalCode, type Payload, type shapes, type Who } from "../../protocol/index.ts";
 
 // The kernel's interfaces, as types, for wave 1 to build against. Keel owns
 // this folder after wave 0 and writes what implements them.
@@ -105,11 +105,22 @@ export interface Kernel {
 	relay(answerer: Answerer): void;
 	/** Turn a name the protocol does not declare into a declared call. At most one feature calls it. */
 	translate(translator: Translator): void;
+	/** Make a call as a given caller from outside any handler (the sync client); the router's checks apply. */
+	call(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>>;
+	/** A check before every handler or relay, after the who and argument checks; throw Refused to refuse. */
+	guard(guard: Guard): void;
+	/** Whether a caller may see a canvas; an event of a canvas it may not see is not sent to it. */
+	sees(sees: Sees): void;
 	/** The deck's absolute folder on Decks-local; undefined in memory and on Studio. For old routes only. */
 	folder(): string | undefined;
 	/** The server's own address once a door listens, for apps and pictures; undefined before. */
 	url(): string | undefined;
 }
+
+/** Refuses a call by throwing Refused; for a server with many people (Studio). */
+export type Guard = (name: string, args: unknown, caller: Caller) => void | Promise<void>;
+/** Whether a caller may see a canvas. */
+export type Sees = (caller: Caller, canvas: string) => boolean;
 
 /** An old name and its arguments, as a declared call; back turns its value into the old answer. */
 export type Translator = (
@@ -130,6 +141,8 @@ export interface Feature {
 	canvases?: (kernel: Kernel) => CanvasSource;
 	/** Pages the feature serves over HTTP, outside /api/v1. */
 	routes?: Route[];
+	/** Calls this feature declares itself, beside the protocol's (Studio's own); checked the same way. */
+	declares?: AnyCall[];
 	/** Brings an old deck up to date, run in feature order before any start. */
 	upgrade?(deck: Deck, version: VersionFile): Promise<void>;
 }

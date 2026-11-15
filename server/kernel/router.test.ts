@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calls } from "../../protocol/index.ts";
+import { calls, Refused } from "../../protocol/index.ts";
 import { probeFeature } from "./probe.test.ts";
 import { callers, testServer } from "./testing.ts";
 import { defineFeature, handle } from "./types.ts";
@@ -149,4 +149,37 @@ test("an old name is translated into a declared call, checked as usual, and its 
 		assert.equal(answer.ok ? "" : answer.error.code, "not_found");
 	}
 	await server.close();
+});
+
+test("a feature may declare calls of its own, guard every call, and say who sees a canvas", async () => {
+	const { defineCall, obj, str } = await import("../../protocol/index.ts");
+	const signin = defineCall({ name: "account.signin", summary: "Sign in.", who: ["person"], args: { email: str() }, answer: obj({ ok: str() }), effect: "change" });
+	const studio = defineFeature({
+		name: "studio",
+		declares: [signin],
+		calls: [handle(signin, (_ctx, { email }) => ({ ok: email }))],
+		start(kernel) {
+			kernel.guard((name, _args, caller) => {
+				if (caller.id === "stranger" && name !== "account.signin") throw new Refused("refused", "No share.");
+			});
+			kernel.sees((caller, canvas) => caller.id !== "stranger" || canvas === "open");
+		},
+	});
+	const server = await testServer({ features: [studio, probeFeature()] });
+	assert.deepEqual(await server.value("account.signin", { email: "a@b" }), { ok: "a@b" });
+	const stranger = { kind: "person" as const, id: "stranger", name: "S" };
+	assert.equal((await server.call("account.signin", { email: "x" }, stranger)).ok, true);
+	const refused = await server.call("port.list", {}, stranger);
+	assert.equal(refused.ok ? "" : refused.error.message, "No share.");
+	const heard: string[] = [];
+	server.events.subscribe({ caller: stranger }, (one) => void heard.push(String(one.payload.canvas)));
+	const { events } = await import("../../protocol/index.ts");
+	server.events.emit(events.itemChanged, { canvas: "secret", ids: [], by: "a", rev: 1 });
+	server.events.emit(events.itemChanged, { canvas: "open", ids: [], by: "a", rev: 2 });
+	assert.deepEqual(heard, ["open"]);
+	await server.close();
+	assert.equal((await server.kernel.call("port.open", { port: 3 }, callers.person)).ok, true);
+	assert.equal((await server.kernel.call("port.open", { port: 3 }, callers.app("x"))).ok, false);
+	const twice = defineFeature({ name: "twice", declares: [calls.port.list], calls: [] });
+	await assert.rejects(testServer({ features: [twice] }), /declared already/);
 });

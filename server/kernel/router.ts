@@ -1,5 +1,5 @@
 import { CALL_BY_NAME, check, Refused, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Feature, Translator } from "./types.ts";
+import type { Client, Context, Feature, Guard, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -9,12 +9,24 @@ import type { Client, Context, Feature, Translator } from "./types.ts";
 type Entry = { call: AnyCall; run: Handled<Context>["run"]; feature: string };
 export type MakeContext = (feature: string, caller: Caller, notes: string[], client?: Client) => Context;
 
+/** The protocol's calls, and those a feature declares itself (Studio's); a name declared twice stops the server. */
+export function declaredOf(features: Feature[]): ReadonlyMap<string, AnyCall> {
+	const declared = new Map(CALL_BY_NAME);
+	for (const feature of features) {
+		for (const call of feature.declares ?? []) {
+			if (declared.has(call.name)) throw new Error(`${feature.name} declares ${call.name}, which is declared already.`);
+			declared.set(call.name, call);
+		}
+	}
+	return declared;
+}
+
 /** Every handled call by name; two handlers for one call stop the server. */
-export function routesOf(features: Feature[]): Map<string, Entry> {
+export function routesOf(features: Feature[], declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME): Map<string, Entry> {
 	const entries = new Map<string, Entry>();
 	for (const feature of features) {
 		for (const { call, run } of feature.calls) {
-			if (CALL_BY_NAME.get(call.name) !== call) throw new Error(`${feature.name} handles ${call.name}, which the protocol does not declare.`);
+			if (declared.get(call.name) !== call) throw new Error(`${feature.name} handles ${call.name}, which the protocol does not declare.`);
 			if (call.side !== "server") throw new Error(`${feature.name} handles ${call.name}, which the harness answers.`);
 			const first = entries.get(call.name);
 			if (first) throw new Error(`${call.name} is handled by both ${first.feature} and ${feature.name}.`);
@@ -40,9 +52,16 @@ export class Router {
 		private makeContext: MakeContext,
 		private checkAnswers = false,
 		private forward?: (name: string, args: unknown, caller: Caller) => Promise<Envelope<unknown>>,
+		private declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME,
 	) {}
 
 	private translator: Translator | undefined;
+	private guards: Guard[] = [];
+
+	/** A check run before every handler or relay, after the who and argument checks; it throws Refused. */
+	guard(guard: Guard): void {
+		this.guards.push(guard);
+	}
 
 	/** Given once, by the feature that knows old names; asked for an undeclared name or the old form. */
 	translate(translator: Translator): void {
@@ -51,12 +70,13 @@ export class Router {
 	}
 
 	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
-		if (!turned && this.translator && (!CALL_BY_NAME.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
+		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
-		if ("relay" in found) return this.relayed(found.relay, args ?? {}, caller, notes);
 		if ("error" in found) return found.error;
 		try {
+			for (const guard of this.guards) await guard(name, args ?? {}, caller);
+			if ("relay" in found) return this.relayed(found.relay, args ?? {}, caller, notes);
 			const value = await found.entry.run(this.makeContext(found.entry.feature, caller, notes, client), (args ?? {}) as never);
 			return this.answer(found.entry.call, value, notes);
 		} catch (error) {
@@ -67,10 +87,10 @@ export class Router {
 
 	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
 		const turned = this.translator!(name, args);
-		if (!turned && CALL_BY_NAME.has(name)) return this.call(name, args, caller, client, true);
+		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
 		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
 		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
-		if (!CALL_BY_NAME.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
+		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
 		const answer = await this.call(turned.name, turned.args, caller, client, true);
 		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
 	}
@@ -86,7 +106,7 @@ export class Router {
 	}
 
 	private find(name: string, caller: Caller, args: unknown, notes: string[]): { entry: Entry } | { error: Envelope<never> } | { relay: AnyCall } {
-		const call = CALL_BY_NAME.get(name);
+		const call = this.declared.get(name);
 		if (!call) return { error: fail("not_found", `There is no call named ${name}.`, notes) };
 		if (!call.who.includes(caller.kind)) return { error: fail("refused", `A ${caller.kind} may not call ${name}; it is for: ${call.who.join(", ")}.`, notes) };
 		const problems = check(call.input, args, "the arguments");
