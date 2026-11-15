@@ -1,6 +1,6 @@
 import type { Line } from "./line.ts";
 
-// For tests: an extension that speaks the real one's wire (extension/background.js):
+// For tests: an extension that speaks the real one's wire (clients/extension/background.js):
 // tabs.onCreated and extension.initialized on connect, { id, result } or
 // { id, error } answers, debugger events up. Its page is a small table.
 
