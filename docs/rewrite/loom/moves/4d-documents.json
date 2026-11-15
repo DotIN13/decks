@@ -110,14 +110,14 @@
 				"dependencies.diff": "^8.0.4",
 				"dependencies.docx-preview": "^0.4.1",
 				"dependencies.jszip": "^3.10.1",
-				"scripts.build:live-doc": "node documents/build-live-doc.mjs",
-				"scripts.postinstall": "node cards/runtime/vendor.mjs && node documents/build-live-doc.mjs"
+				"scripts.build:live-doc": "node documents/build-live-doc.mjs"
 			}
 		},
 		{
 			"file": "package.json",
 			"values": {
-				"scripts.build:live-doc": "npm run build:live-doc -w @decks/canvas"
+				"scripts.build:live-doc": "npm run build:live-doc -w @decks/canvas",
+				"scripts.postinstall": "npm run vendor -w @decks/canvas && npm run build:live-doc -w @decks/canvas"
 			}
 		}
 	],

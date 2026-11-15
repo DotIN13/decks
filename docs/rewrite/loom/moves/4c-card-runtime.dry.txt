@@ -1,6 +1,6 @@
 # Step 4c-card-runtime: canvas/cards/runtime/: card-host folds into the canvas library; vendored libraries leave git, copied at install
 
-Dry run on 28c22710, on top of 4b-ink. Nothing was moved.
+Dry run on 3a7869fc, on top of 4b-ink. Nothing was moved.
 
 - files moved by git mv: 18
 - files taken out of git (moved on disk): 99
@@ -184,7 +184,7 @@ canvas/cards/runtime/vendor.mjs:2
 ## Then run
 
 - before: scripts/vendor.mjs and scripts/live-doc.mjs kept by the switch-over (or found at their tools/ home and the table's from paths changed)
-- node tools/heavy.mjs --wait -- npm install (its postinstall copies the vendored libraries into canvas/cards/runtime/lib)
+- node tools/heavy.mjs --wait -- npm install (the root package's postinstall copies the vendored libraries into canvas/cards/runtime/lib; npm 11 skips a workspace's own install scripts)
 - diff the copied files against git's last copy: the same bytes (pinned versions)
 - node tools/check.mjs canvas && node tools/check.mjs server
 - node tools/gates/run.mjs (built: the 8 card-host lib entries gone)

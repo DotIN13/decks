@@ -184,8 +184,7 @@
 				"dependencies.pdfjs-dist": "5.7.284",
 				"dependencies.highlight.js": null,
 				"[\"dependencies\",\"highlight.js\"]": "11.12.0",
-				"scripts.vendor": "node cards/runtime/vendor.mjs",
-				"scripts.postinstall": "node cards/runtime/vendor.mjs"
+				"scripts.vendor": "node cards/runtime/vendor.mjs"
 			}
 		},
 		{
@@ -198,13 +197,14 @@
 		{
 			"file": "package.json",
 			"values": {
-				"scripts.vendor": "npm run vendor -w @decks/canvas"
+				"scripts.vendor": "npm run vendor -w @decks/canvas",
+				"scripts.postinstall": "npm run vendor -w @decks/canvas"
 			}
 		}
 	],
 	"then": [
 		"before: scripts/vendor.mjs and scripts/live-doc.mjs kept by the switch-over (or found at their tools/ home and the table's from paths changed)",
-		"node tools/heavy.mjs --wait -- npm install (its postinstall copies the vendored libraries into canvas/cards/runtime/lib)",
+		"node tools/heavy.mjs --wait -- npm install (the root package's postinstall copies the vendored libraries into canvas/cards/runtime/lib; npm 11 skips a workspace's own install scripts)",
 		"diff the copied files against git's last copy: the same bytes (pinned versions)",
 		"node tools/check.mjs canvas && node tools/check.mjs server",
 		"node tools/gates/run.mjs (built: the 8 card-host lib entries gone)",
