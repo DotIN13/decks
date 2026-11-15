@@ -72,6 +72,35 @@ function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
 	return undefined;
 }
 
+/** A copy or a cut of what is selected: the clip on the clipboard, held by the harness, and a cut's items taken off. */
+function copyItems(deps: ClipboardDeps, event: ClipboardEvent, cut: boolean): void {
+	if (event.defaultPrevented || !event.clipboardData || typing() || wordsSelected()) return;
+	const { handle } = deps;
+	const ids = handle.selection?.() ?? [];
+	if (!ids.length) return;
+	const doc = handle.drawn();
+	const taken = clipItems(doc, ids, placements(doc, { theme: baseTheme(doc, "light") }));
+	if (!taken) return;
+	const id = deps.call ? freshId() : undefined;
+	const clip: Clip = { v: 1, harness: deps.harness(), canvas: deps.canvas, ...(id ? { id } : {}), box: taken.box, items: taken.items };
+	const text = clipText(taken.items);
+	event.preventDefault();
+	event.clipboardData.setData(CLIP_TYPE, JSON.stringify(clip));
+	event.clipboardData.setData("text/html", clipHtml(clip, text));
+	event.clipboardData.setData("text/plain", text);
+	// The items the copy took, by their ids here: what a cut takes off.
+	const tops = taken.items.map((item) => item.id);
+	const takeOff = () => {
+		if (cut && deps.canWrite()) handle.edit(tops.map((one) => ({ op: "delete", id: one })));
+	};
+	if (!deps.call || !id) return takeOff();
+	// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
+	void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
+		if (answer.ok) return takeOff();
+		deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
+	});
+}
+
 export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: string; text?: string }) => void } {
 	const { handle } = deps;
 	/** Where the pointer is over the canvas, on this frame's screen; undefined once it has left. */
@@ -85,34 +114,8 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 		return { x: Math.round(at.x), y: Math.round(at.y) };
 	};
 
-	const copy = (event: ClipboardEvent, cut: boolean) => {
-		if (event.defaultPrevented || !event.clipboardData || typing() || wordsSelected()) return;
-		const ids = handle.selection?.() ?? [];
-		if (!ids.length) return;
-		const doc = handle.drawn();
-		const taken = clipItems(doc, ids, placements(doc, { theme: baseTheme(doc, "light") }));
-		if (!taken) return;
-		const id = deps.call ? freshId() : undefined;
-		const clip: Clip = { v: 1, harness: deps.harness(), canvas: deps.canvas, ...(id ? { id } : {}), box: taken.box, items: taken.items };
-		const text = clipText(taken.items);
-		event.preventDefault();
-		event.clipboardData.setData(CLIP_TYPE, JSON.stringify(clip));
-		event.clipboardData.setData("text/html", clipHtml(clip, text));
-		event.clipboardData.setData("text/plain", text);
-		// The items the copy took, by their ids here: what a cut takes off.
-		const tops = taken.items.map((item) => item.id);
-		const takeOff = () => {
-			if (cut && deps.canWrite()) handle.edit(tops.map((one) => ({ op: "delete", id: one })));
-		};
-		if (!deps.call || !id) return takeOff();
-		// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
-		void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
-			if (answer.ok) return takeOff();
-			deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
-		});
-	};
-	addEventListener("copy", (event) => copy(event, false), { signal: life() });
-	addEventListener("cut", (event) => copy(event, true), { signal: life() });
+	addEventListener("copy", (event) => copyItems(deps, event, false), { signal: life() });
+	addEventListener("cut", (event) => copyItems(deps, event, true), { signal: life() });
 
 	/** Select what a paste put in, once the drawing has it (it comes down the canvas's stream). */
 	const selectWhenDrawn = (made: string[], tries = 40) => {
