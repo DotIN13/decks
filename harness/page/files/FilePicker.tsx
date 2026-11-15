@@ -92,7 +92,10 @@ export function FilePicker(props: {
 	 */
 	const [google, { refetch: recheck }] = createResource(
 		documents,
-		async () => (await (await fetch(api("/google/status"))).json()) as { mode: string; client: boolean; signedIn: boolean; email?: string; paste?: boolean; comments?: boolean },
+		async () => {
+			const answer = await call<{ connected: boolean; email?: string }>("google.status", {});
+			return { mode: "", client: answer.ok, signedIn: answer.ok && answer.value.connected, ...(answer.ok && answer.value.email ? { email: answer.value.email } : {}) } as { mode: string; client: boolean; signedIn: boolean; email?: string; paste?: boolean; comments?: boolean };
+		},
 	);
 	const signedIn = () => !!google()?.signedIn;
 
@@ -115,10 +118,9 @@ export function FilePicker(props: {
 	const [docs, { refetch: relist }] = createResource(
 		() => (tab() === "google" && signedIn() && !pasted() ? { q: asked() } : false),
 		async ({ q }) => {
-			const response = await fetch(api(`/google/docs${q ? `?q=${encodeURIComponent(q)}` : ""}`));
-			const body = (await response.json().catch(() => ({}))) as { docs?: GoogleListed[]; error?: string };
-			if (!response.ok) throw new Error(body.error ?? `Google answered ${response.status}.`);
-			return body.docs ?? [];
+			const answer = await call<Array<{ id: string; title: string; url: string; modified?: number }>>("google.list", q ? { query: q } : {});
+			if (!answer.ok) throw new Error(answer.code === "unavailable" ? "This server cannot reach Google Docs yet." : answer.error);
+			return answer.value.map((doc): GoogleListed => ({ id: doc.id, title: doc.title, ...(doc.modified ? { modified: new Date(doc.modified).toISOString() } : {}) }));
 		},
 	);
 	// Back from signing in, in another tab: ask again.
@@ -136,8 +138,8 @@ export function FilePicker(props: {
 	const [said, setSaid] = createSignal("");
 	const signIn = () => window.open(`${api("/google/signin")}?origin=${encodeURIComponent(location.origin)}`, "_blank", "noopener");
 	const finish = async () => {
-		const answer = (await (await fetch(api("/google/code"), { method: "POST", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ url: returned().trim() }) })).json()) as { ok: boolean; email?: string; message?: string };
-		setSaid(answer.ok ? `Signed in as ${answer.email}.` : (answer.message ?? "That did not work."));
+		const answer = await call<{ connected: boolean; email?: string }>("google.connect", { url: returned().trim() });
+		setSaid(answer.ok ? `Signed in as ${answer.value.email ?? "you"}.` : answer.error);
 		if (answer.ok) void recheck();
 	};
 
