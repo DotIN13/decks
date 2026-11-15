@@ -1,6 +1,7 @@
 import { baseTheme, parse, placements, toHtml, type PenDocument, type PenNode } from "@decks/pen";
 import type * as S from "./shapes.ts";
 import { layout, Refused } from "../../protocol/index.ts";
+import { marks, type Writer } from "./marks.ts";
 
 // The page a screenshot is taken of (rules 7 and 8): the items asked for, in a
 // frame with no layout at their canvas places, and each card as its page.
@@ -58,7 +59,7 @@ function round(boxes: S.Box[]): S.Box {
 }
 
 /** The composed page of a drawing's file, cards addressed by cardUrl. */
-export function compose(text: string, canvas: string, of: Of, options: { scale?: number; scheme?: "light" | "dark"; cardUrl: (path: string) => string | undefined }): Composed {
+export function compose(text: string, canvas: string, of: Of, options: { scale?: number; scheme?: "light" | "dark"; writer?: Writer; cardUrl: (path: string) => string | undefined }): Composed {
 	const doc = parse(text);
 	const scheme = options.scheme ?? "light";
 	const placed = placements(doc, { theme: baseTheme(doc, scheme) });
@@ -82,6 +83,6 @@ export function compose(text: string, canvas: string, of: Of, options: { scale?:
 			const got = layout.resolveReference(canvas, written);
 			return "path" in got ? options.cardUrl(got.path) : undefined;
 		},
-	}).replace("</head>", `<style>body { padding: 0 !important; gap: 0 !important; background: ${ground} !important; }</style>\n</head>`);
+	}).replace("</head>", `<style>body { padding: 0 !important; gap: 0 !important; background: ${ground} !important; }\n${marks(children, options.writer)}</style>\n</head>`);
 	return { html, box, w, h, factor: factorFor(w, h, options.scale) };
 }

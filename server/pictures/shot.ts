@@ -3,6 +3,7 @@ import type * as S from "./shapes.ts";
 import { toDeckPath, type Bytes, type Context } from "../kernel/index.ts";
 import { compose, factorFor, type Of } from "./compose.ts";
 import { cardPath, keep, type Machine } from "./machine.ts";
+import type { Writer } from "./marks.ts";
 
 // canvas.screenshot (rules 7 to 9): a composed page of the drawing and its
 // cards, or one card's own page, pictured and written to the deck.
@@ -36,6 +37,14 @@ function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
 	const png = bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50;
 	if (png) return { w: Buffer.from(bytes).readUInt32BE(16), h: Buffer.from(bytes).readUInt32BE(20) };
 	return box ? { w: Math.round(box.x2 - box.x1), h: Math.round(box.y2 - box.y1) } : { w: 0, h: 0 };
+}
+
+/** The agent that last wrote the drawing, as its placeholder frames are marked; none for the person. */
+async function writerOf(ctx: Context, canvas: string): Promise<Writer | undefined> {
+	const by = (await ctx.deck.revisions?.(toDeckPath(`${layout.canvasFolder(canvas)}/canvas.pen`)).catch(() => []))?.at(-1)?.by;
+	if (!by || by === "person" || by === "disk") return undefined;
+	const agent = await ctx.call<{ name?: string; color?: string }>("agent.get", { agent: by }).catch(() => undefined);
+	return agent?.color ? { color: agent.color, ...(agent.name ? { name: agent.name } : {}) } : undefined;
 }
 
 type Seen = { how: string; data: string; mime: string };
@@ -78,7 +87,8 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 		passes.push(page);
 		return page.url;
 	};
-	const made = compose(await drawingText(ctx, canvas), canvas, args.of, { cardUrl, ...(args.scale ? { scale: args.scale } : {}), ...(args.scheme ? { scheme: args.scheme } : {}) });
+	const writer = await writerOf(ctx, canvas);
+	const made = compose(await drawingText(ctx, canvas), canvas, args.of, { cardUrl, ...(writer ? { writer } : {}), ...(args.scale ? { scale: args.scale } : {}), ...(args.scheme ? { scheme: args.scheme } : {}) });
 	const tab = await m.browser.page({ width: made.w, height: made.h, scale: made.factor, scheme: args.scheme ?? "light" });
 	try {
 		await tab.show(made.html);

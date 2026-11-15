@@ -231,3 +231,16 @@ test("rule 8: a card's picture comes from a screen showing it when one answers, 
 	assert.equal(seen?.bytes[0], 0x89);
 	assert.equal(await seenCard(testContext(), CARD, "work"), undefined, "no screen: the file is used");
 });
+
+test("rule 15: a card's own frame and a placeholder's dashed edge are drawn in the picture", async () => {
+	const { marks, ACCENT } = await import("./marks.ts");
+	const card: never = { type: "browser", id: "c", cornerRadius: 0, stroke: "#ff0000", strokeWidth: 6, strokeAlignment: "outer", effect: { type: "shadow", offset: { x: 0, y: 0 }, blur: 0, spread: 14, color: "#0000ff" }, metadata: { type: "decks.card" } } as never;
+	const css = marks([{ type: "frame", id: "f", children: [card] }, { type: "frame", id: "p", placeholder: true }], undefined);
+	assert.match(css, /\[data-pen-id="c"\] \{ border-radius: 0px !important; outline: 6px solid #ff0000 !important; outline-offset: 0px !important; box-shadow: 0px 0px 0px 14px #0000ff !important; \}/);
+	assert.match(css, new RegExp(`\\[data-pen-id="p"\\]::after \\{[^}]*border: 2px dashed ${ACCENT}`));
+	assert.doesNotMatch(css, /::before/, "no writer: no tag");
+	const named = marks([{ type: "frame", id: "p", placeholder: true }], { name: "Ann", color: "#2eaf5a" });
+	assert.match(named, /border: 2px dashed #2eaf5a/);
+	assert.match(named, /::before \{ content: "Ann";[^}]*background: #2eaf5a/);
+	assert.equal(marks([{ type: "browser", id: "plain", metadata: { type: "decks.card" } }], undefined), "", "a plain card keeps pen's frame");
+});

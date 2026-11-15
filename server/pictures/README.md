@@ -46,11 +46,12 @@ HTML; `playwright` for the browser. No other feature.
     download, taken as `canvas.screenshot` takes it, answered as bytes and kept nowhere.
 14. `POST /pictures/snapshot?path=&w=&h=&scheme=` draws a card from markup its page posted, at
     the card's own address with a pass for that origin only, and answers the PNG.
+15. A picture draws what the canvas adds: a card's own corner, outline and shadow, and a
+    placeholder frame's dashed edge in its last writer's colour (the accent for the person).
 
 ## Not here
 
-The engine's native screenshot tool (the engine's release cargo build) is not used yet:
-every picture is the browser's, and `live` changes nothing. `how` says "chromium".
+The engine's native screenshot tool is not used yet: every picture is Chromium's (`how` says so).
 
 ## Check
 
