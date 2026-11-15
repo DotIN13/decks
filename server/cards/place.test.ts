@@ -55,8 +55,7 @@ test("documents rule 12: a name from the canvas's folder is stored as the deck n
 	const made = await s.value<Placed>("item.insert", { item: { type: "document", path: "plan.md" } }, ann);
 	assert.equal(made.path, "canvases/a/files/plan.md");
 	assert.equal((await s.value<{ text: string }>("file.read", { path: "canvases/a/files/plan.md" })).text, "");
-	const refused = await s.call("item.insert", { item: { type: "document", path: "docs/no-such-file.md" }, canvas: "a" }, "person");
-	assert.equal(refused.ok ? "ok" : refused.error.code, "not_found");
-	assert.match(refused.ok ? "" : refused.error.message, /docs\/no-such-file\.md/);
+	const asPerson = await s.call("item.insert", { item: { type: "document", path: "files/new.md" }, canvas: "a" }, "person");
+	assert.equal(asPerson.ok && (asPerson.value as Placed).path, "canvases/a/files/new.md");
 	await s.close();
 });
