@@ -18,14 +18,16 @@
 		"./ink": "./ink/index.ts",
 		"./cards-runtime": "./cards/runtime/index.ts",
 		"./cards-runtime/sandbox": "./cards/runtime/sandbox.ts",
-		"./cards-runtime/lib/*": "./cards/runtime/lib/*"
+		"./cards-runtime/lib/*": "./cards/runtime/lib/*",
+		"./documents": "./documents/model.ts"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"**/*.test.ts\"",
 		"build:css": "node scripts/build-css.mjs",
 		"build:lib": "node ../scripts/build-solid-lib.mjs .",
-		"vendor": "node cards/runtime/vendor.mjs"
+		"vendor": "node cards/runtime/vendor.mjs",
+		"build:live-doc": "node documents/build-live-doc.mjs"
 	},
 	"dependencies": {
 		"@decks/api": "*",
@@ -39,11 +41,13 @@
 		"mathjax-full": "^3.2.2",
 		"solid-js": "^1.9.14",
 		"@decks/hub": "*",
-		"@decks/docs": "*",
 		"d3": "7.9.0",
 		"katex": "0.16.47",
 		"mermaid": "11.17.2",
-		"pdfjs-dist": "5.7.284"
+		"pdfjs-dist": "5.7.284",
+		"diff": "^8.0.4",
+		"docx-preview": "^0.4.1",
+		"jszip": "^3.10.1"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.0",

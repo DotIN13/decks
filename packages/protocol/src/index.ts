@@ -29,4 +29,4 @@ export * from "./web.ts";
 export * from "./wire.ts";
 export * from "./names.ts";
 export * from "./files.ts";
-export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/docs";
+export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/canvas/documents";

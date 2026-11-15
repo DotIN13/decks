@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applySplice } from "../index.ts";
+import { applySplice } from "./model.ts";
 import { docxBlocks, markdownBlocks, paragraphSplices, readParagraph, texBlocks } from "./blocks.ts";
 import { texToHtml } from "./render.ts";
 

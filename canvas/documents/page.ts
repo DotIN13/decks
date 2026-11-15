@@ -1,16 +1,16 @@
-import type { CompileError, DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "../index.ts";
-import { DocSync } from "../client.ts";
-import { spliceDiff } from "../merge.ts";
-import type { DocSync as Sync } from "../client.ts";
+import type { CompileError, DocClientMessage, DocRemoteStatus, GitStatus, DocServerMessage, DocVersion, Splice } from "./model.ts";
+import { DocSync } from "./client.ts";
+import { spliceDiff } from "./merge.ts";
+import type { DocSync as Sync } from "./client.ts";
 import { docxBlocks, readParagraph } from "./blocks.ts";
 import { findMarks, marksOf, segments, shiftMarks, spliceBetween, type Mark } from "./marks.ts";
 import { LiveEditor, type BlockStyle, type FormatState, type InlineStyle } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
-import type { DocsRequest } from "../gdoc/types.ts";
+import type { DocsRequest } from "./google/types.ts";
 
 /**
- * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
+ * `canvas/documents/page.ts`: a document drawn as a page you type into, in plain DOM.
  *
  * Markdown and LaTeX are typed into as they read (`live.ts`): the file's own characters, styled,
  * with their syntax hidden until the caret reaches it, and a toolbar of the usual styles. A Word

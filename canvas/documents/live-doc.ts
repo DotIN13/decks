@@ -1,9 +1,9 @@
-import { mountDocPage } from "@decks/docs/page";
+import { mountDocPage } from "./page.ts";
 
 /**
  * `lib/live-doc.js`: a `[data-live="doc"]` box on a board, drawn as a document page you type into.
  *
- * The page is `@decks/docs/page`; this is only how it talks. A board has no socket of its own:
+ * The page is `canvas/documents/page.ts`; this is only how it talks. A board has no socket of its own:
  * it hands every message up to the app, which carries it on the connection it already has, and
  * the app hands the server's answers back down (`apps/web/src/board/live-doc.ts`).
  *

@@ -1,4 +1,4 @@
-import { mountDocPage } from "@decks/docs/page";
+import { mountDocPage } from "../documents/page.ts";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { ownInput } from "./input.ts";
 import { APP_BAR } from "../render/types.ts";
@@ -11,7 +11,7 @@ import { scheme } from "../theme.ts";
  */
 
 /**
- * A document item (`decks.document`): the document editor (`@decks/docs/page`) in the item's place, its
+ * A document item (`decks.document`): the document editor (`canvas/documents/page.ts`) in the item's place, its
  * messages carried by the host (`CanvasHost.documents`): in the canvas frame, to the harness on the
  * canvas's token, which answers them only for files a document item on that canvas names. Plain
  * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.

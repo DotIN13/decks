@@ -1,6 +1,6 @@
 /** The frames. Everything that changes state is one of these, and nothing else crosses. */
 
-import type { DocClientMessage, DocServerMessage } from "@decks/docs";
+import type { DocClientMessage, DocServerMessage } from "@decks/canvas/documents";
 import type {
 	AgentChat,
 	AgentKind,

@@ -1,4 +1,4 @@
-import type { DocChange, Splice } from "../index.ts";
+import type { DocChange, Splice } from "./model.ts";
 
 /**
  * Where a suggestion shows on the page: the words it put in, and a ghost of the words it took out.

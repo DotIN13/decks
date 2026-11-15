@@ -8,13 +8,13 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-		"test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "devDependencies": {
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@decks/docs": "*",
-    "@decks/pen": "*"
+    "@decks/pen": "*",
+    "@decks/canvas": "*"
   }
 }

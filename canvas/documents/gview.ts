@@ -1,8 +1,8 @@
-import type { DocSync } from "../client.ts";
-import { applySplice, type Splice } from "../index.ts";
-import { spliceDiff } from "../merge.ts";
-import type { DocsColor, DocsDimension, DocsDocument, DocsParagraphElement, DocsParagraphStyle, DocsRequest, DocsStructuralElement, DocsTextStyle } from "../gdoc/types.ts";
-import { isStruct, OBJECT_UNIT, STRUCT } from "../gdoc/units.ts";
+import type { DocSync } from "./client.ts";
+import { applySplice, type Splice } from "./model.ts";
+import { spliceDiff } from "./merge.ts";
+import type { DocsColor, DocsDimension, DocsDocument, DocsParagraphElement, DocsParagraphStyle, DocsRequest, DocsStructuralElement, DocsTextStyle } from "./google/types.ts";
+import { isStruct, OBJECT_UNIT, STRUCT } from "./google/units.ts";
 import type { Mark } from "./marks.ts";
 
 /**

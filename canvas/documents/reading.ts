@@ -1,5 +1,5 @@
-import type { Splice } from "../index.ts";
-import type { DocSync } from "../client.ts";
+import type { Splice } from "./model.ts";
+import type { DocSync } from "./client.ts";
 import { renderAsync } from "docx-preview";
 import JSZip from "jszip";
 import { blocks, docxBlocks, paragraphSplices, readParagraph, type Block, type Paragraph } from "./blocks.ts";

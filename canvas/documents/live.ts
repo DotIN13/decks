@@ -1,6 +1,6 @@
-import { transformSplices, type DocChange, type Splice } from "../index.ts";
-import type { DocSync } from "../client.ts";
-import { invert } from "../merge.ts";
+import { transformSplices, type DocChange, type Splice } from "./model.ts";
+import type { DocSync } from "./client.ts";
+import { invert } from "./merge.ts";
 import { blocks } from "./blocks.ts";
 import { spliceBetween, type Mark } from "./marks.ts";
 import { readTabular, texMeta, TEXT_ENVS, THEOREMS, withMacros, type TexMeta } from "./tex.ts";

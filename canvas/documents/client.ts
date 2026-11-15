@@ -1,4 +1,4 @@
-import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./index.ts";
+import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./model.ts";
 
 /**
  * `@decks/docs/client`: one page's copy of a document, kept in step with the file through the

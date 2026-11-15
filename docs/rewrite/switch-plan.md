@@ -33,7 +33,7 @@ Decided in DESIGN.md section 11; they go at the map's step 4a.
 - `packages/api`: the canvas library's card calls (cardCalls)
 - `packages/hub`: the canvas library's follower (studio-line.ts)
 - `scripts/vendor.mjs`: fills packages/card-host/lib (Loom's step 4c moves it)
-- `scripts/live-doc.mjs`: builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)
+- scripts/live-doc.mjs (now `canvas/documents/build-live-doc.mjs`): builds lib/live-doc.js from runtime/live-doc.ts (Loom's step 4d moves it)
 - `runtime/live-doc.ts`: see Deleted
 
 ## Renamed

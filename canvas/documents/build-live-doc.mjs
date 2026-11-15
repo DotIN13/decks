@@ -8,9 +8,9 @@ import { build } from "esbuild";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 await build({
-	entryPoints: [join(root, "runtime", "live-doc.ts")],
+	entryPoints: [join(root, "canvas", "documents", "live-doc.ts")],
 	bundle: true,
 	format: "esm",
 	platform: "browser",

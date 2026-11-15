@@ -125,16 +125,6 @@ export interface CompileError {
 	line?: number;
 }
 
-/** What typesetting a document gave: the PDF, when there is one, and LaTeX's errors. */
-export interface CompileResult {
-	ok: boolean;
-	/** Absolute path of the PDF written. */
-	pdf?: string;
-	errors: CompileError[];
-	/** Why nothing ran at all (no engine installed, say), in a sentence. */
-	error?: string;
-}
-
 /** The git repository a document sits in, as `git status` has it, without asking the remote. */
 export interface GitStatus {
 	/** The branch checked out, or a short commit when none is. */
@@ -150,13 +140,6 @@ export interface GitStatus {
 	behind: number;
 	/** Files with edits not yet committed. */
 	changed: number;
-}
-
-/** What a pull or a push did, in a sentence, and the repository as it stands after. */
-export interface GitResult {
-	ok: boolean;
-	message: string;
-	status?: GitStatus;
 }
 
 /** A document whose words live somewhere else, kept in step by the server: a Google Doc. */

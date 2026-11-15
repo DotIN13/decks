@@ -1,4 +1,4 @@
-import { applySplice, transformSplices, type Splice } from "./index.ts";
+import { applySplice, transformSplices, type Splice } from "./model.ts";
 import { diffArrays } from "diff";
 
 /**

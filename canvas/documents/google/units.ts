@@ -17,68 +17,6 @@ export const STRUCT = { section: "\uE000", table: "\uE001", row: "\uE002", cell:
 export const OBJECT_UNIT = "\uFFFC";
 export const isStruct = (ch: string) => ch >= "\uE000" && ch <= "\uE004";
 
-/** The Doc's body as index-aligned text. */
-export function docUnits(doc: DocsDocument): string {
-	const out: string[] = [];
-	const pad = (index: number | undefined) => {
-		// An index nothing here accounts for is structure, so the text never falls out of step.
-		while (index !== undefined && out.length < index) out.push(STRUCT.other);
-	};
-	const walk = (content: readonly DocsStructuralElement[] | undefined) => {
-		for (const element of content ?? []) {
-			pad(element.startIndex);
-			if (element.sectionBreak) out.push(STRUCT.section);
-			else if (element.paragraph) {
-				for (const part of element.paragraph.elements ?? []) {
-					pad(part.startIndex);
-					if (part.textRun) out.push(...splitUnits(part.textRun.content ?? ""));
-					else for (let i = (part.startIndex ?? out.length); i < (part.endIndex ?? (part.startIndex ?? out.length) + 1); i++) out.push(OBJECT_UNIT);
-				}
-			} else if (element.table) {
-				out.push(STRUCT.table);
-				for (const row of element.table.tableRows ?? []) {
-					pad((row as { startIndex?: number }).startIndex);
-					out.push(STRUCT.row);
-					for (const cell of row.tableCells ?? []) {
-						pad((cell as { startIndex?: number }).startIndex);
-						out.push(STRUCT.cell);
-						walk(cell.content);
-					}
-				}
-			} else if (element.tableOfContents) {
-				out.push(STRUCT.other);
-				walk((element.tableOfContents as { content?: DocsStructuralElement[] }).content);
-			} else out.push(STRUCT.other);
-			pad(element.endIndex);
-		}
-	};
-	walk(doc.body?.content);
-	return out.join("");
-}
-
-/** By UTF-16 unit, as Docs counts. */
-/**
- * The index of each table cell's last newline. A cell's text cannot lose it in Docs, and the text
- * alone does not say where a table's last cell ends: the paragraph after the table follows it with
- * no index of its own between them.
- */
-export function segmentEnds(doc: DocsDocument): Set<number> {
-	const ends = new Set<number>();
-	const walk = (content: readonly DocsStructuralElement[] | undefined) => {
-		for (const element of content ?? []) {
-			for (const row of element.table?.tableRows ?? []) {
-				for (const cell of row.tableCells ?? []) {
-					const last = cell.content?.[cell.content.length - 1];
-					if (last?.endIndex !== undefined) ends.add(last.endIndex - 1);
-					walk(cell.content);
-				}
-			}
-		}
-	};
-	walk(doc.body?.content);
-	return ends;
-}
-
 /**
  * The splices from `from` to `to`, each at its index once those before it are made. Typing never
  * changes a table's structure, so when both have the same structure the text between each two
@@ -98,12 +36,6 @@ export function unitDiff(from: string, to: string): Array<{ at: number; before: 
 		for (const splice of spliceDiff(a[k]!, b[k]!)) out.push({ at: at + splice.at, before: splice.before, text: splice.text });
 		at += b[k]!.length + 1;
 	}
-	return out;
-}
-
-function splitUnits(text: string): string[] {
-	const out: string[] = [];
-	for (let i = 0; i < text.length; i++) out.push(text[i]!);
 	return out;
 }
 

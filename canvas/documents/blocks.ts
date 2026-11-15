@@ -1,4 +1,4 @@
-import type { DocFormat, Splice } from "../index.ts";
+import type { DocFormat, Splice } from "./model.ts";
 
 /**
  * A document cut into blocks for the page: each block a span of the source, drawn as it reads

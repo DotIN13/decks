@@ -12,3 +12,5 @@
 /fonts/
 /standard_fonts/
 /wasm/
+# built at install by ../../documents/build-live-doc.mjs
+/live-doc.js

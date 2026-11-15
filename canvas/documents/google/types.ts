@@ -123,52 +123,6 @@ export interface DocsCellLocation {
 	columnIndex: number;
 }
 
-/** `writeControl`: the revision the requests were made against; Google refuses them if it has moved. */
-export interface DocsWriteControl {
-	requiredRevisionId?: string;
-	/** Made against this revision, and moved by Google past anything written since: for styles, which cannot conflict. */
-	targetRevisionId?: string;
-}
-
-/** What a batch answered: the revision it made. */
-export interface DocsBatchResult {
-	writeControl?: { requiredRevisionId?: string };
-}
-
-/** A comment on a Doc, as Drive keeps it: Docs has none of its own. */
-export interface DocsComment {
-	id: string;
-	content: string;
-	author?: { displayName?: string; photoLink?: string; me?: boolean };
-	createdTime?: string;
-	resolved?: boolean;
-	quotedFileContent?: { value?: string };
-	replies?: Array<{ id: string; content?: string; author?: { displayName?: string; photoLink?: string; me?: boolean }; createdTime?: string; action?: string }>;
-}
-
-/** The calls a document page makes, against Google or against a stand-in for it. */
-export interface DocsApi {
-	get(id: string): Promise<DocsDocument>;
-	batchUpdate(id: string, requests: DocsRequest[], writeControl?: DocsWriteControl): Promise<DocsBatchResult>;
-	/** The Doc's open comments, through Drive. */
-	comments(id: string): Promise<DocsComment[]>;
-	/** A new comment on the quoted words; a reply, or a reply that resolves. */
-	comment(id: string, content: string, quote: string): Promise<void>;
-	reply(id: string, commentId: string, content: string, action?: "resolve" | "reopen"): Promise<void>;
-	/** The person's Docs, the ones they looked at last first; `query` narrows them by name. */
-	list(query?: string): Promise<DocsListed[]>;
-}
-
-/** A Doc in the person's Drive, as the file picker lists it. */
-export interface DocsListed {
-	id: string;
-	title: string;
-	/** When it was last changed by anyone, as an ISO time. */
-	modified?: string;
-	/** Who owns it, when it is not the person. */
-	owner?: string;
-}
-
 // -- the page's model of a document: what both a Google Doc and its markdown are read into ------
 
 /** The styles markdown can say. */
@@ -225,4 +179,3 @@ export interface Atom {
 
 export type Block = Para | Table | Atom;
 
-export const OBJECT = "\uFFFC";
