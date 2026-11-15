@@ -1,0 +1,16 @@
+{
+	"name": "@decks-next/extension",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The Chrome extension that shares one tab of your own browser with a deck.",
+	"exports": {
+		".": "./background.js"
+	},
+	"scripts": {
+		"test": "node ../../tools/check.mjs clients/extension"
+	},
+	"dependencies": {
+		"@decks-next/protocol": "0.0.0"
+	}
+}

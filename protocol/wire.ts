@@ -16,6 +16,8 @@ export const LOGIN_PATH = `${API}/login`;
 export const FILES_PATH = "/files/";
 /** MCP as JSON-RPC over HTTP, on the caller's bearer token: the server's own door. */
 export const MCP_PATH = "/mcp";
+/** Where the Decks extension dials, with ?code=<pairing code>; kept from before the rewrite, since installed extensions dial it. */
+export const TAB_RELAY_PATH = "/api/web/relay";
 
 /** Where a client finds a server and who it is, when it is not told. */
 export const ENV = { url: "DECKS_URL", token: "DECKS_TOKEN", deck: "DECKS_DECK", tools: "DECKS_TOOLS", home: "DECKS_HOME" } as const;

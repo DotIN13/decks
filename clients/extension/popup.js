@@ -1,4 +1,5 @@
 /** The popup: pair once, share the current tab, see what is shared, stop. */
+/** @type {(id: string) => any} */
 const $ = (id) => document.getElementById(id);
 
 function ask(message) {
@@ -22,7 +23,7 @@ function draw(status) {
 		for (const tab of status.tabs) {
 			const row = document.createElement("div");
 			row.className = "tab";
-			row.textContent = `${tab.title || "(untitled)"} — ${tab.url}`;
+			row.textContent = `${tab.title || "(untitled)"}: ${tab.url}`;
 			box.append(row);
 		}
 	} else {
