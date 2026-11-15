@@ -130,6 +130,7 @@ test("an old name is translated into a declared call, checked as usual, and its 
 			kernel.translate((name, args) => {
 				if (name === "ports") return { name: "port.list", args: {}, back: (value) => ({ ports: value }) };
 				if (name === "web.open") return { name: "port.open", args: { port: (args as { args: unknown[] }).args[0] as number } };
+				if (name === "port.open" && (args as { args?: unknown[] }).args) return { name: "port.open", args: { port: (args as { args: number[] }).args[0]!, label: "old" } };
 				if (name === "gone") return { refusal: { code: "not_found", message: "gone is retired.", hint: "port.list" } };
 				return name === "loop" ? { name: "loop2", args: {} } : undefined;
 			}),
@@ -139,6 +140,8 @@ test("an old name is translated into a declared call, checked as usual, and its 
 	assert.equal((await server.value<{ port: number }>("web.open", { args: [5] })).port, 5);
 	const bad = await server.call("web.open", { args: ["x"] });
 	assert.equal(bad.ok ? "" : bad.error.code, "invalid");
+	assert.equal((await server.value<{ label: string }>("port.open", { args: [6] })).label, "old");
+	assert.equal((await server.value<{ label?: string }>("port.open", { port: 8 })).label, undefined);
 	const gone = await server.call("gone");
 	assert.equal(gone.ok ? "" : gone.error.hint, "port.list");
 	for (const name of ["loop", "nothing"]) {

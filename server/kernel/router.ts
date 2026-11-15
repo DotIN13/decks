@@ -24,6 +24,10 @@ export function routesOf(features: Feature[]): Map<string, Entry> {
 	return entries;
 }
 
+/** Today's positional form, { args: [...] } and nothing else; no declared call takes it. */
+const oldForm = (args: unknown): boolean =>
+	typeof args === "object" && args !== null && Array.isArray((args as { args?: unknown }).args) && Object.keys(args).length === 1;
+
 const fail = (code: Refused["code"], message: string, notes: string[], hint?: string): Envelope<never> => ({
 	ok: false,
 	error: { code, message, ...(hint ? { hint } : {}) },
@@ -40,14 +44,14 @@ export class Router {
 
 	private translator: Translator | undefined;
 
-	/** Given once, by the feature that knows old names; asked only for an undeclared name. */
+	/** Given once, by the feature that knows old names; asked for an undeclared name or the old form. */
 	translate(translator: Translator): void {
 		if (this.translator) throw new Error("Only one feature may translate old call names.");
 		this.translator = translator;
 	}
 
-	async call(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
-		if (!CALL_BY_NAME.has(name) && this.translator) return this.translated(name, args, caller, client);
+	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
+		if (!turned && this.translator && (!CALL_BY_NAME.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
 		if ("relay" in found) return this.relayed(found.relay, args ?? {}, caller, notes);
@@ -63,10 +67,11 @@ export class Router {
 
 	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
 		const turned = this.translator!(name, args);
+		if (!turned && CALL_BY_NAME.has(name)) return this.call(name, args, caller, client, true);
 		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
 		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
 		if (!CALL_BY_NAME.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
-		const answer = await this.call(turned.name, turned.args, caller, client);
+		const answer = await this.call(turned.name, turned.args, caller, client, true);
 		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
 	}
 
