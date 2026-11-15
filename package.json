@@ -26,7 +26,6 @@
     "packages/*",
     "apps/*",
     "runtime",
-    "extension",
     "e2e",
     "examples/*",
     "protocol",
