@@ -71,3 +71,14 @@ test("an old name posted to /api/v1 answers through the kernel's translator", as
 	await doors.close();
 	await server.close();
 });
+
+test("a same-name old call in the positional form answers through the translator", async () => {
+	const server = await testServer({ features: features(), deck: { "canvases/c/canvas.pen": JSON.stringify({ version: "2.14", children: [] }) } });
+	const doors = await server.listen(0);
+	const answer = await fetch(`${doors.url}/api/v1/canvas.create`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify({ args: ["A new one"] }) });
+	const body = (await answer.json()) as { ok: boolean; value?: { title?: string } };
+	assert.equal(body.ok, true, JSON.stringify(body));
+	assert.equal(body.value?.title, "A new one");
+	await doors.close();
+	await server.close();
+});
