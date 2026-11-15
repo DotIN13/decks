@@ -166,3 +166,14 @@ test("folder: a symlink out of the deck is refused, and a remove lands in the tr
 	assert.equal(await readFile(join(root, ".decks", "trash", batch!, "a.txt"), "utf8"), "1");
 	await made.done();
 });
+
+test("the kernel says the deck's folder on a folder, and nothing in memory", async () => {
+	const { buildKernel } = await import("./kernel.ts");
+	const root = await mkdtemp(join(tmpdir(), "keel-folder-"));
+	const inner = new FolderDeck(root);
+	const onDisk = await buildKernel({ deck: inner, stores: memoryStores(), features: [] });
+	assert.equal(onDisk.kernel.folder(), inner.root);
+	const inMemory = await buildKernel({ deck: new MemoryDeck(), stores: memoryStores(), features: [] });
+	assert.equal(inMemory.kernel.folder(), undefined);
+	await rm(root, { recursive: true, force: true });
+});

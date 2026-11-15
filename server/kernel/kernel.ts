@@ -12,7 +12,7 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Ver
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
 
-export type KernelOptions = { deck: Deck & { startAt?(rev: number): void }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile };
+export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile };
 export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
 function canvasSource(features: Feature[], kernel: Kernel): CanvasSource | undefined {
@@ -39,7 +39,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const relay = new Relay(options.relayWaitMs);
 	const address: { url?: string } = {};
-	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), translate: (one) => router.translate(one), url: () => address.url };
+	const kernel: Kernel = { deck: history, events, canvas, callers, store: options.stores, kinds, relay: (answerer) => relay.answer(answerer), translate: (one) => router.translate(one), url: () => address.url, folder: () => options.deck.root };
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
 	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });

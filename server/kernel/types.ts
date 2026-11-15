@@ -105,6 +105,8 @@ export interface Kernel {
 	relay(answerer: Answerer): void;
 	/** Turn a name the protocol does not declare into a declared call. At most one feature calls it. */
 	translate(translator: Translator): void;
+	/** The deck's absolute folder on Decks-local; undefined in memory and on Studio. For old routes only. */
+	folder(): string | undefined;
 	/** The server's own address once a door listens, for apps and pictures; undefined before. */
 	url(): string | undefined;
 }
