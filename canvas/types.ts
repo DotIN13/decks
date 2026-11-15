@@ -217,7 +217,7 @@ export interface CanvasHandle {
 /**
  * State a host keeps itself and the editor reads and writes (the Decks app's camera, selection and
  * mode are the app's own): each a getter and a setter. What is not given, the editor keeps. The
- * framed editor (`frame/outside/host.tsx`) keeps all of it in step with its frame; `createEditor` itself
+ * framed editor (`host/outside/framed-editor.tsx`) keeps all of it in step with its frame; `createEditor` itself
  * takes only the mode and the ink (`EditorOwnState`), which is what the canvas frame keeps.
  */
 export interface EditorState {

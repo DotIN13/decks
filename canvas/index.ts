@@ -5,13 +5,13 @@
  */
 export { createEditor, fitAll, type CanvasHandle, type CanvasOptions, type Editor, type EditorState } from "./editor/editor.tsx";
 export type { InkTool } from "./ink/ink.ts";
-export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
+export { canvasHost, setCanvasHost, type CanvasHost } from "./host/host.ts";
 export type { InkRequest, StageComment } from "./types.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./editor/pen-tools.ts";
 export type { DocEdits, DrawingWriter } from "./render/types.ts";
 // The canvas frame (`frame/`): the canvas in a sandboxed page of its own, and the protocol to it.
-export { bootFrame } from "./frame/inside/frame.tsx";
-export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
-export { CallRefused, type FrameCalls } from "./frame/protocol.ts";
-export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./frame/outside/host.tsx";
+export { bootFrame } from "./host/inside/frame.tsx";
+export type { FrameChrome, FrameChromeView } from "./host/chrome.ts";
+export { CallRefused, type FrameCalls } from "./host/messages.ts";
+export { createFramedEditor, type CanvasPass, type FramedEditor, type FramedEditorOptions, type FramedHandle, type FrameHostOptions } from "./host/outside/framed-editor.tsx";

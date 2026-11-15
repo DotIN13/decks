@@ -130,7 +130,7 @@ messages the line carries (`card.changed`, `canvas.changed`, `agent.state`, …)
 
 The app's page makes the frame (`createFramedEditor`), gives it `start` and a `MessagePort`, and
 after that trades only what is the page's: its chrome, the composer, your storage
-(`frame/protocol.ts`). The frame reads its drawing from the harness on its pass, follows its
+(`host/messages.ts`). The frame reads its drawing from the harness on its pass, follows its
 canvas's event stream, and sends your edits itself; the page never relays the drawing.
 
 Inside the frame, the editor (`packages/canvas`) keeps the drawing as a model, sends each edit as

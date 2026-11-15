@@ -12,7 +12,7 @@ import { createBackend } from "./backend.ts";
 import { installPresence } from "./presence.ts";
 import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
-import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
+import type { FrameEnd, FramePage, Rect, Start } from "../messages.ts";
 import { forgetMissing } from "../../items/missing.ts";
 import { giveDeckImports } from "../../cards/card.ts";
 

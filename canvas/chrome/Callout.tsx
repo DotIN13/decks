@@ -6,7 +6,7 @@ import { COARSE } from "../input/touch-rules.ts";
 import { setPropsOpen } from "../editor/pen-tools.ts";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import { menuLeft } from "./menu-place.ts";
-import { canvasHost, openInTab } from "../host.ts";
+import { canvasHost, openInTab } from "../host/host.ts";
 import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";

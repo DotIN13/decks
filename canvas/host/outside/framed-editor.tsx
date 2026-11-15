@@ -5,7 +5,7 @@ import type { EditorState, StageComment } from "../../types.ts";
 import type { PenTool } from "../../editor/pen-tools.ts";
 import type { InkTool } from "../../ink/ink.ts";
 import { insets } from "../../camera/insets.ts";
-import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
+import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../messages.ts";
 
 /**
  * The frame's address, with the page's measuring parameters passed on: the frame probe (`?probe=<collector>`,
@@ -156,7 +156,7 @@ export interface FramedEditor {
 type Options = FramedEditorOptions;
 
 /**
- * The editor in a sandboxed frame (`protocol.ts`): the canvas runs in the frame (`bootFrame`); this end
+ * The editor in a sandboxed frame (`messages.ts`): the canvas runs in the frame (`bootFrame`); this end
  * keeps it in step with the host's state, turns its messages into the host's callbacks, and answers
  * what it asks.
  *

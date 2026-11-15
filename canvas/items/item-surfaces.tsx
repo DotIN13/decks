@@ -2,7 +2,7 @@ import { mountDocPage } from "../documents/page.ts";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { ownInput } from "../input/item-keys.ts";
 import { APP_BAR } from "../render/types.ts";
-import { canvasHost } from "../host.ts";
+import { canvasHost } from "../host/host.ts";
 import { scheme } from "../theme.ts";
 
 /**
@@ -174,7 +174,7 @@ export function AppSurface(props: { app: string; path: string; visible: boolean;
 					class="app-surface-frame"
 					title={about()?.title ?? props.app}
 					src={url()}
-					/* No more than the canvas frame around it has (`frame/outside/host.tsx`), and the same reasons for what is left out. */
+					/* No more than the canvas frame around it has (`host/outside/framed-editor.tsx`), and the same reasons for what is left out. */
 					sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-popups allow-pointer-lock allow-top-navigation-to-custom-protocols"
 					allow="clipboard-read; clipboard-write; fullscreen; autoplay; picture-in-picture; screen-wake-lock; web-share; gamepad; encrypted-media; accelerometer; gyroscope; xr-spatial-tracking"
 					style={{ "pointer-events": props.selected ? "auto" : "none" }}

@@ -5,7 +5,7 @@
  */
 export { PenBar } from "../chrome/PenBar.tsx";
 export { InkBar } from "../chrome/InkBar.tsx";
-export * from "../host.ts";
+export * from "../host/host.ts";
 export * from "../camera/view-calls.ts";
 export * from "../cards/card-reading.ts";
 export * from "../chrome/keycaps.ts";

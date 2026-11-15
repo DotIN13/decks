@@ -3,7 +3,7 @@ import type { Page, Camera } from "@decks/protocol-old";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
-import { canvasHost, openInTab } from "../host.ts";
+import { canvasHost, openInTab } from "../host/host.ts";
 import { appShowing } from "../items/item-surfaces.tsx";
 import MediaPlayer from "../items/MediaPlayer.tsx";
 import { chooseAwake, NO_AWAKE, sameAwake, type Awake, type AwakeItem } from "../items/awake.ts";

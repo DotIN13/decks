@@ -1633,7 +1633,7 @@ body {
 	.app[data-phone="true"] .v3-deck .switcher-name {
 		display: none;
 	}
-	/* The row lives in the canvas frame, whose root carries the phone mark (`frame/inside/boot.ts`), not the app's. */
+	/* The row lives in the canvas frame, whose root carries the phone mark (`host/inside/boot.ts`), not the app's. */
 	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] {
 		gap: 0;
 		padding: 0 4px;

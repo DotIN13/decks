@@ -3,14 +3,14 @@ import { serialize, type PenEdit } from "@decks/pen";
 import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol-old";
 import type { createEditor } from "../../editor/editor.tsx";
-import { passless, passOf, setCanvasHost, withPass } from "../../host.ts";
+import { passless, passOf, setCanvasHost, withPass } from "../host.ts";
 import { drawing } from "../../ink/ink.ts";
 import { canvasBox } from "../../camera/insets.ts";
 import { fitInto } from "../../camera/camera.ts";
 import { placedItems } from "../../drawing/boxes.ts";
 import { cardCalls } from "./card-calls.ts";
 import type { FrameContext } from "./boot.ts";
-import type { Rect } from "../protocol.ts";
+import type { Rect } from "../messages.ts";
 
 /**
  * How the server draws card pictures, in each picture's address: raised with `CARD_LOOK` in the server's

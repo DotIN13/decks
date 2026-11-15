@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol-old";
 import type { Accessor, JSX, Setter } from "solid-js";
 import type { CanvasHandle, StageComment } from "../types.ts";
-import type { ComposerPart } from "./protocol.ts";
+import type { ComposerPart } from "./messages.ts";
 
 /**
  * The editor's chrome, drawn inside the canvas frame by the app that made it: its tools, the pen tray,

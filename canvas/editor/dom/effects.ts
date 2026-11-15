@@ -5,7 +5,7 @@
  * sized, and when the camera was last dragged.
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
-import { canvasHost, openInTab, type CanvasHost } from "../../host.ts";
+import { canvasHost, openInTab, type CanvasHost } from "../../host/host.ts";
 import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";

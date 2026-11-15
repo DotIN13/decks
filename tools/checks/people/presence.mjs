@@ -6,7 +6,7 @@
  * at most twenty times a second, the selection when it changes), and the harness says it to every other
  * line watching the canvas (`presence.changed`), never to the one who said it. The other frame draws the
  * pointer as a cursor with a name tag and the selection as an outline in the same colour
- * (`frame/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
+ * (`host/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
  */
 import { card, canvasFrame, open, resetStage, rest, say, selectCard } from "../harness.mjs";
 

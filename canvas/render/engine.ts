@@ -18,7 +18,7 @@ import { baseTheme, diff, isArrow, isShape, pathBounds, shapeKind, shapeOutline,
 import type { Camera } from "@decks/protocol-old";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../look/font-files.ts";
 import { iconUrl, parseIcon } from "../look/icons.ts";
-import { pictureAddress } from "../host.ts";
+import { pictureAddress } from "../host/host.ts";
 import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../editor/snap.ts";
 import { boundsOf } from "../drawing/bounds.ts";
@@ -112,7 +112,7 @@ type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array 
 export function pixelsFirst(): boolean {
 	const forced = knobs.tilePixels;
 	if (typeof forced === "boolean") return forced;
-	// `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `host.tsx`), for measuring one way on a device that takes the other.
+	// `?tiles=bitmaps` or `?tiles=pixels` on the page's address (carried into the frame, `framed-editor.tsx`), for measuring one way on a device that takes the other.
 	const asked = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("tiles");
 	if (asked === "bitmaps") return false;
 	if (asked === "pixels") return true;

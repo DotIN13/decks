@@ -33,7 +33,7 @@ const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 
 /**
  * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
- * drawing's tools and properties, and ink. The canvas frame (`frame/inside/frame.tsx`) makes it where
+ * drawing's tools and properties, and ink. The canvas frame (`host/inside/frame.tsx`) makes it where
  * its layout wants the stage, with its own mode and ink given in `state`.
  *
  * One canvas to a page: the tools and the host's answers are module state, as they are in the

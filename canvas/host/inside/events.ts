@@ -13,7 +13,7 @@ import { handsOn } from "../../camera/touched.ts";
 import { drawingFollower } from "./backend.ts";
 import { installClipboard, sayer } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";
-import type { CardSlot } from "../protocol.ts";
+import type { CardSlot } from "../messages.ts";
 
 /**
  * What the frame hears, once its editor is made: the clipboard, the drawing as the harness or Studio

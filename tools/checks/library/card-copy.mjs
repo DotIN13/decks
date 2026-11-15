@@ -1,7 +1,7 @@
 /**
  * Words selected in a card copy as words, in Chromium and in WebKit (Safari's engine).
  *
- * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`frame/inside/clipboard.ts`)
+ * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`host/inside/clipboard.ts`)
  * copies the selected items as a clip, standing aside only when words are selected. Selecting words in a
  * card selects the card too; where the frame's selection cannot see into the card's closed root (WebKit),
  * the canvas took the copy and put the card on the clipboard as an item, and the words never got there.

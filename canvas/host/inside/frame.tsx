@@ -9,14 +9,14 @@ import { openFrame } from "./boot.ts";
 import { endLife } from "./life.ts";
 import { editorOptions, installHost } from "./options.ts";
 import { wireFrame } from "./events.ts";
-import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../protocol.ts";
+import { PROTOCOL, peer, type FrameEnd, type Hello, type Start, type StartMessage } from "../messages.ts";
 import { forgetMissing } from "../../items/missing.ts";
 
 /**
  * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its
  * drawing from the harness on the canvas token (`backend.ts`), makes the editor, follows the canvas's
  * stream and sends your edits itself. With the page it trades only what is the page's: its chrome, the
- * composer, your storage (`protocol.ts`).
+ * composer, your storage (`messages.ts`).
  *
  * What a host answered with a function (a board's address, its picture, its storage) is worked out
  * here from `start`: the files' ticketed address, the pages' trust, the page's kept values.

@@ -9,7 +9,7 @@ import { cardCall, cardMayCall } from "./card-calls.ts";
  * A canvas pass for the one canvas the frame shows (`server/src/auth/passes.ts`), asked for with this
  * tab's token: the frame makes its calls with it in the header, and reads that canvas's files and
  * pictures with it in their address, since it has no token and no cookie of its own. It lives an
- * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `frame/outside/host.tsx`).
+ * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `host/outside/framed-editor.tsx`).
  */
 export function canvasPass(canvas: string): Promise<CanvasPass> {
 	/*

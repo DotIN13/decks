@@ -7,7 +7,7 @@
  */
 @layer decks.surface {
 	/*
-	 * What an agent just drew (`frame/inside/marks.ts`): a mark on each item it touched, drawn in the
+	 * What an agent just drew (`host/inside/marks.ts`): a mark on each item it touched, drawn in the
 	 * stage's world in canvas units, so it is counter-scaled by `--zoom` like the cursor. An insert or
 	 * a change is printed: a band of the agent's colour sweeps across the item behind a bright head, a
 	 * fill and a glow fade, and the outline goes last. A move keeps only the outline, since the glide

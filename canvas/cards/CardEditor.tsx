@@ -22,7 +22,7 @@ import Undo2 from "lucide-solid/icons/undo-2";
 import { pageFont } from "../look/look.ts";
 import type { Token, Tokens } from "marked";
 import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
-import { pictureAddress } from "../host.ts";
+import { pictureAddress } from "../host/host.ts";
 
 /**
  * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back

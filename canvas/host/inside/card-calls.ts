@@ -1,6 +1,6 @@
 import type { Camera } from "@decks/protocol-old";
 import { cardCalls as cardCallsTo } from "@decks/api";
-import { CallRefused } from "../protocol.ts";
+import { CallRefused } from "../messages.ts";
 
 /**
  * Where a card's `card.decks` call is answered, in the canvas frame (`card.ts`, `CanvasHost.cardCall`):

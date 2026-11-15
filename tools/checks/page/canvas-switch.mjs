@@ -1,6 +1,6 @@
 /**
  * Moving between canvases keeps the canvas frame when both are yours alone, and makes a new one
- * otherwise (`frame/outside/host.tsx`, `inPlace`; `frame/inside/frame.tsx`, `reset`).
+ * otherwise (`host/outside/framed-editor.tsx`, `inPlace`; `host/inside/frame.tsx`, `reset`).
  *
  * A frame moved in place keeps the code and the engine's module it loaded, so a switch skips the
  * frame's whole start; it ends everything the old canvas started first (`life.ts`). A friend's

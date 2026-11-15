@@ -4,7 +4,7 @@
  * Each of them closes on a press anywhere else or on Escape, heard on its own document. The canvas
  * frame is a document of its own: a press in the page (the side panel, the composer, the top bar)
  * never reaches the frame's listeners, and a press in the frame never reaches the page's. So the
- * frame's bridge tells the other side (`frame/inside/frame.tsx`, `frame/outside/host.tsx`), which
+ * frame's bridge tells the other side (`host/inside/frame.tsx`, `host/outside/framed-editor.tsx`), which
  * calls `dismissMenus()`, and everything that opens listens with `onDismiss`.
  *
  * Unlike a press, this moves no focus: a menu put away this way does not hand the keyboard back to

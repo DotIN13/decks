@@ -22,7 +22,7 @@ const person = await asPerson();
 const me = (await call("agent.me", [], person)).value;
 const agent = { ...person, "x-decks-agent": me.id };
 
-// The frame's `card.seen` messages, counted: it says them on its line (`frame/inside/backend.ts`), not as a POST
+// The frame's `card.seen` messages, counted: it says them on its line (`host/inside/backend.ts`), not as a POST
 // any more. Read inside the frame, where its socket lives; Playwright's websocket events do not reach it.
 await canvas.evaluate(() => {
 	window.__seenSent = [];

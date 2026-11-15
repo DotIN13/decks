@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Page } from "@decks/protocol-old";
 import type { PenDocument } from "@decks/pen";
-import type { FramePage } from "../protocol.ts";
+import type { FramePage } from "../messages.ts";
 import { createCardPlacer } from "./boot.ts";
 
 const card = (name: string, x = 0) => ({ type: "browser", id: name, x, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path: `cards/${name}/index.html` } });

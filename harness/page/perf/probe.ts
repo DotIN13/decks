@@ -5,7 +5,7 @@
  * (`scripts/ipad-profile.mjs`). Nothing runs without the parameter.
  *
  * It runs in the canvas frame, where the stage is: the app's page passes `?probe` and its companions on
- * to the frame's address (`@decks/canvas`, `frame/outside/host.tsx`), and keeps only a relay
+ * to the frame's address (`@decks/canvas`, `host/outside/framed-editor.tsx`), and keeps only a relay
  * (`probe-relay.ts`) through which an inspector of the page runs an expression here.
  */
 import type { Knobs, Probes } from "@decks/canvas/host";

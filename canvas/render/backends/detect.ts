@@ -109,7 +109,7 @@ function preferred(): BackendName | undefined {
 }
 
 export function detect(): Promise<Detected> {
-	// Once a frame: the next canvas it moves to in place (`frame/inside/frame.tsx`) finds the answer here. One that failed is asked again.
+	// Once a frame: the next canvas it moves to in place (`host/inside/frame.tsx`) finds the answer here. One that failed is asked again.
 	const asked = (detected ??= detectNow());
 	asked.catch(() => detected === asked && (detected = undefined));
 	return asked;
