@@ -98,12 +98,13 @@ import { createPanelTab, createPanelWidth } from "./actions.ts";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
-const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type { PanelApp } from "./AppRow.tsx";
-import { AppLogs, AppRow, type AppAction, type PanelApp } from "./AppRow.tsx";
+import { type AppAction, type PanelApp } from "./AppRow.tsx";
+import { AppsTab, CanvasTab } from "./tabs/view.tsx";
+import { AgentsTab, RecentTab, type Lists } from "./lists/view.tsx";
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
@@ -239,8 +240,6 @@ export function LeftPanel(props: {
 	};
 	const [query, setQuery] = createSignal("");
 	/** The app picked in the Apps tab, and the one whose logs are open. */
-	const [pickedApp, setPickedApp] = createSignal<string>();
-	const [logsOf, setLogsOf] = createSignal<PanelApp>();
 	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
 	const { tab, setTab, folded, toggleFolder } = createPanelTab();
 	createEffect(() => {
@@ -350,22 +349,6 @@ export function LeftPanel(props: {
 	// Listed without laying the drawing out (it ran on every change, whichever tab showed); the one picked is read again with its box, to fly to it.
 	const items = createMemo(() => canvasItems(props.canvasDoc, query(), { boxes: false }));
 	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
-	const cardItems = () => items().items.filter((item) => item.board !== undefined);
-	const drawnItems = () => items().items.filter((item) => item.board === undefined);
-	const itemRow = (item: CanvasItem) => (
-		<button
-			type="button"
-			class="v3-item"
-			data-row
-			data-kind={item.kind}
-			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
-			title={item.label}
-			onClick={() => props.onPickItem?.(canvasItems(props.canvasDoc, query()).items.find((one) => one.id === item.id) ?? item)}
-		>
-			<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
-			<span class="v3-item-name truncate">{item.label}</span>
-		</button>
-	);
 	/** The head's second line: what the tab holds. */
 	const headWords = () => {
 		const t = tab();
@@ -549,6 +532,24 @@ export function LeftPanel(props: {
 		else return;
 		event.preventDefault();
 	};
+
+	/** What both agent lists need from the panel. */
+	const lists = (): Lists => ({
+		identities: props.identities,
+		workspaces: workspaceNames(),
+		lines: lines(),
+		count: agentCount(),
+		query: query(),
+		taken: nameTaken,
+		hover: (id, at) => setHovered((was) => (at ? { id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === id ? undefined : was)),
+		...(props.onFocusAgent ? { onFocusAgent: props.onFocusAgent } : {}),
+		...(props.onCloseAgent ? { onCloseAgent: props.onCloseAgent } : {}),
+		...(props.onNewAgent ? { onNewAgent: props.onNewAgent } : {}),
+		...(props.onAgentTags ? { onAgentTags: props.onAgentTags } : {}),
+		...(props.onAgentWorkspace ? { onAgentWorkspace: props.onAgentWorkspace } : {}),
+		...(props.onAgentRename ? { onAgentRename: props.onAgentRename } : {}),
+		...(props.onAbortAgent ? { onAbortAgent: props.onAbortAgent } : {}),
+	});
 
 	return (
 		<>
@@ -755,202 +756,16 @@ export function LeftPanel(props: {
 					onScroll={growIfNearEnd}
 				>
 					<Show when={tab() === "agents"}>
-						<For each={agentList}>
-							{(section, index) => (
-								<div
-									class="panel-section"
-									data-kind={section.kind}
-									/*
-									 * A heading is where an agent is dropped to change the project it says it is
-									 * in (`agents/agent-drag.ts`). The whole section takes the drop, not the
-									 * heading's own line: the target you aim at is the group of rows, and a 20px
-									 * strip of text is a target you miss.
-									 *
-									 * `preventDefault` on `dragover` is what makes a drop possible at all, and
-									 * saying it only for our own type is what keeps a file dragged in from
-									 * landing here instead of on the canvas.
-									 */
-									data-drop={over() === section.id ? "true" : undefined}
-									onDragOver={(event) => {
-										if (!props.onAgentWorkspace || !carriesAgent(event.dataTransfer)) return;
-										event.preventDefault();
-										if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-										setOver(section.id);
-									}}
-									onDragLeave={(event) => {
-										/*
-										 * Only when the pointer left this section for somewhere we can name.
-										 * Crossing a row inside it fires this too — hence the containment test —
-										 * and a `dragleave` with no `relatedTarget` at all is the browser's way of
-										 * saying "somewhere else", which during a drag over our own list is
-										 * usually a frame boundary rather than a departure. Clearing on those left
-										 * the heading unmarked while the hand held still over it. The end of the
-										 * drag clears it whatever happens (below).
-										 */
-										const to = event.relatedTarget as Node | null;
-										if (!to || event.currentTarget.contains(to)) return;
-										setOver((was) => (was === section.id ? undefined : was));
-									}}
-									onDrop={(event) => {
-										const id = draggedAgent(event.dataTransfer);
-										setOver(undefined);
-										if (!id) return;
-										event.preventDefault();
-										props.onAgentWorkspace?.(id, section.kind === "workspace" ? section.label : null);
-									}}
-								>
-									<div class="v3-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
-										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? `Show ${section.label}` : `Fold ${section.label}`} onClick={() => toggleFolder(section.id)}>
-											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
-											<Icon of={Folder} size={15} class="v3-folder-icon" />
-											<span class="v3-folder-name truncate">{section.label}</span>
-										</button>
-										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
-										<Show when={props.onNewAgent}>
-											<NewAgentButton
-												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
-												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
-												class="v3-folder-add"
-												size={14}
-											/>
-										</Show>
-									</div>
-									{/*
-										`.row-list` is the row vocabulary — the grid, the corner, the hover, the
-										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
-										agent row wants all of that and its own overrides (a 20px or 26px face column,
-										by `data-lines`), which `.agent-list` in `panel.css` supplies.
-
-										Re-implementing it instead is how two lists in one panel come to nearly
-										match: the board rows above are the same object.
-									*/}
-									{/* Folded by its height (`styles/v3.css`), so the rows slide shut rather than vanish. */}
-									<div class="v3-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
-									<div class="row-list agent-list" data-lines={lines()}>
-									<For each={section.rows.slice(0, allowance(index()))}>
-										{(row) => (
-											<AgentRow
-												row={row}
-												identity={props.identities?.[row.chat.id]}
-												onFocus={() => props.onFocusAgent?.(row.chat.id)}
-												onClose={() => props.onCloseAgent?.(row.chat.id)}
-												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
-												workspaces={workspaceNames()}
-												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
-												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
-												taken={(name) => nameTaken(name, row.chat.id)}
-												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
-												lines={lines()}
-												size={22}
-												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
-											/>
-										)}
-									</For>
-									</div>
-									</div>
-								</div>
-							)}
-						</For>
-						<Show when={props.onNewAgent}>
-							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label="New agent" class="v3-new-agent" size={15} text="New agent" />
-						</Show>
-
-						{/* The same shape of empty state the boards list has, and the same reasoning:
-						    a panel that is blank for a good reason still looks broken without it. */}
-						<Show when={agentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
-								{agentCount() === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
-							</p>
-						</Show>
+						<AgentsTab sections={agentList} l={lists()} f={{ folded, toggle: toggleFolder, over, setOver, allowance }} />
 					</Show>
-
 					<Show when={tab() === "recent"}>
-						<div class="panel-section" data-kind="recent">
-							<Show when={recentList.length > 0}>
-								<div class="v3-sec">
-									<span>Recent</span>
-								</div>
-							</Show>
-							<div class="row-list agent-list" data-lines={lines()}>
-								<For each={recentList}>
-									{(row) => (
-											<AgentRow
-												row={row}
-												identity={props.identities?.[row.chat.id]}
-												onFocus={() => props.onFocusAgent?.(row.chat.id)}
-												onClose={() => props.onCloseAgent?.(row.chat.id)}
-												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
-												workspaces={workspaceNames()}
-												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
-												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
-												taken={(name) => nameTaken(name, row.chat.id)}
-												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
-												lines={lines()}
-												size={26}
-												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
-											/>
-									)}
-								</For>
-							</div>
-						</div>
-						<Show when={recentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{agentCount() === 0 ? "No agents yet." : `No agent matches “${query().trim()}”.`}</p>
-						</Show>
+						<RecentTab rows={recentList} l={lists()} />
 					</Show>
-
 					<Show when={tab() === "canvas"}>
-						<div class="panel-section v3-items" data-kind="canvas">
-							<Show when={cardItems().length > 0}>
-								<div class="v3-sec">
-									<span>Cards</span>
-									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{cardItems().length}</span>
-								</div>
-								<For each={cardItems()}>{(item) => itemRow(item)}</For>
-							</Show>
-							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
-								<div class="v3-sec">
-									<span>Drawing</span>
-									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{drawnItems().length}</span>
-								</div>
-								<For each={drawnItems()}>{(item) => itemRow(item)}</For>
-								<Show when={items().arrows.length > 0}>
-									<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
-										<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
-										<span class="v3-item-name truncate">Arrows</span>
-										<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
-									</button>
-								</Show>
-							</Show>
-							<Show when={items().items.length === 0 && items().arrows.length === 0}>
-								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? `Nothing on this canvas matches “${query().trim()}”.` : "Nothing on this canvas yet."}</p>
-							</Show>
-						</div>
+						<CanvasTab items={items()} selected={selectedItems()} current={props.current} query={query()} onPick={(item) => props.onPickItem?.(canvasItems(props.canvasDoc, query()).items.find((one) => one.id === item.id) ?? item)} onPickArrows={(ids) => props.onPickArrows?.(ids)} />
 					</Show>
 					<Show when={tab() === "apps"}>
-						{/* The "Apps tab redesigned" mockup: rows 12px in like the search, no heading (the head counts them). */}
-						<div class="panel-section v3-apps" data-kind="apps">
-							<For each={apps()}>
-								{(app) => (
-									<AppRow
-										app={app}
-										picked={pickedApp() === app.name}
-										onPick={() => setPickedApp(app.name)}
-										onAct={(action) => props.onApp?.(app, action)}
-										onLogs={() => setLogsOf(app)}
-									/>
-								)}
-							</For>
-							<Show when={apps().length === 0}>
-								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
-									{props.apps === undefined ? "Looking for apps…" : query().trim() ? `No app matches “${query().trim()}”.` : "This deck has no apps yet. Ask an agent for one."}
-								</p>
-							</Show>
-							<Show when={logsOf()}>
-								{(app) => <AppLogs title={app().title} read={() => props.onAppLogs?.(app()) ?? Promise.resolve(undefined)} onClose={() => setLogsOf(undefined)} />}
-							</Show>
-						</div>
+						<AppsTab apps={apps()} known={props.apps} query={query()} {...(props.onApp ? { onApp: props.onApp } : {})} {...(props.onAppLogs ? { onAppLogs: props.onAppLogs } : {})} />
 					</Show>
 				</div>
 
