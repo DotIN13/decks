@@ -109,15 +109,15 @@ export class CanvasStore {
 	}
 
 	async setTitle(name: string, title: string, by: Caller): Promise<void> {
-		await this.deck.write(toDeckPath(`${layout.canvasFolder(name)}/canvas.json`), enc.encode(`${JSON.stringify({ title }, null, "\t")}\n`), by);
 		this.titles.set(name, title);
+		await this.deck.write(this.metaFile(name), enc.encode(`${JSON.stringify({ title }, null, "\t")}\n`), by);
 		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: by.id, rev: 0 });
 	}
 
 	/** Open a canvas newly made or found: its drawing, its frames, its title. */
 	async open(name: string): Promise<void> {
 		const folder = layout.canvasFolder(name);
-		const meta = await this.text(toDeckPath(`${folder}/canvas.json`));
+		const meta = await this.text(this.metaFile(name));
 		this.titles.set(name, readTitle(meta) ?? name);
 		this.keep(this.file(name), name, (await this.text(this.file(name))) ?? EMPTY);
 		for (const file of await this.penFiles(toDeckPath(`${folder}/frames`))) this.keep(file, name, (await this.text(file)) ?? EMPTY);
@@ -155,6 +155,7 @@ export class CanvasStore {
 
 	private async heard(path: DeckPath, kind: "written" | "deleted", by: string): Promise<void> {
 		const at = layout.canvasOfPath(path);
+		if (at?.rest === "canvas.json" && kind === "written") return this.titleHeard(at.name, by);
 		if (!at || kind === "deleted" || !path.endsWith(".pen")) return;
 		const text = await this.text(path);
 		const kept = this.drawings.get(path);
@@ -170,9 +171,22 @@ export class CanvasStore {
 		if (change) this.kernel.events.emit(events.itemChanged, { canvas: kept!.canvas, ids: idsOf(change.ops), by, rev: change.rev, base: change.rev - 1, edits: change.ops });
 		if (kept) return;
 		if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
-			if (!this.titles.has(at.name)) this.titles.set(at.name, at.name);
+			if (!this.titles.has(at.name)) this.titles.set(at.name, readTitle(await this.text(this.metaFile(at.name))) ?? at.name);
 			this.keep(path, at.name, text);
 		}
+	}
+
+	/** A canvas.json written by someone else: its title, told as canvas.changed when it differs. */
+	private async titleHeard(name: string, by: string): Promise<void> {
+		if (!this.titles.has(name)) return;
+		const title = readTitle(await this.text(this.metaFile(name))) ?? name;
+		if (title === this.titles.get(name)) return;
+		this.titles.set(name, title);
+		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by, rev: 0 });
+	}
+
+	private metaFile(name: string): DeckPath {
+		return toDeckPath(`${layout.canvasFolder(name)}/canvas.json`);
 	}
 
 	private async names(): Promise<string[]> {

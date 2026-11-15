@@ -47,7 +47,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 12. `item.clip` keeps a copy of items and the files their kinds name, for a day. `item.paste`
     puts them in with new ids as one change; arrows stay joined to the copies.
 13. A canvas's `name` is its folder and never changes; its `title` is in `canvas.json`. A call
-    may name a canvas by either. A canvas named by none is the caller's here.
+    may name a canvas by either; one written there from outside is read in. A canvas named by
+    none is the caller's here.
 14. A frame file holds one reusable item. `frame.save` writes an item to one and puts a ref in
     its place unless `replace` is false.
 

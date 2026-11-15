@@ -223,3 +223,16 @@ test("a drawing written back to an earlier text of its own is read in, not taken
 	assert.equal((await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, "one");
 	await s.close();
 });
+
+test("a canvas made from outside takes its title from canvas.json, and a rename from outside is read in", async () => {
+	const s = await start();
+	const put = (path: string, body: string) => s.deck.write(toDeckPath(path), new TextEncoder().encode(body), callers.agent("studio"));
+	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Garden plan" }));
+	await put("canvases/garden/canvas.pen", `${JSON.stringify({ version: "2.14", children: [] })}\n`);
+	const titleOf = async () => (await s.value<{ name: string; title: string }[]>("canvas.list")).find((c) => c.name === "garden")?.title;
+	assert.equal(await waitFor(titleOf, (t) => t !== undefined), "Garden plan");
+	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Kitchen garden" }));
+	assert.equal(await waitFor(titleOf, (t) => t === "Kitchen garden"), "Kitchen garden");
+	assert.ok(s.heard.some((e) => e.name === "canvas.changed" && e.payload.canvas === "garden" && e.payload.by === "studio"));
+	await s.close();
+});
