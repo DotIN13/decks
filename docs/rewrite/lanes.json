@@ -95,7 +95,8 @@
 		"engine/crates/apple/",
 		"engine/Cargo.toml",
 		"engine/Cargo.lock",
-		"engine/crates/"
+		"engine/crates/",
+		"tools/gates/baseline/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
