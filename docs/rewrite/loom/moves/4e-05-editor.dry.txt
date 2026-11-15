@@ -1,6 +1,6 @@
 # Step 4e-05-editor: Regroup canvas: edit/ and editor.tsx become editor/
 
-Dry run on 222ed175, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input. Nothing was moved.
+Dry run on 81832e3e, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input. Nothing was moved.
 
 - files moved by git mv: 43
 - files taken out of git (moved on disk): 0

@@ -235,7 +235,7 @@ function tableEdits(table, current, write) {
 function leftovers(table, files, current) {
 	const units = [...new Set(table.moves.filter((m) => m.from.endsWith("/")).map((m) => m.from.split("/").slice(0, 2).join("/")))];
 	// A path joined from its parts names the folder too: join(root, "packages", "stage").
-	const olds = units.flatMap((u) => [u, u.split("/").map((part) => `"${part}"`).join(", ")]);
+	const olds = units.flatMap((u) => (u.startsWith("packages/") ? [u, u.split("/").map((part) => `"${part}"`).join(", ")] : [u]));
 	const kept = new Set((table.keep || []).map((k) => `${k.file}|${k.string}`));
 	const out = [];
 	const code = [];

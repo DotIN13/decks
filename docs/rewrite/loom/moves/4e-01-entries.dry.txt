@@ -1,6 +1,6 @@
 # Step 4e-01-entries: Regroup canvas: public/ becomes entries/
 
-Dry run on 222ed175, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents. Nothing was moved.
+Dry run on 81832e3e, on top of 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents. Nothing was moved.
 
 - files moved by git mv: 4
 - files taken out of git (moved on disk): 0
