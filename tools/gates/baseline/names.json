@@ -656,7 +656,6 @@
 	"examples/share-site/README.md: board": 1,
 	"examples/share-site/src/server.ts: board": 2,
 	"examples/share-site/vite.config.ts: stage": 1,
-	"extension/popup.html: board": 1,
 	"harness/accounts/accounts.ts: board": 1,
 	"harness/page/agents/agent-order.test.ts: board": 1,
 	"harness/page/agents/agent-order.ts: board": 2,

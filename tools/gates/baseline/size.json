@@ -157,7 +157,6 @@
 	"e2e/harness.mjs: over 400 lines": 1,
 	"e2e/perf-canvas.mjs: function perfCanvas over 80 lines": 1,
 	"e2e/run.mjs: over 400 lines": 1,
-	"extension/background.js: over 400 lines": 1,
 	"harness/accounts/accounts.test.ts: over 400 lines": 1,
 	"harness/accounts/accounts.ts: over 400 lines": 1,
 	"harness/page/agents/AgentEdit.tsx: function AgentEdit over 80 lines": 1,
