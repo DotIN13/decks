@@ -9,6 +9,8 @@ repo) and calls it through the C interface in `include/decks_engine.h`.
 - `src/engine.rs`: one engine. The same `Page` and `Worker` the browser runs (`stage-web`'s
   `engine.rs`), on one Metal device, in one thread: the worker paints tiles, the page lays them out
   with the cards' pictures, and the frame is drawn into a Metal layer or a Metal texture.
+- `src/gesture.rs`: a drag or a resize as the web shows it: lifted, previewed by the page alone,
+  then put down. Nothing saved, nothing in undo, no tile painted again until the drop.
 - `src/device.rs`: opening the Metal device, the host's layer as a surface, the host's textures.
 - `src/ffi.rs`: the C interface, and nothing else.
 - `include/decks_engine.h`: the C interface, written by hand, kept in step with `ffi.rs`.

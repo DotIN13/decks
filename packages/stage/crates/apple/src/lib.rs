@@ -9,6 +9,7 @@ pub mod device;
 pub mod engine;
 pub mod ffi;
 pub mod frame;
+pub mod gesture;
 
 pub use engine::Engine;
 pub use frame::View;

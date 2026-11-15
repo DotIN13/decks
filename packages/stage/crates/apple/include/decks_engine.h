@@ -52,6 +52,14 @@ bool decks_engine_attach_layer(DecksEngine *engine, void *ca_metal_layer, uint32
 int32_t decks_engine_frame(DecksEngine *engine, DecksView view);
 bool decks_engine_draw_into(DecksEngine *engine, void *mtl_texture, DecksView view);
 
+/* A gesture, as the web page shows one. preview: each step, [[id, {dx, dy, w?, h?, radius?, set?}]],
+   or "null" to take it back; returns the ids lifted (JSON). Nothing is saved or put in undo. At the
+   end: preview "null", apply the final change once (mine), then put_down. carry: cards a drag
+   carries, ["path"], and how far ("[]" ends it). */
+char *decks_engine_preview(DecksEngine *engine, const char *moving_json);
+bool decks_engine_carry(DecksEngine *engine, const char *paths_json, double dx, double dy);
+bool decks_engine_put_down(DecksEngine *engine);
+
 /* Questions, answered as JSON. Points are in stage units. */
 char *decks_engine_pick(DecksEngine *engine, double x, double y, double slop);
 char *decks_engine_pick_all(DecksEngine *engine, double x, double y, double slop);

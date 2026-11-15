@@ -211,3 +211,21 @@ pub extern "C" fn decks_engine_wanted(e: *mut Engine) -> *mut c_char {
 pub extern "C" fn decks_engine_font_needs(e: *mut Engine) -> *mut c_char {
 	guard(std::ptr::null_mut(), || Ok(out(engine(e)?.font_needs())))
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn decks_engine_preview(e: *mut Engine, moving: *const c_char) -> *mut c_char {
+	guard(std::ptr::null_mut(), || Ok(out(Value::from(engine(e)?.preview(text(moving, "the preview")?)?))))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn decks_engine_carry(e: *mut Engine, paths: *const c_char, dx: f64, dy: f64) -> bool {
+	guard(false, || engine(e)?.carry(text(paths, "the paths")?, dx, dy).map(|_| true))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn decks_engine_put_down(e: *mut Engine) -> bool {
+	guard(false, || {
+		engine(e)?.put_down();
+		Ok(true)
+	})
+}

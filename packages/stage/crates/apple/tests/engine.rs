@@ -89,3 +89,42 @@ fn frame_time_on_this_mac() {
 	eprintln!("frame time, notes-and-text at 2360×1640: first {first:.1} ms (tiles painted, read back); a panning frame {each:.2} ms (composed, drawn, waited for)");
 	assert!(each < 1000.0);
 }
+
+/// A drag as the web shows it: lifted, moved at each step by the page alone, nothing in undo; then
+/// taken back, saved once, and put down, after which the worker's tiles carry it again.
+#[test]
+fn a_drag_previews_then_lands() {
+	let Some(mut engine) = engine_for("notes-and-text") else { return };
+	let v = view();
+	engine.pixels(&v).unwrap();
+	let tiles = engine.page.tiles.len();
+	for step in 1..=10 {
+		let lifted = engine.preview(&format!(r#"[["dot", {{ "dx": {}, "dy": 0 }}]]"#, step * 10)).unwrap();
+		assert_eq!(lifted, vec!["dot".to_owned()]);
+	}
+	let moved = engine.pixels(&v).unwrap().0;
+	assert_eq!(at(&moved, &v, 330.0, 230.0), [0x14, 0x80, 0x6f], "the dot is drawn where the drag has it");
+	assert_eq!(at(&moved, &v, 230.0, 230.0), [255, 255, 255], "and not where it was");
+	assert!(engine.page.history.undo(&mut engine.page.doc.clone()).is_none(), "nothing went into undo");
+	assert_eq!(engine.page.tiles.len(), tiles, "no tile was added for the steps");
+	engine.preview("null").unwrap();
+	engine.apply(r#"[{"op":"set","id":"dot","key":"x","value":300}]"#, true).unwrap();
+	engine.put_down();
+	let saved = engine.pixels(&v).unwrap().0;
+	assert_eq!(at(&saved, &v, 330.0, 230.0), [0x14, 0x80, 0x6f], "saved where it was dropped");
+	assert!(engine.page.lifted.is_empty(), "the worker's tiles carry it again");
+	assert_eq!(engine.pick(330.0, 230.0, 0.0)["id"], "dot");
+}
+
+/// The whole drawing arriving again keeps the tiles on screen until new ones replace them.
+#[test]
+fn a_new_document_does_not_blank_the_canvas() {
+	let Some(mut engine) = engine_for("notes-and-text") else { return };
+	let v = view();
+	engine.pixels(&v).unwrap();
+	let pen = std::fs::read_to_string(drawing("notes-and-text", "pen")).unwrap();
+	engine.set_document(&pen).unwrap();
+	assert!(!engine.page.tiles.is_empty(), "the page still holds its tiles");
+	let again = engine.pixels(&v).unwrap().0;
+	assert_eq!(at(&again, &v, 230.0, 230.0), [0x14, 0x80, 0x6f]);
+}

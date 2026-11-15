@@ -70,6 +70,7 @@ impl Engine {
 			self.worker.sent(key);
 		}
 		self.let_go();
+		self.land();
 		self.worker.view_left(view.camera(), view.scale, view.width, view.height, false)
 	}
 

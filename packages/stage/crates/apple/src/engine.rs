@@ -24,6 +24,8 @@ pub struct Engine {
 	pub page_gpu: Gpu,
 	pub worker_gpu: Gpu,
 	next_worker_texture: u32,
+	/// What a gesture has lifted and not yet put down (`gesture.rs`).
+	pub lifted: crate::gesture::Lifted,
 	/// The size the attached layer is configured at, in pixels; none until a layer is attached.
 	pub layer_size: Option<(u32, u32)>,
 }
@@ -36,7 +38,7 @@ impl Engine {
 		let worker_gpu = device.backend();
 		let page = Page::new(pen, dark, session)?;
 		let worker = Worker::new(pen, dark)?;
-		Ok(Engine { device, page, worker, page_gpu, worker_gpu, next_worker_texture: WORKER_TEXTURES, layer_size: None })
+		Ok(Engine { device, page, worker, page_gpu, worker_gpu, next_worker_texture: WORKER_TEXTURES, lifted: Default::default(), layer_size: None })
 	}
 
 	pub(crate) fn worker_texture(&mut self) -> u32 {
@@ -44,12 +46,12 @@ impl Engine {
 		self.next_worker_texture
 	}
 
-	/// The whole drawing again, as the server sent it: the page keeps its tiles until they are
-	/// painted again, the worker starts from it.
+	/// The whole drawing again, as the server sent it: the worker starts from it and paints every
+	/// tile again, and the page shows the tiles it has until each new one replaces it.
 	pub fn set_document(&mut self, pen: &str) -> Result<(), String> {
 		self.page.set_document(pen)?;
 		self.worker.reload(pen, self.page.scene.dark)?;
-		self.forget_all_tiles();
+		self.lifted.clear();
 		Ok(())
 	}
 
@@ -58,7 +60,6 @@ impl Engine {
 		self.page.set_dark(dark);
 		let text = self.page.doc.to_text();
 		self.worker.reload(&text, dark)?;
-		self.forget_all_tiles();
 		Ok(())
 	}
 
@@ -78,7 +79,6 @@ impl Engine {
 		if self.worker.apply(&changes, generation).is_err() {
 			let text = self.page.doc.to_text();
 			self.worker.reload(&text, self.page.scene.dark)?;
-			self.forget_all_tiles();
 		}
 		Ok(generation)
 	}
@@ -183,17 +183,6 @@ impl Engine {
 	/// The drawing's extent, `[x, y, w, h]` in stage units, or null when it is empty.
 	pub fn extent(&self) -> Value {
 		self.page.scene.extent().map_or(Value::Null, |r| serde_json::json!([r.x, r.y, r.w, r.h]))
-	}
-
-	/// Let every tile go, on both sides: after a new document or scheme.
-	fn forget_all_tiles(&mut self) {
-		let keys: Vec<_> = self.page.tiles.keys().copied().collect();
-		for texture in self.page.forget_tiles(&keys) {
-			self.page_gpu.forget(texture);
-		}
-		for key in keys {
-			self.worker.dropped(key);
-		}
 	}
 }
 
