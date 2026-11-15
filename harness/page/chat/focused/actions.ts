@@ -1,11 +1,11 @@
-import { clearPreview, decks, state, warnIfFailed } from "../../state/index.ts";
+import { clearPreview, decks, notice, state, warnIfFailed } from "../../state/index.ts";
 
-/** Run a time-machine call for the focused agent, after ending any preview; a refusal is noticed. */
-function onFocused(run: (agent: string) => Promise<unknown>): void {
+/** Run a time-machine call for the focused agent, after ending any preview; a refusal is noticed, a success said by `done`. */
+function onFocused(run: (agent: string) => Promise<unknown>, done?: string): void {
 	const agent = state.focused;
 	if (!agent) return;
 	clearPreview();
-	void run(agent).then(() => undefined, warnIfFailed);
+	void run(agent).then(() => done && notice("info", done), warnIfFailed);
 }
 
 /** Look at the canvas as it was at an entry; null ends the look. */
@@ -19,6 +19,7 @@ export function previewAt(entry: string | null): void {
 	void decks.chat.preview({ agent, entry });
 }
 
-export const rewindTo = (entry: string) => onFocused((agent) => decks.chat.rewind({ agent, entry }));
+// The rewound words come back in the composer (chat.drafted); the notice only says it happened.
+export const rewindTo = (entry: string) => onFocused((agent) => decks.chat.rewind({ agent, entry }), "Rewound.");
 export const forkAt = (entry: string) => onFocused((agent) => decks.chat.fork({ agent, entry }));
 export const restoreTo = (entry: string) => onFocused((agent) => decks.chat.restore({ agent, entry }));
