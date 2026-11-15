@@ -31,12 +31,20 @@ test("a handler with a wrong argument type does not compile", () => {
 	handle(get, (_ctx, { id }) => ({ id }));
 });
 
-test("a call with no handler does not compile, and fails at start", () => {
+test("a call with no handler does not compile, and at run time answers unavailable and warns once", async () => {
 	const calls = { move, get };
-	assert.throws(() =>
+	const warned: string[] = [];
+	const warn = console.warn;
+	console.warn = (text: string) => void warned.push(text);
+	try {
 		// @ts-expect-error get has no handler
-		handleAll(calls, { move: (_ctx, { id, x }) => ({ id, x }) }),
-	);
+		const partial = handleAll(calls, { move: (_ctx, { id, x }) => ({ id, x }) });
+		assert.deepEqual(warned, ["decks: item.get is declared but has no handler here; it answers unavailable."]);
+		const getStub = partial.find((h) => h.call.name === "item.get")!;
+		assert.throws(() => (getStub.run as (ctx: Ctx, args: object) => unknown)({ caller: "x" }, { id: "a" }), { code: "unavailable", message: "item.get is not handled on this server yet." });
+	} finally {
+		console.warn = warn;
+	}
 	const all = handleAll(calls, { move: (_c, { id, x }) => ({ id, x }), get: (_c, { id }) => ({ id, x: 0 }) });
 	assert.deepEqual(
 		all.map((h) => h.call.name),

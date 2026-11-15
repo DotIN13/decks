@@ -3,8 +3,8 @@ import { obj, type Infer, type ObjOf, type Props, type Shape } from "./schema.ts
 
 // A call is declared once, here in the protocol, and handled once, in one
 // feature. Its arguments are one object keyed by name: the thing, the change,
-// then options. handle() and handleAll() make a missing or wrong handler a
-// compile error.
+// then options. A missing or wrong handler is a compile error; at run time a
+// missing one answers unavailable, so an addition never stops a server.
 
 export const WHO = ["person", "agent", "app", "card"] as const;
 export type Who = (typeof WHO)[number];
@@ -72,6 +72,14 @@ export interface Handled<Ctx> {
 	run: (ctx: Ctx, args: never) => unknown;
 }
 
+/** A call declared but not handled yet, given at run time: it answers unavailable and warns once. */
+function stub(name: string): Handler<AnyCall, unknown> {
+	(globalThis as { console?: { warn(text: string): void } }).console?.warn(`decks: ${name} is declared but has no handler here; it answers unavailable.`);
+	return () => {
+		throw new Refused("unavailable", `${name} is not handled on this server yet.`);
+	};
+}
+
 /** handle and handleAll, bound to one kind of handler context. */
 export function handlersFor<Ctx>() {
 	function handle<C extends AnyCall>(call: C, run: Handler<C, Ctx>): Handled<Ctx> {
@@ -79,9 +87,9 @@ export function handlersFor<Ctx>() {
 	}
 	function handleAll<Calls extends Record<string, AnyCall>>(calls: Calls, impl: { [K in keyof Calls]: Handler<Calls[K], Ctx> }): Handled<Ctx>[] {
 		return Object.keys(calls).map((key) => {
+			const call = calls[key]! as Calls[keyof Calls];
 			const run = impl[key as keyof Calls];
-			if (typeof run !== "function") throw new Error(`No handler for ${calls[key]!.name}.`);
-			return handle(calls[key]! as Calls[keyof Calls], run);
+			return handle(call, typeof run === "function" ? run : stub(call.name));
 		});
 	}
 	return { handle, handleAll };
