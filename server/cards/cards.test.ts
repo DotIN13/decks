@@ -138,3 +138,9 @@ test("rules 18 and 19: a resize names its resizer the writer; a change after a r
 	assert.ok((after.changed ?? 0) > (after.seen ?? 0), JSON.stringify(after));
 	await s.close();
 });
+
+test("rule 14: a card's own :host rules apply to its element on its page", async () => {
+	const { hostRules } = await import("./page.ts");
+	assert.equal(hostRules("<style>:host { background: #000 } :host([data-theme=dark]) p { color: red }</style><p>x</p>"), "<style>#decks-card { background: #000 } #decks-card[data-theme=dark] p { color: red }</style><p>x</p>");
+	assert.equal(hostRules("<p>:host stays in words</p>"), "<p>:host stays in words</p>");
+});

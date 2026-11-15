@@ -41,6 +41,13 @@ export function widthOf(source: string): number {
 	}
 }
 
+const STYLE = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
+
+/** A card's own :host rules, made to apply to its element on a page of its own as they do on the canvas. */
+export function hostRules(html: string): string {
+	return html.replace(STYLE, (_all, open: string, css: string, close: string) => open + css.replace(/:host\(([^()]*)\)/g, "#decks-card$1").replace(/:host\b/g, "#decks-card") + close);
+}
+
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** A card as a page of its own: the piece under card.css, its modules called with a card. */
@@ -49,7 +56,7 @@ export function cardPage(input: { path: string; source: string; pass: string; de
 	const shared = layout.isSharedCanvas(layout.canvasOfPath(input.path)?.name ?? "");
 	const name = input.path.split("/").pop()!;
 	const urls = shared ? [] : Array.from({ length: n }, (_, i) => `./${name}.m${i}.js${input.pass}`);
-	const html = input.source.replace(SCRIPT, (all, attrs: string) => (runs(attrs) ? "" : all));
+	const html = hostRules(input.source.replace(SCRIPT, (all, attrs: string) => (runs(attrs) ? "" : all)));
 	const w = widthOf(input.source);
 	// Relative to the card, so a pass in the path (a compat address) or in the query reaches them too.
 	const up = "../".repeat(input.path.split("/").length - 1);
@@ -59,7 +66,7 @@ export function cardPage(input: { path: string; source: string; pass: string; de
 <html lang="en"><head><meta charset="utf-8" /><title>${escape(titleOf(input.path, input.source))}</title>
 <link rel="stylesheet" href="${up}lib/card.css${input.pass}" />
 <script type="importmap">${map}</script></head>
-<body class="card" style="width:${w}px"><div class="card-body" id="decks-card">${html}</div>
+<body class="card" style="width:${w}px"><div class="card-body" id="decks-card" style="min-height:100vh">${html}</div>
 <script type="module">${PAGE_SCRIPT.replace("__PATH__", JSON.stringify(input.path)).replace("__URLS__", JSON.stringify(urls)).replace("__W__", String(w))}</script>
 <script src="${up}lib/card.js${input.pass}"></script></body></html>
 `;
@@ -75,11 +82,12 @@ const calls = (name) => new Proxy(function () {}, {
 	get: (_t, k) => (typeof k === "string" && k !== "then" ? calls(name ? name + "." + k : k) : undefined),
 	apply: () => Promise.reject(new Error(name + ": a card opened in a tab of its own makes no calls; open it on its canvas.")),
 });
+root.dataset.theme = dark.matches ? "dark" : "light";
 const card = { root, document, signal: new AbortController().signal, url, path, page: true, elements: customElements,
 	file: (n) => new URL(n, url).href + location.search, theme: dark.matches ? "dark" : "light", size: { w: __W__, h: root.offsetHeight },
 	store: { getItem: (n) => localStorage.getItem(key(n)), setItem: (n, v) => localStorage.setItem(key(n), v), removeItem: (n) => localStorage.removeItem(key(n)) },
 	on: (what, fn) => void listeners[what]?.add(fn), decks: calls("") };
-dark.addEventListener("change", () => { card.theme = dark.matches ? "dark" : "light"; for (const fn of listeners.theme) fn(); });
+dark.addEventListener("change", () => { card.theme = root.dataset.theme = dark.matches ? "dark" : "light"; for (const fn of listeners.theme) fn(); });
 new ResizeObserver(() => { card.size = { w: root.offsetWidth, h: root.offsetHeight }; for (const fn of listeners.size) fn(); }).observe(root);
 for (const u of __URLS__) {
 	try { const m = await import(new URL(u, location.href).href); if (typeof m.default === "function") await m.default(card); }
