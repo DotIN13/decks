@@ -7,7 +7,7 @@ import { dismissMenus } from "@decks/ui";
 import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
-import { runStageCall } from "../../camera/stage-ops.ts";
+import { runStageCall } from "../../camera/view-calls.ts";
 import { cardShot } from "../../items/card-surface.tsx";
 import { handsOn } from "../../camera/touched.ts";
 import { drawingFollower } from "./backend.ts";
@@ -106,7 +106,7 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
 	/*
 	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out
-	 * for a canvas it holds (`stage-ops.ts`), and answered to the harness.
+	 * for a canvas it holds (`view-calls.ts`), and answered to the harness.
 	 */
 	const stageCall = (call: StageCall) => {
 		if (call.op === "shot") return void shootCard(call);

@@ -4,7 +4,7 @@
 	"canvas/camera/controller.ts: function createCameraController over 80 lines": 1,
 	"canvas/camera/controller.ts: over 400 lines": 1,
 	"canvas/camera/insets.ts: function watchInsets over 80 lines": 1,
-	"canvas/camera/stage-ops.ts: function runStageCall over 80 lines": 1,
+	"canvas/camera/view-calls.ts: function runStageCall over 80 lines": 1,
 	"canvas/cards/CardEditor.tsx: function (anonymous) over 80 lines": 1,
 	"canvas/cards/CardEditor.tsx: function block over 80 lines": 1,
 	"canvas/cards/CardEditor.tsx: function CardEditor over 80 lines": 1,

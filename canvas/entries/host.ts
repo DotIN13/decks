@@ -6,7 +6,7 @@
 export { PenBar } from "../ui/PenBar.tsx";
 export { InkBar } from "../ui/InkBar.tsx";
 export * from "../host.ts";
-export * from "../camera/stage-ops.ts";
+export * from "../camera/view-calls.ts";
 export * from "../items/card-reading.ts";
 export * from "../ui/keycaps.ts";
 export * from "../theme.ts";
