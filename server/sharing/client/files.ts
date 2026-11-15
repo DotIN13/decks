@@ -14,16 +14,6 @@ type Here = { folder: string; name: string; s: CanvasState; editable: boolean; b
 /** What to do with one path, from our bytes, Studio's file and what both last agreed. */
 type Plan = "same" | "upload" | "download" | "remove-here" | "remove-there" | "conflict" | "forget";
 
-function plan(mine: string | undefined, theirs: SyncFile | undefined, known: { version: number; hash: string } | undefined): Plan {
-	if (mine && !theirs) return known && known.hash === mine ? "remove-here" : "upload";
-	if (!mine && theirs) return known && known.version === theirs.version ? "remove-there" : "download";
-	if (!mine || !theirs) return "forget";
-	if (mine === theirs.hash) return "same";
-	if (known && known.hash === mine) return "download";
-	if (known && known.version === theirs.version) return "upload";
-	return "conflict";
-}
-
 export async function syncFiles(p: FilePass, folder: string, name: string, s: CanvasState, editable: boolean): Promise<void> {
 	const base = `/sync/v1/canvases/${encodeURIComponent(s.id)}/files`;
 	const here: Here = { folder, name, s, editable, base };
@@ -38,6 +28,16 @@ export async function syncFiles(p: FilePass, folder: string, name: string, s: Ca
 		const bytes = local.get(path);
 		await act(p, here, path, bytes, remote.get(path), plan(bytes && hashOf(bytes), remote.get(path), s.files[path]));
 	}
+}
+
+function plan(mine: string | undefined, theirs: SyncFile | undefined, known: { version: number; hash: string } | undefined): Plan {
+	if (mine && !theirs) return known && known.hash === mine ? "remove-here" : "upload";
+	if (!mine && theirs) return known && known.version === theirs.version ? "remove-there" : "download";
+	if (!mine || !theirs) return "forget";
+	if (mine === theirs.hash) return "same";
+	if (known && known.hash === mine) return "download";
+	if (known && known.version === theirs.version) return "upload";
+	return "conflict";
 }
 
 async function act(p: FilePass, h: Here, path: string, bytes: Uint8Array | undefined, theirs: SyncFile | undefined, what: Plan): Promise<void> {

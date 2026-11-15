@@ -7,11 +7,6 @@ export type Merged = { doc: PenDocument; applied: number; adjusted: number; drop
 
 type Node = { id: string; children?: unknown };
 
-function has(doc: PenDocument, id: string): boolean {
-	const visit = (list: readonly Node[]): boolean => list.some((n) => n.id === id || (Array.isArray(n.children) && visit(n.children as Node[])));
-	return visit((doc.children ?? []) as Node[]);
-}
-
 /** Edits as merged; applied in order to `current`, they make `doc`. */
 export function merge(current: PenDocument, edits: readonly PenEdit[]): Merged {
 	const there = ids(current);
@@ -51,6 +46,11 @@ function fit(doc: PenDocument, edit: PenEdit): PenEdit | undefined {
 	const parent = edit.parent !== null && has(doc, edit.parent) ? edit.parent : null;
 	const after = edit.after !== null && has(doc, edit.after) && parent === edit.parent ? edit.after : lastOf(doc, parent, edit.id);
 	return { ...edit, parent, after };
+}
+
+function has(doc: PenDocument, id: string): boolean {
+	const visit = (list: readonly Node[]): boolean => list.some((n) => n.id === id || (Array.isArray(n.children) && visit(n.children as Node[])));
+	return visit((doc.children ?? []) as Node[]);
 }
 
 function childrenOf(list: readonly Node[], parent: string): readonly Node[] | undefined {

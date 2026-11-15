@@ -8,12 +8,6 @@ import { Stale, type HubStore } from "./store.ts";
 
 export type EditsAnswer = { rev: number; base: number; applied: number; adjusted: number; dropped: number; changes: PenEdit[]; pen?: PenDocument };
 
-function happened(pen: PenDocument, edits: readonly PenEdit[]) {
-	const merged = merge(pen, edits);
-	const made = merged.adjusted || merged.dropped.length ? diff(pen, merged.doc) : changesNothing(pen, merged.edits) ? [] : merged.edits;
-	return { merged, made };
-}
-
 /** Merge, keep as one revision, tell everyone. A caller that names itself (client) is not sent the drawing. */
 export function commitEdits(hub: HubStore, live: Live | undefined, id: string, edits: readonly PenEdit[], by: string, client?: string): EditsAnswer {
 	for (let attempt = 0; ; attempt++) {
@@ -31,4 +25,10 @@ export function commitEdits(hub: HubStore, live: Live | undefined, id: string, e
 		const answer = { rev, base: current.rev, applied: merged.applied, adjusted: merged.adjusted, dropped: merged.dropped.length, changes: made };
 		return client ? answer : { ...answer, pen: merged.doc };
 	}
+}
+
+function happened(pen: PenDocument, edits: readonly PenEdit[]) {
+	const merged = merge(pen, edits);
+	const made = merged.adjusted || merged.dropped.length ? diff(pen, merged.doc) : changesNothing(pen, merged.edits) ? [] : merged.edits;
+	return { merged, made };
 }

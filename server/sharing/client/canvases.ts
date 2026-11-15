@@ -14,19 +14,6 @@ type Add = (folder: string, c: SyncCanvas, fresh: boolean) => Pair;
 
 const nameOf = (folder: string) => folder.slice(folder.lastIndexOf("/") + 1);
 
-/** Each folder's claim: the state's when it names the folder, else canvas.json's. One claim per id. */
-async function claims(p: Pass, state: SyncState, folders: string[], remote: Map<string, SyncCanvas>): Promise<Map<string, string>> {
-	const byId = new Map<string, string>();
-	const fromJson: [string, string][] = [];
-	for (const folder of folders) {
-		const id = state.canvases[folder]?.id;
-		if (id && remote.has(id) && !byId.has(id)) byId.set(id, folder);
-		else fromJson.push([folder, (await readJson(p.deck, folder)).studio ?? ""]);
-	}
-	for (const [folder, id] of fromJson) if (id && remote.has(id) && !byId.has(id)) byId.set(id, folder);
-	return new Map([...byId].map(([id, folder]) => [folder, id]));
-}
-
 /** Every pair of folder and canvas for this pass, making canvases and folders as needed. */
 export async function pairs(p: Pass, state: SyncState, list: SyncCanvas[], user: string): Promise<Pair[]> {
 	const remote = new Map(list.map((c) => [c.id, c]));
@@ -48,6 +35,19 @@ export async function pairs(p: Pass, state: SyncState, list: SyncCanvas[], user:
 	}
 	for (const c of list) if (!taken.has(c.id)) await arrive(p, c, user, folders, add);
 	return out;
+}
+
+/** Each folder's claim: the state's when it names the folder, else canvas.json's. One claim per id. */
+async function claims(p: Pass, state: SyncState, folders: string[], remote: Map<string, SyncCanvas>): Promise<Map<string, string>> {
+	const byId = new Map<string, string>();
+	const fromJson: [string, string][] = [];
+	for (const folder of folders) {
+		const id = state.canvases[folder]?.id;
+		if (id && remote.has(id) && !byId.has(id)) byId.set(id, folder);
+		else fromJson.push([folder, (await readJson(p.deck, folder)).studio ?? ""]);
+	}
+	for (const [folder, id] of fromJson) if (id && remote.has(id) && !byId.has(id)) byId.set(id, folder);
+	return new Map([...byId].map(([id, folder]) => [folder, id]));
 }
 
 async function unclaimed(p: Pass, folder: string, list: SyncCanvas[], taken: Set<string>, user: string, add: Add): Promise<void> {

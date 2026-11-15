@@ -10,22 +10,6 @@ import type { StudioApi } from "./transport.ts";
 
 export type Pass = { api: StudioApi; deck: Deck; store: Store; by: Caller; log: (line: string) => void };
 
-async function localDoc(p: Pass, folder: string): Promise<PenDocument | undefined> {
-	const got = await readText(p.deck, `${folder}/canvas.pen`);
-	try {
-		return got === undefined ? undefined : parse(got);
-	} catch {
-		return undefined;
-	}
-}
-
-async function keep(p: Pass, folder: string, s: CanvasState, doc: PenDocument, rev: number, local?: PenDocument): Promise<void> {
-	const text = serialize(doc);
-	if (!local || serialize(local) !== text) await writeText(p.deck, `${folder}/canvas.pen`, text, p.by);
-	await writeBase(p.store, s.id, doc);
-	s.rev = rev;
-}
-
 /** Push our edits (when we may) and take Studio's answer; else take what changed there. */
 export async function syncDrawing(p: Pass, folder: string, s: CanvasState, editable: boolean): Promise<void> {
 	const local = await localDoc(p, folder);
@@ -40,6 +24,22 @@ export async function syncDrawing(p: Pass, folder: string, s: CanvasState, edita
 	const lists = got.changes as PenEdit[][];
 	if (!lists.length) return;
 	await keep(p, folder, s, lists.reduce(loosely, base), got.rev as number, local);
+}
+
+async function localDoc(p: Pass, folder: string): Promise<PenDocument | undefined> {
+	const got = await readText(p.deck, `${folder}/canvas.pen`);
+	try {
+		return got === undefined ? undefined : parse(got);
+	} catch {
+		return undefined;
+	}
+}
+
+async function keep(p: Pass, folder: string, s: CanvasState, doc: PenDocument, rev: number, local?: PenDocument): Promise<void> {
+	const text = serialize(doc);
+	if (!local || serialize(local) !== text) await writeText(p.deck, `${folder}/canvas.pen`, text, p.by);
+	await writeBase(p.store, s.id, doc);
+	s.rev = rev;
 }
 
 /** The whole drawing from Studio: when the log no longer reaches, or we have no base. */

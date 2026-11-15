@@ -14,16 +14,6 @@ export type Logged = { rev: number; edits: PenEdit[] };
 /** Who asks: a person, and the harness they ask through. */
 export type Who = { user: { id: string; name: string; email?: string }; harness?: { id: string; name: string } };
 
-/** A commit onto a revision the canvas has moved past. */
-export class Stale extends Error {}
-
-export const hashOf = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
-
-type Kept = { canvas: SyncCanvas; pen: PenDocument; log: Logged[]; files: Map<string, SyncFile>; people: Map<string, Role>; hashes: Set<string> };
-
-/** The most revisions the log keeps; older ones come whole. */
-export const LOG_MAX = 1000;
-
 /** What the hub's routes, commits and live socket need of a store. Studio implements it on a database. */
 export interface HubStore {
 	name(user: string, name: string): void;
@@ -43,6 +33,16 @@ export interface HubStore {
 	setInventory(harness: string, apps: App[]): void;
 	inventory(harness: string): App[] | undefined;
 }
+
+/** A commit onto a revision the canvas has moved past. */
+export class Stale extends Error {}
+
+export const hashOf = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+
+type Kept = { canvas: SyncCanvas; pen: PenDocument; log: Logged[]; files: Map<string, SyncFile>; people: Map<string, Role>; hashes: Set<string> };
+
+/** The most revisions the log keeps; older ones come whole. */
+export const LOG_MAX = 1000;
 
 export class MemoryHub implements HubStore {
 	private readonly kept = new Map<string, Kept>();
