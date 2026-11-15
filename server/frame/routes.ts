@@ -1,3 +1,4 @@
+import { layout } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
 import type { Passes } from "./passes.ts";
 
@@ -7,7 +8,7 @@ import type { Passes } from "./passes.ts";
 
 const PASS_ROOT = "/api/t/";
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value) });
-const allowed = (canvas: string, rest: string) => rest.startsWith(`canvases/${canvas}/`) || rest.startsWith("assets/") || rest.startsWith("lib/");
+const allowed = (canvas: string, rest: string) => rest.startsWith(`${layout.canvasFolder(canvas)}/`) || rest.startsWith("assets/") || rest.startsWith("lib/");
 
 async function importsOf(ctx: Context): Promise<Record<string, string> | undefined> {
 	try {
