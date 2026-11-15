@@ -3,7 +3,7 @@
 // Per check: Decks-local on a fresh fixture copy, the harness, and the page, each on ports of its own.
 // A heavy job: node tools/heavy.mjs --wait -- node tools/checks/run.mjs <check>. Only server: --only-server.
 // CHECKS_LOG_DIR=<dir> keeps each check's whole log there; CHECKS_VERBOSE=1 prints a failure's tail.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -13,14 +13,20 @@ const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 const FIXTURE = join(ROOT, "tools/fixtures/deck");
 const BASE = Number(process.env.CHECKS_PORT ?? 4612);
 const WAIT_MS = 60_000;
+/** What one run shares: the page built once. */
+const RUN = { dist: undefined };
 const CHECK_MS = Number(process.env.CHECKS_TIMEOUT_MS ?? 300_000);
 
 /** How each program starts, given its ports and the deck. Edit here when an owner changes theirs. */
 export const PROGRAMS = {
 	server: ({ server, deck }) => ({ cmd: process.execPath, args: ["--import", "tsx", "server/main.ts", "--deck", deck, "--port", String(server)] }),
 	harness: ({ deck, home }) => ({ cmd: process.execPath, args: ["--import", "tsx", "harness/main.ts", "--deck", deck, "--kinds", "pi"], env: { PI_CODING_AGENT_DIR: join(ROOT, "e2e/fake-agent"), DECKS_DATA_DIR: home } }),
-	// vite itself, not through npm: npm reports the stop at the end of a check as an error.
-	page: ({ deck, web }) => ({ cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web), DECKS_PAGE_COMPAT: "1" } }),
+	// The built page on a plain static server with the dev server's proxy rules (page-server.mjs);
+	// CHECKS_PAGE=dev runs vite's dev server instead, directly, not through npm.
+	page: ({ deck, web, dist }) =>
+		process.env.CHECKS_PAGE === "dev" || !dist
+			? { cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web), DECKS_PAGE_COMPAT: "1" } }
+			: { cmd: process.execPath, args: [join(ROOT, "tools/checks/page-server.mjs"), "--dist", dist, "--deck", deck, "--port", String(web), "--compat"] },
 };
 
 export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 1, web: BASE + 3 * i + 2 });
@@ -102,7 +108,15 @@ async function stopAndWait(child) {
 }
 
 /** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
-export async function runPrograms(work, { i = 0, onlyServer = false, log = [] } = {}) {
+/** The page built once for a run, into a scratch folder: vite build of harness/page. */
+export function buildPage() {
+	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
+	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
+	return dist;
+}
+
+export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
 	const ports = portsFor(i);
 	for (const port of Object.values(ports)) if (await listening(port)) throw new Error(`port ${port} is in use`);
 	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
@@ -113,7 +127,7 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [] } 
 	const started = [];
 	try {
 		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) {
-			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home }), log);
+			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home, dist }), log);
 			started.push(child);
 			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
 			await until(ready, child, name);
@@ -159,6 +173,7 @@ async function main(argv) {
 	if (!files.length) return console.error("usage: node tools/checks/run.mjs [--only-server] <check> ..."), 2;
 	const missing = files.filter((f) => !existsSync(join(ROOT, "e2e/checks", f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
+	if (!onlyServer && process.env.CHECKS_PAGE !== "dev") RUN.dist = buildPage();
 	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
 	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [join(ROOT, "e2e/fake-model.mjs")] }, []);
 	let failed = 0;
@@ -170,6 +185,7 @@ async function main(argv) {
 		if (process.env.CHECKS_LOG_DIR) writeFileSync(join(process.env.CHECKS_LOG_DIR, `${file}.log`), result.log?.join("") ?? "");
 	}
 	if (model) stop(model);
+	if (RUN.dist) rmSync(join(RUN.dist, ".."), { recursive: true, force: true });
 	console.log(`${files.length - failed} of ${files.length} checks pass`);
 	return failed ? 1 : 0;
 }
