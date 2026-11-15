@@ -92,3 +92,9 @@ test("a same-name old call in the positional form answers through the translator
 	await doors.close();
 	await server.close();
 });
+
+test("an app to open is named from today's path", async () => {
+	const { appToOpen } = await import("./apps.ts");
+	assert.equal(appToOpen("/compat/apps/e2e-notes/open", "/compat/apps/"), "e2e-notes");
+	assert.equal(appToOpen("/compat/apps/e2e-notes", "/compat/apps/"), undefined);
+});
