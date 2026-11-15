@@ -1,3 +1,5 @@
+// One Decks agent run by Claude Code: a long-lived query per agent, its turns,
+// sign-in, accounts, usage, modes and the session tree it can rewind.
 import { sentAs } from "../shared/sent-as.ts";
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
@@ -393,6 +395,36 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
+	 * Make a conversation resumable from this folder.
+	 *
+	 * Claude Code files a session under `projects/<the folder, every other character a dash>/`, so a
+	 * session resumed from another folder (a deck that moved, a conversation begun elsewhere) is
+	 * looked for where it is not, and fails with "No conversation found". When the
+	 * file is not under this folder, it is found under any other and copied here; the original
+	 * stays, so the old folder can still open it.
+	 */
+	private bringTranscriptHere(id: string): void {
+		const root = join(this.configDir(), "projects");
+		const here = join(root, this.context.cwd.replace(/[^a-zA-Z0-9]/g, "-"));
+		if (existsSync(join(here, `${id}.jsonl`)) || !existsSync(root)) return;
+		for (const folder of readdirSync(root)) {
+			const source = join(root, folder, `${id}.jsonl`);
+			if (!existsSync(source)) continue;
+			mkdirSync(here, { recursive: true });
+			copyFileSync(source, join(here, `${id}.jsonl`));
+			return;
+		}
+	}
+
+	/** The Claude Code config folder this agent's session runs under: its account's, or the machine's. */
+	private configDir(): string {
+		const accounts = this.context.accounts;
+		const account = this.context.account;
+		const env = accounts && account ? accounts.environmentFor(this.context.agent.id, account.id()) : accounts?.activeEnvironment();
+		return env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+	}
+
+	/**
 	 * The input side of the query: an async iterable the shell pushes into.
 	 *
 	 * A generator rather than a channel object because that is the shape `query()` takes.
@@ -456,6 +488,15 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
+	 * Whether a file tool is writing this agent's own memory: `projects/<folder>/memory/` in its
+	 * Claude config folder, by either spelling of the path (the config folder is a link).
+	 */
+	private isOwnMemory(toolName: string, input: Record<string, unknown>): boolean {
+		if (!["Write", "Edit", "MultiEdit"].includes(toolName) || typeof input.file_path !== "string") return false;
+		return inMemoryFolder(this.configDir(), input.file_path);
+	}
+
+	/**
 	 * The agent asking the *user* something, rather than asking permission.
 	 *
 	 * This arrives through `canUseTool` like every other tool, and treating it as one is
@@ -473,6 +514,210 @@ export class ClaudeBackend implements AgentBackend {
 	 * dock 88px tall is a dock nobody can read; sequential is also the only order in which
 	 * a later question can be worth answering after an earlier one.
 	 */
+
+	// --- what the end of a turn may do -----------------------------------------------
+
+	/**
+	 * A subscription reaching its limit — said, not worked around.
+	 *
+	 * **Nothing switches by itself.** This used to mark the account spent, move the
+	 * conversation to the next subscription down the list, and re-send the prompt when the
+	 * turn had not touched anything yet. Three things happened without being asked, one of
+	 * them mid-turn, and the record of it was a line of transcript nobody was reading at the
+	 * time. So what is left is the sentence: which window ran out, whose subscription it was,
+	 * when it lifts, and that another one is a press away in the model picker.
+	 *
+	 * The press is cheap, which is what makes this the right trade: a switch is one `rename`
+	 * of a symlink and the CLI re-reads its credentials per request, so choosing another
+	 * account and pressing send again spends it on the very next turn — no restart, no lost
+	 * conversation. And re-sending is the person's, which is the part a machine should not
+	 * guess: Decks agents edit files, and a turn that got three tool calls in before the
+	 * refusal cannot simply be replayed.
+	 */
+	private onRateLimit(info: SDKRateLimitInfo): void {
+		const { notice } = this.context;
+		const accounts = this.context.accounts;
+
+		if (info.status === "allowed_warning") {
+			/*
+			 * Said once per window, not once per event.
+			 *
+			 * The CLI emits this whenever the figure moves, which near a limit is every turn —
+			 * and a warning repeated every turn is one nobody reads. The window it is about is
+			 * the key, so a fresh warning about the *seven-day* limit still gets through after
+			 * one about the five-hour limit.
+			 */
+			const window = info.rateLimitType ?? "limit";
+			if (this.warnedAbout !== window) {
+				this.warnedAbout = window;
+				// `eventPercent`, not `Math.round`: this event's figure is a fraction, and rounding it as a
+				// percentage is what made every warning say "1% used". See the function for what is known
+				// and what is inferred.
+				const used = eventPercent(info.utilization);
+				const share = used === null ? "" : ` (${used}% used)`;
+				notice("warn", `This Claude subscription is close to its ${limitWindow(window)} limit${share}.`);
+			}
+			return;
+		}
+		if (info.status !== "rejected") {
+			// Back under the limit: the next warning about this window is worth hearing again.
+			this.warnedAbout = undefined;
+			return;
+		}
+
+		// What *this* agent is on, not what the machine is on: two agents can be spending
+		// two subscriptions, and the one that refused is the one this session was using.
+		const mine = this.context.account?.id();
+		const spent = mine ? accounts?.describe(mine) : accounts?.active();
+		// Unix seconds on the event, milliseconds everywhere it is compared or shown.
+		const reset = resetWords(epochMs(info.resetsAt));
+		const window = limitWindow(info.rateLimitType);
+		const whose = spent?.email ? `${spent.email}'s` : "This";
+		/*
+		 * Whether there is anywhere to go, which is the only thing the account list is asked
+		 * here — and it decides one clause of a sentence rather than an account switch.
+		 *
+		 * `signed in and not this one` rather than `not spent`: nothing is marked spent any
+		 * more, so the honest offer is "there is another subscription you could put this
+		 * conversation on", and whether it has quota left is something only trying it can say.
+		 */
+		const elsewhere = accounts?.hasOther?.(mine) === true;
+		notice(
+			"error",
+			elsewhere
+				? `${whose} Claude subscription has reached its ${window} limit${reset}. Pick another one in the model picker and send again.`
+				: `${whose} Claude subscription has reached its ${window} limit${reset}. Add another account in settings, or wait.`,
+		);
+	}
+
+	/**
+	 * A turn that was not an answer: try it again rather than leaving it as one.
+	 *
+	 * Several Claude Code processes on one machine share one credentials file, and when a
+	 * token comes due they all want it refreshed at once. The CLI serialises that with a
+	 * lock and tells the losers to come back — and with six agents open that is five turns
+	 * lost to a sentence the CLI itself calls transient. Worse, the SDK reports the turn as
+	 * a *success* whose content is that sentence, so it lands as the assistant's reply and
+	 * the person watching has to read it and press send again.
+	 *
+	 * Three conditions, and all three are needed:
+	 *
+	 * - the reply **is** the failure (`transient.ts`, which matches on prose because there
+	 *   is nothing structural to match on, and says so);
+	 * - the turn **did nothing** — no tool call, no board write. Decks agents edit files, and
+	 *   replaying a turn that got halfway could write the same board twice. The rate-limit
+	 *   path used to resend under the same guard; it does not resend at all now;
+	 * - there are retries left, so a refresh that is genuinely stuck ends in the message
+	 *   standing rather than in a turn that never finishes.
+	 *
+	 * The old reply is taken back before the new attempt, so what the person sees is one
+	 * line saying the login is busy and then the answer — rather than an error, an error,
+	 * and an answer.
+	 */
+	private retryTransient(): void {
+		const { translator, notice } = this.context;
+		if (!isTransientAuthFailure(translator.lastAssistantText())) {
+			this.transientTries = 0;
+			return;
+		}
+		if (translator.turnTouchedAnything()) return;
+		const again = translator.lastUserText();
+		if (!again) return;
+
+		if (this.transientTries >= MAX_TRANSIENT_RETRIES) {
+			this.transientTries = 0;
+			notice("error", "Another Claude Code process is still refreshing this login. Send that again in a minute, or close some agents.");
+			return;
+		}
+
+		const attempt = ++this.transientTries;
+		const wait = retryDelayMs(attempt);
+		translator.dropLastAssistant();
+		this.context.historyChanged?.();
+		notice("warn", `Another Claude Code process is refreshing this login. Trying again in ${Math.round(wait / 1000)}s.`);
+		const timer = setTimeout(() => {
+			if (this.closed) return;
+			this.push(again);
+		}, wait);
+		// Never a reason to hold the process open: a deck shutting down mid-wait should shut down.
+		timer.unref?.();
+	}
+
+	/**
+	 * A turn that failed because the session it was told to resume is not in this account's
+	 * store. Asked again once, in a fresh session.
+	 *
+	 * The id can be right and the store still be the wrong one, with nothing about the person,
+	 * the deck or the task at fault: `--resume` is looked up inside the config directory the
+	 * process is handed (`claude/accounts.ts`), and that directory can have moved under a
+	 * stored id. It did here: the id was written before the per-agent link existed, the account
+	 * it ended up on kept a private `projects/` instead of the shared store, and the session was
+	 * in the 53 transcripts that copy did not have. The morning's scheduled task ended as
+	 * `error_during_execution` with a session id quoted back at somebody who could do nothing
+	 * with it. `stale-session.ts` says why this reads prose rather than a field.
+	 *
+	 * What starting fresh costs is the conversation's memory of itself, and that was already
+	 * the cost — the memory is unreachable either way, and this way the work still happens.
+	 *
+	 * Returns whether it took the failure over, so the caller does not also report a stop.
+	 */
+	private recoverStaleSession(said: string | undefined): boolean {
+		const { translator, notice } = this.context;
+		if (!isStaleSession(said)) {
+			this.staleTries = 0;
+			return false;
+		}
+		/*
+		 * A turn that already changed a board is not repeated — the rule the busy-login retry
+		 * follows too. Here it also means the failure stands: the turn did something, so "ask it
+		 * again in a fresh session" is not a repair, it is a second attempt at work already done.
+		 */
+		const again = translator.turnTouchedAnything() ? undefined : translator.lastUserText();
+		if (!again) return false;
+		if (this.staleTries >= 1) {
+			this.staleTries = 0;
+			notice(
+				"error",
+				"Claude cannot find this conversation's session in this account's transcript store, so this turn cannot be asked again. Send it once more and it starts a fresh conversation.",
+			);
+			return true;
+		}
+		this.staleTries += 1;
+		notice("warn", "Claude cannot find this conversation's session in this account's transcript store, so it starts a fresh one and asks again.");
+		// The reply is not an answer, and leaving it in the transcript is what made this read
+		// as a result rather than a failure.
+		translator.dropLastAssistant();
+		this.context.historyChanged?.();
+		// Forgotten before the restart, so the new query is opened without `--resume`.
+		this.sessionId = undefined;
+		void this.restartQuery(again);
+		return true;
+	}
+
+	/**
+	 * Open a fresh session and ask the same thing in it.
+	 *
+	 * The same moves `rewindTo` makes to replace a query: stop feeding the old one, open the new
+	 * one, then let the old one end. Nothing is resumed, which is the whole point of it.
+	 */
+	private async restartQuery(text: string): Promise<void> {
+		const previous = this.session;
+		this.closed = true;
+		this.wake?.();
+		this.queue = [];
+		try {
+			await this.startQuery();
+			this.push(text);
+		} catch (error) {
+			this.closed = false;
+			this.context.notice("error", `Claude could not start a new session: ${(error as Error).message}`);
+		}
+		try {
+			await previous.return(undefined);
+		} catch {
+			/* a query that has already ended is not a problem worth raising */
+		}
+	}
 
 	// --- the conversation -------------------------------------------------------------
 
@@ -805,6 +1050,20 @@ export class ClaudeBackend implements AgentBackend {
 		else this.context.notice("info", "Claude was not signed in.");
 	}
 
+	async abort(): Promise<void> {
+		try {
+			await this.session.interrupt();
+		} finally {
+			this.streaming = false;
+		}
+	}
+
+	get isStreaming(): boolean {
+		return this.streaming;
+	}
+
+	// --- moving to another account ---------------------------------------------------
+
 	/**
 	 * The agent moved to another subscription (`AgentSession.useAccount`).
 	 *
@@ -851,18 +1110,6 @@ export class ClaudeBackend implements AgentBackend {
 		}
 	}
 
-	async abort(): Promise<void> {
-		try {
-			await this.session.interrupt();
-		} finally {
-			this.streaming = false;
-		}
-	}
-
-	get isStreaming(): boolean {
-		return this.streaming;
-	}
-
 	// --- the model ---------------------------------------------------------------------
 
 	model(): AgentModel | undefined {
@@ -893,6 +1140,8 @@ export class ClaudeBackend implements AgentBackend {
 			reasoning: Boolean(model.supportsEffort),
 		}));
 	}
+
+	// --- usage -----------------------------------------------------------------------
 
 	usage(): AgentUsage | null {
 		return this.lastUsage;
@@ -964,208 +1213,6 @@ export class ClaudeBackend implements AgentBackend {
 			this.refreshUsage(plan),
 		]);
 		return toUsageReport(usage, identity.email ?? (mine ? accounts?.describe(mine)?.email : accounts?.active()?.email) ?? null);
-	}
-
-	/**
-	 * A subscription reaching its limit — said, not worked around.
-	 *
-	 * **Nothing switches by itself.** This used to mark the account spent, move the
-	 * conversation to the next subscription down the list, and re-send the prompt when the
-	 * turn had not touched anything yet. Three things happened without being asked, one of
-	 * them mid-turn, and the record of it was a line of transcript nobody was reading at the
-	 * time. So what is left is the sentence: which window ran out, whose subscription it was,
-	 * when it lifts, and that another one is a press away in the model picker.
-	 *
-	 * The press is cheap, which is what makes this the right trade: a switch is one `rename`
-	 * of a symlink and the CLI re-reads its credentials per request, so choosing another
-	 * account and pressing send again spends it on the very next turn — no restart, no lost
-	 * conversation. And re-sending is the person's, which is the part a machine should not
-	 * guess: Decks agents edit files, and a turn that got three tool calls in before the
-	 * refusal cannot simply be replayed.
-	 */
-	private onRateLimit(info: SDKRateLimitInfo): void {
-		const { notice } = this.context;
-		const accounts = this.context.accounts;
-
-		if (info.status === "allowed_warning") {
-			/*
-			 * Said once per window, not once per event.
-			 *
-			 * The CLI emits this whenever the figure moves, which near a limit is every turn —
-			 * and a warning repeated every turn is one nobody reads. The window it is about is
-			 * the key, so a fresh warning about the *seven-day* limit still gets through after
-			 * one about the five-hour limit.
-			 */
-			const window = info.rateLimitType ?? "limit";
-			if (this.warnedAbout !== window) {
-				this.warnedAbout = window;
-				// `eventPercent`, not `Math.round`: this event's figure is a fraction, and rounding it as a
-				// percentage is what made every warning say "1% used". See the function for what is known
-				// and what is inferred.
-				const used = eventPercent(info.utilization);
-				const share = used === null ? "" : ` (${used}% used)`;
-				notice("warn", `This Claude subscription is close to its ${limitWindow(window)} limit${share}.`);
-			}
-			return;
-		}
-		if (info.status !== "rejected") {
-			// Back under the limit: the next warning about this window is worth hearing again.
-			this.warnedAbout = undefined;
-			return;
-		}
-
-		// What *this* agent is on, not what the machine is on: two agents can be spending
-		// two subscriptions, and the one that refused is the one this session was using.
-		const mine = this.context.account?.id();
-		const spent = mine ? accounts?.describe(mine) : accounts?.active();
-		// Unix seconds on the event, milliseconds everywhere it is compared or shown.
-		const reset = resetWords(epochMs(info.resetsAt));
-		const window = limitWindow(info.rateLimitType);
-		const whose = spent?.email ? `${spent.email}'s` : "This";
-		/*
-		 * Whether there is anywhere to go, which is the only thing the account list is asked
-		 * here — and it decides one clause of a sentence rather than an account switch.
-		 *
-		 * `signed in and not this one` rather than `not spent`: nothing is marked spent any
-		 * more, so the honest offer is "there is another subscription you could put this
-		 * conversation on", and whether it has quota left is something only trying it can say.
-		 */
-		const elsewhere = accounts?.hasOther?.(mine) === true;
-		notice(
-			"error",
-			elsewhere
-				? `${whose} Claude subscription has reached its ${window} limit${reset}. Pick another one in the model picker and send again.`
-				: `${whose} Claude subscription has reached its ${window} limit${reset}. Add another account in settings, or wait.`,
-		);
-	}
-
-	/**
-	 * A turn that was not an answer: try it again rather than leaving it as one.
-	 *
-	 * Several Claude Code processes on one machine share one credentials file, and when a
-	 * token comes due they all want it refreshed at once. The CLI serialises that with a
-	 * lock and tells the losers to come back — and with six agents open that is five turns
-	 * lost to a sentence the CLI itself calls transient. Worse, the SDK reports the turn as
-	 * a *success* whose content is that sentence, so it lands as the assistant's reply and
-	 * the person watching has to read it and press send again.
-	 *
-	 * Three conditions, and all three are needed:
-	 *
-	 * - the reply **is** the failure (`transient.ts`, which matches on prose because there
-	 *   is nothing structural to match on, and says so);
-	 * - the turn **did nothing** — no tool call, no board write. Decks agents edit files, and
-	 *   replaying a turn that got halfway could write the same board twice. The rate-limit
-	 *   path used to resend under the same guard; it does not resend at all now;
-	 * - there are retries left, so a refresh that is genuinely stuck ends in the message
-	 *   standing rather than in a turn that never finishes.
-	 *
-	 * The old reply is taken back before the new attempt, so what the person sees is one
-	 * line saying the login is busy and then the answer — rather than an error, an error,
-	 * and an answer.
-	 */
-	private retryTransient(): void {
-		const { translator, notice } = this.context;
-		if (!isTransientAuthFailure(translator.lastAssistantText())) {
-			this.transientTries = 0;
-			return;
-		}
-		if (translator.turnTouchedAnything()) return;
-		const again = translator.lastUserText();
-		if (!again) return;
-
-		if (this.transientTries >= MAX_TRANSIENT_RETRIES) {
-			this.transientTries = 0;
-			notice("error", "Another Claude Code process is still refreshing this login. Send that again in a minute, or close some agents.");
-			return;
-		}
-
-		const attempt = ++this.transientTries;
-		const wait = retryDelayMs(attempt);
-		translator.dropLastAssistant();
-		this.context.historyChanged?.();
-		notice("warn", `Another Claude Code process is refreshing this login. Trying again in ${Math.round(wait / 1000)}s.`);
-		const timer = setTimeout(() => {
-			if (this.closed) return;
-			this.push(again);
-		}, wait);
-		// Never a reason to hold the process open: a deck shutting down mid-wait should shut down.
-		timer.unref?.();
-	}
-
-	/**
-	 * A turn that failed because the session it was told to resume is not in this account's
-	 * store. Asked again once, in a fresh session.
-	 *
-	 * The id can be right and the store still be the wrong one, with nothing about the person,
-	 * the deck or the task at fault: `--resume` is looked up inside the config directory the
-	 * process is handed (`claude/accounts.ts`), and that directory can have moved under a
-	 * stored id. It did here: the id was written before the per-agent link existed, the account
-	 * it ended up on kept a private `projects/` instead of the shared store, and the session was
-	 * in the 53 transcripts that copy did not have. The morning's scheduled task ended as
-	 * `error_during_execution` with a session id quoted back at somebody who could do nothing
-	 * with it. `stale-session.ts` says why this reads prose rather than a field.
-	 *
-	 * What starting fresh costs is the conversation's memory of itself, and that was already
-	 * the cost — the memory is unreachable either way, and this way the work still happens.
-	 *
-	 * Returns whether it took the failure over, so the caller does not also report a stop.
-	 */
-	private recoverStaleSession(said: string | undefined): boolean {
-		const { translator, notice } = this.context;
-		if (!isStaleSession(said)) {
-			this.staleTries = 0;
-			return false;
-		}
-		/*
-		 * A turn that already changed a board is not repeated — the rule the busy-login retry
-		 * follows too. Here it also means the failure stands: the turn did something, so "ask it
-		 * again in a fresh session" is not a repair, it is a second attempt at work already done.
-		 */
-		const again = translator.turnTouchedAnything() ? undefined : translator.lastUserText();
-		if (!again) return false;
-		if (this.staleTries >= 1) {
-			this.staleTries = 0;
-			notice(
-				"error",
-				"Claude cannot find this conversation's session in this account's transcript store, so this turn cannot be asked again. Send it once more and it starts a fresh conversation.",
-			);
-			return true;
-		}
-		this.staleTries += 1;
-		notice("warn", "Claude cannot find this conversation's session in this account's transcript store, so it starts a fresh one and asks again.");
-		// The reply is not an answer, and leaving it in the transcript is what made this read
-		// as a result rather than a failure.
-		translator.dropLastAssistant();
-		this.context.historyChanged?.();
-		// Forgotten before the restart, so the new query is opened without `--resume`.
-		this.sessionId = undefined;
-		void this.restartQuery(again);
-		return true;
-	}
-
-	/**
-	 * Open a fresh session and ask the same thing in it.
-	 *
-	 * The same moves `rewindTo` makes to replace a query: stop feeding the old one, open the new
-	 * one, then let the old one end. Nothing is resumed, which is the whole point of it.
-	 */
-	private async restartQuery(text: string): Promise<void> {
-		const previous = this.session;
-		this.closed = true;
-		this.wake?.();
-		this.queue = [];
-		try {
-			await this.startQuery();
-			this.push(text);
-		} catch (error) {
-			this.closed = false;
-			this.context.notice("error", `Claude could not start a new session: ${(error as Error).message}`);
-		}
-		try {
-			await previous.return(undefined);
-		} catch {
-			/* a query that has already ended is not a problem worth raising */
-		}
 	}
 
 	/**
@@ -1344,6 +1391,16 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
+	 * The session id to resume (`AgentBackend.sessionRef`).
+	 *
+	 * Reassigned by `rewindTo`, which forks and stays in the new session — so this is the
+	 * live branch rather than the one the agent started on.
+	 */
+	sessionRef(): string | undefined {
+		return this.sessionId;
+	}
+
+	/**
 	 * The same point, as a session of its own.
 	 *
 	 * `forkSession` copies the transcript into a new session id, so the fork is resumable
@@ -1351,55 +1408,6 @@ export class ClaudeBackend implements AgentBackend {
 	 * *inclusive* and Decks forks from *before* a message — so the new chat opens with it
 	 * unasked — which means cutting at the message before ours.
 	 */
-	/**
-	 * The session id to resume (`AgentBackend.sessionRef`).
-	 *
-	 * Reassigned by `rewindTo`, which forks and stays in the new session — so this is the
-	 * live branch rather than the one the agent started on.
-	 */
-	/** The Claude Code config folder this agent's session runs under: its account's, or the machine's. */
-	private configDir(): string {
-		const accounts = this.context.accounts;
-		const account = this.context.account;
-		const env = accounts && account ? accounts.environmentFor(this.context.agent.id, account.id()) : accounts?.activeEnvironment();
-		return env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
-	}
-
-	/**
-	 * Whether a file tool is writing this agent's own memory: `projects/<folder>/memory/` in its
-	 * Claude config folder, by either spelling of the path (the config folder is a link).
-	 */
-	private isOwnMemory(toolName: string, input: Record<string, unknown>): boolean {
-		if (!["Write", "Edit", "MultiEdit"].includes(toolName) || typeof input.file_path !== "string") return false;
-		return inMemoryFolder(this.configDir(), input.file_path);
-	}
-
-	/**
-	 * Make a conversation resumable from this folder.
-	 *
-	 * Claude Code files a session under `projects/<the folder, every other character a dash>/`, so a
-	 * session resumed from another folder (a deck that moved, a conversation begun elsewhere) is
-	 * looked for where it is not, and fails with "No conversation found". When the
-	 * file is not under this folder, it is found under any other and copied here; the original
-	 * stays, so the old folder can still open it.
-	 */
-	private bringTranscriptHere(id: string): void {
-		const root = join(this.configDir(), "projects");
-		const here = join(root, this.context.cwd.replace(/[^a-zA-Z0-9]/g, "-"));
-		if (existsSync(join(here, `${id}.jsonl`)) || !existsSync(root)) return;
-		for (const folder of readdirSync(root)) {
-			const source = join(root, folder, `${id}.jsonl`);
-			if (!existsSync(source)) continue;
-			mkdirSync(here, { recursive: true });
-			copyFileSync(source, join(here, `${id}.jsonl`));
-			return;
-		}
-	}
-
-	sessionRef(): string | undefined {
-		return this.sessionId;
-	}
-
 	async forkFrom(entryId: string): Promise<string | undefined> {
 		if (!this.sessionId) return undefined;
 		let messages: Awaited<ReturnType<typeof getSessionMessages>>;
@@ -1434,6 +1442,8 @@ export class ClaudeBackend implements AgentBackend {
 	}
 }
 
+// --- the query's options ----------------------------------------------------------
+
 function stageServerName(): string {
 	// Kept as a call rather than an import of the constant so the two files cannot
 	// disagree about it silently.
@@ -1446,21 +1456,59 @@ function stageServerName(): string {
  * `off` and `minimal` have no effort counterpart — the CLI's lowest is `low` — so they map
  * to nothing rather than to a level that would spend more than was asked for.
  */
-/**
- * What the session has cost, out of the payload behind the CLI's own `/usage`.
- *
- * Reported as zero for a while, on the grounds that the call is experimental — which left
- * the meter saying "3% ctx" beside a pi agent saying "3% ctx · $0.0018", and a cost of zero
- * is not more honest than no figure, it is a wrong one.
- *
- * `undefined` rather than zero when the payload has no figure, so the caller keeps the one
- * it had: the whole payload is held at arm's length, because the SDK's own name for the call
- * is an instruction — `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`.
- */
-function sessionCost(usage: SDKControlGetUsageResponse | undefined): number | undefined {
-	const cost = usage?.session?.total_cost_usd;
-	return typeof cost === "number" && Number.isFinite(cost) ? cost : undefined;
+function effortOf(level: ThinkingLevel | undefined): "low" | "medium" | "high" | "xhigh" | "max" | undefined {
+	switch (level) {
+		case "low":
+		case "medium":
+		case "high":
+		case "xhigh":
+		case "max":
+			return level;
+		default:
+			return undefined;
+	}
 }
+
+// --- permission prompts -----------------------------------------------------------
+
+/** A one-line description of what a tool was asked to do, for the confirm dialog. */
+function describe(input: Record<string, unknown>): string {
+	for (const key of ["command", "file_path", "path", "pattern", "url"]) {
+		const value = input[key];
+		if (typeof value === "string" && value.trim()) return `${key}: ${value.trim().slice(0, 300)}`;
+	}
+	return "";
+}
+
+/**
+ * Whether `file` is in a memory folder of this Claude config folder, `projects/<folder>/memory/`,
+ * by either spelling of either path — the config folder Decks hands an agent is a link.
+ */
+export function inMemoryFolder(configDir: string, file: string): boolean {
+	const target = resolve(file);
+	const projects = join(configDir, "projects");
+	const roots = [projects];
+	try {
+		roots.push(realpathSync(projects));
+	} catch {
+		// No projects folder yet: only the plain spelling can match.
+	}
+	const spellings = [target];
+	try {
+		spellings.push(join(realpathSync(dirname(target)), basename(target)));
+	} catch {
+		// A memory file in a folder not made yet: the plain spelling is all there is.
+	}
+	return spellings.some((path) =>
+		roots.some((root) => {
+			const rel = relative(root, path);
+			const parts = rel.split(sep);
+			return !rel.startsWith("..") && !isAbsolute(rel) && parts.length >= 3 && parts[1] === "memory" && !parts.includes("..");
+		}),
+	);
+}
+
+// --- the CLI outside a session ----------------------------------------------------
 
 /** The CLI's own auth subcommand, to be run outside any session. */
 function runClaudeCommand(
@@ -1507,112 +1555,6 @@ async function claudeAuthStatus(configDir?: string): Promise<{ loggedIn: boolean
 	}
 }
 
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function effortOf(level: ThinkingLevel | undefined): "low" | "medium" | "high" | "xhigh" | "max" | undefined {
-	switch (level) {
-		case "low":
-		case "medium":
-		case "high":
-		case "xhigh":
-		case "max":
-			return level;
-		default:
-			return undefined;
-	}
-}
-
-/**
- * Whether a user-role message is something a person typed.
- *
- * A tool result rides on a user message as a `tool_result` block, and a synthetic message
- * can carry no text at all. Either way it is not a point in the conversation you can
- * return to.
- */
-function isTyped(message: unknown): boolean {
-	const content = (message as { content?: unknown } | undefined)?.content;
-	if (typeof content === "string") return content.trim().length > 0;
-	if (!Array.isArray(content)) return false;
-	if (content.some((part) => (part as { type?: string })?.type === "tool_result")) return false;
-	return content.some((part) => (part as { type?: string })?.type === "text");
-}
-
-/** Whether a session message's content begins with the text that was displayed. */
-
-/** A one-line description of what a tool was asked to do, for the confirm dialog. */
-/**
- * Whether `file` is in a memory folder of this Claude config folder, `projects/<folder>/memory/`,
- * by either spelling of either path — the config folder Decks hands an agent is a link.
- */
-export function inMemoryFolder(configDir: string, file: string): boolean {
-	const target = resolve(file);
-	const projects = join(configDir, "projects");
-	const roots = [projects];
-	try {
-		roots.push(realpathSync(projects));
-	} catch {
-		// No projects folder yet: only the plain spelling can match.
-	}
-	const spellings = [target];
-	try {
-		spellings.push(join(realpathSync(dirname(target)), basename(target)));
-	} catch {
-		// A memory file in a folder not made yet: the plain spelling is all there is.
-	}
-	return spellings.some((path) =>
-		roots.some((root) => {
-			const rel = relative(root, path);
-			const parts = rel.split(sep);
-			return !rel.startsWith("..") && !isAbsolute(rel) && parts.length >= 3 && parts[1] === "memory" && !parts.includes("..");
-		}),
-	);
-}
-
-function describe(input: Record<string, unknown>): string {
-	for (const key of ["command", "file_path", "path", "pattern", "url"]) {
-		const value = input[key];
-		if (typeof value === "string" && value.trim()) return `${key}: ${value.trim().slice(0, 300)}`;
-	}
-	return "";
-}
-
-/** The window a limit is about, in words rather than the wire's name for it. */
-function limitWindow(type: string | undefined): string {
-	switch (type) {
-		case "five_hour":
-			return "5-hour";
-		case "seven_day":
-			return "weekly";
-		case "seven_day_opus":
-			return "weekly Opus";
-		case "seven_day_sonnet":
-			return "weekly Sonnet";
-		case "overage":
-		case "seven_day_overage_included":
-			return "overage";
-		default:
-			return "usage";
-	}
-}
-
-/**
- * When a limit lifts, said the way a person would say it.
- *
- * A bare timestamp is not information at a glance, and the reset is usually today — so a
- * time is enough, and a date is only added when it is not today. Empty when there is no
- * reset to report, because "resets undefined" is worse than saying nothing.
- */
-function resetWords(at: number | undefined): string {
-	if (!at || !Number.isFinite(at)) return "";
-	const when = new Date(at);
-	if (Number.isNaN(when.getTime())) return "";
-	const today = new Date().toDateString() === when.toDateString();
-	const time = when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-	return today ? ` (resets ${time})` : ` (resets ${when.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time})`;
-}
-
 /**
  * Who a config directory is signed in as, from the CLI's own `auth status`.
  *
@@ -1635,6 +1577,28 @@ export async function claudeIdentity(configDir?: string): Promise<{ email?: stri
 	} catch {
 		return {};
 	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// --- usage and limits -------------------------------------------------------------
+
+/**
+ * What the session has cost, out of the payload behind the CLI's own `/usage`.
+ *
+ * Reported as zero for a while, on the grounds that the call is experimental — which left
+ * the meter saying "3% ctx" beside a pi agent saying "3% ctx · $0.0018", and a cost of zero
+ * is not more honest than no figure, it is a wrong one.
+ *
+ * `undefined` rather than zero when the payload has no figure, so the caller keeps the one
+ * it had: the whole payload is held at arm's length, because the SDK's own name for the call
+ * is an instruction — `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`.
+ */
+function sessionCost(usage: SDKControlGetUsageResponse | undefined): number | undefined {
+	const cost = usage?.session?.total_cost_usd;
+	return typeof cost === "number" && Number.isFinite(cost) ? cost : undefined;
 }
 
 /**
@@ -1672,3 +1636,57 @@ export async function probeUsage(env: NodeJS.ProcessEnv | undefined): Promise<SD
 		probe.close?.();
 	}
 }
+
+/** The window a limit is about, in words rather than the wire's name for it. */
+function limitWindow(type: string | undefined): string {
+	switch (type) {
+		case "five_hour":
+			return "5-hour";
+		case "seven_day":
+			return "weekly";
+		case "seven_day_opus":
+			return "weekly Opus";
+		case "seven_day_sonnet":
+			return "weekly Sonnet";
+		case "overage":
+		case "seven_day_overage_included":
+			return "overage";
+		default:
+			return "usage";
+	}
+}
+
+/**
+ * When a limit lifts, said the way a person would say it.
+ *
+ * A bare timestamp is not information at a glance, and the reset is usually today — so a
+ * time is enough, and a date is only added when it is not today. Empty when there is no
+ * reset to report, because "resets undefined" is worse than saying nothing.
+ */
+function resetWords(at: number | undefined): string {
+	if (!at || !Number.isFinite(at)) return "";
+	const when = new Date(at);
+	if (Number.isNaN(when.getTime())) return "";
+	const today = new Date().toDateString() === when.toDateString();
+	const time = when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	return today ? ` (resets ${time})` : ` (resets ${when.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time})`;
+}
+
+// --- the session tree -------------------------------------------------------------
+
+/**
+ * Whether a user-role message is something a person typed.
+ *
+ * A tool result rides on a user message as a `tool_result` block, and a synthetic message
+ * can carry no text at all. Either way it is not a point in the conversation you can
+ * return to.
+ */
+function isTyped(message: unknown): boolean {
+	const content = (message as { content?: unknown } | undefined)?.content;
+	if (typeof content === "string") return content.trim().length > 0;
+	if (!Array.isArray(content)) return false;
+	if (content.some((part) => (part as { type?: string })?.type === "tool_result")) return false;
+	return content.some((part) => (part as { type?: string })?.type === "text");
+}
+
+/** Whether a session message's content begins with the text that was displayed. */

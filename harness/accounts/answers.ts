@@ -9,16 +9,6 @@ type Tell = (name: string, payload: unknown) => void;
 const refused = (code: string, message: string, hint?: string) => Object.assign(new Error(message), { code, ...(hint ? { hint } : {}) });
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
-export function accountRows(accounts: ClaudeAccounts) {
-	const active = accounts.activeId();
-	return accounts.list().map((one) => ({
-		id: one.id,
-		label: one.email ?? (one.id === "default" ? "This Mac's Claude login" : one.id),
-		active: one.id === active,
-		...(one.plan ? { spending: one.plan } : {}),
-	}));
-}
-
 export function accountAnswers(accounts: ClaudeAccounts, sessions: Sessions, tell: Tell): Record<string, Answerer> {
 	const changed = () => tell("account.changed", { ids: [], by: "harness", rev: Date.now() });
 	const row = (id: string) => accountRows(accounts).find((one) => one.id === id);
@@ -48,4 +38,14 @@ export function accountAnswers(accounts: ClaudeAccounts, sessions: Sessions, tel
 			return (await session.backend?.report?.()) ?? { account: session.account ?? null };
 		},
 	};
+}
+
+export function accountRows(accounts: ClaudeAccounts) {
+	const active = accounts.activeId();
+	return accounts.list().map((one) => ({
+		id: one.id,
+		label: one.email ?? (one.id === "default" ? "This Mac's Claude login" : one.id),
+		active: one.id === active,
+		...(one.plan ? { spending: one.plan } : {}),
+	}));
 }
