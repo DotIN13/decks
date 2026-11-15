@@ -10,6 +10,8 @@ export type ShotOptions = { type: "png" | "jpeg"; clip?: { x: number; y: number;
 export interface Page {
 	goto(url: string): Promise<void>;
 	show(html: string): Promise<void>;
+	/** Send this token as the bearer on every request to this origin, and to no other. */
+	authorize(origin: string, token: string): Promise<void>;
 	evaluate<T>(script: string): Promise<T>;
 	screenshot(options: ShotOptions): Promise<Bytes>;
 	pdf(size: { width: number; height: number }): Promise<Bytes>;
@@ -47,6 +49,9 @@ function wrap(page: PwPage, close: () => Promise<void>): Page {
 		async show(html) {
 			await page.setContent(html, { waitUntil: "load", timeout: LOAD_MS });
 			await settle(page);
+		},
+		async authorize(origin, token) {
+			await page.route((url) => url.origin === origin, (route) => route.continue({ headers: { ...route.request().headers(), authorization: `Bearer ${token}` } }));
 		},
 		evaluate: (script) => page.evaluate(script),
 		async screenshot(options) {

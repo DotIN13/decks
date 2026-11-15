@@ -29,6 +29,7 @@ function fakeBrowser(reading: Reading, views: Views = { controls: 0, opening: re
 				errors,
 				goto: async (url) => void one.urls.push(url),
 				show: async (html) => void one.html.push(html),
+				authorize: async (origin: string) => void one.urls.push(`authorize ${origin}`),
 				evaluate: async <T>(script: string) => (script.includes("controls") ? views : script.startsWith("(() =>") ? reading : undefined) as T,
 				screenshot: async () => (one.shots++, new Uint8Array([137, 80, 78, 71])),
 				pdf: async () => new TextEncoder().encode("%PDF"),
@@ -193,6 +194,21 @@ test("rule 13: a picture to download is answered as bytes, with its box, and kep
 	assert.ok(JSON.parse(got.headers.get("x-shot-box") ?? "null"), "it says the box it pictured");
 	assert.equal((await s.value<unknown[]>("file.list", { path: "", deep: true })).length, before, "nothing written to the deck");
 	assert.equal((await fetch(`${served.url}/pictures/shot?pass=${served.token}`)).status, 404, "no canvas named");
+	await served.close();
+	await s.close();
+});
+
+test("rule 14: posted markup is drawn at the card's own address, with a pass for that origin only", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	const served = await s.listen();
+	const post = (path: string) => fetch(`${served.url}/pictures/snapshot?path=${path}&w=300&h=200&pass=${served.token}`, { method: "POST", body: "<html><head></head><body><p>hi</p></body></html>" });
+	const got = await post(CARD);
+	assert.equal(got.status, 200, await got.clone().text());
+	assert.equal(got.headers.get("content-type"), "image/png");
+	assert.deepEqual(fake.seen[0]!.urls, ["authorize http://127.0.0.1:4664"]);
+	assert.match(fake.seen[0]!.html[0]!, /<head><base href="http:\/\/127\.0\.0\.1:4664\/files\/canvases\/work\/cards\/sales\/">/);
+	assert.equal((await post("canvases/work/cards/none/index.html")).status, 404);
 	await served.close();
 	await s.close();
 });

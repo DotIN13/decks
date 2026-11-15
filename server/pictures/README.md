@@ -43,6 +43,8 @@ HTML; `playwright` for the browser. No other feature.
    its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
 13. `GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&name=` is a picture to
     download, taken as `canvas.screenshot` takes it, answered as bytes and kept nowhere.
+14. `POST /pictures/snapshot?path=&w=&h=&scheme=` draws a card from markup its page posted, at
+    the card's own address with a pass for that origin only, and answers the PNG.
 
 ## Not here
 

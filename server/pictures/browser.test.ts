@@ -55,9 +55,28 @@ test("card.fit and canvas.screenshot in a real browser, on the fixture deck", { 
 			await (await fetch(`${served.url}/pictures/${path}?w=480&v=0&pass=${served.token}`)).arrayBuffer();
 			assert.ok(Date.now() - again < 300, `the second from the store, under 300 ms (first took ${again - t0} ms)`);
 		}
+		const folder = CARD.replace(/index\.html$/, "");
+		await s.value("file.write", { path: `${folder}snap.css`, text: "body { background: rgb(255, 0, 0); margin: 0 }" }, ann);
+		const snap = await fetch(`${served.url}/pictures/snapshot?path=${CARD}&w=200&h=100&pass=${served.token}`, { method: "POST", body: '<html><head><link rel="stylesheet" href="snap.css"></head><body></body></html>' });
+		assert.equal(snap.headers.get("content-type"), "image/png", await snap.clone().text());
+		const red = await redPixel(Buffer.from(await snap.arrayBuffer()));
+		assert.ok(red, "the card's own stylesheet loaded, by its relative address");
 	} finally {
 		await served.close();
 		await s.close();
 		await browser.close();
 	}
 });
+
+/** Whether the PNG's middle pixel is red, read in a page of its own. */
+async function redPixel(png: Buffer): Promise<boolean> {
+	const { chromium: pw } = await import("playwright");
+	const b = await pw.launch({ headless: true });
+	try {
+		const page = await b.newPage();
+		const data = png.toString("base64");
+		return await page.evaluate(`(async () => { const i = await createImageBitmap(await (await fetch("data:image/png;base64,${data}")).blob()); const c = new OffscreenCanvas(i.width, i.height); const x = c.getContext("2d"); x.drawImage(i, 0, 0); const p = x.getImageData(i.width >> 1, i.height >> 1, 1, 1).data; return p[0] > 200 && p[1] < 60 && p[2] < 60; })()`);
+	} finally {
+		await b.close();
+	}
+}
