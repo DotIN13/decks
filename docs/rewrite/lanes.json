@@ -95,8 +95,7 @@
 		"engine/crates/apple/",
 		"engine/Cargo.toml",
 		"engine/Cargo.lock",
-		"engine/crates/",
-		"tools/gates/baseline/"
+		"engine/crates/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
@@ -117,5 +116,8 @@
 		"package-lock.json",
 		"AGENTS.md",
 		"CONTRIBUTING.md"
+	],
+	"*": [
+		"tools/gates/baseline/"
 	]
 }
