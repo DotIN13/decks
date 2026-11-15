@@ -47,7 +47,6 @@
 	"canvas/host/inside/options.ts: function editorOptions over 80 lines": 1,
 	"canvas/host/inside/options.ts: function installHost over 80 lines": 1,
 	"canvas/host/inside/presence.ts: function installPresence over 80 lines": 1,
-	"canvas/host/inside/studio-line.ts: function createStudioLine over 80 lines": 1,
 	"canvas/host/outside/framed-editor.tsx: function createFramedEditor over 80 lines": 1,
 	"canvas/host/outside/framed-editor.tsx: function keepInStep over 80 lines": 1,
 	"canvas/host/outside/framed-editor.tsx: function wire over 80 lines": 1,
