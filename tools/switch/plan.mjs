@@ -43,7 +43,7 @@ function importers(files, name) {
 }
 
 function deletions(files) {
-	return REPLACED.map((r) => {
+	return REPLACED.filter((r) => !KEPT.includes(r.old)).map((r) => {
 		const there = existsSync(join(ROOT, r.old));
 		const name = nameOf(r.old);
 		const users = name ? importers(files, name) : [];

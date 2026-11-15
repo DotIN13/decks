@@ -4,12 +4,14 @@ const list = (rows) => rows.map((r) => `- ${r}`).join("\n");
 
 function deleted(p) {
 	const go = p.deletions.filter((d) => d.delete).map((d) => `\`${d.old}\` (${d.name ?? "no package"}): now ${d.home}. Proof: ${d.proof}.`);
-	const stay = p.deletions.filter((d) => !d.delete).map((d) => `\`${d.old}\`: **not deleted**, ${d.why}. Its new home: ${d.home}.`);
-	return `## Deleted\n\n${list(go)}\n\n### Not deleted, and why\n\n${list(stay)}\n- \`packages/docs\`: its server half lives in server/documents, its page half is Loom's; the package goes whole with Loom.`;
+	const moved = p.deletions.filter((d) => d.why === "already gone").map((d) => `\`${d.old}\`: already moved to ${d.home}.`);
+	const stay = p.deletions.filter((d) => !d.delete && d.why !== "already gone").map((d) => `\`${d.old}\`: **not deleted**, ${d.why}. Its new home: ${d.home}.`);
+	return `## Deleted\n\n${list([...go, ...moved])}\n\n### Not deleted, and why\n\n${list(stay)}\n- \`packages/docs\`: its server half lives in server/documents, its page half is Loom's; the package goes whole with Loom.`;
 }
 
 function kept(p) {
-	return `## Kept until Loom moves them (wave 3)\n\n${list(p.kept.map((k) => `\`${k}\``))}`;
+	const why = { "packages/protocol": "the canvas library reads its old shapes (Page, Presence, StageCall, ...)", "packages/api": "the canvas library's card calls (cardCalls)", "packages/hub": "the canvas library's follower (studio-line.ts)" };
+	return `## Kept until Loom moves them (wave 3)\n\nDecided in DESIGN.md section 11; they go at the map's step 4a.\n\n${list(p.kept.map((k) => `\`${k}\`${why[k] ? `: ${why[k]}` : ""}`))}`;
 }
 
 function renamed(p) {
