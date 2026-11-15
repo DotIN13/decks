@@ -22,3 +22,17 @@ test("GET /api/deck lists the cards on every canvas and a friend's old board", a
 	await doors.close();
 	await server.close();
 });
+
+test("an upload lands in the canvas's files/, never over another, and where finds it", async () => {
+	const server = await testServer({ features: features(), deck: { "canvases/plan/canvas.pen": JSON.stringify({ version: "2.14", children: [] }) } });
+	const doors = await server.listen(0);
+	const up = () => fetch(`${doors.url}/api/upload?name=${encodeURIComponent("a photo.png")}&canvas=plan`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: new Uint8Array([1, 2, 3]) }).then((r) => r.json() as Promise<{ path: string; ref?: string; bytes: number }>);
+	const first = await up();
+	const second = await up();
+	assert.deepEqual([first.path, first.ref, first.bytes], ["canvases/plan/files/a photo.png", "files/a photo.png", 3]);
+	assert.equal(second.path, "canvases/plan/files/a photo-2.png");
+	const where = await fetch(`${doors.url}/api/where?path=${encodeURIComponent(first.path)}`, { headers: { authorization: `Bearer ${doors.token}` } }).then((r) => r.json() as Promise<{ inDeck: boolean }>);
+	assert.equal(where.inDeck, true);
+	await doors.close();
+	await server.close();
+});
