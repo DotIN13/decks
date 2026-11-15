@@ -32,8 +32,25 @@ export async function readDrawing(deck: Deck, canvas: string, base: string): Pro
 	}
 }
 
+/** A card's news as card.list answers it. */
+export type News = { by?: string; named?: number; changed?: number; seen?: number };
+
+/** Each card's news by its path, read once from card.list; empty when the call is refused. */
+export async function newsOf(call: (name: string, args: Record<string, unknown>) => Promise<unknown>): Promise<Map<string, News>> {
+	const cards = (await call("card.list", {}).catch(() => [])) as Array<News & { path: string }>;
+	return new Map(cards.map((card) => [card.path, card]));
+}
+
+/** News as today's Page carried it: who wrote it last, and when it was named, changed and seen. */
+const pageNews = (news: News | undefined) => ({
+	...(news?.by ? { lastWrittenBy: news.by === "person" ? "you" : news.by } : {}),
+	...(news?.named !== undefined ? { namedAt: news.named } : {}),
+	...(news?.changed !== undefined ? { modifiedAt: news.changed } : {}),
+	...(news?.seen !== undefined ? { seenAt: news.seen } : {}),
+});
+
 /** The cards at the top of a drawing (and old boards, with boards), as today's Page records. */
-export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = false): Record<string, unknown>[] {
+export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = false, news = new Map<string, News>()): Record<string, unknown>[] {
 	const kinds = boards ? ["decks.card", "decks.board"] : ["decks.card"];
 	return (doc.children ?? [])
 		.filter((node) => kinds.includes(node.metadata?.type ?? "") && typeof node.metadata?.path === "string")
@@ -47,7 +64,8 @@ export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = fal
 			h: node.height ?? 700,
 			rev: 0,
 			inContext: [],
-		}));
+		}))
+		.map((page) => ({ ...page, ...pageNews(news.get(String(page.path))) }));
 }
 
 const bearer = (header: string | undefined) => (header?.startsWith("Bearer ") ? header.slice(7) : undefined);
@@ -64,7 +82,7 @@ export function drawingRoute(deck: () => Deck): Route {
 			const got = bound && bound !== canvas ? undefined : await ctx.call<{ rev?: number }>("canvas.get", { canvas }).catch(() => undefined);
 			const read = got ? await readDrawing(deck(), canvas, base) : undefined;
 			if (!read) return void res.writeHead(404, { "content-type": "text/plain" }).end(`There is no canvas called ${canvas}.`);
-			const body = JSON.stringify({ doc: read.doc, base, rev: got?.rev ?? 0, cards: pagesOf(canvas, read.doc, true) });
+			const body = JSON.stringify({ doc: read.doc, base, rev: got?.rev ?? 0, cards: pagesOf(canvas, read.doc, true, await newsOf((n, a) => ctx.call(n, a))) });
 			res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(body);
 		},
 	};

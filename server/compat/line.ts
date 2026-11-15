@@ -8,7 +8,7 @@ import { readDrawing } from "./drawing.ts";
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
 
 export const LINE_PATH = "/compat/v1/socket";
-const QUIET = new Set(["card.seen", "card.extent", "canvas.unwatch"]);
+const QUIET = new Set(["card.extent", "canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
 type State = { caller?: Caller; token?: string; watched: Map<string, Stop> };
@@ -55,6 +55,7 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck): void {
 		if (message.type === "canvas.watch") return watch(String(message.canvas ?? ""), message.since, message.whole);
 		if (message.type === "canvas.unwatch") state.watched.get(String(message.canvas))?.();
 		if (message.type === "presence.set") return screen(message);
+		if (message.type === "card.seen") return void (await door.call("card.seen", { card: String(message.path ?? "") }, state.caller!, client));
 		if (message.type === "view.answered") return answered(message);
 		if (QUIET.has(String(message.type)) || message.type === "line.token") return;
 		send({ type: "harness.notice", level: "warn", text: `The line does not know ${String(message.type)}.` });

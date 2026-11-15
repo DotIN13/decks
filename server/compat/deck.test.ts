@@ -37,3 +37,11 @@ test("an upload lands in the canvas's files/, never over another, and where find
 	await server.close();
 });
 
+
+test("pages carry a card's news as today's Page did", async () => {
+	const { pagesOf } = await import("./drawing.ts");
+	const doc = { children: [{ type: "browser", id: "one", metadata: { type: "decks.card", path: "cards/one/index.html" } }] };
+	const news = new Map([["canvases/plan/cards/one/index.html", { by: "person", named: 1, changed: 2, seen: 3 }]]);
+	const [page] = pagesOf("plan", doc, false, news);
+	assert.deepEqual([page!.lastWrittenBy, page!.namedAt, page!.modifiedAt, page!.seenAt], ["you", 1, 2, 3]);
+});
