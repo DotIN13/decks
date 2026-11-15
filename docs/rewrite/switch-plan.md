@@ -9,6 +9,7 @@ Written by `node tools/switch/run.mjs --dry` on 2026-11-15 from the tree as it i
 - `packages/agent-ui` (@decks/agent-ui): now harness/page (chat/, composer/). Proof: chat-content, slash, voice, working-marks checks.
 - `packages/sdk` (@decks/sdk): now clients/sdk, clients/cli. Proof: node tools/check.mjs clients/sdk, tools/clients/same.test.ts.
 - `runtime` (@decks/runtime): now harness/prompts, harness/runtimes. Proof: node tools/check.mjs harness; running, time-machine checks.
+- `e2e` (@decks/e2e): now tools/checks (the runner, the harness, the fake model and agent) and the features' checks/ folders. Proof: every check moved first and started by node tools/checks/run.mjs.
 - `extension`: already moved to clients/extension.
 
 ### Not deleted, and why
@@ -28,7 +29,7 @@ Decided in DESIGN.md section 11; they go at the map's step 4a.
 - `packages/pen`
 - `packages/ui`
 - `packages/stage`
-- `packages/protocol`: the canvas library reads its old shapes (Page, Presence, StageCall, ...)
+- `packages/protocol`: the canvas library reads its old shapes (Page, Presence and the old call and author types)
 - `packages/api`: the canvas library's card calls (cardCalls)
 - `packages/hub`: the canvas library's follower (studio-line.ts)
 
@@ -51,21 +52,23 @@ Then one install under the heavy lock, so node_modules links the new names.
 
 ## Moved
 
-The 76 browser checks of stop 3, each to its owner's feature (owners from the stop 3 card's runs.json; with none, by what it exercises: the page's to Pane, the canvas library's to tools/checks/canvas until Loom moves the library):
+All 95 browser checks move and start under `node tools/checks/run.mjs`; `e2e/run.mjs` goes with e2e/. Stop 3's go to their owners' features (owners from the stop 3 card's runs.json; with none, by what they exercise: the page's to Pane, the canvas library's to tools/checks/canvas until Loom moves the library); the agent checks to tools/checks/agent, the benches to tools/checks/bench:
 
 - `server/cards/checks/` (7): empty-canvas-follows, board-links, placement, card-ground, card-tab, card-links, deck-imports
 - `harness/page/checks/` (17): panel (by subject: Pane), chat-content (by subject: Pane), slash (by subject: Pane), notifications (by subject: Pane), agents-tab, shell (by subject: Pane), focus, placement-views, context (by subject: Pane), per-agent (by subject: Pane), working-marks (by subject: Pane), panel-steady (by subject: Pane), item-pill, voice (by subject: Pane), canvas-switch (by subject: Pane), stages (by subject: Pane), new-agent-opens (by subject: Pane)
 - `server/people/checks/` (6): tiers, news-seen, old-board (by subject: Roster), view-calls, presence, agent-cursor
 - `server/canvas/checks/` (8): geometry, board-comment, pen-stage, card-editor, stage-gestures, shapes, same-drawing, frames
-- `tools/checks/canvas/` (24): selection (by subject: Loom), camera (by subject: Loom), layers-webkit (by subject: Loom), placement-at (by subject: Loom), glide (by subject: Loom), stage-scroll (by subject: Loom), card-phone (by subject: Loom), bent-arrows (by subject: Loom), engine-slide (by subject: Loom), zoom-out-pictures (by subject: Loom), opening-lands (by subject: Loom), wheel-diagonal (by subject: Loom), backends (by subject: Loom), context-loss (by subject: Loom), note-edges (by subject: Loom), tile-pixels (by subject: Loom), stage-goldens (by subject: Loom), drop-lands (by subject: Loom), canvas-frame (by subject: Loom), pencil-then-finger (by subject: Loom), media (by subject: Loom), camera-roundtrip (by subject: Loom), card-copy (by subject: Loom), card-keys (by subject: Loom)
-- `tools/checks/e2e/` (6): items-made, card-shot, stage-shot, placeholder, ink-long-stroke, smooth-edits
+- `tools/checks/canvas/` (34): selection (by subject: Loom), camera (by subject: Loom), layers-webkit (by subject: Loom), placement-at (by subject: Loom), glide (by subject: Loom), stage-scroll (by subject: Loom), card-phone (by subject: Loom), bent-arrows (by subject: Loom, timed), engine-slide (by subject: Loom), zoom-out-pictures (by subject: Loom), opening-lands (by subject: Loom), wheel-diagonal (by subject: Loom), backends (by subject: Loom), context-loss (by subject: Loom), note-edges (by subject: Loom), tile-pixels (by subject: Loom), stage-goldens (by subject: Loom), drop-lands (by subject: Loom), canvas-frame (by subject: Loom), pencil-then-finger (by subject: Loom), media (by subject: Loom), camera-roundtrip (by subject: Loom), card-copy (by subject: Loom), card-keys (by subject: Loom), arrow-label (not in stop 3, named), arrows-steady (not in stop 3, named), awake-drag (not in stop 3, named), card-frame-demo (not in stop 3, named), card-frame-drag (not in stop 3, named), cards-smoke (not in stop 3), edits-wait (not in stop 3, named), look-shots (not in stop 3, named), nudge (not in stop 3, named), text-shots (not in stop 3, named)
+- `tools/checks/e2e/` (6): items-made, card-shot, stage-shot, placeholder, ink-long-stroke (timed), smooth-edits (timed)
 - `server/pictures/checks/` (8): apps-in-frame, card-fit, one-picture, export, export-pill, awake, card-frame, card-files-img
+- `tools/checks/agent/` (6): agent-rows (not in stop 3), chrome (not in stop 3), running (not in stop 3), stage-api (not in stop 3), time-machine (not in stop 3), walkthrough (not in stop 3)
+- `tools/checks/bench/` (3): awake-bench (not in stop 3, named), pan-heavy (not in stop 3, named), render-perf (not in stop 3, named)
 
-`e2e/harness.mjs` becomes `tools/checks/harness.mjs`; each moved check's `../harness.mjs` import is rewritten to it, and nothing else in a check changes. `e2e/run.mjs` is replaced by `tools/checks/run.mjs`, which finds checks in their new places. The fixture moves from `e2e/fixture` to `tools/fixtures/deck` (already there).
+What the runner must know of a check is a field in `tools/checks/checks.json`: `timed` runs alone on the dev server, as it was written for (DESIGN.md section 11), every other check on the built page; `agent` is skipped unless `--agent`; `named` and `bench` for the long checks and the measures; `path` where it lives. `e2e/harness.mjs` becomes `tools/checks/harness.mjs` and each moved check's `../` imports point there; the fake model and agent move to tools/checks; the fixture is `tools/fixtures/deck` (already there).
 
-### Not in stop 3 (19): they stay in e2e/checks with today's e2e/run.mjs, for their owners to keep or drop
+### The agent checks, once on the new programs before the deletions
 
-agent-rows, arrow-label, arrows-steady, awake-bench, awake-drag, card-frame-demo, card-frame-drag, cards-smoke, chrome, edits-wait, look-shots, nudge, pan-heavy, render-perf, running, stage-api, text-shots, time-machine, walkthrough
+agent-rows, chrome, running, time-machine, walkthrough: each starts an agent's turn through Pi with the fake model (`fake-agent`, `fake-model.mjs` on port 4700), which the runner starts; no signed-in Claude, no tokens. Run on 2026-11-14: all pass. stage-api: asks the agent to run the decks command, which the fake model cannot do; it needs a real model. The runner starts the harness with Pi on the fake model only, so that run needs the harness started with a signed-in Claude (`--kinds claude`), once, with Mason's yes.
 
 ## Compat
 
@@ -152,16 +155,24 @@ Every old name answers until 2027-05-14. After the switch, today's canvas librar
 
 ## Root files
 
-- Workspaces: `packages/*`, `apps/*`, `e2e`, `examples/*`, `protocol`, `server`, `harness`, `harness/page`, `clients/*`, `tools`.
-- Scripts: `dev`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}" & node --import tsx harness/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `start`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `build:page`: `npm run build --workspace @decks/page`; `typecheck`: `npm run typecheck --workspaces --if-present`; `test`: `node tools/check.mjs protocol && node tools/check.mjs server && node tools/check.mjs harness && node tools/check.mjs tools`; `gates`: `node tools/gates/run.mjs`; `test:e2e`: `node tools/checks/run.mjs`; `check`: `node tools/check.mjs`; `heavy`: `node tools/heavy.mjs`.
-- Scripts removed: `dev:server`, `dev:web`, `e2e:serve`, `e2e:serve:server`, `build`, `vendor`, `build:live-doc`, `css:order`, `gates:next`, `dev:example`, `build:packages`, `test:packages`.
+- Workspaces: `packages/*`, `apps/*`, `examples/*`, `protocol`, `server`, `harness`, `harness/page`, `clients/*`, `tools`.
+- Kept until Loom moves the packages that use them: `vendor` (copies d3, KaTeX, pdf.js and the bundles into packages/card-host/lib); `build:live-doc` (builds packages/card-host/lib/live-doc.js); `build:packages` (builds the public @decks packages (canvas, pen, ui, the engine, card-host, hub) for Studio and npm); `test:packages` (packs and installs those packages to prove they run outside the repo).
+- Scripts: `dev`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}" & node --import tsx harness/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `start`: `node --import tsx server/main.ts --deck "${DECKS_DECK:-$PWD/data}"`; `build:page`: `npm run build --workspace @decks/page`; `typecheck`: `npm run typecheck --workspaces --if-present`; `test`: `node tools/check.mjs protocol && node tools/check.mjs server && node tools/check.mjs harness && node tools/check.mjs tools`; `gates`: `node tools/gates/run.mjs`; `test:e2e`: `node tools/checks/run.mjs`; `check`: `node tools/check.mjs`; `heavy`: `node tools/heavy.mjs`; `vendor`: `node scripts/vendor.mjs`; `build:live-doc`: `node scripts/live-doc.mjs`; `build:packages`: `node scripts/build-packages.mjs`; `test:packages`: `node scripts/test-packages.mjs`.
+- Scripts removed: `dev:server`, `dev:web`, `e2e:serve`, `e2e:serve:server`, `build`, `css:order`, `gates:next`, `dev:example`.
 - CI: .github/workflows/test.yml: npm run test:e2e runs tools/checks/run.mjs; the typecheck and test steps stay.
+
+## Lanes the switch needs, for that one job
+
+- 1. moving the checks: `e2e/`, `harness/page/checks/`, `server/canvas/checks/`, `server/cards/checks/`, `server/people/checks/`, `server/pictures/checks/`, `tools/checks/`
+- 2. deleting: `apps/server/`, `apps/web/`, `packages/agent-ui/`, `packages/sdk/`, `runtime/`, `e2e/`
+- 3. renaming (files that name @decks-next): `clients/attach/`, `clients/cli/`, `clients/extension/`, `clients/mcp/`, `clients/sdk/`, `docs/`, `harness/`, `protocol/`, `server/package.json`, `tools/`
+- 4. root files and CI: `package.json`, `package-lock.json`, `.github/workflows/`
 
 ## Order, one commit each, the gates passing after each
 
-The commits touch other lanes' folders (the moved checks, the deleted code): Mason opens those paths to Warden for the switch, or commits them.
+The commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.
 
-1. Move the 76 checks and the harness into place; run.mjs finds them there.
+1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.
 2. Delete what has a new home and no importer left.
 3. Rename @decks-next to @decks, then install.
 4. Root files and CI.
