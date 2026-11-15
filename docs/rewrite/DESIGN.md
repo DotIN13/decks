@@ -364,3 +364,10 @@ An app's source may live outside the deck, as long as the deck knows where it is
 - **Package names stay**, except the engine's, which takes its folder's name.
 - **Vendored libraries leave git.** d3, KaTeX and pdf.js become npm dependencies pinned to the versions
   vendored today and are copied in at install; the engine's built files are built, not kept.
+- **Checks that measure time run on the dev server**, as today's runner runs them; every other check
+  runs on the built page. `ink-long-stroke` compares two timings 0.2 to 0.4 ms apart: it passes 10 of
+  10 on the dev server for today's programs and the new ones alike, and 7 of 10 on the minified build.
+  The assertion was written for the dev server; the same conditions are the fair comparison.
+- **No check is left with a runner whose programs are gone.** The 19 checks outside stop 3 move with
+  the switch-over too and start under the new runner; the five that need a real agent are run once on
+  the new programs before the old code is deleted.
