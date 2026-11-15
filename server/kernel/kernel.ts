@@ -2,14 +2,13 @@ import { Refused, type Caller, type Envelope } from "../../protocol/index.ts";
 import { randomUUID } from "node:crypto";
 import { Callers } from "./callers.ts";
 import { machineFolder } from "./disk.ts";
-import { checkMount } from "./fence.ts";
 import { EventBus } from "./events.ts";
 import { HistoryDeck } from "./history.ts";
 import { ownFeature } from "./own-calls.ts";
 import { Relay } from "./relay.ts";
 import { declaredOf, Router, routesOf, type MakeContext } from "./router.ts";
 import { memoryVersion, readJson, writeJson, type Stores } from "./store.ts";
-import { toDeckPath, type CanvasDoc, type CanvasSource, type Context, type Deck, type Feature, type Kernel, type Stop, type Store, type VersionFile } from "./types.ts";
+import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Store, VersionFile } from "./types.ts";
 
 // Builds the kernel from a deck, a store per feature and the features: the
 // deck wrapped in history, the callers, the event stream, the canvas source,
@@ -44,10 +43,6 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const kinds = features.flatMap((one) => one.items ?? []);
 	const relay = new Relay(options.relayWaitMs);
 	const address: { url?: string } = {};
-	const mount = (prefix: string, folder: string) => {
-		const checked = checkMount(prefix, folder, options.deck.root);
-		history.mount(checked.prefix, checked.folder);
-	};
 	const kernel: Kernel = {
 		...{ deck: history, events, canvas, callers, store: options.stores, kinds },
 		relay: (answerer) => relay.answer(answerer),
@@ -57,7 +52,6 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		call: (name, args, caller) => router.call(name, args, caller),
 		sees: (one) => void events.sees.push(one),
 		...{ url: () => address.url, folder: () => options.deck.root, machine: () => machine, deckId: () => deckId },
-		...{ mount, unmount: (prefix: string) => history.unmount(toDeckPath(prefix)) },
 	};
 	source = canvasSource(features, kernel);
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);

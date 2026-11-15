@@ -9,7 +9,6 @@ no feature; only `server/main.ts` does. Keel owns it.
 - `deck.ts` (the deck on a folder), `memory-deck.ts` (in memory), `history.ts` (every write a
   revision), `disk.ts` and `store.ts` (a feature's private store), `callers.ts` (tokens to callers).
 - `router.ts`, `events.ts`, `relay.ts`, `kernel.ts` (builds it all), `own-calls.ts` (`deck.*`).
-- `fence.ts`: what may be mounted, and which mount a path is under.
 - `doors/`: `http.ts`, `socket.ts`, `ws.ts`, `mcp.ts`. `lockfile.ts`, `server.ts` (`startServer`).
 - `testing.ts`: `testServer` and `testContext`, for every feature's tests. `index.ts`: the entry.
 
@@ -21,9 +20,7 @@ no feature; only `server/main.ts` does. Keel owns it.
 
 1. Only `deck.ts`, `disk.ts` and `lockfile.ts` touch `node:fs`; everything else reads a deck through `Deck`.
 2. A path is a `DeckPath`, checked once by `toDeckPath`; a symlink that leads out is refused as `invalid`.
-3. `apps/<name>` may be mounted on a folder outside the deck (DESIGN 10), only through `Kernel.mount`,
-   never on a home, system, hidden or deck folder; fenced like the deck. Mounts are not saved.
-   Every write, remove and move is a revision in history, with who and when; a file is readable and
+3. The deck's calls stay inside the deck; a file outside it is edited on disk (DESIGN 10). Every write, remove and move is a revision in history, with who and when; a file is readable and
    restorable at any revision. A remove goes to `.decks/trash/`. A change on the disk is `by: "disk"`, the server's own writes known by their bytes.
 4. A token or a pass (a token issued to a card or an app) becomes a `Caller` at the door. Nothing else
    says who is calling. Only hashes are kept. The person on this machine has id `person`.

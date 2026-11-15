@@ -41,9 +41,6 @@ export interface Deck {
 	readAt?(path: DeckPath, rev: number): Promise<Bytes>;
 	/** Write the file back as it was at a revision, as a new revision. */
 	restore?(path: DeckPath, rev: number, by: Caller): Promise<Revision>;
-	/** Section 10: apps/<name> resolves to a folder outside the deck. Set only through Kernel.mount. */
-	mount?(prefix: DeckPath, folder: string): void;
-	unmount?(prefix: DeckPath): void;
 }
 
 export type Item = shapes.Item;
@@ -113,9 +110,6 @@ export interface Kernel {
 	translate(translator: Translator): void;
 	/** Make a call as a given caller from outside any handler (the sync client); the router's checks apply. */
 	call(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>>;
-	/** Mount apps/<name> on a folder outside the deck; refused invalid for an unsafe folder, unavailable on a deck that cannot. */
-	mount(prefix: string, folder: string): void;
-	unmount(prefix: string): void;
 	/** The machine's own folder for the kernel and features, outside any deck, user-only. */
 	machine(): string;
 	/** A stable id for this deck, made once and kept with the deck. */

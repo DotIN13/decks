@@ -1,15 +1,14 @@
 import { createHash } from "node:crypto";
 import { watch as fsWatch, type FSWatcher } from "node:fs";
-import { cp, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { layout, Refused, type Caller } from "../../protocol/index.ts";
-import { Mounts, type Mount } from "./fence.ts";
 import { toDeckPath, type Bytes, type Deck, type DeckPath, type Entry, type FileChange, type Revision, type Stop } from "./types.ts";
 
-// The deck on a folder, and apps/<name> mounted on folders outside it. A
-// path is joined to its base; a symlink out of the base is refused. Removes
-// go to .decks/trash/. A change on the disk by anything else is told as by
-// "disk"; the server's own writes are known by their bytes, not by time.
+// The deck on a folder. A path is joined to the root; a symlink out of the
+// deck is refused. Removes go to .decks/trash/. A change on the disk by
+// anything else is told as by "disk"; the server's own writes are known by
+// their bytes, not by time. Hidden files never show.
 
 type Where = { full: string; base: string; basePath: string };
 const hashOf = (bytes: Bytes | Buffer) => createHash("sha256").update(bytes).digest("hex");
@@ -21,7 +20,6 @@ export class FolderDeck implements Deck {
 	private fsWatchers = new Map<string, FSWatcher>();
 	private own = new Map<string, string>();
 	private pending = new Map<string, NodeJS.Timeout>();
-	private mounts = new Mounts();
 
 	constructor(
 		readonly root: string,
@@ -32,18 +30,6 @@ export class FolderDeck implements Deck {
 
 	startAt(rev: number): void {
 		this.rev = Math.max(this.rev, rev);
-	}
-
-	mount(prefix: DeckPath, folder: string): void {
-		this.mounts.add({ prefix, folder });
-		if (this.watchers.size) this.watchFolder(folder, prefix);
-	}
-
-	unmount(prefix: DeckPath): void {
-		const found = this.mounts.find(prefix);
-		if (!this.mounts.remove(prefix) || !found) return;
-		this.fsWatchers.get(found.mount.folder)?.close();
-		this.fsWatchers.delete(found.mount.folder);
 	}
 
 	async read(path: DeckPath): Promise<Bytes> {
@@ -66,31 +52,24 @@ export class FolderDeck implements Deck {
 
 	async list(dir: DeckPath | ""): Promise<Entry[]> {
 		const { full } = dir ? await this.real(dir) : { full: this.root };
-		const mounted = dir === "apps" ? this.mounts.list().map(({ prefix }): Entry => ({ path: prefix, kind: "dir", size: 0, at: 0 })) : [];
 		let names: string[];
 		try {
 			names = await readdir(full);
 		} catch (error) {
-			if (mounted.length) return mounted;
 			throw this.refusal(error, dir || "the deck", "folder");
 		}
-		const entries: Entry[] = [...mounted];
+		const entries: Entry[] = [];
 		for (const name of names.filter((one) => !one.startsWith("."))) {
 			const path = toDeckPath(dir ? `${dir}/${name}` : name);
-			if (this.mounts.isMount(path)) continue;
 			const info = await stat(join(full, name)).catch(() => undefined);
 			if (info) entries.push({ path, kind: info.isDirectory() ? "dir" : "file", size: info.isDirectory() ? 0 : info.size, at: info.mtimeMs });
 		}
-		if (dir === "" && this.mounts.list().length && !entries.some((one) => one.path === "apps")) entries.push({ path: toDeckPath("apps"), kind: "dir", size: 0, at: 0 });
 		return entries.sort((a, b) => a.path.localeCompare(b.path));
 	}
 
 	watch(on: (change: FileChange) => void): Stop {
 		this.watchers.add(on);
-		if (!this.fsWatchers.size) {
-			this.watchFolder(this.root, "");
-			for (const { prefix, folder } of this.mounts.list()) this.watchFolder(folder, prefix);
-		}
+		if (!this.fsWatchers.size) this.watchFolder(this.root, "");
 		return () => {
 			this.watchers.delete(on);
 			if (this.watchers.size === 0) this.close();
@@ -98,19 +77,17 @@ export class FolderDeck implements Deck {
 	}
 
 	async remove(path: DeckPath, by: Caller): Promise<Revision> {
-		if (this.mounts.isMount(path)) throw new Refused("refused", `${path} is an app whose source is outside the deck; it is not deleted through the deck.`, "app.delete");
 		const where = await this.real(path);
 		const files = await this.filesUnder(path, where);
 		if (!files) throw new Refused("not_found", `There is nothing at ${path}.`, "file.list");
 		const trash = join(this.root, ".decks", "trash", `${this.clock()}-${this.rev + 1}`, path);
 		await mkdir(dirname(trash), { recursive: true });
 		for (const one of files) this.own.set(one, GONE);
-		await moveAcross(where.full, trash);
+		await rename(where.full, trash);
 		return this.tellAll(files.map((one) => [one, "deleted"]), path, by.id);
 	}
 
 	async move(from: DeckPath, to: DeckPath, by: Caller): Promise<Revision> {
-		if (this.mounts.isMount(from) || this.mounts.isMount(to)) throw new Refused("refused", "An app mounted from outside the deck is not moved through the deck.", "app.get");
 		const [source, target] = [await this.real(from), await this.real(to)];
 		const files = await this.filesUnder(from, source);
 		if (!files) throw new Refused("not_found", `There is nothing at ${from}.`, "file.list");
@@ -118,7 +95,7 @@ export class FolderDeck implements Deck {
 		const moved = files.map((one) => toDeckPath(to + one.slice(from.length)));
 		for (const one of files) this.own.set(one, GONE);
 		await mkdir(dirname(target.full), { recursive: true });
-		await moveAcross(source.full, target.full);
+		await rename(source.full, target.full);
 		for (const one of moved) this.own.set(one, hashOf(await readFile(this.where(one).full)));
 		const changes = [...files.map((one) => [one, "deleted"] as const), ...moved.map((one) => [one, "written"] as const)];
 		return this.tellAll(changes, to, by.id);
@@ -132,9 +109,7 @@ export class FolderDeck implements Deck {
 	}
 
 	private where(path: string): Where {
-		const found = this.mounts.find(path);
-		if (!found) return { full: join(this.root, path), base: this.root, basePath: "" };
-		return { full: found.rest ? join(found.mount.folder, found.rest) : found.mount.folder, base: found.mount.folder, basePath: found.mount.prefix };
+		return { full: join(this.root, path), base: this.root, basePath: "" };
 	}
 
 	/** Where a path is, refused if a symlink on the way leads out of its base. */
@@ -193,7 +168,7 @@ export class FolderDeck implements Deck {
 		try {
 			this.fsWatchers.set(folder, fsWatch(folder, { recursive: true }, (_kind, name) => name && this.heard(String(name), prefix, basename(folder))));
 		} catch {
-			// A mounted folder that is missing is watched when it is mounted again.
+			// A deck folder that cannot be watched tells no disk changes.
 		}
 	}
 
@@ -201,7 +176,6 @@ export class FolderDeck implements Deck {
 	private heard(name: string, prefix: string, own: string): void {
 		const rel = name.split(sep).join("/");
 		if (layout.hiddenPart(rel)) return;
-		if (!prefix && this.mounts.find(rel)) return;
 		const path = prefix ? `${prefix}/${rel}` : rel;
 		clearTimeout(this.pending.get(path));
 		this.pending.set(path, setTimeout(() => void this.settle(path, rel === own), 60));
@@ -219,16 +193,3 @@ export class FolderDeck implements Deck {
 		this.tellAll([[toDeckPath(path), kind ? "written" : "deleted"]], toDeckPath(path), "disk");
 	}
 }
-
-/** rename, or copy and remove when the two are on different disks. */
-async function moveAcross(from: string, to: string): Promise<void> {
-	try {
-		await rename(from, to);
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-		await cp(from, to, { recursive: true });
-		await rm(from, { recursive: true, force: true });
-	}
-}
-
-export type { Mount };

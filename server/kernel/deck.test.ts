@@ -19,7 +19,7 @@ import { toDeckPath as p, type Deck, type FileChange } from "./types.ts";
 const ann: Caller = { kind: "agent", id: "ann", name: "Ann" };
 const enc = (text: string) => new TextEncoder().encode(text);
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
-type Made = { deck: HistoryDeck; done(): Promise<void>; outside?(): Promise<string> };
+type Made = { deck: HistoryDeck; done(): Promise<void> };
 
 async function folder(files: Record<string, string>): Promise<Made> {
 	const root = await mkdtemp(join(tmpdir(), "keel-deck-"));
@@ -30,24 +30,13 @@ async function folder(files: Record<string, string>): Promise<Made> {
 	const inner = new FolderDeck(root);
 	const deck = new HistoryDeck(inner, folderStores(root)("history"));
 	await deck.load();
-	const outsides: string[] = [];
-	const outside = async () => {
-		const one = await mkdtemp(join(tmpdir(), "keel-app-"));
-		outsides.push(one);
-		return one;
-	};
-	const done = async () => {
-		inner.close();
-		for (const one of [root, ...outsides]) await rm(one, { recursive: true, force: true });
-	};
-	return { deck, done, outside };
+	return { deck, done: async () => (inner.close(), rm(root, { recursive: true, force: true })) };
 }
 
 async function memory(files: Record<string, string>): Promise<Made> {
 	const deck = new HistoryDeck(new MemoryDeck(files), memoryStores()("history"));
 	await deck.load();
-	let n = 0;
-	return { deck, done: async () => {}, outside: async () => `/outside/app-${++n}` };
+	return { deck, done: async () => {} };
 }
 
 deckSuite("memory", memory);
@@ -107,23 +96,6 @@ test("the kernel says the deck's folder on a folder, and nothing in memory", asy
 	const inMemory = await buildKernel({ deck: new MemoryDeck(), stores: memoryStores(), features: [] });
 	assert.equal(inMemory.kernel.folder(), undefined);
 	await rm(root, { recursive: true, force: true });
-});
-
-test("folder: a mount is fenced: no symlink out of the mounted folder, changes in it heard as by disk", async () => {
-	const made = await folder({});
-	const app = await made.outside!();
-	try {
-		made.deck.mount(p("apps/notes"), app);
-		await symlink(tmpdir(), join(app, "out"));
-		await assert.rejects(made.deck.read(p("apps/notes/out/x")), { code: "invalid" });
-		const heard = await new Promise<FileChange>((done) => {
-			const stop = made.deck.watch((c) => (stop(), done(c)));
-			setTimeout(() => void writeFile(join(app, "edited.js"), "x"), 50);
-		});
-		assert.deepEqual([heard.path, heard.by], ["apps/notes/edited.js", "disk"]);
-	} finally {
-		await made.done();
-	}
 });
 
 test("folder: an edit on the disk right after the server's own write is still told", async () => {
