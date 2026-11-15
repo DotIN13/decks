@@ -19,7 +19,8 @@ async function fileAnswer(dist: string, rel: string): Promise<RouteAnswer> {
 	try {
 		const body = await readFile(file);
 		const cache = rel.startsWith("assets/") ? "public, max-age=31536000, immutable" : "no-cache";
-		return { type: TYPES[extname(file)] ?? "application/octet-stream", body, headers: { "cache-control": cache } };
+		// The frame is sandboxed, its origin "null": its own modules and sheets are fetched cross-origin.
+		return { type: TYPES[extname(file)] ?? "application/octet-stream", body, headers: { "cache-control": cache, "access-control-allow-origin": "*" } };
 	} catch {
 		return rel === "canvas-frame.html" ? { status: 503, type: "text/plain", body: NOT_BUILT } : { status: 404, type: "text/plain", body: "Not found." };
 	}
