@@ -117,3 +117,12 @@ test("view.screenshot asks the screen showing the canvas and gives back its answ
 	assert.deepEqual(((await shot) as { value: unknown }).value, picture);
 	await s.close();
 });
+
+test("a canvas frame's own line can draw a card but is no screen to count", async () => {
+	const { s, on } = await peopleServer();
+	await on(fakeClient("page"), "view.move", { x: 0, y: 0, zoom: 1, canvas: "a" }, person);
+	await on(fakeClient("frame"), "view.move", { x: 0, y: 0, zoom: 1, canvas: "a", device: "frame" }, { kind: "person", id: "person~frame-1", name: "you", canvas: "a" });
+	assert.equal(await s.value<number>("view.reload", { canvas: "a" }, person), 1, "the frame is not counted");
+	assert.equal(s.callers.resolve(s.token(person))?.canvas, "a");
+	await s.close();
+});

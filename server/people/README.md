@@ -48,6 +48,9 @@ model, a login or a transcript.
     canvas, or the origin.
 14. Only the socket that hosts an agent sets its `state` and `queued` (`agent.update`). An agent
     whose state is thinking or tool is not deleted (`conflict`).
+15. A canvas frame's line reports with `view.move` device `frame`: it can answer `view.screenshot`,
+    and is never counted, moved or followed. `view.screenshot` tells every line on the canvas and
+    takes the first `view.answer`, or is unavailable after 20 s.
 
 ## Check
 

@@ -40,7 +40,7 @@ export function viewCalls(holder: Holder): Handled<Context>[] {
 		},
 		screenshot: async (ctx, { card, canvas }) => {
 			const name = here(p(), ctx, canvas ?? canvasOfTarget(card));
-			const screen = p().screens.showing(name).sort((a, b) => b.at - a.at)[0];
+			const screen = p().screens.drawing(name)[0];
 			if (!screen) throw new Refused("unavailable", `No screen is showing the canvas ${name}, so none can draw ${card}.`, "canvas.screenshot");
 			const { id, answer } = p().answers.ask(screen.client, `a picture of ${card}`);
 			p().tell(ctx, events.viewRequested, { ids: [card], canvas: name, call: "view.screenshot", args: { card }, id });
@@ -94,7 +94,8 @@ function move(people: People, ctx: Context, args: Infer<typeof calls.view.move.i
 	const camera = { x: args.x, y: args.y, zoom: args.zoom };
 	const client = people.meet(ctx);
 	if (ctx.caller.kind === "person" && client) {
-		people.screens.report(client, ctx.caller.id, { canvas: name, ...(args.agent !== undefined ? { follows: people.roster.find(args.agent).id } : {}) });
+		const said = { canvas: name, ...(args.device === "frame" ? { frame: true } : {}), ...(args.agent !== undefined ? { follows: people.roster.find(args.agent).id } : {}) };
+		people.screens.report(client, ctx.caller.id, said);
 		const follows = people.screens.ofPerson(ctx.caller.id).find((s) => s.client === client)?.follows;
 		people.screens.record(ctx.caller.id, name, args.device, camera);
 		if (follows) people.screens.record(follows, name, args.device, camera);
