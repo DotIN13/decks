@@ -1,5 +1,9 @@
 /* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
 @layer components {
+
+	/* Only the painted things take the pointer. */
+	.stream-card,
+	.stream-bubble,
 	.stream-rw {
 		pointer-events: auto;
 	}

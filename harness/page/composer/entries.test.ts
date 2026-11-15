@@ -30,10 +30,15 @@ test("every name Studio imports resolves from the chat's and the composer's entr
 	}
 });
 
-test("every name today's agent-ui chat and composer entries export is still exported", () => {
-	const old = (file: string) => exported(fileURLToPath(new URL(`../../../packages/agent-ui/src/public/${file}`, import.meta.url)));
-	for (const [file, entry] of [["chat.ts", "chat/index.ts"], ["composer.ts", "composer/index.ts"]] as const) {
+// What today's @decks/agent-ui entries exported, read 2026-11-14, kept here since that package goes at the switch-over.
+const TODAY = {
+	"chat/index.ts": ["AgentPart", "Align", "Block", "FloatRow", "Inline", "LOAD_MORE_AT", "ListItem", "Markdown", "MineReader", "MineReading", "PAGE", "SignPlace", "StatusLine", "Stream", "TableCell", "TimeMachine", "ToolChip", "ToolGroup", "ToolItem", "ToolSlot", "Turn", "TurnCard", "WINDOW", "WorkingSign", "askFullResult", "awaitingResult", "blocks", "distinctNames", "earlierLabel", "floatRows", "forgetAskedResults", "fullResult", "hasEarlier", "hiddenCount", "inline", "isWorking", "prepend", "receiveToolResult", "resetToolResults", "setMineReader", "setToolResultSender", "signPlacement", "toolSlots", "turnCards", "windowOf", "windowStart", "workingWords"],
+	"composer/index.ts": ["DRAFT_MIME", "Draft", "DraftField", "DraftFieldApi", "DraftFieldProps", "DraftMention", "DraftNode", "LABEL_LIMIT", "MentionKind", "PILL_LIMIT", "PillAbout", "PillHost", "closePillCard", "commentLabel", "draftComments", "draftForAgent", "draftIsEmpty", "draftLabel", "draftText", "fileMention", "isMentionKind", "mentionAddress", "normalize", "openPillCard", "parseDraft", "pillElement", "pillNode", "pillTip", "pillWords", "serializeDraft", "shortLabel", "textDraft", "wirePills", "withMention"],
+};
+
+test("every name today's agent-ui chat and composer entries exported is still exported", () => {
+	for (const [entry, wanted] of Object.entries(TODAY)) {
 		const has = exported(join(PAGE, entry));
-		assert.deepEqual([...old(file)].filter((name) => !has.has(name)), [], entry);
+		assert.deepEqual(wanted.filter((name) => !has.has(name)), [], entry);
 	}
 });
