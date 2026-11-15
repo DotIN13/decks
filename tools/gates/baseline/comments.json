@@ -95,8 +95,6 @@
 	"canvas/editor/core/arrows.ts: comment over 5 lines": 2,
 	"canvas/editor/core/dispatch.ts: comment over 5 lines": 3,
 	"canvas/editor/core/drop.ts: comment over 5 lines": 2,
-	"canvas/editor/core/gesture.ts: comment over 5 lines": 2,
-	"canvas/editor/core/gesture.ts: em dash": 3,
 	"canvas/editor/core/insert.ts: comment over 5 lines": 1,
 	"canvas/editor/core/keys.ts: comment over 5 lines": 2,
 	"canvas/editor/core/keys.ts: em dash": 3,
