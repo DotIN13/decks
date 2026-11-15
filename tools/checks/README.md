@@ -24,6 +24,7 @@ Node's own modules. It starts the programs as processes and imports none of them
 
 ## Check
 
-- `node tools/heavy.mjs --wait -- node tools/checks/run.mjs <check>` (`CHECKS_VERBOSE=1` prints
-  the last lines of a failure; `--only-server` starts Decks-local alone).
+- `node tools/checks/run.mjs <check> ...`, directly: it takes a lock slot per check itself, and
+  refuses under heavy.mjs (`CHECKS_VERBOSE=1` prints the last lines of a failure; `--only-server`
+  starts Decks-local alone; `--agent` runs the agent checks).
 - `node tools/check.mjs tools`.

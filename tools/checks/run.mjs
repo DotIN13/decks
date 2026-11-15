@@ -5,6 +5,7 @@
 // CHECKS_LOG_DIR=<dir> keeps each check's whole log there; CHECKS_VERBOSE=1 prints a failure's tail.
 import { spawn, spawnSync } from "node:child_process";
 import { freeGb, withSlot } from "../heavy.mjs";
+import { portsFree } from "./ports.mjs";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -117,6 +118,8 @@ async function stopAndWait(child) {
 	stop(child);
 	await Promise.race([exited, new Promise((r) => setTimeout(r, 3_000))]);
 	signal(child, "SIGKILL");
+	// Its port is free only once it is gone: wait for the kill too, so the slot is let go after it.
+	if (child.exitCode === null && child.signalCode === null) await Promise.race([exited, new Promise((r) => setTimeout(r, 2_000))]);
 }
 
 /** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
@@ -137,7 +140,8 @@ export function buildPage() {
 
 export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
 	const ports = portsFor(i);
-	for (const port of Object.values(ports)) if (await listening(port)) throw new Error(`port ${port} is in use`);
+	// The slot is ours, but the last caller's programs may still be closing its ports: wait for them.
+	await portsFree(Object.values(ports));
 	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 	const deck = join(scratch, "deck");
 	const home = join(scratch, "home");
@@ -198,11 +202,9 @@ async function main(argv) {
 	if (!named.length) return console.error("usage: node tools/checks/run.mjs [--only-server] [--agent] [--kinds claude] <check> ..."), 2;
 	const missing = files.filter((f) => !existsSync(checkPath(f)));
 	if (missing.length) return console.error(`no such check: ${missing.join(", ")}`), 2;
-	// A slot per run, never for the loop: a build alone, each check in a check slot (alone if it times).
-	// A caller already holding one (heavy.mjs -- run.mjs, HEAVY_HELD) has the run's lock: take nothing more.
-	const held = process.env.HEAVY_HELD;
+	// A slot per check, never for the loop, taken here: under heavy.mjs every check would share one slot's ports.
+	if (process.env.HEAVY_HELD) return console.error("Refused: run tools/checks/run.mjs directly, not under tools/heavy.mjs; it takes a lock slot for each check itself (two at once, a timed check alone)."), 2;
 	const inSlot = async (cls, work) => {
-		if (held) return work(held === "check" ? 1 : 0);
 		if (freeGb() < 8) throw new Error(`only ${freeGb().toFixed(1)} GB free, under 8 GB: free disk, then tell Mason`);
 		return withSlot(cls, work);
 	};
