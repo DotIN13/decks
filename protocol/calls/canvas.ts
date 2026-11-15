@@ -1,5 +1,5 @@
 import { defineCall } from "../call.ts";
-import { arr, bool, lit, num, opt, str, union } from "../schema.ts";
+import { arr, bool, int, lit, named, num, obj, opt, str, union } from "../schema.ts";
 import { BoxChange, Canvas, Deleted, File, Screenshot } from "../shapes.ts";
 import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas, onItems } from "./parts.ts";
 
@@ -100,5 +100,34 @@ export const exportPage = defineCall({
 	who: NOT_CARD,
 	args: { of: union(str(), arr(str())), format: opt(lit("html", "tailwind")), to: opt(str()), ...onItems },
 	answer: File,
+	effect: "change",
+});
+
+const CanvasVersion = named("CanvasVersion", obj({ rev: int(), by: str(), at: num(), items: int("Ops in it, or 0 when not known.") }), "One revision of a drawing.");
+
+export const versions = defineCall({
+	name: "canvas.versions",
+	summary: "A drawing's revisions, newest first, as file.versions lists a document's.",
+	who: PEOPLE,
+	args: { ...onCanvas },
+	answer: arr(CanvasVersion),
+	effect: "read",
+});
+
+export const version = defineCall({
+	name: "canvas.version",
+	summary: "The drawing's file as it was at a revision.",
+	who: PEOPLE,
+	args: { rev: int(), ...onCanvas },
+	answer: obj({ rev: int(), text: str() }),
+	effect: "read",
+});
+
+export const restore = defineCall({
+	name: "canvas.restore",
+	summary: "Write the drawing back as it was at a revision, as a new revision, as file.restore does for a document.",
+	who: PERSON,
+	args: { rev: int(), ...onCanvas },
+	answer: Canvas,
 	effect: "change",
 });

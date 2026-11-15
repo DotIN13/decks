@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 131 calls (111 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 134 calls (114 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -38,6 +38,9 @@ A pen.dev drawing and the folder around it: canvases/<name>/, with its cards, fr
 | `canvas.export` | agents | `canvas.export` | person, agent, app | Answers the File it wrote. |
 | new | | `canvas.get` | anyone | Split from canvas.read: the canvas's title, file, revision and variables. |
 | `here` | agents | `canvas.here` | anyone | A bare word becomes noun.verb. |
+| new | | `canvas.versions` | person, agent | Added in 0.18.0 for Loft: a drawing's revisions, newest first, as file.versions. |
+| new | | `canvas.version` | person, agent | Added in 0.18.0: the drawing's file as it was at a revision. |
+| new | | `canvas.restore` | person | Added in 0.18.0: write the drawing back as it was, as a new revision, as file.restore. |
 | `canvas.list` | agents | `canvas.list` | person, agent, app | Unchanged. |
 | `canvas.remove` | person | `canvas.delete` | person | Renamed. |
 | `canvas.screenshot` | agents | `canvas.screenshot` | person, agent, app | The picture's size is a Size { w, h }. |
