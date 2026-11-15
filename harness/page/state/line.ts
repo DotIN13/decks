@@ -3,8 +3,8 @@ import { batch } from "solid-js";
 import { openOldLine } from "./compat/line.ts";
 
 // The page's one line to the server: every call through @decks-next/sdk, and
-// one socket (the sdk's Line) for the events, handed to listeners by name in
-// one batch per paint, and for the calls tied to this screen (view.move).
+// one socket (the sdk's Line) for the events the page hears, by name, handed
+// out in one batch per paint, and for the calls tied to this screen.
 
 export type Answer<T = unknown> = { ok: true; value: T; notes: string[] } | { ok: false; error: string; code: string; notes: string[] };
 type Hear = (payload: Record<string, unknown>, name: string) => void;
@@ -56,7 +56,7 @@ function listen(): void {
 	socket.on(arrive);
 	socket.caller.then(
 		() => {
-			socket.watch();
+			socket.watch(watched(line.hearers.keys()));
 			line.attempt = 0;
 			line.up(true);
 		},
@@ -100,9 +100,18 @@ function arrive(event: Heard): void {
 /** Hear one event by name, or "*" for every one. Answers the stop. */
 export function on(name: string, hear: Hear): () => void {
 	const set = line.hearers.get(name) ?? new Set<Hear>();
+	const fresh = !line.hearers.has(name);
 	set.add(hear);
 	line.hearers.set(name, set);
+	// A name heard for the first time widens what the socket asks for; until then it is not sent.
+	if (fresh) line.socket?.caller.then(() => line.socket?.watch(watched(line.hearers.keys())), () => {});
 	return () => void set.delete(hear);
+}
+
+/** The events the socket asks for: the names the page hears, or every event when one hears "*". */
+export function watched(names: Iterable<string>): string[] | undefined {
+	const list = [...names];
+	return list.includes("*") ? undefined : list.sort();
 }
 
 const need = (): Client => {
