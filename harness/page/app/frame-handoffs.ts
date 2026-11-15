@@ -6,6 +6,7 @@ import { commentBlock } from "../markup/comments.ts";
 import { addComment, cleanFrameComment, cleanFrameInk, cleanFramePills } from "../state/comments.ts";
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
+import { call } from "../state/line.ts";
 import { stageOf } from "../state/canvases.ts";
 import { setDraft } from "../state/ui.ts";
 import { inkAsked } from "./ink-prompts.ts";
@@ -80,9 +81,11 @@ export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	const card = ids.length === 1 ? /(?:^|\/)cards\/([^/]+)\//.exec(ids[0] ?? "")?.[1] : undefined;
 	void (async () => {
 		try {
-			const response = await fetch(api(`/stage-shot?${new URLSearchParams({ canvas, agent: agentId, of: ids.join(","), format, scheme: scheme() })}`), { headers: authHeaders() });
-			if (!response.ok) throw new Error((await response.text().catch(() => "")) || `the server answered ${response.status}`);
-			const named = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1];
+			const shot = await call<{ file: string }>("canvas.screenshot", { canvas, of: ids.length === 1 ? ids[0] : ids, format, scheme: scheme() });
+			if (!shot.ok) throw new Error(shot.error);
+			const response = await fetch(`/files/${shot.value.file.split("/").map(encodeURIComponent).join("/")}`, { headers: authHeaders() });
+			if (!response.ok) throw new Error(`the server answered ${response.status}`);
+			const named = shot.value.file.split("/").pop();
 			const local = URL.createObjectURL(await response.blob());
 			const link = document.createElement("a");
 			link.href = local;

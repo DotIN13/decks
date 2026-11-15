@@ -5,6 +5,7 @@ import { scratch } from "./agent.ts";
 import { setStages } from "./canvases.ts";
 import { ensureAgent, nameOf, setState, state } from "./deck.ts";
 import { call, on } from "./line.ts";
+import { firstFocus } from "./focus.ts";
 import { reread } from "./history.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
@@ -70,7 +71,7 @@ function drawAgents(hooks: SyncHooks): void {
 		heardState(chat.id, chat.state, hooks);
 	}
 	setStages(held.canvases.map((canvas) => stageRowOf(canvas, held.agents)));
-	if (!state.focused && chats[0]) setState("focused", chats[0].id);
+	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id)));
 	if (!state.focused) releasePages();
 }
 

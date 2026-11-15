@@ -2,6 +2,7 @@ import { call, warnIfFailed } from "../state/line.ts";
 import { canvasOf } from "../state/canvases.ts";
 import { setState, state } from "../state/deck.ts";
 import { ensureHistory } from "../state/history.ts";
+import { keepFocus } from "../state/focus.ts";
 import { setDraft, setUnread } from "../state/ui.ts";
 import type { AgentMode, ThinkingLevel } from "../state/types/index.ts";
 
@@ -15,6 +16,7 @@ export function focusAgent(id: string): void {
 	setUnread(id, 0);
 	ensureHistory(id);
 	setDraft(undefined);
+	keepFocus(id);
 	void call("chat.focus", { agent: id });
 }
 
