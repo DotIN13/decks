@@ -371,3 +371,8 @@ An app's source may live outside the deck, as long as the deck knows where it is
 - **No check is left with a runner whose programs are gone.** The 19 checks outside stop 3 move with
   the switch-over too and start under the new runner; the five that need a real agent are run once on
   the new programs before the old code is deleted.
+- **A check written against the dev page's timing runs there until it is fixed.** `card-shot` takes the
+  first awake card surface as its own; on the faster built page another card is still awake at that
+  moment. The canvas library's rule is unchanged and right. Until the switch-over the checks stay
+  unchanged, so it runs on the dev server by a trait in the runner's list; after the checks move, it
+  picks its card by path and returns to the built page.
