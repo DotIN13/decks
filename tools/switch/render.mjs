@@ -47,11 +47,16 @@ function root(r) {
 	return `## Root files\n\n- Workspaces: ${r.workspaces.map((w) => `\`${w}\``).join(", ")}.\n- Kept until Loom moves the packages that use them: ${kept}.\n- Scripts: ${Object.entries(r.scripts).map(([k, v]) => `\`${k}\`: \`${v}\``).join("; ")}.\n- Scripts removed: ${r.removedScripts.map((s) => `\`${s}\``).join(", ")}.\n- CI: ${r.ci}.`;
 }
 
+function followUps(p) {
+	const rows = p.checks.moved.filter((m) => m.traits.dev).map((m) => `\`${m.check}\` (now \`${m.to}\`): ${m.traits.why}`);
+	return rows.length ? `## Follow-ups after the checks move\n\nChecks run unchanged until the switch-over; these were written against the dev page's timing and run on the dev server (\`dev\` in checks.json) until their owner does this, then go back to the built page:\n\n${list(rows)}` : "";
+}
+
 function lanes(l) {
 	const rows = [["1. moving the checks", l.move], ["2. deleting", l.delete], ["3. renaming (files that name @decks-next)", l.rename], ["4. root files and CI", l.root]];
 	return `## Lanes the switch needs, for that one job\n\n${list(rows.map(([what, paths]) => `${what}: ${paths.map((x) => `\`${x}\``).join(", ")}`))}`;
 }
 
 export function render(p, names, r, l) {
-	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), compat(names), root(r), ...(l ? [lanes(l)] : [])].join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.\n\n1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
+	return `# The switch-over, planned\n\nWritten by \`node tools/switch/run.mjs --dry\` on ${new Date().toISOString().slice(0, 10)} from the tree as it is. Nothing in any deck is touched; "apps" means the repo's apps/ source folder.\n\n${[deleted(p), kept(p), renamed(p), moved(p), followUps(p), compat(names), root(r), ...(l ? [lanes(l)] : [])].filter(Boolean).join("\n\n")}\n\n## Order, one commit each, the gates passing after each\n\nThe commits touch other lanes' folders: Mason opens the paths listed above to Warden for the switch.\n\n1. Move every check, the harness and the fake model and agent into place; run.mjs finds them by checks.json.\n2. Delete what has a new home and no importer left.\n3. Rename @decks-next to @decks, then install.\n4. Root files and CI.\n5. Shrink the gate baselines.\n`;
 }

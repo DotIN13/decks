@@ -18,6 +18,8 @@ const BASE = Number(process.env.CHECKS_PORT ?? 4610);
 export const traitsOf = (file) => JSON.parse(readFileSync(join(ROOT, "tools/checks/checks.json"), "utf8")).checks[file.replace(/\.mjs$/, "")] ?? {};
 /** A check that measures time runs alone, on the dev server it was written for (DESIGN.md section 11). */
 export const timed = (file) => traitsOf(file).timed === true;
+/** A check written against the dev page's timing (checks.json says why) runs on the dev server too. */
+const onDev = (file) => timed(file) || traitsOf(file).dev === true;
 /** The fake model and agent, in tools/checks after the switch-over, in e2e before. */
 const helper = (name) => (existsSync(join(ROOT, "tools/checks", name)) ? join(ROOT, "tools/checks", name) : join(ROOT, "e2e", name));
 const WAIT_MS = 60_000;
@@ -171,7 +173,7 @@ export async function runCheck(file, i, { onlyServer = false } = {}) {
 				check.on("exit", (c) => (clearTimeout(timer), done(c)));
 			});
 			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
-		}, { i, onlyServer, log, dist: timed(file) ? null : RUN.dist });
+		}, { i, onlyServer, log, dist: onDev(file) ? null : RUN.dist });
 	} catch (error) {
 		return { file, ok: false, why: error.message, log };
 	}
@@ -205,7 +207,7 @@ async function main(argv) {
 		return withSlot(cls, work);
 	};
 	// Checks that measure time run on the dev server, as they were written for (DESIGN.md section 11).
-	if (!onlyServer && process.env.CHECKS_PAGE !== "dev" && files.some((f) => !timed(f))) RUN.dist = await inSlot("exclusive", () => buildPage());
+	if (!onlyServer && process.env.CHECKS_PAGE !== "dev" && files.some((f) => !onDev(f))) RUN.dist = await inSlot("exclusive", () => buildPage());
 	// The fake model today's agent checks drive Pi with (e2e/fake-agent points at it), shared by every check.
 	const model = (await listening(4700)) ? undefined : launch("model", { cmd: process.execPath, args: [helper("fake-model.mjs")] }, []);
 	let failed = 0;

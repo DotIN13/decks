@@ -1,26 +1,76 @@
 {
-	"why": "What the runner must know about a check beyond its name. timed: it measures time, so it runs alone on the dev server, as it was written for (DESIGN.md section 11). agent: it starts an agent's turn; skipped unless --agent; the fake model (tools/checks/fake-model.mjs) answers it, unless model: it needs a real model that runs the decks command. named: minutes long or pictures to look at; runs only when named. bench: it measures, it does not pass or fail on its own. path: where it lives after the switch-over (until then, e2e/checks/<name>.mjs).",
+	"why": "What the runner must know about a check beyond its name. timed: it measures time, so it runs alone on the dev server, as it was written for (DESIGN.md section 11). agent: it starts an agent's turn; skipped unless --agent; the fake model (tools/checks/fake-model.mjs) answers it, unless model: it needs a real model that runs the decks command. named: minutes long or pictures to look at; runs only when named. bench: it measures, it does not pass or fail on its own. dev: written against the dev page's timing, so it runs on the dev server, not the built page, until its follow-up (its why says what). path: where it lives after the switch-over (until then, e2e/checks/<name>.mjs).",
 	"checks": {
-		"bent-arrows": { "timed": true },
-		"smooth-edits": { "timed": true },
-		"ink-long-stroke": { "timed": true },
-		"agent-rows": { "agent": true },
-		"stage-api": { "agent": true, "model": true },
-		"running": { "agent": true },
-		"time-machine": { "agent": true },
-		"chrome": { "agent": true },
-		"walkthrough": { "agent": true },
-		"render-perf": { "bench": true, "named": true },
-		"pan-heavy": { "bench": true, "named": true },
-		"awake-bench": { "bench": true, "named": true },
-		"edits-wait": { "named": true },
-		"nudge": { "named": true },
-		"arrows-steady": { "named": true },
-		"awake-drag": { "named": true },
-		"card-frame-drag": { "named": true },
-		"card-frame-demo": { "named": true },
-		"arrow-label": { "named": true },
-		"text-shots": { "named": true },
-		"look-shots": { "named": true }
+		"bent-arrows": {
+			"timed": true
+		},
+		"smooth-edits": {
+			"timed": true
+		},
+		"ink-long-stroke": {
+			"timed": true
+		},
+		"agent-rows": {
+			"agent": true
+		},
+		"stage-api": {
+			"agent": true,
+			"model": true
+		},
+		"running": {
+			"agent": true
+		},
+		"time-machine": {
+			"agent": true
+		},
+		"chrome": {
+			"agent": true
+		},
+		"walkthrough": {
+			"agent": true
+		},
+		"render-perf": {
+			"bench": true,
+			"named": true
+		},
+		"pan-heavy": {
+			"bench": true,
+			"named": true
+		},
+		"awake-bench": {
+			"bench": true,
+			"named": true
+		},
+		"edits-wait": {
+			"named": true
+		},
+		"nudge": {
+			"named": true
+		},
+		"arrows-steady": {
+			"named": true
+		},
+		"awake-drag": {
+			"named": true
+		},
+		"card-frame-drag": {
+			"named": true
+		},
+		"card-frame-demo": {
+			"named": true
+		},
+		"arrow-label": {
+			"named": true
+		},
+		"text-shots": {
+			"named": true
+		},
+		"look-shots": {
+			"named": true
+		},
+		"card-shot": {
+			"dev": true,
+			"why": "It takes the first awake .card-surface over 100 px wide as its card (line 44); on the faster built page another fixture card is still awake off screen then, so it types into the wrong card. After the checks move: pick the card by its path, then back to the built page."
+		}
 	}
 }
