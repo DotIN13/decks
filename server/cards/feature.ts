@@ -1,7 +1,8 @@
 import { events, layout } from "../../protocol/index.ts";
 import { defineFeature, type Feature, type Kernel } from "../kernel/types.ts";
 import { cardCalls, fileCalls } from "./calls.ts";
-import { cardKind } from "./item.ts";
+import { cardKindWith } from "./prepare.ts";
+import { followSizes } from "./resize.ts";
 import { syncLib, type LibSource } from "./lib.ts";
 import { routes } from "./page.ts";
 
@@ -15,18 +16,23 @@ export function cards(options: CardsOptions = {}): Feature {
 	return defineFeature({
 		name: "cards",
 		calls: [...fileCalls, ...cardCalls(() => kernel)],
-		items: [cardKind],
+		items: [cardKindWith(() => kernel?.deck)],
 		routes,
 		async start(given) {
 			kernel = given;
 			if (options.lib) await syncLib(options.lib, given.deck);
+			const sizes = followSizes(given);
 			// A write to any file in a card's folder is news about the card.
-			return given.deck.watch((change) => {
+			const files = given.deck.watch((change) => {
 				const card = layout.cardOf(change.path);
 				if (!card) return;
 				const removed = change.kind === "deleted" && change.path === card;
 				given.events.emit(events.cardChanged, { canvas: layout.canvasOfPath(card)?.name ?? "", ids: [card], by: change.by, rev: change.rev, ...(removed ? { removed } : {}) });
 			});
+			return () => {
+				sizes();
+				files();
+			};
 		},
 	});
 }

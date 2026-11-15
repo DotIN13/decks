@@ -39,6 +39,9 @@ and Google Docs.
 11. `google.link` writes a Doc's mirror in `docs/google/`, once per Doc. While a page has a mirror
    open it syncs every two seconds: the Doc's edits arrive as a change to review, typing goes out.
 
+12. A document item names its file from the deck's root. A name from the canvas's folder is taken
+   for the file it means, with a note; a file named nowhere is made empty in the canvas's files/.
+
 Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
 
 ## Check

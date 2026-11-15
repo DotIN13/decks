@@ -48,6 +48,9 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
    `/files/<card>.m<n>.js`. A card on a friend's canvas runs no scripts: its modules are refused.
 15. The card runtime in `lib/` is brought up to this build's on start: a file is written only when
    its bytes differ, and one this build no longer ships is removed.
+16. A card item given as html is written into a new folder of the canvas before it is placed.
+17. A card placed with no box takes the size its file declares (`<meta name="card">`), else 1000 by 600.
+18. A card resized on its canvas writes its new size into its file's meta tag.
 
 ## Check
 
