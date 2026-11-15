@@ -44,6 +44,8 @@ export class Session {
 	usage: AgentUsage | undefined;
 	private starting: Promise<void> | undefined;
 	private rev = 0;
+	/** Messages being handed to the runtime right now. */
+	private sending = 0;
 	private saveTimer: ReturnType<typeof setTimeout> | undefined;
 	private briefing = "";
 
@@ -108,11 +110,14 @@ export class Session {
 		this.translator.setState("thinking");
 		await this.mark(said.id);
 		const sent = (await this.front(text)) ?? text;
+		this.sending += 1;
 		try {
 			await this.backend.prompt(sent);
 		} catch (error) {
 			this.translator.notice("error", (error as Error).message);
 			this.translator.setState("idle");
+		} finally {
+			this.sending -= 1;
 		}
 		if (!this.backend.isStreaming && this.state !== "idle") this.translator.setState("idle");
 		this.usage = this.backend.usage() ?? this.usage;
@@ -258,9 +263,10 @@ export class Session {
 			translator: this.translator,
 			bridge: this.bridge,
 			notice: (level, text) => this.tellChat("runtime.noticed", [this.id], { level, text }),
-			// A late end of the last turn says nothing once the next has begun.
+			// A late end of the last turn says nothing once the next has begun: while a
+			// message is being handed over, or while the runtime says a turn runs.
 			turnEnded: () => {
-				if (this.backend?.isStreaming) return;
+				if (this.sending > 0 || this.backend?.isStreaming) return;
 				this.usage = this.backend?.usage() ?? this.usage;
 				this.translator.setState("idle");
 			},

@@ -32,7 +32,8 @@ who it is and what it is given. A session knows nothing of where its agent sits 
    agent to the sender with its last words. An answer never asks for a reply, so two agents cannot
    loop.
 8. Each change of state (idle, thinking, tool, error) and of the queue's length is reported with
-   `agent.update { state, queued }` on the host line, and told as `chat.changed`.
+   `agent.update { state, queued }` on the host line, and told as `chat.changed`. A runtime's late
+   end of turn counts only when no message is being handed over and no turn runs.
 9. Every transcript entry is told as `chat.added` with ids `[agent, entry]`: the whole entry, or a
    delta of its text or thinking while it streams. `rev` counts the agent's changes.
 10. The transcript is kept in the harness's own folder, never the deck: the last 500 entries, and an
