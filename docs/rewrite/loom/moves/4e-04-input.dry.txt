@@ -1,12 +1,12 @@
 # Step 4e-04-input: Regroup canvas: pointer, keys and touch rules into input/
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view. Nothing was moved.
 
 - files moved by git mv: 6
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 23
-- import lines rewritten: 46
+- files edited or created: 21
+- import lines rewritten: 44
 - warnings: 0
 
 ## Moved
@@ -26,9 +26,6 @@ canvas/camera/touch.ts:4
 canvas/camera/touch.ts:38
   - * So the sources release what they hold (`stage/input.ts` on teardown, `Stage` when
   + * So the sources release what they hold (`input/canvas-input.ts` on teardown, `Stage` when
-canvas/cards/runtime/lib/card.css:784
-  - * what makes the canvas (`stage/input.ts`) give it the wheel while it has room and hand the scroll
-  + * what makes the canvas (`input/canvas-input.ts`) give it the wheel while it has room and hand the scroll
 canvas/edit/dom/OverlayLayer.tsx:14
   - import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "./touch-rules.ts";
   + import { COARSE, HANDLE_DOT_PX, HANDLE_HIT_PX } from "../../input/touch-rules.ts";
@@ -146,18 +143,15 @@ canvas/view/items-layer.tsx:41
 canvas/view/selection.tsx:54
   - /** A press is held on the canvas (`input.ts`): the drawn items' pill steps aside. */
   + /** A press is held on the canvas (`canvas-input.ts`): the drawn items' pill steps aside. */
-e2e/checks/card-keys.mjs:5
-  - * in it (`items/input.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
-  + * in it (`input/item-keys.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
 harness/page/canvases/CanvasOps.tsx:25
   - * Every row is checked against the code that implements it, in `@decks/canvas`: `stage/input.ts`
   + * Every row is checked against the code that implements it, in `@decks/canvas`: `input/canvas-input.ts`
-harness/page/index.css:130
-  - The stage sets `none` for itself (`stage/input.ts`). */
-  + The stage sets `none` for itself (`input/canvas-input.ts`). */
 scripts/card-zoom.mjs:16
   - * events in WebKit, which has no CDP (`stage/input.ts`, the same events a trackpad pinch sends there).
   + * events in WebKit, which has no CDP (`input/canvas-input.ts`, the same events a trackpad pinch sends there).
+tools/checks/library/card-keys.mjs:5
+  - * in it (`items/input.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
+  + * in it (`input/item-keys.ts`): its own scripts hear them, and the canvas's keys do nothing to it. Before,
 
 ## Files the table edits or creates
 

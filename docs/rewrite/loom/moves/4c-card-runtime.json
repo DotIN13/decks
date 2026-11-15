@@ -32,11 +32,37 @@
 		"docs/rewrite/",
 		"packages/protocol/",
 		"packages/api/",
-		"packages/hub/"
+		"packages/hub/",
+		"packages/card-host/lib/"
 	],
-	"remove": [
-		"packages/card-host/package.json",
-		"packages/card-host/tsconfig.json"
+	"specifiers": {
+		"@decks/card-host": "@decks/canvas/cards-runtime"
+	},
+	"mentions": [
+		[
+			"packages/card-host/lib",
+			"canvas/cards/runtime/lib"
+		],
+		[
+			"packages/card-host/src/",
+			"canvas/cards/runtime/"
+		],
+		[
+			"`card-host/lib`",
+			"`canvas/cards/runtime/lib`"
+		]
+	],
+	"localize": [
+		{
+			"within": "canvas/",
+			"name": "@decks/card-host",
+			"target": "canvas/cards/runtime/index.ts"
+		},
+		{
+			"within": "canvas/",
+			"name": "@decks/card-host/sandbox",
+			"target": "canvas/cards/runtime/sandbox.ts"
+		}
 	],
 	"untrack": [
 		"packages/card-host/lib/d3.min.js",
@@ -52,6 +78,10 @@
 		"packages/card-host/lib/fonts/",
 		"packages/card-host/lib/standard_fonts/",
 		"packages/card-host/lib/wasm/"
+	],
+	"remove": [
+		"packages/card-host/package.json",
+		"packages/card-host/tsconfig.json"
 	],
 	"ignore": [
 		{
@@ -73,35 +103,6 @@
 				"/wasm/"
 			]
 		}
-	],
-	"localize": [
-		{
-			"within": "canvas/",
-			"name": "@decks/card-host",
-			"target": "canvas/cards/runtime/index.ts"
-		},
-		{
-			"within": "canvas/",
-			"name": "@decks/card-host/sandbox",
-			"target": "canvas/cards/runtime/sandbox.ts"
-		}
-	],
-	"specifiers": {
-		"@decks/card-host": "@decks/canvas/cards-runtime"
-	},
-	"mentions": [
-		[
-			"packages/card-host/lib",
-			"canvas/cards/runtime/lib"
-		],
-		[
-			"packages/card-host/src/",
-			"canvas/cards/runtime/"
-		],
-		[
-			"`card-host/lib`",
-			"`canvas/cards/runtime/lib`"
-		]
 	],
 	"paths": [
 		{
@@ -134,6 +135,31 @@
 					"to": "join(root, \"canvas\", \"cards\", \"runtime\", \"lib\", \"live-doc.js\")"
 				}
 			]
+		},
+		{
+			"file": "server/main.ts",
+			"replace": [
+				{
+					"from": "\"../packages/card-host/lib\"",
+					"to": "\"../canvas/cards/runtime/lib\""
+				}
+			]
+		},
+		{
+			"file": "server/cards/cards.test.ts",
+			"replace": [
+				{
+					"from": "\"../../packages/card-host/lib/\"",
+					"to": "\"../../canvas/cards/runtime/lib/\""
+				}
+			]
+		}
+	],
+	"keep": [
+		{
+			"file": "canvas/cards/runtime/runtime.test.ts",
+			"string": "../package.json",
+			"why": "a name that must not reach out of lib/, refused on purpose"
 		}
 	],
 	"set": [

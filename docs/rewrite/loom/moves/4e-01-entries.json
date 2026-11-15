@@ -20,7 +20,8 @@
 		"docs/rewrite/",
 		"packages/protocol/",
 		"packages/api/",
-		"packages/hub/"
+		"packages/hub/",
+		"canvas/cards/runtime/lib/"
 	],
 	"create": [
 		{

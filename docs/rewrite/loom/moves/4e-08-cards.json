@@ -64,7 +64,8 @@
 		"docs/rewrite/",
 		"packages/protocol/",
 		"packages/api/",
-		"packages/hub/"
+		"packages/hub/",
+		"canvas/cards/runtime/lib/"
 	],
 	"mentions": [
 		[
@@ -79,6 +80,23 @@
 			"model/markdown.ts",
 			"cards/markdown.ts"
 		]
+	],
+	"keep": [
+		{
+			"file": "canvas/cards/card-snapshot.ts",
+			"string": "../../lib/card.css",
+			"why": "read beside a card's page"
+		},
+		{
+			"file": "canvas/cards/card.ts",
+			"string": "../../assets/importmap.json",
+			"why": "against the card's address"
+		},
+		{
+			"file": "canvas/cards/card.ts",
+			"string": "../../lib/",
+			"why": "against the card's address"
+		}
 	],
 	"create": [
 		{

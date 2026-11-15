@@ -1,12 +1,12 @@
 # Step 4e-03-view: Regroup canvas: stage/ becomes view/, Stage.tsx is CanvasView.tsx
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 29
-- import lines rewritten: 53
+- files edited or created: 28
+- import lines rewritten: 52
 - warnings: 0
 
 ## Moved
@@ -26,9 +26,6 @@ canvas/camera/scroll-area.ts:10
 canvas/cards/CardEditor.tsx:28
   - * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
   + * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back
-canvas/cards/runtime/lib/card.js:1421
-  - * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/Stage.tsx`). A board is in the app's own
-  + * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/view/CanvasView.tsx`). A board is in the app's own
 canvas/edit/dom/pointer.ts:50
   - /** What a double-click or a double tap opens, the page's (`Stage.tsx`): each answers whether it was one. */
   + /** What a double-click or a double tap opens, the page's (`CanvasView.tsx`): each answers whether it was one. */
@@ -143,39 +140,39 @@ canvas/types.ts:11
 canvas/ui/AgentCursor.tsx:15
   - * - **Stay.** It is drawn one level up, on the stage (`Stage.tsx`), for as long as the agent is
   + * - **Stay.** It is drawn one level up, on the stage (`CanvasView.tsx`), for as long as the agent is
-e2e/checks/glide.mjs:115
-  - * browser sends before the next frame (`Stage.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
-  + * browser sends before the next frame (`CanvasView.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
-e2e/checks/item-pill.mjs:90
-  - // The stage says which board's picture is under a point (`Stage.tsx`).
-  + // The stage says which board's picture is under a point (`CanvasView.tsx`).
-e2e/checks/render-perf.mjs:177
+tools/checks/bench/render-perf.mjs:177
   - /** Pinch to `zoom` exactly: 64 scroll units per e-fold (`Stage.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
   + /** Pinch to `zoom` exactly: 64 scroll units per e-fold (`CanvasView.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
-e2e/checks/shapes.mjs:176
+tools/checks/canvas/shapes.mjs:176
   - // A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `Stage.tsx`).
   + // A shape is clicked on its outline; the page says where it draws it (`__decksProbes.penBox`, `CanvasView.tsx`).
-e2e/checks/stage-gestures.mjs:178
+tools/checks/canvas/stage-gestures.mjs:178
   - // A board is its picture: the stage says which board is under a point (`Stage.tsx`), or its node's inert surface is there.
   + // A board is its picture: the stage says which board is under a point (`CanvasView.tsx`), or its node's inert surface is there.
-e2e/checks/stage-gestures.mjs:576
+tools/checks/canvas/stage-gestures.mjs:576
   - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
   + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
-e2e/checks/stage-gestures.mjs:609
+tools/checks/canvas/stage-gestures.mjs:609
   - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
   + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
-e2e/checks/stage-gestures.mjs:741
+tools/checks/canvas/stage-gestures.mjs:741
   - // A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
   + // A board below the live zoom has no node, only its picture: the stage says where it is (`CanvasView.tsx`).
-e2e/checks/stage-shot.mjs:6
-  - * canvas exactly as the canvas does (`StageEngine.place`, `Stage.tsx`). When the two disagreed the
-  + * canvas exactly as the canvas does (`StageEngine.place`, `CanvasView.tsx`). When the two disagreed the
-e2e/checks/wheel-diagonal.mjs:4
-  - * The stage pans by the wheel's own deltas (`Stage.tsx`, `onWheel`), and the browser keeps whole
-  + * The stage pans by the wheel's own deltas (`CanvasView.tsx`, `onWheel`), and the browser keeps whole
-e2e/harness.mjs:377
+tools/checks/harness.mjs:372
   - // Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
   + // Below the live zoom a board has no node, only its picture (`CanvasView.tsx`): the stage lists them.
+tools/checks/library/glide.mjs:115
+  - * browser sends before the next frame (`Stage.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+  + * browser sends before the next frame (`CanvasView.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+tools/checks/library/wheel-diagonal.mjs:4
+  - * The stage pans by the wheel's own deltas (`Stage.tsx`, `onWheel`), and the browser keeps whole
+  + * The stage pans by the wheel's own deltas (`CanvasView.tsx`, `onWheel`), and the browser keeps whole
+tools/checks/page/item-pill.mjs:90
+  - // The stage says which board's picture is under a point (`Stage.tsx`).
+  + // The stage says which board's picture is under a point (`CanvasView.tsx`).
+tools/checks/pictures/stage-shot.mjs:6
+  - * canvas exactly as the canvas does (`StageEngine.place`, `Stage.tsx`). When the two disagreed the
+  + * canvas exactly as the canvas does (`StageEngine.place`, `CanvasView.tsx`). When the two disagreed the
 
 ## Files the table edits or creates
 

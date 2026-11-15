@@ -26,8 +26,12 @@
 			"file": "server/main.ts",
 			"replace": [
 				{
-					"from": "\"../engine/target/bin\"",
+					"from": "\"../packages/eng/target/bin\"",
 					"to": "\"../engine/target/bin\""
+				},
+				{
+					"from": "\"../packages/lib/src/deep/\"",
+					"to": "\"../lib/deep/\""
 				}
 			]
 		}

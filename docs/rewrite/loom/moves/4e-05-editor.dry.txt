@@ -1,12 +1,12 @@
 # Step 4e-05-editor: Regroup canvas: edit/ and editor.tsx become editor/
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input. Nothing was moved.
 
 - files moved by git mv: 43
 - files taken out of git (moved on disk): 0
 - files deleted: 0
 - files edited or created: 27
-- import lines rewritten: 79
+- import lines rewritten: 78
 - warnings: 0
 
 ## Moved
@@ -69,9 +69,6 @@ canvas/camera/glide.ts:8
 canvas/editor/core/imports.test.ts:5
   - /** Core is the editor with no page under it: it may import itself, the pen types, edit/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
   + /** Core is the editor with no page under it: it may import itself, the pen types, editor/snap.ts, model/file-kinds.ts and camera/glide.ts, and nothing else. */
-canvas/editor/core/imports.test.ts:6
-  - test("edit/core imports nothing from the page, Solid or the engine", () => {
-  + test("editor/core imports nothing from the page, Solid or the engine", () => {
 canvas/editor/editor.tsx:5
   - import { fitInto, frames } from "./camera/camera.ts";
   + import { fitInto, frames } from "../camera/camera.ts";

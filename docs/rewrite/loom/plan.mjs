@@ -77,10 +77,16 @@ function rewriteRelative(spec, ctx) {
 	return relativeFrom(ctx.to, newTarget, spec.endsWith("/"));
 }
 
-const CODE_PATH = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*|@import\s+(?:url\(\s*)?)(["'])(\.\.?\/[^"'\n]*)\2/g;
-/** Only a URL made from this module's own address is a path in the tree; one from a card's address is not. */
-const MODULE_URL = /(\bnew\s+URL\s*\(\s*)(["'])(\.\.?\/[^"'\n]*)\2(?=\s*,\s*import\.meta\.url)/g;
+/** An import or export statement's line: the only lines whose paths and names change by themselves. */
+const IMPORT_LINE = /^\s*(import\b|export\b[^=]*\bfrom\b|\}\s*from\b|@import\b)/;
+const STATIC_PATH = /(\bfrom\s*|^\s*import\s+|@import\s+(?:url\(\s*)?)(["'])(\.\.?\/[^"'\n]*)\2/g;
+/** A call that loads a module: import() or require(), wherever it is. */
+const CALL_PATH = /(\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])(\.\.?\/[^"'\n]*)\2/g;
 const JSON_PATH = /((?:^|[:[,])\s*)"(\.\.?\/[^"\n]*)"(?!\s*:)/g;
+/** Any other relative path in a string: never rewritten by itself, only warned about when it points into a move. */
+const OTHER_PATH = /(["'`])(\.\.?\/[^"'`\n]*)\1/g;
+/** The config files whose relative values are paths: a package's and a type check's. */
+const CONFIG = /(^|\/)(package\.json|tsconfig[\w.-]*\.json)$/;
 
 /** A name npm can install: "name" or "@scope/name", with no subpath. A dependency key must be one. */
 const isPackageName = (name) => /^(@[^/]+\/)?[^/@]+$/.test(name);
@@ -92,18 +98,65 @@ function bareRule(specifiers) {
 	return new RegExp(`(["'\`])(${alt})((?:/[^"'\`\\n]*)?)\\1`, "g");
 }
 
-/** One line of one file, with its import paths and package names rewritten. */
-function rewriteLine(line, ctx, inScripts) {
+/** Where a line's comment starts, outside any string; -1 when it has none. A whole comment line starts at 0. */
+export function commentStart(line) {
+	if (/^\s*(\/\/|\/\*|\*)/.test(line)) return 0;
+	let quote = "";
+	for (let i = 0; i < line.length - 1; i++) {
+		const ch = line[i];
+		if (quote) { if (ch === "\\") i++; else if (ch === quote) quote = ""; continue; }
+		if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+		else if (ch === "/" && (line[i + 1] === "/" || line[i + 1] === "*")) return i;
+	}
+	return -1;
+}
+
+/** A package name in a package.json dependency key, or in an import line or a load call of code. */
+function renameBare(line, ctx, isImport) {
+	if (!ctx.bare) return line;
+	const to = (m, q, name, sub) => `${q}${ctx.specifiers[name]}${sub}${q}`;
+	if (ctx.from.endsWith("package.json")) return line.replace(ctx.bare, (m, q, name, sub) => (isPackageName(ctx.specifiers[name]) && /^\s*"[^"]+"\s*:/.test(line) ? to(m, q, name, sub) : m));
+	if (isImport) return line.replace(ctx.bare, to);
+	return line.replace(/(\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])([^"']+)\2/g, (m, head, q, spec) => {
+		const name = Object.keys(ctx.specifiers).find((n) => spec === n || spec.startsWith(`${n}/`));
+		return name ? `${head}${q}${ctx.specifiers[name]}${spec.slice(name.length)}${q}` : m;
+	});
+}
+
+/** A relative string the move does not rewrite that points into it: the table must list it. */
+function warnOther(line, ctx, n) {
+	for (const m of line.matchAll(OTHER_PATH)) {
+		const target = normalize(join(dirname(ctx.from), m[2]));
+		if (ctx.map(target) !== target || ctx.from !== ctx.to) {
+			const fresh = normalize(join(dirname(ctx.to), m[2]));
+			const listed = (ctx.listed.get(ctx.to) ?? []).some((from) => from.includes(m[2])) || ctx.kept.has(`${ctx.to}|${m[2]}`);
+			if (fresh !== ctx.map(target) && !listed) ctx.warnings.push(`${ctx.to}:${n}: the string ${m[2]} points at a moved path and is not rewritten; list it in paths`);
+		}
+	}
+}
+
+/** One line of one file: its import paths, its package names, and the comments' mentions. */
+function rewriteLine(line, ctx, inScripts, n) {
+	const fix = (_m, head, q, spec) => `${head}${q}${rewriteRelative(spec, ctx)}${q}`;
 	let out = line;
 	if (ctx.from.endsWith(".json")) {
-		if (!inScripts) out = out.replace(JSON_PATH, (_m, head, spec) => `${head}"${rewriteRelative(spec, ctx)}"`);
-	} else {
-		const fix = (_m, head, q, spec) => `${head}${q}${rewriteRelative(spec, ctx)}${q}`;
-		out = out.replace(CODE_PATH, fix).replace(MODULE_URL, fix);
+		if (CONFIG.test(ctx.from) && !inScripts) out = out.replace(JSON_PATH, (_m, head, spec) => `${head}"${rewriteRelative(spec, ctx)}"`);
+		return renameBare(out, ctx, false);
 	}
-	for (const l of ctx.localize) out = out.replace(l.rule, (_m, q) => `${q}${relativeFrom(ctx.to, l.target, false)}${q}`);
-	if (ctx.bare) out = out.replace(ctx.bare, (m, q, name, sub) => (ctx.from.endsWith("package.json") && !isPackageName(ctx.specifiers[name]) ? m : `${q}${ctx.specifiers[name]}${sub}${q}`));
-	for (const [from, to, within] of ctx.mentions) if (!within || ctx.to.startsWith(within)) out = out.split(from).join(to);
+	const at = commentStart(line);
+	const code = at < 0 ? line : line.slice(0, at);
+	let rest = at < 0 ? "" : line.slice(at);
+	const isImport = at !== 0 && IMPORT_LINE.test(code);
+	let head = code;
+	if (isImport) {
+		head = head.replace(STATIC_PATH, fix);
+		for (const l of ctx.localize) head = head.replace(l.rule, (_m, q) => `${q}${relativeFrom(ctx.to, l.target, false)}${q}`);
+	}
+	head = head.replace(CALL_PATH, fix);
+	head = renameBare(head, ctx, isImport);
+	if (!isImport && head === code) warnOther(code.replace(CALL_PATH, ""), ctx, n);
+	for (const [from, to, within] of ctx.mentions) if (!within || ctx.to.startsWith(within)) rest = rest.split(from).join(to);
+	out = head + rest;
 	return out;
 }
 
@@ -115,7 +168,7 @@ export function rewriteFile(text, ctx) {
 	const out = lines.map((line, i) => {
 		const opens = ctx.from.endsWith("package.json") && /"scripts"\s*:\s*\{/.test(line);
 		if (opens) inScripts = true;
-		const next = rewriteLine(line, ctx, inScripts);
+		const next = rewriteLine(line, ctx, inScripts, i + 1);
 		if (inScripts && line.includes("}")) inScripts = false;
 		if (next !== line) changes.push({ file: ctx.to, line: i + 1, before: line, after: next });
 		return next;
@@ -204,7 +257,7 @@ export function plan(table, repo) {
 	const oldFiles = new Set(repo.files);
 	const newFiles = new Set(newPaths);
 	const onDisk = new Set([...newFiles, ...[...untracked].filter((f) => !removed.has(f)).map(map)]);
-	const base = { map, oldFiles, newFiles, onDisk, oldDirs: dirsOf(oldFiles), newDirs: dirsOf(onDisk), warnings: [], specifiers: table.specifiers || {}, bare: bareRule(table.specifiers), mentions: table.mentions || [], localize: [] };
+	const base = { map, oldFiles, newFiles, onDisk, oldDirs: dirsOf(oldFiles), newDirs: dirsOf(onDisk), warnings: [], specifiers: table.specifiers || {}, bare: bareRule(table.specifiers), mentions: table.mentions || [], localize: [], listed: new Map((table.paths || []).map((p) => [p.file, p.replace.map((r) => r.from)])), kept: new Set((table.keep || []).map((k) => `${k.file}|${k.string}`)) };
 	const localizeAll = (table.localize || []).map((l) => ({ ...l, rule: new RegExp(`(["'])${l.name.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\1`, "g") }));
 	const texts = new Map();
 	const edits = new Map();
@@ -214,7 +267,7 @@ export function plan(table, repo) {
 		const to = newOf.get(f) ?? f;
 		const text = MENTIONS.test(f) ? repo.read(f) : null;
 		if (text != null) texts.set(to, text);
-		if (text == null || !SCANNED.test(f) || (skipped(f, table) && !newOf.has(f))) continue;
+		if (text == null || !SCANNED.test(f) || skipped(f, table)) continue;
 		const localize = f.endsWith(".json") ? [] : localizeAll.filter((l) => to.startsWith(l.within));
 		const r = rewriteFile(text, { ...base, from: f, to, localize });
 		if (r.text !== text) { edits.set(to, r.text); changes.push(...r.changes); }

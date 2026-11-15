@@ -1,6 +1,6 @@
 # Step 4e-11-host: Regroup canvas: frame/ and host.ts become host/
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome. Nothing was moved.
 
 - files moved by git mv: 19
 - files taken out of git (moved on disk): 0
@@ -138,18 +138,6 @@ canvas/types.ts:220
 canvas/view/items-layer.tsx:6
   - import { canvasHost, openInTab } from "../host.ts";
   + import { canvasHost, openInTab } from "../host/host.ts";
-e2e/checks/canvas-switch.mjs:3
-  - * otherwise (`frame/outside/host.tsx`, `inPlace`; `frame/inside/frame.tsx`, `reset`).
-  + * otherwise (`host/outside/framed-editor.tsx`, `inPlace`; `host/inside/frame.tsx`, `reset`).
-e2e/checks/card-copy.mjs:4
-  - * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`frame/inside/clipboard.ts`)
-  + * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`host/inside/clipboard.ts`)
-e2e/checks/news-seen.mjs:25
-  - // The frame's `card.seen` messages, counted: it says them on its line (`frame/inside/backend.ts`), not as a POST
-  + // The frame's `card.seen` messages, counted: it says them on its line (`host/inside/backend.ts`), not as a POST
-e2e/checks/presence.mjs:9
-  - * (`frame/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
-  + * (`host/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
 harness/page/canvases/pass.ts:12
   - * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `frame/outside/host.tsx`).
   + * hour; the frame's host asks for the next one at half that (`@decks/canvas`, `host/outside/framed-editor.tsx`).
@@ -159,6 +147,18 @@ harness/page/perf/probe.ts:8
 harness/page/shell/v3.css:1636
   - /* The row lives in the canvas frame, whose root carries the phone mark (`frame/inside/boot.ts`), not the app's. */
   + /* The row lives in the canvas frame, whose root carries the phone mark (`host/inside/boot.ts`), not the app's. */
+tools/checks/library/card-copy.mjs:4
+  - * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`frame/inside/clipboard.ts`)
+  + * A card is drawn in a closed shadow root on the canvas, and the canvas's own ⌘C (`host/inside/clipboard.ts`)
+tools/checks/page/canvas-switch.mjs:3
+  - * otherwise (`frame/outside/host.tsx`, `inPlace`; `frame/inside/frame.tsx`, `reset`).
+  + * otherwise (`host/outside/framed-editor.tsx`, `inPlace`; `host/inside/frame.tsx`, `reset`).
+tools/checks/people/news-seen.mjs:25
+  - // The frame's `card.seen` messages, counted: it says them on its line (`frame/inside/backend.ts`), not as a POST
+  + // The frame's `card.seen` messages, counted: it says them on its line (`host/inside/backend.ts`), not as a POST
+tools/checks/people/presence.mjs:9
+  - * (`frame/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
+  + * (`host/inside/presence.ts`, `frame.tsx`). Nothing of it is written anywhere.
 ui/dismiss.ts:7
   - * frame's bridge tells the other side (`frame/inside/frame.tsx`, `frame/outside/host.tsx`), which
   + * frame's bridge tells the other side (`host/inside/frame.tsx`, `host/outside/framed-editor.tsx`), which
@@ -175,6 +175,7 @@ ui/dismiss.ts:7
 
 - docs/REORGANIZATION.md: 2
 - docs/STUDIO-MIGRATION.md: 1
+- tools/checks/checks.json: 1
 
 ## Then run
 

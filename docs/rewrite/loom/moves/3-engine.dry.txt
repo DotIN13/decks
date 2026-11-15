@@ -1,12 +1,12 @@
 # Step 3-engine: engine/: packages/stage moved whole and named @decks/engine; its built wasm leaves git
 
-Dry run on 69f33823, on top of 1-pen, 2-ui. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui. Nothing was moved.
 
 - files moved by git mv: 112
 - files taken out of git (moved on disk): 8
 - files deleted: 0
-- files edited or created: 26
-- import lines rewritten: 31
+- files edited or created: 25
+- import lines rewritten: 21
 - warnings: 0
 
 ## Taken out of git
@@ -137,24 +137,6 @@ Dry run on 69f33823, on top of 1-pen, 2-ui. Nothing was moved.
 
 ## Lines rewritten
 
-e2e/checks/placeholder.mjs:5
-  - * `packages/stage/crates/paint/src/painter.rs`).
-  + * `engine/crates/paint/src/painter.rs`).
-e2e/checks/stage-goldens.mjs:5
-  - * `packages/stage/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
-  + * `engine/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
-e2e/checks/stage-goldens.mjs:14
-  - // The fonts the fixtures set words in, fetched when missing (`packages/stage/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
-  + // The fonts the fixtures set words in, fetched when missing (`engine/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
-e2e/checks/stage-goldens.mjs:15
-  - const fonts = spawnSync(process.execPath, ["fetch-fonts.mjs"], { cwd: join(web, "../../packages/stage"), encoding: "utf8", timeout: 120000 });
-  + const fonts = spawnSync(process.execPath, ["fetch-fonts.mjs"], { cwd: join(web, "../../engine"), encoding: "utf8", timeout: 120000 });
-e2e/checks/stage-shot.mjs:231
-  - const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
-  + const nativeBuilt = existsSync(new URL("../../engine/target/release/stage-shot", import.meta.url));
-examples/share-site/vite.config.ts:9
-  - optimizeDeps: { exclude: ["@decks/stage", "@decks/canvas"] },
-  + optimizeDeps: { exclude: ["@decks/engine", "@decks/canvas"] },
 packages/canvas/package.json:30
   - "@decks/stage": "*",
   + "@decks/engine": "*",
@@ -176,12 +158,6 @@ packages/canvas/src/look/media-look.ts:4
 packages/canvas/src/model/markdown.ts:14
   - * blocks and styled runs the engine lays out (`packages/stage/crates/text/src/card.rs`). Obsidian's own inline syntax
   + * blocks and styled runs the engine lays out (`engine/crates/text/src/card.rs`). Obsidian's own inline syntax
-packages/canvas/src/render/backends/detect.ts:6
-  - * The answer also says which build to load: `@decks/stage` (`pkg/`) draws with WebGPU only, and
-  + * The answer also says which build to load: `@decks/engine` (`pkg/`) draws with WebGPU only, and
-packages/canvas/src/render/backends/detect.ts:7
-  - * `@decks/stage/gl` (`pkg-gl/`) with WebGL 2 as well, at about 680 KB more brotli wasm, so a
-  + * `@decks/engine/gl` (`pkg-gl/`) with WebGL 2 as well, at about 680 KB more brotli wasm, so a
 packages/canvas/src/render/backends/detect.ts:21
   - export type StageModule = typeof import("@decks/stage");
   + export type StageModule = typeof import("@decks/engine");
@@ -191,15 +167,9 @@ packages/canvas/src/render/backends/detect.ts:50
 packages/canvas/src/render/backends/detect.ts:52
   - webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
   + webgl2: { name: "webgl2", load: (compiled) => import("@decks/engine/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
-packages/canvas/src/render/engine.ts:4
-  - * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
-  + * The stage's engine, on the page: the Rust page engine (`@decks/engine`) and its render worker.
 packages/canvas/src/render/engine.ts:15
   - import type { PageEngine } from "@decks/stage";
   + import type { PageEngine } from "@decks/engine";
-packages/canvas/src/render/render.worker.ts:2
-  - * The render worker: the Rust worker engine (`@decks/stage`), holding the same drawing as the page
-  + * The render worker: the Rust worker engine (`@decks/engine`), holding the same drawing as the page
 packages/canvas/src/render/render.worker.ts:7
   - import type { WorkerEngine } from "@decks/stage";
   + import type { WorkerEngine } from "@decks/engine";
@@ -221,18 +191,21 @@ engine/package.json:2
 pen/arrow-fixtures.test.ts:9
   - * The cases the stage engine's Rust router is held to (`packages/stage/crates/scene/src/arrows.rs`,
   + * The cases the stage engine's Rust router is held to (`engine/crates/scene/src/arrows.rs`,
-pen/arrow-fixtures.test.ts:14
-  - const FILE = fileURLToPath(new URL("../packages/stage/crates/scene/fixtures/arrows.json", import.meta.url));
-  + const FILE = fileURLToPath(new URL("../engine/crates/scene/fixtures/arrows.json", import.meta.url));
-scripts/build-solid-lib.mjs:7
-  - * the engine still `import("@decks/stage")`, so a host's bundler sees what it would see in the
-  + * the engine still `import("@decks/engine")`, so a host's bundler sees what it would see in the
-server/pictures/native.ts:19
-  - const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/stage/target/release/stage-shot");
-  + const built = resolve(dirname(fileURLToPath(import.meta.url)), "../../engine/target/release/stage-shot");
+tools/checks/library/stage-goldens.mjs:5
+  - * `packages/stage/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
+  + * `engine/pkg*` builds on a throwaway server of its own. One PASS/FAIL line per backend and
+tools/checks/library/stage-goldens.mjs:14
+  - // The fonts the fixtures set words in, fetched when missing (`packages/stage/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
+  + // The fonts the fixtures set words in, fetched when missing (`engine/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
+tools/checks/pictures/placeholder.mjs:5
+  - * `packages/stage/crates/paint/src/painter.rs`).
+  + * `engine/crates/paint/src/painter.rs`).
 
 ## Files the table edits or creates
 
+- server/pictures/native.ts
+- tools/checks/pictures/stage-shot.mjs
+- engine/demo/serve.mjs
 - package.json
 - engine/.gitignore
 - engine/README.md
@@ -250,8 +223,8 @@ server/pictures/native.ts:19
 - docs/DEPLOYMENT.md: 4
 - docs/DESIGN.md: 1
 - docs/REORGANIZATION.md: 2
-- e2e/KNOWN-FAILURES.md: 2
 - engine/crates/apple/README.md: 2
+- tools/checks/library/stage-goldens.mjs: 1
 
 ## Then run
 

@@ -1,12 +1,12 @@
 # Step 1-pen: pen/: packages/pen moved to the top, src/ flattened, the name @decks/pen kept
 
-Dry run on 69f33823. Nothing was moved.
+Dry run on 62a79ab8. Nothing was moved.
 
 - files moved by git mv: 29
 - files taken out of git (moved on disk): 0
 - files deleted: 0
 - files edited or created: 11
-- import lines rewritten: 17
+- import lines rewritten: 9
 - warnings: 0
 
 ## Moved
@@ -43,27 +43,9 @@ Dry run on 69f33823. Nothing was moved.
 
 ## Lines rewritten
 
-e2e/harness.mjs:28
-  - import { applyEdits } from "../packages/pen/src/diff.ts";
-  + import { applyEdits } from "../pen/diff.ts";
 pen/package.json:6
   - "exports": { ".": "./src/index.ts" },
   + "exports": { ".": "./index.ts" },
-pen/arrow-fixtures.test.ts:14
-  - const FILE = fileURLToPath(new URL("../../stage/crates/scene/fixtures/arrows.json", import.meta.url));
-  + const FILE = fileURLToPath(new URL("../packages/stage/crates/scene/fixtures/arrows.json", import.meta.url));
-pen/colors.test.ts:66
-  - const guide = readFileSync(new URL("../../../runtime/skills/canvas-authoring/SKILL.md", import.meta.url), "utf8");
-  + const guide = readFileSync(new URL("../runtime/skills/canvas-authoring/SKILL.md", import.meta.url), "utf8");
-pen/colors.test.ts:68
-  - const skill = readFileSync(new URL("../../../runtime/skills/canvas-authoring/colors.md", import.meta.url), "utf8");
-  + const skill = readFileSync(new URL("../runtime/skills/canvas-authoring/colors.md", import.meta.url), "utf8");
-pen/colors.test.ts:74
-  - const design = readFileSync(new URL("../../../runtime/skills/canvas-design/SKILL.md", import.meta.url), "utf8");
-  + const design = readFileSync(new URL("../runtime/skills/canvas-design/SKILL.md", import.meta.url), "utf8");
-pen/schema.test.ts:5
-  - const root = new URL("../../../", import.meta.url);
-  + const root = new URL("../", import.meta.url);
 pen/tsconfig.json:2
   - "extends": "../../tsconfig.base.json",
   + "extends": "../tsconfig.base.json",
@@ -76,18 +58,12 @@ scripts/gen-pen-schema.mjs:3
 scripts/gen-pen-schema.mjs:8
   - import { FIELDS, UNDRAWN_EFFECTS, UNDRAWN_FILLS } from "../packages/pen/src/fields.ts";
   + import { FIELDS, UNDRAWN_EFFECTS, UNDRAWN_FILLS } from "../pen/fields.ts";
-scripts/gen-pen-schema.mjs:11
-  - const typesFile = `${root}packages/pen/src/types.ts`;
-  + const typesFile = `${root}pen/types.ts`;
-scripts/gen-pen-schema.mjs:71
-  - parts.push(`<!-- Generated from packages/pen/src/types.ts and fields.ts by scripts/gen-pen-schema.mjs. Edit those, then run the script. -->
-  + parts.push(`<!-- Generated from pen/types.ts and fields.ts by scripts/gen-pen-schema.mjs. Edit those, then run the script. -->
-scripts/gen-pen-schema.mjs:135
-  - console.error("runtime/skills/canvas-design/schema.md is out of date with packages/pen: run node --import tsx scripts/gen-pen-schema.mjs");
-  + console.error("runtime/skills/canvas-design/schema.md is out of date with pen: run node --import tsx scripts/gen-pen-schema.mjs");
 tools/checks/fixtures.test.mjs:1
   - // The fixture drawings still lay out as their expected layouts say, by today's packages/pen.
   + // The fixture drawings still lay out as their expected layouts say, by today's pen.
+tools/checks/harness.mjs:28
+  - import { applyEdits } from "../../packages/pen/src/diff.ts";
+  + import { applyEdits } from "../../pen/diff.ts";
 tools/fixtures/layouts.mjs:1
   - // Expected layouts of the fixture drawings, as today's packages/pen lays them out.
   + // Expected layouts of the fixture drawings, as today's pen lays them out.
@@ -97,6 +73,9 @@ tools/fixtures/layouts.mjs:6
 
 ## Files the table edits or creates
 
+- pen/arrow-fixtures.test.ts
+- pen/colors.test.ts
+- pen/schema.test.ts
 - package.json
 - pen/README.md
 
@@ -112,6 +91,7 @@ tools/fixtures/layouts.mjs:6
 - harness/prompts/skills/canvas-authoring/colors.md: 1
 - harness/prompts/skills/canvas-design/schema.md: 1
 - scripts/README.md: 2
+- scripts/gen-pen-schema.mjs: 2
 - tools/fixtures/README.md: 2
 
 ## Then run

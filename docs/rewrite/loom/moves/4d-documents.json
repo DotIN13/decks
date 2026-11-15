@@ -52,29 +52,8 @@
 		"docs/rewrite/",
 		"packages/protocol/",
 		"packages/api/",
-		"packages/hub/"
-	],
-	"remove": [
-		"packages/docs/"
-	],
-	"untrack": [
-		"canvas/cards/runtime/lib/live-doc.js"
-	],
-	"ignore": [
-		{
-			"file": "canvas/cards/runtime/lib/.gitignore",
-			"add": [
-				"# built at install by ../../documents/build-live-doc.mjs",
-				"/live-doc.js"
-			]
-		}
-	],
-	"localize": [
-		{
-			"within": "canvas/",
-			"name": "@decks/docs/page",
-			"target": "canvas/documents/page.ts"
-		}
+		"packages/hub/",
+		"canvas/cards/runtime/lib/"
 	],
 	"mentions": [
 		[
@@ -85,6 +64,28 @@
 			"`@decks/docs/page`",
 			"`canvas/documents/page.ts`"
 		]
+	],
+	"localize": [
+		{
+			"within": "canvas/",
+			"name": "@decks/docs/page",
+			"target": "canvas/documents/page.ts"
+		}
+	],
+	"untrack": [
+		"canvas/cards/runtime/lib/live-doc.js"
+	],
+	"remove": [
+		"packages/docs/"
+	],
+	"ignore": [
+		{
+			"file": "canvas/cards/runtime/lib/.gitignore",
+			"add": [
+				"# built at install by ../../documents/build-live-doc.mjs",
+				"/live-doc.js"
+			]
+		}
 	],
 	"paths": [
 		{

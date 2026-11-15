@@ -57,7 +57,7 @@ test("a moved file's import of a file that stays is rewritten from its new place
 	assert.equal(line(fixturePlan(), "lib/index.ts", 2), 'import { util } from "../shared/util.ts";');
 });
 
-test("a file that stays is rewritten to reach a moved file, new URL included", () => {
+test("a file that stays is rewritten to reach a moved file, and a listed path string is replaced", () => {
 	const p = fixturePlan();
 	assert.equal(line(p, "server/main.ts", 2), 'import { extra } from "../lib/extra.ts";');
 	assert.equal(line(p, "server/main.ts", 3), 'const deep = new URL("../lib/deep/", import.meta.url);');
@@ -212,8 +212,8 @@ test("a removed folder still gives up the files a table moves out of it", () => 
 	assert.equal(p.remove.includes("packages/lib/src/extra.ts"), false);
 });
 
-test("a package name is never made relative in a JSON file, and a moved file is never skipped", () => {
-	const table = { step: "t", title: "t", moves: [{ from: "shared/util.ts", to: "packages/lib/src/util.ts" }], skip: ["shared/", "server/"], localize: [{ within: "server/", name: "@x/eng", target: "packages/eng/made/out.js" }] };
+test("a package name is never made relative in a JSON file", () => {
+	const table = { step: "t", title: "t", moves: [{ from: "shared/util.ts", to: "packages/lib/src/util.ts" }], skip: ["server/"], localize: [{ within: "server/", name: "@x/eng", target: "packages/eng/made/out.js" }] };
 	const r = tree();
 	const read = (f) => (f === "shared/util.ts" ? 'import { x } from "../server/main.ts";\n' : r.read(f));
 	const p = plan(table, { files: r.files, read });
@@ -223,8 +223,10 @@ test("a package name is never made relative in a JSON file, and a moved file is 
 
 test("a mention can be limited to the files of one folder", () => {
 	const table = { step: "t", title: "t", moves: [], mentions: [["util", "tool", "shared/"]] };
-	const p = plan(table, tree());
-	assert.equal(p.edits.get("shared/util.ts").trim(), "export const tool = 1;");
+	const r = tree();
+	const read = (f) => (f === "shared/util.ts" ? "// the util of everything\nexport const util = 1;\n" : r.read(f));
+	const p = plan(table, { files: r.files, read });
+	assert.equal(p.edits.get("shared/util.ts"), "// the tool of everything\nexport const util = 1;\n", "the comment, not the code");
 	assert.equal(p.edits.has("packages/lib/src/index.ts"), false);
 });
 
@@ -242,4 +244,36 @@ test("--go re-keys the gate baselines with the files when the checkout has the r
 		assert.ok(notes.includes("re-keyed 7 baseline keys"), notes.join("; "));
 		assert.deepEqual(globalThis.loomPairs.find(([a]) => a === "packages/lib/src/extra.ts"), ["packages/lib/src/extra.ts", "lib/extra.ts"]);
 	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("only import lines, load calls and listed strings change: a path inside any other string is warned about, not touched", () => {
+	const r = tree();
+	const text = 'import { extra } from "../packages/lib/src/extra.ts";\nconst note = "see ../packages/lib/src/extra.ts";\nconst m = await import("../packages/lib/src/extra.ts");\nwrite("../packages/lib/src/extra.ts", "x"); // ../packages/lib/src/extra.ts\n';
+	const read = (f) => (f === "shared/util.ts" ? text : r.read(f));
+	const p = plan({ step: "t", title: "t", moves: [{ from: "packages/lib/src/", to: "lib/" }] }, { files: r.files, read });
+	const lines = p.edits.get("shared/util.ts").split("\n");
+	assert.equal(lines[0], 'import { extra } from "../lib/extra.ts";');
+	assert.equal(lines[1], 'const note = "see ../packages/lib/src/extra.ts";', "inside a sentence: not a path string, untouched");
+	assert.equal(lines[2], 'const m = await import("../lib/extra.ts");');
+	assert.equal(lines[3], 'write("../packages/lib/src/extra.ts", "x"); // ../packages/lib/src/extra.ts', "a string a program writes, untouched");
+	assert.ok(p.warnings.some((w) => w.startsWith("shared/util.ts:4:")), "and warned about, so the table lists it or leaves it on purpose");
+});
+
+test("a relative value in a JSON file that is not a package's or a type check's is left alone", () => {
+	const r = tree();
+	const files = [...r.files, "shared/data.json"];
+	const read = (f) => (f === "shared/data.json" ? '{ "at": "../packages/lib/src/extra.ts" }\n' : r.read(f));
+	assert.equal(plan(loadTable(TABLE), { files, read }).edits.has("shared/data.json"), false);
+});
+
+test("a string a table keeps on purpose is not warned about, and a skipped file that moves is moved but not read", () => {
+	const r = tree();
+	const read = (f) => (f === "shared/util.ts" ? 'write("../packages/lib/src/extra.ts");\n' : r.read(f));
+	const base = { step: "t", title: "t", moves: [{ from: "packages/lib/src/", to: "lib/" }] };
+	const warned = (p) => p.warnings.filter((w) => w.startsWith("shared/util.ts")).length;
+	assert.equal(warned(plan(base, { files: r.files, read })), 1);
+	assert.equal(warned(plan({ ...base, keep: [{ file: "shared/util.ts", string: "../packages/lib/src/extra.ts" }] }, { files: r.files, read })), 0);
+	const skipped = plan({ ...base, skip: ["packages/lib/src/"] }, r);
+	assert.ok(skipped.moves.some(([a]) => a === "packages/lib/src/index.ts"));
+	assert.equal(skipped.edits.has("lib/index.ts"), false);
 });

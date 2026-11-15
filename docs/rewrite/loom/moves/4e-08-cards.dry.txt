@@ -1,12 +1,12 @@
 # Step 4e-08-cards: Regroup canvas: card files from items/ and model/ join cards/
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items. Nothing was moved.
 
 - files moved by git mv: 12
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 31
-- import lines rewritten: 33
+- files edited or created: 29
+- import lines rewritten: 31
 - warnings: 0
 
 ## Moved
@@ -29,9 +29,6 @@ Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card
 canvas/cards/CardEditor.tsx:24
   - import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "../model/card-syntax.ts";
   + import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
-canvas/cards/runtime/lib/card.js:395
-  - * frame (`canvas/items/card.ts`); a board on its own has no stage and no token.
-  + * frame (`canvas/cards/card.ts`); a board on its own has no stage and no token.
 canvas/editor/core/ops.test.ts:257
   - const { newCard, fileItem } = await import("../../model/card-frame.ts");
   + const { newCard, fileItem } = await import("../../cards/card-frame.ts");
@@ -68,9 +65,6 @@ canvas/cards/card-load.ts:1
 canvas/cards/card-surface.tsx:8
   - import { markMissing } from "./missing.ts";
   + import { markMissing } from "../items/missing.ts";
-canvas/cards/card.ts:20
-  - * the server's `boards/cards.ts`), so `import "./sales.js"` resolves from the card's folder and the
-  + * the server's `boards/cards.ts`), so `import "../items/sales.js"` resolves from the card's folder and the
 canvas/items/file-drop.ts:2
   - import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "../model/card-frame.ts";
   + import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, FILE_CARD_W, liveFileItem } from "../cards/card-frame.ts";
@@ -113,18 +107,18 @@ canvas/view/items-layer.tsx:19
 canvas/view/selection.tsx:10
   - import { parseMarkdown } from "../model/markdown.ts";
   + import { parseMarkdown } from "../cards/markdown.ts";
-e2e/checks/card-ground.mjs:6
-  - * content (`items/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
-  + * content (`cards/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
-e2e/checks/card-links.mjs:4
-  - * A link in a card is read against the card's own address (`items/card-surface.tsx`, `followLink`), so
-  + * A link in a card is read against the card's own address (`cards/card-surface.tsx`, `followLink`), so
-e2e/checks/deck-imports.mjs:7
-  - * `imports`), the frame adds it before any card's script runs (`items/card.ts`, `giveDeckImports`), and the
-  + * `imports`), the frame adds it before any card's script runs (`cards/card.ts`, `giveDeckImports`), and the
 harness/page/canvases/CanvasOps.tsx:27
   - * `model/file-drop.ts` for the drop, `items/card-surface.tsx` for a card's own chrome,
   + * `model/file-drop.ts` for the drop, `cards/card-surface.tsx` for a card's own chrome,
+tools/checks/cards/card-ground.mjs:6
+  - * content (`items/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
+  + * content (`cards/card.ts`). Here: a card whose only style is that rule, awake on the canvas, in
+tools/checks/cards/card-links.mjs:4
+  - * A link in a card is read against the card's own address (`items/card-surface.tsx`, `followLink`), so
+  + * A link in a card is read against the card's own address (`cards/card-surface.tsx`, `followLink`), so
+tools/checks/cards/deck-imports.mjs:7
+  - * `imports`), the frame adds it before any card's script runs (`items/card.ts`, `giveDeckImports`), and the
+  + * `imports`), the frame adds it before any card's script runs (`cards/card.ts`, `giveDeckImports`), and the
 
 ## Files the table edits or creates
 

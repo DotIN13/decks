@@ -1,12 +1,12 @@
 # Step 4b-ink: canvas/ink/: packages/ink folds into the canvas library; @decks/ink goes
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas. Nothing was moved.
 
 - files moved by git mv: 3
 - files taken out of git (moved on disk): 0
 - files deleted: 2
-- files edited or created: 10
-- import lines rewritten: 8
+- files edited or created: 9
+- import lines rewritten: 7
 - warnings: 0
 
 ## Deleted
@@ -34,9 +34,6 @@ canvas/model/ink.ts:1
 canvas/ui/InkBar.tsx:1
   - import { INK_COLORS } from "@decks/ink";
   + import { INK_COLORS } from "../ink/index.ts";
-e2e/checks/ink-long-stroke.mjs:5
-  - * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/ink`; `StageInk.tsx`),
-  + * The stroke under the pen is shaped as it grows (`inkShaper`, `@decks/canvas/ink`; `StageInk.tsx`),
 harness/page/frame/PenTray.tsx:1
   - import { INK_COLORS, type InkColor } from "@decks/ink";
   + import { INK_COLORS, type InkColor } from "@decks/canvas/ink";

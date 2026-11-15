@@ -1,12 +1,12 @@
 # Step 4d-documents: canvas/documents/: the page half of docs folds into the canvas library; the server half is already server/documents
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime. Nothing was moved.
 
 - files moved by git mv: 19
 - files taken out of git (moved on disk): 1
 - files deleted: 17
-- files edited or created: 16
-- import lines rewritten: 26
+- files edited or created: 15
+- import lines rewritten: 24
 - warnings: 0
 
 ## Taken out of git
@@ -129,12 +129,6 @@ canvas/documents/reading.ts:1
 canvas/documents/reading.ts:2
   - import type { DocSync } from "../client.ts";
   + import type { DocSync } from "./client.ts";
-canvas/documents/live-doc.ts:1
-  - import { mountDocPage } from "@decks/docs/page";
-  + import { mountDocPage } from "./page.ts";
-canvas/documents/live-doc.ts:6
-  - * The page is `@decks/docs/page`; this is only how it talks. A board has no socket of its own:
-  + * The page is `canvas/documents/page.ts`; this is only how it talks. A board has no socket of its own:
 
 ## Files the table edits or creates
 

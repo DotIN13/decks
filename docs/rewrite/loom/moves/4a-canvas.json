@@ -33,6 +33,43 @@
 			"canvas"
 		]
 	],
+	"paths": [
+		{
+			"file": "canvas/styles/surface.css",
+			"replace": [
+				{
+					"from": "@source \"../src\";",
+					"to": "@source \"..\";"
+				}
+			]
+		},
+		{
+			"file": "server/pictures/ladder.test.ts",
+			"replace": [
+				{
+					"from": "\"../../packages/canvas/src/render/device.ts\"",
+					"to": "\"../../canvas/render/device.ts\""
+				}
+			]
+		}
+	],
+	"keep": [
+		{
+			"file": "canvas/items/card-snapshot.ts",
+			"string": "../../lib/card.css",
+			"why": "read beside a card's page, not this module"
+		},
+		{
+			"file": "canvas/items/card.ts",
+			"string": "../../assets/importmap.json",
+			"why": "against the card's address"
+		},
+		{
+			"file": "canvas/items/card.ts",
+			"string": "../../lib/",
+			"why": "against the card's address"
+		}
+	],
 	"set": [
 		{
 			"file": "canvas/tsconfig.json",

@@ -1,12 +1,12 @@
 # Step 4c-card-runtime: canvas/cards/runtime/: card-host folds into the canvas library; vendored libraries leave git, copied at install
 
-Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing was moved.
+Dry run on 62a79ab8, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing was moved.
 
 - files moved by git mv: 18
 - files taken out of git (moved on disk): 99
 - files deleted: 2
-- files edited or created: 14
-- import lines rewritten: 10
+- files edited or created: 12
+- import lines rewritten: 5
 - warnings: 0
 
 ## Taken out of git
@@ -139,9 +139,6 @@ Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink. Nothing
 
 ## Lines rewritten
 
-canvas/items/card-surface.tsx:62
-  - * `@decks/card-host`): what it imports beside it is then a new address at each version. A page keeps
-  + * `@decks/canvas/cards-runtime`): what it imports beside it is then a new address at each version. A page keeps
 examples/share-site/packed/site.mjs:12
   - import { libFile, LIVE_CARD_HEADERS } from "@decks/card-host";
   + import { libFile, LIVE_CARD_HEADERS } from "@decks/canvas/cards-runtime";
@@ -154,25 +151,15 @@ canvas/cards/runtime/runtime.test.ts:3
 scripts/live-doc.mjs:2
   - * Bundle the document page into `packages/card-host/lib/live-doc.js`, the one module a `[data-live="doc"]`
   + * Bundle the document page into `canvas/cards/runtime/lib/live-doc.js`, the one module a `[data-live="doc"]`
-scripts/live-doc.mjs:23
-  - console.log("[live-doc] packages/card-host/lib/live-doc.js");
-  + console.log("[live-doc] canvas/cards/runtime/lib/live-doc.js");
-scripts/public-entries.test.mjs:50
-  - "@decks/card-host": ["LIVE_CARD_HEADERS", "cardModuleOf", "cardModules", "contentType", "libFile", "passes", "unstampCard"],
-  + "@decks/canvas/cards-runtime": ["LIVE_CARD_HEADERS", "cardModuleOf", "cardModules", "contentType", "libFile", "passes", "unstampCard"],
 canvas/cards/runtime/vendor.mjs:2
   - * Put the board primitives into `card-host/lib`, from the packages in node_modules.
   + * Put the board primitives into `canvas/cards/runtime/lib`, from the packages in node_modules.
-server/cards/cards.test.ts:104
-  - const root = new URL("../../packages/card-host/lib/", import.meta.url).pathname;
-  + const root = new URL("../../canvas/cards/runtime/lib/", import.meta.url).pathname;
-server/main.ts:51
-  - const folder = fileURLToPath(new URL("../packages/card-host/lib", import.meta.url));
-  + const folder = fileURLToPath(new URL("../canvas/cards/runtime/lib", import.meta.url));
 
 ## Files the table edits or creates
 
 - canvas/cards/runtime/index.ts
+- server/main.ts
+- server/cards/cards.test.ts
 - canvas/package.json
 - examples/share-site/package.json
 - package.json
@@ -186,6 +173,7 @@ server/main.ts:51
 
 - docs/REORGANIZATION.md: 2
 - scripts/README.md: 2
+- scripts/live-doc.mjs: 1
 
 ## Then run
 

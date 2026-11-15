@@ -45,6 +45,44 @@
 			]
 		}
 	],
+	"paths": [
+		{
+			"file": "server/pictures/native.ts",
+			"replace": [
+				{
+					"from": "\"../../packages/stage/target/release/stage-shot\"",
+					"to": "\"../../engine/target/release/stage-shot\""
+				}
+			]
+		},
+		{
+			"file": "tools/checks/pictures/stage-shot.mjs",
+			"replace": [
+				{
+					"from": "\"../../../packages/stage/target/release/stage-shot\"",
+					"to": "\"../../../engine/target/release/stage-shot\""
+				}
+			]
+		},
+		{
+			"file": "pen/arrow-fixtures.test.ts",
+			"replace": [
+				{
+					"from": "\"../packages/stage/crates/scene/fixtures/arrows.json\"",
+					"to": "\"../engine/crates/scene/fixtures/arrows.json\""
+				}
+			]
+		},
+		{
+			"file": "engine/demo/serve.mjs",
+			"replace": [
+				{
+					"from": "\"../../../data/decks\"",
+					"to": "\"../../data/decks\""
+				}
+			]
+		}
+	],
 	"set": [
 		{
 			"file": "engine/package.json",

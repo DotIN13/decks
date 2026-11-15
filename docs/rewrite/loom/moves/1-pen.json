@@ -33,6 +33,67 @@
 			"pen"
 		]
 	],
+	"paths": [
+		{
+			"file": "pen/arrow-fixtures.test.ts",
+			"replace": [
+				{
+					"from": "\"../../stage/crates/scene/fixtures/arrows.json\"",
+					"to": "\"../packages/stage/crates/scene/fixtures/arrows.json\""
+				}
+			]
+		},
+		{
+			"file": "pen/colors.test.ts",
+			"replace": [
+				{
+					"from": "\"../../../runtime/skills/canvas-authoring/SKILL.md\"",
+					"to": "\"../harness/prompts/skills/canvas-authoring/SKILL.md\""
+				},
+				{
+					"from": "\"../../../runtime/skills/canvas-authoring/colors.md\"",
+					"to": "\"../harness/prompts/skills/canvas-authoring/colors.md\""
+				},
+				{
+					"from": "\"../../../runtime/skills/canvas-design/SKILL.md\"",
+					"to": "\"../harness/prompts/skills/canvas-design/SKILL.md\""
+				}
+			]
+		},
+		{
+			"file": "pen/schema.test.ts",
+			"replace": [
+				{
+					"from": "new URL(\"../../../\", import.meta.url)",
+					"to": "new URL(\"../\", import.meta.url)"
+				}
+			]
+		},
+		{
+			"file": "scripts/gen-pen-schema.mjs",
+			"replace": [
+				{
+					"from": "`${root}runtime/skills/canvas-design/schema.md`",
+					"to": "`${root}harness/prompts/skills/canvas-design/schema.md`"
+				},
+				{
+					"from": "\"runtime/skills/canvas-design/schema.md is out of date with packages/pen:",
+					"to": "\"harness/prompts/skills/canvas-design/schema.md is out of date with pen/:"
+				},
+				{
+					"from": "`${root}packages/pen/src/types.ts`",
+					"to": "`${root}pen/types.ts`"
+				}
+			]
+		}
+	],
+	"keep": [
+		{
+			"file": "pen/pen.test.ts",
+			"string": "../../components.pen",
+			"why": "an import inside a drawing the test writes, not a file of the repo"
+		}
+	],
 	"set": [
 		{
 			"file": "pen/tsconfig.json",
