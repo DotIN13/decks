@@ -19,7 +19,7 @@
 		"./frame": "./frame/feature.ts",
 		"./compat": "./compat/feature.ts",
 		"./upgrade": "./upgrade/feature.ts",
-		"./sharing/hub/*": "./sharing/hub/*.ts"
+		"./sharing/hub": "./sharing/hub/index.ts"
 	},
 	"scripts": {
 		"test": "node ../tools/check.mjs server"
