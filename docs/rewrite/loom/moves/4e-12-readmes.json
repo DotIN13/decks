@@ -1,6 +1,6 @@
 {
 	"step": "4e-12-readmes",
-	"title": "Regroup canvas: READMEs for render/, look/, documents/ and the whole folder",
+	"title": "Regroup canvas: READMEs for render/, look/, documents/, canvas/",
 	"moves": [],
 	"skip": [
 		"apps/",
