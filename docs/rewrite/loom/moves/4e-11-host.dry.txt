@@ -1,18 +1,19 @@
 # Step 4e-11-host: Regroup canvas: frame/ and host.ts become host/
 
-Dry run on 0e84ac15, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome. Nothing was moved.
+Dry run on 69f33823, on top of 1-pen, 2-ui, 3-engine, 4a-canvas, 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink, 4e-10-chrome. Nothing was moved.
 
-- files moved by git mv: 18
+- files moved by git mv: 19
 - files taken out of git (moved on disk): 0
 - files deleted: 0
-- files edited or created: 34
-- import lines rewritten: 42
+- files edited or created: 35
+- import lines rewritten: 43
 - warnings: 0
 
 ## Moved
 
 - canvas/frame/chrome.ts -> canvas/host/chrome.ts
 - canvas/frame/inside/backend.ts -> canvas/host/inside/backend.ts
+- canvas/frame/inside/boot.test.ts -> canvas/host/inside/boot.test.ts
 - canvas/frame/inside/boot.ts -> canvas/host/inside/boot.ts
 - canvas/frame/inside/card-calls.ts -> canvas/host/inside/card-calls.ts
 - canvas/frame/inside/clipboard.ts -> canvas/host/inside/clipboard.ts
@@ -62,6 +63,9 @@ canvas/entries/host.ts:8
 canvas/host/chrome.ts:4
   - import type { ComposerPart } from "./protocol.ts";
   + import type { ComposerPart } from "./messages.ts";
+canvas/host/inside/boot.test.ts:5
+  - import type { FramePage } from "../protocol.ts";
+  + import type { FramePage } from "../messages.ts";
 canvas/host/inside/boot.ts:15
   - import type { FrameEnd, FramePage, Rect, Start } from "../protocol.ts";
   + import type { FrameEnd, FramePage, Rect, Start } from "../messages.ts";

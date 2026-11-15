@@ -8,6 +8,10 @@
 		"to": "canvas/host/inside/backend.ts"
 	},
 	{
+		"from": "canvas/frame/inside/boot.test.ts",
+		"to": "canvas/host/inside/boot.test.ts"
+	},
+	{
 		"from": "canvas/frame/inside/boot.ts",
 		"to": "canvas/host/inside/boot.ts"
 	},

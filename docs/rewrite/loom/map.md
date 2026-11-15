@@ -436,3 +436,16 @@ imports by package and folder, top-level outlines and inner function sizes of ea
   so the move's commit carries them. Keys of deleted or untracked files fall with
   `node tools/gates/run.mjs --shrink`. The eight `stage` class names pass by rule
   (`tools/gates/markup-names.json`, 476a73c0).
+
+## 12. Waiting for wave 3 (from the stop 3 fixes, 2026-11-15)
+
+- **The engine asks again for a picture wider than its rung.** On a compressed answer the engine holds
+  whatever width the server sent (`render/engine.ts` `fetchPicture`); the bitmap path clamps to the rung
+  and the compressed path does not. one-picture flaked because the new server rounded 800 up to 1000
+  (Depot fixes the server's rungs). In the split of `render/engine.ts` (sheet `canvas-render-engine`),
+  an answer wider than the rung asked is taken and asked for again at the rung, with a unit test.
+- **One ladder, named by the protocol.** Protocol 0.21.0 has `PICTURE_LADDER = [192, 480, 800]`
+  (`protocol/wire.ts`). When the canvas library's old imports are rewired after step 4a,
+  `render/device.ts` takes `PICTURES.big.ladder` from it, and the small and phone ladders stay subsets.
+  `server/pictures/ladder.test.ts` reads `device.ts` by a `new URL` path; step 4a's table already
+  rewrites it (`moves/4a-canvas.dry.txt`), so Depot need not change it for the move.

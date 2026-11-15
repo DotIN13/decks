@@ -312,6 +312,10 @@
 		"to": "canvas/frame/inside/backend.ts"
 	},
 	{
+		"from": "packages/canvas/src/frame/inside/boot.test.ts",
+		"to": "canvas/frame/inside/boot.test.ts"
+	},
+	{
 		"from": "packages/canvas/src/frame/inside/boot.ts",
 		"to": "canvas/frame/inside/boot.ts"
 	},
