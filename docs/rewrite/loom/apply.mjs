@@ -50,8 +50,9 @@ async function rekeyBaselines(root, moves, notes) {
 /** Runs the plan. Returns notes on what it carried or left, for the caller to read. */
 export async function apply(root, table, p) {
 	const notes = [];
-	if (p.untrack.length) git(root, ["rm", "-r", "-q", "--cached", "--", ...(table.untrack || [])]);
-	if (p.remove.length) git(root, ["rm", "-r", "-q", "--", ...(table.remove || [])]);
+	// The plan's own lists, file by file: a table's prefix also covers the files it moves out of a removed folder.
+	if (p.untrack.length) git(root, ["rm", "-q", "--cached", "--", ...p.untrack]);
+	if (p.remove.length) git(root, ["rm", "-q", "--", ...p.remove]);
 	for (const [from, to] of p.moves) {
 		mkdirSync(dirname(join(root, to)), { recursive: true });
 		git(root, ["mv", "--", from, to]);

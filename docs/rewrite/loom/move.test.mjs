@@ -277,3 +277,17 @@ test("a string a table keeps on purpose is not warned about, and a skipped file 
 	assert.ok(skipped.moves.some(([a]) => a === "packages/lib/src/index.ts"));
 	assert.equal(skipped.edits.has("lib/index.ts"), false);
 });
+
+test("--go moves the files a table takes out of a folder it removes, and deletes only the rest", async () => {
+	const root = mkdtempSync(join(tmpdir(), "loom-remove-"));
+	try {
+		cpSync(TREE, root, { recursive: true });
+		const git = (...a) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "core.hooksPath=/dev/null", ...a], { cwd: root, encoding: "utf8" });
+		git("init", "-q"); git("add", "."); git("commit", "-q", "-m", "fixture");
+		const table = { step: "t", title: "t", moves: [{ from: "packages/lib/src/extra.ts", to: "shared/extra.ts" }], remove: ["packages/lib/"] };
+		await apply(root, table, plan(table, checkout(root)));
+		assert.equal(readFileSync(join(root, "shared/extra.ts"), "utf8").trim(), "export const extra = 1;");
+		assert.equal(existsSync(join(root, "packages/lib/src/index.ts")), false);
+		assert.match(git("status", "--porcelain"), /^R {2}packages\/lib\/src\/extra\.ts -> shared\/extra\.ts$/m);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
