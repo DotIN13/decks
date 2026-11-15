@@ -44,8 +44,10 @@ export class Session {
 	usage: AgentUsage | undefined;
 	private starting: Promise<void> | undefined;
 	private rev = 0;
+
 	/** Messages being handed to the runtime right now. */
 	private sending = 0;
+
 	private saveTimer: ReturnType<typeof setTimeout> | undefined;
 	private briefing = "";
 
@@ -72,17 +74,17 @@ export class Session {
 		});
 	}
 
-	/** Calls as the agent itself, with its current token. */
-	get client(): Client {
-		return agentClient(this.deps.url, this.saved.token);
-	}
-
 	get id(): string {
 		return this.spec.id;
 	}
 
 	get deckPath(): string {
 		return this.deps.deckPath;
+	}
+
+	/** Calls as the agent itself, with its current token. */
+	get client(): Client {
+		return agentClient(this.deps.url, this.saved.token);
 	}
 
 	get dormant(): boolean {
@@ -93,6 +95,7 @@ export class Session {
 		return this.translator.history();
 	}
 
+	// A turn: start, prompt, abort
 	/** Start the runtime, once; a failure is kept and said, and the next message tries again. */
 	start(): Promise<void> {
 		this.starting ??= this.open().catch((error: Error) => {
@@ -125,6 +128,18 @@ export class Session {
 		this.save();
 	}
 
+	/** What goes in front of a message: news, then the reminder. None for a slash command. */
+	private async front(text: string): Promise<string | undefined> {
+		if (text.trimStart().startsWith("/")) return undefined;
+		const lines: string[] = [];
+		const news = await takeNews(this.client);
+		if (news) lines.push(news);
+		const me = await this.client.call("agent.me").then((a) => a.value as Agent).catch(() => undefined);
+		const unsaid = me ? identityReminder(me) : undefined;
+		if (unsaid) lines.push(unsaid);
+		return lines.length ? `${lines.join("\n")}\n\n${text}` : undefined;
+	}
+
 	/** The person's message: into the turn when the runtime can take one, else their queue. */
 	send(text: string, parts?: MessagePart[]): ChatItem | undefined {
 		if (this.state !== "idle" && !STEERS[this.spec.kind]) return void this.queues.add(text, parts);
@@ -138,6 +153,18 @@ export class Session {
 		this.translator.setState("idle");
 	}
 
+	private settled(): Promise<void> {
+		if (this.state === "idle") return Promise.resolve();
+		return new Promise((resolve) => {
+			const check = setInterval(() => {
+				if (this.state !== "idle") return;
+				clearInterval(check);
+				resolve();
+			}, 50);
+		});
+	}
+
+	// Mail from other agents
 	/** Mail from the server: now into the turn, or queued behind the person's own. */
 	mail(message: { id: string; from: string; task: string; cards: string[]; reply?: boolean; state?: string }): void {
 		const item: Mail = { id: message.id, from: message.from, task: message.task, cards: message.cards, ...(message.reply ? { reply: true } : {}) };
@@ -162,86 +189,27 @@ export class Session {
 		});
 	}
 
-	/** The versions a message was marked with as it was sent. */
-	marksOf(entry: string): Record<string, string> {
-		return this.saved.marks?.[entry] ?? {};
+	// What the server and the page are told
+	private hear(event: ChatEvent): void {
+		if (event.type === "chat.item") return this.tellChat("chat.added", [this.id, event.item.id], { item: event.item });
+		if (event.type === "chat.delta") return this.tellChat("chat.added", [this.id, event.itemId], { delta: event.delta, field: event.field });
+		const was = this.state;
+		this.state = event.state;
+		this.report();
+		if (event.state === "idle" && was !== "idle") this.queues.turnEnded();
 	}
 
-	/** Before the runtime hears a message: the settled version of each file the agent has touched. */
-	private async mark(entry: string): Promise<void> {
-		const paths = touchedFiles(this, this.deps.deckPath);
-		if (!paths.length) return;
-		const marks = await markFiles(this, paths);
-		this.saved.marks = { ...this.saved.marks, [entry]: marks };
+	/** State and queue length, to the server's record and the page. */
+	private report(): void {
+		void this.deps.host.call("agent.update", { agent: this.id, change: { state: this.state, queued: this.queues.length } }).catch(() => {});
+		this.tellChat("chat.changed", [this.id], {});
 	}
 
-	/** Spend from another Claude account: this agent's link is repointed, and its runtime follows. */
-	useAccount(id: string): boolean {
-		const accounts = this.deps.accounts;
-		if (!accounts?.has(id)) return false;
-		this.saved.account = id;
-		accounts.pointAgentAt?.(this.id, id);
-		this.backend?.accountChanged?.();
-		this.save();
-		return true;
+	private tellChat(name: string, ids: string[], more: Record<string, unknown>): void {
+		this.deps.host.tell(name, { ids, by: this.id, rev: ++this.rev, ...more });
 	}
 
-	get account(): string | undefined {
-		return this.saved.account ?? this.deps.accounts?.defaultId();
-	}
-
-	/** The record changed on the server: follow its model, thinking and mode. */
-	async follow(record: { model?: string; thinking?: string; mode?: string }): Promise<void> {
-		const [provider, ...rest] = (record.model ?? "").split("/");
-		const model = rest.join("/");
-		const thinking = record.thinking as ThinkingLevel | undefined;
-		const now = this.backend?.model() ?? this.saved.model;
-		if (provider && model && (now?.provider !== provider || now?.model !== model)) {
-			if (this.backend) await this.backend.setModel(provider, model, thinking);
-			else this.saved.model = { provider, model, thinking: thinking ?? now?.thinking ?? "medium" };
-		} else if (thinking && now?.thinking !== thinking) {
-			if (this.backend) this.backend.setThinking(thinking);
-			else if (this.saved.model) this.saved.model = { ...this.saved.model, thinking };
-		}
-		const mode = record.mode as AgentMode | undefined;
-		if (mode && mode !== (this.backend?.mode?.() ?? this.saved.mode)) {
-			this.saved.mode = mode;
-			await this.backend?.setMode?.(mode);
-		}
-		this.save();
-	}
-
-	/** A new token for this agent, as an adopting server gives one. */
-	retoken(token: string): void {
-		this.saved.token = token;
-	}
-
-	/** Open on this runtime handle when the runtime starts: a fork's copy of another conversation. */
-	resumeFrom(ref: string): void {
-		if (!this.backend) this.saved.sessionRef = ref;
-	}
-
-	/** The saved copy, as transcript.ts writes it. */
-	snapshot(): Saved {
-		const ref = this.backend?.sessionRef();
-		const model = this.backend?.model();
-		return { ...this.saved, ...(ref ? { sessionRef: ref } : {}), ...(model ? { model } : {}), items: this.translator.history() };
-	}
-
-	dispose(): void {
-		this.flush();
-		this.queues.dispose();
-		this.bridge.dispose();
-		this.backend?.dispose();
-	}
-
-	/** Write now, as the harness stops. */
-	flush(): void {
-		if (this.saveTimer) clearTimeout(this.saveTimer);
-		this.saveTimer = undefined;
-		this.deps.transcripts.write(this.snapshot());
-	}
-
+	// Opening the runtime
 	private async open(): Promise<void> {
 		if (this.deps.open) {
 			this.backend = await this.deps.open(this.context());
@@ -281,46 +249,73 @@ export class Session {
 		};
 	}
 
-	/** What goes in front of a message: news, then the reminder. None for a slash command. */
-	private async front(text: string): Promise<string | undefined> {
-		if (text.trimStart().startsWith("/")) return undefined;
-		const lines: string[] = [];
-		const news = await takeNews(this.client);
-		if (news) lines.push(news);
-		const me = await this.client.call("agent.me").then((a) => a.value as Agent).catch(() => undefined);
-		const unsaid = me ? identityReminder(me) : undefined;
-		if (unsaid) lines.push(unsaid);
-		return lines.length ? `${lines.join("\n")}\n\n${text}` : undefined;
+	// Following the record: model, mode, account, token
+	/** The record changed on the server: follow its model, thinking and mode. */
+	async follow(record: { model?: string; thinking?: string; mode?: string }): Promise<void> {
+		const [provider, ...rest] = (record.model ?? "").split("/");
+		const model = rest.join("/");
+		const thinking = record.thinking as ThinkingLevel | undefined;
+		const now = this.backend?.model() ?? this.saved.model;
+		if (provider && model && (now?.provider !== provider || now?.model !== model)) {
+			if (this.backend) await this.backend.setModel(provider, model, thinking);
+			else this.saved.model = { provider, model, thinking: thinking ?? now?.thinking ?? "medium" };
+		} else if (thinking && now?.thinking !== thinking) {
+			if (this.backend) this.backend.setThinking(thinking);
+			else if (this.saved.model) this.saved.model = { ...this.saved.model, thinking };
+		}
+		const mode = record.mode as AgentMode | undefined;
+		if (mode && mode !== (this.backend?.mode?.() ?? this.saved.mode)) {
+			this.saved.mode = mode;
+			await this.backend?.setMode?.(mode);
+		}
+		this.save();
 	}
 
-	private hear(event: ChatEvent): void {
-		if (event.type === "chat.item") return this.tellChat("chat.added", [this.id, event.item.id], { item: event.item });
-		if (event.type === "chat.delta") return this.tellChat("chat.added", [this.id, event.itemId], { delta: event.delta, field: event.field });
-		const was = this.state;
-		this.state = event.state;
-		this.report();
-		if (event.state === "idle" && was !== "idle") this.queues.turnEnded();
+	/** Spend from another Claude account: this agent's link is repointed, and its runtime follows. */
+	useAccount(id: string): boolean {
+		const accounts = this.deps.accounts;
+		if (!accounts?.has(id)) return false;
+		this.saved.account = id;
+		accounts.pointAgentAt?.(this.id, id);
+		this.backend?.accountChanged?.();
+		this.save();
+		return true;
 	}
 
-	/** State and queue length, to the server's record and the page. */
-	private report(): void {
-		void this.deps.host.call("agent.update", { agent: this.id, change: { state: this.state, queued: this.queues.length } }).catch(() => {});
-		this.tellChat("chat.changed", [this.id], {});
+	get account(): string | undefined {
+		return this.saved.account ?? this.deps.accounts?.defaultId();
 	}
 
-	private tellChat(name: string, ids: string[], more: Record<string, unknown>): void {
-		this.deps.host.tell(name, { ids, by: this.id, rev: ++this.rev, ...more });
+	/** A new token for this agent, as an adopting server gives one. */
+	retoken(token: string): void {
+		this.saved.token = token;
 	}
 
-	private settled(): Promise<void> {
-		if (this.state === "idle") return Promise.resolve();
-		return new Promise((resolve) => {
-			const check = setInterval(() => {
-				if (this.state !== "idle") return;
-				clearInterval(check);
-				resolve();
-			}, 50);
-		});
+	/** Open on this runtime handle when the runtime starts: a fork's copy of another conversation. */
+	resumeFrom(ref: string): void {
+		if (!this.backend) this.saved.sessionRef = ref;
+	}
+
+	// Marks for going back
+	/** The versions a message was marked with as it was sent. */
+	marksOf(entry: string): Record<string, string> {
+		return this.saved.marks?.[entry] ?? {};
+	}
+
+	/** Before the runtime hears a message: the settled version of each file the agent has touched. */
+	private async mark(entry: string): Promise<void> {
+		const paths = touchedFiles(this, this.deps.deckPath);
+		if (!paths.length) return;
+		const marks = await markFiles(this, paths);
+		this.saved.marks = { ...this.saved.marks, [entry]: marks };
+	}
+
+	// Keeping the transcript
+	/** The saved copy, as transcript.ts writes it. */
+	snapshot(): Saved {
+		const ref = this.backend?.sessionRef();
+		const model = this.backend?.model();
+		return { ...this.saved, ...(ref ? { sessionRef: ref } : {}), ...(model ? { model } : {}), items: this.translator.history() };
 	}
 
 	private save(): void {
@@ -330,5 +325,19 @@ export class Session {
 			this.deps.transcripts.write(this.snapshot());
 		}, SAVE_MS);
 		this.saveTimer.unref?.();
+	}
+
+	/** Write now, as the harness stops. */
+	flush(): void {
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		this.saveTimer = undefined;
+		this.deps.transcripts.write(this.snapshot());
+	}
+
+	dispose(): void {
+		this.flush();
+		this.queues.dispose();
+		this.bridge.dispose();
+		this.backend?.dispose();
 	}
 }

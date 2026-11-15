@@ -5,9 +5,12 @@ import type { Session } from "./session.ts";
 // history (file.versions, file.restore). README rule 11.
 
 type UserItem = { id: string; kind: string; entryId?: string; at: number; text?: string };
+
 type CardRow = { path: string; by?: string };
 type Version = { sha: string; at: number };
+type Text = { text: string };
 
+// Rewind and fork
 /** The user message an entry names: its transcript id or its runtime entry. */
 export function userEntry(session: Session, entry: string): UserItem | undefined {
 	return (session.history() as UserItem[]).find((one) => one.kind === "user" && (one.id === entry || one.entryId === entry));
@@ -40,9 +43,11 @@ export async function forkRef(session: Session, entry: string): Promise<string |
 	return session.backend?.forkFrom(runtimeEntry(session, entry));
 }
 
+// The files the agent touched, and their versions as each message was sent
 const FILE = /(?:^|[\s"'=(])((?:\/|\.\/)?[\w.@-]+(?:\/[\w.@-]+)*\.(?:html|css|js|mjs|json|md|svg|pen))(?=$|[\s"',)])/g;
 
 /** The deck files the agent's tool calls named: paths in their arguments, made relative to the deck. */
+
 export function touchedFiles(session: Session, deckPath: string): string[] {
 	const found = new Set<string>();
 	for (const item of session.history() as Array<{ kind: string; args?: unknown; title?: string }>) {
@@ -57,7 +62,15 @@ export function touchedFiles(session: Session, deckPath: string): string[] {
 	return [...found];
 }
 
-type Text = { text: string };
+/** What a message is marked with as it is sent: each touched file's settled version. */
+export async function markFiles(session: Session, paths: string[]): Promise<Record<string, string>> {
+	const out: Record<string, string> = {};
+	for (const path of paths) {
+		const sha = await settledVersion(session, path);
+		if (sha !== undefined) out[path] = sha;
+	}
+	return out;
+}
 
 /** The file's newest version once the server has heard its last write: its text matches the disk's. */
 export async function settledVersion(session: Session, path: string, tries = 20): Promise<string | undefined> {
@@ -72,16 +85,7 @@ export async function settledVersion(session: Session, path: string, tries = 20)
 	return undefined;
 }
 
-/** What a message is marked with as it is sent: each touched file's settled version. */
-export async function markFiles(session: Session, paths: string[]): Promise<Record<string, string>> {
-	const out: Record<string, string> = {};
-	for (const path of paths) {
-		const sha = await settledVersion(session, path);
-		if (sha !== undefined) out[path] = sha;
-	}
-	return out;
-}
-
+// Preview and restore
 /** For each file the agent named or wrote, its version when the message was sent: the mark, else by time. */
 export async function cardsAt(session: Session, entry: string): Promise<Record<string, string>> {
 	const user = userEntry(session, entry);

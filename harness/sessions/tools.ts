@@ -6,6 +6,10 @@ import { decksEnv } from "../runtimes/env.ts";
 import { deckContext, type DeckFacts } from "../runtimes/shared/context.ts";
 import { guidelinesFile } from "../prompts/paths.ts";
 
+type CardRow = { path: string; title: string; placements?: Array<{ box?: { x1: number; y1: number; x2: number; y2: number } }> };
+type News = { changes: Array<{ canvas?: string; ids: string[]; by: string; event: string }> };
+
+// The agent's shell
 // What an agent is given: the decks command with its own token, the deck
 // told once from calls, and before each message what changed since its last.
 
@@ -19,7 +23,11 @@ export function agentClient(url: string, token: string | undefined): Client {
 	return clientFor(url, token);
 }
 
-type CardRow = { path: string; title: string; placements?: Array<{ box?: { x1: number; y1: number; x2: number; y2: number } }> };
+// What it is told once
+/** What the agent is told once: the deck's context, then the guidelines as a list. */
+export function briefingText(facts: DeckFacts): string {
+	return [deckContext(facts), "", ...guidelines().map((line) => `- ${line}`)].join("\n");
+}
 
 /** The facts the briefing states, gathered by calls; a call that fails leaves its fact out. */
 export async function deckFacts(client: Client, deckPath: string): Promise<DeckFacts> {
@@ -42,12 +50,12 @@ export function guidelines(): string[] {
 	return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
 }
 
-/** What the agent is told once: the deck's context, then the guidelines as a list. */
-export function briefingText(facts: DeckFacts): string {
-	return [deckContext(facts), "", ...guidelines().map((line) => `- ${line}`)].join("\n");
+// What changed since its last message
+/** Ask the server for the agent's news; moves its mark on. Nothing when the call fails. */
+export async function takeNews(client: Client): Promise<string | undefined> {
+	const answered = await client.call("agent.news").catch(() => undefined);
+	return answered ? newsLines(answered.value as News) : undefined;
 }
-
-type News = { changes: Array<{ canvas?: string; ids: string[]; by: string; event: string }> };
 
 /** What others changed on the agent's canvases since its last message, as lines; none when nothing did. */
 export function newsLines(news: News): string | undefined {
@@ -67,12 +75,7 @@ export function newsLines(news: News): string | undefined {
 	return `[Decks] Since your last message, others changed your canvas:\n${lines.join("\n")}`;
 }
 
-/** Ask the server for the agent's news; moves its mark on. Nothing when the call fails. */
-export async function takeNews(client: Client): Promise<string | undefined> {
-	const answered = await client.call("agent.news").catch(() => undefined);
-	return answered ? newsLines(answered.value as News) : undefined;
-}
-
+// Hand-offs
 /** A hand-off as the agent reads it: who sent it, the task, and the cards it names. */
 export function brief(from: string, task: string, cards: string[], now: boolean): string {
 	const lines = [`${from} ${now ? "sent you this, to act on now" : "queued this for you"}:`, "", task];

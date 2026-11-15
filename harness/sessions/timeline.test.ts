@@ -1,3 +1,4 @@
+// The files an agent's tool calls named, for preview and restore.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Session } from "./session.ts";

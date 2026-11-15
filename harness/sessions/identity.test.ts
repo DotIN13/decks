@@ -1,3 +1,4 @@
+// Who an agent is: the spec from agent.requested, the reminder, news lines and hand-offs.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { identityReminder, specOf } from "./identity.ts";

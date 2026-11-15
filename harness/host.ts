@@ -23,13 +23,7 @@ export type HarnessOptions = {
 };
 
 export type Harness = { sessions: Sessions; url: string; connected(): boolean; stop(): Promise<void> };
-
 type Mailed = { id: string; from: string; to: string; task: string; cards: string[]; reply?: boolean; state?: string };
-
-/** The kinds this machine can run, or those named. */
-export function offeredKinds(asked?: RunKind[]): RunKind[] {
-	return (asked ?? [...AGENT_KINDS]).filter((kind) => runtimeOf(kind)?.availability().available);
-}
 
 export async function startHarness(options: HarnessOptions): Promise<Harness> {
 	const home = options.home ?? harnessHome();
@@ -78,13 +72,9 @@ export async function startHarness(options: HarnessOptions): Promise<Harness> {
 	};
 }
 
-/** A deck with no agent gets one of the first kind offered, named by the server, at home on the canvas named, else the deck's first, else a new one. */
-async function firstAgent(link: HostLink, kind: RunKind | undefined, canvas: string | undefined): Promise<void> {
-	if (!kind) return;
-	const agents = (await link.call("agent.list").catch(() => [undefined])) as unknown[];
-	if (agents.length) return;
-	const first = canvas ?? ((await link.call("canvas.list").catch(() => [])) as Array<{ name: string }>)[0]?.name;
-	await link.call("agent.create", { kind, ...(first ? { canvas: first } : {}) }).catch(() => {});
+/** The kinds this machine can run, or those named. */
+export function offeredKinds(asked?: RunKind[]): RunKind[] {
+	return (asked ?? [...AGENT_KINDS]).filter((kind) => runtimeOf(kind)?.availability().available);
 }
 
 /** agent.requested: a session, dormant, and the server told it is idle. */
@@ -120,4 +110,13 @@ async function retry(connect: () => Promise<void>, stopped: () => boolean): Prom
 			// The server is not back yet: try again, more slowly.
 		}
 	}
+}
+
+/** A deck with no agent gets one of the first kind offered, named by the server, at home on the canvas named, else the deck's first, else a new one. */
+async function firstAgent(link: HostLink, kind: RunKind | undefined, canvas: string | undefined): Promise<void> {
+	if (!kind) return;
+	const agents = (await link.call("agent.list").catch(() => [undefined])) as unknown[];
+	if (agents.length) return;
+	const first = canvas ?? ((await link.call("canvas.list").catch(() => [])) as Array<{ name: string }>)[0]?.name;
+	await link.call("agent.create", { kind, ...(first ? { canvas: first } : {}) }).catch(() => {});
 }

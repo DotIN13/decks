@@ -1,3 +1,4 @@
+// The harness's call answers: one per call, refusals for unknown agents, the queue and the focus.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

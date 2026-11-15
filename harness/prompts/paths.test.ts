@@ -1,3 +1,4 @@
+// What the prompts folder ships, and that every path names something real.
 import assert from "node:assert/strict";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";

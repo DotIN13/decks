@@ -1,3 +1,4 @@
+// The transcript kept in the harness's folder, and paging back through its archive.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
