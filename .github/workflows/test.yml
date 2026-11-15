@@ -41,25 +41,15 @@ jobs:
 
       - run: npm ci --include=dev
 
-      # One command over every workspace: the two apps, the protocol, the board vocabulary,
-      # the runtime assets, the extension and the browser checks. A workspace added to the
+      # One command over every workspace: the protocol, Decks-local, the harness and its page,
+      # the clients, the tools, and the libraries still in packages/. A workspace added to the
       # root `package.json` with a `typecheck` script is covered by this line and nothing
       # else — which is the reason it is `--workspaces` rather than a list of four.
       - run: npm run typecheck
 
-      # **The cascade gate, on its own line, and before the tests.** The app's stylesheets
-      # are all inside `@layer components`, so which rule wins a tie is decided by the order
-      # they are flattened in — and `npm test` and `npm run test:e2e` both measure elements,
-      # not rules, so a rule dragged past another can turn a check green while changing the
-      # page. `scripts/css-order.mjs` hashes that order against the committed baseline; it is
-      # its own step so the log says "the order moved" instead of burying it in a test list.
-      - run: npm run css:order
-
-      # **Three more gates, each its own line for the same reason.** An exported symbol nothing
-      # references, a class no markup writes, and a comment naming a file that no longer exists are
-      # the three kinds of residue a reorganization leaves behind and a reader pays for; typecheck
-      # and the tests are blind to all three. `scripts/dead-exports.mjs`, `dead-css.mjs` and
-      # `stale-paths.mjs` each exit 1 naming what they found.
+      # **The gates, on their own line.** The thirteen rules of tools/gates (sizes, names, imports,
+      # comments, the page's style order, residue such as a dead export or a stale file name and the
+      # rest), each against its baseline; typecheck and the tests are blind to all of them.
       - run: npm run gates
 
       # **Before the unit tests, not after.** Some unit tests drive a real page (the browser
