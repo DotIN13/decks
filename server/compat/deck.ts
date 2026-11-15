@@ -4,10 +4,7 @@ import { pagesOf, readDrawing } from "./drawing.ts";
 // Today's GET /api/deck: the deck's folder and every card and old board on its canvases,
 // friends' included, as today's checks read it (deckState, preflight).
 
-/** The folder a deck lives in, when it lives in one (a Deck on a folder keeps it as root). */
-const folderPath = (deck: Deck): string => (deck as Deck & { root?: string }).root ?? "";
-
-export function deckRoute(deck: () => Deck): Route {
+export function deckRoute(deck: () => Deck, folder: () => string | undefined): Route {
 	return {
 		method: "GET",
 		prefix: "/api/deck",
@@ -18,7 +15,7 @@ export function deckRoute(deck: () => Deck): Route {
 				const read = await readDrawing(deck(), canvas.name, "");
 				if (read) boards.push(...pagesOf(canvas.name, read.doc, true));
 			}
-			const path = folderPath(deck());
+			const path = folder() ?? "";
 			const body = { deck: { path, name: path.split("/").filter(Boolean).pop() ?? "deck", boards, roots: [] } };
 			return { type: "application/json", body: JSON.stringify(body) };
 		},

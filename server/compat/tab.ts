@@ -40,7 +40,7 @@ function openTab(peer: Peer, tab: Tab): void {
 		}
 		void heard(tab, message).catch((error: Error) => tab.send({ type: "notice", level: "error", text: error.message }));
 	});
-	void roster(tab).then(() => stages(tab));
+	void roster(tab);
 }
 
 const call = async <T>(tab: Tab, name: string, args: Record<string, unknown>): Promise<T> => {
@@ -62,6 +62,7 @@ async function roster(tab: Tab): Promise<AgentRow[]> {
 	if (!tab.focused || !agents.some((a) => a.id === tab.focused)) tab.focused = agents[0]?.id;
 	const chats = await Promise.all(agents.map(async (a) => ({ id: a.id, name: a.name, color: a.color, kind: a.kind ?? "pi", state: a.state ?? "idle", stage: a.canvas, workspace: a.workspace, tags: a.tags ?? [], unread: 0, inPlay: await inPlay(tab, a.canvas) })));
 	tab.send({ type: "agents", chats, ...(tab.focused ? { focused: tab.focused } : {}), defaultKind: "pi" });
+	await stages(tab, agents);
 	return agents;
 }
 
@@ -77,9 +78,12 @@ async function agentHeard(tab: Tab, name: string, payload: Record<string, unknow
 	await roster(tab);
 }
 
-async function stages(tab: Tab): Promise<void> {
+/** Today's canvas list: each canvas with the agents at home on it. */
+async function stages(tab: Tab, agents?: AgentRow[]): Promise<void> {
 	const list = await call<Array<{ name: string; title: string; rev?: number }>>(tab, "canvas.list", {});
-	tab.send({ type: "stages", stages: list.map((c) => ({ name: c.name, title: c.title, rev: c.rev ?? 0 })) });
+	const all = agents ?? (await call<AgentRow[]>(tab, "agent.list", {}));
+	const on = (name: string) => all.filter((a) => a.canvas === name).map((a) => ({ id: a.id, name: a.name, color: a.color }));
+	tab.send({ type: "stages", stages: list.map((c) => ({ name: c.name, title: c.title, rev: c.rev ?? 0, agents: on(c.name) })) });
 }
 
 /** An agent's drawing, whole, as today's stage.pen. */

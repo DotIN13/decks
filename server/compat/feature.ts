@@ -11,6 +11,7 @@ import { tabRoute } from "./tab.ts";
 export function compatFeature(): Feature {
 	let deck: Deck | undefined;
 	let url: () => string | undefined = () => undefined;
+	let folder: () => string | undefined = () => undefined;
 	const deckNow = () => {
 		if (!deck) throw new Error("compat has not started");
 		return deck;
@@ -18,10 +19,11 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow)],
+		routes: [lineRoute(deckNow), drawingRoute(deckNow), ...pictureRoutes(() => url()), tabRoute(deckNow), deckRoute(deckNow, () => folder())],
 		start(kernel) {
 			deck = kernel.deck;
 			url = () => kernel.url();
+			folder = () => kernel.folder();
 			kernel.translate(translate);
 		},
 	});
