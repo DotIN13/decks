@@ -23,7 +23,7 @@ test("a second turn right after the first never shows the agent idle until it en
 	};
 	await on("agent.host", { kinds: ["pi"] });
 	const agents = await Promise.all(Array.from({ length: 6 }, (_, i) => on("agent.create", { name: `A${i}`, kind: "pi", canvas: "plan" })));
-	const ada = agents[0].id;
+	const ada = agents[0]!.id;
 	const doors = await server.listen(0);
 	const ws = new WebSocket(`${doors.url.replace("http", "ws")}/ws?decks_token=${doors.token}`);
 	const states: string[] = [];

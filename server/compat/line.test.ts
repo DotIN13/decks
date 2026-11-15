@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
+import { MemoryDeck } from "../kernel/memory-deck.ts";
 
 // Today's line against the fixture deck: hello, watch, an edit in pen.dev's own form,
 // the change told back whole as canvas.changed, and the drawing's file written.
@@ -62,6 +63,37 @@ test("today's line draws and edits the fixture canvas through compat", async () 
 	assert.deepEqual(changed.made, ["e1"], "the line's own edit is named as made, so the frame stops showing it on top");
 	const file = new TextDecoder().decode(await server.deck.read("canvases/auth-refresh/canvas.pen" as never));
 	assert.match(file, /From today's line/);
+	line.close();
+	await doors.close();
+	await server.close();
+});
+
+/** A deck whose writes land late, as a loaded disk makes them: a change is announced after its write. */
+class SlowDeck extends MemoryDeck {
+	override async write(...args: Parameters<MemoryDeck["write"]>): ReturnType<MemoryDeck["write"]> {
+		await new Promise((r) => setTimeout(r, 300));
+		return super.write(...args);
+	}
+}
+
+test("an edit is named as made only on a revision that has it, not on an older change announced after it", async () => {
+	const server = await testServer({ features: features(), deck: new SlowDeck(fixtureFiles()) });
+	const doors = await server.listen(0);
+	const line = openLine(doors.url);
+	line.send({ type: "line.hello", token: doors.token, watch: [{ canvas: "auth-refresh" }] });
+	await line.next("line.hello");
+	const put = { op: "insert", node: { type: "note", id: "late-note", content: "Put" }, box: { x1: 40, y1: 2400 } };
+	// The insert's write is still landing when the delete is answered: its announcement comes after.
+	line.send({ type: "line.call", id: "1", verb: "canvas.batch", args: [[put], { canvas: "auth-refresh" }], edit: "e-put" });
+	line.send({ type: "line.call", id: "2", verb: "canvas.batch", args: [[{ op: "delete", id: "late-note" }], { canvas: "auth-refresh" }], edit: "e-delete" });
+	for (const _ of [1, 2]) assert.equal((await line.next("call.answered")).ok, true);
+	for (;;) {
+		const changed = await line.next("canvas.changed");
+		const made = (changed.made as string[] | undefined) ?? [];
+		if (!made.includes("e-delete")) continue;
+		assert.ok(!JSON.stringify(changed.doc).includes("late-note"), `the delete was named as made on revision ${String(changed.rev)}, which still has the note`);
+		break;
+	}
 	line.close();
 	await doors.close();
 	await server.close();

@@ -11,9 +11,13 @@ export const LINE_PATH = "/compat/v1/socket";
 const QUIET = new Set(["canvas.unwatch"]);
 
 type Said = Record<string, unknown>;
-/** edits: the frame's names for its edits sent and not yet told back as made, oldest first. */
+/**
+ * edits: the frame's names for its edits not yet told back as made, each with its canvas and, once
+ * answered, the revision the canvas had then (at), which has the edit. sent: this line's messages in order.
+ */
 type Pointer = { last: number; timer?: ReturnType<typeof setTimeout>; value: unknown; canvas: string };
-type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: string[]; pointer?: Pointer };
+type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
+type Edit = { name: string; canvas?: string; at?: number; answered?: Promise<void> };
 
 /** The canvas a caller is bound to: a frame's pass names one; the person's token none. */
 export const boundTo = (caller: Caller): string | undefined => (/(^|~)frame-/.test(caller.id) ? caller.canvas : undefined);
@@ -87,8 +91,18 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 			return send({ type: "call.answered", id, ok: false, error: `This line is ${bound}'s: it calls on no other canvas.` });
 		}
 		if (bound && turned.args.canvas === undefined) turned.args.canvas = bound;
-		if (typeof message.edit === "string") state.edits.push(message.edit);
+		const edit: Edit | undefined = typeof message.edit === "string" ? { name: message.edit, ...(typeof turned.args.canvas === "string" ? { canvas: turned.args.canvas } : {}) } : undefined;
+		let answer = () => {};
+		if (edit) (edit.answered = new Promise<void>((done) => (answer = done))), state.edits.push(edit);
 		const envelope = await door.call(turned.name, turned.args, caller, client);
+		// A change is announced after its write lands, so an older one may come first: the edit is made at
+		// the revision the canvas has once it is answered (that one has it), never on an announcement before.
+		if (edit && envelope.ok && edit.canvas) {
+			const got = await door.call("canvas.get", { canvas: edit.canvas }, caller, client);
+			edit.at = got.ok ? ((got.value as { rev?: number }).rev ?? 0) : 0;
+		}
+		if (edit && (!envelope.ok || !edit.canvas)) state.edits.splice(state.edits.indexOf(edit), 1);
+		answer();
 		if (envelope.ok) return send({ type: "call.answered", id, ok: true, value: answerBack(turned.old[0], envelope.value), ...(envelope.notes.length ? { notes: envelope.notes } : {}) });
 		send({ type: "call.answered", id, ok: false, error: envelope.error.message, ...(envelope.notes.length ? { notes: envelope.notes } : {}) });
 	}
@@ -176,15 +190,28 @@ async function watchOn(w: Watching, canvas: string, since: unknown, whole: unkno
 	w.state.watched.get(canvas)?.();
 	w.state.watched.set(canvas, w.door.subscribe({ caller, client: w.client.id, events: HEARD, canvas }, (event) => {
 		// The frame shows its own edits until a drawing says it has them: this line's change names them as made.
-		const mine = event.name === "item.changed" && event.payload.by === caller.id && w.state.edits.length;
-		const payload = mine ? { ...event.payload, made: w.state.edits.splice(0) } : event.payload;
-		void told(event.name, payload, drawing, cardPage).then((said) => said && w.send(said));
+		// Told in the order heard, each once the edits in flight now are answered, so their revisions are known.
+		const inFlight = Promise.all(w.state.edits.map((e) => e.answered));
+		w.state.sent = (w.state.sent ?? Promise.resolve())
+			.then(() => inFlight)
+			.then(() => told(event.name, madeIn(w.state, canvas, event), drawing, cardPage))
+			.then((said) => said && w.send(said), () => undefined);
 	}));
 	const rev = (got.value as { rev?: number }).rev ?? 0;
 	if (whole === true || (typeof since === "number" && since !== rev)) {
 		const read = await drawing(canvas);
 		if (read) w.send({ type: "canvas.changed", canvas, rev, doc: read.doc, base: read.base });
 	}
+}
+
+/** An item.changed naming the line's edits that its revision has, which leave the list; any other event as it is. */
+function madeIn(state: State, canvas: string, event: { name: string; payload: Record<string, unknown> }): Record<string, unknown> {
+	const rev = event.payload.rev;
+	if (event.name !== "item.changed" || typeof rev !== "number") return event.payload;
+	const made = state.edits.filter((e) => e.canvas === canvas && e.at !== undefined && e.at <= rev);
+	if (!made.length) return event.payload;
+	state.edits = state.edits.filter((e) => !made.includes(e));
+	return { ...event.payload, made: made.map((e) => e.name) };
 }
 
 /** Where a canvas's files are read on this line's pass, as the frame feature serves them. */
