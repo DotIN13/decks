@@ -12,6 +12,7 @@ checks speak them; they are how we know the new programs behave.
 - `line.ts`: today's line at `/compat/v1/socket` (`line.hello`, `line.call`, `canvas.watch`).
 - `tab.ts`: today's tab socket at `/ws` (the roster, an agent's drawing, the checks' dozen messages).
 - `drawing.ts`: today's `/compat/stage-pen/<canvas>`, the drawing as the canvas frame first reads it.
+- `deck.ts`: today's `GET /api/deck`, the deck's folder and its cards and boards.
 - `pictures.ts`: today's `/api/stage-thumb/<canvas>`, read from server/pictures' canvas tile.
 - `feature.ts`: its one export.
 

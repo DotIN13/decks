@@ -6,22 +6,26 @@ import { toDeckPath, type Deck, type Route } from "../kernel/index.ts";
 export const DRAWING_PATH = "/compat/stage-pen/";
 type Node = { type?: string; id?: string; name?: string; x?: number; y?: number; width?: number; height?: number; metadata?: { type?: string; path?: string }; children?: Node[] };
 
+/** A canvas's folder: canvases/<name>, or shared/canvases/<owner>/<name> for a friend's. */
+export const folderOf = (canvas: string): string => (canvas.startsWith("shared/") ? `shared/canvases/${canvas.slice(7)}` : `canvases/${canvas}`);
+
 /** The drawing's document, parsed, with the files base it is read against. */
 export async function readDrawing(deck: Deck, canvas: string, base: string): Promise<{ doc: { children?: Node[] }; base: string } | undefined> {
 	try {
-		const bytes = await deck.read(toDeckPath(`canvases/${canvas}/canvas.pen`));
+		const bytes = await deck.read(toDeckPath(`${folderOf(canvas)}/canvas.pen`));
 		return { doc: JSON.parse(new TextDecoder().decode(bytes)) as { children?: Node[] }, base };
 	} catch {
 		return undefined;
 	}
 }
 
-/** The cards at the top of a drawing, as today's Page records. */
-export function pagesOf(canvas: string, doc: { children?: Node[] }): Record<string, unknown>[] {
+/** The cards at the top of a drawing (and old boards, with boards), as today's Page records. */
+export function pagesOf(canvas: string, doc: { children?: Node[] }, boards = false): Record<string, unknown>[] {
+	const kinds = boards ? ["decks.card", "decks.board"] : ["decks.card"];
 	return (doc.children ?? [])
-		.filter((node) => node.metadata?.type === "decks.card" && typeof node.metadata.path === "string")
+		.filter((node) => kinds.includes(node.metadata?.type ?? "") && typeof node.metadata?.path === "string")
 		.map((node) => ({
-			path: `canvases/${canvas}/${node.metadata!.path!}`,
+			path: `${folderOf(canvas)}/${node.metadata!.path!}`,
 			title: node.name ?? node.metadata!.path!,
 			card: true,
 			x: node.x ?? 0,

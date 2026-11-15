@@ -1,5 +1,6 @@
 import { defineFeature, type Deck, type Feature } from "../kernel/index.ts";
 import { translate } from "./args.ts";
+import { deckRoute } from "./deck.ts";
 import { drawingRoute } from "./drawing.ts";
 import { lineRoute } from "./line.ts";
 import { stageThumbRoute } from "./pictures.ts";
@@ -17,7 +18,7 @@ export function compatFeature(): Feature {
 	return defineFeature({
 		name: "compat",
 		calls: [],
-		routes: [lineRoute(deckNow), drawingRoute(deckNow), stageThumbRoute(() => url()), tabRoute(deckNow)],
+		routes: [lineRoute(deckNow), drawingRoute(deckNow), stageThumbRoute(() => url()), tabRoute(deckNow), deckRoute(deckNow)],
 		start(kernel) {
 			deck = kernel.deck;
 			url = () => kernel.url();
