@@ -13,7 +13,7 @@ const person = await asPerson();
 const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person }, body: JSON.stringify({ args }) })).json();
 const files = `${dirname(dirname(dirname(await cardFile("plan"))))}/files`;
 mkdirSync(files, { recursive: true });
-copyFileSync(new URL("../../apps/web/public/icon-192.png", import.meta.url).pathname, `${files}/pic.png`);
+copyFileSync(new URL("../../../harness/page/public/icon-192.png", import.meta.url).pathname, `${files}/pic.png`);
 const made = await call("canvas.insert", [{ type: "card", title: "Pic", html: `<div class="doc"><img id="pic" src="../../files/pic.png" style="width:120px"></div>`, width: 400, height: 200 }]);
 const CARD = made.value?.card;
 // A page of the harness's own, to read the screenshot's pixels in.

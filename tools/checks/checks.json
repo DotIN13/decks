@@ -2,75 +2,316 @@
 	"why": "What the runner must know about a check beyond its name. timed: it measures time, so it runs alone on the dev server, as it was written for (DESIGN.md section 11). agent: it starts an agent's turn; skipped unless --agent; the fake model (tools/checks/fake-model.mjs) answers it, unless model: it needs a real model that runs the decks command. named: minutes long or pictures to look at; runs only when named. bench: it measures, it does not pass or fail on its own. dev: written against the dev page's timing, so it runs on the dev server, not the built page, until its follow-up (its why says what). path: where it lives after the switch-over (until then, e2e/checks/<name>.mjs).",
 	"checks": {
 		"bent-arrows": {
-			"timed": true
+			"timed": true,
+			"path": "tools/checks/library/bent-arrows.mjs"
 		},
 		"smooth-edits": {
-			"timed": true
+			"timed": true,
+			"path": "tools/checks/library/smooth-edits.mjs"
 		},
 		"ink-long-stroke": {
-			"timed": true
+			"timed": true,
+			"path": "tools/checks/library/ink-long-stroke.mjs"
 		},
 		"agent-rows": {
-			"agent": true
+			"agent": true,
+			"path": "tools/checks/agent/agent-rows.mjs"
 		},
 		"stage-api": {
 			"agent": true,
-			"model": true
+			"model": true,
+			"path": "tools/checks/agent/stage-api.mjs"
 		},
 		"running": {
-			"agent": true
+			"agent": true,
+			"path": "tools/checks/agent/running.mjs"
 		},
 		"time-machine": {
-			"agent": true
+			"agent": true,
+			"path": "tools/checks/agent/time-machine.mjs"
 		},
 		"chrome": {
-			"agent": true
+			"agent": true,
+			"path": "tools/checks/agent/chrome.mjs"
 		},
 		"walkthrough": {
-			"agent": true
+			"agent": true,
+			"path": "tools/checks/agent/walkthrough.mjs"
 		},
 		"render-perf": {
 			"bench": true,
-			"named": true
+			"named": true,
+			"path": "tools/checks/bench/render-perf.mjs"
 		},
 		"pan-heavy": {
 			"bench": true,
-			"named": true
+			"named": true,
+			"path": "tools/checks/bench/pan-heavy.mjs"
 		},
 		"awake-bench": {
 			"bench": true,
-			"named": true
+			"named": true,
+			"path": "tools/checks/bench/awake-bench.mjs"
 		},
 		"edits-wait": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/edits-wait.mjs"
 		},
 		"nudge": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/nudge.mjs"
 		},
 		"arrows-steady": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/arrows-steady.mjs"
 		},
 		"awake-drag": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/awake-drag.mjs"
 		},
 		"card-frame-drag": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/card-frame-drag.mjs"
 		},
 		"card-frame-demo": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/card-frame-demo.mjs"
 		},
 		"arrow-label": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/arrow-label.mjs"
 		},
 		"text-shots": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/text-shots.mjs"
 		},
 		"look-shots": {
-			"named": true
+			"named": true,
+			"path": "tools/checks/library/look-shots.mjs"
 		},
 		"card-shot": {
 			"dev": true,
-			"why": "It takes the first awake .card-surface over 100 px wide as its card (line 44); on the faster built page another fixture card is still awake off screen then, so it types into the wrong card. After the checks move: pick the card by its path, then back to the built page."
+			"why": "It takes the first awake .card-surface over 100 px wide as its card (line 44); on the faster built page another fixture card is still awake off screen then, so it types into the wrong card. After the checks move: pick the card by its path, then back to the built page.",
+			"path": "tools/checks/page/card-shot.mjs"
+		},
+		"empty-canvas-follows": {
+			"path": "tools/checks/cards/empty-canvas-follows.mjs"
+		},
+		"panel": {
+			"path": "tools/checks/page/panel.mjs"
+		},
+		"tiers": {
+			"path": "tools/checks/library/tiers.mjs"
+		},
+		"chat-content": {
+			"path": "tools/checks/page/chat-content.mjs"
+		},
+		"slash": {
+			"path": "tools/checks/page/slash.mjs"
+		},
+		"notifications": {
+			"path": "tools/checks/page/notifications.mjs"
+		},
+		"geometry": {
+			"path": "tools/checks/canvas/geometry.mjs"
+		},
+		"agents-tab": {
+			"path": "tools/checks/page/agents-tab.mjs"
+		},
+		"selection": {
+			"path": "tools/checks/library/selection.mjs"
+		},
+		"news-seen": {
+			"path": "tools/checks/people/news-seen.mjs"
+		},
+		"board-links": {
+			"path": "tools/checks/cards/board-links.mjs"
+		},
+		"old-board": {
+			"path": "tools/checks/people/old-board.mjs"
+		},
+		"board-comment": {
+			"path": "tools/checks/canvas/board-comment.mjs"
+		},
+		"shell": {
+			"path": "tools/checks/page/shell.mjs"
+		},
+		"focus": {
+			"path": "tools/checks/page/focus.mjs"
+		},
+		"camera": {
+			"path": "tools/checks/library/camera.mjs"
+		},
+		"layers-webkit": {
+			"path": "tools/checks/library/layers-webkit.mjs"
+		},
+		"placement": {
+			"path": "tools/checks/cards/placement.mjs"
+		},
+		"placement-views": {
+			"path": "tools/checks/page/placement-views.mjs"
+		},
+		"placement-at": {
+			"path": "tools/checks/library/placement-at.mjs"
+		},
+		"items-made": {
+			"path": "tools/checks/canvas/items-made.mjs"
+		},
+		"apps-in-frame": {
+			"path": "tools/checks/pictures/apps-in-frame.mjs"
+		},
+		"glide": {
+			"path": "tools/checks/library/glide.mjs"
+		},
+		"context": {
+			"path": "tools/checks/page/context.mjs"
+		},
+		"per-agent": {
+			"path": "tools/checks/page/per-agent.mjs"
+		},
+		"working-marks": {
+			"path": "tools/checks/page/working-marks.mjs"
+		},
+		"panel-steady": {
+			"path": "tools/checks/page/panel-steady.mjs"
+		},
+		"pen-stage": {
+			"path": "tools/checks/canvas/pen-stage.mjs"
+		},
+		"stage-scroll": {
+			"path": "tools/checks/library/stage-scroll.mjs"
+		},
+		"card-editor": {
+			"path": "tools/checks/canvas/card-editor.mjs"
+		},
+		"card-fit": {
+			"path": "tools/checks/pictures/card-fit.mjs"
+		},
+		"card-phone": {
+			"path": "tools/checks/library/card-phone.mjs"
+		},
+		"stage-gestures": {
+			"path": "tools/checks/canvas/stage-gestures.mjs"
+		},
+		"shapes": {
+			"path": "tools/checks/canvas/shapes.mjs"
+		},
+		"item-pill": {
+			"path": "tools/checks/page/item-pill.mjs"
+		},
+		"voice": {
+			"path": "tools/checks/page/voice.mjs"
+		},
+		"engine-slide": {
+			"path": "tools/checks/library/engine-slide.mjs"
+		},
+		"zoom-out-pictures": {
+			"path": "tools/checks/library/zoom-out-pictures.mjs"
+		},
+		"opening-lands": {
+			"path": "tools/checks/library/opening-lands.mjs"
+		},
+		"wheel-diagonal": {
+			"path": "tools/checks/library/wheel-diagonal.mjs"
+		},
+		"backends": {
+			"path": "tools/checks/library/backends.mjs"
+		},
+		"context-loss": {
+			"path": "tools/checks/library/context-loss.mjs"
+		},
+		"one-picture": {
+			"path": "tools/checks/pictures/one-picture.mjs"
+		},
+		"note-edges": {
+			"path": "tools/checks/library/note-edges.mjs"
+		},
+		"tile-pixels": {
+			"path": "tools/checks/library/tile-pixels.mjs"
+		},
+		"stage-shot": {
+			"path": "tools/checks/pictures/stage-shot.mjs"
+		},
+		"stage-goldens": {
+			"path": "tools/checks/library/stage-goldens.mjs"
+		},
+		"placeholder": {
+			"path": "tools/checks/pictures/placeholder.mjs"
+		},
+		"export": {
+			"path": "tools/checks/pictures/export.mjs"
+		},
+		"export-pill": {
+			"path": "tools/checks/pictures/export-pill.mjs"
+		},
+		"drop-lands": {
+			"path": "tools/checks/library/drop-lands.mjs"
+		},
+		"canvas-frame": {
+			"path": "tools/checks/library/canvas-frame.mjs"
+		},
+		"canvas-switch": {
+			"path": "tools/checks/page/canvas-switch.mjs"
+		},
+		"same-drawing": {
+			"path": "tools/checks/canvas/same-drawing.mjs"
+		},
+		"pencil-then-finger": {
+			"path": "tools/checks/library/pencil-then-finger.mjs"
+		},
+		"media": {
+			"path": "tools/checks/library/media.mjs"
+		},
+		"frames": {
+			"path": "tools/checks/canvas/frames.mjs"
+		},
+		"camera-roundtrip": {
+			"path": "tools/checks/library/camera-roundtrip.mjs"
+		},
+		"stages": {
+			"path": "tools/checks/page/stages.mjs"
+		},
+		"view-calls": {
+			"path": "tools/checks/people/view-calls.mjs"
+		},
+		"awake": {
+			"path": "tools/checks/pictures/awake.mjs"
+		},
+		"presence": {
+			"path": "tools/checks/people/presence.mjs"
+		},
+		"card-copy": {
+			"path": "tools/checks/library/card-copy.mjs"
+		},
+		"card-ground": {
+			"path": "tools/checks/cards/card-ground.mjs"
+		},
+		"card-frame": {
+			"path": "tools/checks/pictures/card-frame.mjs"
+		},
+		"card-files-img": {
+			"path": "tools/checks/pictures/card-files-img.mjs"
+		},
+		"card-keys": {
+			"path": "tools/checks/library/card-keys.mjs"
+		},
+		"card-tab": {
+			"path": "tools/checks/cards/card-tab.mjs"
+		},
+		"card-links": {
+			"path": "tools/checks/cards/card-links.mjs"
+		},
+		"deck-imports": {
+			"path": "tools/checks/cards/deck-imports.mjs"
+		},
+		"new-agent-opens": {
+			"path": "tools/checks/page/new-agent-opens.mjs"
+		},
+		"agent-cursor": {
+			"path": "tools/checks/people/agent-cursor.mjs"
+		},
+		"cards-smoke": {
+			"path": "tools/checks/library/cards-smoke.mjs"
 		}
 	}
 }

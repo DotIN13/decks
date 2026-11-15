@@ -25,7 +25,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright";
-import { applyEdits } from "../packages/pen/src/diff.ts";
+import { applyEdits } from "../../packages/pen/src/diff.ts";
 
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
@@ -122,7 +122,7 @@ export const nameOf = (path) => /\/cards\/([^/]+)\/index\.html$/.exec(path.split
 
 /** Where the fixture puts each of its cards, from its canvas file: what `resetStage` moves them back to. */
 const FIXTURE_PLACES = (() => {
-	const doc = JSON.parse(readFileSync(new URL(`./fixture/decks/canvases/${CANVAS}/canvas.pen`, import.meta.url), "utf8"));
+	const doc = JSON.parse(readFileSync(new URL(`../fixtures/deck/canvases/${CANVAS}/canvas.pen`, import.meta.url), "utf8"));
 	return (doc.children ?? []).filter((node) => node.metadata?.type === "decks.card").map((node) => ({ path: `canvases/${CANVAS}/${node.metadata.path}`, x: node.x, y: node.y }));
 })();
 

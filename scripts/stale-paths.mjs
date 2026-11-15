@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 
 /** Files whose vanished names are history or another project's, told as such. */
 const HISTORY = new Set([
-	"e2e/README.md", "e2e/run.mjs", "e2e/harness.mjs", "e2e/checks/context.mjs",
+	"e2e/README.md", "e2e/run.mjs", "tools/checks/harness.mjs", "tools/checks/page/context.mjs",
 	"apps/web/src/lib/media.ts", "runtime/paths.ts", "apps/server/src/browser/bridge.test.ts", "packages/canvas/styles/canvas.css",
 	"scripts/css-order.test.mjs", "packages/agent-ui/src/alerts/policy.ts", "packages/agent-ui/styles/stream.css",
 	"docs/REORGANIZATION.md", "docs/COMPAT.md", "docs/STUDIO-MIGRATION.md",

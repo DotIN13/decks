@@ -49,7 +49,7 @@ const FONT_MS = Number(process.env.RENDER_PERF_FONT_MS ?? 0);
  * painted), then 2 × RUNS − 1 runs.
  */
 const WIDE = RUNS * 2 - 1;
-const OUT = process.env.RENDER_PERF_OUT ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../node_modules/.cache/decks-e2e/render-perf.json");
+const OUT = process.env.RENDER_PERF_OUT ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../node_modules/.cache/decks-e2e/render-perf.json");
 const W = 1500;
 const H = 950;
 const DPR = 2;

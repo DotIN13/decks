@@ -37,7 +37,6 @@
 	"apps/web/src/pages/shot.ts: harness may not import pen (packages/pen)": 1,
 	"apps/web/src/panel/LeftPanel.tsx: harness may not import pen (packages/pen)": 1,
 	"apps/web/src/state/pens.ts: harness may not import pen (packages/pen)": 1,
-	"e2e/harness.mjs: reaches past the entry of packages/pen": 1,
 	"examples/share-site/src/page.ts: reaches past the entry of packages/canvas": 1,
 	"harness/page/app/landing.ts: harness may not import pen (packages/pen)": 1,
 	"harness/page/connections/bundle.ts: harness may not import pen (packages/pen)": 1,
@@ -52,5 +51,6 @@
 	"packages/sync-protocol/src/schemas.ts: protocol may not import zod": 1,
 	"scripts/card-zoom.mjs: reaches past the entry of e2e": 1,
 	"scripts/gen-pen-schema.mjs: reaches past the entry of packages/pen": 1,
-	"scripts/opencode2-live.mts: reaches past the entry of apps/server": 3
+	"scripts/opencode2-live.mts: reaches past the entry of apps/server": 3,
+	"tools/checks/harness.mjs: reaches past the entry of packages/pen": 1
 }
