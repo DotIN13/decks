@@ -45,6 +45,16 @@ test("card.fit and canvas.screenshot in a real browser, on the fixture deck", { 
 		assert.ok(Math.max(shot.size.w, shot.size.h) <= 1600);
 		const card = await s.value<{ file: string }>("canvas.screenshot", { of: CARD, format: "jpeg", to: "exports/risks.jpg" }, ann);
 		assert.deepEqual([...(await s.deck.read(card.file as never)).slice(0, 2)], [0xff, 0xd8]);
+		await s.value("file.write", { path: "shared/canvases/ada/old-notes/pages/notes.html", text: "<title>Notes</title><h1>An old page</h1>" }, ann);
+		for (const path of [CARD, "shared/canvases/ada/old-notes/pages/notes.html"]) {
+			const t0 = Date.now();
+			const first = await fetch(`${served.url}/pictures/${path}?w=480&v=0&pass=${served.token}`);
+			assert.equal(first.headers.get("content-type"), "image/jpeg", path);
+			assert.ok((await first.arrayBuffer()).byteLength > 1000, `${path} is a real picture`);
+			const again = Date.now();
+			await (await fetch(`${served.url}/pictures/${path}?w=480&v=0&pass=${served.token}`)).arrayBuffer();
+			assert.ok(Date.now() - again < 300, `the second from the store, under 300 ms (first took ${again - t0} ms)`);
+		}
 	} finally {
 		await served.close();
 		await s.close();

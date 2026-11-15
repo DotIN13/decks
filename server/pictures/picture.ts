@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { layout, Refused } from "../../protocol/index.ts";
-import type { Context, Route, RouteAnswer } from "../kernel/index.ts";
+import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { cardPath, type Machine } from "./machine.ts";
 
 // A card's picture for the canvas (rule 11): its page at its own width,
@@ -23,20 +23,30 @@ export function metaWidth(source: string): number {
 /** The rung asked for, rounded up to one the store keeps. */
 export const rungFor = (asked: number) => RUNGS.find((rung) => rung >= asked) ?? RUNGS.at(-1)!;
 
-/** The card's picture as PNG bytes, taken once per card version, rung and scheme. */
+/** A card by its folder or index.html, or any other .html page in the deck, kept from before cards. */
+export function picturedPath(raw: string): DeckPath {
+	const trimmed = raw.replace(/\/+$/, "");
+	if (/\.html?$/i.test(trimmed) && !/\/index\.html$/i.test(trimmed)) return toDeckPath(trimmed);
+	return cardPath(trimmed);
+}
+
+/** The page's picture as JPEG bytes, taken once per version, rung and scheme. */
 export async function cardPicture(ctx: Context, m: Machine, card: string, asked: number, scheme: "light" | "dark"): Promise<Uint8Array> {
-	const source = await ctx.deck.read(cardPath(card));
+	const path = picturedPath(card);
+	const source = await ctx.deck.read(path).catch(() => {
+		throw new Refused("not_found", `There is no page at ${path}.`, "file.find");
+	});
 	const rung = rungFor(asked);
-	const key = `${createHash("sha256").update(source).digest("hex").slice(0, 24)}-${rung}-${scheme}.png`;
+	const key = `${createHash("sha256").update(source).digest("hex").slice(0, 24)}-${rung}-${scheme}.jpg`;
 	const kept = await ctx.store.get(key);
 	if (kept) return kept;
 	const width = metaWidth(new TextDecoder().decode(source));
-	const canvas = layout.canvasOfPath(card)?.name ?? "";
-	const page = m.cardPage(card, canvas);
+	const canvas = layout.canvasOfPath(path)?.name ?? "";
+	const page = m.cardPage(path, canvas);
 	const tab = await m.browser.page({ width, height: Math.round(width * 0.72), scale: rung / width, scheme });
 	try {
 		await tab.goto(page.url);
-		const bytes = await tab.screenshot({ type: "png", full: true });
+		const bytes = await tab.screenshot({ type: "jpeg", full: true });
 		await ctx.store.put(key, bytes);
 		return bytes;
 	} finally {
@@ -51,7 +61,7 @@ async function answer(ctx: Context, m: Machine, path: string, query: URLSearchPa
 		const asked = Number(query.get("w") ?? 480);
 		const scheme = query.get("scheme") === "dark" ? "dark" : "light";
 		const bytes = await cardPicture(ctx, m, card, Number.isFinite(asked) && asked > 0 ? asked : 480, scheme);
-		return { type: "image/png", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
+		return { type: "image/jpeg", body: bytes, headers: { "cache-control": query.has("v") ? "private, max-age=31536000, immutable" : "no-cache" } };
 	} catch (error) {
 		if (!(error instanceof Refused)) return { status: 503, type: "text/plain", body: (error as Error).message };
 		return { status: error.code === "not_found" ? 404 : error.code === "unavailable" ? 503 : 400, type: "text/plain", body: error.message };

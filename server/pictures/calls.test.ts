@@ -138,7 +138,7 @@ test("rule 11: a card's picture is taken once per version and rung", async () =>
 	const served = await s.listen();
 	const get = () => fetch(`${served.url}/pictures/${CARD}?w=300&pass=${served.token}`);
 	const first = await get();
-	assert.equal(first.headers.get("content-type"), "image/png");
+	assert.equal(first.headers.get("content-type"), "image/jpeg");
 	assert.equal(first.headers.get("cache-control"), "no-cache");
 	const versioned = await fetch(`${served.url}/pictures/${CARD}?w=300&v=0&whole=1&pass=${served.token}`);
 	assert.match(versioned.headers.get("cache-control") ?? "", /immutable/);
@@ -163,6 +163,20 @@ test("rule 12: a canvas's tile is a JPEG of the whole canvas, taken once per dra
 	await get("work", "dark");
 	assert.equal(fake.seen.length, 2, "dark is a picture of its own");
 	assert.equal((await get("nowhere")).status, 404);
+	await served.close();
+	await s.close();
+});
+
+test("rule 11: a page from before cards, any other .html in the deck, is pictured too", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	await s.value("file.write", { path: "shared/canvases/ada/old-notes/pages/notes.html", text: "<title>Notes</title><p>old</p>" }, ann);
+	const served = await s.listen();
+	const got = await fetch(`${served.url}/pictures/shared/canvases/ada/old-notes/pages/notes.html?w=480&v=0&pass=${served.token}`);
+	assert.equal(got.status, 200, await got.clone().text());
+	assert.equal(got.headers.get("content-type"), "image/jpeg");
+	assert.match(fake.seen[0]!.urls[0]!, /\/files\/shared\/canvases\/ada\/old-notes\/pages\/notes\.html\?pass=/);
+	assert.equal((await fetch(`${served.url}/pictures/canvases/work/nowhere.html?pass=${served.token}`)).status, 404);
 	await served.close();
 	await s.close();
 });

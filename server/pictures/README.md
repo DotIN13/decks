@@ -36,8 +36,9 @@ HTML; `playwright` for the browser. No other feature.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
     A card in it is an iframe of its page, addressed from where the page is written.
-11. A card's picture is kept in the feature's store by the card's bytes, width and scheme, so
-    an unchanged card is pictured once. With `v` in the address it is cached for a year.
+11. `GET /pictures/<path>` is a JPEG of a card, or of any other `.html` page in the deck (pages
+    from before cards). It is kept in the store by the page's bytes, width and scheme, so an
+    unchanged page is pictured once. With `v` in the address it is cached for a year.
 12. A canvas's tile picture is `GET /pictures/canvas-tile/<canvas>?scheme=&v=`: the whole canvas,
    its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
 
