@@ -31,6 +31,7 @@ export class Apps {
 		this.clock = options.clock ?? Date.now;
 	}
 
+	// What an app is now
 	/** The app's manifest, with where it builds and runs told to the machine. Rule 14. */
 	async manifest(name: string): Promise<Manifest> {
 		const manifest = await manifestOf(this.deck, name);
@@ -67,6 +68,7 @@ export class Apps {
 		return this.running.has(name);
 	}
 
+	// Building and running
 	/** Copy the source into the running copy, writing only what differs. Rule 2. */
 	async sync(name: string): Promise<number> {
 		let wrote = 0;
@@ -96,6 +98,16 @@ export class Apps {
 			if (!(await this.runBuild(name, manifest))) return false;
 			return this.start(name, manifest);
 		});
+	}
+
+	/** The port a server app answers on, starting it when it sleeps. */
+	async portFor(name: string): Promise<number | undefined> {
+		const live = this.running.get(name);
+		if (live) {
+			this.seen(name);
+			return (await live.ready) ? live.port : undefined;
+		}
+		return (await this.run(name)) ? this.running.get(name)?.port : undefined;
 	}
 
 	private job(name: string, work: () => Promise<boolean>): Promise<boolean> {
@@ -189,6 +201,7 @@ export class Apps {
 		return true;
 	}
 
+	// Its data folder kept in the deck
 	/** An in-deck app's data folder (rule 2) is the deck's: what the app writes there in its copy is
 	 *  written to the deck, and what a call writes there in the deck reaches the copy, while it runs. */
 	private keepData(name: string, live: Running, data: string): void {
@@ -214,6 +227,7 @@ export class Apps {
 		await this.deck.write(at, bytes, by).catch(() => {});
 	}
 
+	// Stopping
 	/** Stop a server app's process group; answers whether one was running. */
 	stop(name: string, status: AppStatus = "stopped"): boolean {
 		const live = this.running.get(name);
@@ -227,16 +241,6 @@ export class Apps {
 		kill(live.child);
 		this.logs.write(name, status === "asleep" ? "asleep: not seen for a while; the next request starts it again" : "stopped");
 		return true;
-	}
-
-	/** The port a server app answers on, starting it when it sleeps. */
-	async portFor(name: string): Promise<number | undefined> {
-		const live = this.running.get(name);
-		if (live) {
-			this.seen(name);
-			return (await live.ready) ? live.port : undefined;
-		}
-		return (await this.run(name)) ? this.running.get(name)?.port : undefined;
 	}
 
 	/** Put to sleep every server app unseen for its idleMinutes. Rule 5. */

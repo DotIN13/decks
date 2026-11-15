@@ -9,10 +9,7 @@ import { APP_NAME, manifestOf } from "./manifest.ts";
 export const OPEN = "/app-pass/";
 const json = (status: number, value: unknown): RouteAnswer => ({ status, type: "application/json", body: JSON.stringify(value), headers: { "cache-control": "no-store" } });
 
-async function placed(ctx: Context, canvas: string, name: string): Promise<boolean> {
-	const items = await ctx.call<{ type: string; app?: string }[]>("item.list", { canvas, depth: 0 }).catch(() => []);
-	return items.some((item) => item.type === "app" && item.app === name);
-}
+export const openRoute = (kernel: () => Kernel): Route => ({ method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), path) });
 
 async function answer(ctx: Context, kernel: Kernel, path: string): Promise<RouteAnswer> {
 	const name = decodeURIComponent(path.slice(OPEN.length)).replace(/\/+$/, "");
@@ -28,4 +25,7 @@ async function answer(ctx: Context, kernel: Kernel, path: string): Promise<Route
 	return json(200, { url: `/app/t/${pass}/${name}/` });
 }
 
-export const openRoute = (kernel: () => Kernel): Route => ({ method: "POST", prefix: OPEN, answer: (ctx, path) => answer(ctx, kernel(), path) });
+async function placed(ctx: Context, canvas: string, name: string): Promise<boolean> {
+	const items = await ctx.call<{ type: string; app?: string }[]>("item.list", { canvas, depth: 0 }).catch(() => []);
+	return items.some((item) => item.type === "app" && item.app === name);
+}

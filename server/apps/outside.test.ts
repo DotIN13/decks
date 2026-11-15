@@ -20,11 +20,6 @@ async function start() {
 	return { s, scratch, door, page: (path: string) => fetch(`${door.url}${path}?pass=${door.token}`), async close() { await door.close(); await s.close(); rmSync(scratch, { recursive: true, force: true }); } };
 }
 
-test("rule 15: a folder is absolute, not a home, a system folder or under a hidden one", () => {
-	assert.equal(outsideFolder("/Users/me/code/trip/", "/Users/me"), "/Users/me/code/trip");
-	for (const bad of ["code/trip", "/", "/Users/me", "/Users", "/usr/local/x", "/etc", "/Users/me/.config/x"]) assert.throws(() => outsideFolder(bad, "/Users/me"), bad);
-});
-
 test("rule 14: the person makes an app in a folder outside the deck; the deck keeps only its record", async () => {
 	const t = await start();
 	const folder = join(t.scratch, "trip");
@@ -37,6 +32,11 @@ test("rule 14: the person makes an app in a folder outside the deck; the deck ke
 	assert.deepEqual(listed.map((one) => one.path), ["apps/trip/app.json"]);
 	assert.match(await (await t.page("/app/trip/")).text(), /<title>Trip<\/title>/);
 	await t.close();
+});
+
+test("rule 15: a folder is absolute, not a home, a system folder or under a hidden one", () => {
+	assert.equal(outsideFolder("/Users/me/code/trip/", "/Users/me"), "/Users/me/code/trip");
+	for (const bad of ["code/trip", "/", "/Users/me", "/Users", "/usr/local/x", "/etc", "/Users/me/.config/x"]) assert.throws(() => outsideFolder(bad, "/Users/me"), bad);
 });
 
 test("rules 16 and 17: app.move takes an in-deck app out; a folder that is gone makes it missing", async () => {

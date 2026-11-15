@@ -11,6 +11,48 @@ import { WAIT_MS, type Apps } from "./service.ts";
 type App = Infer<typeof shapes.App>;
 const { app } = calls;
 
+export function appCalls(apps: () => Apps, kernel: () => Kernel): Handled<Context>[] {
+	const A = { list: app.list, get: app.get, create: app.create, update: app.update, clone: app.clone, move: app.move, build: app.build, run: app.run, stop: app.stop, restart: app.restart, remove: app.remove, logs: app.logs, check: app.check };
+	return handleAll(A, {
+		list: async (ctx) => Promise.all((await appNames(ctx.deck)).map((name) => describe(ctx, apps(), name))),
+		get: (ctx, { name }) => describe(ctx, apps(), name, true),
+		create: (ctx, { name, starter, title, source }) => create(ctx, apps(), describe, { name, starter: starter ?? "static", ...(title ? { title } : {}), ...(source ? { source } : {}) }),
+		update: async (ctx, { name, seen, source }) => {
+			await manifestOf(ctx.deck, name);
+			if (source) await setSource(ctx, apps(), name, source);
+			if (seen !== undefined) apps().set(name, { seen });
+			return describe(ctx, apps(), name);
+		},
+		clone: (ctx, { url, name, title, to }) => cloneApp(ctx, apps(), describe, { url, ...(name ? { name } : {}), ...(title ? { title } : {}), ...(to ? { to } : {}) }),
+		move: (ctx, { name, to }) => moveOut(ctx, apps(), describe, name, to),
+		build: async (ctx, { name }) => within(ctx, apps(), name, apps().build(name)),
+		run: async (ctx, { name }) => within(ctx, apps(), name, apps().run(name)),
+		stop: async (ctx, { name }) => {
+			await manifestOf(ctx.deck, name);
+			if (!apps().stop(name)) ctx.note(`${name} was not running.`);
+			return describe(ctx, apps(), name);
+		},
+		restart: async (ctx, { name }) => {
+			await manifestOf(ctx.deck, name);
+			apps().stop(name);
+			return within(ctx, apps(), name, apps().run(name));
+		},
+		remove: async (ctx, { name }) => {
+			await manifestOf(ctx.deck, name);
+			await apps().forget(name);
+			apps().machine.place(name, undefined);
+			await unplace(ctx, name);
+			await ctx.deck.remove(folderOf(name), ctx.caller);
+			return { deleted: `${APPS}/${name}` };
+		},
+		logs: async (ctx, { name, tail }) => {
+			await manifestOf(ctx.deck, name);
+			return apps().logs.tail(name, tail ?? 200);
+		},
+		check: (ctx, { name }) => check(ctx, apps(), kernel(), name),
+	});
+}
+
 /** An app as a call answers it: its manifest, its state, its repository. */
 export async function describe(ctx: Context, apps: Apps, name: string, withRepo = false): Promise<App> {
 	const manifest = await apps.manifest(name);
@@ -67,46 +109,4 @@ async function check(ctx: Context, apps: Apps, kernel: Kernel, name: string): Pr
 		kernel.callers.revoke(id);
 		apps.seen(name);
 	}
-}
-
-export function appCalls(apps: () => Apps, kernel: () => Kernel): Handled<Context>[] {
-	const A = { list: app.list, get: app.get, create: app.create, update: app.update, clone: app.clone, move: app.move, build: app.build, run: app.run, stop: app.stop, restart: app.restart, remove: app.remove, logs: app.logs, check: app.check };
-	return handleAll(A, {
-		list: async (ctx) => Promise.all((await appNames(ctx.deck)).map((name) => describe(ctx, apps(), name))),
-		get: (ctx, { name }) => describe(ctx, apps(), name, true),
-		create: (ctx, { name, starter, title, source }) => create(ctx, apps(), describe, { name, starter: starter ?? "static", ...(title ? { title } : {}), ...(source ? { source } : {}) }),
-		update: async (ctx, { name, seen, source }) => {
-			await manifestOf(ctx.deck, name);
-			if (source) await setSource(ctx, apps(), name, source);
-			if (seen !== undefined) apps().set(name, { seen });
-			return describe(ctx, apps(), name);
-		},
-		clone: (ctx, { url, name, title, to }) => cloneApp(ctx, apps(), describe, { url, ...(name ? { name } : {}), ...(title ? { title } : {}), ...(to ? { to } : {}) }),
-		move: (ctx, { name, to }) => moveOut(ctx, apps(), describe, name, to),
-		build: async (ctx, { name }) => within(ctx, apps(), name, apps().build(name)),
-		run: async (ctx, { name }) => within(ctx, apps(), name, apps().run(name)),
-		stop: async (ctx, { name }) => {
-			await manifestOf(ctx.deck, name);
-			if (!apps().stop(name)) ctx.note(`${name} was not running.`);
-			return describe(ctx, apps(), name);
-		},
-		restart: async (ctx, { name }) => {
-			await manifestOf(ctx.deck, name);
-			apps().stop(name);
-			return within(ctx, apps(), name, apps().run(name));
-		},
-		remove: async (ctx, { name }) => {
-			await manifestOf(ctx.deck, name);
-			await apps().forget(name);
-			apps().machine.place(name, undefined);
-			await unplace(ctx, name);
-			await ctx.deck.remove(folderOf(name), ctx.caller);
-			return { deleted: `${APPS}/${name}` };
-		},
-		logs: async (ctx, { name, tail }) => {
-			await manifestOf(ctx.deck, name);
-			return apps().logs.tail(name, tail ?? 200);
-		},
-		check: (ctx, { name }) => check(ctx, apps(), kernel(), name),
-	});
 }

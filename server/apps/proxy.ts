@@ -10,28 +10,6 @@ import type { RouteAnswer } from "../kernel/index.ts";
 const PROXY_MS = 60_000;
 const DROP = new Set(["authorization", "cookie", "connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "host"]);
 
-/** The request's headers as the app should see them. */
-export function headersFor(req: IncomingMessage, base: string): Record<string, string | string[]> {
-	const out: Record<string, string | string[]> = {};
-	for (const [key, value] of Object.entries(req.headers)) if (value !== undefined && !DROP.has(key) && !key.startsWith("x-decks-")) out[key] = value;
-	out.connection = "close";
-	if (base) out["x-forwarded-prefix"] = base;
-	return out;
-}
-
-/** The address a request passes on, with ?pass= taken off. */
-export function withoutPass(path: string, search: string): string {
-	const query = new URLSearchParams(search);
-	query.delete("pass");
-	return `${path}${query.size ? `?${query}` : ""}`;
-}
-
-/** A redirect from the app to its own root, put back under its address on Decks. */
-export function underBase(location: string | undefined, base: string): string | undefined {
-	if (!location || !base || !location.startsWith("/") || location.startsWith("//") || location.startsWith(base)) return location;
-	return `${base}${location}`;
-}
-
 export function pipeTo(req: IncomingMessage, res: ServerResponse, port: number, path: string, base: string): Promise<void> {
 	return new Promise((done) => {
 		const upstream = request({ host: "127.0.0.1", port, method: req.method, path, headers: headersFor(req, base), agent: false, timeout: PROXY_MS }, (answer) => {
@@ -77,6 +55,28 @@ export function upgradeTo(req: IncomingMessage, socket: Duplex, head: Buffer, po
 	socket.on("error", end);
 	upstream.on("close", end);
 	socket.on("close", end);
+}
+
+/** The request's headers as the app should see them. */
+export function headersFor(req: IncomingMessage, base: string): Record<string, string | string[]> {
+	const out: Record<string, string | string[]> = {};
+	for (const [key, value] of Object.entries(req.headers)) if (value !== undefined && !DROP.has(key) && !key.startsWith("x-decks-")) out[key] = value;
+	out.connection = "close";
+	if (base) out["x-forwarded-prefix"] = base;
+	return out;
+}
+
+/** The address a request passes on, with ?pass= taken off. */
+export function withoutPass(path: string, search: string): string {
+	const query = new URLSearchParams(search);
+	query.delete("pass");
+	return `${path}${query.size ? `?${query}` : ""}`;
+}
+
+/** A redirect from the app to its own root, put back under its address on Decks. */
+export function underBase(location: string | undefined, base: string): string | undefined {
+	if (!location || !base || !location.startsWith("/") || location.startsWith("//") || location.startsWith(base)) return location;
+	return `${base}${location}`;
 }
 
 /** Write a buffered answer to a raw response. */

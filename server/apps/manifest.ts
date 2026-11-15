@@ -2,7 +2,7 @@ import { Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Deck, type DeckPath } from "../kernel/index.ts";
 import { sourceOf, type Source } from "./source.ts";
 
-// An app's name and app.json, read from the deck. Rule 1 of the README.
+// An app's name, its app.json and the list of its source files, read from the deck. Rule 1.
 
 export type AppKind = "static" | "build" | "server";
 export type Manifest = { title?: string; kind: AppKind; root?: string; install?: string; build?: string; start?: string; prefix?: boolean; idleMinutes?: number; source?: Source; data?: string };

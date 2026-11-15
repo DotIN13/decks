@@ -15,28 +15,6 @@ type Describe = (ctx: Context, apps: Apps, name: string, withRepo?: boolean) => 
 const encode = (text: string) => new TextEncoder().encode(text);
 const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
-async function hasRecord(ctx: Context, name: string): Promise<boolean> {
-	return (await ctx.deck.list(folderOf(name)).catch(() => [])).length > 0;
-}
-
-async function writeAll(ctx: Context, name: string, files: Record<string, Uint8Array>): Promise<void> {
-	for (const [path, bytes] of Object.entries(files)) await ctx.deck.write(toDeckPath(`${folderOf(name)}/${path}`), bytes, ctx.caller);
-}
-
-/** app.json's text with source set, every other field kept as written. */
-function withSource(json: string, source: Source): Uint8Array {
-	const raw = JSON.parse(json) as Record<string, unknown>;
-	return encode(`${JSON.stringify({ ...raw, source }, null, "\t")}\n`);
-}
-
-/** A folder an outside app may take: missing, or empty. */
-async function freeFolder(apps: Apps, raw: string): Promise<string> {
-	const path = outsideFolder(raw);
-	const seen = await apps.machine.look(path);
-	if (seen.entries > 0) throw new Refused("conflict", `${path} already has files; an app is made in a new or empty folder.`, "app.move");
-	return path;
-}
-
 export async function create(ctx: Context, apps: Apps, describe: Describe, args: { name: string; starter: Starter; title?: string; source?: Source }): Promise<App> {
 	const { name, starter } = args;
 	if (await hasRecord(ctx, name)) throw new Refused("conflict", `apps/${name} already has files; an app is made in a new folder.`, "app.get");
@@ -52,26 +30,6 @@ export async function create(ctx: Context, apps: Apps, describe: Describe, args:
 		await apps.sync(name);
 	}
 	await commitAll(apps.machine.folder(name), `Start ${name} from the ${starter} starter`).catch((error: Error) => ctx.note(`No git repository: ${error.message}`));
-	return describe(ctx, apps, name, true);
-}
-
-/** The kind a cloned folder with no app.json is, from its package.json. */
-export function guessManifest(title: string, pkg: string | undefined): string {
-	let scripts: Record<string, unknown> = {};
-	try {
-		scripts = (JSON.parse(pkg ?? "{}") as { scripts?: Record<string, unknown> }).scripts ?? {};
-	} catch {
-		scripts = {};
-	}
-	return `${JSON.stringify({ title, kind: scripts.start ? "server" : scripts.build ? "build" : "static" }, null, "\t")}\n`;
-}
-
-/** A missing app (rule 16) taken again from its repository into a folder the person names. */
-async function cloneMissing(ctx: Context, apps: Apps, describe: Describe, name: string, url: string, to: string): Promise<App> {
-	const path = await freeFolder(apps, to);
-	await clone(url, dirname(path), basename(path));
-	const record = toDeckPath(`${folderOf(name)}/app.json`);
-	await ctx.deck.write(record, withSource(decode(await ctx.deck.read(record)), { path, repo: url }), ctx.caller);
 	return describe(ctx, apps, name, true);
 }
 
@@ -97,6 +55,26 @@ export async function cloneApp(ctx: Context, apps: Apps, describe: Describe, arg
 	if (outside) json = decode(withSource(json, { path: outside, repo: args.url }));
 	await writeAll(ctx, name, outside ? { "app.json": encode(json) } : { ...files, "app.json": encode(json) });
 	return describe(ctx, apps, name, true);
+}
+
+/** A missing app (rule 16) taken again from its repository into a folder the person names. */
+async function cloneMissing(ctx: Context, apps: Apps, describe: Describe, name: string, url: string, to: string): Promise<App> {
+	const path = await freeFolder(apps, to);
+	await clone(url, dirname(path), basename(path));
+	const record = toDeckPath(`${folderOf(name)}/app.json`);
+	await ctx.deck.write(record, withSource(decode(await ctx.deck.read(record)), { path, repo: url }), ctx.caller);
+	return describe(ctx, apps, name, true);
+}
+
+/** The kind a cloned folder with no app.json is, from its package.json. */
+export function guessManifest(title: string, pkg: string | undefined): string {
+	let scripts: Record<string, unknown> = {};
+	try {
+		scripts = (JSON.parse(pkg ?? "{}") as { scripts?: Record<string, unknown> }).scripts ?? {};
+	} catch {
+		scripts = {};
+	}
+	return `${JSON.stringify({ title, kind: scripts.start ? "server" : scripts.build ? "build" : "static" }, null, "\t")}\n`;
 }
 
 /** app.update's source: point the record at another folder; refused from anyone but the person. */
@@ -126,4 +104,27 @@ export async function moveOut(ctx: Context, apps: Apps, describe: Describe, name
 	await commitAll(path, `Move ${name} out of the deck`).catch((error: Error) => ctx.note(`No git repository: ${error.message}`));
 	ctx.note(`${name} now lives in ${path}: edit its files there, on disk; file calls see only its record.`);
 	return describe(ctx, apps, name, true);
+}
+
+// Shared by the makers
+async function hasRecord(ctx: Context, name: string): Promise<boolean> {
+	return (await ctx.deck.list(folderOf(name)).catch(() => [])).length > 0;
+}
+
+async function writeAll(ctx: Context, name: string, files: Record<string, Uint8Array>): Promise<void> {
+	for (const [path, bytes] of Object.entries(files)) await ctx.deck.write(toDeckPath(`${folderOf(name)}/${path}`), bytes, ctx.caller);
+}
+
+/** app.json's text with source set, every other field kept as written. */
+function withSource(json: string, source: Source): Uint8Array {
+	const raw = JSON.parse(json) as Record<string, unknown>;
+	return encode(`${JSON.stringify({ ...raw, source }, null, "\t")}\n`);
+}
+
+/** A folder an outside app may take: missing, or empty. */
+async function freeFolder(apps: Apps, raw: string): Promise<string> {
+	const path = outsideFolder(raw);
+	const seen = await apps.machine.look(path);
+	if (seen.entries > 0) throw new Refused("conflict", `${path} already has files; an app is made in a new or empty folder.`, "app.move");
+	return path;
 }

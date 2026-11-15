@@ -6,15 +6,6 @@ import { Refused } from "../../protocol/index.ts";
 export type Checked = { verdict: string; url: string; title?: string; errors: string[]; failed?: string[]; words?: number };
 type Load = { status: number; title: string; words: number; errors: string[]; failed: string[] };
 
-/** The verdict from what a load found, in a sentence. */
-export function verdict(found: Load): string {
-	if (found.status >= 400) return `The page answered ${found.status}.`;
-	if (found.errors.length) return `The page threw ${found.errors.length} error${found.errors.length > 1 ? "s" : ""}.`;
-	if (found.failed.length) return `${found.failed.length} request${found.failed.length > 1 ? "s" : ""} failed.`;
-	if (found.words === 0) return "The page loaded but shows no words.";
-	return "Loads clean: no errors, no failed requests.";
-}
-
 /** Open url (its pass in the path) in Chromium, wait for it to settle, and report. */
 export async function checkInBrowser(url: string, shown: string): Promise<Checked> {
 	const playwright = await import("playwright").catch(() => undefined);
@@ -40,4 +31,13 @@ export async function checkInBrowser(url: string, shown: string): Promise<Checke
 	} finally {
 		await browser.close();
 	}
+}
+
+/** The verdict from what a load found, in a sentence. */
+export function verdict(found: Load): string {
+	if (found.status >= 400) return `The page answered ${found.status}.`;
+	if (found.errors.length) return `The page threw ${found.errors.length} error${found.errors.length > 1 ? "s" : ""}.`;
+	if (found.failed.length) return `${found.failed.length} request${found.failed.length > 1 ? "s" : ""} failed.`;
+	if (found.words === 0) return "The page loaded but shows no words.";
+	return "Loads clean: no errors, no failed requests.";
 }

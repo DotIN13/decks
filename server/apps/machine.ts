@@ -4,8 +4,8 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { connect, createServer } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
 
-// The app's running copy on this machine, its commands and its processes.
-// The only module of the feature that touches node:fs; it never writes the deck.
+// Where an app builds and runs on this machine (its copy, or its folder outside the deck): its
+// files, its commands and its processes. The feature's only module on node:fs; it never writes the deck.
 
 const SECRET = /^(?:ANTHROPIC_|CLAUDE_|OPENAI_|GEMINI_|AWS_)|^(?:GOOGLE_API_KEY|GH_TOKEN|GITHUB_TOKEN|DECKS_STUDIO_KEY)$|_(?:TOKEN|SECRET|API_KEY|KEY|PASSWORD)$/i;
 const DECKS_OWN = /^DECKS_/;
@@ -20,6 +20,7 @@ export class Machine {
 
 	constructor(readonly workdir: string) {}
 
+	// Where the app builds and runs
 	/** Where the app builds and runs: its source folder outside the deck, else its copy here. */
 	folder(name: string): string {
 		return this.outside.get(name) ?? join(this.workdir, name);
@@ -35,26 +36,6 @@ export class Machine {
 		return this.outside.has(name);
 	}
 
-	/** Whether a folder exists, and how many names it holds. */
-	async look(folder: string): Promise<{ exists: boolean; entries: number }> {
-		const names = await readdir(folder).catch(() => undefined);
-		return { exists: names !== undefined, entries: names?.length ?? 0 };
-	}
-
-	/** Hear writes under a folder of the app's copy; answers how to stop. */
-	watchCopy(name: string, sub: string, hear: (path: string) => void): () => void {
-		const root = join(this.workdir, name);
-		let watcher: ReturnType<typeof watch> | undefined;
-		try {
-			mkdirSync(join(root, sub), { recursive: true });
-			watcher = watch(join(root, sub), { recursive: true }, (_kind, file) => file && hear(`${sub}/${String(file).split(sep).join("/")}`));
-			watcher.on("error", () => watcher?.close());
-		} catch {
-			watcher = undefined;
-		}
-		return () => watcher?.close();
-	}
-
 	/** A path inside the running copy, or undefined when it climbs out or is hidden. */
 	inside(name: string, path: string): string | undefined {
 		const root = this.folder(name);
@@ -64,21 +45,11 @@ export class Machine {
 		return target;
 	}
 
-	/** Write a file of the copy only when its bytes differ; answers whether it wrote. */
-	async put(name: string, path: string, bytes: Uint8Array): Promise<boolean> {
-		const file = this.inside(name, path);
-		if (!file) return false;
-		const was = await readFile(file).catch(() => undefined);
-		if (was && Buffer.compare(was, Buffer.from(bytes)) === 0) return false;
-		await mkdir(dirname(file), { recursive: true });
-		await writeFile(file, bytes);
-		return true;
-	}
-
-	/** Remove a file of the copy, when its deck file went. */
-	async drop(name: string, path: string): Promise<void> {
-		const file = this.inside(name, path);
-		if (file && !this.isOutside(name)) await rm(file, { force: true });
+	// Its files
+	/** Whether a folder exists, and how many names it holds. */
+	async look(folder: string): Promise<{ exists: boolean; entries: number }> {
+		const names = await readdir(folder).catch(() => undefined);
+		return { exists: names !== undefined, entries: names?.length ?? 0 };
 	}
 
 	async read(name: string, path: string): Promise<Uint8Array | undefined> {
@@ -108,11 +79,43 @@ export class Machine {
 			.sort();
 	}
 
+	/** Write a file of the copy only when its bytes differ; answers whether it wrote. */
+	async put(name: string, path: string, bytes: Uint8Array): Promise<boolean> {
+		const file = this.inside(name, path);
+		if (!file) return false;
+		const was = await readFile(file).catch(() => undefined);
+		if (was && Buffer.compare(was, Buffer.from(bytes)) === 0) return false;
+		await mkdir(dirname(file), { recursive: true });
+		await writeFile(file, bytes);
+		return true;
+	}
+
+	/** Remove a file of the copy, when its deck file went. */
+	async drop(name: string, path: string): Promise<void> {
+		const file = this.inside(name, path);
+		if (file && !this.isOutside(name)) await rm(file, { force: true });
+	}
+
 	/** Remove the copy, as when an app is deleted. */
 	remove(name: string): Promise<void> {
 		return rm(this.folder(name), { recursive: true, force: true });
 	}
 
+	/** Hear writes under a folder of the app's copy; answers how to stop. */
+	watchCopy(name: string, sub: string, hear: (path: string) => void): () => void {
+		const root = join(this.workdir, name);
+		let watcher: ReturnType<typeof watch> | undefined;
+		try {
+			mkdirSync(join(root, sub), { recursive: true });
+			watcher = watch(join(root, sub), { recursive: true }, (_kind, file) => file && hear(`${sub}/${String(file).split(sep).join("/")}`));
+			watcher.on("error", () => watcher?.close());
+		} catch {
+			watcher = undefined;
+		}
+		return () => watcher?.close();
+	}
+
+	// Its commands
 	/** The environment of an app's commands: this process's, with no secret and no NODE_ENV=production. */
 	env(extra: Record<string, string>): NodeJS.ProcessEnv {
 		const env: NodeJS.ProcessEnv = {};

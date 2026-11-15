@@ -13,38 +13,6 @@ import { openRoute } from "./open.ts";
 
 export type AppsFeatureOptions = { workdir?: string; clock?: () => number };
 
-function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
-	const app: Route = {
-		method: "ANY",
-		prefix: "/app/",
-		tokenOf: passInPath,
-		serve: (ctx, req, res) => serveApp(ctx, apps(), req, res),
-		upgrade(req, socket, head, door) {
-			const asked = new URL(req.url ?? "/", "http://decks.local");
-			const carried = passInPath(asked);
-			const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
-			const at = parseAppPath(url.pathname);
-			if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
-			void apps().manifest(at.name)
-				.then((manifest) => (manifest.kind === "server" ? serverTarget(apps(), at.name, manifest, at.inner, url.search) : undefined))
-				.catch(() => undefined)
-				.then((target) => (target ? upgradeTo(req, socket, head, target.port, target.path, target.base) : socket.end("HTTP/1.1 404 Not Found\r\n\r\n")));
-		},
-	};
-	const forward = (prefix: string): Route => ({
-		method: "ANY",
-		prefix,
-		serve: (ctx: Context, req, res) => serveForward(ctx, req, res),
-		upgrade(req, socket, head, door) {
-			const url = new URL(req.url ?? "/", "http://decks.local");
-			const target = forwardTarget(url.pathname);
-			if (!target || !door.resolve(url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
-			upgradeTo(req, socket, head, target.port, target.path, "");
-		},
-	});
-	return [app, forward("/node/"), forward("/rnode/"), openRoute(kernel)];
-}
-
 /** Apps and ports. workdir is where in-deck apps' copies run: by default <machine>/app-run/<deck id>. */
 export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 	let kernel: Kernel | undefined;
@@ -76,6 +44,38 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 			};
 		},
 	});
+}
+
+function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
+	const app: Route = {
+		method: "ANY",
+		prefix: "/app/",
+		tokenOf: passInPath,
+		serve: (ctx, req, res) => serveApp(ctx, apps(), req, res),
+		upgrade(req, socket, head, door) {
+			const asked = new URL(req.url ?? "/", "http://decks.local");
+			const carried = passInPath(asked);
+			const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
+			const at = parseAppPath(url.pathname);
+			if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+			void apps().manifest(at.name)
+				.then((manifest) => (manifest.kind === "server" ? serverTarget(apps(), at.name, manifest, at.inner, url.search) : undefined))
+				.catch(() => undefined)
+				.then((target) => (target ? upgradeTo(req, socket, head, target.port, target.path, target.base) : socket.end("HTTP/1.1 404 Not Found\r\n\r\n")));
+		},
+	};
+	const forward = (prefix: string): Route => ({
+		method: "ANY",
+		prefix,
+		serve: (ctx: Context, req, res) => serveForward(ctx, req, res),
+		upgrade(req, socket, head, door) {
+			const url = new URL(req.url ?? "/", "http://decks.local");
+			const target = forwardTarget(url.pathname);
+			if (!target || !door.resolve(url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+			upgradeTo(req, socket, head, target.port, target.path, "");
+		},
+	});
+	return [app, forward("/node/"), forward("/rnode/"), openRoute(kernel)];
 }
 
 export default appsFeature();

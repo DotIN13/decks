@@ -7,6 +7,39 @@ export const STARTERS = ["static", "node", "solid", "react", "next"] as const;
 export type Starter = (typeof STARTERS)[number];
 export const STARTER_KIND: Record<Starter, AppKind> = { static: "static", node: "server", solid: "build", react: "build", next: "server" };
 
+/** The files of a starter, by path inside the app. */
+export function starterFiles(starter: Starter, title: string): Record<string, string> {
+	switch (starter) {
+		case "static":
+			return {
+				"app.json": json({ title, kind: "static" }),
+				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n	<!-- On the canvas: browser storage in a sandboxed frame, and wheels it cannot use go to the canvas. -->\n	<script src="decks-canvas.js"></script>\n`),
+				"style.css": STYLE,
+				"app.js": STATIC_JS,
+			};
+		case "node":
+			return {
+				"app.json": json({ title, kind: "server", start: "node server.js" }),
+				"package.json": json({ name: "app", private: true, type: "module", scripts: { start: "node server.js" } }),
+				"server.js": NODE_SERVER,
+				"public/index.html": page(title, nodeList(title), `	<style>${STYLE}</style>\n`),
+			};
+		case "solid":
+			return viteApp(title, false);
+		case "react":
+			return viteApp(title, true);
+		case "next":
+			return {
+				"app.json": json({ title, kind: "server", build: "npm run build", start: "npm start", prefix: true }),
+				"package.json": json({ name: "app", private: true, scripts: { build: "next build", start: "next start -p $PORT -H 127.0.0.1" }, dependencies: { next: "^15.0.0", react: "^19.0.0", "react-dom": "^19.0.0" } }),
+				"next.config.mjs": `export default { basePath: process.env.BASE_PATH ?? "" };\n`,
+				"app/layout.jsx": NEXT_LAYOUT(title),
+				"app/globals.css": STYLE,
+				"app/page.jsx": `export default function Page() {\n\treturn <main><h1>${escape(title)}</h1></main>;\n}\n`,
+			};
+	}
+}
+
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const json = (value: unknown) => `${JSON.stringify(value, null, "\t")}\n`;
 
@@ -142,36 +175,3 @@ export default function Layout({ children }) {
 	);
 }
 `;
-
-/** The files of a starter, by path inside the app. */
-export function starterFiles(starter: Starter, title: string): Record<string, string> {
-	switch (starter) {
-		case "static":
-			return {
-				"app.json": json({ title, kind: "static" }),
-				"index.html": page(title, `	<h1>${escape(title)}</h1>\n	<p id="count">Pressed 0 times.</p>\n	<button id="press">Press</button>\n	<script src="app.js"></script>`, `	<link rel="stylesheet" href="style.css" />\n	<!-- On the canvas: browser storage in a sandboxed frame, and wheels it cannot use go to the canvas. -->\n	<script src="decks-canvas.js"></script>\n`),
-				"style.css": STYLE,
-				"app.js": STATIC_JS,
-			};
-		case "node":
-			return {
-				"app.json": json({ title, kind: "server", start: "node server.js" }),
-				"package.json": json({ name: "app", private: true, type: "module", scripts: { start: "node server.js" } }),
-				"server.js": NODE_SERVER,
-				"public/index.html": page(title, nodeList(title), `	<style>${STYLE}</style>\n`),
-			};
-		case "solid":
-			return viteApp(title, false);
-		case "react":
-			return viteApp(title, true);
-		case "next":
-			return {
-				"app.json": json({ title, kind: "server", build: "npm run build", start: "npm start", prefix: true }),
-				"package.json": json({ name: "app", private: true, scripts: { build: "next build", start: "next start -p $PORT -H 127.0.0.1" }, dependencies: { next: "^15.0.0", react: "^19.0.0", "react-dom": "^19.0.0" } }),
-				"next.config.mjs": `export default { basePath: process.env.BASE_PATH ?? "" };\n`,
-				"app/layout.jsx": NEXT_LAYOUT(title),
-				"app/globals.css": STYLE,
-				"app/page.jsx": `export default function Page() {\n\treturn <main><h1>${escape(title)}</h1></main>;\n}\n`,
-			};
-	}
-}
