@@ -1,3 +1,5 @@
+// Spots the CLI saying the session it was told to resume is not there,
+// so the harness can start a fresh one.
 /**
  * The CLI saying the conversation it was told to resume is not in the store it can see.
  *

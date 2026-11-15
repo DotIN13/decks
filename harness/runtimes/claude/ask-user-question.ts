@@ -1,3 +1,5 @@
+// Answers Claude's AskUserQuestion tool by asking the person each question
+// and handing their choices back on the tool's input.
 /**
  * `AskUserQuestion`, which is a question and not a permission prompt.
  *

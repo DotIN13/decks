@@ -1,3 +1,5 @@
+// Reads what the Claude CLI prints for a terminal: strips the escapes,
+// finds the first URL and the last line.
 /**
  * Reading what the Claude CLI prints, when there is no terminal to print it to.
  *

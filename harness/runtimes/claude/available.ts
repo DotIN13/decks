@@ -1,3 +1,5 @@
+// Finds the Claude CLI on this machine, and says whether a Claude agent
+// could start and what is missing if not.
 import { existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, delimiter, dirname, join } from "node:path";
@@ -22,6 +24,20 @@ export const CLAUDE_PATH_ENV = "DECKS_CLAUDE_PATH";
 
 /** A test escape hatch: an install that forbids the SDK's own binary. */
 export const CLAUDE_BUNDLED_ENV = "DECKS_CLAUDE_BUNDLED";
+
+/**
+ * Whether a Claude agent could start, and what is missing if not.
+ *
+ * Used to fail with a sentence a person can act on, in the agent's own column, rather
+ * than with the SDK's message about a platform package nobody asked for.
+ */
+export function claudeAvailability(override?: string): { available: boolean; reason?: string } {
+	if (claudeExecutable(override) || claudeBundledExecutable()) return { available: true };
+	return {
+		available: false,
+		reason: `No Claude Code executable found. Install Claude Code, set ${CLAUDE_PATH_ENV} to where it lives, or install the SDK's platform package (npm install @anthropic-ai/claude-agent-sdk).`,
+	};
+}
 
 export function claudeExecutable(override?: string): string | undefined {
 	for (const candidate of [override, process.env[CLAUDE_PATH_ENV]]) {
@@ -71,18 +87,4 @@ export function claudeBundledExecutable(): string | undefined {
 		// No SDK package: nothing either of us could launch.
 	}
 	return undefined;
-}
-
-/**
- * Whether a Claude agent could start, and what is missing if not.
- *
- * Used to fail with a sentence a person can act on, in the agent's own column, rather
- * than with the SDK's message about a platform package nobody asked for.
- */
-export function claudeAvailability(override?: string): { available: boolean; reason?: string } {
-	if (claudeExecutable(override) || claudeBundledExecutable()) return { available: true };
-	return {
-		available: false,
-		reason: `No Claude Code executable found. Install Claude Code, set ${CLAUDE_PATH_ENV} to where it lives, or install the SDK's platform package (npm install @anthropic-ai/claude-agent-sdk).`,
-	};
 }

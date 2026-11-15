@@ -1,3 +1,5 @@
+// Spots a turn lost to a token refresh another process holds,
+// and says how long to wait and how often to retry.
 /**
  * A turn that failed for a reason worth waiting out, rather than an answer.
  *

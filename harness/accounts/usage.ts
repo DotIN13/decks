@@ -1,3 +1,5 @@
+// Reads the CLI's /usage answer into a usage report: the plan's windows,
+// the session's spend and the behaviour scan.
 import type { ModelSpend, PlanLimit, SessionSpend, TokenCounts, UsageReport, UsageShare, UsageWindow } from "../runtimes/types/index.ts";
 
 /**
@@ -75,6 +77,8 @@ export function toUsageReport(raw: unknown, account: string | null): UsageReport
 		behaviors: readBehaviors(record(root.behaviors)),
 	};
 }
+
+// --- the plan's windows
 
 /**
  * Every window the account has, read from **both** places the payload states them.
@@ -230,6 +234,8 @@ function titled(raw: string): string {
 	return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
+// --- what the session spent
+
 function readSession(session: Record<string, unknown> | null): SessionSpend {
 	const models: ModelSpend[] = [];
 	for (const [model, value] of Object.entries(record(session?.model_usage) ?? {})) {
@@ -273,6 +279,8 @@ function add(total: TokenCounts, spend: ModelSpend): TokenCounts {
 		cacheWrite: total.cacheWrite + spend.tokens.cacheWrite,
 	};
 }
+
+// --- the behaviour scan
 
 function readBehaviors(behaviors: Record<string, unknown> | null): UsageReport["behaviors"] {
 	if (!behaviors) return null;

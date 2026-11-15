@@ -1,3 +1,5 @@
+// Reads Claude's message stream into the transcript: text, thinking,
+// tool calls and their results, and notices.
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { titleFor, type Translator } from "../shared/translator.ts";
 

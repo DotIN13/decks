@@ -1,3 +1,5 @@
+// The tools Decks gives a Claude agent itself: the two Google Docs tools,
+// and the rules that let the decks command run without a prompt.
 import { createSdkMcpServer, type McpSdkServerConfigWithInstance, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";

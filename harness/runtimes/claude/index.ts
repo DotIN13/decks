@@ -1,3 +1,5 @@
+// The Claude Code runtime as Decks sees it: its name, what it can do,
+// whether it is installed, and how to start one.
 import { claudeAvailability } from "./available.ts";
 import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "./backend.ts";
 import type { AgentRuntime } from "../runtime.ts";
