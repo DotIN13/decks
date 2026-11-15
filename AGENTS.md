@@ -12,9 +12,9 @@ The map of this repo for agents. Read it first, then the design.
 
 ## What is where
 
-The rewrite is built beside today's code. Until the switch-over at the end of wave 2, today's
-code stays untouched and working, under the `@decks/*` names. New folders are workspaces named
-`@decks-next/<folder>`.
+The switch-over at the end of wave 2 is done: the new folders are workspaces named
+`@decks/<folder>`, and the libraries still in packages/ keep their names until Loom moves them;
+the old protocol package is `@decks/protocol-old` until then.
 
 New folders, today:
 

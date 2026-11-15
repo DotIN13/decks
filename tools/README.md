@@ -22,7 +22,7 @@ Anything in the repo: tools read every folder. Nothing in the repo imports tools
   `npm ci`, `npm install`, a page build. Run it through `heavy.mjs --wait --`.
 - Browser checks: `node tools/checks/run.mjs <check> ...`, directly. It takes a check slot for each
   run (two at once), alone for a check that measures time, never for the whole loop.
-- A new folder's project: `<folder>/package.json` named `@decks-next/<folder>` (`type: module`,
+- A new folder's project: `<folder>/package.json` named `@decks/<folder>` (`type: module`,
   `exports` pointing at `.ts` files) and `<folder>/tsconfig.json` that extends
   `tsconfig.folder.json` with `include: ["**/*.ts"]`. That base has no node types; a folder that
   needs them adds `"types": ["node"]`. Under `clients/<name>/`, extend `../../tsconfig.folder.json`.
