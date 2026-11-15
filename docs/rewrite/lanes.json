@@ -59,7 +59,10 @@
 		"packages/protocol/",
 		"packages/canvas/",
 		"packages/ui/",
-		"scripts/"
+		"scripts/",
+		"packages/hub/",
+		"SECURITY.md",
+		"examples/"
 	],
 	"Keel": [
 		"server/kernel/",
