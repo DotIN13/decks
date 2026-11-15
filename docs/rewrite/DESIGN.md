@@ -385,3 +385,8 @@ second in both slots), and `stage-api` 5 of 5 with a real Claude. What the runs 
 the commits: a card named by its folder, an agent shown idle too early, the picture ladder, a focus on
 an unread card, and one race in today's canvas library (`tiers`, 2 of 10 on today's programs too). The
 switch-over follows `docs/rewrite/switch-plan.md`; Warden's lanes are opened for that one job.
+
+**Where browser checks live (Mason, 2026-11-15).** Every browser check is under `tools/checks/<feature>/`,
+never inside `server/` or `harness/`: it drives three programs from outside, so it is a tool. The folder's
+name is its owner. A feature's own tests, with no browser, stay beside its code. This replaces "move each
+check to its feature" and keeps the imports rule without an exception.
