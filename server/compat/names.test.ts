@@ -40,6 +40,8 @@ test("old arguments in order become the new call's, options spread", () => {
 	assert.deepEqual(keyed(["item", "..."], [{ type: "note" }, { canvas: "c", at: { x1: 1, y1: 2 } }]), { item: { type: "note" }, canvas: "c", at: { x1: 1, y1: 2 } });
 	const insert = turn("canvas.insert", [{ type: "note" }, { at: { x1: 1, y1: 2 } }]);
 	assert.ok(!("refusal" in insert) && (insert.args.at as { x: number }).x === 1);
+	const set = turn("agent.update", [{ canvas: "plan" }]);
+	assert.ok(!("refusal" in set) && (set.args.change as { canvas: string }).canvas === "plan" && set.args.patch === undefined);
 	const step = turn("canvas.step", ["redo"]);
 	assert.ok(!("refusal" in step) && step.name === "canvas.undo" && step.args.redo === true);
 	assert.deepEqual(answerBack("canvas.space", { x: 3, y: 4 }), { x1: 3, y1: 4 });

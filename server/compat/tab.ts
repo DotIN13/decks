@@ -155,6 +155,7 @@ function identity(tab: Tab, agent: AgentRow): void {
 
 async function documentCreate(tab: Tab, m: Said, canvas: string | undefined): Promise<void> {
 	const at = m.at && typeof m.at === "object" ? { at: m.at } : {};
-	const item = (await call<{ path?: string }>(tab, "item.insert", { item: { type: "document", ...(typeof m.document === "string" ? { path: m.document } : {}) }, canvas, ...at })) ?? {};
-	if (typeof m.request === "string") tab.send({ type: "document.created", request: m.request, path: item.path ?? "" });
+	const item = (await call<{ id?: string }>(tab, "item.insert", { item: { type: "document", ...(typeof m.document === "string" ? { path: m.document } : {}) }, canvas, ...at })) ?? {};
+	// Today's answer named the item on the canvas, item:<id>, which the page selects and flies to.
+	if (typeof m.request === "string") tab.send({ type: "document.created", request: m.request, path: `item:${item.id ?? ""}` });
 }
