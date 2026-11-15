@@ -2,6 +2,7 @@ import { calls, Refused, type Handled } from "../../protocol/index.ts";
 import { handleAll, type Context, type Deck, type DeckPath, type Store } from "../kernel/types.ts";
 import type { Documents } from "./doc.ts";
 import { guarded, type GoogleAccount } from "./google.ts";
+import { link, type GoogleDocs } from "./links.ts";
 import { fence } from "./path.ts";
 import { skipped } from "./records.ts";
 
@@ -43,10 +44,17 @@ export function documentCalls(docs: () => Documents | undefined): Handled<Contex
 	});
 }
 
-export function googleCalls(account: GoogleAccount | undefined): Handled<Context>[] {
+export function googleCalls(account: GoogleAccount | undefined, docs: GoogleDocs | undefined): Handled<Context>[] {
 	return handleAll(google, {
 		status: async () => guarded(account, () => account!.status()),
 		connect: async (_ctx, { url }) => guarded(account, () => account!.connect(url)),
 		disconnect: async () => guarded(account, () => account!.disconnect()),
+		list: async (_ctx, { query }) => guarded(docs, () => docs!.list(query)),
+		link: async (ctx, { url }) =>
+			guarded(docs, async () => {
+				const { mirror } = await link(docs!, ctx.deck, ctx.store, url);
+				const last = (await ctx.deck.revisions?.(mirror))?.at(-1);
+				return { path: mirror, ...(last ? { rev: last.rev, by: last.by, at: last.at } : {}) };
+			}),
 	});
 }

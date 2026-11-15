@@ -36,8 +36,10 @@ and Google Docs.
 9. On a canvas a document is a `browser` node whose metadata is `{ type: "decks.document", path }`,
    the path from the deck's root. Its file travels with it on copy, paste and share.
 10. Without Google credentials the google calls answer `unavailable`; they never throw anything else.
+11. `google.link` writes a Doc's mirror in `docs/google/`, once per Doc. While a page has a mirror
+   open it syncs every two seconds: the Doc's edits arrive as a change to review, typing goes out.
 
-Typesetting, git and Google comments are not built in wave 1: the router answers them `unavailable`.
+Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
 
 ## Check
 

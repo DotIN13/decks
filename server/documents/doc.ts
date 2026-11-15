@@ -49,6 +49,11 @@ export class Documents {
 		return next;
 	}
 
+	/** Whether a page has this document open. */
+	isOpen(path: string): boolean {
+		return (this.open.get(path)?.clients.size ?? 0) > 0;
+	}
+
 	stop(): void {
 		this.stopWatch();
 		for (const doc of this.open.values()) clearTimeout(doc.pause);

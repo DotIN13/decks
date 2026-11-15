@@ -69,3 +69,46 @@ test("with a sign-in given, the google calls answer it; when it throws, unavaila
 	assert.equal((await s.call("google.status", {}, "agent")).ok, false);
 	await s.close();
 });
+
+class FakeLibrary extends FakeDocs {
+	async list(query?: string) {
+		const all = [{ id: "1abcdefghijklmnopqrstuvwxyz", title: "Field notes", url: "https://docs.google.com/document/d/1abcdefghijklmnopqrstuvwxyz/edit" }];
+		return all.filter((d) => !query || d.title.toLowerCase().includes(query.toLowerCase()));
+	}
+	async title() {
+		return "Field notes";
+	}
+}
+
+test("google.list and google.link: the mirror is made once, and syncs while a page has it open", async () => {
+	const remote = new FakeLibrary("From Google\n");
+	const s = await testServer({ features: [documents({ docs: remote, tickMs: 10 })] });
+	assert.equal((await s.value<unknown[]>("google.list", { query: "field" }, "person")).length, 1);
+	assert.deepEqual(await s.value("google.list", { query: "nothing" }, "person"), []);
+	const url = "https://docs.google.com/document/d/1abcdefghijklmnopqrstuvwxyz/edit";
+	const made = await s.value<{ path: string; by: string }>("google.link", { url }, "person");
+	assert.equal(made.path, "docs/google/field-notes-1abcde.md");
+	assert.equal(made.by, "google");
+	assert.equal((await s.value<{ path: string }>("google.link", { url }, "person")).path, made.path);
+	const opened = await s.value<{ rev: number; text: string }>("file.open", { path: made.path, client: "p" }, "person");
+	assert.equal(opened.text, "From Google\n");
+	await s.value("file.splice", { path: made.path, client: "p", rev: opened.rev, batch: "1", splices: [{ at: 11, before: "", text: ", typed" }] }, "person");
+	remote.text = "From Google Docs\n";
+	remote.revision++;
+	await new Promise((r) => setTimeout(r, 60));
+	assert.equal(remote.text, "From Google Docs, typed\n");
+	const state = await s.value<{ text: string; changes: { by: string }[] }>("file.open", { path: made.path, client: "p" }, "person");
+	assert.equal(state.text, "From Google Docs, typed\n");
+	assert.deepEqual(state.changes.map((c) => c.by), ["google"]);
+	assert.equal((await s.call("google.link", { url: "not a doc" }, "person")).ok, false);
+	await s.close();
+});
+
+test("without the Docs API, list and link answer unavailable", async () => {
+	const s = await testServer({ features: [documents()] });
+	for (const [name, args] of [["google.list", {}], ["google.link", { url: "https://docs.google.com/document/d/x/edit" }]] as const) {
+		const answer = await s.call(name, args, "person");
+		assert.equal(answer.ok ? "ok" : answer.error.code, "unavailable", name);
+	}
+	await s.close();
+});

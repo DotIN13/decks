@@ -38,11 +38,11 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 export type Link = { id: string; mirror: DeckPath };
 
-/** Theirs merged into ours, both made from base; what theirs added that ours did not. */
+/** Theirs merged into ours, both made from base. At one spot, theirs (already saved) goes first. */
 export function merge3(base: string, theirs: string, ours: string): string {
 	if (theirs === base || theirs === ours) return ours;
 	if (ours === base) return theirs;
-	const moved = transformAll(diff(base, theirs), diff(base, ours), false).a;
+	const moved = transformAll(diff(base, theirs), diff(base, ours), true).a;
 	let text = ours;
 	for (const s of moved) text = applyAll(text, [s]) ?? text;
 	return text;
