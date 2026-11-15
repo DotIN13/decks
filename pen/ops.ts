@@ -134,39 +134,10 @@ function canonicalFills(node: PenNode): void {
 function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 	if (!op || typeof op !== "object" || typeof (op as { op?: unknown }).op !== "string") throw new PenError('each edit is an object with an "op": insert, update, replace, delete, move, copy or variables.');
 	switch (op.op) {
-		case "insert": {
-			if (!op.node || typeof op.node !== "object" || typeof op.node.type !== "string") throw new PenError('insert needs a node with a type, as in { op: "insert", node: { type: "note", content: "…" } }.');
-			const node = withIds(clone(op.node) as PenNode, ids(doc));
-			canonicalFills(node);
-			const siblings = childrenOf(doc, op.parent);
-			const at = clampIndex(op.index, siblings.length);
-			siblings.splice(at, 0, node);
-			/*
-			 * A new frame hugs what it holds, and the height its box gives is the least it is: `fit_content(h)`,
-			 * pen's own hug with a number (`layout.ts`). Only a plain number in the node's own `height` fixes it.
-			 * A frame that lays nothing out (`layout: "none"`), or that clips what it already holds, is a
-			 * scene, not a stack: its box is the picture's edge, and a hug would grow it round whatever runs
-			 * past that edge. An empty clipped column (the Frame tool's) still hugs, its box the floor.
-			 */
-			const holds = Array.isArray(op.node.children) && op.node.children.length > 0;
-			const scene = op.node.layout === "none" || (op.node.clip === true && holds);
-			const floor = node.type === "frame" && typeof op.node.height !== "number" && !scene;
-			const note = [op.box ? placeBox(doc, node.id, op.box, options, { floor }) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
-			return { op: "insert", id: node.id, ...(note ? { note } : {}) };
-		}
-		case "update": {
-			if (typeof op.id === "string" && op.id.includes("/")) return updateInside(doc, op.id, op.set ?? {}, op.box);
-			const found = located(doc, op.id);
-			for (const [key, value] of Object.entries(op.set ?? {})) {
-				if (key === "id") throw new PenError(`an id is how the item is found; to rename ${op.id}, replace it.`);
-				if (key === "children") throw new PenError("children are changed with insert, move and delete, not update.");
-				if (value === null) delete found.node[key];
-				else found.node[key] = clone(value);
-			}
-			canonicalFills(found.node);
-			const note = [op.box ? placeBox(doc, op.id, op.box, options) : undefined, unreadableColour(found.node)].filter(Boolean).join(" ");
-			return { op: "update", id: op.id, ...(note ? { note } : {}) };
-		}
+		case "insert":
+			return insertOp(doc, op, options);
+		case "update":
+			return updateOp(doc, op, options);
 		case "replace": {
 			if (!op.node || typeof op.node.type !== "string") throw new PenError("replace needs a node with a type.");
 			const found = located(doc, op.id);
@@ -198,39 +169,85 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 			const note = op.box ? placeBox(doc, op.id, op.box, options) : undefined;
 			return { op: "move", id: op.id, ...(note ? { note } : {}) };
 		}
-		case "copy": {
-			const found = located(doc, op.id);
-			const taken = ids(doc);
-			if (op.as !== undefined && (typeof op.as !== "string" || !op.as || op.as.includes("/") || taken.has(op.as))) throw new PenError(`"${String(op.as)}" cannot be the copy's id: it is taken, empty or contains "/".`);
-			const copy = freshIds(clone(found.node), taken, op.as);
-			const siblings = op.parent === undefined ? found.siblings : childrenOf(doc, op.parent);
-			const at = op.index === undefined ? (op.parent === undefined ? found.index + 1 : siblings.length) : clampIndex(op.index, siblings.length);
-			siblings.splice(at, 0, copy);
-			const note = op.box ? placeBox(doc, copy.id, op.box, options) : undefined;
-			return { op: "copy", id: copy.id, ...(note ? { note } : {}) };
-		}
-		case "variables": {
-			/*
-			 * The document's variables and theme axes, which no item holds: `$name` in a field reads
-			 * them, and a value can differ by theme — `{ value: "#1c1c1e", theme: { Mode: "Dark" } }`.
-			 */
-			if (!op.set || typeof op.set !== "object") throw new PenError('variables needs set: { "name": { type: "color", value: "#…" } }, or null to remove one.');
-			const vars = (doc.variables ??= {});
-			for (const [name, def] of Object.entries(op.set)) {
-				if (name.includes(":") || name.startsWith("$")) throw new PenError(`"${name}" cannot be a variable name: no colon, and no leading $ (that is how a field refers to it).`);
-				if (def === null) delete vars[name];
-				else {
-					if (!def || !["boolean", "color", "number", "string"].includes((def as PenVariable).type)) throw new PenError(`${name} needs a type: boolean, color, number or string.`);
-					vars[name] = clone(def);
-				}
-			}
-			if (op.themes === null) delete doc.themes;
-			else if (op.themes) doc.themes = clone(op.themes);
-			return { op: "variables", id: Object.keys(op.set).join(",") };
-		}
+		case "copy":
+			return copyOp(doc, op, options);
+		case "variables":
+			return variablesOp(doc, op);
 		default:
 			throw new PenError(`"${(op as { op: string }).op}" is not an edit: use insert, update, replace, delete, move, copy or variables.`);
 	}
+}
+
+
+/** A new item, with fresh ids, where the edit puts it; a new frame hugs what it holds, its box the floor. */
+function insertOp(doc: PenDocument, op: Extract<Op, { op: "insert" }>, options: ApplyOptions): OpResult {
+	if (!op.node || typeof op.node !== "object" || typeof op.node.type !== "string") throw new PenError('insert needs a node with a type, as in { op: "insert", node: { type: "note", content: "…" } }.');
+	const node = withIds(clone(op.node) as PenNode, ids(doc));
+	canonicalFills(node);
+	const siblings = childrenOf(doc, op.parent);
+	const at = clampIndex(op.index, siblings.length);
+	siblings.splice(at, 0, node);
+	/*
+	 * A new frame hugs what it holds, and the height its box gives is the least it is: `fit_content(h)`,
+	 * pen's own hug with a number (`layout.ts`). Only a plain number in the node's own `height` fixes it.
+	 * A frame that lays nothing out (`layout: "none"`), or that clips what it already holds, is a
+	 * scene, not a stack: its box is the picture's edge, and a hug would grow it round whatever runs
+	 * past that edge. An empty clipped column (the Frame tool's) still hugs, its box the floor.
+	 */
+	const holds = Array.isArray(op.node.children) && op.node.children.length > 0;
+	const scene = op.node.layout === "none" || (op.node.clip === true && holds);
+	const floor = node.type === "frame" && typeof op.node.height !== "number" && !scene;
+	const note = [op.box ? placeBox(doc, node.id, op.box, options, { floor }) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
+	return { op: "insert", id: node.id, ...(note ? { note } : {}) };
+}
+
+/** Fields of an item set or removed (null removes), then its box placed. */
+function updateOp(doc: PenDocument, op: Extract<Op, { op: "update" }>, options: ApplyOptions): OpResult {
+	if (typeof op.id === "string" && op.id.includes("/")) return updateInside(doc, op.id, op.set ?? {}, op.box);
+	const found = located(doc, op.id);
+	for (const [key, value] of Object.entries(op.set ?? {})) {
+		if (key === "id") throw new PenError(`an id is how the item is found; to rename ${op.id}, replace it.`);
+		if (key === "children") throw new PenError("children are changed with insert, move and delete, not update.");
+		if (value === null) delete found.node[key];
+		else found.node[key] = clone(value);
+	}
+	canonicalFills(found.node);
+	const note = [op.box ? placeBox(doc, op.id, op.box, options) : undefined, unreadableColour(found.node)].filter(Boolean).join(" ");
+	return { op: "update", id: op.id, ...(note ? { note } : {}) };
+}
+
+/** A copy of an item with fresh ids, after it or where the edit says. */
+function copyOp(doc: PenDocument, op: Extract<Op, { op: "copy" }>, options: ApplyOptions): OpResult {
+	const found = located(doc, op.id);
+	const taken = ids(doc);
+	if (op.as !== undefined && (typeof op.as !== "string" || !op.as || op.as.includes("/") || taken.has(op.as))) throw new PenError(`"${String(op.as)}" cannot be the copy's id: it is taken, empty or contains "/".`);
+	const copy = freshIds(clone(found.node), taken, op.as);
+	const siblings = op.parent === undefined ? found.siblings : childrenOf(doc, op.parent);
+	const at = op.index === undefined ? (op.parent === undefined ? found.index + 1 : siblings.length) : clampIndex(op.index, siblings.length);
+	siblings.splice(at, 0, copy);
+	const note = op.box ? placeBox(doc, copy.id, op.box, options) : undefined;
+	return { op: "copy", id: copy.id, ...(note ? { note } : {}) };
+}
+
+/** The document's variables and theme axes, set or removed. */
+function variablesOp(doc: PenDocument, op: Extract<Op, { op: "variables" }>): OpResult {
+	/*
+	 * The document's variables and theme axes, which no item holds: `$name` in a field reads
+	 * them, and a value can differ by theme — `{ value: "#1c1c1e", theme: { Mode: "Dark" } }`.
+	 */
+	if (!op.set || typeof op.set !== "object") throw new PenError('variables needs set: { "name": { type: "color", value: "#…" } }, or null to remove one.');
+	const vars = (doc.variables ??= {});
+	for (const [name, def] of Object.entries(op.set)) {
+		if (name.includes(":") || name.startsWith("$")) throw new PenError(`"${name}" cannot be a variable name: no colon, and no leading $ (that is how a field refers to it).`);
+		if (def === null) delete vars[name];
+		else {
+			if (!def || !["boolean", "color", "number", "string"].includes((def as PenVariable).type)) throw new PenError(`${name} needs a type: boolean, color, number or string.`);
+			vars[name] = clone(def);
+		}
+	}
+	if (op.themes === null) delete doc.themes;
+	else if (op.themes) doc.themes = clone(op.themes);
+	return { op: "variables", id: Object.keys(op.set).join(",") };
 }
 
 function located(doc: PenDocument, id: string) {
