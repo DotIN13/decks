@@ -1,0 +1,199 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+
+	/* --- what the agent did, inside its card ---------------------------------- */
+
+	/* --- tool calls ------------------------------------------------------------- */
+	.stream-tools {
+		display: flex;
+		flex-direction: column;
+		/* 2px, not 5: these are lines in a log, and a log's lines touch. The row's own 24px
+		   of height is what separates them, and the hover wash is what groups a line's words. */
+		gap: 2px;
+	}
+
+	.tool {
+		align-self: stretch;
+	}
+
+	/* No fill, no border, no radius at rest. */
+	.tool > .row {
+		display: flex;
+		width: 100%;
+		min-height: 24px;
+		align-items: center;
+		padding: 0 6px;
+		gap: 8px;
+		border: 0;
+		border-radius: var(--radius-thumb);
+		background: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+		transition: background-color 120ms ease;
+	}
+
+	/* A row with nothing behind it is not a control. It keeps the cursor it had before
+	   anything was clickable, and the chevron is absent rather than dimmed. */
+	.tool > .row:disabled {
+		cursor: default;
+	}
+
+	.tool > .row:hover:not(:disabled),
+	.tool > .row[data-open="true"] {
+		background: var(--line);
+	}
+
+	.tool > .row:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+
+	/* The status cell: 12px whatever is in it. */
+	.tool > .row > .state {
+		display: inline-flex;
+		width: 12px;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		color: var(--faint);
+	}
+
+	/* Done is a 5px dot, and it is deliberately the quietest thing in the row. */
+	.tool[data-state="done"] > .row > .state::before {
+		width: 5px;
+		height: 5px;
+		border-radius: var(--radius-pill);
+		background: var(--line-strong);
+		content: "";
+	}
+
+	/*
+	 * Running is a spinner, because the message is "not finished yet" and motion is the only way to
+	 * say that without words. It replaces a dot that pulsed amber, which read as a warning, and amber
+	 * means "waiting for you" everywhere else in this app.
+	 */
+	.tool[data-state="running"] > .row > .state::before {
+		width: 9px;
+		height: 9px;
+		box-sizing: border-box;
+		border: 1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+		border-top-color: var(--color-accent);
+		border-radius: var(--radius-pill);
+		animation: tool-spin 0.67s linear infinite;
+		content: "";
+	}
+
+	@keyframes tool-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tool[data-state="running"] > .row > .state::before {
+			animation-duration: 2s;
+		}
+	}
+
+	/* Failure gets a *shape*, not a colour, a triangle, drawn by the component. */
+	.tool[data-state="error"] > .row > .state {
+		color: var(--color-danger);
+	}
+
+	.tool[data-state="error"] > .row .title {
+		color: var(--color-danger);
+	}
+
+	/*
+	 * The name: an identifier, so mono, and uppercase, which is what stops a 10px word from reading as
+	 * the sentence rather than the label on it.
+	 */
+	.tool > .row .name {
+		overflow: hidden;
+		min-width: 0;
+		max-width: 42%;
+		flex: 0 1 auto;
+		color: var(--faint);
+		font-family: var(--font-mono);
+		font-size: var(--type-micro);
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		text-overflow: ellipsis;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	/* The description, the path, the command, the pattern. Arguments are code, so it keeps
+	   the mono face and gives up the weight; it is the widest thing in the row. */
+	.tool > .row .title {
+		overflow: hidden;
+		min-width: 0;
+		flex: 1;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: var(--type-note);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Pictures a call returned, which the output cannot show. Beside the chevron because it
+	   is a fact about the result rather than about the call. */
+	.tool > .row .imgs {
+		flex: none;
+		color: var(--faint);
+		font-size: var(--type-micro);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* At the right end, where a disclosure belongs: a column of them is something the eye can
+	   run down. Turned rather than swapped for a second glyph, this app's convention. */
+	.tool > .row .twisty {
+		flex: none;
+		color: var(--faint);
+		opacity: 0.5;
+		transition: transform 120ms ease;
+	}
+
+	.tool > .row[data-open="true"] .twisty {
+		transform: rotate(90deg);
+	}
+
+	/* What hangs off a row: the calls inside a group, and a call's own output. */
+	.tool-kids,
+	.tool > pre {
+		margin: 2px 0 4px 12px;
+		padding-left: 14px;
+		box-shadow: inset 1px 0 0 0 var(--line);
+	}
+
+	.tool-kids {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	/*
+	 * The output: the mono face and the indent are what mark it as somebody else's text, so it needs
+	 * no fill and no rule across the top, both of which it used to have, a third grey and a fourth
+	 * edge in a block that has one of each.
+	 */
+	.tool > pre {
+		max-height: 220px;
+		padding-top: 1px;
+		padding-bottom: 2px;
+		overflow: auto;
+		border: 0;
+		background: none;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: var(--type-hint);
+		line-height: 1.55;
+		overflow-wrap: anywhere;
+		/* Reserved whether or not this one scrolls, so an output that does and one that does
+		   not wrap at the same column. */
+		scrollbar-gutter: stable;
+		white-space: pre-wrap;
+	}
+}

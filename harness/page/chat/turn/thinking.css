@@ -1,0 +1,36 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+	.thinking {
+	align-self: flex-end;
+	max-width: 92%;
+	padding: 0 14px;
+	text-align: right;
+	color: var(--faint);
+	font-size: var(--type-ui);
+}
+	.thinking > button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline dotted;
+}
+	.thinking > .body {
+	margin-top: 4px;
+	padding-left: 8px;
+	border-left: 2px solid var(--line);
+	white-space: pre-wrap;
+}
+	/* The tool row's styles are in `styles/stream.css`, not here. */
+	/*
+ * Under a tool's output when only a preview of it arrived (`ToolChip`): the rest is on its
+ * way, or, if the call is no longer anywhere, this is all there is.
+ */
+.tool > .more {
+	margin: 4px 0 0;
+	font-size: var(--type-note);
+	color: var(--muted, #888);
+}
+}

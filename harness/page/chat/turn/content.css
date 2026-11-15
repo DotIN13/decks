@@ -1,0 +1,65 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+
+	/* Thinking: a disclosure, and quiet. Not addressed to the reader, and a card that showed
+	   it in full would be a card where the reply is the small part. */
+	.stream-thinking {
+		color: var(--faint);
+		font-size: var(--type-label);
+	}
+
+	.stream-thinking > button {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		font: inherit;
+		text-decoration: underline dotted;
+	}
+
+	.stream-thinking > button:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/* Bounded, and it scrolls. */
+	.stream-thinking > .body {
+		max-height: min(320px, 38vh);
+		margin-top: 4px;
+		padding-left: 8px;
+		overflow-y: auto;
+		border-left: 2px solid var(--line);
+		overscroll-behavior-y: contain;
+		white-space: pre-wrap;
+	}
+
+	/* A fenced block inside a card: a step deeper than the card it sits in, and never wider
+	   than it, a reply that pasted a 200-column log must not stretch the column. */
+	.stream-card .md pre {
+		overflow-x: auto;
+		margin: 0;
+		padding: 8px 10px;
+		border-radius: var(--radius-chip);
+		background: var(--bg-deep);
+		font-family: var(--font-mono);
+		font-size: var(--type-note);
+		white-space: pre;
+	}
+
+	/* The caret is gone, and with it its keyframes. */
+
+	/* A notice is a card too, a failure to launch is exactly the thing worth being able to
+	   scroll back to, but it is the quietest one. */
+	.stream-notice {
+		color: var(--muted);
+	}
+
+	.stream-notice[data-level="warn"] {
+		color: color-mix(in srgb, var(--color-warn) 70%, var(--fg));
+	}
+
+	.stream-notice[data-level="error"] {
+		color: var(--color-danger);
+	}
+}

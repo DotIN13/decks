@@ -1,0 +1,270 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+
+	/* The mark in motion is the runtime's own colour: Claude's orange, Pi's blue. */
+	svg[data-agent="claude"][data-busy] {
+		color: #d97757;
+	}
+
+	/*
+	 * Pi in the accent blue, which is a deliberate divergence: picone leaves its tiles as
+	 * `currentColor`.
+	 */
+	svg[data-agent="pi"][data-busy] {
+		color: var(--color-accent);
+	}
+
+	/* --- the four working marks (Pi's and Claude's ported from picone's own app stylesheet) --- */
+
+	/*
+	 * Pi builds. Ten character cells appear in reading order and fall away again, which is what a
+	 * terminal does while it draws: 55ms of stagger per cell in the markup, one 1.35s cycle here.
+	 */
+	.pi-tile {
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+
+	svg[data-agent][data-busy] .pi-tile {
+		animation: pi-build 1.35s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+	}
+
+	@keyframes pi-build {
+		0% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+
+		20%,
+		55% {
+			opacity: 1;
+			transform: scale(1);
+		}
+
+		78% {
+			opacity: 0.15;
+			transform: scale(0.55);
+		}
+
+		100% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+	}
+
+	/*
+	 * Claude cycles. Ten glyphs, `· ✢ ✳ ✶ ✻ ✽` and back down, stacked at the same point, each shown
+	 * for a tenth of the cycle by its own delay. `steps(1, end)` because a frame either is or is not:
+	 * interpolating opacity would cross-fade two asterisks into a blur that is neither.
+	 */
+	.claude-frame {
+		fill: currentColor;
+		font-family: var(--font-mono);
+		font-size: 20px;
+		dominant-baseline: central;
+		text-anchor: middle;
+		opacity: 0;
+		animation: claude-cycle 1800ms steps(1, end) infinite;
+	}
+
+	@keyframes claude-cycle {
+		0%,
+		9.999% {
+			opacity: 1;
+		}
+
+		10%,
+		100% {
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * opencode builds its own frame: four walls clockwise from the top, each growing out of the corner
+	 * it starts at, and then the block rising into the opening they have just drawn.
+	 */
+	.oc-wall,
+	.oc-fill {
+		transform-box: fill-box;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-top {
+		transform-origin: left center;
+		transform: scaleX(0);
+		animation: oc-draw-x 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-right {
+		transform-origin: center top;
+		transform: scaleY(0);
+		animation: oc-draw-y 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 180ms infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-bottom {
+		transform-origin: right center;
+		transform: scaleX(0);
+		animation: oc-draw-x 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 360ms infinite;
+	}
+
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-left {
+		transform-origin: center bottom;
+		transform: scaleY(0);
+		animation: oc-draw-y 1500ms cubic-bezier(0.22, 0.8, 0.3, 1) 540ms infinite;
+	}
+
+	@keyframes oc-draw-x {
+		0% {
+			transform: scaleX(0);
+		}
+
+		22%,
+		100% {
+			transform: scaleX(1);
+		}
+	}
+
+	@keyframes oc-draw-y {
+		0% {
+			transform: scaleY(0);
+		}
+
+		22%,
+		100% {
+			transform: scaleY(1);
+		}
+	}
+
+	/* The block, rising out of the bottom of the opening. */
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-fill {
+		transform: translateY(100%);
+		animation: oc-fill 1500ms cubic-bezier(0.3, 0.7, 0.2, 1) 560ms infinite;
+	}
+
+	@keyframes oc-fill {
+		0% {
+			transform: translateY(100%);
+		}
+
+		38%,
+		100% {
+			transform: translateY(0);
+		}
+	}
+
+	/* The finished mark holds, then fades to begin again: the reset is one animation on the
+	   group, so every part of it goes at once however late that part arrived. */
+	svg:is([data-agent="opencode"], [data-agent="opencode2"])[data-busy] .oc-cycle {
+		animation: oc-cycle 1500ms linear infinite;
+	}
+
+	@keyframes oc-cycle {
+		0% {
+			opacity: 0;
+		}
+
+		8%,
+		88% {
+			opacity: 1;
+		}
+
+		100% {
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * antigravity draws its own arch, along its own centreline, from the left foot to the right one,
+	 * the mask in the component is that line stroked wide, and this is the dash that walks it.
+	 */
+	svg[data-agent="antigravity"][data-busy] .ag-trace {
+		stroke-dasharray: 100;
+		animation: ag-draw 1600ms cubic-bezier(0.35, 0.1, 0.3, 1) infinite;
+	}
+
+	@keyframes ag-draw {
+		0% {
+			stroke-dashoffset: 100;
+		}
+
+		58%,
+		100% {
+			stroke-dashoffset: 0;
+		}
+	}
+
+	/* And then the one movement the name promises: up a unit, and settle. */
+	svg[data-agent="antigravity"][data-busy] .ag-cycle {
+		animation: ag-cycle 1600ms cubic-bezier(0.3, 0.7, 0.2, 1) infinite;
+	}
+
+	@keyframes ag-cycle {
+		0%,
+		58% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+
+		74% {
+			transform: translateY(-1.2px);
+			opacity: 1;
+		}
+
+		88% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+
+		100% {
+			transform: translateY(0);
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * Motion off, and the mark still *visible*, which is the trap picone hit and wrote down:
+	 * `animation: none` on an element whose first keyframe is `opacity: 0.08` leaves a ghost, and on
+	 * one that starts at 0 leaves nothing at all.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		svg[data-agent][data-busy] .pi-tile {
+			animation: none;
+			opacity: 1;
+			transform: none;
+		}
+
+		.claude-frame {
+			animation: none;
+			opacity: 0;
+		}
+
+		/* The widest of the ten, so a still sign is still a mark rather than a dot. */
+		.claude-frame:nth-child(6) {
+			opacity: 1;
+		}
+
+		/*
+		 * The two new marks stop *finished*: opencode as the whole frame with the block in the place the
+		 * symbol puts it, antigravity as the whole arch.
+		 */
+		svg[data-agent][data-busy] .oc-wall,
+		svg[data-agent][data-busy] .oc-fill {
+			animation: none;
+			transform: none;
+		}
+
+		svg[data-agent][data-busy] .oc-cycle,
+		svg[data-agent][data-busy] .ag-cycle {
+			animation: none;
+			opacity: 1;
+		}
+
+		svg[data-agent][data-busy] .ag-trace {
+			animation: none;
+			stroke-dashoffset: 0;
+		}
+
+		.stream {
+			translate: none;
+		}
+	}
+}

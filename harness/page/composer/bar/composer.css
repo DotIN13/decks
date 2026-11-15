@@ -1,0 +1,129 @@
+/* The composer: what sits under the input. */
+@layer components {
+	/* The same rules, under the same query. */
+	@media (pointer: coarse) {
+	.set-row .chip-button {
+		--control-md: 34px;
+	}
+}
+	/* A file dragged over the input bar: it will be copied into the deck and mentioned (`Composer`). */
+.composer-box[data-dropping="true"] {
+	outline: 2px dashed var(--accent, #3b82f6);
+	outline-offset: 2px;
+}
+
+	/*
+	 * A drawn item dragged over it from the canvas: dropping mentions it instead of moving it
+	 * (the canvas). The same mark as a file's, because it is the same promise, let go here and
+	 * this goes into what you are typing, and the two can never be up at once.
+	 */
+.composer-box[data-refer="true"] {
+	outline: 2px dashed var(--accent, #3b82f6);
+	outline-offset: 2px;
+}
+	/*
+	 * What you queued with Ctrl+Enter (`Composer`), as a tab on top of the box: one row per message,
+	 * in the order they will go, each with edit, send now and remove.
+	 */
+	.composer-queue {
+		margin: 0 14px;
+		padding: 4px 6px;
+		border: 1px solid var(--line-strong);
+		border-bottom: none;
+		border-radius: 14px 14px 0 0;
+		background: var(--panel);
+	}
+	.composer-queue-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 2px 6px 4px;
+		font-size: var(--type-note);
+		color: var(--muted);
+	}
+	.composer-queue-release {
+		font: inherit;
+		color: var(--color-accent);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+	}
+	.composer-queue-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 4px;
+		font-size: var(--type-ui);
+		color: var(--fg);
+	}
+	.composer-queue-n {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		font-size: var(--type-micro);
+		font-weight: 700;
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+	}
+	.composer-queue-text {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	/* The mic and what it shows while it records (`Composer`, `voice.ts`). */
+	.composer-mic[data-busy="true"] {
+		color: var(--color-accent);
+	}
+	/* While recording, the controls row is the recording's alone (`Composer`, voice). */
+	.composer-recording {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
+	.composer-recording .composer-wave {
+		flex: 1;
+		justify-content: center;
+		overflow: hidden;
+	}
+	.composer-live {
+		margin: 6px 2px 0;
+		font-size: var(--type-body, 15px);
+		line-height: 1.4;
+		color: var(--color-fg);
+	}
+	.composer-live-pending,
+	.composer-live-wait {
+		color: var(--color-muted);
+	}
+	.composer-wave {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		height: 22px;
+	}
+	.composer-wave > i {
+		display: block;
+		width: 3px;
+		border-radius: 2px;
+		background: var(--color-danger);
+	}
+	.composer-clock {
+		font-size: var(--type-note);
+		font-variant-numeric: tabular-nums;
+		color: var(--color-danger);
+	}
+	.send-button.composer-done {
+		background: var(--color-accent);
+		border-color: var(--color-accent);
+		color: #fff;
+	}
+}

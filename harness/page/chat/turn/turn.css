@@ -1,0 +1,109 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+	.stream-rw {
+		pointer-events: auto;
+	}
+
+	/* The menu the time machine opens. */
+
+	/*
+	 * A card: opaque, a hairline, one soft shadow, and the same 12px corner every other float in the
+	 * app has. A bubble rounder than the panels reads as a different program.
+	 */
+	/* `9px 11px 11px`, and the extra pixel at the foot is not a typo. */
+	.stream-card {
+		box-sizing: border-box;
+		padding: 9px 11px 11px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--fg);
+		/* The one surface in the chrome read in paragraphs rather than glanced at. */
+		font-size: var(--type-ui);
+		line-height: 1.5;
+		word-break: break-word;
+	}
+
+	/* Your own turn: narrower, right-aligned, tinted. */
+	.stream-mine {
+		--mine: var(--color-accent-soft);
+		--mine-fg: var(--color-grey-1100);
+		display: flex;
+		align-items: flex-start;
+		justify-content: flex-end;
+		gap: 6px;
+	}
+
+	/* The soft accent is a *light* tint; on the dark scheme it is a bright plate with light
+	   text on it. The dark value is the one the card drew rather than a mix of the light one,
+	   which came out either invisible or violet. */
+	[data-color-scheme="dark"] .stream-mine {
+		--mine: #2b3a63;
+		--mine-fg: var(--color-grey-100);
+	}
+
+	/* Your own turn, and the same asymmetry: see `.stream-card` above for the arithmetic. */
+	.stream-bubble {
+		box-sizing: border-box;
+		max-width: 88%;
+		padding: 8px 11px 10px;
+		/* A tint alone loses its edge over a light card, so the border is not decoration:
+		   it is what keeps the bubble a bubble when the thing behind it is white. */
+		border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--mine);
+		box-shadow: var(--shadow);
+		color: var(--mine-fg);
+		font-size: var(--type-ui);
+		line-height: 1.5;
+		/* Verbatim, so the line breaks you typed are the line breaks the agent was sent. */
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	/* The time machine, at the bubble's top-left and outside the tint. */
+	.stream-rw {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		margin-top: 4px;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-item);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		transition:
+			opacity 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-mine:hover .stream-rw,
+	.stream-mine:focus-within .stream-rw,
+	.stream-rw[data-open="true"] {
+		opacity: 1;
+	}
+
+	.stream-rw:hover {
+		color: var(--fg);
+	}
+
+	.stream-rw:focus-visible {
+		opacity: 1;
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* No hovering on a touchscreen, and this is the only route to the time machine, so it is
+	   simply there. After the rules above, so it wins. */
+	@media (pointer: coarse) {
+		.stream-rw {
+			opacity: 1;
+		}
+	}
+}

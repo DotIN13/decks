@@ -1,0 +1,100 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+
+	/* The working sign where the column shows it: a card, not a pill. */
+	.stream-working {
+		display: flex;
+		width: max-content;
+		max-width: 100%;
+		align-self: flex-end;
+		align-items: center;
+		gap: 7px;
+		color: var(--muted);
+		font-size: var(--type-ui);
+	}
+
+	/* The day boundary, in sentence case. */
+	.stream-day {
+		align-self: center;
+		padding: 2px 9px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-pill);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		font-size: var(--type-note);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+
+	/* The way back into the conversation, at the top of what is drawn. */
+	.stream-earlier {
+		align-self: center;
+		padding: 3px 11px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-pill);
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-note);
+		font-weight: 500;
+		pointer-events: auto;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-earlier:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-earlier:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* The way back to the foot, once you have read away from it. */
+	.stream-jump {
+		position: absolute;
+		bottom: var(--gutter);
+		left: 50%;
+		display: flex;
+		height: 26px;
+		align-items: center;
+		padding: 0 11px;
+		gap: 5px;
+		border: 1px solid var(--line);
+		border-radius: 13px;
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-note);
+		pointer-events: auto;
+		translate: -50% 0;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			opacity 160ms ease;
+	}
+	/* Hidden by opacity alone, never taken out of the page or restyled otherwise (`Stream.tsx`, the momentum of a scroll on iOS). */
+	.stream-jump[data-shown="false"] {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.stream-jump:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-jump:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+}

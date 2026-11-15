@@ -1,0 +1,139 @@
+/* Markdown, as the conversation renders it. */
+@layer components {
+	/* --- markdown inside a reply ------------------------------------------------- */
+.md {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+}
+	.md > * {
+	margin: 0;
+}
+	/* A paragraph keeps its own line breaks. */
+.md p,
+.md blockquote,
+.md li {
+	white-space: pre-wrap;
+}
+	/* Weight and size, not an outline entry, see the note in `MarkdownView.tsx` (`@decks/agent-ui`). */
+.md .md-h {
+	font-weight: 600;
+	line-height: 1.3;
+}
+	.md .md-h[data-level="1"] {
+	font-size: var(--type-title);
+}
+	.md .md-h[data-level="2"] {
+	font-size: var(--type-name);
+}
+	/* Three and deeper stop growing: below the body size a heading is just bold text, and in a
+   column this narrow that is all the distinction that survives anyway. */
+.md .md-h[data-level="3"],
+.md .md-h[data-level="4"],
+.md .md-h[data-level="5"],
+.md .md-h[data-level="6"] {
+	font-size: var(--type-body);
+}
+	/* A list stays a list, which takes two explicit statements here. */
+.md ul,
+.md ol {
+	padding-left: 1.3em;
+	list-style-position: outside;
+}
+	.md ul {
+	list-style-type: disc;
+}
+	.md ol {
+	list-style-type: decimal;
+}
+	/* A table, in a box of its own that scrolls. */
+.md .md-table {
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+}
+	/* `max-content`, so the table is the width it wants and the box above scrolls. */
+.md table {
+	width: max-content;
+	border-collapse: collapse;
+	font-size: var(--type-label);
+	line-height: 1.45;
+}
+	/* Cells wrap, with a floor. */
+/* A ceiling, so "natural width" stays a width and not a paragraph on one line. */
+.md :is(th, td) {
+	min-width: 56px;
+	max-width: 280px;
+	padding: 3px 8px;
+	border: 1px solid var(--line);
+	/* Undone, not merely unset: `.stream-card` sets it for prose and it inherits in here. */
+	word-break: normal;
+	text-align: left;
+	vertical-align: top;
+	overflow-wrap: break-word;
+}
+	.md th {
+	background: var(--bg-deep);
+	font-weight: 600;
+}
+	/* A nested bullet gets its own mark as well as its own indent, so two levels read as two. */
+.md ul li[data-depth="1"] {
+	list-style-type: circle;
+}
+	.md ul li[data-depth="2"],
+.md ul li[data-depth="3"] {
+	list-style-type: square;
+}
+	.md li + li {
+	margin-top: 3px;
+}
+	/* Nesting is an indent, because the parser flattens it (`markdown.ts`). */
+.md li[data-depth="1"] {
+	margin-left: 1.1em;
+}
+	.md li[data-depth="2"] {
+	margin-left: 2.2em;
+}
+	.md li[data-depth="3"] {
+	margin-left: 3.3em;
+}
+	.md li::marker {
+	color: var(--faint);
+}
+	.md blockquote {
+	padding-left: 9px;
+	border-left: 2px solid var(--line-strong);
+	color: var(--muted);
+}
+	/* `--line-strong`, not `--line`: inside a bubble the quieter one is nearly invisible, and
+   a rule nobody can see is a block the reply wrote for nothing. */
+.md hr {
+	height: 0;
+	border: 0;
+	border-top: 1px solid var(--line-strong);
+}
+	/* Inline code, as against a fenced block: a tint, not a pane. */
+.md code {
+	padding: 1px 4px;
+	border-radius: var(--radius-thumb);
+	background: color-mix(in oklab, var(--fg) 9%, transparent);
+	font-family: var(--font-mono);
+	font-size: var(--type-ui);
+	word-break: break-word;
+}
+	.md a {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: color-mix(in oklab, currentcolor 45%, transparent);
+	text-underline-offset: 2px;
+}
+	.md a:hover {
+	text-decoration-color: currentcolor;
+}
+	.md strong {
+	font-weight: 650;
+}
+	.md s {
+	opacity: 0.65;
+}
+}

@@ -1,0 +1,45 @@
+/* The conversation's rules, in their cascade order: index.css imports these sheets one after another. */
+@layer components {
+
+	/* --- the status line, over the input bar ---------------------------------- */
+
+	/*
+	 * Painted like a row of the history, the same hairline, the same shadow, a 14px corner, * because that is what it stands in for while the history is away. And it is a button: the
+	 * one thing to do about "it is working" is go and watch.
+	 */
+	.statusline {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		padding: 0 11px 0 9px;
+		gap: 7px;
+		border: 1px solid var(--line);
+		border-radius: var(--row-radius);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-ui);
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.statusline:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.statusline:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* The mark, nudged a pixel down, which is the difference between centred and *looking* centred. */
+	.statusline .mark,
+	.stream-working .mark {
+		flex: none;
+		translate: 0 1px;
+	}
+}

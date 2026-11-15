@@ -1,0 +1,98 @@
+/* The conversation, floating: the shapes the column and its cards spell the same way. */
+@layer components {
+	/* A column of cards over the canvas, and not a panel. */
+	.stream {
+		/* The gutter the cards' shadows live in, counted into the column's own box. */
+		--gutter: 24px;
+		position: absolute;
+		z-index: var(--z-conversation);
+		top: calc(64px - var(--gutter));
+		right: calc(12px - var(--gutter));
+		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + max(12px, env(safe-area-inset-bottom)) - 12px);
+		display: flex;
+		box-sizing: border-box;
+		width: calc(320px + 2 * var(--gutter));
+		max-width: 100vw;
+		flex-direction: column;
+		justify-content: flex-end;
+		opacity: 0;
+		pointer-events: none;
+		/* Opacity and an 8px slide, on the cards rather than on a panel, there is no panel
+		   to slide. The column has no paint of its own, so moving it *is* moving them. */
+		translate: 0 8px;
+		transition:
+			opacity 160ms ease,
+			translate 160ms ease;
+	}
+
+	/* `none`, not `0 0`, and this one is a trap worth naming. */
+	.stream[data-shown="true"] {
+		opacity: 1;
+		translate: none;
+	}
+
+	/* Away, it is not there at all: an invisible surface that ate the wheel would be a canvas
+	   that had stopped working for no visible reason. */
+	.stream:not([data-shown="true"]) {
+		visibility: hidden;
+	}
+
+	/* `.stream-head` is gone: the column has no × of its own. */
+
+	.stream-roll {
+		position: relative;
+		display: flex;
+		/* Content-sized until there is more than fits, which is what the column above needs. */
+		flex: 0 1 auto;
+		flex-direction: column;
+		/* The only gap in the column, and it is a click-through target for a pointer. */
+		--roll-gap: 10px;
+		gap: var(--roll-gap);
+		padding: var(--gutter);
+		overflow-y: auto;
+		/* The column keeps its own place (`Stream.tsx`): the browser's anchoring moved it under changed content. */
+		overflow-anchor: none;
+		overscroll-behavior: contain;
+		/*
+		 * No scrollbar. The column is a stack of objects over a canvas rather than a pane, and a track
+		 * drawn down the inside of it would be the one straight edge in a surface whose whole argument is
+		 * that it does not have one.
+		 */
+		scrollbar-width: none;
+	}
+
+	.stream-roll::-webkit-scrollbar {
+		display: none;
+	}
+
+	/*
+	 * The column overflows by design, that is what scrolling is for, and a flex column shrinks its
+	 * children to try to avoid it.
+	 */
+	.stream-roll > * {
+		flex: 0 0 auto;
+	}
+
+	/*
+	 * The two ends the column's observers watch (`Stream.tsx`): empty rows that take no room, the gap
+	 * beside each given back, so the column is laid out as if they were not there.
+	 */
+	.stream-roll > .stream-edge {
+		height: 1px;
+		pointer-events: none;
+	}
+	.stream-roll > .stream-edge:first-child {
+		margin-bottom: calc(-1 * var(--roll-gap) - 1px);
+	}
+	.stream-roll > .stream-edge:last-child {
+		margin-top: calc(-1 * var(--roll-gap) - 1px);
+	}
+	/* Focusable to scroll by keys; the focus is shown only when keys took it there. */
+	.stream-roll:focus:not(:focus-visible) {
+		outline: none;
+	}
+
+	/* Only the painted things take the pointer. */
+	.stream-card,
+	.stream-bubble,
+}
