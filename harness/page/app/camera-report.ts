@@ -2,7 +2,7 @@ import type { Camera } from "../state/types/index.ts";
 import { canvasBox } from "@decks/canvas/camera";
 import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
-import { call } from "../state/line.ts";
+import { callOnLine } from "../state/line.ts";
 import { deviceId } from "../state/device.ts";
 import { stageOf } from "../state/canvases.ts";
 
@@ -41,7 +41,7 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
 	const stage = stageOf(agentId)?.name;
-	void call("view.move", { x: sized.x, y: sized.y, zoom: sized.zoom, agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId });
+	void callOnLine("view.move", { x: sized.x, y: sized.y, zoom: sized.zoom, agent: agentId, ...(stage ? { canvas: stage } : {}), device: deviceId });
 }
 
 /**

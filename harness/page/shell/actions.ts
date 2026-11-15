@@ -17,6 +17,10 @@ import { createCameraLanding, reportCameraOnArrival } from "../app/landing.ts";
 import { createFraming } from "../app/links.ts";
 import { createPills } from "../app/pills.ts";
 import { installViewport } from "../app/viewport.ts";
+import { answerViews } from "../app/view-requests.ts";
+import { rememberView } from "../app/remember-view.ts";
+import { moveConversation } from "../canvases/actions.ts";
+import { canvasItems } from "@decks/canvas/tools";
 import { can } from "../connections/backend.ts";
 import { createFileDrops } from "../files/index.ts";
 import { scheme } from "../lib/theme.ts";
@@ -180,6 +184,7 @@ export function createPage() {
 	const [findAt, setFindAt] = createSignal(0);
 	wireBrowser({ files, editorHandle, park: landing.park, find: setFindAt });
 	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => stageOf(id)?.name, state.focused));
+	onMount(() => onCleanup(answerViews({ editor: editorHandle, boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
 	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyStage, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
 }
 

@@ -1,9 +1,9 @@
-import { clientFor, DecksError, type Client, type Heard, type Stream, type Typed } from "@decks-next/sdk/browser";
+import { clientFor, DecksError, Line, type Client, type Heard, type Typed } from "@decks-next/sdk/browser";
 import { batch } from "solid-js";
 
 // The page's one line to the server: every call through @decks-next/sdk, and
-// one event stream, handed to listeners by name in one batch per paint. The
-// harness's calls go through the same door; the server passes them on.
+// one socket (the sdk's Line) for the events, handed to listeners by name in
+// one batch per paint, and for the calls tied to this screen (view.move).
 
 export type Answer<T = unknown> = { ok: true; value: T; notes: string[] } | { ok: false; error: string; code: string; notes: string[] };
 type Hear = (payload: Record<string, unknown>, name: string) => void;
@@ -11,7 +11,7 @@ type Hear = (payload: Record<string, unknown>, name: string) => void;
 /** The page's address book: who it is and how it calls. Not reactive; `connected` in state/deck is. */
 const line = {
 	client: undefined as Client | undefined,
-	stream: undefined as Stream | undefined,
+	socket: undefined as Line | undefined,
 	stopped: false,
 	attempt: 0,
 	hearers: new Map<string, Set<Hear>>(),
@@ -49,18 +49,34 @@ export async function start(onUp: (up: boolean) => void): Promise<Client> {
 function listen(): void {
 	const client = line.client;
 	if (!client || line.stopped || !client.token) return;
-	const stream = client.events(arrive);
-	line.stream = stream;
-	queueMicrotask(() => {
-		line.attempt = 0;
-		line.up(true);
-	});
-	const again = () => {
-		if (line.stopped || line.stream !== stream) return;
+	const socket = new Line(client.url, client.token);
+	line.socket = socket;
+	socket.on(arrive);
+	socket.caller.then(
+		() => {
+			socket.watch();
+			line.attempt = 0;
+			line.up(true);
+		},
+		() => {},
+	);
+	void socket.closed.then(() => {
+		if (line.stopped || line.socket !== socket) return;
 		line.up(false);
 		window.setTimeout(listen, Math.min(2000, 150 * 2 ** line.attempt++));
-	};
-	stream.done.then(again, again);
+	});
+}
+
+/** A call on this page's socket, for what is tied to this screen (view.move registers it). Never throws. */
+export async function callOnLine<T = unknown>(name: string, args: unknown = {}): Promise<Answer<T>> {
+	if (!line.socket) return call<T>(name, args);
+	try {
+		const answered = await line.socket.call(name, args);
+		return { ok: true, value: answered.value as T, notes: answered.notes };
+	} catch (error) {
+		const refusal = error instanceof DecksError ? error : undefined;
+		return { ok: false, error: (error as Error).message, code: refusal?.code ?? "unavailable", notes: refusal?.notes ?? [] };
+	}
 }
 
 function arrive(event: Heard): void {
@@ -115,8 +131,8 @@ export const token = (): string | undefined => line.client?.token;
 /** Close the line for good. */
 export function stop(): void {
 	line.stopped = true;
-	line.stream?.stop();
-	line.stream = undefined;
+	line.socket?.close();
+	line.socket = undefined;
 	line.client = undefined;
 }
 
