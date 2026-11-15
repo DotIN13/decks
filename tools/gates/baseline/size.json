@@ -58,8 +58,6 @@
 	"canvas/view/items-layer.tsx: function createItemsLayer over 80 lines": 1,
 	"canvas/view/selection.tsx: function createSelection over 80 lines": 1,
 	"canvas/view/selection.tsx: function pills over 80 lines": 1,
-	"engine/crates/paint/src/painter.rs: over 1000 lines": 1,
-	"engine/crates/web/src/bind.rs: over 1000 lines": 1,
 	"harness/accounts/accounts.ts: over 1000 lines": 1,
 	"harness/page/agents/AgentEdit.tsx: function AgentEdit over 80 lines": 1,
 	"harness/page/agents/AgentHoverCard.tsx: function AgentHoverCard over 80 lines": 1,
