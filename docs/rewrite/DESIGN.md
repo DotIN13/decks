@@ -329,11 +329,12 @@ An app's source may live outside the deck, as long as the deck knows where it is
   the kind and the commands. The record may carry `source: { path, repo? }`: a folder on this machine,
   and the git address it can be cloned from. With no `source`, the source is the folder the record sits
   in, as today, so every existing deck keeps working.
-- **The file calls reach an app's source wherever it is.** A path under the app's name in the deck's
-  apps folder resolves to the source folder: the kernel's deck takes a mount for it. So the calls stay
-  complete without the disk, and an agent on the iPad edits an app the same way.
+- **The file calls stay inside the deck.** They never reach a folder outside it, an app's source
+  included: there is no mount. An app or any other file outside the deck is edited directly, on disk,
+  by whoever has the disk. So "complete without the disk" holds for everything in the deck, and an app
+  kept outside it is, by the person's choice, not editable by a client that has no disk.
 - **Only the person may point the deck at a folder outside it.** An agent, an app or a card cannot set or
-  change `source.path`: that would let a call reach any folder on the machine. A path into the deck's
+  change `source.path`: the server runs an app's install, build and start commands in that folder. A path into the deck's
   own hidden folders, a home folder itself or a system folder is refused.
 - **An outside app builds and runs where it is**, like any project: its `node_modules`, its build and its
   data sit beside its source, and its own git is its history. An app whose source is in the deck builds
