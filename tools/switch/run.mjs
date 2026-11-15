@@ -128,7 +128,8 @@ export function ciFile(text) {
 	};
 	swap(text.slice(text.indexOf("      # **The cascade gate, on its own line"), text.indexOf("      # **Three more gates")), "");
 	swap("      # **Three more gates, each its own line for the same reason.** An exported symbol nothing\n      # references, a class no markup writes, and a comment naming a file that no longer exists are\n      # the three kinds of residue a reorganization leaves behind and a reader pays for; typecheck\n      # and the tests are blind to all three. `scripts/dead-exports.mjs`, `dead-css.mjs` and\n      # `stale-paths.mjs` each exit 1 naming what they found.", "      # **The gates, on their own line.** The thirteen rules of tools/gates (sizes, names, imports,\n      # comments, the page's style order, residue such as a dead export or a stale file name and the\n      # rest), each against its baseline; typecheck and the tests are blind to all of them.");
-	swap("      # One command over every workspace: the two apps, the protocol, the board vocabulary,\n      # the runtime assets, the extension and the browser checks.", "      # One command over every workspace: the protocol, Decks-local, the harness and its page,\n      # the clients, the tools, and the libraries still in packages/.");
+	const from = text.indexOf("      # One command over every workspace:");
+	swap(text.slice(from, text.indexOf("the browser checks.", from) + "the browser checks.".length), "      # One command over every workspace: the protocol, Decks-local, the harness and its page,\n      # the clients, the tools, and the libraries still in packages/.");
 	return text;
 }
 
