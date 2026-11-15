@@ -47,6 +47,7 @@ test("old arguments in order become the new call's, options spread", () => {
 	const step = turn("canvas.step", ["redo"]);
 	assert.ok(!("refusal" in step) && step.name === "canvas.undo" && step.args.redo === true);
 	assert.deepEqual(answerBack("canvas.space", { x: 3, y: 4 }), { x1: 3, y1: 4 });
+	assert.deepEqual(answerBack("canvas.fit", { card: "c", canvas: "x", box: { x1: 10, y1: 0, x2: 490, y2: 681 } }), { card: "c", canvas: "x", box: { x1: 10, y1: 0, x2: 490, y2: 681 }, w: 480, h: 681 });
 	assert.equal((answerBack("canvas.export", { path: "exports/a.html", size: 3 }) as { file: string }).file, "exports/a.html");
 	const app = answerBack("apps.create", { name: "e2e-notes", status: "stopped" }) as { item: unknown; next: string };
 	assert.deepEqual(app.item, { type: "app", app: "e2e-notes" });
