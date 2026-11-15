@@ -11,6 +11,22 @@ const colour = (value: unknown) => (typeof value === "string" && /^#[0-9a-f]{3,8
 const quote = (text: string) => `"${text.replace(/["\\\n]/g, " ")}"`;
 const target = (id: string) => `[data-pen-id="${id.replace(/"/g, "")}"]`;
 
+/** The marks for every item in the tree, as one stylesheet. */
+export function marks(nodes: PenNode[], writer: Writer | undefined): string {
+	const out: string[] = [];
+	const walk = (node: PenNode) => {
+		const meta = node.metadata as { type?: unknown } | undefined;
+		if (node.type === "browser" && meta?.type === "decks.card") {
+			const css = cardFrame(node);
+			if (css) out.push(css);
+		}
+		if (node.type === "frame" && node.placeholder === true) out.push(placeholderMark(node, writer));
+		for (const child of (node.children as PenNode[] | undefined) ?? []) walk(child);
+	};
+	for (const node of nodes) walk(node);
+	return out.join("\n");
+}
+
 /** A card's own frame: its corner, an outline by its alignment, and its shadows. */
 export function cardFrame(node: PenNode): string | undefined {
 	const parts: string[] = [];
@@ -40,18 +56,3 @@ export function placeholderMark(node: PenNode, writer: Writer | undefined): stri
 	return `${edge}\n${at}::before { content: ${quote(name)}; position: absolute; left: 6px; top: 6px; padding: 3px 6px; border-radius: 4px; background: ${c}; color: #fff; font: 600 12px Inter, system-ui, sans-serif; z-index: 3; }`;
 }
 
-/** The marks for every item in the tree, as one stylesheet. */
-export function marks(nodes: PenNode[], writer: Writer | undefined): string {
-	const out: string[] = [];
-	const walk = (node: PenNode) => {
-		const meta = node.metadata as { type?: unknown } | undefined;
-		if (node.type === "browser" && meta?.type === "decks.card") {
-			const css = cardFrame(node);
-			if (css) out.push(css);
-		}
-		if (node.type === "frame" && node.placeholder === true) out.push(placeholderMark(node, writer));
-		for (const child of (node.children as PenNode[] | undefined) ?? []) walk(child);
-	};
-	for (const node of nodes) walk(node);
-	return out.join("\n");
-}

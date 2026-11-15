@@ -21,10 +21,63 @@ const LATIN = /^[\u0000-ÿıŒœʻʼˆ˚˜̩̄̈ -⁯€™↑↓−∕﻿�]
 const LATIN_EXT = /^[Ā-ɏḀ-ỿ]$/u;
 
 export type NativeArgs = { canvas: string; text: string; box: Box; factor: number; scheme: "light" | "dark"; format: "png" | "jpeg"; writer?: Writer; cardPicture: (card: string, px: number) => Promise<Bytes> };
+
 export type NativeTaken = { bytes: Bytes } | { why: string };
 
+// Drawing a box natively, round by round.
+/** Draw the box natively; the picture's bytes, or why not. */
+export async function drawNatively(ctx: Context, native: Native, args: NativeArgs): Promise<NativeTaken> {
+	const dir = join(tmpdir(), "decks-native-shots", randomUUID());
+	await mkdir(dir, { recursive: true });
+	try {
+		const out = join(dir, `out.${args.format === "jpeg" ? "jpg" : "png"}`);
+		const width = Math.round((args.box.x2 - args.box.x1) * args.factor);
+		const height = Math.round((args.box.y2 - args.box.y1) * args.factor);
+		const base = { doc: args.text, dark: args.scheme === "dark", box: [args.box.x1, args.box.y1, args.box.x2, args.box.y2], scale: args.factor, width, height, paper: PAPER[args.scheme], cards: await cardsIn(ctx, args, dir), out, format: args.format, quality: 90, ...(args.writer ? { writer: args.writer } : {}) };
+		const asked = await native.ask({ ...base, fontNeeds: true });
+		if (!asked.ok) return { why: `the native tool failed: ${asked.error}` };
+		const files = fontFiles(asked.fontNeeds ?? []);
+		if ("why" in files) return files;
+		const fonts = [];
+		for (const file of files) {
+			const path = await fontPath(file);
+			if (path) fonts.push({ key: file.key, family: file.family, path, fallback: false });
+		}
+		let more: Record<string, unknown> = { fonts };
+		for (let n = 0; n < ROUNDS; n++) {
+			const answer = await native.ask({ ...base, ...more });
+			if (!answer.ok) return { why: `the native tool failed: ${answer.error}` };
+			if (answer.problems?.length) return { why: `a picture in the box cannot be drawn here (${answer.problems.join("; ")})` };
+			if (answer.file) return { bytes: new Uint8Array(await readFile(answer.file)) };
+			const next = await handover(ctx, args, answer, dir);
+			if ("why" in next) return next as { why: string };
+			more = next;
+		}
+		return { why: "the native tool kept asking for more" };
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+}
+
+// Each card as its picture.
+async function cardsIn(ctx: Context, args: NativeArgs, dir: string): Promise<{ x: number; y: number; w: number; h: number; picture: string }[]> {
+	const out = [];
+	const b = args.box;
+	for (const item of ctx.canvas(args.canvas).read()) {
+		const c = item.box;
+		if (item.type !== "card" || !c || c.x1 >= b.x2 || c.x2 <= b.x1 || c.y1 >= b.y2 || c.y2 <= b.y1) continue;
+		const picture = join(dir, `${randomUUID()}.jpg`);
+		await writeFile(picture, await args.cardPicture(String(item.card), (c.x2 - c.x1) * args.factor));
+		out.push({ x: c.x1, y: c.y1, w: c.x2 - c.x1, h: c.y2 - c.y1, picture });
+	}
+	return out;
+}
+
+// The font files the words need.
 type FontFile = { key: string; family: string; urls: string[] };
+
 const id = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
+
 const round = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
 
 /** The font files a set of needs takes, or the first character no Latin file draws. */
@@ -62,6 +115,22 @@ async function fontPath(file: FontFile): Promise<string | undefined> {
 	return undefined;
 }
 
+// What the tool asks for: pictures; maths, markdown cards and icons are the browser's.
+/** Answer the tool's needs for one more round, or say why it cannot be drawn natively. */
+async function handover(ctx: Context, args: NativeArgs, answer: Answer, dir: string): Promise<Record<string, unknown> | { why: string }> {
+	const needs = answer.needs ?? { cards: [], pictures: [], icons: [], math: [] };
+	if (needs.math.length) return { why: "the box has maths, which the browser typesets" };
+	if (needs.cards.length) return { why: "the box has markdown cards, which the browser lays out" };
+	if (needs.icons.length) return { why: "the box has icons, which the browser draws" };
+	const pictures = [];
+	for (const url of needs.pictures) {
+		const path = await pictureFile(ctx, args.canvas, url, dir);
+		if (!path) return { why: `a picture in the box cannot be loaded (${url.slice(0, 80)})` };
+		pictures.push({ url, path });
+	}
+	return pictures.length ? { pictures } : { why: "the native tool asked for nothing it could be given" };
+}
+
 /** A picture the drawing names, as a file the tool can read: from the deck, a data address or the web. */
 async function pictureFile(ctx: Context, canvas: string, url: string, dir: string): Promise<string | undefined> {
 	let bytes: Uint8Array | undefined;
@@ -81,64 +150,3 @@ async function pictureFile(ctx: Context, canvas: string, url: string, dir: strin
 	return path;
 }
 
-async function cardsIn(ctx: Context, args: NativeArgs, dir: string): Promise<{ x: number; y: number; w: number; h: number; picture: string }[]> {
-	const out = [];
-	const b = args.box;
-	for (const item of ctx.canvas(args.canvas).read()) {
-		const c = item.box;
-		if (item.type !== "card" || !c || c.x1 >= b.x2 || c.x2 <= b.x1 || c.y1 >= b.y2 || c.y2 <= b.y1) continue;
-		const picture = join(dir, `${randomUUID()}.jpg`);
-		await writeFile(picture, await args.cardPicture(String(item.card), (c.x2 - c.x1) * args.factor));
-		out.push({ x: c.x1, y: c.y1, w: c.x2 - c.x1, h: c.y2 - c.y1, picture });
-	}
-	return out;
-}
-
-/** Answer the tool's needs for one more round, or say why it cannot be drawn natively. */
-async function handover(ctx: Context, args: NativeArgs, answer: Answer, dir: string): Promise<Record<string, unknown> | { why: string }> {
-	const needs = answer.needs ?? { cards: [], pictures: [], icons: [], math: [] };
-	if (needs.math.length) return { why: "the box has maths, which the browser typesets" };
-	if (needs.cards.length) return { why: "the box has markdown cards, which the browser lays out" };
-	if (needs.icons.length) return { why: "the box has icons, which the browser draws" };
-	const pictures = [];
-	for (const url of needs.pictures) {
-		const path = await pictureFile(ctx, args.canvas, url, dir);
-		if (!path) return { why: `a picture in the box cannot be loaded (${url.slice(0, 80)})` };
-		pictures.push({ url, path });
-	}
-	return pictures.length ? { pictures } : { why: "the native tool asked for nothing it could be given" };
-}
-
-/** Draw the box natively; the picture's bytes, or why not. */
-export async function drawNatively(ctx: Context, native: Native, args: NativeArgs): Promise<NativeTaken> {
-	const dir = join(tmpdir(), "decks-native-shots", randomUUID());
-	await mkdir(dir, { recursive: true });
-	try {
-		const out = join(dir, `out.${args.format === "jpeg" ? "jpg" : "png"}`);
-		const width = Math.round((args.box.x2 - args.box.x1) * args.factor);
-		const height = Math.round((args.box.y2 - args.box.y1) * args.factor);
-		const base = { doc: args.text, dark: args.scheme === "dark", box: [args.box.x1, args.box.y1, args.box.x2, args.box.y2], scale: args.factor, width, height, paper: PAPER[args.scheme], cards: await cardsIn(ctx, args, dir), out, format: args.format, quality: 90, ...(args.writer ? { writer: args.writer } : {}) };
-		const asked = await native.ask({ ...base, fontNeeds: true });
-		if (!asked.ok) return { why: `the native tool failed: ${asked.error}` };
-		const files = fontFiles(asked.fontNeeds ?? []);
-		if ("why" in files) return files;
-		const fonts = [];
-		for (const file of files) {
-			const path = await fontPath(file);
-			if (path) fonts.push({ key: file.key, family: file.family, path, fallback: false });
-		}
-		let more: Record<string, unknown> = { fonts };
-		for (let n = 0; n < ROUNDS; n++) {
-			const answer = await native.ask({ ...base, ...more });
-			if (!answer.ok) return { why: `the native tool failed: ${answer.error}` };
-			if (answer.problems?.length) return { why: `a picture in the box cannot be drawn here (${answer.problems.join("; ")})` };
-			if (answer.file) return { bytes: new Uint8Array(await readFile(answer.file)) };
-			const next = await handover(ctx, args, answer, dir);
-			if ("why" in next) return next as { why: string };
-			more = next;
-		}
-		return { why: "the native tool kept asking for more" };
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-}

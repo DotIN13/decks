@@ -15,19 +15,6 @@ const run = promisify(execFile);
 
 export type Level = { width: number; height: number; rgba: Uint8Array };
 
-/** The astcenc binary for this machine, or undefined when none is installed. */
-export function encoder(): string | undefined {
-	try {
-		const require = createRequire(import.meta.url);
-		const pkg = require.resolve(`@astcenc/${process.platform}-${process.arch}/package.json`);
-		const bin = (require(pkg) as { bin?: string | Record<string, string> }).bin;
-		const path = typeof bin === "string" ? bin : bin ? Object.values(bin)[0] : undefined;
-		return path ? join(dirname(pkg), path) : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 /** The levels a browser page makes from a picture: the first a multiple of 16 each way, then halves. */
 export const LEVELS = `async (b64) => {
 	const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -49,6 +36,38 @@ export const LEVELS = `async (b64) => {
 		bitmap = await createImageBitmap(bitmap, { resizeWidth: width, resizeHeight: height, resizeQuality: "high" });
 	}
 }`;
+
+/** Every level encoded, packed in one file. */
+export async function compress(levels: Level[], binary = encoder()): Promise<Uint8Array> {
+	if (!binary) throw new Error("no astcenc for this machine");
+	const dir = await mkdtemp(join(tmpdir(), "decks-astc-"));
+	try {
+		const blocks: Uint8Array[] = [];
+		for (const [n, level] of levels.entries()) {
+			const input = join(dir, `${n}.tga`);
+			const output = join(dir, `${n}.astc`);
+			await writeFile(input, tga(level));
+			await run(binary, ["-cl", input, output, "4x4", "-medium", "-silent"], { timeout: 60_000 });
+			blocks.push(new Uint8Array((await readFile(output)).subarray(16)));
+		}
+		return pack(levels, blocks);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+}
+
+/** The astcenc binary for this machine, or undefined when none is installed. */
+export function encoder(): string | undefined {
+	try {
+		const require = createRequire(import.meta.url);
+		const pkg = require.resolve(`@astcenc/${process.platform}-${process.arch}/package.json`);
+		const bin = (require(pkg) as { bin?: string | Record<string, string> }).bin;
+		const path = typeof bin === "string" ? bin : bin ? Object.values(bin)[0] : undefined;
+		return path ? join(dirname(pkg), path) : undefined;
+	} catch {
+		return undefined;
+	}
+}
 
 /** A TGA of one level, which astcenc reads: BGRA, 8 bits of alpha, rows from the top. */
 function tga(level: Level): Buffer {
@@ -79,21 +98,3 @@ export function pack(levels: Level[], blocks: Uint8Array[]): Uint8Array {
 	return new Uint8Array(Buffer.concat([head, ...blocks]));
 }
 
-/** Every level encoded, packed in one file. */
-export async function compress(levels: Level[], binary = encoder()): Promise<Uint8Array> {
-	if (!binary) throw new Error("no astcenc for this machine");
-	const dir = await mkdtemp(join(tmpdir(), "decks-astc-"));
-	try {
-		const blocks: Uint8Array[] = [];
-		for (const [n, level] of levels.entries()) {
-			const input = join(dir, `${n}.tga`);
-			const output = join(dir, `${n}.astc`);
-			await writeFile(input, tga(level));
-			await run(binary, ["-cl", input, output, "4x4", "-medium", "-silent"], { timeout: 60_000 });
-			blocks.push(new Uint8Array((await readFile(output)).subarray(16)));
-		}
-		return pack(levels, blocks);
-	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-}

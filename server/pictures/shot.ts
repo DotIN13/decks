@@ -15,6 +15,19 @@ export type ShotArgs = { of?: Of; scale?: number; format?: "png" | "jpeg" | "pdf
 const decoder = new TextDecoder();
 const extOf = (format: string) => (format === "jpeg" ? "jpg" : format);
 
+export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
+
+// Keeping the picture in the deck.
+/** Take the picture, keep it in the deck, answer where and how big. */
+export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
+	const taken = await take(ctx, m, args);
+	const { canvas, card } = taken;
+	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
+	if (card && !taken.live) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
+	if (args.live === false) ctx.note("Every picture here is the browser's; the engine's native tool is not used yet.");
+	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
+}
+
 /** Where a picture is kept: to, else exports/screenshots/<canvas>-<time>.<ext>. */
 export function shotPath(canvas: string, format: string, to: string | undefined, now: number): string {
 	if (to) return toDeckPath(to);
@@ -22,34 +35,25 @@ export function shotPath(canvas: string, format: string, to: string | undefined,
 	return toDeckPath(`exports/screenshots/${canvas.replace(/[^\w-]+/g, "-")}-${stamp}.${extOf(format)}`);
 }
 
+// Taking it: a card as a screen has it, a card's own page, or the composed drawing.
+/** Take the picture and keep nothing: its bytes, size, box and how it was made. */
+export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean; live?: boolean }> {
+	const canvas = ctx.canvasName(args.canvas);
+	// A card's PDF is the card on its canvas with paper round it, as today; its picture its own page.
+	const card = isCard(args.of) && args.format !== "pdf" ? cardPath(args.of) : undefined;
+	if (card) {
+		const seen = await seenCard(ctx, card, canvas);
+		const on = seen ? ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card) : undefined;
+		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, live: true, how: seen.how };
+	}
+	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
+	return { ...taken, canvas, card: !!card, how: taken.how ?? (card ? "chromium: the card's page" : "chromium: composed from the drawing's file") };
+}
+
 const isCard = (of: Of): of is string => typeof of === "string" && /\/cards\//.test(of);
 
-async function drawingText(ctx: Context, canvas: string): Promise<string> {
-	try {
-		return decoder.decode(await ctx.deck.read(toDeckPath(`${layout.canvasFolder(canvas)}/canvas.pen`)));
-	} catch {
-		throw new Refused("not_found", `The canvas ${canvas} has no drawing to picture.`, "canvas.list");
-	}
-}
-
-export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
-
-/** A PNG's size from its header, else the box's. */
-function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
-	const png = bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50;
-	if (png) return { w: Buffer.from(bytes).readUInt32BE(16), h: Buffer.from(bytes).readUInt32BE(20) };
-	return box ? { w: Math.round(box.x2 - box.x1), h: Math.round(box.y2 - box.y1) } : { w: 0, h: 0 };
-}
-
-/** The agent that last wrote the drawing, as its placeholder frames are marked; none for the person. */
-async function writerOf(ctx: Context, canvas: string): Promise<Writer | undefined> {
-	const by = (await ctx.deck.revisions?.(toDeckPath(`${layout.canvasFolder(canvas)}/canvas.pen`)).catch(() => []))?.at(-1)?.by;
-	if (!by || by === "person" || by === "disk") return undefined;
-	const agent = await ctx.call<{ name?: string; color?: string }>("agent.get", { agent: by }).catch(() => undefined);
-	return agent?.color ? { color: agent.color, ...(agent.name ? { name: agent.name } : {}) } : undefined;
-}
-
 type Seen = { how: string; data: string; mime: string };
+
 const SEEN_MS = 4_000;
 
 /** The card as a screen showing it has it now (view.screenshot), or undefined when none can say. */
@@ -60,6 +64,13 @@ export async function seenCard(ctx: Context, card: string, canvas: string): Prom
 	const seen = await Promise.race([asked, late]).finally(() => clearTimeout(timer));
 	if (!seen || (seen.how !== "canvas" && seen.how !== "snapshot") || typeof seen.data !== "string") return undefined;
 	return { bytes: new Uint8Array(Buffer.from(seen.data, "base64")), how: seen.how };
+}
+
+/** A PNG's size from its header, else the box's. */
+function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
+	const png = bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50;
+	if (png) return { w: Buffer.from(bytes).readUInt32BE(16), h: Buffer.from(bytes).readUInt32BE(20) };
+	return box ? { w: Math.round(box.x2 - box.x1), h: Math.round(box.y2 - box.y1) } : { w: 0, h: 0 };
 }
 
 /** One card's own page at its width on the canvas, or 1000 when it is not there. */
@@ -115,26 +126,20 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 	}
 }
 
-/** Take the picture and keep nothing: its bytes, size, box and how it was made. */
-export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean; live?: boolean }> {
-	const canvas = ctx.canvasName(args.canvas);
-	// A card's PDF is the card on its canvas with paper round it, as today; its picture its own page.
-	const card = isCard(args.of) && args.format !== "pdf" ? cardPath(args.of) : undefined;
-	if (card) {
-		const seen = await seenCard(ctx, card, canvas);
-		const on = seen ? ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card) : undefined;
-		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, live: true, how: seen.how };
-	}
-	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
-	return { ...taken, canvas, card: !!card, how: taken.how ?? (card ? "chromium: the card's page" : "chromium: composed from the drawing's file") };
+// Reading the drawing.
+/** The agent that last wrote the drawing, as its placeholder frames are marked; none for the person. */
+async function writerOf(ctx: Context, canvas: string): Promise<Writer | undefined> {
+	const by = (await ctx.deck.revisions?.(toDeckPath(`${layout.canvasFolder(canvas)}/canvas.pen`)).catch(() => []))?.at(-1)?.by;
+	if (!by || by === "person" || by === "disk") return undefined;
+	const agent = await ctx.call<{ name?: string; color?: string }>("agent.get", { agent: by }).catch(() => undefined);
+	return agent?.color ? { color: agent.color, ...(agent.name ? { name: agent.name } : {}) } : undefined;
 }
 
-/** Take the picture, keep it in the deck, answer where and how big. */
-export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
-	const taken = await take(ctx, m, args);
-	const { canvas, card } = taken;
-	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
-	if (card && !taken.live) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
-	if (args.live === false) ctx.note("Every picture here is the browser's; the engine's native tool is not used yet.");
-	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
+async function drawingText(ctx: Context, canvas: string): Promise<string> {
+	try {
+		return decoder.decode(await ctx.deck.read(toDeckPath(`${layout.canvasFolder(canvas)}/canvas.pen`)));
+	} catch {
+		throw new Refused("not_found", `The canvas ${canvas} has no drawing to picture.`, "canvas.list");
+	}
 }
+

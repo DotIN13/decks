@@ -11,13 +11,21 @@ export type ExportArgs = { of: string | string[]; format?: "html" | "tailwind"; 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 
-/** A path the page reads, from the folder it is written in. */
-export function fromPage(page: string, file: string): string {
-	const from = page.split("/").slice(0, -1);
-	const to = file.split("/");
-	let same = 0;
-	while (same < from.length && same < to.length - 1 && from[same] === to[same]) same++;
-	return [...from.slice(same).map(() => ".."), ...to.slice(same)].map(encodeURIComponent).join("/");
+/** Write the page and answer it as a file. */
+export async function exportItems(ctx: Context, args: ExportArgs): Promise<S.File> {
+	const canvas = ctx.canvasName(args.canvas);
+	const ids = typeof args.of === "string" ? [args.of] : args.of;
+	const source = toDeckPath(sourceOf(canvas, args.frame));
+	let text: string;
+	try {
+		text = decoder.decode(await ctx.deck.read(source));
+	} catch {
+		throw new Refused("not_found", `There is no drawing at ${source}.`, args.frame ? "frame.list" : "canvas.list");
+	}
+	const page = toDeckPath(args.to ?? `exports/${(ids[0] ?? "page").replace(/[^\w-]+/g, "-")}.html`);
+	const html = pageOf(text, ids, { format: args.format ?? "html", canvas, page });
+	const rev = await ctx.deck.write(page, encoder.encode(html), ctx.caller);
+	return { path: page, size: encoder.encode(html).length, rev: rev.rev, by: rev.by, at: rev.at };
 }
 
 /** The drawing's file for a canvas, or for a frame file in its frames/. */
@@ -47,19 +55,12 @@ export function pageOf(text: string, ids: string[], options: { format: "html" | 
 	}
 }
 
-/** Write the page and answer it as a file. */
-export async function exportItems(ctx: Context, args: ExportArgs): Promise<S.File> {
-	const canvas = ctx.canvasName(args.canvas);
-	const ids = typeof args.of === "string" ? [args.of] : args.of;
-	const source = toDeckPath(sourceOf(canvas, args.frame));
-	let text: string;
-	try {
-		text = decoder.decode(await ctx.deck.read(source));
-	} catch {
-		throw new Refused("not_found", `There is no drawing at ${source}.`, args.frame ? "frame.list" : "canvas.list");
-	}
-	const page = toDeckPath(args.to ?? `exports/${(ids[0] ?? "page").replace(/[^\w-]+/g, "-")}.html`);
-	const html = pageOf(text, ids, { format: args.format ?? "html", canvas, page });
-	const rev = await ctx.deck.write(page, encoder.encode(html), ctx.caller);
-	return { path: page, size: encoder.encode(html).length, rev: rev.rev, by: rev.by, at: rev.at };
+/** A path the page reads, from the folder it is written in. */
+export function fromPage(page: string, file: string): string {
+	const from = page.split("/").slice(0, -1);
+	const to = file.split("/");
+	let same = 0;
+	while (same < from.length && same < to.length - 1 && from[same] === to[same]) same++;
+	return [...from.slice(same).map(() => ".."), ...to.slice(same)].map(encodeURIComponent).join("/");
 }
+

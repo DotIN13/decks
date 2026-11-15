@@ -30,41 +30,6 @@ const LOAD_MS = 15_000;
 type PwBrowser = import("playwright").Browser;
 type PwPage = import("playwright").Page;
 
-/** Waits for the page and what it fetches, then two frames, so modules have drawn. */
-async function settle(page: PwPage): Promise<void> {
-	await page.waitForLoadState("networkidle", { timeout: LOAD_MS }).catch(() => {});
-	await page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true").catch(() => {});
-	await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60))))").catch(() => {});
-}
-
-function wrap(page: PwPage, close: () => Promise<void>): Page {
-	const errors: string[] = [];
-	page.on("pageerror", (error) => void errors.push(error.message.split("\n")[0] ?? ""));
-	return {
-		errors,
-		async goto(url) {
-			await page.goto(url, { waitUntil: "load", timeout: LOAD_MS });
-			await settle(page);
-		},
-		async show(html) {
-			await page.setContent(html, { waitUntil: "load", timeout: LOAD_MS });
-			await settle(page);
-		},
-		async authorize(origin, token) {
-			await page.route((url) => url.origin === origin, (route) => route.continue({ headers: { ...route.request().headers(), authorization: `Bearer ${token}` } }));
-		},
-		evaluate: (script) => page.evaluate(script),
-		async screenshot(options) {
-			const shot = await page.screenshot({ type: options.type, ...(options.clip ? { clip: options.clip } : {}), fullPage: options.full ?? false, ...(options.type === "jpeg" ? { quality: 88 } : {}) });
-			return new Uint8Array(shot);
-		},
-		async pdf(size) {
-			return new Uint8Array(await page.pdf({ width: `${size.width}px`, height: `${size.height}px`, printBackground: true, pageRanges: "1" }));
-		},
-		close,
-	};
-}
-
 /** The Chromium Playwright installed. A launch that fails says why in one sentence. */
 export function chromium(): Browser {
 	let started: Promise<PwBrowser> | undefined;
@@ -110,3 +75,39 @@ export function chromium(): Browser {
 		},
 	};
 }
+
+function wrap(page: PwPage, close: () => Promise<void>): Page {
+	const errors: string[] = [];
+	page.on("pageerror", (error) => void errors.push(error.message.split("\n")[0] ?? ""));
+	return {
+		errors,
+		async goto(url) {
+			await page.goto(url, { waitUntil: "load", timeout: LOAD_MS });
+			await settle(page);
+		},
+		async show(html) {
+			await page.setContent(html, { waitUntil: "load", timeout: LOAD_MS });
+			await settle(page);
+		},
+		async authorize(origin, token) {
+			await page.route((url) => url.origin === origin, (route) => route.continue({ headers: { ...route.request().headers(), authorization: `Bearer ${token}` } }));
+		},
+		evaluate: (script) => page.evaluate(script),
+		async screenshot(options) {
+			const shot = await page.screenshot({ type: options.type, ...(options.clip ? { clip: options.clip } : {}), fullPage: options.full ?? false, ...(options.type === "jpeg" ? { quality: 88 } : {}) });
+			return new Uint8Array(shot);
+		},
+		async pdf(size) {
+			return new Uint8Array(await page.pdf({ width: `${size.width}px`, height: `${size.height}px`, printBackground: true, pageRanges: "1" }));
+		},
+		close,
+	};
+}
+
+/** Waits for the page and what it fetches, then two frames, so modules have drawn. */
+async function settle(page: PwPage): Promise<void> {
+	await page.waitForLoadState("networkidle", { timeout: LOAD_MS }).catch(() => {});
+	await page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true").catch(() => {});
+	await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60))))").catch(() => {});
+}
+
