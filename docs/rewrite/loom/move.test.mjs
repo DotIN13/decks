@@ -287,7 +287,7 @@ test("--go moves the files a table takes out of a folder it removes, and deletes
 		const table = { step: "t", title: "t", moves: [{ from: "packages/lib/src/extra.ts", to: "shared/extra.ts" }], remove: ["packages/lib/"] };
 		await apply(root, table, plan(table, checkout(root)));
 		assert.equal(readFileSync(join(root, "shared/extra.ts"), "utf8").trim(), "export const extra = 1;");
-		assert.equal(existsSync(join(root, "packages/lib/src/index.ts")), false);
+		assert.equal(existsSync(join(root, "packages/lib")), false, "and no empty folder is left");
 		assert.match(git("status", "--porcelain"), /^R {2}packages\/lib\/src\/extra\.ts -> shared\/extra\.ts$/m);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });

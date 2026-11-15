@@ -1,6 +1,6 @@
 # Step 4e-02-camera: Regroup canvas: camera/stage-ops.ts becomes camera/view-calls.ts
 
-Dry run on addac017, on top of 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries. Nothing was moved.
+Dry run on 0c3f98c5, on top of 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries. Nothing was moved.
 
 - files moved by git mv: 2
 - files taken out of git (moved on disk): 0

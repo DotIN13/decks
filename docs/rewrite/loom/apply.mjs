@@ -66,6 +66,8 @@ export async function apply(root, table, p) {
 	}
 	if (p.edits.size) git(root, ["add", "--", ...p.edits.keys()]);
 	for (const f of folders) { removeEmpty(root, f); removeEmptyParents(root, f); }
+	// A file moved or removed by name can leave its folder empty too.
+	for (const f of [...p.moves.map(([from]) => from), ...p.remove, ...p.untrack]) removeEmptyParents(root, f);
 	await rekeyBaselines(root, p.moves, notes);
 	return notes;
 }

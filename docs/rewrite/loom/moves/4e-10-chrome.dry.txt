@@ -1,6 +1,6 @@
 # Step 4e-10-chrome: Regroup canvas: ui/ becomes chrome/
 
-Dry run on addac017, on top of 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink. Nothing was moved.
+Dry run on 0c3f98c5, on top of 4b-ink, 4c-card-runtime, 4d-documents, 4e-01-entries, 4e-02-camera, 4e-03-view, 4e-04-input, 4e-05-editor, 4e-06-drawing, 4e-07-items, 4e-08-cards, 4e-09-ink. Nothing was moved.
 
 - files moved by git mv: 15
 - files taken out of git (moved on disk): 0
