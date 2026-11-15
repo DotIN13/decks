@@ -95,7 +95,7 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 	const native = !args.live && args.format !== "pdf" ? m.native?.() : undefined;
 	if (native) {
 		const scheme = args.scheme ?? "light";
-		const cardPictureOf = (card: string, px: number) => cardPicture(ctx, m, card, px, scheme);
+		const cardPictureOf = (card: string, px: number) => cardPicture(ctx, m, card, px, scheme, true);
 		const drawn = await drawNatively(ctx, native, { canvas, text, box: made.box, factor: made.factor, scheme, format: args.format === "jpeg" ? "jpeg" : "png", ...(writer ? { writer } : {}), cardPicture: cardPictureOf });
 		if ("bytes" in drawn) {
 			for (const pass of passes) pass.done();

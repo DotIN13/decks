@@ -37,9 +37,9 @@ HTML; `playwright` for the browser. No other feature.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
 10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
     A card in it is an iframe of its page, addressed from where the page is written.
-11. `GET /pictures/<path>`: a JPEG of a card or any other `.html` page in the deck, kept by its
-    bytes, width and scheme, so it is pictured once; with `v`, cached for a year. With `astc=1`
-    it is every size in 4 x 4 ASTC blocks for the GPU (astcenc), when this machine has the encoder.
+11. `GET /pictures/<path>?w=`: a JPEG of a card or other `.html` page at a rung of the canvas's
+    ladder (192, 480, 800), never wider; kept by bytes, width and scheme; with `v`, cached a year;
+    with `astc=1`, 4 x 4 ASTC blocks for the GPU. Only screenshots and exports draw cards wider.
 12. A canvas's tile picture is `GET /pictures/canvas-tile/<canvas>?scheme=&v=`: the whole canvas,
    its long side 480 px, a JPEG kept by the drawing's bytes and scheme; with `v`, cached for a year.
 13. `GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&live=&name=`: a picture to

@@ -8,7 +8,10 @@ import { cardPath, type Machine } from "./machine.ts";
 // shrunk to w, kept in the store by the card's bytes, width and scheme.
 
 export const PICTURES = "/pictures/";
-const RUNGS = [192, 480, 1000, 2000];
+/** The canvas's ladder: the widths it asks a card's picture at (PICTURES.big.ladder in the canvas library). */
+export const LADDER: readonly number[] = [192, 480, 800];
+/** The widest picture an export or a screenshot draws a card from. */
+const WIDEST = 2000;
 
 /** The width a card asks for in its meta tag, else 1000. */
 export function metaWidth(source: string): number {
@@ -21,8 +24,11 @@ export function metaWidth(source: string): number {
 	}
 }
 
-/** The rung asked for, rounded up to one the store keeps. */
-export const rungFor = (asked: number) => RUNGS.find((rung) => rung >= asked) ?? RUNGS.at(-1)!;
+/** The rung for a width the canvas asks: a rung of its ladder exactly, else the next one up, never past the top. */
+export const rungFor = (asked: number): number => (LADDER.includes(asked) ? asked : (LADDER.find((rung) => rung >= asked) ?? LADDER.at(-1)!));
+
+/** The width a screenshot or an export draws a card at: what it needs, in whole pixels, at most WIDEST. */
+export const exactWidth = (px: number): number => Math.max(1, Math.min(WIDEST, Math.ceil(px)));
 
 /** A card by its folder or index.html, or any other .html page in the deck, kept from before cards. */
 export function picturedPath(raw: string): DeckPath {
@@ -32,12 +38,12 @@ export function picturedPath(raw: string): DeckPath {
 }
 
 /** The page's picture as JPEG bytes, taken once per version, rung and scheme. */
-export async function cardPicture(ctx: Context, m: Machine, card: string, asked: number, scheme: "light" | "dark"): Promise<Uint8Array> {
+export async function cardPicture(ctx: Context, m: Machine, card: string, asked: number, scheme: "light" | "dark", exact = false): Promise<Uint8Array> {
 	const path = picturedPath(card);
 	const source = await ctx.deck.read(path).catch(() => {
 		throw new Refused("not_found", `There is no page at ${path}.`, "file.find");
 	});
-	const rung = rungFor(asked);
+	const rung = exact ? exactWidth(asked) : rungFor(asked);
 	const key = `${createHash("sha256").update(source).digest("hex").slice(0, 24)}-${rung}-${scheme}.jpg`;
 	const kept = await ctx.store.get(key);
 	if (kept) return kept;
