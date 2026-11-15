@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Context, Store } from "../kernel/index.ts";
 import { pipeTo, send, withoutPass } from "./proxy.ts";
 
-// Forwarded ports: kept in the store, reached at /node/ and /rnode/. Rule 13.
+// Forwarded ports: kept in the store, reached at /node/ and /rnode/. Rule 12.
 
 export type Forward = { port: number; label?: string; by?: string; at: number; path: string; stripped: string };
 const KEY = "ports.json";

@@ -4,11 +4,11 @@ import { Logs } from "./logs.ts";
 import { freePort, kill, listening, Machine } from "./machine.ts";
 import { folderOf, manifestOf, sourceFiles, type Manifest } from "./manifest.ts";
 
-// Apps built and run: their state, their jobs and their processes. Rules 3 to 7.
+// Apps built and run: their state, their jobs and their processes. Rules 2 to 6.
 
-export type AppStatus = "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken";
+export type AppStatus = "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken" | "missing";
 export type Kept = { status?: AppStatus; port?: number; error?: string; at?: number; seenAt?: number; seen?: number };
-type Running = { child: ChildProcess; port: number; ready: Promise<boolean> };
+type Running = { child: ChildProcess; port: number; ready: Promise<boolean>; unwatch?: () => void };
 
 export const WAIT_MS = 15_000;
 const START_MS = 45_000;
@@ -31,9 +31,17 @@ export class Apps {
 		this.clock = options.clock ?? Date.now;
 	}
 
+	/** The app's manifest, with where it builds and runs told to the machine. Rule 15. */
+	async manifest(name: string): Promise<Manifest> {
+		const manifest = await manifestOf(this.deck, name);
+		this.machine.place(name, manifest.source?.path);
+		return manifest;
+	}
+
 	/** What happened to an app, merged with what it is when nothing has. */
 	async stateOf(name: string, manifest: Manifest): Promise<Kept & { status: AppStatus }> {
 		const kept = this.kept.get(name) ?? {};
+		if (manifest.source && !(await this.machine.look(manifest.source.path)).exists) return { ...kept, status: "missing" };
 		return { ...kept, status: kept.status ?? (await this.idleStatus(name, manifest)) };
 	}
 
@@ -59,9 +67,10 @@ export class Apps {
 		return this.running.has(name);
 	}
 
-	/** Copy the source into the running copy, writing only what differs. Rule 3. */
+	/** Copy the source into the running copy, writing only what differs. Rule 2. */
 	async sync(name: string): Promise<number> {
 		let wrote = 0;
+		if (this.machine.isOutside(name)) return 0;
 		for (const file of await sourceFiles(this.deck, name)) {
 			const bytes = await this.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`));
 			if (await this.machine.put(name, file.path, bytes)) wrote += 1;
@@ -71,12 +80,12 @@ export class Apps {
 
 	/** Install and build as the manifest says. A second call joins the first. */
 	build(name: string): Promise<boolean> {
-		return this.job(name, async () => this.runBuild(name, await manifestOf(this.deck, name)));
+		return this.job(name, async () => this.runBuild(name, await this.manifest(name)));
 	}
 
 	/** Start a server app, building it first when it needs it; any other kind is built. */
 	async run(name: string): Promise<boolean> {
-		const manifest = await manifestOf(this.deck, name);
+		const manifest = await this.manifest(name);
 		if (manifest.kind !== "server") return this.build(name);
 		const live = this.running.get(name);
 		if (live) {
@@ -125,6 +134,9 @@ export class Apps {
 
 	private async runBuild(name: string, manifest: Manifest): Promise<boolean> {
 		const t0 = this.clock();
+		if (manifest.source && !(await this.machine.look(manifest.source.path)).exists) {
+			return this.failed(name, `${manifest.source.path} is not on this machine; app.clone takes it from ${manifest.source.repo ?? "its repository"}.`);
+		}
 		await this.sync(name);
 		const out = (text: string) => this.logs.write(name, text);
 		if ((await this.needsInstall(name)) && !(await this.machine.isDir(name, "node_modules"))) {
@@ -159,6 +171,7 @@ export class Apps {
 		const ready = listening(port, START_MS, () => gone);
 		const live: Running = { child, port, ready };
 		this.running.set(name, live);
+		this.keepData(name, live);
 		child.on("exit", (code, signal) => {
 			gone = true;
 			if (this.running.get(name) !== live) return;
@@ -175,6 +188,15 @@ export class Apps {
 		return true;
 	}
 
+	/** An in-deck app's data/ folder, written in its copy while it runs, is written back to the deck. */
+	private keepData(name: string, live: Running): void {
+		if (this.machine.isOutside(name)) return;
+		const by = { kind: "app" as const, id: name, name };
+		live.unwatch = this.machine.watchCopy(name, "data", (path) => {
+			void this.machine.read(name, path).then((bytes) => bytes && this.deck.write(toDeckPath(`${folderOf(name)}/${path}`), bytes, by)).catch(() => {});
+		});
+	}
+
 	/** Stop a server app's process group; answers whether one was running. */
 	stop(name: string, status: AppStatus = "stopped"): boolean {
 		const live = this.running.get(name);
@@ -184,6 +206,7 @@ export class Apps {
 		}
 		this.running.delete(name);
 		this.set(name, { status, port: undefined });
+		live.unwatch?.();
 		kill(live.child);
 		this.logs.write(name, status === "asleep" ? "asleep: not seen for a while; the next request starts it again" : "stopped");
 		return true;
@@ -199,10 +222,10 @@ export class Apps {
 		return (await this.run(name)) ? this.running.get(name)?.port : undefined;
 	}
 
-	/** Put to sleep every server app unseen for its idleMinutes. Rule 7. */
+	/** Put to sleep every server app unseen for its idleMinutes. Rule 6. */
 	async sleepUnseen(): Promise<void> {
 		for (const name of [...this.running.keys()]) {
-			const minutes = (await manifestOf(this.deck, name).catch(() => undefined))?.idleMinutes ?? IDLE_MINUTES;
+			const minutes = (await this.manifest(name).catch(() => undefined))?.idleMinutes ?? IDLE_MINUTES;
 			if (this.clock() - (this.kept.get(name)?.seenAt ?? 0) > minutes * 60_000) this.stop(name, "asleep");
 		}
 	}

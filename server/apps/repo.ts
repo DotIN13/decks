@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { Refused } from "../../protocol/index.ts";
 
-// Every app is a git repository in its running copy. Rule 10.
+// Every app is a git repository in its running copy. Rule 9.
 
 export type Repo = { branch: string; head: string; dirty?: number; remote?: string };
 

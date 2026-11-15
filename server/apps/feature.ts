@@ -1,4 +1,3 @@
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineFeature, type Context, type Feature, type Kernel, type Route } from "../kernel/index.ts";
 import { appCalls } from "./calls.ts";
@@ -8,7 +7,6 @@ import { forwardTarget, serveForward } from "./ports.ts";
 import { upgradeTo } from "./proxy.ts";
 import { parseAppPath, passInPath, serverTarget, serveApp } from "./serve.ts";
 import { Apps } from "./service.ts";
-import { manifestOf } from "./manifest.ts";
 import { openRoute } from "./open.ts";
 
 // The apps feature: app folders served, built or run, and forwarded ports.
@@ -27,7 +25,7 @@ function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 			const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
 			const at = parseAppPath(url.pathname);
 			if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
-			void manifestOf(kernel().deck, at.name)
+			void apps().manifest(at.name)
 				.then((manifest) => (manifest.kind === "server" ? serverTarget(apps(), at.name, manifest, at.inner, url.search) : undefined))
 				.catch(() => undefined)
 				.then((target) => (target ? upgradeTo(req, socket, head, target.port, target.path, target.base) : socket.end("HTTP/1.1 404 Not Found\r\n\r\n")));
@@ -47,7 +45,7 @@ function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 	return [app, forward("/node/"), forward("/rnode/"), openRoute(kernel)];
 }
 
-/** Apps and ports. workdir is where the running copies live; on Decks-local, <deck>/.decks/app-run. */
+/** Apps and ports. workdir is where in-deck apps' copies run: by default <machine>/app-run/<deck id>. */
 export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 	let kernel: Kernel | undefined;
 	let apps: Apps | undefined;
@@ -63,7 +61,7 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 		routes: appRoutes(need, () => kernel!),
 		start(given) {
 			kernel = given;
-			const workdir = options.workdir ?? join(tmpdir(), "decks-app-run", String(process.pid));
+			const workdir = options.workdir ?? join(given.machine(), "app-run", given.deckId());
 			const env = (name: string): Record<string, string> => {
 				const url = given.url();
 				const token = given.callers.issue({ kind: "app", id: name, name }, "app server");

@@ -2,7 +2,7 @@ import { calls, type Handled } from "../../protocol/index.ts";
 import { handleAll, type Context } from "../kernel/index.ts";
 import { close, forwards, open } from "./ports.ts";
 
-// The port calls. Rule 13 of the README.
+// The port calls. Rule 12 of the README.
 
 export function portCalls(clock: () => number): Handled<Context>[] {
 	const { port } = calls;

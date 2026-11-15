@@ -21,12 +21,12 @@ test("rule 1: a name is lower-case letters, digits and dashes; kind defaults to 
 	assert.throws(() => parseManifest("a", '{"root":"../out"}'), /outside the app/);
 });
 
-test("rule 5: an app's commands inherit no secret and none of Decks's own variables", () => {
+test("rule 4: an app's commands inherit no secret and none of Decks's own variables", () => {
 	for (const name of ["ANTHROPIC_API_KEY", "GH_TOKEN", "MY_SECRET", "DECKS_TOKEN", "DECKS_STUDIO_KEY", "DB_PASSWORD"]) assert.ok(secretEnv(name), name);
 	for (const name of ["PATH", "HOME", "LANG"]) assert.ok(!secretEnv(name), name);
 });
 
-test("rule 8: an app's address and the files a path names", () => {
+test("rule 7: an app's address and the files a path names", () => {
 	assert.deepEqual(parseAppPath("/app/notes/a/b.js"), { name: "notes", inner: "/a/b.js", slash: true });
 	assert.deepEqual(parseAppPath("/app/notes"), { name: "notes", inner: "/", slash: false });
 	assert.equal(parseAppPath("/app/No/"), undefined);
@@ -37,7 +37,7 @@ test("rule 8: an app's address and the files a path names", () => {
 	assert.deepEqual(candidates("/%E0%A4%A"), []);
 });
 
-test("rule 8: the pass never reaches the app, and a redirect stays under the app", () => {
+test("rule 7: the pass never reaches the app, and a redirect stays under the app", () => {
 	assert.equal(withoutPass("/x", "?pass=abc&q=1"), "/x?q=1");
 	assert.equal(withoutPass("/x", "?pass=abc"), "/x");
 	assert.equal(underBase("/login", "/app/a"), "/app/a/login");
@@ -46,7 +46,7 @@ test("rule 8: the pass never reaches the app, and a redirect stays under the app
 	assert.equal(underBase("//x.org/", "/app/a"), "//x.org/");
 });
 
-test("rule 10: every starter has an app.json of its kind; clone takes only https and git addresses", () => {
+test("rule 9: every starter has an app.json of its kind; clone takes only https and git addresses", () => {
 	for (const starter of STARTERS) {
 		const files = starterFiles(starter, "My <tool>");
 		assert.equal(parseManifest("a", files["app.json"]!).kind, STARTER_KIND[starter], starter);
@@ -61,7 +61,7 @@ test("rule 10: every starter has an app.json of its kind; clone takes only https
 	assert.equal(nameFromUrl("https://github.com/Me/Trip_Planner.git"), "trip-planner");
 });
 
-test("rule 12: the verdict says the worst thing first", () => {
+test("rule 11: the verdict says the worst thing first", () => {
 	assert.equal(verdict({ status: 500, title: "", words: 0, errors: ["x"], failed: [] }), "The page answered 500.");
 	assert.equal(verdict({ status: 200, title: "", words: 3, errors: ["x", "y"], failed: [] }), "The page threw 2 errors.");
 	assert.equal(verdict({ status: 200, title: "", words: 3, errors: [], failed: ["a"] }), "1 request failed.");
@@ -69,7 +69,7 @@ test("rule 12: the verdict says the worst thing first", () => {
 	assert.match(verdict({ status: 200, title: "t", words: 3, errors: [], failed: [] }), /Loads clean/);
 });
 
-test("rule 13: /node keeps the address's path, /rnode strips it", () => {
+test("rule 12: /node keeps the address's path, /rnode strips it", () => {
 	assert.deepEqual(forwardTarget("/node/localhost/8766/a?b"), { port: 8766, path: "/node/localhost/8766/a?b" });
 	assert.deepEqual(forwardTarget("/rnode/localhost/8766/a"), { port: 8766, path: "/a" });
 	assert.deepEqual(forwardTarget("/rnode/localhost/8766"), { port: 8766, path: "/" });

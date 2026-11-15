@@ -1,10 +1,11 @@
 import { Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Deck, type DeckPath } from "../kernel/index.ts";
+import { sourceOf, type Source } from "./source.ts";
 
-// An app's name and app.json, read from the deck. Rules 1 and 2 of the README.
+// An app's name and app.json, read from the deck. Rule 1 of the README.
 
 export type AppKind = "static" | "build" | "server";
-export type Manifest = { title?: string; kind: AppKind; root?: string; install?: string; build?: string; start?: string; prefix?: boolean; idleMinutes?: number };
+export type Manifest = { title?: string; kind: AppKind; root?: string; install?: string; build?: string; start?: string; prefix?: boolean; idleMinutes?: number; source?: Source };
 
 export const APP_NAME = /^[a-z0-9][a-z0-9-]{0,47}$/;
 export const APPS = "apps";
@@ -33,6 +34,8 @@ export function parseManifest(name: string, raw: string): Manifest {
 	}
 	if (read.prefix === true) manifest.prefix = true;
 	if (typeof read.idleMinutes === "number" && read.idleMinutes > 0) manifest.idleMinutes = read.idleMinutes;
+	const source = sourceOf(read.source);
+	if (source) manifest.source = source;
 	if (manifest.root && (manifest.root.startsWith("/") || manifest.root.split("/").includes(".."))) {
 		throw new Refused("invalid", `apps/${name}/app.json names a root outside the app.`, "file.edit");
 	}

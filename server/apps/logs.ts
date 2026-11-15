@@ -1,6 +1,6 @@
 import type { Store } from "../kernel/index.ts";
 
-// Each app's last 600 lines of output, kept in the feature's store. Rule 9.
+// Each app's last 600 lines of output, kept in the feature's store. Rule 8.
 
 export const LOG_LINES = 600;
 const ERRORS = /\berr(or)?\b|ERR!|failed|exception|cannot|not found|traceback/i;

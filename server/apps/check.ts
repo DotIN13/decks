@@ -1,6 +1,6 @@
 import { Refused } from "../../protocol/index.ts";
 
-// app.check: load the app in a browser and say what went wrong. Rule 12.
+// app.check: load the app in a browser and say what went wrong. Rule 11.
 // The browser is Playwright's Chromium, started for the check and closed after.
 
 export type Checked = { verdict: string; url: string; title?: string; errors: string[]; failed?: string[]; words?: number };

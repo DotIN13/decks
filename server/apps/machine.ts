@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { connect, createServer } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
@@ -15,11 +16,42 @@ export const secretEnv = (name: string): boolean => SECRET.test(name) || DECKS_O
 export type Output = (text: string) => void;
 
 export class Machine {
+	private outside = new Map<string, string>();
+
 	constructor(readonly workdir: string) {}
 
-	/** The app's running copy. */
+	/** Where the app builds and runs: its source folder outside the deck, else its copy here. */
 	folder(name: string): string {
-		return join(this.workdir, name);
+		return this.outside.get(name) ?? join(this.workdir, name);
+	}
+
+	/** Say that an app's source lives in a folder outside the deck, or (undefined) in the deck. */
+	place(name: string, outside: string | undefined): void {
+		if (outside) this.outside.set(name, outside);
+		else this.outside.delete(name);
+	}
+
+	isOutside(name: string): boolean {
+		return this.outside.has(name);
+	}
+
+	/** Whether a folder exists, and how many names it holds. */
+	async look(folder: string): Promise<{ exists: boolean; entries: number }> {
+		const names = await readdir(folder).catch(() => undefined);
+		return { exists: names !== undefined, entries: names?.length ?? 0 };
+	}
+
+	/** Hear writes under a folder of the app's copy; answers how to stop. */
+	watchCopy(name: string, sub: string, hear: (path: string) => void): () => void {
+		const root = join(this.workdir, name);
+		let watcher: ReturnType<typeof watch> | undefined;
+		try {
+			watcher = watch(join(root, sub), { recursive: true }, (_kind, file) => file && hear(`${sub}/${String(file).split(sep).join("/")}`));
+			watcher.on("error", () => watcher?.close());
+		} catch {
+			watcher = undefined;
+		}
+		return () => watcher?.close();
 	}
 
 	/** A path inside the running copy, or undefined when it climbs out or is hidden. */

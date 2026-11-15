@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { toDeckPath, type Context, type RouteAnswer } from "../kernel/index.ts";
-import { APP_NAME, folderOf, manifestOf, type Manifest } from "./manifest.ts";
+import { APP_NAME, folderOf, type Manifest } from "./manifest.ts";
 import { asksGuest, guestScript, guestSrc, withGuest } from "./guest.ts";
 import { pipeTo, send, withoutPass } from "./proxy.ts";
 import type { Apps } from "./service.ts";
 
 // /app/<name>/<path>: a static app's files from the deck, a built app's from
-// its running copy, a server app proxied. Rule 8 of the README.
+// its running copy, a server app proxied. Rule 7 of the README.
 
 const TYPES: Record<string, string> = {
 	html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8",
@@ -55,7 +55,7 @@ async function fromDeck(ctx: Context, name: string, root: string, inner: string)
 
 async function fromCopy(apps: Apps, name: string, root: string, inner: string): Promise<RouteAnswer | undefined> {
 	for (const path of candidates(inner)) {
-		const bytes = await apps.machine.read(name, `${root}/${path}`);
+		const bytes = await apps.machine.read(name, root ? `${root}/${path}` : path);
 		if (bytes) return { type: typeOf(path), body: bytes, headers: { "cache-control": "no-cache" } };
 	}
 	return undefined;
@@ -75,7 +75,7 @@ export async function serveApp(ctx: Context, apps: Apps, req: IncomingMessage, r
 	const at = parseAppPath(url.pathname);
 	if (!at) return send(res, plain(404, "An app's address is /app/<name>/."));
 	if (!at.slash) return send(res, { status: 308, type: "text/plain", body: "", headers: { location: `/app/${at.name}/${url.search}` } });
-	const manifest = await manifestOf(ctx.deck, at.name).catch(() => undefined);
+	const manifest = await apps.manifest(at.name).catch(() => undefined);
 	if (!manifest) return send(res, plain(404, `There is no app called ${at.name}.`));
 	apps.seen(at.name);
 	const guest: RouteAnswer = { type: "text/javascript; charset=utf-8", body: guestScript(at.name), headers: { "cache-control": "no-cache" } };
@@ -86,7 +86,9 @@ export async function serveApp(ctx: Context, apps: Apps, req: IncomingMessage, r
 		return pipeTo(req, res, target.port, target.path, target.base);
 	}
 	if (req.method !== "GET" && req.method !== "HEAD") return send(res, plain(405, `${at.name} is a ${manifest.kind} app: it answers GET only.`));
-	const found = manifest.kind === "static" ? await fromDeck(ctx, at.name, manifest.root ?? "", at.inner) : await fromCopy(apps, at.name, manifest.root ?? "dist", at.inner);
+	const inDeck = manifest.kind === "static" && !manifest.source;
+	const root = manifest.root ?? (manifest.kind === "build" ? "dist" : "");
+	const found = inDeck ? await fromDeck(ctx, at.name, root, at.inner) : await fromCopy(apps, at.name, root, at.inner);
 	if (!found) return send(res, asksGuest(at.inner) ? guest : plain(404, `${at.inner} is not in the app ${at.name}.`));
 	if (!found.type.startsWith("text/html")) return send(res, found);
 	const page = typeof found.body === "string" ? found.body : new TextDecoder().decode(found.body);
