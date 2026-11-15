@@ -39,7 +39,7 @@ const fn = (n) => `export function long() {\n${lines(n - 2, "\tcall();")}}\n`;
 const TICK = String.fromCharCode(96);
 const README = "# x\n## Owns\na\n## May import\nb\n## Rules\nc\n## Check\nd\n";
 
-test("size names a file over 400 lines", () => plantedFails("size", { "server/a/big.ts": lines(401) }, { "server/a/big.ts": lines(400) }, "server/a/big.ts"));
+test("size names a file over 1,000 lines", () => plantedFails("size", { "server/a/big.ts": lines(1001) }, { "server/a/big.ts": lines(1000) }, "server/a/big.ts: over 1000 lines"));
 test("size names a function over 80 lines", () => plantedFails("size", { "server/a/f.ts": fn(81) }, { "server/a/f.ts": fn(80) }, "function long"));
 test("names names a retired word, even inside an identifier", () =>
 	plantedFails("names", { "server/a/x.ts": "const boardCamera = 1;\n" }, { "server/a/x.ts": "const cardCamera = 1;\n" }, "server/a/x.ts: board"));

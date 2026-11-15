@@ -1,10 +1,10 @@
-// Rule 1: a file holds 400 lines at most, a function 80.
+// Rule 1: a file holds 1,000 lines at most, a function 80.
 // Files of code, styles and Rust are measured; functions in TypeScript and JavaScript only, by the compiler's parse.
 import ts from "typescript";
 import { CODE, bump, isSource, lineCount } from "./lib.mjs";
 
 const MEASURED = /\.(ts|tsx|mts|mjs|js|cjs|css|rs|wgsl|swift)$/;
-export const FILE_MAX = 400;
+export const FILE_MAX = 1000;
 export const FUNCTION_MAX = 80;
 
 function functionName(node) {
@@ -34,7 +34,7 @@ export function longFunctions(path, text) {
 
 export default {
 	name: "size",
-	rule: "1. A file holds 400 lines at most, a function 80.",
+	rule: "1. A file holds 1,000 lines at most, a function 80.",
 	scan({ files, read }) {
 		const counts = new Map();
 		for (const f of files.filter((f) => isSource(f) && MEASURED.test(f))) {

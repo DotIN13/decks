@@ -7,6 +7,7 @@ The ten rules of `docs/rewrite/DESIGN.md` section 6, plus lanes and the map, as 
 - One file per rule: `size.mjs` (1), `names.mjs` (2), `imports.mjs` (3), `calls.mjs` (4),
   `readme.mjs` (5), `comments.mjs` (6), `commits.mjs` (7), `parts.mjs` (8), `state.mjs` (9),
   `built.mjs` (10).
+- Rule 1's limits: a file over 1,000 lines, a function over 80 (`FILE_MAX` and `FUNCTION_MAX` in `size.mjs`).
 - `lanes.mjs`: a commit touches only its author's paths in `docs/rewrite/lanes.json`.
 - `agents-md.mjs`: `AGENTS.md` is 150 lines at most and names only paths that exist.
 - `legacy.mjs`: calls the four gates in `scripts/` from before the rewrite.

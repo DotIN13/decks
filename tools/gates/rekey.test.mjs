@@ -26,13 +26,13 @@ test("keys move with the same counts, the legacy gate's prefix kept, a collision
 		names: { "packages/canvas/src/a.ts: stage": 3, "server/b.ts: board": 1 },
 		legacy: { "stale-paths: packages/canvas/src/m.md: x.ts": 1 },
 		readme: { "packages/canvas/src: has no README.md": 1 },
-		size: { "packages/canvas/src/a.ts: over 400 lines": 1, "canvas/a.ts: over 400 lines": 1 },
+		size: { "packages/canvas/src/a.ts: over 1000 lines": 1, "canvas/a.ts: over 1000 lines": 1 },
 	});
 	assert.equal(rekey(root, [["packages/canvas/src", "canvas"]]), 4);
 	assert.deepEqual(read(root, "names"), { "canvas/a.ts: stage": 3, "server/b.ts: board": 1 });
 	assert.deepEqual(read(root, "legacy"), { "stale-paths: canvas/m.md: x.ts": 1 });
 	assert.deepEqual(read(root, "readme"), { "canvas: has no README.md": 1 });
-	assert.deepEqual(read(root, "size"), { "canvas/a.ts: over 400 lines": 2 });
+	assert.deepEqual(read(root, "size"), { "canvas/a.ts: over 1000 lines": 2 });
 });
 
 test("an imports key's old unit moves with the package's files: its name in the text too", () => {
@@ -52,10 +52,10 @@ test("an imports key's old unit moves with the package's files: its name in the 
 });
 
 test("a split's new files carry its exceptions, never above its total", () => {
-	const before = { "canvas/gesture.ts: board": 106, "canvas/gesture.ts: over 400 lines": 1 };
+	const before = { "canvas/gesture.ts: board": 106, "canvas/gesture.ts: over 1000 lines": 1 };
 	const split = { added: ["canvas/a.ts", "canvas/b.ts"], modified: ["canvas/gesture.ts"] };
-	const kept = { "canvas/gesture.ts: board": 50, "canvas/a.ts: board": 30, "canvas/b.ts: board": 20, "canvas/a.ts: over 400 lines": 1 };
-	assert.deepEqual([...splitKeys(before, kept, split)].sort(), ["canvas/a.ts: board", "canvas/a.ts: over 400 lines", "canvas/b.ts: board"]);
+	const kept = { "canvas/gesture.ts: board": 50, "canvas/a.ts: board": 30, "canvas/b.ts: board": 20, "canvas/a.ts: over 1000 lines": 1 };
+	assert.deepEqual([...splitKeys(before, kept, split)].sort(), ["canvas/a.ts: board", "canvas/a.ts: over 1000 lines", "canvas/b.ts: board"]);
 	const more = { "canvas/gesture.ts: board": 90, "canvas/a.ts: board": 30 };
 	assert.deepEqual([...splitKeys(before, more, split)], [], "120 of a kind the file had 106 of is growth");
 	assert.deepEqual([...splitKeys(before, { "canvas/a.ts: stage": 1 }, split)], [], "a kind the file never had is growth");
