@@ -106,8 +106,8 @@
 	"canvas/editor/core/overlay-json.ts: stage": 2,
 	"canvas/editor/core/overlay.test.ts: board": 50,
 	"canvas/editor/core/overlay.test.ts: stage": 2,
-	"canvas/editor/core/overlay.ts: board": 72,
-	"canvas/editor/core/overlay.ts: stage": 6,
+	"canvas/editor/core/overlay.ts: board": 14,
+	"canvas/editor/core/overlay.ts: stage": 1,
 	"canvas/editor/core/pick.test.ts: board": 16,
 	"canvas/editor/core/pick.test.ts: stage": 10,
 	"canvas/editor/core/pick.ts: board": 21,
@@ -666,5 +666,10 @@
 	"ui/scribble.tsx: board": 1,
 	"canvas/editor/core/gesture-carry.ts: board": 30,
 	"canvas/editor/core/gesture-handle.ts: board": 24,
-	"canvas/editor/core/gesture-press.ts: board": 23
+	"canvas/editor/core/gesture-press.ts: board": 23,
+	"canvas/editor/core/outlines.ts: board": 48,
+	"canvas/editor/core/handles.ts: board": 6,
+	"canvas/editor/core/measure.ts: board": 1,
+	"canvas/editor/core/outlines.ts: stage": 1,
+	"canvas/editor/core/handles.ts: stage": 3
 }

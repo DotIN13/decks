@@ -39,7 +39,6 @@
 	"canvas/drawing/drawing.ts: function createDrawing over 80 lines": 1,
 	"canvas/drawing/drawing.ts: over 400 lines": 1,
 	"canvas/editor/core/overlay-json.ts: function overlayJson over 80 lines": 1,
-	"canvas/editor/core/overlay.ts: over 400 lines": 1,
 	"canvas/editor/dom/controller.ts: function createEditor over 80 lines": 1,
 	"canvas/editor/dom/effects.ts: function createEffects over 80 lines": 1,
 	"canvas/editor/dom/OverlayLayer.tsx: function OverlayLayer over 80 lines": 1,

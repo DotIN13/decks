@@ -101,7 +101,6 @@
 	"canvas/editor/core/model.ts: comment over 5 lines": 1,
 	"canvas/editor/core/ops.ts: comment over 5 lines": 7,
 	"canvas/editor/core/overlay-json.ts: comment over 5 lines": 1,
-	"canvas/editor/core/overlay.ts: comment over 5 lines": 3,
 	"canvas/editor/core/pick.ts: comment over 5 lines": 1,
 	"canvas/editor/core/resize.ts: comment over 5 lines": 5,
 	"canvas/editor/core/scene.ts: comment over 5 lines": 1,
