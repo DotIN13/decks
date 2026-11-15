@@ -118,3 +118,10 @@ sat waiting for an hour:
 Browser checks: call `node tools/checks/run.mjs <check>` directly; it takes a slot per run, two checks at
 once, timed checks alone. `node tools/heavy.mjs --wait -- <command>` is for builds, installs and the whole
 type check, which run alone. Do not wrap `run.mjs` in `heavy.mjs`.
+
+## Undo only what is yours, by name
+
+The checkout is shared, so the tree holds other agents' unsaved edits. Never undo by pattern or for the
+whole tree: no `git restore .`, no `git restore` over `git ls-files -m`, no `git checkout -- .`,
+`git stash`, `git clean` or `git reset --hard`. Undo by naming your own files, one list, read before you
+run it. Added on 2026-11-15 after one such restore reverted another agent's edits in two files.
