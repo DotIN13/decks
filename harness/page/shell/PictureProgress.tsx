@@ -51,40 +51,40 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 
 	return (
 		<Show when={!props.quietWhenDone || (progress() !== undefined && !done())}>
-		<Show when={props.quietWhenDone}>
-			<span class="rule block" />
-		</Show>
-		<div
-			data-row
-			data-flat="true"
-			/* A reading: a press on it does not close the menu (`Popover`). */
-			data-keep-open
-			class="picture-progress"
-			role="status"
-			title={done() ? "Every card has its pictures" : "Pictures of the cards are being made in the background"}
-		>
-			<span class="row-icon">
-				<Icon of={Images} size={15} />
-			</span>
-			<span class="flex min-w-0 flex-1 flex-col gap-[4px]">
-				<span class="row-label">Card pictures</span>
-				<Show when={!done()}>
-					<span class="picture-progress-track" aria-hidden="true">
-						<span class="picture-progress-fill" style={{ width: `${share()}%` }} />
-					</span>
-					<span class="meta tabular-nums">
-						{(() => {
-							const p = progress();
-							if (!p) return "Checking…";
-							return `${count(p.ready)} of ${count(p.total)} made${p.failed > 0 ? `, ${count(p.failed)} failed` : ""}`;
-						})()}
-					</span>
-				</Show>
-			</span>
-			<Show when={done()}>
-				<span class="meta flex-none">All ready</span>
+			<Show when={props.quietWhenDone}>
+				<span class="rule block" />
 			</Show>
-		</div>
+			<div
+				data-row
+				data-flat="true"
+				/* A reading: a press on it does not close the menu (`Popover`). */
+				data-keep-open
+				class="picture-progress"
+				role="status"
+				title={done() ? "Every card has its pictures" : "Pictures of the cards are being made in the background"}
+			>
+				<span class="row-icon">
+					<Icon of={Images} size={15} />
+				</span>
+				<span class="flex min-w-0 flex-1 flex-col gap-[4px]">
+					<span class="row-label">Card pictures</span>
+					<Show when={!done()}>
+						<span class="picture-progress-track" aria-hidden="true">
+							<span class="picture-progress-fill" style={{ width: `${share()}%` }} />
+						</span>
+						<span class="meta tabular-nums">
+							{(() => {
+								const p = progress();
+								if (!p) return "Checking…";
+								return `${count(p.ready)} of ${count(p.total)} made${p.failed > 0 ? `, ${count(p.failed)} failed` : ""}`;
+							})()}
+						</span>
+					</Show>
+				</span>
+				<Show when={done()}>
+					<span class="meta flex-none">All ready</span>
+				</Show>
+			</div>
 		</Show>
 	);
 }

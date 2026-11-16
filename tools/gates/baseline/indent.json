@@ -4,10 +4,5 @@
 	"canvas/chrome/PenBar.tsx: JSX child level with its parent": 7,
 	"canvas/editor/dom/TextEditing.tsx: JSX child level with its parent": 2,
 	"canvas/editor/editor.tsx: line shallower than its block": 4,
-	"canvas/items/item-slot.tsx: JSX child level with its parent": 4,
-	"canvas/view/CanvasView.tsx: JSX child level with its parent": 8,
-	"harness/page/connections/Switcher.tsx: JSX child level with its parent": 2,
-	"harness/page/shell/PictureProgress.tsx: JSX child level with its parent": 2,
-	"ui/agent-marks.tsx: JSX child level with its parent": 6,
-	"ui/Popover.tsx: JSX child level with its parent": 1
+	"canvas/items/item-slot.tsx: JSX child level with its parent": 4
 }

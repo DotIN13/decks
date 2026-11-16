@@ -248,62 +248,62 @@ export function Switcher(props: { label?: string } = {}) {
 						<For each={[...connections()].sort((a, b) => Number(b.id === current()?.id) - Number(a.id === current()?.id))}>
 							{(one, index) => (
 								<>
-								<Show when={index() === 1}>
-									<div class="menu-label">Other decks</div>
-								</Show>
-								<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined} data-here={one.id === current()?.id ? "true" : undefined}>
-									<Show
-										when={editing() === one.id}
-										fallback={
-											<>
-												<button type="button" role="menuitem" data-row data-flat="true" class="min-w-0 flex-1" data-connection={one.id} onClick={() => void go(one.id)}>
-													<span class="switcher-dot" data-reach={one.id === current()?.id ? "ok" : (reached()[one.id] ?? "unknown")} aria-hidden="true" />
-													<span class="flex min-w-0 flex-1 flex-col items-start">
-														<span class="row-label w-full truncate text-left">{rowName(one)}</span>
-														<span class="row-note w-full truncate text-left text-faint">
-															{kindNote(one)}
-															{one.name && one.kind !== "here" && one.name !== one.label ? ` · ${one.label}` : ""}
-															{reached()[one.id] === "off" ? " · not reachable" : reached()[one.id] === "unpaired" ? " · pairing revoked" : ""}
-														</span>
-													</span>
-												</button>
-												<button type="button" class="close" title="Rename" aria-label={`Rename ${rowName(one)}`} onClick={() => startRename(one)} data-rename={one.id}>
-													<Icon of={Pencil} size={12} />
-												</button>
-												<Show when={one.kind !== "here" && one.id !== current()?.id}>
-													<button type="button" class="close" title={one.kind === "bundle" ? "Remove this canvas from this browser" : "Forget this server"} aria-label={`Forget ${rowName(one)}`} onClick={() => void forget(one.id)}>
-														<Icon of={X} size={12} />
-													</button>
-												</Show>
-											</>
-										}
-									>
-										{/*
-											Renaming in the row itself. Its keys stop here: the menu listens on the document
-											for Escape and the arrows, and they mean the text while it is being typed.
-										*/}
-										<label class="field switcher-rename h-8 min-w-0 flex-1 rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
-											<input
-												ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
-												type="text"
-												maxLength={60}
-												class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-												placeholder={one.kind === "here" ? (ownName() ?? "This server") : one.label}
-												value={draftName()}
-												onInput={(event) => setDraftName(event.currentTarget.value)}
-												/* `on:` binds to the field itself; Solid's `onKeyDown` is delegated to the
-												   document, where the menu's own listener would already have the key. */
-												on:keydown={(event: KeyboardEvent) => {
-													event.stopPropagation();
-													if (event.key === "Enter") finishRename(true);
-													else if (event.key === "Escape") finishRename(false);
-												}}
-												onBlur={() => finishRename(true)}
-												data-rename-input
-											/>
-										</label>
+									<Show when={index() === 1}>
+										<div class="menu-label">Other decks</div>
 									</Show>
-								</div>
+									<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined} data-here={one.id === current()?.id ? "true" : undefined}>
+										<Show
+											when={editing() === one.id}
+											fallback={
+												<>
+													<button type="button" role="menuitem" data-row data-flat="true" class="min-w-0 flex-1" data-connection={one.id} onClick={() => void go(one.id)}>
+														<span class="switcher-dot" data-reach={one.id === current()?.id ? "ok" : (reached()[one.id] ?? "unknown")} aria-hidden="true" />
+														<span class="flex min-w-0 flex-1 flex-col items-start">
+															<span class="row-label w-full truncate text-left">{rowName(one)}</span>
+															<span class="row-note w-full truncate text-left text-faint">
+																{kindNote(one)}
+																{one.name && one.kind !== "here" && one.name !== one.label ? ` · ${one.label}` : ""}
+																{reached()[one.id] === "off" ? " · not reachable" : reached()[one.id] === "unpaired" ? " · pairing revoked" : ""}
+															</span>
+														</span>
+													</button>
+													<button type="button" class="close" title="Rename" aria-label={`Rename ${rowName(one)}`} onClick={() => startRename(one)} data-rename={one.id}>
+														<Icon of={Pencil} size={12} />
+													</button>
+													<Show when={one.kind !== "here" && one.id !== current()?.id}>
+														<button type="button" class="close" title={one.kind === "bundle" ? "Remove this canvas from this browser" : "Forget this server"} aria-label={`Forget ${rowName(one)}`} onClick={() => void forget(one.id)}>
+															<Icon of={X} size={12} />
+														</button>
+													</Show>
+												</>
+											}
+										>
+											{/*
+												Renaming in the row itself. Its keys stop here: the menu listens on the document
+												for Escape and the arrows, and they mean the text while it is being typed.
+											*/}
+											<label class="field switcher-rename h-8 min-w-0 flex-1 rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+												<input
+													ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
+													type="text"
+													maxLength={60}
+													class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+													placeholder={one.kind === "here" ? (ownName() ?? "This server") : one.label}
+													value={draftName()}
+													onInput={(event) => setDraftName(event.currentTarget.value)}
+													/* `on:` binds to the field itself; Solid's `onKeyDown` is delegated to the
+													   document, where the menu's own listener would already have the key. */
+													on:keydown={(event: KeyboardEvent) => {
+														event.stopPropagation();
+														if (event.key === "Enter") finishRename(true);
+														else if (event.key === "Escape") finishRename(false);
+													}}
+													onBlur={() => finishRename(true)}
+													data-rename-input
+												/>
+											</label>
+										</Show>
+									</div>
 								</>
 							)}
 						</For>
