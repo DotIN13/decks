@@ -1,4 +1,4 @@
-import { jsonSchemaOf, PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope } from "../../../protocol/index.ts";
+import { jsonSchemaOf, PROTOCOL_VERSION, toolText, type AnyCall, type Caller } from "../../../protocol/index.ts";
 import type { Built } from "../kernel.ts";
 import { SERVER_VERSION } from "../version.ts";
 
@@ -24,7 +24,7 @@ export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise
 			return reply({ tools: built.router.callable(caller).map(tool) });
 		case "tools/call": {
 			const envelope = await built.router.call(String(rpc.params?.name), rpc.params?.arguments ?? {}, caller);
-			const text = textOf(envelope);
+			const { text } = toolText(envelope);
 			return reply({ content: [{ type: "text", text }], structuredContent: envelope, isError: !envelope.ok });
 		}
 		default:
@@ -34,13 +34,3 @@ export async function mcpAnswer(built: Built, caller: Caller, rpc: Rpc): Promise
 
 const tool = (call: AnyCall) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) });
 
-/** What an MCP client reads: the value then its notes, or the refusal, its hint, then notes; as clients/mcp writes it. */
-export function textOf(envelope: Envelope<unknown>): string {
-	if (!envelope.ok) {
-		const { message, code, hint } = envelope.error;
-		return [`${message} (${code})`, ...(hint ? [`Try ${hint}.`] : []), ...envelope.notes].join("\n");
-	}
-	const { value } = envelope;
-	const text = value === undefined || value === null ? "(done)" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
-	return [text, ...envelope.notes].join("\n");
-}
