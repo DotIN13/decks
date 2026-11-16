@@ -235,8 +235,7 @@ export function toObsidian(md: string): string {
 		.replace(/\{\+\+([\s\S]+?)\+\+\}/g, "")
 		.replace(/\{--([\s\S]+?)--\}/g, "$1")
 		.replace(/\{==([\s\S]+?)==\}/g, "==$1==")
-		.replace(/\s*\{>>([\s\S]+?)<<\}/g, " %%$1%%")
-;
+		.replace(/\s*\{>>([\s\S]+?)<<\}/g, " %%$1%%");
 }
 
 /** Styled words, `[words]{.red .large}`, as the words alone; a span inside a span too. */

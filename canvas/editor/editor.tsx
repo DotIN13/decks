@@ -160,9 +160,9 @@ function parkViews(
 ): (() => void) | undefined {
 	const { camera, setCamera, doc, look } = s;
 	let parkTimer: ReturnType<typeof setTimeout> | undefined;
-const park = (scope: string | undefined) => {
-	if (scope && views) views.keep(scope, undefined, viewToPark(untrack(camera), untrack(penSelection)[0]));
-};
+	const park = (scope: string | undefined) => {
+		if (scope && views) views.keep(scope, undefined, viewToPark(untrack(camera), untrack(penSelection)[0]));
+	};
 	return options.views
 	? createRoot((done) => {
 			const scope = options.views!.scope;
@@ -310,10 +310,10 @@ function canvasSurface(s: SurfaceParts): JSX.Element {
 		setCamera={setCamera}
 		selected={selected()}
 		onSelect={(path) => {
-		setSelected(path);
-		options.onSelect?.(path);
-		/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
-		if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
+			setSelected(path);
+			options.onSelect?.(path);
+			/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
+			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 		}}
 		onMove={movePage}
 		frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.pages?.page?.(slot.board.path)} {...(options.pages?.cardScripts && !options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.pages.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}

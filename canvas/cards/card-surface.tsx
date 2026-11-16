@@ -139,41 +139,36 @@ function mountFresh(host: HTMLElement, html: string, props: CardSurfaceProps, st
 
 /** Load the card's file again when it changes: not when only its size in it did. */
 function loadOnChange(props: CardSurfaceProps, load: () => void): void {
-/*
- * Loaded again when its file changes, not when only its size in the file did (`sized`): a card
- * resized by its edge wrote its size into its own tag, and a new revision for that had the card
- * fetched, parsed and its scripts started over, mid-use. The revision still names its picture.
- */
-/*
- * What a load is for, each kept as a memo so only a change of its value runs the load: the file's
- * address without its query (the host's carries the revision as one, so it is a new string at
- * every change of the card), the revision of the card's words, which stays while the file's
- * changes are of its size alone (`sized`: a card resized by its edge wrote its size into its own
- * tag, and that had the card fetched and its scripts started over, mid-use), and the host's reloads
- * of this card alone (its record of every card's is a new object at each). The revision still names
- * its picture.
- */
-const pageKey = createMemo(() => props.page.replace(/[?#].*$/, ""));
-const contentRev = createMemo<number>((was) => (props.sized && was !== undefined ? was : props.rev), props.rev);
-const reloads = createMemo(() => props.reload);
+	/*
+	 * What a load is for, each kept as a memo so only a change of its value runs the load: the file's
+	 * address without its query (the host's carries the revision as one, so it is a new string at
+	 * every change of the card), the revision of the card's words, which stays while the file's
+	 * changes are of its size alone (`sized`: a card resized by its edge wrote its size into its own
+	 * tag, and that had the card fetched and its scripts started over, mid-use), and the host's reloads
+	 * of this card alone (its record of every card's is a new object at each). The revision still names
+	 * its picture.
+	 */
+	const pageKey = createMemo(() => props.page.replace(/[?#].*$/, ""));
+	const contentRev = createMemo<number>((was) => (props.sized && was !== undefined ? was : props.rev), props.rev);
+	const reloads = createMemo(() => props.reload);
 	createEffect(on(() => [pageKey(), contentRev(), reloads()] as const, load));
 }
 
 /** The card told the scheme and its size as they change, read first so the effects run again once it mounts. */
 function followSchemeAndSize(props: CardSurfaceProps, mounted: () => MountedCard | undefined): void {
-/*
- * The scheme and the size are read before the card is asked: a card mounts later than these run
- * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect
- * would never run again and a card would keep the scheme it woke in.
- */
-createEffect(() => {
-	const theme = scheme();
-	mounted()?.setTheme(theme);
-});
-createEffect(() => {
-	const size = props.size();
-	mounted()?.setSize(size);
-});
+	/*
+	 * The scheme and the size are read before the card is asked: a card mounts later than these run
+	 * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect
+	 * would never run again and a card would keep the scheme it woke in.
+	 */
+	createEffect(() => {
+		const theme = scheme();
+		mounted()?.setTheme(theme);
+	});
+	createEffect(() => {
+		const size = props.size();
+		mounted()?.setSize(size);
+	});
 }
 
 /** What the card's own root hears: the one rule (`ownInput`), and the card's links and words. */
