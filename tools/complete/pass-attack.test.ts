@@ -19,6 +19,9 @@ async function withB(root: string): Promise<void> {
 	await writeFile(join(root, "canvases", "b", "files", "secret.txt"), SECRET);
 	await mkdir(join(root, "canvases", "b", "cards", "secret"), { recursive: true });
 	await writeFile(join(root, "canvases", "b", "cards", "secret", "index.html"), `<title>${SECRET}</title><div class="doc">${SECRET}</div>`);
+	await mkdir(join(root, "apps", "other"), { recursive: true });
+	await writeFile(join(root, "apps", "other", "app.json"), JSON.stringify({ title: "Other", kind: "static" }));
+	await writeFile(join(root, "apps", "other", "index.html"), `<title>${SECRET}</title>`);
 }
 
 type Probe = { status: number; text: string };
@@ -65,6 +68,8 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			["canvas.export", { of: "x", to: "canvases/b/canvas.pen" }],
 			["canvas.screenshot", { to: "canvases/b/cards/secret/index.html" }],
 			["canvas.screenshot", { to: "apps/x/server.js" }],
+			["item.insert", { item: { type: "app", app: "other" } }],
+			["item.batch", { ops: [{ op: "insert", item: { type: "app", app: "other" } }] }],
 		];
 		for (const [name, args] of calls) {
 			const p = await call(name, args);
@@ -90,6 +95,8 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 		const exists = (path: string) => stat(join(s.root, path)).then(() => true, () => false);
 		assert.equal(await exists("assets/planted.txt"), false, `a pass wrote into the deck's assets/ (upload answered ${upload.status})`);
 		if (upload.ok) assert.ok(await exists(`canvases/${A}/files/planted.txt`), "an upload a pass may make lands in its own canvas's files/");
+		const opened = await fetch(`${s.url}/app-pass/other`, { method: "POST", headers: { authorization: `Bearer ${pass}` } });
+		assert.ok(opened.status >= 400, `a pass opened an app placed on no canvas of its own: ${opened.status}`);
 		const again = await fetch(`${s.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify({ canvas: "b" }) });
 		assert.ok(again.status >= 400, "a pass asked for a pass");
 		const mcp = await fetch(`${s.url}/mcp`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "item.list", arguments: { canvas: "b" } } }) });
