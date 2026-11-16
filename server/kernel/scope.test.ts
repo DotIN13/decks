@@ -142,6 +142,22 @@ test("a pass's card may be one its canvas already places, as the canvas feature 
 	await server.close();
 });
 
+test("a pass's call that only reads may name the deck's assets/ and lib/; one that writes may not", async () => {
+	const server = await testServer();
+	const pass = server.callers.resolve(server.callers.issue({ ...callers.person, id: "person~frame-4" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
+	const code = async (name: string, args: Record<string, unknown>) => {
+		const answer = await server.call(name, args, pass);
+		return answer.ok ? "ok" : answer.error.code;
+	};
+	assert.notEqual(await code("file.url", { path: "assets/a.png" }), "refused", "file.url (read) of assets/ passes the scope");
+	assert.notEqual(await code("file.url", { path: "lib/card.css" }), "refused");
+	assert.equal(await code("file.url", { path: "docs/loose.md" }), "refused", "docs/ only when placed");
+	assert.equal(await code("file.url", { path: "canvases/b/files/x.png" }), "refused");
+	assert.equal(await code("file.write", { path: "assets/a.png", text: "x" }), "refused", "a write stays in its folder or what is placed");
+	assert.equal(await code("file.write", { path: "lib/card.css", text: "x" }), "refused");
+	await server.close();
+});
+
 test("each refusal a pass meets, by a call or a route, is one JSON line in DECKS_REFUSALS", async () => {
 	const { tempFolder } = await import("./disk.ts");
 	const { readFile } = await import("node:fs/promises");

@@ -54,6 +54,8 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 		assert.ok(pass, "the person's token asks for a pass");
 		const { call, get } = probes(s, pass);
 		assert.ok(answered(await call("item.list", {})), "on its own canvas a pass still reads its items");
+		const shared = await call("file.url", { path: "assets/sketch.svg" });
+		assert.ok(answered(shared), `a pass still gets the address of the deck's assets/: ${shared.text.slice(0, 160)}`);
 		const calls: [string, Record<string, unknown>][] = [
 			["item.list", { canvas: "b" }],
 			["canvas.create", { title: "evil" }],
@@ -74,9 +76,11 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			["canvas.screenshot", { to: "apps/x/server.js" }],
 			["item.insert", { item: { type: "app", app: "other" } }],
 			["item.insert", { item: { type: "ref", ref: "canvases/b/frames/x.pen" } }],
-			...["docs/loose.md", "assets/loose.md", "apps/loose.md"].flatMap((path): [string, Record<string, unknown>][] => [
-				["file.open", { path, client: "attack" }],
-				["file.splice", { path, client: "attack", rev: 0, batch: "b1", splices: [{ at: 0, before: "", text: "PWNED" }] }],
+			["file.open", { path: "docs/loose.md", client: "attack" }],
+			["file.open", { path: "apps/loose.md", client: "attack" }],
+			...["docs/loose.md", "assets/loose.md", "apps/loose.md"].map((path): [string, Record<string, unknown>] => [
+				"file.splice",
+				{ path, client: "attack", rev: 0, batch: "b1", splices: [{ at: 0, before: "", text: "PWNED" }] },
 			]),
 			["item.batch", { ops: [{ op: "insert", item: { type: "app", app: "other" } }] }],
 		];

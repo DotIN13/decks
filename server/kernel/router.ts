@@ -164,7 +164,8 @@ function beyond(scope: Scope | undefined, name: string, args: unknown, placed: P
 	if (scope.calls && !scope.calls.includes(name)) return `This pass may not call ${name}; it reaches only its canvas's calls.`;
 	const asked = typeof args === "object" && args !== null ? (args as { canvas?: unknown }).canvas : undefined;
 	if (scope.canvas !== undefined && asked !== undefined && asked !== scope.canvas) return `This pass reaches only the canvas ${scope.canvas}, not ${String(asked)}.`;
-	return scope.canvas === undefined ? undefined : outsideFolder(scope.canvas, args, placed);
+	const reads = CALL_BY_NAME.get(name)?.effect === "read";
+	return scope.canvas === undefined ? undefined : outsideFolder(scope.canvas, args, placed, reads);
 }
 
 /** Whether a canvas places an item at a path (Kernel.places, answered by the canvas feature). */
@@ -174,8 +175,12 @@ type Placed = (canvas: string, path: string) => boolean;
  *  path: its folder or what its canvas already places, such as an old page or a document from docs/). */
 const PLACES = { to: false, card: true, cards: true, path: true } as const;
 
+/** What every card may read and point at beside its canvas: the deck's shared roots. A call that only reads
+ *  (its effect in the protocol is read) may name them; a call that changes anything may not. */
+const SHARED_READS = ["assets", "lib"];
+
 /** Why an argument naming a place lies outside what a scoped canvas reaches, read through deckPathFrom. */
-function outsideFolder(canvas: string, args: unknown, placed: Placed): string | undefined {
+function outsideFolder(canvas: string, args: unknown, placed: Placed, reads: boolean): string | undefined {
 	if (typeof args !== "object" || args === null) return undefined;
 	const folder = layout.canvasFolder(canvas);
 	for (const [key, mayBePlaced] of Object.entries(PLACES)) {
@@ -188,7 +193,8 @@ function outsideFolder(canvas: string, args: unknown, placed: Placed): string | 
 			} catch {
 				return `This pass's ${key}, ${value}, is not a path inside the deck.`;
 			}
-			if (!inside(path, folder) && !(mayBePlaced && placed(canvas, path))) return `This pass's ${key} must be inside ${folder}${mayBePlaced ? " or placed on its canvas" : ""}, not ${path}.`;
+			const shared = reads && key !== "to" && SHARED_READS.some((root) => inside(path, root));
+			if (!inside(path, folder) && !shared && !(mayBePlaced && placed(canvas, path))) return `This pass's ${key} must be inside ${folder}${mayBePlaced ? " or placed on its canvas" : ""}, not ${path}.`;
 		}
 	}
 	return undefined;
