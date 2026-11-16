@@ -1,3 +1,5 @@
+// The editor on the page: its state in one signal, stepped by the gestures,
+// each part handed out as a memo, and what each step asks for done.
 /**
  * The editor on the page: its state (`core/model.ts`, `EditorState`) held in one signal, stepped
  * by `core/gesture.ts`, with what each step asks for done here — ops sent (`onPenEdit`), the
@@ -8,7 +10,7 @@
  * touched by a pointer move that changes only the drag. The step keeps every part it does not
  * change as the same value, which is what lets a memo see that nothing changed.
  *
- * The selection is this editor's. `state/pen-tools.ts` reads and writes it through
+ * The selection is this editor's. `editor/pen-tools.ts` reads and writes it through
  * `feedSelection`, so the drawing bar and the properties panel see the one selection the stage has.
  */
 import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type PenDocument } from "@decks/pen";
@@ -53,8 +55,21 @@ export function pointerInput(event: { clientX: number; clientY: number; shiftKey
 }
 
 export function createEditor(host: EditorHost) {
+	const core = editorCore(host);
+	const parts = stateParts(core);
+	followHost(core, host, parts);
+	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => core.update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
+	onCleanup(feedSelection({ items: parts.items, select: (next) => select(next) }));
+	return { ...parts, ...pagesAndGlide(core, host, parts), ...actions(core, host, select) };
+}
+
+/** What every part of the editor shares: its state, how a step is dispatched, and what waits for a frame. */
+type Core = ReturnType<typeof editorCore>;
+
+/** The state in one signal, the effects run for each step, and the step itself (`dispatch`). */
+function editorCore(host: EditorHost) {
 	/*
-	 * The selection the last stage left (`state/pen-tools.ts`, `keptSelection`): a stage mounted
+	 * The selection the last stage left (`editor/pen-tools.ts`, `keptSelection`): a stage mounted
 	 * again starts with what was selected, as it did when the selection was the page's own signal.
 	 */
 	const [state, setState] = createSignal<EditorState>(withSelection(initialState(untrack(host.mode), untrack(host.tool)), { items: keptSelection() }));
@@ -122,7 +137,20 @@ export function createEditor(host: EditorHost) {
 		if (!read().resize) frames.length = 0;
 	};
 	const update = (change: (now: EditorState) => EditorState) => commit(change(read()));
+	const part = <T>(pick: (now: EditorState) => T): Accessor<T> => createMemo(() => pick(state()));
+	const drawnAt = { next: (drawnDoc: PenDocument | undefined) => {
+		const fresh = drawnDoc !== lastDrawn;
+		lastDrawn = drawnDoc;
+		if (fresh) generation++;
+		return fresh;
+	} };
+	return { state, read, commit, update, dispatch, part, frames, afterFrame, effects, drawnAt };
+}
 
+/** The app's mode and tool kept in the state, and pages let go of, landed and carried as the pages change. */
+function followHost(core: Core, host: EditorHost, parts: ReturnType<typeof stateParts>): void {
+	const { update } = core;
+	const { pageDrag, ownDrag, pageResize } = parts;
 	// The mode and the tool are the app's and the drawing bar's: the state keeps a copy for the step to read.
 	createEffect(() => {
 		const mode = host.mode();
@@ -134,14 +162,6 @@ export function createEditor(host: EditorHost) {
 		const present = new Set(host.boards().map((board) => board.path));
 		update((now) => prunePages(now, present));
 	});
-
-	const part = <T>(pick: (now: EditorState) => T): Accessor<T> => createMemo(() => pick(state()));
-	const items = part((now) => now.selection.items);
-	const pagePicks = part((now) => now.selection.boards);
-	const pageResize = part((now) => now.pageResize);
-	const pageDrag = part((now) => now.pageDrag);
-	const ownDrag = part((now) => now.ownDrag);
-
 	/*
 	 * A board size let go of is held until the board is at it (`landPageResize`): asked again
 	 * whenever the boards change, and once as it is let go.
@@ -167,29 +187,13 @@ export function createEditor(host: EditorHost) {
 		// The boards' pictures are the engine's, and go with the drag there.
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
+}
 
-	/** Whether an arrow on the drawing ends on this board. */
-	const arrowEndsOn = (path: string) => {
-		for (const { node } of host.scene.items()) {
-			if (!isArrow(node)) continue;
-			const ends = (node.metadata ?? {}) as { from?: unknown; to?: unknown };
-			if (arrowEndItem(ends.from) === path || arrowEndItem(ends.to) === path) return true;
-		}
-		return false;
-	};
-	const ZERO: Offset = { dx: 0, dy: 0 };
-	const shown = part(shownDrag);
-	const shownResize = part((now) => now.shownResize);
-	/** A drop's glide in hand, each frame of it as the engine draws it (`stage/engine.ts`, `onGlide`). */
-	const [glide, setGlide] = createSignal<ReadonlyMap<string, Offset> | undefined>(undefined, { equals: false });
-
-	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
-	onCleanup(feedSelection({ items, select: (next) => select(next) }));
-
+/** Each part of the state handed out as its own memo, so a reader of one is not touched by a change to another. */
+function stateParts(core: Core) {
+	const { state, part } = core;
 	return {
 		state,
-		items,
-		pagePicks,
 		hoverItem: part((now) => now.hover.item),
 		hoverPage: part((now) => now.hover.board),
 		hoverPicture: part((now) => now.hover.picture),
@@ -199,12 +203,7 @@ export function createEditor(host: EditorHost) {
 		altHeld: part((now) => !!now.hover.alt),
 		gesture: part((now) => now.gesture),
 		drag: part((now) => now.drag),
-		shownDrag: shown,
-		pageDrag,
-		ownDrag,
 		resize: part((now) => now.resize),
-		shownResize,
-		pageResize,
 		radius: part((now) => now.radius),
 		marquee: part((now) => now.marquee),
 		guides: part((now) => now.guides),
@@ -219,7 +218,32 @@ export function createEditor(host: EditorHost) {
 		/** The words open for typing (`dom/TextEditing.tsx`), and the item they are. */
 		text: part((now) => now.text),
 		typing: part((now) => now.text?.id),
+		items: part((now) => now.selection.items),
+		pagePicks: part((now) => now.selection.boards),
+		pageDrag: part((now) => now.pageDrag),
+		ownDrag: part((now) => now.ownDrag),
+		pageResize: part((now) => now.pageResize),
+		shownDrag: part(shownDrag),
+		shownResize: part((now) => now.shownResize),
+	};
+}
 
+/** Pages carried and sized, and a drop's glide: what the canvas draws while a gesture is in hand. */
+function pagesAndGlide(core: Core, host: EditorHost, parts: ReturnType<typeof stateParts>) {
+	const { pageDrag, pageResize, ownDrag, items, shownDrag: shown, shownResize } = parts;
+	/** Whether an arrow on the drawing ends on this board. */
+	const arrowEndsOn = (path: string) => {
+		for (const { node } of host.scene.items()) {
+			if (!isArrow(node)) continue;
+			const ends = (node.metadata ?? {}) as { from?: unknown; to?: unknown };
+			if (arrowEndItem(ends.from) === path || arrowEndItem(ends.to) === path) return true;
+		}
+		return false;
+	};
+	const ZERO: Offset = { dx: 0, dy: 0 };
+	/** A drop's glide in hand, each frame of it as the engine draws it (`render/engine.ts`, `onGlide`). */
+	const [glide, setGlide] = createSignal<ReadonlyMap<string, Offset> | undefined>(undefined, { equals: false });
+	return {
 		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
 		carrying: createMemo(() => !!pageDrag() || !!pageResize() || !!ownDrag()),
 		/** The boards a gesture holds, which keep their nodes wherever the camera goes. */
@@ -253,7 +277,13 @@ export function createEditor(host: EditorHost) {
 			const resized = shownResize();
 			return resized?.id === id ? resized : undefined;
 		},
+	};
+}
 
+/** What the page calls: an input stepped, the selection and hover set, the engine's drawings and frames said. */
+function actions(core: Core, host: EditorHost, select: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => void) {
+	const { read, update, dispatch, frames, afterFrame, effects, drawnAt } = core;
+	return {
 		/** Step one input; true when it left a gesture in hand, for the page to follow the pointer. */
 		input: (input: Input): boolean => {
 			dispatch(input);
@@ -275,9 +305,7 @@ export function createEditor(host: EditorHost) {
 		 * one more generation, and the one that answers a gesture puts its preview down.
 		 */
 		drawn: (drawnDoc: PenDocument | undefined, current: PenDocument | undefined) => {
-			const fresh = drawnDoc !== lastDrawn;
-			lastDrawn = drawnDoc;
-			if (fresh) generation++;
+			const fresh = drawnAt.next(drawnDoc);
 			const doc = drawnDoc ?? current;
 			dispatch({ type: "drawn", fresh, current: fresh && drawnDoc === current, present: doc ? penIds(doc) : new Set<string>() });
 		},

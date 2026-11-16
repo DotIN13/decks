@@ -1,3 +1,4 @@
+// Colours read through the browser, for what the editor draws in a theme's colours.
 /** A CSS colour as red, green, blue from 0 to 1, read through the browser (`rgb(…)` or `color(srgb …)`); grey when it cannot be read. */
 export function rgbOf(css: string, probe?: HTMLElement): [number, number, number] {
 	if (typeof document === "undefined") return [0.5, 0.5, 0.5];

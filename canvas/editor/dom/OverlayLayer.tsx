@@ -1,3 +1,5 @@
+// What the editor draws over the canvas: outlines, the selection's frame, handles,
+// anchors, guides, drop marks and arrows, each section a part of its own.
 /**
  * What the editor draws over the canvas (`core/overlay.ts`, `Overlay`), as elements in the world:
  * outlines, handles, hints, guides and drafts, in stage pixels, with every screen size divided by
@@ -32,16 +34,19 @@ type OverlayHandlers = {
 	onPageHandle: (event: PointerEvent, handle: Handle) => void;
 };
 
-export function OverlayLayer(
-	props: OverlayHandlers & {
-		overlay: Accessor<Overlay>;
-		zoom: number;
-		/** Whether a board is growing to its content, which its outline says. */
-		sizing: (path: string) => boolean;
-		/** Drawn between the item's handles and the radius handle: the one media player, laid over its item. */
-		children?: JSX.Element;
-	},
-) {
+type OverlayProps = OverlayHandlers & {
+	overlay: Accessor<Overlay>;
+	zoom: number;
+	/** Whether a board is growing to its content, which its outline says. */
+	sizing: (path: string) => boolean;
+	/** Drawn between the item's handles and the radius handle: the one media player, laid over its item. */
+	children?: JSX.Element;
+};
+
+/** What every section of the layer reads: its props, the overlay, a handle at screen size, and whether many are selected. */
+type OverlayCtx = { props: OverlayProps; o: () => Overlay; knob: (x: number, y: number, px: number, after?: string) => JSX.CSSProperties; many: () => boolean };
+
+export function OverlayLayer(props: OverlayProps) {
 	const o = () => props.overlay();
 	/**
 	 * A handle drawn at its screen size, `px` square, centred on a point in the world and scaled by the
@@ -61,6 +66,24 @@ export function OverlayLayer(
 	});
 	/** More than one thing selected: each is outlined thin, and one box round them all is the strong line. */
 	const many = () => !!o().selectionFrame?.many;
+	const c: OverlayCtx = { props, o, knob, many };
+	return (
+		<>
+			<SelectionOutlines c={c} />
+			<GripAndHover c={c} />
+			<DropMarks c={c} />
+			<AnchorsAndGuides c={c} />
+			<Distances c={c} />
+			<ArrowMarks c={c} />
+			<HandlesAndRadius c={c} />
+			<PageHandlesAndDraft c={c} />
+		</>
+	);
+}
+
+/** What the selection sits in and holds, each thing's outline, and the selection's frame. */
+function SelectionOutlines(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, many } = p.c;
 	return (
 		<>
 			{/*
@@ -126,6 +149,15 @@ export function OverlayLayer(
 					</>
 				)}
 			</Show>
+		</>
+	);
+}
+
+/** A card block's grip, the outline under the pointer, and where a join will land. */
+function GripAndHover(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o } = p.c;
+	return (
+		<>
 			<Show when={o().grip}>
 				{(grip) => (
 					<div
@@ -169,6 +201,15 @@ export function OverlayLayer(
 					/>
 				)}
 			</For>
+		</>
+	);
+}
+
+/** Where a drop would go: the frame it goes into, its slots, the boundary it takes, the sides offered. */
+function DropMarks(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, knob } = p.c;
+	return (
+		<>
 			{/*
 			 * What a live drag would drop into: the frame under the pointer, in the same outline an
 			 * arrow's end uses to say what it would join. The one thing that makes the gesture
@@ -214,6 +255,15 @@ export function OverlayLayer(
 					</For>
 				)}
 			</For>
+		</>
+	);
+}
+
+/** The arrow anchors on the selection's sides, and the snapping guides. */
+function AnchorsAndGuides(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, knob } = p.c;
+	return (
+		<>
 			{/*
 				The four places an arrow can leave a selected item from, just outside the middle of each
 				side: a drag from one draws an arrow that keeps to that side.
@@ -274,6 +324,15 @@ export function OverlayLayer(
 					)}
 				</For>
 			</Show>
+		</>
+	);
+}
+
+/** The distances from the selection to what is hovered, while Alt is held. */
+function Distances(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o } = p.c;
+	return (
+		<>
 			{/*
 			 * Alt held over another item, in edit mode: red lines from the selection to it, each with
 			 * its length in pixels, in the snapping guides' colour (`core/overlay.ts`, `measure`).
@@ -297,6 +356,15 @@ export function OverlayLayer(
 					</>
 				)}
 			</Show>
+		</>
+	);
+}
+
+/** An arrow's ends and bend, the route it takes, and the end being drawn. */
+function ArrowMarks(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, knob } = p.c;
+	return (
+		<>
 			<Show when={o().arrow}>
 				{(ends) => (
 					<For each={["from", "to"] as const}>
@@ -347,6 +415,15 @@ export function OverlayLayer(
 					</svg>
 				)}
 			</Show>
+		</>
+	);
+}
+
+/** The resize handles, the media player between them, and the radius handle. */
+function HandlesAndRadius(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, knob } = p.c;
+	return (
+		<>
 			<Show when={o().handles}>
 				{(box) => (
 					<For each={HANDLES}>
@@ -382,6 +459,15 @@ export function OverlayLayer(
 					);
 				}}
 			</Show>
+		</>
+	);
+}
+
+/** A page's resize handles, and a shape being drawn. */
+function PageHandlesAndDraft(p: { c: OverlayCtx }): JSX.Element {
+	const { props, o, knob } = p.c;
+	return (
+		<>
 			<Show when={o().pageHandles}>
 				{(box) => (
 					<For each={pageHandleList()}>

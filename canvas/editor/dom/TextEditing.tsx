@@ -1,3 +1,5 @@
+// Typing into an item's words on the canvas: opening a text, a label or a card,
+// the typed words drawn as they grow, and saving or taking them back.
 /**
  * Typing on the stage: a drawn item's words, a shape's, or a card's markdown, typed in an editor
  * laid over the item (`TextEditor`, the `.pen-text`), set exactly as the canvas sets them so the
@@ -12,7 +14,7 @@
  */
 import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDocument, type PenNode } from "@decks/pen";
 import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
-import { createEffect, createMemo, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, onCleanup, Show, type JSX } from "solid-js";
 import { setPenTyping } from "../pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../cards/card-frame.ts";
 import { CardEditor } from "../../cards/CardEditor.tsx";
@@ -45,10 +47,72 @@ export type TextHost = {
 };
 
 export function createTextEditing(editor: Editor, host: TextHost) {
-	const doc = () => host.pen()?.doc;
 	const open = editor.text;
 	const setOpen = editor.setText;
+	const look = lookups(host);
+	const opens = opening(editor, host, look);
+	const pictures = pictureSizer(host);
+	const typed = typedPreview(host, look, pictures.pictureSize);
+	const ghost = stillCopy(host);
+	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
+	createEffect(() => {
+		if (!host.pen()) return;
+		pageFont("Inter", 400, false);
+		pageFont("Inter", 600, false);
+	});
+	/** Where the item being typed into is now: a made item is placed once the server answers. */
+	const penTextBox = createMemo(() => {
+		host.redrawn();
+		const now = open();
+		return now ? (host.scene.item(now.id)?.box ?? now.box) : undefined;
+	});
+	/*
+	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
+	 * server's answer has been drawn shows the old words for a moment, and then the new.
+	 */
+	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
+	const unmuteNow = () => {
+		if (unmute) clearTimeout(unmute.timer);
+		unmute = undefined;
+		host.engine.muteText(undefined);
+		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
+		ghost.markWhenDrawn();
+	};
+	const { commitPenText, cancel } = committing({ open, setOpen, host, look, typed, ghost, pictures, unmuteNow, clearUnmute: () => unmute && clearTimeout(unmute.timer) });
+	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
+	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
 
+	return {
+		/** The words open for typing, if any. */
+		open,
+		openPenText: opens.openPenText,
+		openShapeWords: opens.openShapeWords,
+		openCardAt: opens.openCardAt,
+		openFileOf: opens.openFileOf,
+		shapeOf: look.shapeOf,
+		cardOf: look.cardOf,
+		/** How an item's words are set (`core/text.ts`, `textLook`): the grip lines up with a block's first line by it. */
+		lookOf: look.textLookOf,
+		cardInner: look.cardInner,
+		/** Where the item being typed into is now. */
+		box: penTextBox,
+		preview: typed.previewTyped,
+		commit: commitPenText,
+		cancel,
+		base: () => host.pen()?.base ?? "",
+		/** The engine laid the drawing out: words saved and drawn are the canvas's to draw again. */
+		drawn: () => {
+			if (unmute && wordsOf(host.scene.item(unmute.id)?.node) === unmute.value) unmuteNow();
+		},
+		/** The sheet put a frame on screen: the still copy goes once the words are in one. */
+		presented: ghost.presented,
+	};
+}
+export type TextEditing = ReturnType<typeof createTextEditing>;
+
+/** How an item's words are looked up and set: the frame it is part of, its card, the card's look and width. */
+function lookups(host: TextHost) {
+	const doc = () => host.pen()?.doc;
 	/** How the canvas sets an item's words, for the editor that types over them (`core/text.ts`, `textLook`). */
 	const textLookOf = (node: PenNode, placed: Parameters<typeof textLook>[2]): TextLook => textLook(doc(), node, placed, host.scheme(), CARD_PALETTE[host.scheme()], pageFont);
 	/** The shape an item is, or is part of (its outline or its words): the frame, by id. */
@@ -59,7 +123,16 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	const cardLook = (card: PenNode): TextLook => cardLookOf(doc(), card, host.scheme(), CARD_PALETTE[host.scheme()], pageFont, CARD_PAD);
 	/** How wide a card's words are: its width less its padding. */
 	const cardInner = (card: PenNode) => cardInnerOf(card, host.scene.item(card.id)?.box.w, CARD_PAD);
+	return { doc, textLookOf, shapeOf, cardOf, cardLook, cardInner };
+}
 
+type Look = ReturnType<typeof lookups>;
+
+/** Opening an item's words for typing: a text, a shape's label, a card at a point, or a file in a tab. */
+function opening(editor: Editor, host: TextHost, look: Look) {
+	const { doc, textLookOf, cardOf, cardLook } = look;
+	const open = editor.text;
+	const setOpen = editor.setText;
 	/**
 	 * Type a shape's words: its own, or a new text made inside it, centred and as wide as the shape,
 	 * which goes again if nothing is typed (`commitPenText`, `fresh`).
@@ -129,13 +202,12 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		else openCard(current, box, false, { caretAt: client });
 		return true;
 	};
-	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
-	createEffect(() => {
-		if (!host.pen()) return;
-		pageFont("Inter", 400, false);
-		pageFont("Inter", 600, false);
-	});
+	return { openShapeWords, openPenText, openFileOf, openCardAt };
+}
 
+/** The words being typed, drawn into a copy of the drawing once a frame, so what holds them grows as they are typed. */
+function typedPreview(host: TextHost, look: Look, pictureSize: (url: string) => { w: number; h: number } | undefined) {
+	const { doc, cardInner } = look;
 	/**
 	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
 	 * a card round its title, a note round its words. A copy of the document with the one item's
@@ -176,24 +248,11 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 	onCleanup(() => {
 		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
 	});
-	/** Where the item being typed into is now: a made item is placed once the server answers. */
-	const penTextBox = createMemo(() => {
-		host.redrawn();
-		const now = open();
-		return now ? (host.scene.item(now.id)?.box ?? now.box) : undefined;
-	});
-	/*
-	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
-	 * server's answer has been drawn shows the old words for a moment, and then the new.
-	 */
-	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
-	const unmuteNow = () => {
-		if (unmute) clearTimeout(unmute.timer);
-		unmute = undefined;
-		host.engine.muteText(undefined);
-		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
-		if (editorGhost) ghostUntil = host.engine.mark();
-	};
+	return { previewTyped, showTyped, dropTyped, setTyped: (value: { id: string; value: string }) => void (typedValue = value) };
+}
+
+/** A still copy of the editor left where it was, until the canvas has a frame with the words in it. */
+function stillCopy(host: TextHost) {
 	/*
 	 * A still copy of the editor, left where the editor was when the typing was put away, until the
 	 * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
@@ -235,7 +294,38 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		ghostUntil = undefined;
 	};
 	onCleanup(dropGhost);
+	return {
+		leaveGhost,
+		dropGhost,
+		/** The canvas may draw the words: the copy goes with the first frame painted after this. */
+		markWhenDrawn: () => {
+			if (editorGhost) ghostUntil = host.engine.mark();
+		},
+		presented: () => {
+			if (ghostUntil !== undefined && host.engine.shows(ghostUntil)) dropGhost();
+		},
+	};
+}
 
+type Committing = {
+	open: Editor["text"];
+	setOpen: Editor["setText"];
+	host: TextHost;
+	look: Look;
+	typed: ReturnType<typeof typedPreview>;
+	ghost: ReturnType<typeof stillCopy>;
+	pictures: ReturnType<typeof pictureSizer>;
+	unmuteNow: () => void;
+	clearUnmute: () => void;
+};
+
+/** Putting the typing away: the words saved as edits, or taken back with Escape. */
+function committing(c: Committing) {
+	const { open, setOpen, host, typed, ghost, unmuteNow } = c;
+	const { cardInner } = c.look;
+	const { pictureSize, measurePictures } = c.pictures;
+	const { showTyped, dropTyped, setTyped } = typed;
+	const leaveGhost = ghost.leaveGhost;
 	const commitPenText = (value: string) => {
 		const now = open();
 		if (now) leaveGhost();
@@ -257,14 +347,14 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 				return dropTyped();
 		}
 		const session = now!;
-		if (unmute) clearTimeout(unmute.timer);
+		c.clearUnmute();
 		/*
 		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
 		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It
 		 * used to wait for the server's answer to be drawn, and a card's words, which keep their ids in
 		 * the answer, were left out for a frame after its copy had already shown them.
 		 */
-		typedValue = { id: session.id, value };
+		setTyped({ id: session.id, value });
 		showTyped();
 		unmuteNow();
 		if (commit.do === "update") {
@@ -299,7 +389,11 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		const ops = cancelOps(now);
 		if (ops.length) host.edit(ops);
 	};
-	/** Pictures' own sizes, as they arrive, so a picture put in a card keeps its shape. */
+	return { commitPenText, cancel };
+}
+
+/** Pictures' own sizes, measured as they arrive, so a picture put in a card keeps its shape. */
+function pictureSizer(host: TextHost) {
 	const pictureSizes = new Map<string, { w: number; h: number } | null>();
 	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
 	const measurePictures = async (markdown: string) => {
@@ -325,158 +419,143 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 			),
 		);
 	};
-	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
-	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
-
-	return {
-		/** The words open for typing, if any. */
-		open,
-		openPenText,
-		openShapeWords,
-		openCardAt,
-		openFileOf,
-		shapeOf,
-		cardOf,
-		/** How an item's words are set (`core/text.ts`, `textLook`): the grip lines up with a block's first line by it. */
-		lookOf: textLookOf,
-		cardInner,
-		/** Where the item being typed into is now. */
-		box: penTextBox,
-		preview: previewTyped,
-		commit: commitPenText,
-		cancel,
-		base: () => host.pen()?.base ?? "",
-		/** The engine laid the drawing out: words saved and drawn are the canvas's to draw again. */
-		drawn: () => {
-			if (unmute && wordsOf(host.scene.item(unmute.id)?.node) === unmute.value) unmuteNow();
-		},
-		/** The sheet put a frame on screen: the still copy goes once the words are in one. */
-		presented: () => {
-			if (ghostUntil !== undefined && host.engine.shows(ghostUntil)) dropGhost();
-		},
-	};
+	return { pictureSize, measurePictures };
 }
-export type TextEditing = ReturnType<typeof createTextEditing>;
 
 /**
  * The editor laid over the item whose words are typed, in the world, in stage units: a card is
- * typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words, in a textarea.
+ * typed into as it reads (`cards/CardEditor.tsx`); a text or a note as its words, in a textarea.
  */
 export function TextEditor(props: { text: TextEditing; zoom: number }) {
 	return (
 		<Show when={props.text.open()} keyed>
-			{(open) => {
-				const look = open.style;
-				const box = () => props.text.box() ?? open.box;
-				const cancel = props.text.cancel;
-				// A card is typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words.
-				if (look.markdown)
-					return (
-						<CardEditor
-							class="pen-text"
-							value={open.value}
-							{...(open.insertAt !== undefined ? { insertAt: open.insertAt } : {})}
-							{...(open.caretAt ? { caretAt: open.caretAt } : {})}
-							{...(open.held ? { held: open.held } : {})}
-							base={props.text.base()}
-							zoom={props.zoom}
-							style={{
-								left: `${box().x}px`,
-								top: `${box().y}px`,
-								width: `${box().w}px`,
-								"min-height": `${box().h}px`,
-								padding: `${look.pad}px`,
-								"font-family": look.font,
-								"font-size": `${look.size}px`,
-								"--card-size": `${look.size}px`,
-								"font-weight": String(look.weight),
-								"letter-spacing": `${look.spacing}px`,
-								"line-height": look.line === undefined ? "1.5" : String(look.line),
-								color: look.ink,
-								background: look.paper ?? "transparent",
-								// Rounded only where the item is: a note or a card has corners, words on the canvas do not.
-								"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-								"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
-							}}
-							onInput={(value) => props.text.preview(open.id, value)}
-							onCommit={props.text.commit}
-							onCancel={cancel}
-						/>
-					);
-				let area: HTMLTextAreaElement | undefined;
-				return (
-					<>
-					<ScribbleCatch target={() => area} onEnd={() => area && props.text.commit(area.value)} />
-					<textarea
-						class="pen-text"
-						data-grows={look.grows}
-						spellcheck={false}
-						style={{
-							left: `${box().x}px`,
-							top: `${box().y}px`,
-							...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
-							"min-height": `${box().h}px`,
-							padding: `${look.pad}px`,
-							"font-family": look.font,
-							"font-size": `${look.size}px`,
-							"font-weight": String(look.weight),
-							"font-style": look.italic ? "italic" : "normal",
-							"letter-spacing": `${look.spacing}px`,
-							"line-height": look.line === undefined ? "normal" : String(look.line),
-							"text-align": look.align as "left",
-							color: look.ink,
-							background: look.paper ?? "transparent",
-							"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
-						}}
-						value={open.value}
-						ref={(el) => {
-							area = el;
-							requestAnimationFrame(() => {
-								el.focus({ preventScroll: true });
-								el.select();
-							});
-						}}
-						onInput={(event) => props.text.preview(open.id, event.currentTarget.value)}
-						onBlur={(event) => {
-							// The pencil writing over the canvas (`ScribbleCatch`): committed when it is done, not now.
-							if (isScribbleCatch(event.relatedTarget)) return;
-							props.text.commit(event.currentTarget.value);
-						}}
-						onKeyDown={(event) => {
-							/*
-							 * Home and End move the caret to the line's start and end. On a Mac they scroll the
-							 * nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`), so a
-							 * note's words were left selected and the next key typed over them.
-							 */
-							if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {
-								event.preventDefault();
-								const el = event.currentTarget;
-								const at = el.selectionDirection === "backward" ? el.selectionStart : el.selectionEnd;
-								const to = event.key === "Home" ? el.value.lastIndexOf("\n", at - 1) + 1 : (() => {
-									const end = el.value.indexOf("\n", at);
-									return end === -1 ? el.value.length : end;
-								})();
-								if (event.shiftKey) {
-									const anchor = el.selectionDirection === "backward" ? el.selectionEnd : el.selectionStart;
-									el.setSelectionRange(Math.min(anchor, to), Math.max(anchor, to), to < anchor ? "backward" : "forward");
-								} else el.setSelectionRange(to, to);
-								return;
-							}
-							if (event.key === "Escape") {
-								event.preventDefault();
-								cancel(event.currentTarget.value);
-							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-								event.preventDefault();
-								event.currentTarget.blur();
-							}
-						}}
-					/>
-					</>
-				);
-			}}
+			{(open) => (open.style.markdown ? <CardWords text={props.text} zoom={props.zoom} open={open} /> : <PlainWords text={props.text} zoom={props.zoom} open={open} />)}
 		</Show>
 	);
+}
+
+type WordsProps = { text: TextEditing; zoom: number; open: TextSession };
+
+/** A card typed into as it reads (`cards/CardEditor.tsx`), laid over the card. */
+function CardWords(props: WordsProps): JSX.Element {
+	const open = props.open;
+	const look = open.style;
+	const box = () => props.text.box() ?? open.box;
+	const cancel = props.text.cancel;
+	return (
+		<CardEditor
+			class="pen-text"
+			value={open.value}
+			{...(open.insertAt !== undefined ? { insertAt: open.insertAt } : {})}
+			{...(open.caretAt ? { caretAt: open.caretAt } : {})}
+			{...(open.held ? { held: open.held } : {})}
+			base={props.text.base()}
+			zoom={props.zoom}
+			style={{
+				left: `${box().x}px`,
+				top: `${box().y}px`,
+				width: `${box().w}px`,
+				"min-height": `${box().h}px`,
+				padding: `${look.pad}px`,
+				"font-family": look.font,
+				"font-size": `${look.size}px`,
+				"--card-size": `${look.size}px`,
+				"font-weight": String(look.weight),
+				"letter-spacing": `${look.spacing}px`,
+				"line-height": look.line === undefined ? "1.5" : String(look.line),
+				color: look.ink,
+				background: look.paper ?? "transparent",
+				// Rounded only where the item is: a note or a card has corners, words on the canvas do not.
+				"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
+				"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
+			}}
+			onInput={(value) => props.text.preview(open.id, value)}
+			onCommit={props.text.commit}
+			onCancel={cancel}
+		/>
+	);
+}
+
+/** A text or a note typed into as its words, in a textarea that grows with them. */
+function PlainWords(props: WordsProps): JSX.Element {
+	const open = props.open;
+	const look = open.style;
+	const box = () => props.text.box() ?? open.box;
+	const cancel = props.text.cancel;
+	let area: HTMLTextAreaElement | undefined;
+	return (
+		<>
+		<ScribbleCatch target={() => area} onEnd={() => area && props.text.commit(area.value)} />
+		<textarea
+			class="pen-text"
+			data-grows={look.grows}
+			spellcheck={false}
+			style={{
+				left: `${box().x}px`,
+				top: `${box().y}px`,
+				...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
+				"min-height": `${box().h}px`,
+				padding: `${look.pad}px`,
+				"font-family": look.font,
+				"font-size": `${look.size}px`,
+				"font-weight": String(look.weight),
+				"font-style": look.italic ? "italic" : "normal",
+				"letter-spacing": `${look.spacing}px`,
+				"line-height": look.line === undefined ? "normal" : String(look.line),
+				"text-align": look.align as "left",
+				color: look.ink,
+				background: look.paper ?? "transparent",
+				"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
+				"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--canvas-accent)`,
+			}}
+			value={open.value}
+			ref={(el) => {
+				area = el;
+				requestAnimationFrame(() => {
+					el.focus({ preventScroll: true });
+					el.select();
+				});
+			}}
+			onInput={(event) => props.text.preview(open.id, event.currentTarget.value)}
+			onBlur={(event) => {
+				// The pencil writing over the canvas (`ScribbleCatch`): committed when it is done, not now.
+				if (isScribbleCatch(event.relatedTarget)) return;
+				props.text.commit(event.currentTarget.value);
+			}}
+			onKeyDown={(event) => textareaKeys(event, cancel)}
+		/>
+		</>
+	);
+}
+
+/** The textarea's own keys: Home and End on the line, Escape to take the words back, ⌘Enter to put them away. */
+function textareaKeys(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }, cancel: (value?: string) => void): void {
+	/*
+	 * Home and End move the caret to the line's start and end. On a Mac they scroll the
+	 * nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`), so a
+	 * note's words were left selected and the next key typed over them.
+	 */
+	if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+		event.preventDefault();
+		const el = event.currentTarget;
+		const at = el.selectionDirection === "backward" ? el.selectionStart : el.selectionEnd;
+		const to = event.key === "Home" ? el.value.lastIndexOf("\n", at - 1) + 1 : (() => {
+			const end = el.value.indexOf("\n", at);
+			return end === -1 ? el.value.length : end;
+		})();
+		if (event.shiftKey) {
+			const anchor = el.selectionDirection === "backward" ? el.selectionEnd : el.selectionStart;
+			el.setSelectionRange(Math.min(anchor, to), Math.max(anchor, to), to < anchor ? "backward" : "forward");
+		} else el.setSelectionRange(to, to);
+		return;
+	}
+	if (event.key === "Escape") {
+		event.preventDefault();
+		cancel(event.currentTarget.value);
+	} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+		event.preventDefault();
+		event.currentTarget.blur();
+	}
 }
 
 export type { TextLook, TextSession };
