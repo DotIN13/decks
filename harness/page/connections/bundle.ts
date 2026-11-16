@@ -27,6 +27,37 @@ export interface BundleManifest {
 
 const READER = "reader";
 
+/** Unpack a `.decks` file into this browser and add it to the connections; answers its id. */
+export async function openBundle(file: Blob): Promise<string> {
+	const files = readZip(await file.arrayBuffer());
+	const manifestFile = files.find((one) => one.name === "manifest.json");
+	if (!manifestFile) throw new Error("This file has no manifest, so it is not a Decks canvas.");
+	const manifest = JSON.parse(new TextDecoder().decode(await manifestFile.bytes())) as BundleManifest;
+	if (manifest.decks !== 2) throw new Error(manifest.decks > 2 ? `This canvas was saved by a newer Decks (format ${manifest.decks}).` : "This canvas was saved by an older Decks; save it again from a newer one.");
+	const id = newId();
+	const cache = await caches.open(cacheName(id));
+	for (const one of files) {
+		const bytes = await one.bytes();
+		await cache.put(`/c/${id}/${one.name}`, new Response(bytes as BodyInit, { headers: { "Content-Type": typeOf(one.name) } }));
+	}
+	const entry: Connection = { id, kind: "bundle", label: manifest.canvas.title, from: manifest.from, added: Date.now(), boards: manifest.cards.length };
+	saveConnections([...connections(), entry]);
+	return id;
+}
+
+/** Forget a bundle: its files and its row. A server's row goes the same way, without a cache. */
+export async function forget(id: string): Promise<void> {
+	await caches.delete(cacheName(id)).catch(() => false);
+	saveConnections(connections().filter((one) => one.id !== id));
+}
+
+async function manifestOf(id: string): Promise<BundleManifest> {
+	const cache = await caches.open(cacheName(id));
+	const response = await cache.match(`/c/${id}/manifest.json`);
+	if (!response) throw new Error("This canvas's files are gone from this browser. Open the .decks file again.");
+	return (await response.json()) as BundleManifest;
+}
+
 function cacheName(id: string): string {
 	return `decks-bundle-${id}`;
 }
@@ -65,35 +96,4 @@ const TYPES: Record<string, string> = {
 export function typeOf(name: string): string {
 	const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
 	return TYPES[ext] ?? "application/octet-stream";
-}
-
-/** Unpack a `.decks` file into this browser and add it to the connections; answers its id. */
-export async function openBundle(file: Blob): Promise<string> {
-	const files = readZip(await file.arrayBuffer());
-	const manifestFile = files.find((one) => one.name === "manifest.json");
-	if (!manifestFile) throw new Error("This file has no manifest, so it is not a Decks canvas.");
-	const manifest = JSON.parse(new TextDecoder().decode(await manifestFile.bytes())) as BundleManifest;
-	if (manifest.decks !== 2) throw new Error(manifest.decks > 2 ? `This canvas was saved by a newer Decks (format ${manifest.decks}).` : "This canvas was saved by an older Decks; save it again from a newer one.");
-	const id = newId();
-	const cache = await caches.open(cacheName(id));
-	for (const one of files) {
-		const bytes = await one.bytes();
-		await cache.put(`/c/${id}/${one.name}`, new Response(bytes as BodyInit, { headers: { "Content-Type": typeOf(one.name) } }));
-	}
-	const entry: Connection = { id, kind: "bundle", label: manifest.canvas.title, from: manifest.from, added: Date.now(), boards: manifest.cards.length };
-	saveConnections([...connections(), entry]);
-	return id;
-}
-
-/** Forget a bundle: its files and its row. A server's row goes the same way, without a cache. */
-export async function forget(id: string): Promise<void> {
-	await caches.delete(cacheName(id)).catch(() => false);
-	saveConnections(connections().filter((one) => one.id !== id));
-}
-
-async function manifestOf(id: string): Promise<BundleManifest> {
-	const cache = await caches.open(cacheName(id));
-	const response = await cache.match(`/c/${id}/manifest.json`);
-	if (!response) throw new Error("This canvas's files are gone from this browser. Open the .decks file again.");
-	return (await response.json()) as BundleManifest;
 }

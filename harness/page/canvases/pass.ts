@@ -5,6 +5,9 @@ import { ask } from "../state/confirm.ts";
 import { call as callServer } from "../state/line.ts";
 import { cardCall, cardMayCall } from "./card-calls.ts";
 
+// What the canvas frame asks of the page: a pass to reach its one canvas, and
+// the agent calls a card makes, the ones that speak to an agent put to you first.
+
 /**
  * A canvas pass for the one canvas the frame shows (`server/src/auth/passes.ts`), asked for with this
  * tab's token: the frame makes its calls with it in the header, and reads that canvas's files and

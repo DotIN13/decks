@@ -19,42 +19,6 @@ export type ManagerProps = {
 	onCopy?: (name: string) => void;
 };
 
-/** Mounted while open or fading out; shown one frame after mounting, so the fade runs. */
-function fade(open: () => boolean) {
-	const [mounted, setMounted] = createSignal(false);
-	const [shown, setShown] = createSignal(false);
-	createEffect(() => {
-		if (open()) {
-			setMounted(true);
-			requestAnimationFrame(() => requestAnimationFrame(() => (open() ? setShown(true) : setMounted(false))));
-			return;
-		}
-		setShown(false);
-		const gone = setTimeout(() => !open() && setMounted(false), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS + 40);
-		onCleanup(() => clearTimeout(gone));
-	});
-	createEffect(() => {
-		if (!shown()) return;
-		document.body.dataset.stageManager = "";
-		onCleanup(() => delete document.body.dataset.stageManager);
-	});
-	return { mounted, shown };
-}
-
-/** Escape closes the manager, unless something inside took the key first. */
-function closeOnEscape(props: ManagerProps): void {
-	createEffect(() => {
-		if (!props.open) return;
-		const escape = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented) return;
-			event.preventDefault();
-			props.onClose();
-		};
-		document.addEventListener("keydown", escape);
-		onCleanup(() => document.removeEventListener("keydown", escape));
-	});
-}
-
 export function createManager(props: ManagerProps) {
 	const [query, setQuery] = createSignal("");
 	const [sort, setSort] = createSignal<"recent" | "az">("recent");
@@ -80,6 +44,42 @@ export function createManager(props: ManagerProps) {
 		props.onClose();
 	};
 	return { ...fade(() => props.open), query, setQuery, sort, setSort, naming, setNaming, fields, found, ordered, searching: () => query().trim() !== "", open, create };
+}
+
+/** Escape closes the manager, unless something inside took the key first. */
+function closeOnEscape(props: ManagerProps): void {
+	createEffect(() => {
+		if (!props.open) return;
+		const escape = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented) return;
+			event.preventDefault();
+			props.onClose();
+		};
+		document.addEventListener("keydown", escape);
+		onCleanup(() => document.removeEventListener("keydown", escape));
+	});
+}
+
+/** Mounted while open or fading out; shown one frame after mounting, so the fade runs. */
+function fade(open: () => boolean) {
+	const [mounted, setMounted] = createSignal(false);
+	const [shown, setShown] = createSignal(false);
+	createEffect(() => {
+		if (open()) {
+			setMounted(true);
+			requestAnimationFrame(() => requestAnimationFrame(() => (open() ? setShown(true) : setMounted(false))));
+			return;
+		}
+		setShown(false);
+		const gone = setTimeout(() => !open() && setMounted(false), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS + 40);
+		onCleanup(() => clearTimeout(gone));
+	});
+	createEffect(() => {
+		if (!shown()) return;
+		document.body.dataset.stageManager = "";
+		onCleanup(() => delete document.body.dataset.stageManager);
+	});
+	return { mounted, shown };
 }
 
 /** A card's rename and delete: a rename ends once, so the blur that follows Enter renames nothing. */

@@ -19,6 +19,31 @@ import { cardMeta, type Row } from "./model.ts";
 
 type M = { m: ReturnType<typeof createManager>; props: ManagerProps };
 
+export function CanvasManager(props: ManagerProps): JSX.Element {
+	const m = createManager(props);
+	return (
+		<Show when={m.mounted()}>
+			<div class="stage-manager" role="dialog" aria-label="Canvases" data-open={m.shown() ? "true" : undefined} onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
+				<div class="stage-box">
+					<div class="stage-head">
+						<div class="stage-title-row">
+							<h2 class="stage-title">Canvases</h2>
+							<NewCanvas m={m} props={props} />
+						</div>
+						<Tools m={m} props={props} />
+					</div>
+					<div class="stage-wall">
+						<For each={m.ordered()}>{(row) => <CanvasCard row={row} here={props.here} searching={m.searching()} scheme={props.scheme} onOpen={m.open} onRename={props.onRename} onDelete={props.onDelete} {...(props.onCopy ? { onCopy: props.onCopy } : {})} />}</For>
+						<Show when={m.searching() && m.found() === 0}>
+							<p class="stage-none">No canvas matches “{m.query().trim()}”.</p>
+						</Show>
+					</div>
+				</div>
+			</div>
+		</Show>
+	);
+}
+
 function NewCanvas(p: M): JSX.Element {
 	const m = p.m;
 	return (
@@ -90,33 +115,22 @@ function Tools(p: M): JSX.Element {
 	);
 }
 
-export function CanvasManager(props: ManagerProps): JSX.Element {
-	const m = createManager(props);
-	return (
-		<Show when={m.mounted()}>
-			<div class="stage-manager" role="dialog" aria-label="Canvases" data-open={m.shown() ? "true" : undefined} onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
-				<div class="stage-box">
-					<div class="stage-head">
-						<div class="stage-title-row">
-							<h2 class="stage-title">Canvases</h2>
-							<NewCanvas m={m} props={props} />
-						</div>
-						<Tools m={m} props={props} />
-					</div>
-					<div class="stage-wall">
-						<For each={m.ordered()}>{(row) => <CanvasCard row={row} here={props.here} searching={m.searching()} scheme={props.scheme} onOpen={m.open} onRename={props.onRename} onDelete={props.onDelete} {...(props.onCopy ? { onCopy: props.onCopy } : {})} />}</For>
-						<Show when={m.searching() && m.found() === 0}>
-							<p class="stage-none">No canvas matches “{m.query().trim()}”.</p>
-						</Show>
-					</div>
-				</div>
-			</div>
-		</Show>
-	);
-}
-
 type CardProps = { row: Row; here: string | undefined; searching: boolean; scheme: "light" | "dark"; onOpen: (name: string) => void; onRename: (name: string, to: string) => void; onDelete: (name: string) => void; onCopy?: (name: string) => void };
 type C = { props: CardProps; e: ReturnType<typeof createCardEdit>; canvas: () => StageRow };
+
+function CanvasCard(props: CardProps): JSX.Element {
+	const canvas = () => props.row.stage;
+	const e = createCardEdit({ canvas, onRename: props.onRename });
+	const here = () => canvas().name === props.here;
+	const meta = () => cardMeta(canvas());
+	return (
+		<div class="stage-card" data-name={canvas().name} data-here={here() ? "true" : undefined} title={`${canvas().title}: ${meta()}${here() ? ", you are here" : canvas().agents.length === 0 ? ", nobody on it" : ""}`} onClick={() => !e.editing() && props.onOpen(canvas().name)} onPointerLeave={() => e.setConfirming(false)}>
+			<Picture props={props} e={e} canvas={canvas} />
+			<Acts props={props} e={e} canvas={canvas} />
+			<Foot props={props} e={e} canvas={canvas} />
+		</div>
+	);
+}
 
 function Picture(p: C): JSX.Element {
 	const [broken, setBroken] = createSignal(false);
@@ -199,19 +213,5 @@ function Foot(p: C): JSX.Element {
 			</span>
 			<span class="stage-meta">{cardMeta(canvas())}</span>
 		</span>
-	);
-}
-
-function CanvasCard(props: CardProps): JSX.Element {
-	const canvas = () => props.row.stage;
-	const e = createCardEdit({ canvas, onRename: props.onRename });
-	const here = () => canvas().name === props.here;
-	const meta = () => cardMeta(canvas());
-	return (
-		<div class="stage-card" data-name={canvas().name} data-here={here() ? "true" : undefined} title={`${canvas().title}: ${meta()}${here() ? ", you are here" : canvas().agents.length === 0 ? ", nobody on it" : ""}`} onClick={() => !e.editing() && props.onOpen(canvas().name)} onPointerLeave={() => e.setConfirming(false)}>
-			<Picture props={props} e={e} canvas={canvas} />
-			<Acts props={props} e={e} canvas={canvas} />
-			<Foot props={props} e={e} canvas={canvas} />
-		</div>
 	);
 }

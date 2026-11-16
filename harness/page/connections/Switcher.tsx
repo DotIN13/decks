@@ -24,37 +24,6 @@ import { available, ensureWorker, reach } from "./worker.ts";
  */
 type Reach = "ok" | "off" | "unpaired";
 
-/**
- * What was typed, as an address: `jules.example.ts.net` → `https://…`, while `localhost:4329`, an
- * IP address and a one-word name like `jules` keep plain http, which is what a Decks on a laptop or
- * a home network serves. A scheme typed is kept as typed.
- */
-function serverBase(typed: string): string {
-	const text = typed.trim().replace(/\/+$/, "");
-	if (/^https?:\/\//i.test(text)) return text;
-	const host = text.replace(/[:/].*$/, "");
-	const plain = /^localhost$/i.test(host) || /^\d+\.\d+\.\d+\.\d+$/.test(host) || text.startsWith("[") || !host.includes(".") || /\.local$/i.test(host);
-	return `${plain ? "http" : "https"}://${text}`;
-}
-
-async function reachable(one: Connection): Promise<Reach> {
-	if (one.kind !== "server") return "ok";
-	try {
-		const response = await fetch(`${one.base.replace(/\/+$/, "")}/api/hello`, { headers: { Authorization: `Bearer ${one.token}` }, mode: "cors", credentials: "omit", signal: AbortSignal.timeout(4000) });
-		if (!response.ok) return "off";
-		const said = (await response.json()) as { paired?: boolean };
-		return said.paired === false ? "unpaired" : "ok";
-	} catch {
-		return "off";
-	}
-}
-
-function kindNote(one: Connection): string {
-	if (one.kind === "here") return location.host;
-	if (one.kind === "server") return new URL(one.base).host;
-	return `file · ${one.boards} card${one.boards === 1 ? "" : "s"}`;
-}
-
 export function Switcher(props: { label?: string } = {}) {
 	const [view, setView] = createSignal<"list" | "connect">("list");
 	const [reached, setReached] = createSignal<Record<string, Reach>>({});
@@ -362,4 +331,35 @@ export function Switcher(props: { label?: string } = {}) {
 			</Popover>
 		</>
 	);
+}
+
+/**
+ * What was typed, as an address: `jules.example.ts.net` → `https://…`, while `localhost:4329`, an
+ * IP address and a one-word name like `jules` keep plain http, which is what a Decks on a laptop or
+ * a home network serves. A scheme typed is kept as typed.
+ */
+function serverBase(typed: string): string {
+	const text = typed.trim().replace(/\/+$/, "");
+	if (/^https?:\/\//i.test(text)) return text;
+	const host = text.replace(/[:/].*$/, "");
+	const plain = /^localhost$/i.test(host) || /^\d+\.\d+\.\d+\.\d+$/.test(host) || text.startsWith("[") || !host.includes(".") || /\.local$/i.test(host);
+	return `${plain ? "http" : "https"}://${text}`;
+}
+
+async function reachable(one: Connection): Promise<Reach> {
+	if (one.kind !== "server") return "ok";
+	try {
+		const response = await fetch(`${one.base.replace(/\/+$/, "")}/api/hello`, { headers: { Authorization: `Bearer ${one.token}` }, mode: "cors", credentials: "omit", signal: AbortSignal.timeout(4000) });
+		if (!response.ok) return "off";
+		const said = (await response.json()) as { paired?: boolean };
+		return said.paired === false ? "unpaired" : "ok";
+	} catch {
+		return "off";
+	}
+}
+
+function kindNote(one: Connection): string {
+	if (one.kind === "here") return location.host;
+	if (one.kind === "server") return new URL(one.base).host;
+	return `file · ${one.boards} card${one.boards === 1 ? "" : "s"}`;
 }

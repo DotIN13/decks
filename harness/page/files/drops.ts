@@ -19,29 +19,6 @@ import { viewOnly } from "../state/canvases.ts";
 import { authedSrc } from "../lib/authed.tsx";
 import { DOCUMENTS, fileAddress, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
 
-
-/** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
-async function openDroppedBundle(file: File): Promise<void> {
-	try {
-		await ensureWorker();
-		switchTo(await openBundle(file));
-	} catch (failed) {
-		notice("warn", (failed as Error).message);
-	}
-}
-
-
-
-const fromStage = (asset: string) => fromCanvas(asset, stageOnScreen());
-
-const refusedOn = (canvas: string | undefined): boolean => {
-	const row = viewOnly(canvas);
-	if (!row) return false;
-	notice("warn", `${row.title} is shared with you to view, by ${row.shared?.owner ?? "its owner"}: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.`);
-	return true;
-};
-
-
 /**
  * Files arriving from outside: dropped on the canvas (empty or over a board), on the input bar,
  * or pasted.
@@ -415,3 +392,22 @@ export function createFileDrops() {
 
 	return { addFile, intoComposer, paste, fileAt, hearCreated, install, dropAt };
 }
+
+/** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
+async function openDroppedBundle(file: File): Promise<void> {
+	try {
+		await ensureWorker();
+		switchTo(await openBundle(file));
+	} catch (failed) {
+		notice("warn", (failed as Error).message);
+	}
+}
+
+const fromStage = (asset: string) => fromCanvas(asset, stageOnScreen());
+
+const refusedOn = (canvas: string | undefined): boolean => {
+	const row = viewOnly(canvas);
+	if (!row) return false;
+	notice("warn", `${row.title} is shared with you to view, by ${row.shared?.owner ?? "its owner"}: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.`);
+	return true;
+};

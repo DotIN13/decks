@@ -12,11 +12,6 @@ interface ZipFile {
 
 class NotAZip extends Error {}
 
-async function inflate(data: Uint8Array): Promise<Uint8Array> {
-	const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-	return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
 export function readZip(buffer: ArrayBuffer): ZipFile[] {
 	const view = new DataView(buffer);
 	const bytes = new Uint8Array(buffer);
@@ -56,4 +51,9 @@ export function readZip(buffer: ArrayBuffer): ZipFile[] {
 		});
 	}
 	return files;
+}
+
+async function inflate(data: Uint8Array): Promise<Uint8Array> {
+	const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+	return new Uint8Array(await new Response(stream).arrayBuffer());
 }

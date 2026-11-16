@@ -34,6 +34,100 @@ interface Group {
 	rows: Array<{ keys: string; what: string }>;
 }
 
+export function CanvasOps(props: { onClose: () => void }) {
+	const groups = () => (canHover() ? pointerGroups() : touchGroups());
+
+	return (
+		<div
+			class="picker-backdrop"
+			onPointerDown={(event) => {
+				// The same rule the file picker documents: a press that *begins* on the
+				// backdrop, so a ghost click from the tap that opened this cannot close it.
+				if (event.target === event.currentTarget) props.onClose();
+			}}
+		>
+			{/*
+				`ops` stays as a class for one reason: the single-column fallback below 560px is a
+				media query, and the rest of the sheet is ordinary layout that reads better as
+				utilities than as a stylesheet nobody needs to look up.
+
+				Opaque, unlike the panels whose class it borrows: this is two dense columns of
+				small text and there is nothing behind it worth reading through it.
+			*/}
+			<div
+				class="panel-float ops-sheet flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
+				role="dialog"
+				aria-label="Shortcuts"
+			>
+				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
+					<span>Shortcuts</span>
+					<span class="flex-1" />
+					{/* `.icon-button`: `icon-button` is a class the rewrite replaced and nothing defines,
+					    so this × was a bare button with no target and no hover. */}
+					<button class="icon-button [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+						<Icon of={X} size={15} />
+					</button>
+				</header>
+
+				<div class="flex flex-col gap-3.5 overflow-y-auto overscroll-contain px-3 pt-2.5 pb-3">
+					<For each={groups()}>
+						{(group) => (
+							<section>
+								<h3 class="mt-0 mb-[5px] text-ui font-semibold text-fg">{group.title}</h3>
+								<For each={group.rows}>
+									{(row) => (
+										<div
+											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-ui leading-[1.5]"
+										>
+											<span class="flex flex-wrap items-center gap-1">
+												<For each={tokens(row.keys)}>
+													{(token) => (
+														<Switch>
+															{/*
+																A keycap: bordered, raised a hair off the panel by one
+																line of shadow, and never narrower than it is tall — so
+																`0` and `⌘D` read as the same family of object rather
+																than a square and a rectangle.
+															*/}
+															<Match when={"cap" in token && token.cap}>
+																{(cap) => (
+																	<kbd class="inline-grid min-w-[1.7em] place-items-center rounded-[5px] border border-[var(--line-strong)] bg-bg-deep px-1.5 py-px font-mono text-note leading-[1.5] text-fg shadow-[0_1px_0_var(--line-strong)]">
+																		{cap()}
+																	</kbd>
+																)}
+															</Match>
+															{/* "either of these": the dot is the renderer's, not the data's. */}
+															<Match when={"or" in token}>
+																<span class="px-px text-faint">·</span>
+															</Match>
+															<Match when={"word" in token && token.word}>
+																{(word) => <span class="text-muted">{word()}</span>}
+															</Match>
+														</Switch>
+													)}
+												</For>
+											</span>
+											<span class="text-muted">{row.what}</span>
+										</div>
+									)}
+								</For>
+							</section>
+						)}
+					</For>
+				</div>
+
+				{/* Said once, at the bottom, because it is the rule behind half the rows above:
+				    below `LIVE_ZOOM` a card is its picture, except the selected one, whose page works. */}
+				<Show when={canHover()}>
+					<footer class="border-t border-line px-3 py-[9px] text-note leading-normal text-faint">
+						Zoomed out far enough, a card is a picture on a map: drag it to move it. The card you select keeps its page, and works at any zoom.
+					</footer>
+				</Show>
+			</div>
+		</div>
+	);
+}
+
 /** With a cursor and a keyboard. */
 function pointerGroups(): Group[] {
 	return [
@@ -146,98 +240,4 @@ function touchGroups(): Group[] {
 			],
 		},
 	];
-}
-
-export function CanvasOps(props: { onClose: () => void }) {
-	const groups = () => (canHover() ? pointerGroups() : touchGroups());
-
-	return (
-		<div
-			class="picker-backdrop"
-			onPointerDown={(event) => {
-				// The same rule the file picker documents: a press that *begins* on the
-				// backdrop, so a ghost click from the tap that opened this cannot close it.
-				if (event.target === event.currentTarget) props.onClose();
-			}}
-		>
-			{/*
-				`ops` stays as a class for one reason: the single-column fallback below 560px is a
-				media query, and the rest of the sheet is ordinary layout that reads better as
-				utilities than as a stylesheet nobody needs to look up.
-
-				Opaque, unlike the panels whose class it borrows: this is two dense columns of
-				small text and there is nothing behind it worth reading through it.
-			*/}
-			<div
-				class="panel-float ops-sheet flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
-				role="dialog"
-				aria-label="Shortcuts"
-			>
-				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
-					<span>Shortcuts</span>
-					<span class="flex-1" />
-					{/* `.icon-button`: `icon-button` is a class the rewrite replaced and nothing defines,
-					    so this × was a bare button with no target and no hover. */}
-					<button class="icon-button [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
-						<Icon of={X} size={15} />
-					</button>
-				</header>
-
-				<div class="flex flex-col gap-3.5 overflow-y-auto overscroll-contain px-3 pt-2.5 pb-3">
-					<For each={groups()}>
-						{(group) => (
-							<section>
-								<h3 class="mt-0 mb-[5px] text-ui font-semibold text-fg">{group.title}</h3>
-								<For each={group.rows}>
-									{(row) => (
-										<div
-											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-ui leading-[1.5]"
-										>
-											<span class="flex flex-wrap items-center gap-1">
-												<For each={tokens(row.keys)}>
-													{(token) => (
-														<Switch>
-															{/*
-																A keycap: bordered, raised a hair off the panel by one
-																line of shadow, and never narrower than it is tall — so
-																`0` and `⌘D` read as the same family of object rather
-																than a square and a rectangle.
-															*/}
-															<Match when={"cap" in token && token.cap}>
-																{(cap) => (
-																	<kbd class="inline-grid min-w-[1.7em] place-items-center rounded-[5px] border border-[var(--line-strong)] bg-bg-deep px-1.5 py-px font-mono text-note leading-[1.5] text-fg shadow-[0_1px_0_var(--line-strong)]">
-																		{cap()}
-																	</kbd>
-																)}
-															</Match>
-															{/* "either of these": the dot is the renderer's, not the data's. */}
-															<Match when={"or" in token}>
-																<span class="px-px text-faint">·</span>
-															</Match>
-															<Match when={"word" in token && token.word}>
-																{(word) => <span class="text-muted">{word()}</span>}
-															</Match>
-														</Switch>
-													)}
-												</For>
-											</span>
-											<span class="text-muted">{row.what}</span>
-										</div>
-									)}
-								</For>
-							</section>
-						)}
-					</For>
-				</div>
-
-				{/* Said once, at the bottom, because it is the rule behind half the rows above:
-				    below `LIVE_ZOOM` a card is its picture, except the selected one, whose page works. */}
-				<Show when={canHover()}>
-					<footer class="border-t border-line px-3 py-[9px] text-note leading-normal text-faint">
-						Zoomed out far enough, a card is a picture on a map: drag it to move it. The card you select keeps its page, and works at any zoom.
-					</footer>
-				</Show>
-			</div>
-		</div>
-	);
 }
