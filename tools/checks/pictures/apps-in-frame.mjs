@@ -88,11 +88,17 @@ say("a press saves through localStorage, which the page keeps under the app's na
 
 // A second page of the same browser (the checks' own first page clears its storage at every load): the app opens there with what it saved.
 const again = await page.context().newPage();
+// What the canvas frame's own sockets hear: an app's state is told to its windows as app.changed.
+const heard = [];
+again.on("websocket", (ws) => ws.on("framereceived", (frame) => typeof frame.payload === "string" && frame.payload.includes('"app.changed"') && heard.push(frame.payload)));
 await again.goto(page.url());
 await canvasFrame(again);
 await call("view.focus", [id, { canvas: stageName }]);
 const back = await until(async () => (await appFrameOf(again)?.locator("#count").textContent({ timeout: 1000 }))?.includes("Pressed 2"));
 say("opened again, the app has what it saved", !!back, String(await appFrameOf(again)?.locator("#count").textContent().catch(() => "")));
+await call("apps.build", ["e2e-counter"]);
+const told = await until(async () => heard.find((text) => text.includes('"e2e-counter"')));
+say("a build of the app is told to the canvas frame as app.changed, by the app's name", !!told, String(told ?? heard[0] ?? "nothing heard").slice(0, 160));
 await again.close();
 
 const wrong = await fetch(`${API}/app/t/dk_ap_e30.bm90LWEtcGFzcw/e2e-counter/`, { headers: { origin: "null", "sec-fetch-site": "cross-site" } });

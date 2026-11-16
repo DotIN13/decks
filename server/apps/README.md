@@ -1,7 +1,6 @@
 # server/apps
 
-Apps and forwarded ports: folders in the deck's `apps/` served, built or run, and local servers a
-card or an app may frame.
+Apps (folders in the deck's `apps/` served, built or run) and forwarded local ports.
 
 ## Owns
 
@@ -28,8 +27,9 @@ check.ts only. No other feature.
 4. A server app is started with `PORT`, `HOST=127.0.0.1` and `BASE_PATH=/app/<name>`; it is
    `running` once its port answers, `broken` if it exits first or 45 s pass. Commands inherit no
    secret (`*_TOKEN`, `*_KEY`, `*_SECRET`, provider keys).
-5. build and run wait up to 15 s, then answer the status; a second call joins the job. A server
-   app unseen for `idleMinutes` (10) sleeps; the next request starts it. Every process is in its own group and the whole group is stopped. The feature's stop stops all.
+5. build and run wait up to 15 s, then answer the status; a second call joins the job. Each change
+   of status or build is `app.changed { ids: [name], status }`. A server app unseen for
+   `idleMinutes` (10) sleeps; a request wakes it. The feature's stop stops every process group.
 6. `/app/<name>/<path>` serves a static app's file from the deck, a built app's from its `root`
    (`dist`) in the running copy, a path with no file its `index.html`, and proxies a server app,
    the path inside the app unless `prefix`. Each upstream request has its own connection, closed

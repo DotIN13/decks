@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { events } from "../../protocol/index.ts";
 import { defineFeature, type Context, type Feature, type Kernel, type Route } from "../kernel/index.ts";
 import { appCalls } from "./calls.ts";
 import { appKind } from "./item.ts";
@@ -35,6 +36,8 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 				return { ...(url ? { DECKS_URL: url } : {}), DECKS_TOKEN: token };
 			};
 			apps = new Apps(given.deck, given.store("apps"), { workdir, env, clock });
+			let rev = 0;
+			apps.onChange = (name, status) => given.events.emit(events.appChanged, { ids: [name], by: name, rev: ++rev, ...(status ? { status } : {}) });
 			const sweep = setInterval(() => void apps?.sleepUnseen(), 60_000);
 			sweep.unref();
 			return () => {

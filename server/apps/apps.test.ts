@@ -128,3 +128,13 @@ test("an app page gets decks-canvas.js, and a canvas pass opens a placed app ins
 	assert.equal((await open(noCanvas)).status, 403, "a caller with no canvas opens nothing inside one");
 	await t.close();
 });
+
+test("rule 5: each change of an app's status is app.changed with its name", async () => {
+	const t = await start();
+	await t.s.value("app.create", { name: "told", starter: "node" }, ann);
+	await t.s.value("app.run", { name: "told" }, ann);
+	await t.s.value("app.stop", { name: "told" }, ann);
+	const told = t.s.heard.filter((one) => one.name === "app.changed" && (one.payload.ids as string[])[0] === "told").map((one) => one.payload.status);
+	assert.deepEqual(told.filter((status, i) => status !== told[i - 1]), ["stopped", "starting", "running", "stopped"]);
+	await t.close();
+});

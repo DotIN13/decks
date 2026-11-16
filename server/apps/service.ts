@@ -23,7 +23,7 @@ export class Apps {
 	private running = new Map<string, Running>();
 	private jobs = new Map<string, Promise<boolean>>();
 	private clock: () => number;
-	onChange?: (name: string) => void;
+	onChange?: (name: string, status: AppStatus | undefined) => void;
 
 	constructor(private deck: Deck, store: Store, private options: AppsOptions) {
 		this.folders = new AppFolders(options.workdir);
@@ -57,7 +57,7 @@ export class Apps {
 		const next: Kept = { ...was, ...patch };
 		for (const key of Object.keys(patch) as (keyof Kept)[]) if (patch[key] === undefined) delete next[key];
 		this.kept.set(name, next);
-		if (was.status !== next.status) this.onChange?.(name);
+		if (was.status !== next.status || was.at !== next.at) this.onChange?.(name, next.status);
 	}
 
 	seen(name: string): void {
