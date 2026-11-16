@@ -1,30 +1,21 @@
-// The editor's host on this page, made inside the canvas element (`CanvasView.tsx`): its effects, the pointer's side, and\n// the editor made from them.
+// The editor's host on this page, made inside the canvas element (`CanvasView.tsx`): its effects, the pointer's side, and
+// the editor made from them.
 import { createSignal } from "solid-js";
 import { type StageEditorHost as EditorHost, createStageEditor, tsSeam } from "../editor/index.ts";
 import { toScreen, toWorld } from "../camera/camera.ts";
 import { penTool, setPenTool } from "../editor/pen-tools.ts";
 import { scheme } from "../theme.ts";
-import type { Props, editsAndInput, engineOf, penActions } from "./CanvasView.tsx";
-import type { cameraOf, viewAndOrigin } from "./canvas-camera.ts";
+import type { Props, editsAndInput, engineOf, penTools } from "./CanvasView.tsx";
+import type { cameraOf, elementAndEngine } from "./canvas-camera.ts";
 
 /** The editor's effects on this page, and the count of the engine's layouts that what reads places reads. */
 export function editorEffectsOf(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
-	element: ReturnType<typeof viewAndOrigin>["element"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
-	props: Props; view: ReturnType<typeof viewAndOrigin>["view"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	element: ReturnType<typeof elementAndEngine>["element"]; penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
+	props: Props; view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { ahead, ctl, element, penLayer, props, view } = ctx;
 
-	/*
-	 * Editing the drawing by hand, in edit mode (`editor/pen-tools.ts` holds the tool and reads the
-	 * editor's selection, `chrome/PenBar.tsx` shows them). Every change is sent as the same pen operation an
-	 * agent would send, and the drawing redraws from the server's answer; until it arrives, a drag
-	 * or a resize is drawn as a preview.
-	 *
-	 * The editor (`editor/dom/controller.ts`) holds the selection, what the pointer is over, the
-	 * gesture in hand and what is drawn for it, stepped by `editor/core/gesture.ts`. The handlers
-	 * here follow the pointer and tell it each step.
-	 */
 	/** Counted up each time the engine lays the drawing out (`penLayer.drawn`): what reads where items are reads it. */
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/** What the editor's effects do on this page. */
@@ -51,9 +42,9 @@ export function editorEffectsOf(ctx: {
 
 /** The pointer's side of the editor. */
 export function editorPointerOf(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; element: ReturnType<typeof viewAndOrigin>["element"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; element: ReturnType<typeof elementAndEngine>["element"];
 	grabbing: ReturnType<typeof editsAndInput>["grabbing"]; input: ReturnType<typeof editsAndInput>["input"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; props: Props;
 	setHoldMenu: ReturnType<typeof editsAndInput>["setHoldMenu"];
 	worldAt: ReturnType<typeof editsAndInput>["worldAt"];
 }) {
@@ -118,16 +109,25 @@ export function editorPointerOf(ctx: {
 	return { editorPointer };
 }
 
-/** The editor: the selection, what the pointer is over, the gesture in hand, made from its host's halves. */
+/**
+ * Editing the drawing by hand, in edit mode (`editor/pen-tools.ts` holds the tool and reads the
+ * editor's selection, `chrome/PenBar.tsx` shows them). Every change is sent as the same pen operation an
+ * agent would send, and the drawing redraws from the server's answer; until it arrives, a drag
+ * or a resize is drawn as a preview.
+ *
+ * The editor (`editor/dom/controller.ts`) holds the selection, what the pointer is over, the
+ * gesture in hand and what is drawn for it, stepped by `editor/core/gesture.ts`. The handlers
+ * here follow the pointer and tell it each step.
+ */
 export function editorOf(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; armPenTool: ReturnType<typeof penActions>["armPenTool"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; armPenTool: ReturnType<typeof penTools>["armPenTool"];
 	ctl: ReturnType<typeof cameraOf>["ctl"]; editorEffects: ReturnType<typeof editorEffectsOf>["editorEffects"];
 	editorPointer: ReturnType<typeof editorPointerOf>["editorPointer"];
 	freshId: ReturnType<typeof editsAndInput>["freshId"]; freshIds: ReturnType<typeof editsAndInput>["freshIds"];
 	penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"]; penEdit: ReturnType<typeof editsAndInput>["penEdit"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
-	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof viewAndOrigin>["view"];
-	worldAt: ReturnType<typeof editsAndInput>["worldAt"]; worldEl: ReturnType<typeof viewAndOrigin>["worldEl"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; props: Props;
+	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof elementAndEngine>["view"];
+	worldAt: ReturnType<typeof editsAndInput>["worldAt"]; worldEl: ReturnType<typeof elementAndEngine>["worldEl"];
 }) {
 	const { ahead, armPenTool, ctl, editorEffects, editorPointer, freshId, freshIds, penDrawn, penEdit, penLayer, props, scene, view, worldAt, worldEl } = ctx;
 	/** What the keys reach on this page. */
@@ -160,6 +160,11 @@ export function editorOf(ctx: {
 		freshId: () => freshId(),
 		idsBut: (id) => freshIds(id),
 	};
+	/*
+	 * Cards picked up with the drawing (`editor.pagePicks`), by a marquee or Shift and a press on a title
+	 * bar, move with the selected items as one selection. The app's own selected card, the one whose
+	 * page takes the keys, is another thing: a single press on a card is only that.
+	 */
 	const editor = createStageEditor({
 		scene,
 		engine: tsSeam(penLayer),

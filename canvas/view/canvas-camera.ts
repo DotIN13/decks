@@ -1,4 +1,5 @@
-// The canvas's camera, made inside the canvas element (`CanvasView.tsx`): where the world is placed, the controller that\n// moves it, and the scroll kept with it.
+// The canvas's camera, made inside the canvas element (`CanvasView.tsx`): where the world is placed, the controller that
+// moves it, and the scroll kept with it.
 import { untrack, createSignal, createEffect, on } from "solid-js";
 import { StageEngine } from "../render/engine.ts";
 import type { createItemsLayer } from "./items-layer.tsx";
@@ -11,8 +12,8 @@ import { probes } from "../debug.ts";
 import type { Props } from "./CanvasView.tsx";
 import type { editorOf } from "./canvas-editor.ts";
 
-/** The canvas's element and engine, its view, and where the world is placed: the origin, the scroll this file set, a zoom held still. */
-export function viewAndOrigin(ctx: { props: Props }) {
+/** The canvas's element and world (filled by refs), its engine, the holder for what is made later, and its view. */
+export function elementAndEngine(ctx: { props: Props }) {
 	const { props } = ctx;
 	/* The host's board, read once: a component, not a value that changes. */
 	const Frame = untrack(() => props.frame);
@@ -29,11 +30,15 @@ export function viewAndOrigin(ctx: { props: Props }) {
 	/** The camera moved: a press in hand runs its last step again (`input/pointer.ts`, `follow`). */
 	const cameraChanged = () => ahead.editor.cameraMoved();
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
-	/**
-	 * The camera: where it is, whether it is moving, and the one place that moves it (`camera/controller.ts`).
-	 * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
-	 * camera to follow.
-	 */
+	return { Frame, element, worldEl, penLayer, ahead, cameraChanged, view, setView };
+}
+
+/** Where the world is placed in the scrolled content: the origin, the transform last written, the scroll this file set, a zoom held still. */
+export function worldPlacement(ctx: {
+	props: Props; element: ReturnType<typeof elementAndEngine>["element"]; view: ReturnType<typeof elementAndEngine>["view"];
+	worldEl: ReturnType<typeof elementAndEngine>["worldEl"];
+}) {
+	const { element, props, view, worldEl } = ctx;
 	/*
 	 * The stage scrolls (`camera/scroll-area.ts`): the camera's position is the stage's scroll, and the
 	 * world is placed in the scrolled content at `origin`, scaled by the zoom. A pan is the browser
@@ -73,21 +78,25 @@ export function viewAndOrigin(ctx: { props: Props }) {
 	const zoomStill: { now: boolean } = { now: false };
 	/** The zoom the world was last placed at, to tell a zoom step from a pan. */
 	const placedZoom: { now: number | undefined } = { now: undefined };
-	return { Frame, element, worldEl, penLayer, ahead, cameraChanged, view, setView, origin, worldOrigin, setWorldOrigin, worldPlaced, ownScroll, placeWorld, placeScroll, zoomScroll, zoomStill, placedZoom };
+	return { origin, worldOrigin, setWorldOrigin, worldPlaced, ownScroll, placeWorld, placeScroll, zoomScroll, zoomStill, placedZoom };
 }
 
-/** The camera: where it is, whether it moves, and the one place that moves it. */
+/**
+ * The camera: where it is, whether it is moving, and the one place that moves it (`camera/controller.ts`).
+ * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
+ * camera to follow.
+ */
 export function cameraOf(ctx: {
-	cameraChanged: ReturnType<typeof viewAndOrigin>["cameraChanged"];
-	element: ReturnType<typeof viewAndOrigin>["element"]; origin: ReturnType<typeof viewAndOrigin>["origin"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
-	placedZoom: ReturnType<typeof viewAndOrigin>["placedZoom"];
-	placeScroll: ReturnType<typeof viewAndOrigin>["placeScroll"];
-	placeWorld: ReturnType<typeof viewAndOrigin>["placeWorld"]; props: Props;
-	setWorldOrigin: ReturnType<typeof viewAndOrigin>["setWorldOrigin"];
-	view: ReturnType<typeof viewAndOrigin>["view"]; worldEl: ReturnType<typeof viewAndOrigin>["worldEl"];
-	zoomScroll: ReturnType<typeof viewAndOrigin>["zoomScroll"];
-	zoomStill: ReturnType<typeof viewAndOrigin>["zoomStill"];
+	cameraChanged: ReturnType<typeof elementAndEngine>["cameraChanged"];
+	element: ReturnType<typeof elementAndEngine>["element"]; origin: ReturnType<typeof worldPlacement>["origin"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
+	placedZoom: ReturnType<typeof worldPlacement>["placedZoom"];
+	placeScroll: ReturnType<typeof worldPlacement>["placeScroll"];
+	placeWorld: ReturnType<typeof worldPlacement>["placeWorld"]; props: Props;
+	setWorldOrigin: ReturnType<typeof worldPlacement>["setWorldOrigin"];
+	view: ReturnType<typeof elementAndEngine>["view"]; worldEl: ReturnType<typeof elementAndEngine>["worldEl"];
+	zoomScroll: ReturnType<typeof worldPlacement>["zoomScroll"];
+	zoomStill: ReturnType<typeof worldPlacement>["zoomStill"];
 }) {
 	const { cameraChanged, element, origin, penLayer, placedZoom, placeScroll, placeWorld, props, setWorldOrigin, view, worldEl, zoomScroll, zoomStill } = ctx;
 	const ctl = createCameraController({
@@ -142,14 +151,14 @@ export function cameraOf(ctx: {
 
 /** The scroll and the camera kept together: back to the middle at rest, a zoom's scroll let go, a scroll followed. */
 export function scrollFollows(ctx: {
-	ctl: ReturnType<typeof cameraOf>["ctl"]; element: ReturnType<typeof viewAndOrigin>["element"];
-	origin: ReturnType<typeof viewAndOrigin>["origin"]; ownScroll: ReturnType<typeof viewAndOrigin>["ownScroll"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
-	placeScroll: ReturnType<typeof viewAndOrigin>["placeScroll"];
-	placeWorld: ReturnType<typeof viewAndOrigin>["placeWorld"];
-	setWorldOrigin: ReturnType<typeof viewAndOrigin>["setWorldOrigin"];
-	view: ReturnType<typeof viewAndOrigin>["view"]; zoomScroll: ReturnType<typeof viewAndOrigin>["zoomScroll"];
-	zoomStill: ReturnType<typeof viewAndOrigin>["zoomStill"];
+	ctl: ReturnType<typeof cameraOf>["ctl"]; element: ReturnType<typeof elementAndEngine>["element"];
+	origin: ReturnType<typeof worldPlacement>["origin"]; ownScroll: ReturnType<typeof worldPlacement>["ownScroll"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
+	placeScroll: ReturnType<typeof worldPlacement>["placeScroll"];
+	placeWorld: ReturnType<typeof worldPlacement>["placeWorld"];
+	setWorldOrigin: ReturnType<typeof worldPlacement>["setWorldOrigin"];
+	view: ReturnType<typeof elementAndEngine>["view"]; zoomScroll: ReturnType<typeof worldPlacement>["zoomScroll"];
+	zoomStill: ReturnType<typeof worldPlacement>["zoomStill"];
 }) {
 	const { ctl, element, origin, ownScroll, penLayer, placeScroll, placeWorld, setWorldOrigin, view, zoomScroll, zoomStill } = ctx;
 	/*

@@ -60,6 +60,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { playing, setPlaying, playingElement, playedTo, toggleMedia } = mediaPlaying();
 	const { appStates } = appStatus({ props });
 	const { covering } = coveringOf({ COVER, gliding, moving, panning, scaling });
+	// A part whose effects read what a later part makes gets a forwarder, `(...a) => x(...a)`, so each part keeps its place in the order the effects were made.
 	sheetCards({ appStates, cardPictures, COVER, covering, editor, isLive: (...a: Parameters<typeof isLive>) => isLive(...a), liveCards, pageIndex: (...a: Parameters<typeof pageIndex>) => pageIndex(...a), penLayer, props, resolveColour });
 	const { carriedPages, picturedNow, draggedAsPicture, LIVE_FILES } = carriedAndPictured({ ctl, deps, editor, liveCards, penLayer, props, renderedPaths: (...a: Parameters<typeof renderedPaths>) => renderedPaths(...a), view });
 	const { playingBox } = playerPlace({ editor, penDrawn, penLayer, playing, setPlaying });

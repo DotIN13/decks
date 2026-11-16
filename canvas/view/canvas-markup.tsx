@@ -1,4 +1,5 @@
-// The canvas's markup, made inside the canvas element (`CanvasView.tsx`): the world with its slots, canvas and overlay, the\n// host's layer in it, and the chrome held to the window.
+// The canvas's markup, made inside the canvas element (`CanvasView.tsx`): the world with its slots, canvas and overlay, the
+// host's layer in it, and the chrome held to the window.
 import { Show } from "solid-js";
 import { OverlayLayer, TextEditor, InsertMenu } from "../editor/index.ts";
 import { type HoldAction, HoldMenu } from "../chrome/HoldMenu.tsx";
@@ -6,15 +7,15 @@ import { setPropsOpen, setInsertPanel } from "../editor/pen-tools.ts";
 import { CanvasInk } from "../ink/InkLayer.tsx";
 import { toWorld } from "../camera/camera.ts";
 import { stagePoint } from "../camera/coords.ts";
-import type { Props, checkProbes, editsAndInput, engineOf, itemsOf, penActions, selectionOf } from "./CanvasView.tsx";
-import type { cameraOf, viewAndOrigin } from "./canvas-camera.ts";
+import type { Props, checkProbes, editsAndInput, engineOf, itemsOf, penTools, selectionOf } from "./CanvasView.tsx";
+import type { cameraOf, elementAndEngine, worldPlacement } from "./canvas-camera.ts";
 import type { editorOf } from "./canvas-editor.ts";
 
 /** The host's layer in the world, made with what it reads. */
 export function worldHostOf(ctx: {
 	ctl: ReturnType<typeof cameraOf>["ctl"]; props: Props;
-	worldOrigin: ReturnType<typeof viewAndOrigin>["worldOrigin"];
-	worldPlaced: ReturnType<typeof viewAndOrigin>["worldPlaced"];
+	worldOrigin: ReturnType<typeof worldPlacement>["worldOrigin"];
+	worldPlaced: ReturnType<typeof worldPlacement>["worldPlaced"];
 }) {
 	const { ctl, props, worldOrigin, worldPlaced } = ctx;
 
@@ -51,8 +52,8 @@ export function worldHostOf(ctx: {
 /** The world's markup, made with what it reads. */
 export function worldLayerOf(ctx: {
 	ctl: ReturnType<typeof cameraOf>["ctl"]; editor: ReturnType<typeof editorOf>["editor"];
-	items: ReturnType<typeof itemsOf>["items"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
-	selection: ReturnType<typeof selectionOf>["selection"]; worldEl: ReturnType<typeof viewAndOrigin>["worldEl"];
+	items: ReturnType<typeof itemsOf>["items"]; penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
+	selection: ReturnType<typeof selectionOf>["selection"]; worldEl: ReturnType<typeof elementAndEngine>["worldEl"];
 	worldHost: ReturnType<typeof worldHostOf>["worldHost"];
 }) {
 	const { ctl, editor, items, penLayer, selection, worldEl, worldHost } = ctx;
@@ -116,10 +117,10 @@ export function fixedLayerOf(ctx: {
 	engineNotice: ReturnType<typeof engineOf>["engineNotice"];
 	freshId: ReturnType<typeof editsAndInput>["freshId"]; holdMenu: ReturnType<typeof editsAndInput>["holdMenu"];
 	inkStrokes: ReturnType<typeof checkProbes>["inkStrokes"]; penEdit: ReturnType<typeof editsAndInput>["penEdit"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; penMoveBy: ReturnType<typeof penActions>["penMoveBy"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; penMoveBy: ReturnType<typeof penTools>["penMoveBy"];
 	penNode: ReturnType<typeof editsAndInput>["penNode"]; props: Props;
 	selection: ReturnType<typeof selectionOf>["selection"];
-	setHoldMenu: ReturnType<typeof editsAndInput>["setHoldMenu"]; view: ReturnType<typeof viewAndOrigin>["view"];
+	setHoldMenu: ReturnType<typeof editsAndInput>["setHoldMenu"]; view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { ctl, editor, engineNotice, freshId, holdMenu, inkStrokes, penEdit, penLayer, penMoveBy, penNode, props, selection, setHoldMenu, view } = ctx;
 

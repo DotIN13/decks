@@ -1,5 +1,5 @@
-// The canvas element: its props, and the component that makes each part of the canvas in order and
-// draws the outer element they sit in.
+// The canvas element: its props, the component that makes each part in order and draws the outer element,
+// and the parts made here: input, the engine, the items, the overlay's colours, the selection, probes, the pen.
 import { probes } from "../debug.ts";
 import type { JSX } from "solid-js";
 import type { Page, Camera } from "@decks/protocol-old";
@@ -24,32 +24,13 @@ import { dropSlot as dropSlotIn, frameUnder as frameUnderIn, idMaker, moveOps, t
 import { createStageInput } from "../input/canvas-input.ts";
 import { createItemsLayer } from "./items-layer.tsx";
 import { createSelection } from "./selection.tsx";
-
-/**
- * The stage: one transform over the boards, and the gestures that move it.
- *
- * The boards live in world coordinates and never learn about the camera except to
- * counter-scale their title bars; everything else is a single CSS transform on one
- * wrapper. That is what keeps a pan at 60fps with a dozen live documents on
- * screen — the browser composites one layer instead of re-laying-out twelve.
- *
- * Gestures follow the trackpad, because that is what this is used on: two-finger
- * scroll pans, pinch zooms, and a plain wheel zooms only when a modifier says so.
- * Space or middle-button drag pans from anywhere, including across a board.
- *
- * **And they follow a hand, because a phone has no trackpad either.** A touchscreen
- * sends no wheel events at all, so every one of those gestures was missing: pinching
- * the canvas moved it about instead of zooming it, since two fingers were two
- * independent one-finger pans. Two fingers are now one gesture (`touch.ts` reduces
- * them, `pinchCamera` moves the camera) and one finger pans — the rule being that a
- * finger on the canvas moves the canvas unless it landed on something that says
- * otherwise, which on a board means a title bar or a component already selected.
- */
-export type { InkRequest, StageComment, StageShots } from "../types.ts";
 import type { InkRequest, StageComment, StageShots } from "../types.ts";
 import { worldHostOf, worldLayerOf, fixedLayerOf } from "./canvas-markup.tsx";
+import { builtOnce } from "./built-once.ts";
 import { editorEffectsOf, editorPointerOf, editorOf } from "./canvas-editor.ts";
-import { viewAndOrigin, cameraOf, scrollFollows } from "./canvas-camera.ts";
+import { elementAndEngine, worldPlacement, cameraOf, scrollFollows } from "./canvas-camera.ts";
+
+export type { InkRequest, StageComment, StageShots } from "../types.ts";
 
 /** What the stage is given by its host. */
 export type StageProps = {
@@ -164,24 +145,48 @@ export type StageProps = {
 /** The props, as the parts take them. */
 export type Props = StageProps;
 
+/*
+ * The stage: one transform over the boards, and the gestures that move it.
+ *
+ * The boards live in world coordinates and never learn about the camera except to
+ * counter-scale their title bars; everything else is a single CSS transform on one
+ * wrapper. That is what keeps a pan at 60fps with a dozen live documents on
+ * screen — the browser composites one layer instead of re-laying-out twelve.
+ *
+ * Gestures follow the trackpad, because that is what this is used on: two-finger
+ * scroll pans, pinch zooms, and a plain wheel zooms only when a modifier says so.
+ * Space or middle-button drag pans from anywhere, including across a board.
+ *
+ * **And they follow a hand, because a phone has no trackpad either.** A touchscreen
+ * sends no wheel events at all, so every one of those gestures was missing: pinching
+ * the canvas moved it about instead of zooming it, since two fingers were two
+ * independent one-finger pans. Two fingers are now one gesture (`touch.ts` reduces
+ * them, `pinchCamera` moves the camera) and one finger pans — the rule being that a
+ * finger on the canvas moves the canvas unless it landed on something that says
+ * otherwise, which on a board means a title bar or a component already selected.
+ */
 /**
  * The canvas, made part by part in order: its camera (`canvas-camera.ts`), input, editor's host
  * (`canvas-editor.ts`), placed items, selection, and the world and chrome (`canvas-markup.tsx`).
  */
 export function Stage(props: Props) {
-	const { Frame, element, worldEl, penLayer, ahead, cameraChanged, view, setView, origin, worldOrigin, setWorldOrigin, worldPlaced, ownScroll, placeWorld, placeScroll, zoomScroll, zoomStill, placedZoom } = viewAndOrigin({ props });
+	const { Frame, element, worldEl, penLayer, ahead, cameraChanged, view, setView } = elementAndEngine({ props });
+	const { origin, worldOrigin, setWorldOrigin, worldPlaced, ownScroll, placeWorld, placeScroll, zoomScroll, zoomStill, placedZoom } = worldPlacement({ element, props, view, worldEl });
 	const { ctl } = cameraOf({ cameraChanged, element, origin, penLayer, placedZoom, placeScroll, placeWorld, props, setWorldOrigin, view, worldEl, zoomScroll, zoomStill });
 	const { moving, scaling, gliding, panning, scrolled } = scrollFollows({ ctl, element, origin, ownScroll, penLayer, placeScroll, placeWorld, setWorldOrigin, view, zoomScroll, zoomStill });
 	const { frame, holdMenu, setHoldMenu, penEdit, worldAt, freshId, freshIds, penNode, input, grabbing } = editsAndInput({ ahead, ctl, element, penLayer, props, scrolled, setView, view });
 	const { engineNotice, scene } = engineOf({ penLayer, props, view });
 	const { penDrawn, setPenDrawn, editorEffects } = editorEffectsOf({ ahead, ctl, element, penLayer, props, view });
 	const { editorPointer } = editorPointerOf({ ahead, element, grabbing, input, penLayer, props, setHoldMenu, worldAt });
+	// A part whose effects read what a later part makes gets a forwarder, `(...a) => x(...a)`, so each part keeps its place in the order the effects were made.
 	const { editor } = editorOf({ ahead, armPenTool: (...a: Parameters<typeof armPenTool>) => armPenTool(...a), ctl, editorEffects, editorPointer, freshId, freshIds, penDrawn, penEdit, penLayer, props, scene, view, worldAt, worldEl });
 	const { items } = itemsOf({ ahead, ctl, editor, element, frame, Frame, gliding, input, moving, panning, penDrawn, penLayer, props, scaling, view });
 	const { engineOverlays } = overlayColours({ ahead, ctl, editor, element, penLayer, props, setPenDrawn });
 	const { selection } = selectionOf({ ahead, ctl, editor, frame, freshIds, input, items, penDrawn, penEdit, penLayer, penNode, props, scene, view });
 	const { inkStrokes } = checkProbes({ ctl, dropSlot: (...a: Parameters<typeof dropSlot>) => dropSlot(...a), editor, element, frameUnder: (...a: Parameters<typeof frameUnder>) => frameUnder(...a), penDrawn, penLayer, penNode, view, worldAt });
-	const { armPenTool, penMoveBy, frameUnder, dropSlot, overLink } = penActions({ editor, frame, penEdit, props, scene, view });
+	readingNews({ props });
+	const { armPenTool, penMoveBy, frameUnder, dropSlot, overLink } = penTools({ editor, penEdit, props, scene });
+	openingFit({ frame, props, view });
 	const { worldHost } = worldHostOf({ ctl, props, worldOrigin, worldPlaced });
 	const { worldLayer } = worldLayerOf({ ctl, editor, items, penLayer, selection, worldEl, worldHost });
 	const { fixedLayer } = fixedLayerOf({ ctl, editor, engineNotice, freshId, holdMenu, inkStrokes, penEdit, penLayer, penMoveBy, penNode, props, selection, setHoldMenu, view });
@@ -228,8 +233,9 @@ export function Stage(props: Props) {
 		>
 			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
 			<div class="stage-content">
-				{worldLayer()}
-				{fixedLayer()}
+				{/* Built once, untracked (`built-once.ts`): a signal read at their top would rebuild every card. */}
+				{builtOnce(worldLayer)}
+				{builtOnce(fixedLayer)}
 			</div>
 		</div>
 	);
@@ -237,10 +243,10 @@ export function Stage(props: Props) {
 
 /** Fitting into the canvas column, editing the drawing, new ids, and what the stage hears from the person. */
 export function editsAndInput(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
-	element: ReturnType<typeof viewAndOrigin>["element"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	element: ReturnType<typeof elementAndEngine>["element"]; penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
 	props: Props; scrolled: ReturnType<typeof scrollFollows>["scrolled"];
-	setView: ReturnType<typeof viewAndOrigin>["setView"]; view: ReturnType<typeof viewAndOrigin>["view"];
+	setView: ReturnType<typeof elementAndEngine>["setView"]; view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { ahead, ctl, element, penLayer, props, scrolled, setView, view } = ctx;
 
@@ -289,8 +295,8 @@ export function editsAndInput(ctx: {
 
 /** The engine told who holds it, what it says when it cannot start, and the scene the editor asks of it. */
 export function engineOf(ctx: {
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
-	view: ReturnType<typeof viewAndOrigin>["view"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; props: Props;
+	view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { penLayer, props, view } = ctx;
 
@@ -321,22 +327,16 @@ export function engineOf(ctx: {
 
 /** Writers' colours as the sheet paints them, and the placed items. */
 export function itemsOf(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
-	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
-	frame: ReturnType<typeof editsAndInput>["frame"]; Frame: ReturnType<typeof viewAndOrigin>["Frame"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof elementAndEngine>["element"];
+	frame: ReturnType<typeof editsAndInput>["frame"]; Frame: ReturnType<typeof elementAndEngine>["Frame"];
 	gliding: ReturnType<typeof scrollFollows>["gliding"]; input: ReturnType<typeof editsAndInput>["input"];
 	moving: ReturnType<typeof scrollFollows>["moving"]; panning: ReturnType<typeof scrollFollows>["panning"];
 	penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
-	scaling: ReturnType<typeof scrollFollows>["scaling"]; view: ReturnType<typeof viewAndOrigin>["view"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; props: Props;
+	scaling: ReturnType<typeof scrollFollows>["scaling"]; view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { ahead, ctl, editor, element, frame, Frame, gliding, input, moving, panning, penDrawn, penLayer, props, scaling, view } = ctx;
-	/*
-	 * Boards picked up with the drawing (`editor.pagePicks`): by a marquee, or Shift and a press on a
-	 * title bar. They move with the selected items as one selection. The app's own selected board is
-	 * a different thing — the one board whose page takes the keys — and a single press on a board is
-	 * still only that.
-	 */
 
 	const resolvedColours = new Map<string, string>();
 	/**
@@ -388,9 +388,9 @@ export function itemsOf(ctx: {
 
 /** The editor's outlines painted by the engine, in the colours read through the browser, and each drawn frame. */
 function overlayColours(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
-	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; props: Props;
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof elementAndEngine>["element"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; props: Props;
 	setPenDrawn: ReturnType<typeof editorEffectsOf>["setPenDrawn"];
 }) {
 	const { ahead, ctl, editor, element, penLayer, props, setPenDrawn } = ctx;
@@ -449,13 +449,13 @@ function overlayColours(ctx: {
 
 /** Edits in both modes, the drag and glide the editor follows, and the selection drawn over it all. */
 export function selectionOf(ctx: {
-	ahead: ReturnType<typeof viewAndOrigin>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
+	ahead: ReturnType<typeof elementAndEngine>["ahead"]; ctl: ReturnType<typeof cameraOf>["ctl"];
 	editor: ReturnType<typeof editorOf>["editor"]; frame: ReturnType<typeof editsAndInput>["frame"];
 	freshIds: ReturnType<typeof editsAndInput>["freshIds"]; input: ReturnType<typeof editsAndInput>["input"];
 	items: ReturnType<typeof itemsOf>["items"]; penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
-	penEdit: ReturnType<typeof editsAndInput>["penEdit"]; penLayer: ReturnType<typeof viewAndOrigin>["penLayer"];
+	penEdit: ReturnType<typeof editsAndInput>["penEdit"]; penLayer: ReturnType<typeof elementAndEngine>["penLayer"];
 	penNode: ReturnType<typeof editsAndInput>["penNode"]; props: Props;
-	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof viewAndOrigin>["view"];
+	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof elementAndEngine>["view"];
 }) {
 	const { ahead, ctl, editor, frame, freshIds, input, items, penDrawn, penEdit, penLayer, penNode, props, scene, view } = ctx;
 	/*
@@ -517,12 +517,12 @@ export function selectionOf(ctx: {
 
 /** For the browser checks: where drawn items, frames, pictures and cards are on screen. */
 export function checkProbes(ctx: {
-	ctl: ReturnType<typeof cameraOf>["ctl"]; dropSlot: ReturnType<typeof penActions>["dropSlot"];
-	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof viewAndOrigin>["element"];
-	frameUnder: ReturnType<typeof penActions>["frameUnder"];
+	ctl: ReturnType<typeof cameraOf>["ctl"]; dropSlot: ReturnType<typeof penTools>["dropSlot"];
+	editor: ReturnType<typeof editorOf>["editor"]; element: ReturnType<typeof elementAndEngine>["element"];
+	frameUnder: ReturnType<typeof penTools>["frameUnder"];
 	penDrawn: ReturnType<typeof editorEffectsOf>["penDrawn"];
-	penLayer: ReturnType<typeof viewAndOrigin>["penLayer"]; penNode: ReturnType<typeof editsAndInput>["penNode"];
-	view: ReturnType<typeof viewAndOrigin>["view"]; worldAt: ReturnType<typeof editsAndInput>["worldAt"];
+	penLayer: ReturnType<typeof elementAndEngine>["penLayer"]; penNode: ReturnType<typeof editsAndInput>["penNode"];
+	view: ReturnType<typeof elementAndEngine>["view"]; worldAt: ReturnType<typeof editsAndInput>["worldAt"];
 }) {
 	const { ctl, dropSlot, editor, element, frameUnder, penDrawn, penLayer, penNode, view, worldAt } = ctx;
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
@@ -566,14 +566,9 @@ export function checkProbes(ctx: {
 	return { inkStrokes };
 }
 
-/** Reading a card that is news, arming a pen tool, moving and dropping items, and the opening fit. */
-export function penActions(ctx: {
-	editor: ReturnType<typeof editorOf>["editor"]; frame: ReturnType<typeof editsAndInput>["frame"];
-	penEdit: ReturnType<typeof editsAndInput>["penEdit"]; props: Props;
-	scene: ReturnType<typeof engineOf>["scene"]; view: ReturnType<typeof viewAndOrigin>["view"];
-}) {
-	const { editor, frame, penEdit, props, scene, view } = ctx;
-
+/** A card that is news, read when it is selected: said once for each change of it. */
+export function readingNews(ctx: { props: Props }) {
+	const { props } = ctx;
 	/*
 	 * Looking at a card that is news reads it: selected (a press on it, or the page putting the selection
 	 * back), it is said to be read (`onRead`) once for each change of it, and its dot goes when the host
@@ -589,6 +584,14 @@ export function penActions(ctx: {
 		readFor.set(path, change);
 		props.onRead(path);
 	});
+}
+
+/** The pen's tools on this page: arming one, moving and dropping items, and a link under the pointer. */
+export function penTools(ctx: {
+	editor: ReturnType<typeof editorOf>["editor"]; penEdit: ReturnType<typeof editsAndInput>["penEdit"]; props: Props;
+	scene: ReturnType<typeof engineOf>["scene"];
+}) {
+	const { editor, penEdit, props, scene } = ctx;
 
 	const armPenTool = (tool: PenTool) => {
 		// The board palette's tool goes down first: picking one of its tools puts this one down.
@@ -609,7 +612,12 @@ export function penActions(ctx: {
 
 	/** A link is under the pointer: the cursor says so. */
 	const overLink = editor.overLink;
+	return { armPenTool, penMoveBy, frameUnder, dropSlot, overLink };
+}
 
+/** Where the canvas opens, the first time this conversation's cards arrive. */
+export function openingFit(ctx: { frame: ReturnType<typeof editsAndInput>["frame"]; props: Props; view: ReturnType<typeof elementAndEngine>["view"] }) {
+	const { frame, props, view } = ctx;
 	/*
 	 * Where the canvas opens, the first time this conversation's boards arrive.
 	 *
@@ -627,5 +635,4 @@ export function penActions(ctx: {
 		fitted = true;
 		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
 	});
-	return { armPenTool, penMoveBy, frameUnder, dropSlot, overLink };
 }
