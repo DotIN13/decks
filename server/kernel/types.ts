@@ -183,6 +183,8 @@ export interface Kernel {
 export interface Tokens {
 	issue(who: Caller, label?: string): string;
 	revoke(id: string): void;
+	/** Take back one token alone, by the token itself; its caller's other tokens stay. The kernel's always has it. */
+	forget?(token: string): void;
 	/** Who a caller of this kind is now; undefined refuses its tokens. */
 	describe(kind: Who, now: (id: string, issued: Caller) => Caller | undefined): void;
 }

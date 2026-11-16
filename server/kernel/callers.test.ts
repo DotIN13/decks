@@ -18,3 +18,13 @@ test("a token issued to a caller resolves to it until revoked, and describe give
 	assert.equal(server.callers.resolve(token), undefined);
 	await server.close();
 });
+
+test("forget takes back one token and leaves the caller's others", async () => {
+	const server = await testServer();
+	const first = server.token(callers.agent("ann"));
+	const second = server.token(callers.agent("ann"));
+	server.callers.forget(first);
+	assert.equal(server.callers.resolve(first), undefined);
+	assert.equal(server.callers.resolve(second)?.id, "ann");
+	await server.close();
+});
