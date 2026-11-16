@@ -19,6 +19,10 @@ async function withB(root: string): Promise<void> {
 	await writeFile(join(root, "canvases", "b", "files", "secret.txt"), SECRET);
 	await mkdir(join(root, "canvases", "b", "cards", "secret"), { recursive: true });
 	await writeFile(join(root, "canvases", "b", "cards", "secret", "index.html"), `<title>${SECRET}</title><div class="doc">${SECRET}</div>`);
+	for (const loose of ["docs/loose.md", "assets/loose.md", "apps/loose.md"]) {
+		await mkdir(join(root, loose, ".."), { recursive: true });
+		await writeFile(join(root, loose), "clean");
+	}
 	await mkdir(join(root, "apps", "other"), { recursive: true });
 	await writeFile(join(root, "apps", "other", "app.json"), JSON.stringify({ title: "Other", kind: "static" }));
 	await writeFile(join(root, "apps", "other", "index.html"), `<title>${SECRET}</title>`);
@@ -70,6 +74,10 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			["canvas.screenshot", { to: "apps/x/server.js" }],
 			["item.insert", { item: { type: "app", app: "other" } }],
 			["item.insert", { item: { type: "ref", ref: "canvases/b/frames/x.pen" } }],
+			...["docs/loose.md", "assets/loose.md", "apps/loose.md"].flatMap((path): [string, Record<string, unknown>][] => [
+				["file.open", { path, client: "attack" }],
+				["file.splice", { path, client: "attack", rev: 0, batch: "b1", splices: [{ at: 0, before: "", text: "PWNED" }] }],
+			]),
 			["item.batch", { ops: [{ op: "insert", item: { type: "app", app: "other" } }] }],
 		];
 		for (const [name, args] of calls) {
@@ -89,6 +97,7 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			const p = await get(path, how);
 			assert.ok(p.status !== 200 && !leaks(p), `GET ${path} gave a pass ${p.status}: ${p.text.slice(0, 120)}`);
 		}
+		for (const loose of ["docs/loose.md", "assets/loose.md", "apps/loose.md"]) assert.equal(await readFile(join(s.root, loose), "utf8"), "clean", `a pass wrote ${loose}, which no canvas places`);
 		const secretCard = await readFile(join(s.root, "canvases", "b", "cards", "secret", "index.html"), "utf8");
 		assert.ok(secretCard.includes(SECRET), "nothing a pass called overwrote b's card");
 		assert.equal(await stat(join(s.root, "assets", "importmap.json")).then(() => true, () => false), false, "a pass wrote assets/importmap.json");
