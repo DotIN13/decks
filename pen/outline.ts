@@ -5,7 +5,7 @@ import { num, radiiOf, type ThemeState } from "./values.ts";
 
 /**
  * An item's outline as one SVG path string in its own space: 0,0 is its top-left corner and w,h
- * its bottom-right, as the engine draws it (`stage/crates/paint/src/mesh.rs`). A path's geometry is
+ * its bottom-right, as the engine draws it (`engine/crates/paint/src/mesh.rs`). A path's geometry is
  * mapped from its viewBox (or the geometry's own bounds) onto its box; a rectangle has its rounded
  * corners, an ellipse its arc or ring, a polygon its corners, and a Decks shape the outline it is
  * drawn with. Anything else has none.

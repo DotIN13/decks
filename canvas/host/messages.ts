@@ -7,7 +7,7 @@ import type { Insets } from "../camera/insets.ts";
  * and the app's page around it as its broker.
  *
  * The frame keeps nothing and holds one credential: a canvas pass for its canvas alone, with your role
- * on it, lasting an hour and renewed by the page unseen (`server/src/auth/passes.ts`). On it the frame
+ * on it, lasting an hour and renewed by the page unseen (`server/frame/passes.ts`). On it the frame
  * reads its drawing, follows the canvas's stream and makes your edits itself, the pass in the
  * `Authorization` header; the page never relays the drawing. It reads its canvas's files and pictures
  * with the same pass in their address (`/api/t/<pass>/…`), since an image or a module cannot send a

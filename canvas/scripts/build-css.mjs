@@ -1,5 +1,5 @@
 /**
- * Build `dist/surface.css`: the canvas surface's stylesheet for any host, with no Tailwind needed there.
+ * Build the surface sheet, `surface.css` in `dist`: the canvas surface's stylesheet for any host, with no Tailwind needed there.
  *
  * Tailwind compiles `styles/surface.css` with the classes the canvas's sources use. Then every
  * rule is scoped to the canvas: a selector `S` becomes `:where(.decks-canvas, .decks-layer) S`

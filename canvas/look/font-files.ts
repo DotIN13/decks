@@ -5,15 +5,14 @@ import { FONT_COVERAGE } from "./font-coverage.ts";
 
 /**
  * Which font files a drawing's words need, and where they come from: the page's engine (`engine.ts`)
- * and the server's measure (`apps/server/src/stage/text.ts`) both fetch by this list, so the two
- * hold the same files and measure the same words alike. Nothing here touches a browser.
+ * fetches by this list. The server's pictures (`server/pictures/native-shot.ts`) keep a copy of it
+ * for now, until the list has one home in the protocol. Nothing here touches a browser.
  *
  * The files come from Fontsource's CDN, which serves every Google font as TrueType. The fallback
  * chain is the family asked for, then Inter (pen.dev's default), then Noto Sans SC for Chinese and
  * Japanese, the Noto symbol fonts for arrows and ticks, and Noto Color Emoji. A family Fontsource
  * does not have falls through to Inter.
  */
-
 
 /** The serif a card's `{.serif}` words are set in. */
 export const SERIF_FAMILY = FACE_ALIAS.serif!;

@@ -7,6 +7,8 @@ import type { InkTool } from "../../ink/ink.ts";
 import { insets } from "../../camera/insets.ts";
 import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../messages.ts";
 
+// The page's end of the framed editor: the canvas runs in a sandboxed frame, and this keeps it in step with the page.
+
 /**
  * The frame's address, with the page's measuring parameters passed on: the frame probe (`?probe=<collector>`,
  * the app's `perf/probe.ts`) and its companions, and the device, engine, picture and card-picture overrides (`render/device.ts`,
@@ -24,7 +26,7 @@ const frameAddress = (): string => {
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
 	/**
-	 * A pass for one canvas (`server/src/auth/passes.ts`): the harness as the frame reaches it (`api`), the
+	 * A pass for one canvas (`server/frame/passes.ts`): the harness as the frame reaches it (`api`), the
 	 * pass for its calls (`token`), the addresses its files and pictures are read at with the pass in them,
 	 * and when it runs out. Asked for again at half its life, unseen: the frame reads, follows and edits
 	 * its canvas on it.
@@ -38,7 +40,7 @@ export interface FrameHostOptions {
 	inPlace?(from: string, to: string): boolean;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
-	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
+	/** A card's agent call, or showing another canvas (`host/inside/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
 	agent?(call: FrameCalls["agent"]["data"]): Promise<unknown>;
 	/** Where what the frame keeps between visits is kept: this page's own storage. */
 	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -209,6 +211,8 @@ interface FramedRun {
 	inUse: () => boolean;
 }
 
+// What the page keeps for the frame, where its rectangles are, and whether you are using it.
+
 /** Every app's saved browser values on this page, by app name and key. */
 function appStoredNow(storage: FramedRun["storage"]): Record<string, Record<string, string>> {
 	const out: Record<string, Record<string, string>> = {};
@@ -271,6 +275,8 @@ function watchFrameFocus(frameAt: Accessor<HTMLIFrameElement | undefined>): () =
 	}
 	return frameInUse;
 }
+
+// Starting a frame on a canvas, what it begins with, and its pass renewed.
 
 /**
  * Start the frame on a canvas: its hello is listened for at once (a frame moved in place says it
@@ -389,6 +395,8 @@ function renew(f: FramedRun, page: PageEnd, canvas: string, firstExpires: number
 	}
 	if (typeof document !== "undefined") document.addEventListener("visibilitychange", shown);
 }
+
+// What the frame says, and the page's state kept in step with it.
 
 /** What the frame says, as the host's own callbacks and state. */
 function wire(f: FramedRun, page: PageEnd, canvas: string): void {
@@ -599,6 +607,8 @@ function sayComposer(f: FramedRun): void {
 		});
 	});
 }
+
+// The frame on the page, and the handle the page moves it by.
 
 /**
  * The frame for the canvas on screen. Moving to another canvas ends the one it showed (its port, its

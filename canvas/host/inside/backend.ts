@@ -35,7 +35,7 @@ export interface Backend {
 
 /** What the line says about this canvas. */
 export type Heard =
-	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/src/stage/pens.ts`). */
+	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/canvas/store.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
@@ -53,6 +53,7 @@ export type Heard =
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
 	| { type: "reconnected" };
 
+/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {
 	let token = firstToken;
 	/** This frame's name on its stream: what the harness says to it alone (a document's answers) carries it. */
@@ -180,7 +181,6 @@ export function drawingFollower(handlers: {
 	};
 }
 
-/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 /** A card written out as a page, drawn by the harness's Chrome at `url`: the picture as base64, or why not. */
 async function snapshotOf(url: string, headers: Record<string, string>, path: string, shot: CardShot): Promise<{ mime: string; data: string } | { why: string }> {
 	try {

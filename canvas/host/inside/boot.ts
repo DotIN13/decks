@@ -234,7 +234,7 @@ function addressesOf(start: Start, keeper: ReturnType<typeof keeperOf>) {
 	/*
 	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
 	 * the canvas's own folder, where the deck's `assets/` and `docs/` are served beside it too
-	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
+	 * (`protocol/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
 	 */
 	const folder = `canvases/${start.canvas.name}/`;
 	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.

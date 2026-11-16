@@ -6,7 +6,7 @@ import type { PenDocument, PenVariable } from "./types.ts";
  * icon not dark ink on dark). An item refers to one as `"$decks-fill-slate"`; the insert that makes it
  * also defines whichever of them the drawing does not have yet (`withDecksColors`). Light values are
  * what the tools always made; dark ones sit on the dark canvas (`#242424`) beside the app's dark
- * palette (`canvas/render/look.ts`).
+ * palette (`canvas/look/look.ts`).
  *
  * Named `decks-<role>[-<variant>]`, in five roles, in this order: text, line, surface, fill, accent.
  */
@@ -38,7 +38,7 @@ export const DECKS_COLORS: Readonly<Record<string, { light: string; dark: string
 	"decks-fill-green": { light: "#bbf7d0", dark: "#1f4730", name: "Fill, green" },
 	"decks-fill-blue": { light: "#bfdbfe", dark: "#1e3a5f", name: "Fill, blue" },
 	"decks-fill-purple": { light: "#e9d5ff", dark: "#3f2d5c", name: "Fill, purple" },
-	/** The pen's and the marker's colours (`canvas/model/ink.ts`), and accents that read on both grounds. */
+	/** The pen's and the marker's colours (`canvas/ink/model.ts`), and accents that read on both grounds. */
 	"decks-accent-red": { light: "#e5484d", dark: "#ff6369", name: "Accent, red" },
 	"decks-accent-orange": { light: "#f97316", dark: "#fb923c", name: "Accent, orange" },
 	"decks-accent-yellow": { light: "#f2b200", dark: "#ffc53d", name: "Accent, yellow" },

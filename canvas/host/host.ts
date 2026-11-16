@@ -7,7 +7,7 @@ import { setIconSource, type IconSource } from "../look/icons.ts";
  * (Decks Studio, the package's own demo). These are the questions the canvas cannot answer itself
  * — where a deck file is served from, whether the person may write at all, which links on a board
  * name another board — set once by the host (`setCanvasHost`) and read where they are needed.
- * Module state, like the tool signals beside it (`state/pen-tools.ts`): one canvas to a page.
+ * Module state, like the tool signals beside it (`editor/pen-tools.ts`): one canvas to a page.
  */
 export interface CanvasHost {
 	/** The address a deck file is read at (an image fill, an embed, a file opened in a tab). */
@@ -19,7 +19,7 @@ export interface CanvasHost {
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
 	cardLink(href: string, base: string): string | undefined;
-	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
+	/** Where an icon's SVG is, before the CDN is asked (`look/icons.ts`). Absent: the CDN. */
 	iconUrl?: IconSource;
 	/**
 	 * Where a picture the drawing names (an image fill, a card's picture) is read, given as the
@@ -75,7 +75,7 @@ export interface CanvasHost {
 
 /**
  * A pass in an address's path, as a canvas frame's files carry it: a harness's `/api/t/<pass>/`
- * (`server/src/auth/passes.ts`), or Studio's `/api/live/<pass>/`.
+ * (`server/frame/passes.ts`), or Studio's `/api/live/<pass>/`.
  */
 const PASS_IN_PATH = /\/api\/(t|live)\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\//;
 

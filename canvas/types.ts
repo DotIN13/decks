@@ -154,7 +154,7 @@ export interface CanvasOptions {
 	world?: () => JSX.Element;
 }
 
-/** The editor's handle, inside the canvas frame (and to an app's chrome there, `frame/chrome.ts`). */
+/** The editor's handle, inside the canvas frame (and to an app's chrome there, `harness/page/frame/chrome.tsx`). */
 export interface CanvasHandle {
 	/**
 	 * A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no
@@ -229,13 +229,9 @@ export interface EditorState {
 	/** Whether ink is in hand. */
 	inking?: Accessor<boolean>;
 	/**
-	 * The drawing as the host has it (with `document`, the host owns it), and the folder its own
-	 * addresses are read against; undefined while there is none to show.
-	 */
-	/**
-	 * `edits`, when the host has them: what made this drawing from the one it gave before (`DocEdits`).
-	 * With `document`: `made`, the person's edits it is the first to have (by the names `send` was given),
-	 * and `scope`, which drawing it is (the canvas): one of another scope drops the edits on their way.
+	 * The drawing as the host has it, the folder its addresses are read against, and `edits` that made it (`DocEdits`);
+	 * with `document` the host owns it: `made` names the person's edits it first has, `scope` the canvas (another drops them).
+	 * Undefined while there is none to show.
 	 */
 	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string; writer?: DrawingWriter; /** The person's own edit or step, shown at once by their hand: nothing to glide. */ own?: true } | undefined>;
 }
