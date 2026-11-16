@@ -126,50 +126,50 @@ export function fixedLayerOf(ctx: {
 	/** The canvas's own chrome, held to the window: the engine's notice, the menus, the pills and the ink. */
 	const fixedLayer = () => (
 		<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
-		{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
-		<Show when={engineNotice()}>
-			{(notice) => (
-				<div class="stage-notice" role="alert">
-					{notice()}
-				</div>
-			)}
-		</Show>
-		<InsertMenu menu={editor.insert} />
-		{selection.pills()}
-		<Show when={holdMenu()} keyed>
-			{(menu) => {
-				const node = menu.ids[0] ? penNode(menu.ids[0]) : undefined;
-				const words = node ? String((node as { content?: unknown; name?: unknown }).content ?? (node as { name?: unknown }).name ?? "") : "";
-				const preview = words ? words.slice(0, 80) : undefined;
-				const tops = () => props.pen?.doc?.children?.length ?? 0;
-				const actions: HoldAction[] = menu.ids.length
-					? [
-							{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
-							{ label: "Duplicate", run: () => selection.penDuplicate() },
-							{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
-							...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.stageName ? `canvases/${props.stageName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
-							{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
-						]
-					: [
-							{ label: "Add a shape…", run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
-							{ label: "Add an icon…", run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
-						];
-				return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
-			}}
-		</Show>
-		<Show when={props.drawing && props.onPenEdit}>
-			<CanvasInk
-				camera={props.camera}
-				view={view()}
-				toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
-				strokes={inkStrokes}
-				layer={penLayer}
-				onEdit={(ops) => penEdit(ops)}
-				newId={freshId}
-				onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
-				{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
-			/>
-		</Show>
+			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
+			<Show when={engineNotice()}>
+				{(notice) => (
+					<div class="stage-notice" role="alert">
+						{notice()}
+					</div>
+				)}
+			</Show>
+			<InsertMenu menu={editor.insert} />
+			{selection.pills()}
+			<Show when={holdMenu()} keyed>
+				{(menu) => {
+					const node = menu.ids[0] ? penNode(menu.ids[0]) : undefined;
+					const words = node ? String((node as { content?: unknown; name?: unknown }).content ?? (node as { name?: unknown }).name ?? "") : "";
+					const preview = words ? words.slice(0, 80) : undefined;
+					const tops = () => props.pen?.doc?.children?.length ?? 0;
+					const actions: HoldAction[] = menu.ids.length
+						? [
+								{ label: "Properties", hint: "drawer", run: () => setPropsOpen(true) },
+								{ label: "Duplicate", run: () => selection.penDuplicate() },
+								{ label: "Bring to front", run: () => penEdit(menu.ids.map((id) => ({ op: "move", id, parent: null, index: Math.max(0, tops() - 1) }))) },
+								...(props.onComment ? [{ label: "Ask the agent", hint: "→", run: () => props.onComment?.({ path: props.stageName ? `canvases/${props.stageName}/canvas.pen` : "the canvas", items: menu.ids, quote: preview ?? "", title: preview ?? "An item", anchor: () => document.querySelector(".stage-fixed > .card-callout")?.getBoundingClientRect(), open: true }) }] : []),
+								{ label: "Delete", danger: true, run: () => selection.penDeleteSelected() },
+							]
+						: [
+								{ label: "Add a shape…", run: () => setInsertPanel({ tab: "shapes", at: menu.stage, client: menu.at }) },
+								{ label: "Add an icon…", run: () => setInsertPanel({ tab: "icons", at: menu.stage, client: menu.at }) },
+							];
+					return <HoldMenu at={menu.at} preview={preview} actions={actions} onClose={() => setHoldMenu(undefined)} />;
+				}}
+			</Show>
+			<Show when={props.drawing && props.onPenEdit}>
+				<CanvasInk
+					camera={props.camera}
+					view={view()}
+					toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
+					strokes={inkStrokes}
+					layer={penLayer}
+					onEdit={(ops) => penEdit(ops)}
+					newId={freshId}
+					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
+					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
+				/>
+			</Show>
 		</div>
 	);
 	return { fixedLayer };
