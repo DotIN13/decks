@@ -1,8 +1,6 @@
 {
 	"canvas/cards/card-snapshot.ts: names a path no file has": 2,
 	"canvas/cards/card.ts: names a path no file has": 1,
-	"canvas/chrome/InkBar.tsx: names a path no file has": 1,
-	"canvas/chrome/InsertMenu.tsx: names a path no file has": 1,
 	"canvas/chrome/properties/state.ts: names a path no file has": 1,
 	"canvas/documents/build-live-doc.mjs: names a path no file has": 2,
 	"canvas/documents/google/units.ts: names a path no file has": 1,

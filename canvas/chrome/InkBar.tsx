@@ -13,25 +13,11 @@ import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setIn
 import { Icon } from "@decks/ui";
 import { inkKey } from "../ink/ink-keys.ts";
 
-/**
- * The drawing tools: what is in your hand, its colour and width, and undo, redo and delete.
- *
- * One row under the top clusters, there while the draw tool is on and gone with it. The
- * order is the order a notes app uses, and for the same reason: the tools you change between
- * most are on the left, what they look like is in the middle, and taking things back is at
- * the far end where a resting hand does not press it.
- */
-const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: string }> = [
-	{ tool: "pen", icon: PenLine, label: "Pen: draws, and presses harder with a pencil" },
-	{ tool: "marker", icon: Highlighter, label: "Marker: wide and see-through, for marking words" },
-	{ tool: "eraser", icon: Eraser, label: "Eraser: removes each stroke it touches" },
-	{ tool: "lasso", icon: Lasso, label: "Lasso: loop round strokes to select them, then drag or delete" },
-];
-
-const COLOR_NAMES: Record<(typeof INK_COLORS)[number], string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
+// The drawing tools' row: what is in your hand, its colour and width, and undo, redo and delete,
+// there while the draw tool is on.
 
 /**
- * What is drawn goes on the stage (`canvas/pen/InkLayer.tsx`), so undo and redo are the stage's
+ * What is drawn goes on the stage (`canvas/ink/InkLayer.tsx`), so undo and redo are the stage's
  * own, and delete takes what the lasso holds off the stage.
  */
 export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void; onDelete: (ids: string[]) => void }) {
@@ -102,7 +88,6 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 	);
 }
 
-
 /** A key while the ink tool is on: Escape lets go of the strokes held or ends drawing; undo, redo and delete act on the drawing. */
 function inkKeyDown(event: KeyboardEvent, props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void }, deleteSelection: () => void): void {
 	const target = event.target as HTMLElement | null;
@@ -164,3 +149,12 @@ function InkPaint(props: { widths: () => readonly number[] }) {
 		</>
 	);
 }
+
+const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: string }> = [
+	{ tool: "pen", icon: PenLine, label: "Pen: draws, and presses harder with a pencil" },
+	{ tool: "marker", icon: Highlighter, label: "Marker: wide and see-through, for marking words" },
+	{ tool: "eraser", icon: Eraser, label: "Eraser: removes each stroke it touches" },
+	{ tool: "lasso", icon: Lasso, label: "Lasso: loop round strokes to select them, then drag or delete" },
+];
+
+const COLOR_NAMES: Record<(typeof INK_COLORS)[number], string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };

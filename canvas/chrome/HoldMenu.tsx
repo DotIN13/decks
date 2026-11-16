@@ -1,5 +1,7 @@
 import { For, onCleanup, onMount, Show } from "solid-js";
 
+// The menu a long press opens on a touchscreen: its rows, and the menu that holds them.
+
 /** One row of the hold menu. */
 export interface HoldAction {
 	label: string;

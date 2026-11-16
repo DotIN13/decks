@@ -1,5 +1,24 @@
 import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
 
+// An agent's cursor on the canvas: an arrow with its name tag that drifts to where the agent works,
+// breathes at rest, rings when it acts, and fades when it leaves.
+
+interface CursorAt {
+	x: number;
+	y: number;
+	label: string;
+	color: string;
+	/** What the cursor arrived for, such as the act's clock: a new one rings again at the same place. */
+	key?: number;
+}
+
+const DRIFT_MS = 380;
+
+const LEAVE_MS = 600;
+
+/** Past this many screen pixels a move is a jump: faded, not drifted. */
+const JUMP_PX = 1200;
+
 /**
  * An agent's cursor: an arrow with its name tag, the way a design tool draws a collaborator's.
  *
@@ -20,20 +39,6 @@ import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
  * title bars (`--zoom`), so it is one size on the screen at any zoom. Reduced motion keeps the
  * position and the name and drops everything that moves.
  */
-interface CursorAt {
-	x: number;
-	y: number;
-	label: string;
-	color: string;
-	/** What the cursor arrived for, such as the act's clock: a new one rings again at the same place. */
-	key?: number;
-}
-
-const DRIFT_MS = 380;
-const LEAVE_MS = 600;
-/** Past this many screen pixels a move is a jump: faded, not drifted. */
-const JUMP_PX = 1200;
-
 export function AgentCursor(props: { cursor: CursorAt | null | undefined; zoom: number }) {
 	const [shown, setShown] = createSignal<CursorAt | undefined>(props.cursor ?? undefined);
 	const [moving, setMoving] = createSignal(false);

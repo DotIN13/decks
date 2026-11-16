@@ -25,6 +25,9 @@ import type { SceneQuery } from "../editor/core/scene.ts";
 import type { Editor } from "../editor/dom/controller.ts";
 import type { TextEditing } from "../editor/dom/TextEditing.tsx";
 
+// The insert menu a press on empty canvas opens: what can be made there, and making it at that point,
+// joined to what it was dragged from.
+
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
 
@@ -39,9 +42,26 @@ export type InsertHost = {
 	freshId: () => string;
 	/** Ids for several new items at once, none `also`. */
 	idsBut: (also: string) => NextId;
-	/** Follow a press to its lift (`dom/pointer.ts`, `follow`). */
+	/** Follow a press to its lift (`input/pointer.ts`, `follow`). */
 	follow: (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => void;
 };
+
+type InsertMenuApi = ReturnType<typeof createInsertMenu>;
+
+/** What the insert menu holds between presses. */
+interface MenuRun {
+	editor: Editor;
+	text: TextEditing;
+	host: InsertHost;
+	/** When a tool last made an item, so the second press of a double-click does not make a note as well. */
+	madeAt: number;
+	/*
+	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
+	 * item is drawn only once the server has answered, and taking the outline away at the release left
+	 * the spot empty for two or three frames.
+	 */
+	draftFor?: string;
+}
 
 export function createInsertMenu(editor: Editor, text: TextEditing, host: InsertHost) {
 	const m: MenuRun = { editor, text, host, madeAt: 0 };
@@ -110,25 +130,25 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 		},
 	};
 }
-type InsertMenuApi = ReturnType<typeof createInsertMenu>;
-
-/** What the insert menu holds between presses. */
-interface MenuRun {
-	editor: Editor;
-	text: TextEditing;
-	host: InsertHost;
-	/** When a tool last made an item, so the second press of a double-click does not make a note as well. */
-	madeAt: number;
-	/*
-	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
-	 * item is drawn only once the server has answered, and taking the outline away at the release left
-	 * the spot empty for two or three frames.
-	 */
-	draftFor?: string;
-}
 
 /** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
 const makeOptions = (m: MenuRun, id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: m.host.idsBut(id), card: newCard });
+
+/**
+ * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
+ * from the canvas menu. Words open for typing at once.
+ */
+function makeAt(m: MenuRun, tool: Exclude<PenTool, "select" | "arrow">, at: Pt, centred = false): void {
+	const { editor, host, text } = m;
+	m.madeAt = performance.now();
+	const id = host.freshId();
+	// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`editor/core/ops.ts`).
+	const parent = frameAt(m, at);
+	const { op, node, box } = makeAtOp(tool, id, at, { ...makeOptions(m, id), centred, ...(parent ? { parent } : {}) });
+	host.edit([op]);
+	editor.selectMade([id]);
+	if (opensWords(tool)) text.openPenText({ id, node, box }, true);
+}
 
 /** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
 const joinAt = (m: MenuRun, point: Pt, not?: string): Join | undefined => joinAtIn(m.host.scene, point, { zoom: m.host.zoom(), not });
@@ -184,23 +204,6 @@ function penDrawn(m: MenuRun, tool: Exclude<PenTool, "select">, at: Pt, startJoi
 	editor.selectMade([id]);
 	if (opensWords(tool)) text.openPenText({ id, node, box }, true);
 }
-
-/**
- * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
- * from the canvas menu. Words open for typing at once.
- */
-function makeAt(m: MenuRun, tool: Exclude<PenTool, "select" | "arrow">, at: Pt, centred = false): void {
-	const { editor, host, text } = m;
-	m.madeAt = performance.now();
-	const id = host.freshId();
-	// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`editor/core/ops.ts`).
-	const parent = frameAt(m, at);
-	const { op, node, box } = makeAtOp(tool, id, at, { ...makeOptions(m, id), centred, ...(parent ? { parent } : {}) });
-	host.edit([op]);
-	editor.selectMade([id]);
-	if (opensWords(tool)) text.openPenText({ id, node, box }, true);
-}
-
 
 /** The insert panel a shape or an icon is picked in, while it is open. */
 export function InsertMenu(props: { menu: InsertMenuApi }) {

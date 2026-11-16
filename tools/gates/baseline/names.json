@@ -61,7 +61,6 @@
 	"canvas/chrome/InkBar.tsx: stage": 4,
 	"canvas/chrome/InsertMenu.tsx: stage": 3,
 	"canvas/chrome/keycaps.test.ts: board": 2,
-	"canvas/chrome/keycaps.ts: board": 2,
 	"canvas/chrome/PenBar.tsx: board": 3,
 	"canvas/chrome/PenBar.tsx: stage": 1,
 	"canvas/chrome/Properties.tsx: board": 1,

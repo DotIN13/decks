@@ -6,6 +6,9 @@ import { Icon, onDismiss } from "@decks/ui";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "../look/icon-index.ts";
 import { iconUrl } from "../look/icons.ts";
 
+// The insert panel: the shape library or the icons, each with its own search, beside the tool column
+// or at a point; a pick arms the tool or is put there at once.
+
 /**
  * The insert panel: the shape library, or the icons — two panels, one for each button in the tool
  * column, each with its own search. No tabs between them and no close button: it closes with a
@@ -20,16 +23,6 @@ import { iconUrl } from "../look/icons.ts";
  * are the libraries' own SVG files, shown as pictures; their names come from each library's list
  * (`icon-index.ts`).
  */
-
-/** What the icons tab shows for Lucide before anything is typed: the ones a diagram reaches for. */
-const LUCIDE_START = [
-	"circle-check", "triangle-alert", "info", "star", "heart", "user", "users", "mail", "phone", "calendar", "clock", "map-pin",
-	"house", "building-2", "database", "server", "cloud", "cpu", "laptop", "smartphone", "wifi", "lock", "key-round", "shield",
-	"settings", "search", "file", "folder", "image", "camera", "music", "video", "chart-column", "chart-pie", "trending-up", "dollar-sign",
-	"shopping-cart", "credit-card", "truck", "package", "rocket", "lightbulb", "zap", "flag", "bell", "message-square", "link", "globe",
-	"code-xml", "git-branch", "bot", "sparkles", "thumbs-up", "check", "x", "plus", "arrow-right", "refresh-cw", "download", "upload",
-];
-
 export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "icon") => void; onClose: () => void }) {
 	const [query, setQuery] = createSignal("");
 	const [library, setLibrary] = createSignal(penIcon().library);
@@ -154,7 +147,38 @@ function keepPlaced(props: { open: InsertPanel; onClose: () => void }, panelOf: 
 	return place;
 }
 
-type IconEntry = { name: string };
+/** The shapes tab: each group's shapes, drawn from the outlines the canvas draws. */
+function ShapesTab(props: { shapes: Array<{ group: string; list: typeof SHAPES }>; onPick: (tool: "shape" | "icon") => void }) {
+	const pickShape = (name: string) => {
+		setPenShape(name);
+		props.onPick("shape");
+	};
+	return (
+		<>
+			<For each={props.shapes}>
+				{(section) => (
+					<>
+						<p class="insert-group">{section.group}</p>
+						<div class="insert-grid">
+							<For each={section.list}>
+								{(shape) => (
+									<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shape.name} aria-label={shape.name} onClick={() => pickShape(shape.name)}>
+										<svg viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true">
+											<path d={shape.geometry} fill-rule={shape.fillRule ?? "nonzero"} data-line={shape.line ? "true" : undefined} />
+										</svg>
+									</button>
+								)}
+							</For>
+						</div>
+					</>
+				)}
+			</For>
+			<Show when={props.shapes.length === 0}>
+				<p class="insert-note">No shape is called that.</p>
+			</Show>
+		</>
+	);
+}
 
 /** The icons tab: the ones used lately, then the library's list or what the search found. */
 function IconsTab(props: { recent: Array<{ library: string; name: string }>; icons: { error?: unknown; loading: boolean }; found: IconEntry[]; query: string; library: string; onPick: (tool: "shape" | "icon") => void }) {
@@ -190,38 +214,7 @@ function IconsTab(props: { recent: Array<{ library: string; name: string }>; ico
 	);
 }
 
-/** The shapes tab: each group's shapes, drawn from the outlines the canvas draws. */
-function ShapesTab(props: { shapes: Array<{ group: string; list: typeof SHAPES }>; onPick: (tool: "shape" | "icon") => void }) {
-	const pickShape = (name: string) => {
-		setPenShape(name);
-		props.onPick("shape");
-	};
-	return (
-		<>
-			<For each={props.shapes}>
-				{(section) => (
-					<>
-						<p class="insert-group">{section.group}</p>
-						<div class="insert-grid">
-							<For each={section.list}>
-								{(shape) => (
-									<button type="button" class="insert-cell" data-shape={shape.name} data-on={penShape() === shape.name ? "true" : undefined} title={shape.name} aria-label={shape.name} onClick={() => pickShape(shape.name)}>
-										<svg viewBox="-4 -4 108 108" preserveAspectRatio="none" aria-hidden="true">
-											<path d={shape.geometry} fill-rule={shape.fillRule ?? "nonzero"} data-line={shape.line ? "true" : undefined} />
-										</svg>
-									</button>
-								)}
-							</For>
-						</div>
-					</>
-				)}
-			</For>
-			<Show when={props.shapes.length === 0}>
-				<p class="insert-note">No shape is called that.</p>
-			</Show>
-		</>
-	);
-}
+type IconEntry = { name: string };
 
 function IconCell(props: { library: string; name: string; picked: boolean; onPick: (name: string) => void }) {
 	const src = () => iconUrl(props.library, props.name, 400);
@@ -231,3 +224,12 @@ function IconCell(props: { library: string; name: string; picked: boolean; onPic
 		</button>
 	);
 }
+
+/** What the icons tab shows for Lucide before anything is typed: the ones a diagram reaches for. */
+const LUCIDE_START = [
+	"circle-check", "triangle-alert", "info", "star", "heart", "user", "users", "mail", "phone", "calendar", "clock", "map-pin",
+	"house", "building-2", "database", "server", "cloud", "cpu", "laptop", "smartphone", "wifi", "lock", "key-round", "shield",
+	"settings", "search", "file", "folder", "image", "camera", "music", "video", "chart-column", "chart-pie", "trending-up", "dollar-sign",
+	"shopping-cart", "credit-card", "truck", "package", "rocket", "lightbulb", "zap", "flag", "bell", "message-square", "link", "globe",
+	"code-xml", "git-branch", "bot", "sparkles", "thumbs-up", "check", "x", "plus", "arrow-right", "refresh-cw", "download", "upload",
+];

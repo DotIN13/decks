@@ -1,5 +1,7 @@
 import { DECKS_COLORS, decksColorOf } from "@decks/pen";
 
+// The adaptive colours the picker offers, a row per role, and how a swatch draws and names one.
+
 /**
  * The adaptive colours on offer, by name, a row per role: text, line and surface; the neutral fills;
  * the soft fills, each above its accent of the same hue.

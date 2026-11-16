@@ -22,6 +22,9 @@ import ImageDown from "lucide-solid/icons/image-down";
 import FileDown from "lucide-solid/icons/file-down";
 import Link from "lucide-solid/icons/link";
 
+// The pill over a selected item or card: its place beside the selection, and its actions,
+// from the words of a stroke of ink to the More menu.
+
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
 
@@ -105,7 +108,7 @@ export function PageCallout(props: {
 		</div>
 	);
 }
-
+// Where the pill sits.
 /** Where the pill sits: measured, on the edge chosen once the box rests, centred on what it is for. */
 function pillPlace(props: Parameters<typeof PageCallout>[0], elementOf: () => HTMLDivElement | undefined) {
 	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
@@ -218,7 +221,7 @@ function chooseSide(props: Parameters<typeof PageCallout>[0], element: HTMLDivEl
 	const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
 	return { below: best.slot.below, sure: true };
 }
-
+// What the pill holds.
 /** Ink selected: hand it to the agent, as a drawing, as a card, or as it is. */
 function InkWords(props: { ink: NonNullable<Parameters<typeof PageCallout>[0]["ink"]> }) {
 	const ink = () => props.ink;

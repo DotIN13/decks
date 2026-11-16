@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { DECKS_COLORS } from "@decks/pen";
 import { ADAPTIVE, sameColor } from "./adaptive.ts";
 
+// The picker's adaptive colours: every one offered once, by role, and how a swatch shows one.
+
 test("the picker's Adaptive rows hold every Decks colour once, by role, and an old name is the same colour as its new one", () => {
 	assert.deepEqual(ADAPTIVE.flat().sort(), Object.keys(DECKS_COLORS).sort());
 	assert.deepEqual(ADAPTIVE.map((row) => row[0]), ["decks-text", "decks-fill-slate", "decks-fill-red", "decks-accent-red"]);

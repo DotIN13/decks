@@ -7,6 +7,11 @@ import { onDismiss, portalLayer } from "@decks/ui";
 import { Icon } from "@decks/ui";
 import { scheme } from "../theme.ts";
 
+// The properties panel's colour picker: shade and hue, hex, a dropper, the adaptive colours
+// and the panel's swatches, opened under the swatch that asked for it.
+
+type Hsv = { h: number; s: number; v: number };
+
 /**
  * A colour picker for the properties panel: a square of shade and brightness, a strip of hues, the
  * colour as hex, a dropper where the browser has one, the adaptive colours, and the panel's own swatches.
@@ -24,39 +29,6 @@ import { scheme } from "../theme.ts";
  * it when the pointer is let go, so the item changes under the pointer and the drawing still takes
  * one edit and not sixty.
  */
-type Hsv = { h: number; s: number; v: number };
-
-function hexToHsv(hex: string): Hsv {
-	const m = /^#?([0-9a-f]{6})/i.exec(hex);
-	const n = m ? parseInt(m[1]!, 16) : 0xffffff;
-	const r = ((n >> 16) & 255) / 255;
-	const g = ((n >> 8) & 255) / 255;
-	const b = (n & 255) / 255;
-	const max = Math.max(r, g, b);
-	const min = Math.min(r, g, b);
-	const d = max - min;
-	let h = 0;
-	if (d > 0) {
-		if (max === r) h = ((g - b) / d) % 6;
-		else if (max === g) h = (b - r) / d + 2;
-		else h = (r - g) / d + 4;
-		h *= 60;
-		if (h < 0) h += 360;
-	}
-	return { h, s: max === 0 ? 0 : d / max, v: max };
-}
-
-function hsvToHex({ h, s, v }: Hsv): string {
-	const c = v * s;
-	const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-	const m = v - c;
-	const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
-	const to = (value: number) => Math.round((value + m) * 255).toString(16).padStart(2, "0");
-	return `#${to(r)}${to(g)}${to(b)}`;
-}
-
-const PALETTE = ["#ffffff", "#f3f4f6", "#9ca3af", "#57606a", "#1f2328", "#fecaca", "#fde68a", "#bbf7d0", "#bfdbfe", "#e9d5ff", "#dc2626", "#d97706", "#16a34a", "#2563eb", "#7c3aed"];
-
 export function ColorPicker(props: {
 	/** The field's colour: a hex, or a variable (`"$decks-text"`). */
 	value: string | undefined;
@@ -191,17 +163,26 @@ function dragAcross(event: PointerEvent, el: HTMLElement, move: (fx: number, fy:
 	el.addEventListener("pointerup", up);
 	el.addEventListener("pointercancel", up);
 }
-
-/** Enter in the hex field: three or six hex digits, with or without #, become the colour. */
-function hexTyped(event: KeyboardEvent, pick: (full: string) => void): void {
-	event.stopPropagation();
-	if (event.key !== "Enter") return;
-	const text = (event.currentTarget as HTMLInputElement).value.trim().replace(/^#/, "").toLowerCase();
-	const full = /^[0-9a-f]{3}$/.test(text) ? text.replace(/./g, (c) => c + c) : text;
-	if (!/^[0-9a-f]{6}$/.test(full)) return;
-	pick(`#${full}`);
+// The square of shade and the strip of hues.
+/** The shade-and-brightness square and the hue strip, each dragged across. */
+function ShadeAndHue(props: { hsv: Hsv; hex: string; setHsv: (next: Hsv) => void; dragOver: (event: PointerEvent, el: HTMLElement, move: (fx: number, fy: number) => void) => void }) {
+	return (
+		<>
+			<div
+				class="color-sv"
+				style={{ "--hue": `hsl(${props.hsv.h} 100% 50%)` }}
+				onPointerDown={(event) => props.dragOver(event, event.currentTarget, (fx, fy) => props.setHsv({ ...props.hsv, s: fx, v: 1 - fy }))}
+				aria-label="Shade and brightness"
+			>
+				<span class="color-knob" style={{ left: `${props.hsv.s * 100}%`, top: `${(1 - props.hsv.v) * 100}%`, background: props.hex }} />
+			</div>
+			<div class="color-hue" onPointerDown={(event) => props.dragOver(event, event.currentTarget, (fx) => props.setHsv({ ...props.hsv, h: Math.min(359.9, fx * 360) }))} aria-label="Hue">
+				<span class="color-knob" style={{ left: `${(props.hsv.h / 360) * 100}%`, top: "50%", background: `hsl(${props.hsv.h} 100% 50%)` }} />
+			</div>
+		</>
+	);
 }
-
+// The swatches, the hex and the dropper.
 /** The adaptive colours, which follow the canvas between light and dark, row by row. */
 function AdaptiveSwatches(props: { value: string | undefined; onPick: (name: string) => void }) {
 	return (
@@ -233,6 +214,8 @@ function AdaptiveSwatches(props: { value: string | undefined; onPick: (name: str
 	);
 }
 
+const PALETTE = ["#ffffff", "#f3f4f6", "#9ca3af", "#57606a", "#1f2328", "#fecaca", "#fde68a", "#bbf7d0", "#bfdbfe", "#e9d5ff", "#dc2626", "#d97706", "#16a34a", "#2563eb", "#7c3aed"];
+
 /** The fixed colours. */
 function PaletteSwatches(props: { picked: string | undefined; onPick: (color: string) => void }) {
 	return (
@@ -254,6 +237,16 @@ function PaletteSwatches(props: { picked: string | undefined; onPick: (color: st
 	);
 }
 
+/** Enter in the hex field: three or six hex digits, with or without #, become the colour. */
+function hexTyped(event: KeyboardEvent, pick: (full: string) => void): void {
+	event.stopPropagation();
+	if (event.key !== "Enter") return;
+	const text = (event.currentTarget as HTMLInputElement).value.trim().replace(/^#/, "").toLowerCase();
+	const full = /^[0-9a-f]{3}$/.test(text) ? text.replace(/./g, (c) => c + c) : text;
+	if (!/^[0-9a-f]{6}$/.test(full)) return;
+	pick(`#${full}`);
+}
+
 /** Whether this browser can pick a colour from the screen. */
 const dropper = typeof window !== "undefined" && "EyeDropper" in window;
 
@@ -267,22 +260,32 @@ async function pickFromScreen(pick: (hex: string) => void): Promise<void> {
 		// Closed with Escape: nothing picked.
 	}
 }
+// Colour as hue, saturation and value.
+function hexToHsv(hex: string): Hsv {
+	const m = /^#?([0-9a-f]{6})/i.exec(hex);
+	const n = m ? parseInt(m[1]!, 16) : 0xffffff;
+	const r = ((n >> 16) & 255) / 255;
+	const g = ((n >> 8) & 255) / 255;
+	const b = (n & 255) / 255;
+	const max = Math.max(r, g, b);
+	const min = Math.min(r, g, b);
+	const d = max - min;
+	let h = 0;
+	if (d > 0) {
+		if (max === r) h = ((g - b) / d) % 6;
+		else if (max === g) h = (b - r) / d + 2;
+		else h = (r - g) / d + 4;
+		h *= 60;
+		if (h < 0) h += 360;
+	}
+	return { h, s: max === 0 ? 0 : d / max, v: max };
+}
 
-/** The shade-and-brightness square and the hue strip, each dragged across. */
-function ShadeAndHue(props: { hsv: Hsv; hex: string; setHsv: (next: Hsv) => void; dragOver: (event: PointerEvent, el: HTMLElement, move: (fx: number, fy: number) => void) => void }) {
-	return (
-		<>
-			<div
-				class="color-sv"
-				style={{ "--hue": `hsl(${props.hsv.h} 100% 50%)` }}
-				onPointerDown={(event) => props.dragOver(event, event.currentTarget, (fx, fy) => props.setHsv({ ...props.hsv, s: fx, v: 1 - fy }))}
-				aria-label="Shade and brightness"
-			>
-				<span class="color-knob" style={{ left: `${props.hsv.s * 100}%`, top: `${(1 - props.hsv.v) * 100}%`, background: props.hex }} />
-			</div>
-			<div class="color-hue" onPointerDown={(event) => props.dragOver(event, event.currentTarget, (fx) => props.setHsv({ ...props.hsv, h: Math.min(359.9, fx * 360) }))} aria-label="Hue">
-				<span class="color-knob" style={{ left: `${(props.hsv.h / 360) * 100}%`, top: "50%", background: `hsl(${props.hsv.h} 100% 50%)` }} />
-			</div>
-		</>
-	);
+function hsvToHex({ h, s, v }: Hsv): string {
+	const c = v * s;
+	const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+	const m = v - c;
+	const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+	const to = (value: number) => Math.round((value + m) * 255).toString(16).padStart(2, "0");
+	return `#${to(r)}${to(g)}${to(b)}`;
 }

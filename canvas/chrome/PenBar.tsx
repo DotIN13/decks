@@ -17,6 +17,8 @@ import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "
 import { Icon } from "@decks/ui";
 import { Properties } from "./Properties.tsx";
 
+// The drawing's controls in edit mode: the column of tools on the canvas's left edge, with undo and redo.
+
 /**
  * The drawing's controls, in edit mode: a column of tools and a properties panel.
  *
@@ -31,16 +33,6 @@ import { Properties } from "./Properties.tsx";
  * the properties panel (`Properties.tsx`), in the board inspector's corner, only while something in
  * the drawing is selected. Every control sends a pen operation, the same one an agent would.
  */
-export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key?: string; after?: boolean; panel?: "shapes" | "icons" }> = [
-	{ tool: "shape", icon: Shapes, label: "Shapes: basic, flowchart, arrows and callouts", panel: "shapes" },
-	{ tool: "icon", icon: SmilePlus, label: "Icons: Lucide, Phosphor, Material and Feather", panel: "icons" },
-	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
-	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
-	{ tool: "card", icon: FileText, label: "Card: write markdown, see headings, lists, bold and links", key: "C" },
-	{ tool: "text", icon: Type, label: "Text", key: "T" },
-	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
-];
-
 export function PenBar(props: {
 	/** Draw the column of tools. Default: true; a host with its own tools turns it off. */
 	tools?: boolean;
@@ -143,3 +135,13 @@ function ToolButton(props: { entry: (typeof TOOLS)[number]; besideTab: () => "sh
 		</button>
 	);
 }
+
+export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key?: string; after?: boolean; panel?: "shapes" | "icons" }> = [
+	{ tool: "shape", icon: Shapes, label: "Shapes: basic, flowchart, arrows and callouts", panel: "shapes" },
+	{ tool: "icon", icon: SmilePlus, label: "Icons: Lucide, Phosphor, Material and Feather", panel: "icons" },
+	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
+	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
+	{ tool: "card", icon: FileText, label: "Card: write markdown, see headings, lists, bold and links", key: "C" },
+	{ tool: "text", icon: Type, label: "Text", key: "T" },
+	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
+];
