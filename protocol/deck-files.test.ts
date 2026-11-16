@@ -12,11 +12,11 @@ test("a card's meta tag: its name, what it holds and its size", () => {
 	assert.equal(cardMeta("<p>no tag</p>"), undefined);
 });
 
-test("the import map, at assets/importmap.json: https kept, relative paths under assets/, the rest dropped", () => {
+test("the import map, at assets/importmap.json: https kept, ./x, /x and x under assets/, what climbs or hides dropped", () => {
 	const text = JSON.stringify({
-		imports: { greet: "./libs/greet/index.js", up: "libs/../x.js", cdn: "https://cdn.example/a.js", out: "../secret.js", hid: ".git/x", root: "/x.js", http: "http://a/b.js", n: 3 },
+		imports: { dot: "./libs/a.js", root: "/libs/b.js", bare: "libs/c.js", up: "libs/../x.js", cdn: "https://cdn.example/a.js", out: "../secret.js", hid: ".git/x", n: 3 },
 	});
-	assert.deepEqual(importMap(text), { greet: "assets/libs/greet/index.js", up: "assets/x.js", cdn: "https://cdn.example/a.js" });
+	assert.deepEqual(importMap(text), { dot: "assets/libs/a.js", root: "assets/libs/b.js", bare: "assets/libs/c.js", up: "assets/x.js", cdn: "https://cdn.example/a.js" });
 	assert.equal(IMPORT_MAP, "assets/importmap.json");
 	assert.deepEqual(importMap(undefined), {});
 	assert.deepEqual(importMap("not json"), {});

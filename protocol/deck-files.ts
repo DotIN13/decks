@@ -38,8 +38,8 @@ const sized = (key: "w" | "h", value: unknown) => (typeof value === "number" && 
 
 /**
  * The names the deck's import map (`{ "imports": { "name": "address" } }`) gives, from its text: an
- * https address as it is; a relative one as its deck path under assets/; one that leaves assets/,
- * names a hidden part, starts with / or has another scheme, dropped. No map reads as {}.
+ * https address as it is; any other as its deck path under assets/, a leading ./ or / dropped, as
+ * today's server reads it; one that climbs out of assets/ or names a hidden part, dropped.
  */
 export function importMap(text: string | undefined): Record<string, string> {
 	const imports = objectOf(text ?? "").imports;
@@ -47,15 +47,14 @@ export function importMap(text: string | undefined): Record<string, string> {
 	if (!imports || typeof imports !== "object") return out;
 	for (const [name, address] of Object.entries(imports as Record<string, unknown>)) {
 		if (!name || typeof address !== "string") continue;
-		const target = /^https:\/\//i.test(address) ? address : assetPath(address);
+		const target = /^https:\/\//.test(address) ? address : assetPath(address);
 		if (target) out[name] = target;
 	}
 	return out;
 }
 
-/** A relative address in the map as a deck path under assets/, or undefined when it leaves it. */
+/** An address in the map as a deck path under assets/, or undefined when it leaves it. */
 function assetPath(address: string): string | undefined {
-	if (/^[a-z][a-z0-9+.-]*:|^\//i.test(address)) return undefined;
 	const parts = ["assets"];
 	for (const part of address.split("/")) {
 		if (part === "" || part === ".") continue;
