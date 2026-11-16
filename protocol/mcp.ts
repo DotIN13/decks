@@ -37,7 +37,8 @@ export function jsonSchemaOf(node: Node): Record<string, unknown> {
 
 /** A call's answer as a tool's text: the value and its notes, or the refusal's sentence, code and hint. */
 export function toolText(envelope: Envelope<unknown>): { text: string; isError: boolean } {
-	if (!envelope.ok) {
+	// Narrowed by `in`, which holds where a client compiles without strict null checks.
+	if ("error" in envelope) {
 		const { message, code, hint } = envelope.error;
 		return { text: [`${message} (${code})`, ...(hint ? [`Try ${hint}.`] : []), ...envelope.notes].join("\n"), isError: true };
 	}
