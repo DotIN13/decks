@@ -13,5 +13,5 @@
 	"scripts/card-zoom.mjs: reaches past the entry of e2e": 1,
 	"scripts/gen-pen-schema.mjs: reaches past the entry of pen": 1,
 	"scripts/opencode2-live.mts: reaches past the entry of apps/server": 3,
-	"tools/checks/harness.mjs: reaches past the entry of pen": 1
+	"tools/checks/harness/programs.mjs: reaches past the entry of pen": 1
 }

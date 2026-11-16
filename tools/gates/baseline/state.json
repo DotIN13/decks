@@ -112,7 +112,7 @@
 	"tools/checks/cards/card-links.mjs: top-level let saved": 1,
 	"tools/checks/cards/card-links.mjs: top-level let words": 1,
 	"tools/checks/cards/deck-imports.mjs: top-level let placed": 1,
-	"tools/checks/harness.mjs: top-level let failures": 1,
+	"tools/checks/harness/programs.mjs: top-level let failures": 1,
 	"tools/checks/library/camera-roundtrip.mjs: top-level let onB": 1,
 	"tools/checks/library/card-phone.mjs: top-level let ghost": 1,
 	"tools/checks/library/card-phone.mjs: top-level let m": 1,
