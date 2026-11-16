@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { rmSync } from "node:fs";
+import { appendFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import type { Stores } from "./store.ts";
@@ -132,4 +132,17 @@ export async function tempFolder(name: string): Promise<{ folder: string; remove
 	const atExit = () => rmSync(folder, { recursive: true, force: true });
 	process.once("exit", atExit);
 	return { folder, remove: () => (process.off("exit", atExit), rm(folder, { recursive: true, force: true })) };
+}
+
+/** A log of the refusals scoped callers meet, one JSON line each, for the browser checks' runner:
+ *  the file DECKS_REFUSALS names, or nothing when it is not set. */
+export function refusalLog(file = process.env.DECKS_REFUSALS): ((refusal: Record<string, unknown>) => void) | undefined {
+	if (!file) return undefined;
+	return (refusal) => {
+		try {
+			appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...refusal })}\n`);
+		} catch {
+			// A log that cannot be written refuses nothing.
+		}
+	};
 }

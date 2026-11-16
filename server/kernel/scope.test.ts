@@ -142,6 +142,32 @@ test("a pass's card may be one its canvas already places, as the canvas feature 
 	await server.close();
 });
 
+test("each refusal a pass meets, by a call or a route, is one JSON line in DECKS_REFUSALS", async () => {
+	const { tempFolder } = await import("./disk.ts");
+	const { readFile } = await import("node:fs/promises");
+	const folder = await tempFolder("keel-refusals");
+	const file = `${folder.folder}/refusals.jsonl`;
+	process.env.DECKS_REFUSALS = file;
+	try {
+		const routes: Route[] = [{ method: "GET", prefix: "/open/", answer: async () => ({ type: "text/plain", body: "x" }) }];
+		const server = await testServer({ features: [probeFeature(), defineFeature({ name: "pages", calls: [], routes })] });
+		const token = server.callers.issue({ ...callers.person, id: "person~frame-5" }, "canvas pass", { canvas: "a", calls: ["port.list"], until: Date.now() + 60_000 });
+		await server.call("port.open", { port: 1 }, server.callers.resolve(token)!);
+		await server.call("port.list", {}, server.callers.resolve(token)!);
+		await server.call("port.open", { port: 2 });
+		const doors = await server.listen(0);
+		await fetch(`${doors.url}/open/x`, { headers: { authorization: `Bearer ${token}` } });
+		await doors.close();
+		await server.close();
+		const lines = (await readFile(file, "utf8")).trim().split("\n").map((one) => JSON.parse(one) as { caller: string; call?: string; route?: string });
+		assert.deepEqual(lines.map((one) => one.call ?? one.route), ["port.open", "GET /open/x"]);
+		assert.ok(lines.every((one) => one.caller === "person~frame-5"));
+	} finally {
+		delete process.env.DECKS_REFUSALS;
+		await folder.remove();
+	}
+});
+
 test("a scoped token ends at its until, and is dropped from the kept tokens", async () => {
 	const at = { now: 1000 };
 	const server = await testServer({ clock: () => at.now });

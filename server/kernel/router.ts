@@ -44,6 +44,15 @@ export class Router {
 
 	// Answering a call: find it, check it, run or relay it, trim and check the answer.
 	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
+		const envelope = await this.answerCall(name, args, caller, client, turned);
+		if (!turned && !envelope.ok && envelope.error.code === "refused" && this.scopeOf?.(caller)) this.onRefused?.({ caller: caller.id, call: name, why: envelope.error.message });
+		return envelope;
+	}
+
+	/** Told of each refusal a scoped caller meets (DECKS_REFUSALS), set by the kernel. */
+	onRefused?: (refusal: { caller: string; call?: string; route?: string; why: string }) => void;
+
+	private async answerCall(name: string, args: unknown, caller: Caller, client: Client | undefined, turned: boolean): Promise<Envelope<unknown>> {
 		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
 		const outside = this.declared.has(name) ? beyond(this.scopeOf?.(caller), name, args, (canvas, path) => this.placed(canvas, path)) : undefined;
 		if (outside) return refusal("refused", outside, "canvas.here");
@@ -161,9 +170,9 @@ function beyond(scope: Scope | undefined, name: string, args: unknown, placed: P
 /** Whether a canvas places an item at a path (Kernel.places, answered by the canvas feature). */
 type Placed = (canvas: string, path: string) => boolean;
 
-/** Arguments that name a place: where to write (to, only its folder), or which card (card, cards: its
- *  folder or a card its canvas already places, such as an old page outside any canvas folder). */
-const PLACES = { to: false, card: true, cards: true } as const;
+/** Arguments that name a place: where to write (to, only its folder), or which card or file (card, cards,
+ *  path: its folder or what its canvas already places, such as an old page or a document from docs/). */
+const PLACES = { to: false, card: true, cards: true, path: true } as const;
 
 /** Why an argument naming a place lies outside what a scoped canvas reaches, read through deckPathFrom. */
 function outsideFolder(canvas: string, args: unknown, placed: Placed): string | undefined {

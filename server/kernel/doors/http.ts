@@ -75,7 +75,10 @@ export function handler(built: Built) {
 		if (req.headers.origin === "null" && token) res.setHeader("access-control-allow-origin", "null");
 		if (req.headers.origin && !token && !open) return json(res, 403, refusal("refused", "A page in a browser must send a token; the origin alone says nothing."));
 		const caller = built.callers.resolve(token) ?? (open ? PUBLIC : undefined);
-		if (found && caller && !reaches(built, found.route, caller, method, new URL(req.url ?? "/", "http://decks.local"))) return json(res, 403, refusal("refused", "This pass does not reach this address.", "canvas.here"));
+		if (found && caller && !reaches(built, found.route, caller, method, new URL(req.url ?? "/", "http://decks.local"))) {
+			built.router.onRefused?.({ caller: caller.id, route: `${method} ${url.pathname}`, why: "This pass does not reach this address." });
+			return json(res, 403, refusal("refused", "This pass does not reach this address.", "canvas.here"));
+		}
 		if (found) return caller ? serveRoute(built, found, caller, req, res) : json(res, 401, NO_TOKEN);
 		return api(built, req, res, url, token, caller);
 	};

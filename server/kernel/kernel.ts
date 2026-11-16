@@ -2,7 +2,7 @@ import { Refused, type Caller, type Envelope } from "../../protocol/index.ts";
 import { randomUUID } from "node:crypto";
 import { adopt } from "./adopt.ts";
 import { Callers } from "./callers.ts";
-import { machineFolder } from "./disk.ts";
+import { machineFolder, refusalLog } from "./disk.ts";
 import { EventBus } from "./events.ts";
 import { HistoryDeck } from "./history.ts";
 import { ownFeature } from "./own-calls.ts";
@@ -64,6 +64,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const parts = { stores: options.stores, old: readMostly(options.old ?? new MemoryStore()) };
 	for (const one of features) await one.upgrade?.(history, version, parts);
 	router.scopeOf = (caller) => callers.scopeOf(caller);
+	const told = refusalLog();
+	if (told) router.onRefused = told;
 	events.scopeOf = (caller) => callers.scopeOf(caller);
 	const stops: Stop[] = [];
 	for (const one of features) {
