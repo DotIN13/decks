@@ -74,3 +74,26 @@ test("a card may not delete a canvas, start an agent or reach another canvas, by
 	await assert.rejects(call("item.list", { canvas: "other" }));
 	assert.equal(sent.filter((one) => one.name === "canvas.delete" || one.name === "agent.create").length, 0);
 });
+
+// Where old and new arguments are the same, a card's answer carries both shapes; where they cannot be one, the old.
+
+test("view.move answers a card the new View and the old Camera's x, y and zoom", async () => {
+	const { call } = frame();
+	const answer = (await call("view.move", { x: 5, y: 6, zoom: 2 })) as Record<string, unknown>;
+	assert.deepEqual([answer.x, answer.y, answer.zoom], [5, 6, 2]);
+	assert.deepEqual(answer.camera, { x: 5, y: 6, zoom: 2 });
+	assert.equal(answer.canvas, "plan");
+});
+
+test("view.focus answers a card the new View and the old target", async () => {
+	const { call } = frame();
+	const answer = (await call("view.focus", { target: "note-1" })) as Record<string, unknown>;
+	assert.equal(answer.target, "note-1");
+	assert.equal(answer.canvas, "plan");
+	assert.equal(answer.moved, true);
+});
+
+test("view.reload answers a card the old { reloaded }, not the new number", async () => {
+	const { call } = frame();
+	assert.deepEqual(await call("view.reload", { card: CARD }), { reloaded: 1 });
+});

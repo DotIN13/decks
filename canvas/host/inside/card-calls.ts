@@ -58,17 +58,19 @@ function here(deps: CardCallDeps, name: string, args: Record<string, unknown>): 
 			const now = deps.camera();
 			const next = { x: typeof args.x === "number" ? args.x : now.x, y: typeof args.y === "number" ? args.y : now.y, zoom: typeof args.zoom === "number" ? args.zoom : now.zoom };
 			deps.move(next, args.animate ? 400 : undefined);
-			return { ...view(), camera: next, moved: true };
+			// A card's answer carries both shapes: the new View and the old Camera's x, y and zoom.
+			return { ...view(), camera: next, moved: true, ...next };
 		}
 		case "view.focus": {
 			const target = args.target;
 			deps.focus(Array.isArray(target) ? target.map(String) : [String(target)]);
-			return { ...view(), moved: true };
+			return { ...view(), moved: true, target };
 		}
 		case "view.reload":
 			if (typeof args.card !== "string") throw new CallRefused('view.reload names a card: { card: "<path>" }.', "refused");
 			deps.reload(args.card);
-			return 1;
+			// The two answers cannot be one: a card keeps the old, so the card docs stay true.
+			return { reloaded: 1 };
 		case "view.cursor":
 			// A labelled dot is an agent's; a card draws its own pointer.
 			return view();
