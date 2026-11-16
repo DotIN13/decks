@@ -13,6 +13,7 @@ export { jsonSchemaOf } from "./json-schema.ts";
 export * from "./call.ts";
 export * from "./event.ts";
 export * as shapes from "./shapes.ts";
+export { idsOf } from "./shapes.ts";
 export * from "./glossary.ts";
 export * as layout from "./layout.ts";
 export * as sync from "./sync.ts";

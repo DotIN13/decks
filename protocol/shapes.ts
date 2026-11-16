@@ -34,6 +34,13 @@ export const ItemOp = named(
 	),
 	"One change in a batch: the item call of that name, with its item or id inside.",
 );
+/** The ids an op touches: the inserted item's (once it has one), a copy's source and its new id, none for variables. */
+export function idsOf(op: Infer<typeof ItemOp>): string[] {
+	if (op.op === "insert") return op.item.id ? [op.item.id] : [];
+	if (op.op === "copy") return op.as ? [op.id, op.as] : [op.id];
+	if (op.op === "variables") return [];
+	return [op.id];
+}
 export const Clip = named("Clip", obj({ id: str(), canvas: str(), box: Box, items: int() }), "Items held for a paste.");
 
 // Canvases, cards and frames.
