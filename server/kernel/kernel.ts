@@ -60,6 +60,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const version = options.version ?? memoryVersion();
 	const parts = { stores: options.stores, old: readMostly(options.old ?? new MemoryStore()) };
 	for (const one of features) await one.upgrade?.(history, version, parts);
+	router.scopeOf = (caller) => callers.scopeOf(caller);
+	events.scopeOf = (caller) => callers.scopeOf(caller);
 	const stops: Stop[] = [];
 	for (const one of features) {
 		const stop = await one.start?.(kernel);

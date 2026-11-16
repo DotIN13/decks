@@ -183,9 +183,13 @@ export interface Kernel {
 	url(): string | undefined;
 }
 
+/** What a scoped token (a pass) may reach: its canvas and only these calls, each when given, and only
+ *  until until (epoch ms). The kernel refuses anything outside it on every door, before any feature runs. */
+export type Scope = { canvas?: string; calls?: string[]; until: number };
+
 /** Tokens. The kernel keeps only hashes; revoke takes every token of a caller id. */
 export interface Tokens {
-	issue(who: Caller, label?: string): string;
+	issue(who: Caller, label?: string, scope?: Scope): string;
 	revoke(id: string): void;
 	/** Take back one token alone, by the token itself; its caller's other tokens stay. The kernel's always has it. */
 	forget?(token: string): void;

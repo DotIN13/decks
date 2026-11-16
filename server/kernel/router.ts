@@ -1,5 +1,5 @@
 import { CALL_BY_NAME, check, Refused, refusal, type AnyCall, type Caller, type Envelope, type Handled } from "../../protocol/index.ts";
-import type { Client, Context, Done, Feature, Filter, Guard, Translator } from "./types.ts";
+import type { Client, Context, Done, Feature, Filter, Guard, Scope, Translator } from "./types.ts";
 
 // Find the call, check who may call it, check the arguments against its
 // shape, run its handler, answer in the envelope. A declared call no feature
@@ -20,6 +20,8 @@ export class Router {
 	) {}
 
 	private translator: Translator | undefined;
+	/** The scope a caller is held to (a canvas pass's), set by the kernel. */
+	scopeOf?: (caller: Caller) => Scope | undefined;
 	private guards: Guard[] = [];
 	private filters: Filter[] = [];
 	private hearers = new Set<(done: Done) => void>();
@@ -27,6 +29,8 @@ export class Router {
 	// Answering a call: find it, check it, run or relay it, trim and check the answer.
 	async call(name: string, args: unknown, caller: Caller, client?: Client, turned = false): Promise<Envelope<unknown>> {
 		if (!turned && this.translator && (!this.declared.has(name) || oldForm(args))) return this.translated(name, args, caller, client);
+		const outside = this.declared.has(name) ? beyond(this.scopeOf?.(caller), name, args) : undefined;
+		if (outside) return refusal("refused", outside, "canvas.here");
 		const notes: string[] = [];
 		const found = this.find(name, caller, args ?? {}, notes);
 		if ("error" in found) return found.error;
@@ -127,6 +131,15 @@ export class Router {
 	callable(caller: Caller): AnyCall[] {
 		return [...this.entries.values()].map((entry) => entry.call).filter((call) => call.who.includes(caller.kind));
 	}
+}
+
+/** Why a call falls outside a caller's scope: a call not in its list, or a canvas not its own. */
+function beyond(scope: Scope | undefined, name: string, args: unknown): string | undefined {
+	if (!scope) return undefined;
+	if (scope.calls && !scope.calls.includes(name)) return `This pass may not call ${name}; it reaches only its canvas's calls.`;
+	const asked = typeof args === "object" && args !== null ? (args as { canvas?: unknown }).canvas : undefined;
+	if (scope.canvas !== undefined && asked !== undefined && asked !== scope.canvas) return `This pass reaches only the canvas ${scope.canvas}, not ${String(asked)}.`;
+	return undefined;
 }
 
 /** Today's positional form, { args: [...] } and nothing else; no declared call takes it. */

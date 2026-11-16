@@ -1,18 +1,21 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import type { Caller, Who } from "../../protocol/index.ts";
 import { readJson, writeJson } from "./store.ts";
-import type { Store, Tokens } from "./types.ts";
+import type { Scope, Store, Tokens } from "./types.ts";
 
 // A token or a pass becomes a Caller at the door, and nothing else says who
 // is calling. Only a token's hash is kept. A pass is a token issued to a card
 // or an app. The person on this machine has id "person"; a paired front end
 // or a terminal gets an id of its own.
 
-type Kept = { hash: string; who: Caller; label?: string; at: number };
+type Kept = { hash: string; who: Caller; label?: string; at: number; scope?: Scope };
 type Pairing = { code: string; expires: number };
 
 export const LOCAL_PERSON: Caller = { kind: "person", id: "person", name: "you" };
 const PAIR_MS = 10 * 60 * 1000;
+
+/** Whether a scoped token's end has come. */
+const ended = (kept: Kept, at: number) => kept.scope !== undefined && kept.scope.until <= at;
 
 const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -32,9 +35,9 @@ export class Callers implements Tokens {
 	}
 
 	// Tokens, and who they stand for.
-	issue(who: Caller, label?: string): string {
+	issue(who: Caller, label?: string, scope?: Scope): string {
 		const token = `dk_${randomBytes(24).toString("base64url")}`;
-		const kept: Kept = { hash: hashOf(token), who: { ...who }, at: this.clock(), ...(label ? { label } : {}) };
+		const kept: Kept = { hash: hashOf(token), who: { ...who }, at: this.clock(), ...(label ? { label } : {}), ...(scope ? { scope } : {}) };
 		this.kept.set(kept.hash, kept);
 		this.save();
 		return token;
@@ -57,9 +60,16 @@ export class Callers implements Tokens {
 	resolve(token: string | undefined): Caller | undefined {
 		if (!token) return undefined;
 		const kept = this.kept.get(hashOf(token));
-		if (!kept) return undefined;
+		if (!kept || ended(kept, this.clock())) return undefined;
 		const now = this.now.get(kept.who.kind);
-		return now ? now(kept.who.id, { ...kept.who }) : { ...kept.who };
+		const caller = now ? now(kept.who.id, { ...kept.who }) : { ...kept.who };
+		return caller && kept.scope?.canvas ? { ...caller, canvas: kept.scope.canvas } : caller;
+	}
+
+	/** The scope a caller's tokens were issued with, or undefined when it has none. */
+	scopeOf(caller: Caller): Scope | undefined {
+		for (const one of this.kept.values()) if (one.who.id === caller.id && one.scope && !ended(one, this.clock())) return one.scope;
+		return undefined;
 	}
 
 	/** Ids that hold tokens, with their labels, for the person. */
@@ -101,6 +111,8 @@ export class Callers implements Tokens {
 	}
 
 	private save(): void {
+		const at = this.clock();
+		for (const [hash, one] of this.kept) if (ended(one, at)) this.kept.delete(hash);
 		const all = [...this.kept.values()];
 		this.saving = this.saving.then(() => writeJson(this.store, "tokens.json", all));
 	}

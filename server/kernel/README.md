@@ -38,6 +38,8 @@ no feature; only `server/main.ts` does. Keel owns it.
    `ask` on its socket; its `reply` comes back. No host, a host gone, or 30 s: `unavailable`.
 9. A feature route needs a token or `?pass=`, unless it is `public` (GET only, a caller that may call
    nothing). A route may take the raw request (`serve`) or an upgrade under its prefix (`upgrade`).
+9b. A store on a folder keeps a key's parts as folders and a file in any script, escaping only what a
+   name cannot hold; a part over 200 bytes is a stem, a hash and a hidden .<name>.key. Old names read.
 10. A deck from today's server keeps its paired tokens and card versions: adopted once, before history
    loads, its versions at negative revisions, oldest lowest. `Kernel.machine()` is a user-only folder outside any deck; `Kernel.deckId()` is made once per deck.
 11. A running server keeps `<deck>/.decks/server.json`, mode 0600, with the person's token. A second

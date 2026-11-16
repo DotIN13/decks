@@ -1,5 +1,5 @@
 import { check, EVENTS, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
-import type { EmitOptions, Events, Sees, Stop } from "./types.ts";
+import type { EmitOptions, Events, Scope, Sees, Stop } from "./types.ts";
 
 // One stream. A feature hears everything with on(); a door subscribes for its
 // caller and hears only what that caller may see: person-only events go to
@@ -15,6 +15,8 @@ const BY_NAME = new Map<string, AnyEvent>(EVENTS.map((event) => [event.name, eve
 export class EventBus implements Events {
 	/** Checks of who may see a canvas, added by a feature (Studio's sharing). */
 	readonly sees: Sees[] = [];
+	/** The scope a caller is held to; a scoped caller hears only its canvas's events. Set by the kernel. */
+	scopeOf?: (caller: Caller) => Scope | undefined;
 	private listeners = new Map<string, Set<(payload: never) => void>>();
 	private subscribers = new Set<{ sub: Subscriber; hear: (heard: Heard) => void }>();
 
@@ -30,6 +32,8 @@ export class EventBus implements Events {
 			if (sub.canvas && record.canvas !== undefined && record.canvas !== sub.canvas) continue;
 			const canvas = typeof record.canvas === "string" ? record.canvas : undefined;
 			if (canvas && !this.sees.every((one) => one(sub.caller, canvas))) continue;
+			const scope = this.scopeOf?.(sub.caller);
+			if (scope?.canvas !== undefined && canvas !== scope.canvas) continue;
 			if (mayHear(sub.caller, event, record)) hear({ name: event.name, payload: record });
 		}
 	}
@@ -46,6 +50,8 @@ export class EventBus implements Events {
 		const event = BY_NAME.get(name);
 		const canvas = typeof payload.canvas === "string" ? payload.canvas : undefined;
 		if (!event || (canvas && !this.sees.every((one) => one(caller, canvas)))) return false;
+		const scope = this.scopeOf?.(caller);
+		if (scope?.canvas !== undefined && canvas !== scope.canvas) return false;
 		return mayHear(caller, event, payload);
 	}
 
