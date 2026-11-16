@@ -604,8 +604,15 @@ export async function socket(api) {
 	const asked = new Set();
 	const waiting = new Map();
 	let calls = 0;
-	/** The agent this line is on: the one its greeting named, then whichever it focused. */
+	/**
+	 * The agent this line is on: the one its greeting named, then an agent it made (a new agent is
+	 * opened by whoever made it, as the page's New agent does) or one it focused. `agent.list` names it
+	 * for this line, except while a focus or a new agent of this line's is still on its way.
+	 */
 	let screen;
+	let focusing = 0;
+	let adding = 0;
+	let knownBeforeAdd = new Set();
 	ws.onmessage = (event) => {
 		const message = JSON.parse(String(event.data));
 		received.push(message);
@@ -613,7 +620,9 @@ export async function socket(api) {
 			waiting.get(message.id)?.(message);
 			waiting.delete(message.id);
 		} else if (message.type === "agent.list") {
-			screen ??= message.focused;
+			const fresh = adding ? message.chats?.find((chat) => !knownBeforeAdd.has(chat.id)) : undefined;
+			if (fresh) screen = fresh.id;
+			else if (!focusing && !adding) screen = message.focused ?? screen;
 		} else if (message.type === "canvas.list") {
 			for (const row of message.stages ?? []) {
 				if (asked.has(row.name)) continue;
@@ -640,8 +649,24 @@ export async function socket(api) {
 	const call = (verb, args = [], on = {}) =>
 		new Promise((resolve) => {
 			const id = `c${++calls}`;
-			waiting.set(id, resolve);
-			if (verb === "agent.focus") screen = args[0];
+			const focus = verb === "agent.focus";
+			const add = verb === "agent.add";
+			if (focus) {
+				screen = args[0];
+				focusing += 1;
+			}
+			if (add) {
+				if (!adding) knownBeforeAdd = new Set((last("agent.list")?.chats ?? []).map((chat) => chat.id));
+				adding += 1;
+			}
+			waiting.set(id, (answer) => {
+				if (focus) focusing -= 1;
+				if (add) {
+					adding -= 1;
+					if (answer.ok && answer.value?.id) void call("agent.focus", [answer.value.id]);
+				}
+				resolve(answer);
+			});
 			const agent = "agent" in on ? on.agent : screen;
 			const stage = "stage" in on ? on.stage : canvasOf(screen);
 			say({ type: "line.call", id, verb, args, ...(agent ? { agent } : {}), ...(stage ? { stage } : {}) });
