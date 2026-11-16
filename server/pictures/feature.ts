@@ -32,5 +32,3 @@ export function picturesFeature(options: PicturesOptions = {}): Feature {
 		},
 	});
 }
-
-export default picturesFeature();

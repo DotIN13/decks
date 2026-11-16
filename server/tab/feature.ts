@@ -24,4 +24,3 @@ export function tabFeature(options: TabOptions = {}): Feature {
 
 export { TabHub } from "./hub.ts";
 export type { Line } from "./line.ts";
-export default tabFeature();

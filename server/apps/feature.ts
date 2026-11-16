@@ -61,5 +61,3 @@ function appRoutes(apps: () => Apps, kernel: () => Kernel): Route[] {
 	});
 	return [app, forward("/node/"), forward("/rnode/"), openRoute(kernel)];
 }
-
-export default appsFeature();
