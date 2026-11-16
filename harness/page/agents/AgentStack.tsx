@@ -7,26 +7,9 @@ import { canHover } from "../lib/media.ts";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
 
 /**
- * The faces in the top-right corner, the most urgent first, with a hover card and a `+n` menu.
- *
- * `agentOrder` is the policy and `agent-order.ts` argues for it; this is the drawing. Two
- * things it is worth restating here, because they are what makes this more than decoration:
- *
- * **Active only.** Figma's stack shows who is *present*, which on a canvas nobody else is
- * looking at is presence theatre. This shows who is *doing something* — a fact you cannot
- * get any other way today, since the only way to learn that a reviewer is waiting for you
- * is to open a panel and read it. And because working goes green, green goes away when you
- * look, and nothing else can put a face here, **the corner empties itself.** A sign that
- * only clears by being dealt with is a sign you can trust; a badge that needs a "mark all
- * read" is not.
- *
- * **A switcher, not an audience.** Clicking a face is `onFocus`, the same swap the dropdown
- * does — it moves the canvas, the camera, the panel and the transcript together. Which is
- * why this is consistent with one agent at a time: there is still no observe mode, no ring
- * round the window and no second camera. Switching *is* following.
- *
- * There is no unread badge. It said "something happened here", which is exactly what green
- * says, and two marks on a 24px circle for one fact is how a corner turns into a dashboard.
+ * The faces in the top-right corner: every other agent, the one asking first, then done, working
+ * and idle (dimmed), three faces and then `+n` (`agent-order.ts` orders them). A face shows a hover
+ * card; a click switches to that agent, as the dropdown does: canvas, camera, panel and transcript.
  */
 export { agentOrder } from "./agent-order.ts";
 
