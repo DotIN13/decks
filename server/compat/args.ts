@@ -1,6 +1,6 @@
 // An old call made into its new one: the name, the arguments, and back the answer.
 // Rule 3 of the README: a list in the old order, options spread, old shapes turned (by protocol's penOps).
-import { penOps } from "../../protocol/index.ts";
+import { CALL_BY_NAME, penOps } from "../../protocol/index.ts";
 import { DROPPED, GOES, OLD_CALLS, type OldCall } from "./table.ts";
 
 type Args = Record<string, unknown>;
@@ -86,6 +86,16 @@ function shaped(now: string, old: string, args: Args): Args {
 		delete args.id;
 	}
 	return args;
+}
+
+/**
+ * The line's name for an edit (line.call's edit), passed on as the new call's own edit argument where it
+ * declares one, so the server names it in item.changed's made on every socket, not only on this line.
+ */
+export function withEdit(turned: { name: string; args: Args }, edit: unknown): { name: string; args: Args } {
+	const declared = CALL_BY_NAME.get(turned.name)?.args;
+	if (typeof edit !== "string" || !declared || !("edit" in declared)) return turned;
+	return { ...turned, args: { ...turned.args, edit } };
 }
 
 // The answer back, in the shape the old call gave it.

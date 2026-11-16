@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
 import { penOps } from "../../protocol/index.ts";
-import { answerBack, keyed, turn } from "./args.ts";
+import { answerBack, keyed, turn, withEdit } from "./args.ts";
 
 const itemOp = penOps.itemOpOf;
 import { DROPPED, GOES, OLD_CALLS, OLD_EVENTS } from "./table.ts";
@@ -125,4 +125,11 @@ test("a screen's request for a card's picture is told as today's view.called sho
 test("view.changed is told as today's presence.changed", async () => {
 	const said = await told("view.changed", { canvas: "c", ids: [], by: "l2", kind: "person", name: "you", color: "#123", pointer: { x: 1, y: 2 }, rev: 0 }, async () => undefined);
 	assert.deepEqual(said, { type: "presence.changed", canvas: "c", by: { kind: "person", id: "l2", name: "you", color: "#123" }, pointer: { x: 1, y: 2 } });
+});
+
+test("the line's edit name goes on as the new call's edit, where the call takes one", () => {
+	assert.equal(withEdit({ name: "item.batch", args: { ops: [] } }, "e1").args.edit, "e1");
+	assert.equal(withEdit({ name: "canvas.undo", args: {} }, "e2").args.edit, "e2");
+	assert.equal("edit" in withEdit({ name: "item.update", args: { id: "a" } }, "e3").args, false);
+	assert.equal("edit" in withEdit({ name: "item.batch", args: { ops: [] } }, undefined).args, false);
 });

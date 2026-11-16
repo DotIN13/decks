@@ -2,7 +2,7 @@
 // names, canvas.watch, and the old events down. Rules 2 to 5 of the README.
 import type { Caller } from "../../protocol/index.ts";
 import type { Deck, Peer, Route, SocketDoor, Stop } from "../kernel/index.ts";
-import { answerBack, turn } from "./args.ts";
+import { answerBack, turn, withEdit } from "./args.ts";
 import { docHeard } from "./docs.ts";
 import { HEARD, told } from "./events.ts";
 import { pagesOf, readDrawing, type News } from "./drawing.ts";
@@ -106,7 +106,8 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 		const edit: Edit | undefined = typeof message.edit === "string" ? { name: message.edit, ...(typeof turned.args.canvas === "string" ? { canvas: turned.args.canvas } : {}) } : undefined;
 		let answer = () => {};
 		if (edit) (edit.answered = new Promise<void>((done) => (answer = done))), state.edits.push(edit);
-		const envelope = await door.call(turned.name, turned.args, caller, client);
+		const sent = withEdit(turned, message.edit);
+		const envelope = await door.call(sent.name, sent.args, caller, client);
 		// A change is announced after its write lands, so an older one may come first: the edit is made at
 		// the revision the canvas has once it is answered (that one has it), never on an announcement before.
 		if (edit && envelope.ok && edit.canvas) {
