@@ -56,7 +56,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 				if (!home) return [];
 				let held;
 				try {
-					held = pens.boards(home.name).find((one) => one.path === path);
+					held = pens.cards.boards(home.name).find((one) => one.path === path);
 				} catch {
 					return [];
 				}
@@ -93,7 +93,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 					/* no canvas: the deck's own frames/, a library to place from */
 				}
 				const asked = typeof path === "string" ? path.trim().replace(/^\.?\/+/, "") : path;
-				return needPens().createFile(home && typeof asked === "string" && /^frames\//.test(asked) ? `${canvasFolder(home)}/${asked}` : path, item as never);
+				return needPens().files.createFile(home && typeof asked === "string" && /^frames\//.test(asked) ? `${canvasFolder(home)}/${asked}` : path, item as never);
 			},
 		},
 	};

@@ -143,7 +143,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		const pens = withPens();
 		const board = deck.refresh(path) ?? deck.board(path);
 		if (!board) throw new Error(`no board at ${path}`);
-		pens.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
+		pens.cards.placeBoards("ada", [{ path, title: board.title, x: 0, y: 0, w: board.w, h: board.h }]);
 	};
 	return {
 		tool,
@@ -404,19 +404,19 @@ test("fit measures at the width a board has on the canvas it names, and leaves o
 	});
 	hold(PLAN);
 	const pens = service.pens!;
-	pens.placeBoards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
-	const ada = pens.boards("ada").find((one) => one.path === PLAN)!;
+	pens.cards.placeBoards("narrow", [{ path: PLAN, title: "plan", x: 0, y: 0, w: 640, h: 300 }]);
+	const ada = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
 
 	const result = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "canvases/narrow/canvas.pen" })`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(asked, [640], "measured at the width the board has on that canvas");
 	// Placed on narrow, the board is narrow's own copy, a card (`canvas/copy-in.ts`): that copy is what is fitted.
-	const copy = pens.copyOf("narrow", PLAN);
+	const copy = pens.cards.copyOf("narrow", PLAN);
 	assert.equal(copy, "canvases/narrow/cards/plan/index.html");
 	assert.deepEqual([deck.board(copy)?.w, deck.board(copy)?.h], [640, 812], "both numbers go to the copy's file");
-	const narrow = pens.boards("narrow").find((one) => one.path === copy)!;
+	const narrow = pens.cards.boards("narrow").find((one) => one.path === copy)!;
 	assert.deepEqual([narrow.w, narrow.h], [640, 812], "and to the canvas it was fitted on");
-	const still = pens.boards("ada").find((one) => one.path === PLAN)!;
+	const still = pens.cards.boards("ada").find((one) => one.path === PLAN)!;
 	assert.deepEqual([still.w, still.h], [ada.w, ada.h], "the agent's own canvas keeps its size");
 	cleanup();
 });

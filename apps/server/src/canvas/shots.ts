@@ -102,7 +102,7 @@ export function shotBox(pens: StagePens, stage: string, of: ShotOf): Box {
 	}
 	const placed = pens.placedOf(stage);
 	const doc = pens.get(stage).doc;
-	const boards = pens.boards(stage);
+	const boards = pens.cards.boards(stage);
 	const boxOfName = (name: string): Box | undefined => {
 		const board = boards.find((one) => one.path === name || one.path === `boards/${name}`);
 		const found = board ? placed.get(board.id)?.box : placed.get(name)?.box;
@@ -132,7 +132,7 @@ export class StageShots {
 
 	async take(request: ShotRequest): Promise<Shot> {
 		const { stage } = request;
-		const fileFrame = request.file ? this.host.pens.fileFrame(request.file) : undefined;
+		const fileFrame = request.file ? this.host.pens.files.fileFrame(request.file) : undefined;
 		if (!fileFrame && !this.host.pens.names().includes(stage)) throw new Error(`There is no stage "${stage}".`);
 		let box: Box;
 		if (fileFrame?.stage) box = shotBox(this.host.pens, fileFrame.stage, request.of);
@@ -168,7 +168,7 @@ export class StageShots {
 		if (native && !why) {
 			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(stage);
 			const onStage = fileFrame?.stage ?? (fileFrame ? undefined : stage);
-			const boards = onStage ? this.host.pens.boards(onStage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const boards = onStage ? this.host.pens.cards.boards(onStage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
 			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
 			if (outcome.ok) return { ...shot, bytes: readFileSync(target), how: "native" as const };
 			notNative = outcome.why;

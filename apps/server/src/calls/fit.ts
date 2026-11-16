@@ -14,13 +14,13 @@ export async function fitOn(ctx: VerbContext, asked: string, named: string | und
 	const pens = service.pens;
 	const on = named ?? agent.stageName?.();
 	// A board from elsewhere is the canvas's own copy of it (`StagePens.copyOf`): that is what is fitted.
-	const path = on && pens ? pens.copyOf(on, asked) : asked;
-	const held = on && pens ? pens.boards(on).find((one) => one.path === path) : undefined;
+	const path = on && pens ? pens.cards.copyOf(on, asked) : asked;
+	const held = on && pens ? pens.cards.boards(on).find((one) => one.path === path) : undefined;
 	if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your canvas"}, so there is no width to fit it at. Put it there first (${isCardPath(path) ? `decks canvas insert --type card --card ${path}` : `decks canvas insert '{"type":"board","board":"${path}"}'`}), or name a canvas that holds it with --canvas.`);
 	const own = !named || named === agent.stageName?.();
 	const before = notes.length;
 	const { board, content, reading, views } = await service.fit(path, { ...(margin === undefined || margin === null ? {} : { margin }), w: held.w });
-	if (!own) pens!.sizeBoard(on, board.path, { w: board.w, h: board.h });
+	if (!own) pens!.cards.sizeBoard(on, board.path, { w: board.w, h: board.h });
 	else agent.sized?.(board.path, { w: board.w, h: board.h });
 	agent.worked?.(board.path);
 	agent.acted?.("resize", board.path);

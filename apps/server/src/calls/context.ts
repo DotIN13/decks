@@ -121,7 +121,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		const mine = agent.stageName?.();
 		let cards = 0;
 		try {
-			cards = pens.boards(name).length;
+			cards = pens.cards.boards(name).length;
 		} catch {
 			/* a canvas whose file does not parse holds no cards we can count */
 		}

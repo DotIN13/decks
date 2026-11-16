@@ -100,7 +100,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		} catch {
 			/* no canvas of its own: the deck's frames/ */
 		}
-		return { frame: needPens().framePen(needPens().frameOn(frame, home)).shown };
+		return { frame: needPens().files.framePen(needPens().files.frameOn(frame, home)).shown };
 	};
 
 	/**
@@ -111,12 +111,12 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		const pens = needPens();
 		const lay = (doc: PenDocument, imported: PenDocument) => placements(imported, { theme: baseTheme(doc, "light"), measure });
 		if (target.frame !== undefined) {
-			const frame = pens.framePen(target.frame);
+			const frame = pens.files.framePen(target.frame);
 			return { doc: frame.doc, layout: (doc) => lay(doc, frame.imported(doc)) };
 		}
 		const entry = pens.get(target.canvas);
 		if (entry.error) throw new Error(`${entry.error}. Fix the file, or replace it whole, before editing it.`);
-		return { doc: entry.doc, layout: (doc) => lay(doc, pens.withImported(target.canvas, doc)) };
+		return { doc: entry.doc, layout: (doc) => lay(doc, pens.files.withImported(target.canvas, doc)) };
 	};
 
 	/** The canvas the ops being turned into pen's are for, if a canvas: a board named from elsewhere is its copy there. */
@@ -130,7 +130,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		return path;
 	};
 	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`StagePens.copyOf`). */
-	const ownOn = (path: string): string => (onCanvas ? needPens().copyOf(onCanvas, path) : path);
+	const ownOn = (path: string): string => (onCanvas ? needPens().cards.copyOf(onCanvas, path) : path);
 
 	/** An item's id, or a board's path on this document turned into its item's id. */
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
@@ -393,9 +393,9 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		let variables: () => Record<string, unknown>;
 		let children: Record<string, unknown>[];
 		if (target.frame !== undefined) {
-			results = pens.editFile(target.frame, penOps).results;
-			variables = () => (pens.framePen(target.frame).doc.variables ?? {}) as Record<string, unknown>;
-			children = pens.readFile(target.frame).children as unknown as Record<string, unknown>[];
+			results = pens.files.editFile(target.frame, penOps).results;
+			variables = () => (pens.files.framePen(target.frame).doc.variables ?? {}) as Record<string, unknown>;
+			children = pens.files.readFile(target.frame).children as unknown as Record<string, unknown>[];
 		} else {
 			const name = target.canvas;
 			const edited = pens.edit(name, penOps, undefined, agent.person ? { undoable: true } : undefined);
@@ -450,13 +450,13 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const pens = needPens();
 				onCanvas = target.canvas;
 				const more: ReadMore = {
-					...(of !== undefined && of !== null ? { of: idIn(target.frame !== undefined ? pens.framePen(target.frame).doc : pens.get(target.canvas).doc, of, "of") } : {}),
+					...(of !== undefined && of !== null ? { of: idIn(target.frame !== undefined ? pens.files.framePen(target.frame).doc : pens.get(target.canvas).doc, of, "of") } : {}),
 					...(depth !== undefined && depth !== null ? { depth } : {}),
 					...(resolve ? { resolve } : {}),
 					...(theme ? { theme } : {}),
 				};
 				if (target.frame !== undefined) {
-					const { file, children, ...rest } = pens.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string; variables?: unknown; themes?: unknown };
+					const { file, children, ...rest } = pens.files.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string; variables?: unknown; themes?: unknown };
 					delete rest.ref;
 					delete rest.stage;
 					return { frame: target.frame, file, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
@@ -498,13 +498,13 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const target = targetOf(on);
 				onCanvas = target.canvas;
 				const pens = needPens();
-				const frame = target.frame !== undefined ? pens.framePen(target.frame) : undefined;
+				const frame = target.frame !== undefined ? pens.files.framePen(target.frame) : undefined;
 				const raw = frame ? frame.doc : pens.get(target.canvas!).doc;
-				const doc = frame ? frame.imported(raw) : pens.withImported(target.canvas!, raw);
+				const doc = frame ? frame.imported(raw) : pens.files.withImported(target.canvas!, raw);
 				const itemIds = asked.map((one) => idIn(raw, one, "of"));
 				const deck = service.deckPath();
 				const page = resolveInDeck(deck, to ?? `exports/${itemIds[0]!.replace(/\//g, "-")}.html`);
-				const folder = frame ? dirname(pens.penFile(target.frame!).file) : pens.folderOf(target.canvas!);
+				const folder = frame ? dirname(pens.files.penFile(target.frame!).file) : pens.folderOf(target.canvas!);
 				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), boardOf: (node) => boardOf(node) });
 				ctx.notes.push(...done.notes);
 				return { file: done.file } as never;
@@ -570,7 +570,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			variables: async (set: Record<string, unknown>, options?: On & { themes?: Record<string, string[]> | null }) => {
 				const target = targetOf(options);
 				one(target, { op: "variables", set, ...(options?.themes !== undefined ? { themes: options.themes } : {}) });
-				const doc = target.frame !== undefined ? needPens().framePen(target.frame).doc : needPens().get(target.canvas).doc;
+				const doc = target.frame !== undefined ? needPens().files.framePen(target.frame).doc : needPens().get(target.canvas).doc;
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, values: shortVariables(doc), ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
 			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
@@ -591,7 +591,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();
 				const entry = pens.get(name);
-						return pens.saveFrame(name, idIn(entry.doc, id), frame, options?.replace !== false);
+						return pens.files.saveFrame(name, idIn(entry.doc, id), frame, options?.replace !== false);
 			},
 			screenshot: async (options?: { canvas?: string; of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) => {
 				const { canvas, ...rest } = options ?? {};

@@ -330,8 +330,8 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				const held = pens();
 				if (!held) return undefined;
 				try {
-					const boards = held.boards(name);
-					const spot = joinSpot(DOCUMENT_SIZE, boards.at(-1), [...boards, ...held.drawn(name)]);
+					const boards = held.cards.boards(name);
+					const spot = joinSpot(DOCUMENT_SIZE, boards.at(-1), [...boards, ...held.cards.drawn(name)]);
 					return { x1: spot.x, y1: spot.y };
 				} catch {
 					return undefined;

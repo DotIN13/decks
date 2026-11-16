@@ -233,7 +233,7 @@ export class Seat {
 	setSize(path: string, size: { w?: number; h?: number }): void {
 		const name = this.canvasName();
 		if (!name) return;
-		this.of.stage.pens!.sizeBoard(name, path, size);
+		this.of.stage.pens!.cards.sizeBoard(name, path, size);
 	}
 
 	/**
@@ -243,7 +243,7 @@ export class Seat {
 	setPosition(path: string, x: number, y: number): void {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 		const name = this.canvasName();
-		if (name && this.of.stage.pens!.moveBoard(name, path, x, y)) return;
+		if (name && this.of.stage.pens!.cards.moveBoard(name, path, x, y)) return;
 		this.places[path] = { x: Math.round(x), y: Math.round(y) };
 		this.of.save();
 	}
@@ -395,7 +395,7 @@ export class Seat {
 			return;
 		}
 		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
-		const own = wanted.map((path) => pens.ownPath(name, path));
+		const own = wanted.map((path) => pens.cards.ownPath(name, path));
 		/*
 		 * What is held is what is on the canvas: the copies, never the other canvas's cards they came
 		 * from, or the panel lists each card twice and the agent's context names files its canvas does
@@ -432,7 +432,7 @@ export class Seat {
 		this.loosePlaying = this.loosePlaying.filter((one) => one !== path);
 		delete this.places[path];
 		const name = this.canvasName();
-		if (playing && name) this.of.stage.pens!.removeBoards(name, [path]);
+		if (playing && name) this.of.stage.pens!.cards.removeBoards(name, [path]);
 		this.publishContext();
 		return true;
 	}

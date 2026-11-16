@@ -271,7 +271,7 @@ export class App {
 		 */
 		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
 		// A canvas's copy of a board from elsewhere is a board of the deck the moment it is made.
-		this.pens.copied = (path) => this.boards?.appeared(path);
+		this.pens.cards.copied = (path) => this.boards?.appeared(path);
 		this.stage.pens = this.pens;
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
@@ -331,7 +331,7 @@ export class App {
 			dir: join(deck.path, ".decks", "thumbs"),
 			boards: () => this.deck.boards,
 			apps: () => this.apps.list().map((one) => one.name),
-			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.boards(name).map((one) => one.path))),
+			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.cards.boards(name).map((one) => one.path))),
 			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
 			reader: () => this.passes.canvas("", "view", HARNESS_ID).pass,
 			extraOrigins: () => (process.env.DECKS_WEB_PORT ? [`http://127.0.0.1:${process.env.DECKS_WEB_PORT}`] : []),

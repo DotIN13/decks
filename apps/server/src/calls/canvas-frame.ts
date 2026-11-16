@@ -131,7 +131,7 @@ export function onCanvas(app: Pick<CallsHost, "stage" | "agents" | "documentsOn"
 export function boardOnCanvas(app: Pick<CallsHost, "stage">, path: string, canvas: string): boolean {
 	if (path.startsWith(`canvases/${canvas}/`)) return true;
 	try {
-		return !!app.stage.pens?.boards(canvas).some((one) => one.path === path);
+		return !!app.stage.pens?.cards.boards(canvas).some((one) => one.path === path);
 	} catch {
 		return false;
 	}

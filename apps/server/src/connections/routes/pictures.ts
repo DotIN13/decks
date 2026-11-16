@@ -198,7 +198,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				deckPath: app.deck.path,
 				deckName: app.deck.name,
 				board: (path) => app.deck.board(path),
-				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.boards(name) },
+				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.cards.boards(name) },
 				picture: async (board, scheme) => {
 					const near = app.thumbs.nearest(board, scheme, "whole");
 					if (near) return near.file;
@@ -231,11 +231,11 @@ export function register(api: Router, { app }: RouteDeps): void {
 		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,
 		 * when it was read), at its place on this drawing: what the canvas frame shows them from.
 		 */
-		const cards = pens.boards(name).flatMap(({ path, x, y, w, h }) => {
+		const cards = pens.cards.boards(name).flatMap(({ path, x, y, w, h }) => {
 			const board = app.deck.board(path);
 			return board ? [{ ...board, x, y, w, h }] : [];
 		});
-		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
+		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.cards.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**
@@ -249,8 +249,8 @@ export function register(api: Router, { app }: RouteDeps): void {
 			return;
 		}
 		try {
-			const frame = pens.fileFrame(req.query.path);
-			const boards = frame.stage ? pens.boards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const frame = pens.files.fileFrame(req.query.path);
+			const boards = frame.stage ? pens.cards.boards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
 			res.setHeader("Cache-Control", "no-store");
 			res.json({ doc: frame.doc, base: frame.base, boards });
 		} catch (error) {

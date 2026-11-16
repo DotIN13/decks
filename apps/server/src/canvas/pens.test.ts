@@ -94,20 +94,20 @@ test("a stage's boards are browser items: synced in, read back in order, moved, 
 		const name = pens.claim("s");
 		const a = { path: "canvases/s/cards/a/index.html", x: 0, y: 0, w: 1000, h: 700, title: "A" };
 		const b = { path: "canvases/s/cards/b/index.html", x: 1200, y: 0, w: 800, h: 600, title: "B" };
-		assert.equal(pens.syncBoards(name, [a, b]), true);
-		assert.equal(pens.syncBoards(name, [a, b]), false, "nothing changed, nothing written");
+		assert.equal(pens.cards.syncBoards(name, [a, b]), true);
+		assert.equal(pens.cards.syncBoards(name, [a, b]), false, "nothing changed, nothing written");
 		const item = pens.get(name).doc.children[0]!;
 		// Held by its deck path; written from the canvas's own folder.
 		assert.deepEqual([item.type, item.id, item.url, item.width, item.metadata], ["browser", "a", "cards/a/index.html", 1000, { type: "decks.card", path: "canvases/s/cards/a/index.html" }]);
 		const saved = JSON.parse(readFileSync(join(dir, "canvases", "s", "canvas.pen"), "utf8")).children[0];
 		assert.deepEqual([saved.url, saved.metadata.path], ["cards/a/index.html", "cards/a/index.html"]);
-		assert.deepEqual(pens.boards(name).map((one) => [one.path, one.x, one.y]), [["canvases/s/cards/a/index.html", 0, 0], ["canvases/s/cards/b/index.html", 1200, 0]]);
-		pens.syncBoards(name, [{ ...a, x: 50, h: 900 }]);
-		assert.deepEqual(pens.boards(name), [{ path: "canvases/s/cards/a/index.html", id: "a", x: 50, y: 0, w: 1000, h: 900 }]);
+		assert.deepEqual(pens.cards.boards(name).map((one) => [one.path, one.x, one.y]), [["canvases/s/cards/a/index.html", 0, 0], ["canvases/s/cards/b/index.html", 1200, 0]]);
+		pens.cards.syncBoards(name, [{ ...a, x: 50, h: 900 }]);
+		assert.deepEqual(pens.cards.boards(name), [{ path: "canvases/s/cards/a/index.html", id: "a", x: 50, y: 0, w: 1000, h: 900 }]);
 		assert.equal(pens.get(name).doc.children[0]!.height, 900);
 		// A board put inside a column by an edit is placed by the column, and read back there.
 		pens.edit(name, [{ op: "insert", node: { type: "frame", id: "col", layout: "vertical", gap: 40, x: 0, y: 2000, children: [] } }, { op: "move", id: "a", parent: "col" }]);
-		assert.deepEqual(pens.boards(name), [{ path: "canvases/s/cards/a/index.html", id: "a", x: 0, y: 2000, w: 1000, h: 900 }]);
+		assert.deepEqual(pens.cards.boards(name), [{ path: "canvases/s/cards/a/index.html", id: "a", x: 0, y: 2000, w: 1000, h: 900 }]);
 	} finally {
 		pens.close();
 		rmSync(dir, { recursive: true, force: true });
@@ -150,7 +150,7 @@ test("what is drawn on a stage, for placement: top-level items, not boards, not 
 			{ op: "insert", node: { type: "frame", id: "f", width: 400, height: 300, children: [{ type: "rectangle", id: "inside", width: 50, height: 50 }] }, box: { x1: 0, y1: 800 } },
 			{ op: "insert", node: { type: "path", id: "a", metadata: { type: "decks.arrow", from: "n", to: "canvases/s/cards/one/index.html" } } },
 		]);
-		const drawn = pens.drawn(name);
+		const drawn = pens.cards.drawn(name);
 		assert.deepEqual(drawn.map((box) => [box.x, box.y]).sort(), [[0, 800], [1100, 0]], "the note and the frame, and nothing inside the frame");
 	} finally {
 		pens.close();
@@ -216,7 +216,7 @@ test("an item saved as a frame goes to its canvas's own frames/, placed there by
 	try {
 		const one = pens.claim("One");
 		pens.edit(one, [{ op: "insert", node: { type: "frame", id: "card", layout: "vertical", width: 200, height: 80, fill: "#ffffff", children: [{ type: "text", id: "title", content: "Wren" }] }, box: { x1: 40, y1: 50 } }]);
-		const saved = pens.saveFrame(one, "card", "frames/agent-card");
+		const saved = pens.files.saveFrame(one, "card", "frames/agent-card");
 		assert.deepEqual(saved, { frame: "canvases/one/frames/agent-card.pen", ref: "frames/agent-card", replaced: true, overwrote: false });
 		const path = join(dir, "canvases", one, "frames", "agent-card.pen");
 		const file = JSON.parse(readFileSync(path, "utf8"));
@@ -251,12 +251,12 @@ test("any .pen file by path: create one in frames/, read and edit it by path, an
 	const pens = new StagePens(dir, (name) => heard.push(name));
 	try {
 		const stage = pens.claim("One");
-		const made = pens.createFile("frames/ui/button", { type: "frame", layout: "horizontal", padding: 8, fill: "#3b5cf6", children: [{ type: "text", id: "label", content: "Go" }] });
+		const made = pens.files.createFile("frames/ui/button", { type: "frame", layout: "horizontal", padding: 8, fill: "#3b5cf6", children: [{ type: "text", id: "label", content: "Go" }] });
 		assert.deepEqual(made, { file: "frames/ui/button.pen", ref: "frames/ui/button", id: "button" });
-		assert.throws(() => pens.createFile("frames/ui/button.pen"), /already there/);
-		assert.throws(() => pens.createFile("frames/Bad Name"), /letters, digits/);
+		assert.throws(() => pens.files.createFile("frames/ui/button.pen"), /already there/);
+		assert.throws(() => pens.files.createFile("frames/Bad Name"), /letters, digits/);
 
-		const view = pens.readFile("frames/ui/button");
+		const view = pens.files.readFile("frames/ui/button");
 		assert.equal((view as { ref?: string }).ref, "frames/ui/button");
 		assert.equal(view.children[0]!.id, "button");
 
@@ -265,19 +265,19 @@ test("any .pen file by path: create one in frames/, read and edit it by path, an
 		const copy = `canvases/${stage}/frames/ui/button.pen`;
 		assert.equal(JSON.parse(readFileSync(join(dir, copy), "utf8")).children[0].id, "button");
 		heard.length = 0;
-		const edited = pens.editFile(copy, [{ op: "update", id: "label", set: { content: "Stop" } }]);
+		const edited = pens.files.editFile(copy, [{ op: "update", id: "label", set: { content: "Stop" } }]);
 		assert.equal(edited.file, copy);
 		assert.deepEqual(heard, [stage], "the canvas that uses it is sent again at once");
 		const inside = pens.read(stage).children[0]!.inside as Array<{ id: string; content?: string }>;
 		assert.equal(inside.find((item) => item.id === "b1/label")?.content, "Stop");
-		pens.editFile("frames/ui/button.pen", [{ op: "update", id: "label", set: { content: "Library" } }]);
+		pens.files.editFile("frames/ui/button.pen", [{ op: "update", id: "label", set: { content: "Library" } }]);
 		assert.equal((pens.read(stage).children[0]!.inside as Array<{ id: string; content?: string }>).find((item) => item.id === "b1/label")?.content, "Stop", "the library's change does not reach the copy");
 
 		// A stage's own file, by its path in the deck or absolutely, is the stage.
-		assert.equal(pens.readFile(`canvases/${stage}/canvas.pen`).children[0]!.id, "b1");
+		assert.equal(pens.files.readFile(`canvases/${stage}/canvas.pen`).children[0]!.id, "b1");
 		const absolute = join(dir, "canvases", stage, "canvas.pen");
-		assert.equal(pens.readFile(absolute).children[0]!.id, "b1");
-		pens.editFile(absolute, [{ op: "update", id: "b1", box: { x1: 300, y1: 100 } }]);
+		assert.equal(pens.files.readFile(absolute).children[0]!.id, "b1");
+		pens.files.editFile(absolute, [{ op: "update", id: "b1", box: { x1: 300, y1: 100 } }]);
 		assert.equal(pens.read(stage).children[0]!.box.x1, 300);
 	} finally {
 		pens.close();
@@ -291,11 +291,11 @@ test("a .pen file outside the deck is read and edited by its absolute path", () 
 	const pens = new StagePens(dir, () => {});
 	try {
 		const file = join(elsewhere, "kit.pen");
-		const made = pens.createFile(file, { type: "rectangle", width: 10, height: 10 });
+		const made = pens.files.createFile(file, { type: "rectangle", width: 10, height: 10 });
 		assert.equal(made.file, file);
 		assert.equal(made.ref, undefined, "only a file in frames/ has a frames ref");
-		pens.editFile(file, [{ op: "update", id: "kit", set: { width: 40 } }]);
-		assert.equal(pens.readFile(file).children[0]!.box.x2, 40);
+		pens.files.editFile(file, [{ op: "update", id: "kit", set: { width: 40 } }]);
+		assert.equal(pens.files.readFile(file).children[0]!.box.x2, 40);
 	} finally {
 		pens.close();
 		rmSync(dir, { recursive: true, force: true });
@@ -322,11 +322,11 @@ test("a canvas stands alone: a card placed from another canvas is copied in, and
 		assert.equal(readFileSync(join(dir, "canvases", "s", "cards", "plan", "chart.js"), "utf8"), "export default 1;", "the card's whole folder comes along");
 		assert.equal(saved.children[1].fill.url, "files/a.png");
 		assert.equal(readFileSync(join(dir, "canvases", "s", "files", "a.png"), "utf8"), "png");
-		assert.equal(pens.copyOf("s", "canvases/t/cards/plan/index.html"), "canvases/s/cards/plan/index.html");
-		assert.equal(pens.ownPath("s", "canvases/t/cards/plan/index.html"), "canvases/s/cards/plan/index.html", "asked for again, the same copy");
+		assert.equal(pens.cards.copyOf("s", "canvases/t/cards/plan/index.html"), "canvases/s/cards/plan/index.html");
+		assert.equal(pens.cards.ownPath("s", "canvases/t/cards/plan/index.html"), "canvases/s/cards/plan/index.html", "asked for again, the same copy");
 		// A reference the rules refuse, written by hand, is not drawn as a card and is written back as it was.
 		put(join(dir, "canvases", "s", "canvas.pen"), JSON.stringify({ version: "2.14", children: [{ type: "browser", id: "x", url: "../other/cards/a/index.html", width: 10, height: 10, metadata: { type: "decks.card", path: "../other/cards/a/index.html" } }] }));
-		assert.deepEqual(pens.boards("s"), []);
+		assert.deepEqual(pens.cards.boards("s"), []);
 		pens.edit("s", [{ op: "insert", node: { type: "note", id: "n" } }]);
 		assert.equal(JSON.parse(readFileSync(join(dir, "canvases", "s", "canvas.pen"), "utf8")).children[0].metadata.path, "../other/cards/a/index.html");
 	} finally {

@@ -20,7 +20,7 @@ export function canvasNameReminder(pens: StagePens | undefined, stage: string | 
 	if (!pens || !stage || !pens.names().includes(stage)) return undefined;
 	let boards: string[];
 	try {
-		boards = pens.boards(stage).map((one) => one.path);
+		boards = pens.cards.boards(stage).map((one) => one.path);
 	} catch {
 		return undefined;
 	}

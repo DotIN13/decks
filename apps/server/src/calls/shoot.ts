@@ -9,7 +9,7 @@ import type { VerbContext } from "./context.ts";
  */
 export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) {
 	const { service, agent, images } = ctx;
-	const onIt = () => (service.pens ? service.pens.boards(stage) : []);
+	const onIt = () => (service.pens ? service.pens.cards.boards(stage) : []);
 	if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
 	const { of, scale, format, to, scheme, live } = options ?? {};
 	/*
@@ -53,7 +53,7 @@ export async function shootOn(ctx: VerbContext, stage: string, options?: { of?: 
 		if (!pens || typeof asked !== "string" || !asked.includes("/")) return undefined;
 		if (!asked.endsWith(".pen") && pens.placedOf(stage).has(asked)) return undefined;
 		try {
-			return existsSync(pens.penFile(asked).file) ? asked : undefined;
+			return existsSync(pens.files.penFile(asked).file) ? asked : undefined;
 		} catch {
 			return undefined;
 		}

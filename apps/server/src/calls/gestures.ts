@@ -72,7 +72,7 @@ export function gestures(ctx: VerbContext): Gestures {
 			const pens = needPens();
 			const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
 			const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path), agent.person ? { undoable: true } : undefined);
-			const placed = placements(pens.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
+			const placed = placements(pens.files.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
 			const answered = results.map((result) => {
 				const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
 				return { ...result, ...(box ? { box } : {}) };

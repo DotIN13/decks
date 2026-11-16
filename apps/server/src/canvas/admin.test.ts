@@ -29,13 +29,13 @@ function fixture() {
 	const deck = Deck.open(deckPath);
 	const pens = new StagePens(deckPath, () => undefined);
 	pens.claim("deploy");
-	pens.syncBoards("deploy", [{ path: "canvases/t/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
+	pens.cards.syncBoards("deploy", [{ path: "canvases/t/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
 	// A second canvas that keeps its own copy of the board in its folder.
 	pens.claim("deploy-copy");
 	mkdirSync(join(deckPath, "canvases", "deploy-copy", "boards"), { recursive: true });
 	put(join(deckPath, "canvases", "deploy-copy", "cards", "plan", "index.html"), "<title>Plan</title>PLAN");
 	deck.refresh("canvases/deploy-copy/cards/plan/index.html");
-	pens.syncBoards("deploy-copy", [{ path: "canvases/deploy-copy/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
+	pens.cards.syncBoards("deploy-copy", [{ path: "canvases/deploy-copy/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
 	const context = { deck, pens, agents: [] as DeckAgent[] };
 	return { deckPath, deck, pens, context, done: () => (pens.close(), rmSync(root, { recursive: true, force: true })) };
 }
@@ -43,11 +43,11 @@ function fixture() {
 test("a rename moves the folder and re-points the boards kept in it, keeping their ids", () => {
 	const { deckPath, deck, pens, context, done } = fixture();
 	try {
-		const before = pens.boards("deploy-copy");
+		const before = pens.cards.boards("deploy-copy");
 		const to = renameStage(context, "deploy-copy", "Launch Plan!");
 		assert.equal(to, "launch-plan");
 		assert.ok(!existsSync(join(deckPath, "canvases", "deploy-copy")));
-		const after = pens.boards("launch-plan");
+		const after = pens.cards.boards("launch-plan");
 		assert.deepEqual(after.map((one) => one.path), ["canvases/launch-plan/cards/plan/index.html"]);
 		assert.deepEqual(after.map((one) => one.id), before.map((one) => one.id));
 		assert.ok(existsSync(join(deckPath, "canvases", "launch-plan", "cards", "plan", "index.html")));

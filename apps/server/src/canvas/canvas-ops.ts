@@ -7,7 +7,8 @@
  */
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces, type Box } from "../deck/place.ts";
-import type { BoardSpot, StagePens } from "./pens.ts";
+import type { StagePens } from "./pens.ts";
+import type { BoardSpot } from "./cards-on.ts";
 
 export interface OnStage {
 	path: string;
@@ -21,7 +22,7 @@ export interface OnStage {
 export function boardsOn(pens: StagePens, deck: Deck, name: string): OnStage[] {
 	if (!pens.has(name)) return [];
 	try {
-		return pens.boards(name).filter((one) => deck.board(one.path));
+		return pens.cards.boards(name).filter((one) => deck.board(one.path));
 	} catch {
 		return [];
 	}
@@ -30,7 +31,7 @@ export function boardsOn(pens: StagePens, deck: Deck, name: string): OnStage[] {
 /** What is drawn on a stage besides its boards, which a joining board keeps clear of. */
 function drawnOn(pens: StagePens, name: string): Box[] {
 	try {
-		return pens.drawn(name);
+		return pens.cards.drawn(name);
 	} catch {
 		// A stage file that does not parse still has its boards to place against.
 		return [];
@@ -79,7 +80,7 @@ export function putOn(
 		const spot = spots[path] ?? known[path];
 		if (board && spot) placing.push({ path, x: spot.x, y: spot.y, w: board.w, h: board.h, title: board.title });
 	}
-	pens.placeBoards(name, placing);
+	pens.cards.placeBoards(name, placing);
 	return placing.map((one) => one.path);
 }
 
@@ -87,6 +88,6 @@ export function putOn(
 export function takeOff(pens: StagePens, deck: Deck, name: string, paths: readonly string[]): Record<string, { x: number; y: number }> {
 	const was: Record<string, { x: number; y: number }> = {};
 	for (const one of boardsOn(pens, deck, name)) if (paths.includes(one.path)) was[one.path] = { x: one.x, y: one.y };
-	if (Object.keys(was).length) pens.removeBoards(name, Object.keys(was));
+	if (Object.keys(was).length) pens.cards.removeBoards(name, Object.keys(was));
 	return was;
 }
