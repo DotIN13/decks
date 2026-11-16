@@ -45,3 +45,11 @@ test("rule 14: a pass's /files address is decoded and fenced before the folder t
 	assert.equal(passMayRead(scope, "/files/canvases/b/files/s.txt"), false);
 	assert.equal(passMayRead({ until: Date.now() + 1000 }, "/files/assets/a.png"), false, "a pass with no canvas reads nothing here");
 });
+
+test("rule 14: a pass also reads a page its canvas already places from the deck root, and nothing new", () => {
+	const scope = { canvas: "a", until: Date.now() + 1000 };
+	const placed = () => new Set(["pages/apps/review.html"]);
+	assert.equal(passMayRead(scope, "/files/pages/apps/review.html", placed), true);
+	assert.equal(passMayRead(scope, "/files/pages/apps/other.html", placed), false);
+	assert.equal(passMayRead(scope, "/files/pages/apps/..%2f..%2fcanvases%2fb%2fx", placed), false);
+});

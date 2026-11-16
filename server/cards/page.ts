@@ -25,7 +25,10 @@ const TYPES: Record<string, string> = {
 
 // --- the route: every file, a card's page, its modules ---
 
-export const routes: Route[] = [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query), scoped: (scope, asked) => passMayRead(scope, asked.path) }];
+/** The /files route; placedOn says the deck paths a canvas's drawing names (a card, an old page or a document placed there). */
+export function filesRoutes(placedOn: (canvas: string) => ReadonlySet<string> = () => new Set()): Route[] {
+	return [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query), scoped: (scope, asked) => passMayRead(scope, asked.path, placedOn) }];
+}
 
 /** GET /files/<path>: a file, a card's page, or one of its modules. */
 export async function answerFile(ctx: Context, rest: string, query: URLSearchParams): Promise<RouteAnswer> {
@@ -51,10 +54,12 @@ export async function answerFile(ctx: Context, rest: string, query: URLSearchPar
 }
 
 /** Rule 14: what a pass may read under /files, from its address, decoded and fenced before any folder test. */
-export function passMayRead(scope: Scope, address: string): boolean {
+export function passMayRead(scope: Scope, address: string, placedOn: (canvas: string) => ReadonlySet<string> = () => new Set()): boolean {
 	if (!scope.canvas) return false;
 	try {
-		return scopedMayRead(scope.canvas, deckPathFrom(address.startsWith(FILES) ? address.slice(FILES.length) : address));
+		const path = deckPathFrom(address.startsWith(FILES) ? address.slice(FILES.length) : address);
+		// Its canvas's folder and the shared roots, or a page its canvas already places from elsewhere (an old page at the deck's root).
+		return scopedMayRead(scope.canvas, path) || placedOn(scope.canvas).has(path.replace(/\.m\d+\.js$/, ""));
 	} catch {
 		return false;
 	}
