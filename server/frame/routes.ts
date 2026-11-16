@@ -2,9 +2,10 @@
 // (README rules 2, 3). They are read through /files/ and /pictures/ on the same pass, so a card's
 // page, modules and picture come as those features make them.
 import { deckFiles, layout } from "../../protocol/index.ts";
-import { deckPathFrom, toDeckPath, type Context, type Route, type RouteAnswer } from "../kernel/index.ts";
+import { deckPathFrom, toDeckPath, type Context, type Kernel, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { isPass, type Passes } from "./passes.ts";
 import { inCanvas, inSharedRoot } from "./paths.ts";
+import { placedOn } from "./placed.ts";
 
 const PASS_ROOT = "/api/t/";
 
@@ -48,7 +49,7 @@ async function importsOf(ctx: Context): Promise<Record<string, string>> {
 	}
 }
 
-export function passFilesRoute(passes: Passes, url: () => string | undefined): Route {
+export function passFilesRoute(passes: Passes, url: () => string | undefined, kernel: () => Kernel | undefined = () => undefined): Route {
 	return {
 		method: "GET",
 		prefix: PASS_ROOT,
@@ -61,7 +62,9 @@ export function passFilesRoute(passes: Passes, url: () => string | undefined): R
 			const canvas = passes.canvasOf(pass);
 			const base = url();
 			const forward = FORWARD[kind];
-			if (!canvas || !forward || !allowed(canvas, rest) || !base) return void res.writeHead(404, { "content-type": "text/plain" }).end("Not found.");
+			// Its canvas's folder and the shared roots, or what its canvas already places (an old page at the deck's root boards/), as today.
+			const reaches = !!canvas && !!rest && (allowed(canvas, rest) || (await placedOn(kernel(), canvas, undefined, rest)));
+			if (!canvas || !forward || !reaches || !base) return void res.writeHead(404, { "content-type": "text/plain" }).end("Not found.");
 			const params = new URLSearchParams(query);
 			params.set("pass", pass);
 			const answer = await fetch(`${base}${forward}${rest.split("/").map(encodeURIComponent).join("/")}?${params}`);

@@ -25,7 +25,7 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 	return defineFeature({
 		name: "frame",
 		calls: [],
-		routes: [...(options.page === false ? [] : staticRoutes(options.dist ?? DIST)), passRoute(passes), passFilesRoute(passes, () => kernel?.url())],
+		routes: [...(options.page === false ? [] : staticRoutes(options.dist ?? DIST)), passRoute(passes), passFilesRoute(passes, () => kernel?.url(), () => kernel)],
 		start(k) {
 			kernel = k;
 			k.guard(passGuard(() => kernel));

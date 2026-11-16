@@ -7,6 +7,7 @@ import { Refused, type Caller } from "../../protocol/index.ts";
 import type { Kernel } from "../kernel/index.ts";
 import { isPass, PASS_CALLS } from "./passes.ts";
 import { inCanvas, inSharedRoot, itemPathOk, plainPath } from "./paths.ts";
+import { placedOn } from "./placed.ts";
 
 type Args = Record<string, unknown>;
 
@@ -41,7 +42,7 @@ export function passGuard(kernel: () => Kernel | undefined) {
 		if (name.startsWith("file.") || name === "frame.get" || (name.startsWith("google.") && args.path !== undefined)) {
 			const path = plainPath(args.path);
 			if (!path) throw refuse(name, `${String(args.path)} is not a plain path`);
-			if (!inCanvas(canvas, path) && !inSharedRoot(path) && !(await placed(kernel(), canvas, caller, path))) {
+			if (!inCanvas(canvas, path) && !inSharedRoot(path) && !(await placedOn(kernel(), canvas, caller, path))) {
 				throw refuse(name, `${path} is not in ${canvas}'s folder, the deck's shared roots, or a document on ${canvas}`);
 			}
 		}
@@ -112,14 +113,6 @@ async function appsPlaced(kernel: Kernel | undefined, canvas: string, caller: Ca
 	};
 	if (got?.ok) walk(got.value, 0);
 	return out;
-}
-
-/** Whether the canvas's drawing places a document at this path (a document item opened from the deck). */
-async function placed(kernel: Kernel | undefined, canvas: string, caller: Caller, path: string): Promise<boolean> {
-	if (!kernel || !path) return false;
-	const got = await kernel.call("canvas.drawing", { canvas }, { ...caller, id: "frame-guard", kind: "person" }).catch(() => undefined);
-	if (!got?.ok) return false;
-	return JSON.stringify(got.value).includes(`"path":${JSON.stringify(path)}`);
 }
 
 const refuse = (name: string, why: string) => new Refused("refused", `A canvas pass may not call ${name}: ${why}.`, "canvas.here");
