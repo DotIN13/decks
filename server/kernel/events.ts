@@ -41,6 +41,14 @@ export class EventBus implements Events {
 		return () => void set.delete(hear as (payload: never) => void);
 	}
 
+	/** Whether a caller may hear this event and payload, as a subscriber would: for a door's replay. */
+	may(caller: Caller, name: string, payload: Record<string, unknown>): boolean {
+		const event = BY_NAME.get(name);
+		const canvas = typeof payload.canvas === "string" ? payload.canvas : undefined;
+		if (!event || (canvas && !this.sees.every((one) => one(caller, canvas)))) return false;
+		return mayHear(caller, event, payload);
+	}
+
 	/** For a door: what one caller may hear, optionally narrowed to some events or a canvas. */
 	subscribe(sub: Subscriber, hear: (heard: Heard) => void): Stop {
 		const entry = { sub, hear };

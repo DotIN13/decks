@@ -93,6 +93,8 @@ export type Change = { rev: number; ops: ItemOp[]; by: string; at?: number };
 export interface CanvasSource {
 	doc(name: string): CanvasDoc;
 	name(nameOrTitle: string): string;
+	/** item.changed payloads for every revision after since, oldest first; missed when the log no longer reaches it. */
+	replay?(name: string, since: number): Record<string, unknown>[] | { missed: true };
 }
 
 // The deck: paths, revisions, every read and write.

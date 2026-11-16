@@ -16,7 +16,7 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Sto
 
 export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string; run?: Kernel["run"] };
 
-export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
+export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; replay(canvas: string, since: number): ReturnType<NonNullable<CanvasSource["replay"]>> | undefined; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
 export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const clock = options.clock ?? Date.now;
@@ -66,7 +66,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		for (const one of stops.reverse()) one();
 		await callers.flush();
 	};
-	return { kernel, router, events, callers, history, relay, features, stop, setUrl: (url) => void (address.url = url) };
+	return { kernel, router, events, callers, history, relay, features, stop, replay: (canvas, since) => source?.replay?.(source.name(canvas), since), setUrl: (url) => void (address.url = url) };
 }
 
 /** The deck's id: read from the kernel's store, made once. */
