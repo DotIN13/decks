@@ -53,7 +53,7 @@
 	},
 	"apps": {
 		"owner": "Depot",
-		"becomes": "adopted: <name>.log as log/<name> in the apps store (last 600 lines), reached through app.logs; <name>.built dropped (builds run in the machine folder)"
+		"becomes": "adopted: <name>.log as log/<name> in the apps store (last 600 lines), reached through app.logs, only while apps/<name>/app.json exists; a log whose app is gone stays behind; <name>.built dropped (builds run in the machine folder)"
 	},
 	"thumbs": {
 		"owner": "Depot",
