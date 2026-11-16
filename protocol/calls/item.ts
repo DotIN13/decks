@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
 import { any, arr, bool, int, lit, nul, num, obj, opt, rec, str, union } from "../schema.ts";
 import { Canvas, Clip, Deleted, Item, ItemOp, Point, SizeChange } from "../shapes.ts";
-import { ANYONE, onCanvas, onItems } from "./parts.ts";
+import { ANYONE, EDIT_NAME, onCanvas, onItems } from "./parts.ts";
 
 // Everything on one canvas, cards included. The verbs are pen.dev's ops.
 
@@ -58,7 +58,7 @@ export const remove = defineCall({
 	name: "item.delete",
 	summary: "Take an item off the canvas. A card's folder stays in the deck.",
 	who: ANYONE,
-	args: { id: str(), ...onItems },
+	args: { id: str(), ...onItems, ...EDIT_NAME },
 	answer: Deleted,
 	effect: "change",
 });
@@ -85,7 +85,7 @@ export const batch = defineCall({
 	name: "item.batch",
 	summary: "Several item changes applied together or not at all. A later op may be beside an item an earlier one made.",
 	who: ANYONE,
-	args: { ops: arr(ItemOp), ...onItems, for: opt(str("The agent a person's edit is for, so it lands in that agent's news.")) },
+	args: { ops: arr(ItemOp), ...onItems, for: opt(str("The agent a person's edit is for, so it lands in that agent's news.")), ...EDIT_NAME },
 	answer: arr(Item),
 	effect: "change",
 });
@@ -103,7 +103,7 @@ export const paste = defineCall({
 	name: "item.paste",
 	summary: "Put in what item.clip holds, as one undoable edit: new ids, joined arrows, and the cards and files they need.",
 	who: ANYONE,
-	args: { clip: obj({ id: str(), canvas: str() }, true), at: opt(Point), ...onCanvas },
+	args: { clip: obj({ id: str(), canvas: str() }, true), at: opt(Point), ...onCanvas, ...EDIT_NAME },
 	answer: arr(Item),
 	effect: "change",
 });

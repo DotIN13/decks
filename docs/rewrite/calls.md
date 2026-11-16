@@ -41,6 +41,7 @@ A pen.dev drawing and the folder around it: canvases/<name>/, with its cards, fr
 | new | | `canvas.versions` | person, agent | Added in 0.18.0 for Loft: a drawing's revisions, newest first, as file.versions. |
 | new | | `canvas.version` | person, agent | Added in 0.18.0: the drawing's file as it was at a revision. |
 | new | | `canvas.restore` | person | Added in 0.18.0: write the drawing back as it was, as a new revision, as file.restore. |
+| new | | `canvas.drawing` | person, app, card | Added in 0.32.0 for Loom and Easel: the pen document as the file holds it, with rev and base, for the canvas frame leaving compat. Also in 0.32.0: item.batch, item.delete, item.paste and canvas.undo take an optional edit name, echoed in item.changed's made; item.changed may carry pen, the change as pen's own edits; protocol/pen-ops.ts turns a pen op into an item op and back. |
 | `canvas.list` | agents | `canvas.list` | person, agent, app | Unchanged. |
 | `canvas.remove` | person | `canvas.delete` | person | Renamed. |
 | `canvas.screenshot` | agents | `canvas.screenshot` | person, agent, app | The picture's size is a Size { w, h }. |

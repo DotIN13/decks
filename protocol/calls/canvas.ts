@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
-import { arr, bool, int, lit, named, num, obj, opt, str, union } from "../schema.ts";
+import { any, arr, bool, int, lit, named, num, obj, opt, rec, str, union } from "../schema.ts";
 import { BoxChange, Canvas, Deleted, File, Screenshot } from "../shapes.ts";
-import { ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas, onItems } from "./parts.ts";
+import { ANYONE, EDIT_NAME, NOT_CARD, PEOPLE, PERSON, onCanvas, onItems } from "./parts.ts";
 
 // Canvases as wholes: list, make, rename, delete, undo, picture, export, and
 // a drawing's history.
@@ -22,6 +22,15 @@ export const get = defineCall({
 	who: ANYONE,
 	args: { ...onCanvas },
 	answer: Canvas,
+	effect: "read",
+});
+
+export const drawing = defineCall({
+	name: "canvas.drawing",
+	summary: "The canvas's pen document as its file holds it, with the revision it is at and the address its relative paths are read against. For the canvas frame, which edits pen's own nodes; everyone else reads item.list.",
+	who: ["person", "app", "card"],
+	args: { ...onCanvas },
+	answer: obj({ doc: rec(any()), rev: int("The revision the document is at: item.changed's base for the next change."), base: str("The address the document's relative paths (pictures, card folders) are read against.") }),
 	effect: "read",
 });
 
@@ -74,7 +83,7 @@ export const undo = defineCall({
 	name: "canvas.undo",
 	summary: "Take back the person's last edit to the drawing, or put it back with redo. Refused when someone changed it since.",
 	who: ["person", "card"],
-	args: { redo: opt(bool()), ...onCanvas },
+	args: { redo: opt(bool()), ...onCanvas, ...EDIT_NAME },
 	answer: Canvas,
 	effect: "change",
 });

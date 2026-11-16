@@ -1,6 +1,7 @@
 import { defineEvent } from "./event.ts";
 import { any, arr, bool, int, lit, nul, num, obj, opt, str, union } from "./schema.ts";
 import { ChangeAuthor } from "./page.ts";
+import { PenOp } from "./sync.ts";
 import { Box, Camera, ChatItem, DocChange, Message, Point, Splice } from "./shapes.ts";
 
 // Every event, on one stream. Each says which ids changed, who changed them
@@ -13,6 +14,8 @@ export const itemChanged = defineEvent("item.changed", "Items on a canvas change
 	from: opt(str("The revision the edits apply to, as text; read base instead.")),
 	base: opt(int("The revision the edits apply to.")),
 	edits: opt(arr(any())),
+	/** The same change as pen's own edits (pen/diff.ts), arrow routes included: what turns the document at base into this revision's, for a client holding canvas.drawing. */
+	pen: opt(arr(PenOp)),
 	made: opt(arr(str("A client's own name for an edit this revision is the first to have."))),
 	author: opt(ChangeAuthor),
 });
