@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { Duplex } from "node:stream";
-import { API, CALL_BY_NAME, check, LOGIN_PATH, PROTOCOL_VERSION, Refused, SOCKET_PATH } from "../../../protocol/index.ts";
+import { API, CALL_BY_NAME, check, LOGIN_PATH, PROTOCOL_VERSION, refusal, refusalFrom, SOCKET_PATH } from "../../../protocol/index.ts";
 
 // A small server that speaks the wire, a test double for the clients' tests:
 // it checks each call's arguments against the protocol, answers with the
@@ -66,17 +66,16 @@ const read = (req: IncomingMessage) =>
 
 function envelope(name: string, args: unknown, token: string | undefined, handlers: Record<string, FakeHandler>, known: string): object {
 	const call = CALL_BY_NAME.get(name);
-	if (!call) return { ok: false, error: { code: "not_found", message: `There is no call named ${name}.`, hint: "deck.get" }, notes: [] };
-	if (token !== known) return { ok: false, error: { code: "refused", message: "That token is not one this server gave.", hint: "agent.attach" }, notes: [] };
+	if (!call) return refusal("not_found", `There is no call named ${name}.`, "deck.get");
+	if (token !== known) return refusal("refused", "That token is not one this server gave.", "agent.attach");
 	const problems = check(call.input, args);
-	if (problems.length) return { ok: false, error: { code: "invalid", message: problems.join(" "), hint: name }, notes: [] };
+	if (problems.length) return refusal("invalid", problems.join(" "), name);
 	const handler = handlers[name];
-	if (!handler) return { ok: false, error: { code: "unavailable", message: `${name} is not handled here yet.` }, notes: [] };
+	if (!handler) return refusal("unavailable", `${name} is not handled here yet.`);
 	try {
 		return { ok: true, value: handler(args as Record<string, unknown>, token), notes: [`${name} answered by the fake server.`] };
 	} catch (error) {
-		const r = error as Refused;
-		return { ok: false, error: { code: r.code ?? "unavailable", message: r.message, ...(r.hint ? { hint: r.hint } : {}) }, notes: [] };
+		return refusalFrom(error);
 	}
 }
 

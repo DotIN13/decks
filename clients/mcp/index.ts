@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { CALLS, ENV, PROTOCOL_VERSION, type AnyCall } from "../../protocol/index.ts";
+import { CALLS, ENV, PROTOCOL_VERSION, type AnyCall, jsonSchemaOf } from "../../protocol/index.ts";
 import { connect, DecksError, type Client } from "../sdk/index.ts";
-import { jsonSchema } from "./schema.ts";
 
 // The MCP relay: JSON-RPC 2.0 over stdio. Each server call an agent may make
 // is a tool of the same name, whose input is the call's arguments; a call
@@ -55,7 +54,7 @@ export async function answer(message: Rpc, client: () => Promise<Client>): Promi
 export function tools(filter?: string): Tool[] {
 	const all: Tool[] = existsSync(GENERATED)
 		? (JSON.parse(readFileSync(GENERATED, "utf8")) as Tool[])
-		: CALLS.map((call) => ({ name: call.name, description: call.summary, inputSchema: jsonSchema(call.input) }));
+		: CALLS.map((call) => ({ name: call.name, description: call.summary, inputSchema: jsonSchemaOf(call.input) }));
 	const shown = new Set(shownCalls(filter).map((call) => call.name));
 	return all.filter((tool) => shown.has(tool.name));
 }

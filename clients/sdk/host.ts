@@ -1,4 +1,4 @@
-import type { Caller, shapes, Infer } from "../../protocol/index.ts";
+import { refusal, refusalFrom, type Caller, type shapes, type Infer } from "../../protocol/index.ts";
 import { find } from "./find.ts";
 import { DecksError } from "./http.ts";
 import { Line, type Ask } from "./line.ts";
@@ -26,8 +26,6 @@ export type HostOptions = {
 
 export type Host = { caller: Caller; line: Line; tell(name: string, payload: unknown): void; close(): void; closed: Promise<void> };
 
-type Refusing = { code?: string; message?: string; hint?: string };
-
 export async function host(options: HostOptions): Promise<Host> {
 	const found = await find(options);
 	if (!found.token) throw new DecksError({ code: "refused", message: "A host needs the person's token.", hint: "deck.pair" });
@@ -48,12 +46,10 @@ export async function host(options: HostOptions): Promise<Host> {
 
 async function reply(answers: Record<string, Answerer>, request: Ask) {
 	const answer = answers[request.name];
-	if (!answer) return { ok: false as const, error: { code: "unavailable" as const, message: `This host does not answer ${request.name}.` }, notes: [] };
+	if (!answer) return refusal("unavailable", `This host does not answer ${request.name}.`);
 	try {
 		return { ok: true as const, value: await answer((request.args ?? {}) as Record<string, unknown>, request.caller), notes: [] };
 	} catch (error) {
-		const e = error as Refusing;
-		const code = (["invalid", "not_found", "refused", "conflict", "unavailable"].includes(e.code ?? "") ? e.code : "unavailable") as "unavailable";
-		return { ok: false as const, error: { code, message: e.message ?? String(error), ...(e.hint ? { hint: e.hint } : {}) }, notes: [] };
+		return refusalFrom(error);
 	}
 }

@@ -62,3 +62,11 @@ test("defineCall answers on the server unless it says otherwise, and builds its 
 	assert.equal(move.side, "server");
 	assert.deepEqual((move.input as unknown as { required: string[] }).required, ["id", "x"]);
 });
+
+test("refusal and refusalFrom build the refusal envelope once, for every door", async () => {
+	const { refusal, refusalFrom } = await import("./call.ts");
+	assert.deepEqual(refusal("not_found", "No item called a.", "item.list"), { ok: false, error: { code: "not_found", message: "No item called a.", hint: "item.list" }, notes: [] });
+	assert.deepEqual(refusal("invalid", "Bad.", undefined, ["n"]), { ok: false, error: { code: "invalid", message: "Bad." }, notes: ["n"] });
+	assert.deepEqual(refusalFrom(new Refused("conflict", "Moved on.", "file.read")), refusal("conflict", "Moved on.", "file.read"));
+	assert.deepEqual(refusalFrom(new Error("boom")), refusal("unavailable", "boom"));
+});

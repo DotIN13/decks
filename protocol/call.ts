@@ -25,6 +25,18 @@ export interface Refusal {
 
 export type Envelope<T> = { ok: true; value: T; notes: string[] } | { ok: false; error: Refusal; notes: string[] };
 
+/** The envelope of a refusal: its code, its sentence, the call that would work, and notes. */
+export function refusal(code: RefusalCode, message: string, hint?: string, notes: string[] = []): Envelope<never> {
+	return { ok: false, error: { code, message, ...(hint ? { hint } : {}) }, notes };
+}
+
+/** The envelope for anything a handler threw: a refusal keeps its code and hint, anything else is unavailable. */
+export function refusalFrom(error: unknown, notes: string[] = []): Envelope<never> {
+	const e = error as { code?: string; message?: string; hint?: string };
+	const code = (REFUSAL_CODES as readonly string[]).includes(e?.code ?? "") ? (e.code as RefusalCode) : "unavailable";
+	return refusal(code, e?.message ?? String(error), e?.hint, notes);
+}
+
 /** A refusal a handler throws; the door turns it into the envelope. */
 export class Refused extends Error {
 	readonly code: RefusalCode;

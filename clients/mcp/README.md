@@ -6,7 +6,6 @@ The MCP relay: JSON-RPC 2.0 over stdio to a running Decks server, for a client w
 ## Owns
 
 - `index.ts`: `tools(filter)`, `callTool(client, name, input)`, `answer(message, client)`, `serve()`.
-- `schema.ts`: JSON Schema for a protocol node, used only when the generated list is missing.
 - `main.ts`: the entry an MCP client runs.
 
 ## May import

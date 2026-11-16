@@ -41,8 +41,6 @@ export function logout(url: string, file: string): string {
 	return `Logged out of ${url}.`;
 }
 
-export const readText = (file: string) => readFileSync(file, "utf8");
-
 /** The tokens decks login kept, by server address. */
 function tokensFromFile(file: string): Record<string, string> {
 	try {

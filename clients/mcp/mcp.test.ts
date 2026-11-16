@@ -1,11 +1,10 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { CALL_BY_NAME, CALLS, Refused } from "../../protocol/index.ts";
+import { CALL_BY_NAME, CALLS, jsonSchemaOf, Refused } from "../../protocol/index.ts";
 import { clientFor } from "../sdk/index.ts";
 import { fakeServer, type Fake } from "../sdk/testing/fake-server.ts";
 import { answer, shownCalls, tools } from "./index.ts";
-import { jsonSchema } from "./schema.ts";
 
 // The relay lists a tool per agent's server call, filtered by DECKS_TOOLS,
 // relays a call to the server, and turns a refusal into an error result.
@@ -25,7 +24,7 @@ test("the tools are the agents' server calls, and the generated list matches the
 	const listed = tools("");
 	assert.deepEqual(listed.map((t) => t.name), shownCalls("").map((c) => c.name));
 	assert.ok(!listed.some((t) => t.name.startsWith("chat.")));
-	for (const tool of listed) assert.deepEqual(tool.inputSchema, jsonSchema(CALL_BY_NAME.get(tool.name)!.input), tool.name);
+	for (const tool of listed) assert.deepEqual(tool.inputSchema, jsonSchemaOf(CALL_BY_NAME.get(tool.name)!.input), tool.name);
 	assert.ok(CALLS.length > listed.length);
 });
 

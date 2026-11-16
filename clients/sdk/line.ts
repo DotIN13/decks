@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type Caller, type Refusal } from "../../protocol/index.ts";
+import { PROTOCOL_VERSION, refusal, type Caller, type Refusal } from "../../protocol/index.ts";
 import { DecksError, type Answered } from "./http.ts";
 import { socketUrl, type Heard } from "./socket.ts";
 
@@ -17,7 +17,7 @@ export class Line {
 	private next = 0;
 	private waiting = new Map<string, (envelope: Envelope) => void>();
 	private hearers = new Set<(event: Heard) => void>();
-	private asked: (ask: Ask) => Promise<Envelope> = async () => ({ ok: false, error: { code: "unavailable", message: "This client answers no harness calls." } });
+	private asked: (ask: Ask) => Promise<Envelope> = async () => refusal("unavailable", "This client answers no harness calls.");
 
 	constructor(url: string, token: string) {
 		this.socket = new WebSocket(socketUrl(url));
