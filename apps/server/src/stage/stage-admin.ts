@@ -23,7 +23,7 @@ interface Context {
 }
 
 function refuseIfBusy(context: Context, name: string, verb: string): void {
-	const busy = context.agents.find((agent) => agent.stageName(false) === name && agent.running);
+	const busy = context.agents.find((agent) => agent.seat.stageName(false) === name && agent.running);
 	if (busy) throw new Error(`${busy.name} is working on "${name}" right now; ${verb} it when that turn ends.`);
 }
 
@@ -47,7 +47,7 @@ function moveCanvas(context: Context, from: string, to: string): string {
 	const repoint = (path: string) => (path.startsWith(before) ? after + path.slice(before.length) : path);
 	context.pens.rename(from, to, repoint);
 	context.deck.reload();
-	for (const agent of context.agents) agent.stageRenamed(from, to, repoint);
+	for (const agent of context.agents) agent.seat.stageRenamed(from, to, repoint);
 	return to;
 }
 
@@ -64,7 +64,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
 	const keepsBoards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
-	if (keepsBoards && context.agents.some((agent) => agent.stageName(false) === name && agent.running)) return name;
+	if (keepsBoards && context.agents.some((agent) => agent.seat.stageName(false) === name && agent.running)) return name;
 	return moveCanvas(context, name, context.pens.freshName(clean));
 }
 
@@ -75,6 +75,6 @@ export function deleteStage(context: Context, name: string): { boards: number } 
 	const boards = existsSync(folder) ? readdirSync(folder).length : 0;
 	context.pens.remove(name);
 	context.deck.reload();
-	for (const agent of context.agents) agent.stageDeleted(name);
+	for (const agent of context.agents) agent.seat.stageDeleted(name);
 	return { boards };
 }

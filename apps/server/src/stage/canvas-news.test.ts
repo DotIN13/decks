@@ -24,21 +24,21 @@ test("canvas changes since an agent's last message come with its next, its own l
 	try {
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
-		one.newStage("Plan");
-		const canvas = one.stageName()!;
-		assert.deepEqual(one.canvasNotes(), [], "the first message has nothing to compare with");
+		one.seat.newStage("Plan");
+		const canvas = one.seat.stageName()!;
+		assert.deepEqual(one.seat.canvasNotes(), [], "the first message has nothing to compare with");
 
 		app.pens.edit(canvas, [{ op: "insert", node: { id: "n1", type: "note", content: "Ship on Friday", x: 0, y: 0 } }]);
-		const told = one.canvasNotes();
+		const told = one.seat.canvasNotes();
 		assert.match(told[0]!, /^\[Since your last message, on "Plan" \(/);
 		assert.deepEqual(told.slice(1, -1), [' you added the note "Ship on Friday" (n1)']);
-		assert.deepEqual(one.canvasNotes(), [], "and told once");
+		assert.deepEqual(one.seat.canvasNotes(), [], "and told once");
 
 		penWriter.run(one.id, () => app.pens.edit(canvas, [{ op: "update", id: "n1", set: { content: "Ship on Monday" } }]));
-		assert.deepEqual(one.canvasNotes(), [], "its own edit is not news to it");
+		assert.deepEqual(one.seat.canvasNotes(), [], "its own edit is not news to it");
 
 		penWriter.run(two.id, () => app.pens.edit(canvas, [{ op: "insert", node: { id: "n2", type: "note", content: "Why?", x: 0, y: 200 } }]));
-		assert.deepEqual(one.canvasNotes().slice(1, -1), [' Two added the note "Why?" (n2)'], "another agent's edit is named");
+		assert.deepEqual(one.seat.canvasNotes().slice(1, -1), [' Two added the note "Why?" (n2)'], "another agent's edit is named");
 	} finally {
 		cleanup();
 	}

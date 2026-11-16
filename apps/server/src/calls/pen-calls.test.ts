@@ -199,7 +199,7 @@ test("a placeholder frame an agent draws names that agent as the canvas's writer
 	const { app, agent, must, cleanup } = await open();
 	try {
 		await must("canvas.insert", [{ type: "frame", name: "Hero", placeholder: true, width: 400, height: 200 }, { at: { x1: 0, y1: 0 } }]);
-		const stage = agent.stageName()!;
+		const stage = agent.seat.stageName()!;
 		assert.equal(app.pens.writerOf(stage), agent.id);
 		const frame = app.pens.frame(agent.id, stage);
 		assert.equal(frame.type === "stage.pen" && frame.by, agent.id);

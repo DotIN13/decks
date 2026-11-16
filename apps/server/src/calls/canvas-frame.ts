@@ -104,14 +104,14 @@ export function onCanvas(app: Pick<CallsHost, "stage" | "agents" | "documentsOn"
 	if (message.type === "view.called") {
 		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
 		// An agent moving to another canvas: the frame showing the canvas it is on now answers, which knows whether the person is using it.
-		if (call?.op === "goto") return !!call.agentId && (call.args as { person?: unknown } | undefined)?.person !== true && app.agents.get(call.agentId)?.stageName() === canvas;
+		if (call?.op === "goto") return !!call.agentId && (call.args as { person?: unknown } | undefined)?.person !== true && app.agents.get(call.agentId)?.seat.stageName() === canvas;
 		if (!call || !["show", "camera", "reload", "cursor", "shot"].includes(call.op ?? "")) return false;
 		// A cursor, a reload or a card's picture names a card: the frame showing the canvas it is on answers, whoever's home that is.
 		if ((call.op === "cursor" || call.op === "reload" || call.op === "shot") && typeof call.args?.path === "string") return boardOnCanvas(app, call.args.path, canvas);
 		if (call.op === "shot") return false;
 		const named = typeof call.args?.stage === "string" ? call.args.stage : undefined;
 		if (named !== undefined) return named === canvas;
-		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
+		return !!call.agentId && app.agents.get(call.agentId)?.seat.stageName() === canvas;
 	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
 	// An agent at work on a card: the frame showing the canvas it is on draws the agent's cursor there.

@@ -48,7 +48,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 	);
 	agent.rename(name);
 	agent.translator.user("here");
-	agent.setPosition("canvases/t/cards/plan/index.html", place.x, place.y);
+	agent.seat.setPosition("canvases/t/cards/plan/index.html", place.x, place.y);
 	const id = agent.id;
 	agent.dispose();
 	return id;
@@ -136,8 +136,8 @@ test("each device's board list carries its own conversation's arrangement", () =
 
 		// And a board moved on the laptop lands on the laptop's conversation, not the phone's.
 		app.handle({ type: "card.move", path: "canvases/t/cards/plan/index.html", x: 64, y: 64 }, replyTo(laptop), laptop);
-		assert.deepEqual(app.agents.get(one)?.positions()["canvases/t/cards/plan/index.html"], { x: 64, y: 64 });
-		assert.deepEqual(app.agents.get(two)?.positions()["canvases/t/cards/plan/index.html"], { x: 900, y: 400 });
+		assert.deepEqual(app.agents.get(one)?.seat.positions()["canvases/t/cards/plan/index.html"], { x: 64, y: 64 });
+		assert.deepEqual(app.agents.get(two)?.seat.positions()["canvases/t/cards/plan/index.html"], { x: 900, y: 400 });
 	} finally {
 		cleanup();
 	}

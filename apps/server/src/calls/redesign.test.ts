@@ -165,7 +165,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		const updated = (await must("agent.update", [{ canvas: other.name }])).value;
 		assert.equal(updated.canvas, other.name);
 		assert.equal((await must("here")).value.name, other.name);
-		assert.equal(agent.stageName(), other.name);
+		assert.equal(agent.seat.stageName(), other.name);
 		// The person's here is the canvas on screen they name.
 		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id, "x-decks-stage": home };
 		assert.equal((await must("here", [], person)).value.name, home);

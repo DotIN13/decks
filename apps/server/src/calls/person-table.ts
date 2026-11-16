@@ -54,9 +54,9 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 	const stageFor = (asked: unknown, call: PersonCall): { name?: string; agent?: DeckAgent } => {
 		const canvas = typeof asked === "string" && pens()?.has(asked) ? asked : call.on.stage && pens()?.has(call.on.stage) ? call.on.stage : undefined;
 		const target = app.target();
-		const name = canvas ?? target.stageName(true);
+		const name = canvas ?? target.seat.stageName(true);
 		if (!name) return {};
-		const agent = target.stageName() === name ? target : agents().looking()?.stageName() === name ? agents().looking() : agents().all().find((one) => one.stageName() === name);
+		const agent = target.seat.stageName() === name ? target : agents().looking()?.seat.stageName() === name ? agents().looking() : agents().all().find((one) => one.seat.stageName() === name);
 		return { name, ...(agent ? { agent } : {}) };
 	};
 	const gesture = async (call: PersonCall, asked: { stage?: string; agent?: string }, name: "move" | "resize" | "hide" | "edit" | "open" | "newStage", args: unknown[]) => {
@@ -94,8 +94,8 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			const workspace = given.workspace ?? (typeof given.near === "string" ? agents().get(given.near)?.workspace : undefined);
 			const latest = agents().latestCanvas(workspace, agent.id);
 			try {
-				if (latest) agent.openStage(latest);
-				else agent.newStage?.(agent.chat().name, { provisional: true });
+				if (latest) agent.seat.openStage(latest);
+				else agent.seat.newStage?.(agent.chat().name, { provisional: true });
 			} catch {
 				/* a name clash or a canvas gone meanwhile: the agent still works, on a canvas of its own once it needs one */
 			}
@@ -108,17 +108,17 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			const { agent, made, token } = agents().attach({ key: String(given.key ?? ""), ...(given.client ? { client: given.client } : {}), ...(given.name ? { name: given.name } : {}), ...(given.workspace ? { workspace: given.workspace } : {}) });
 			if (!token) throw new Error("This harness hands out no agent tokens.");
 			// Its home canvas: the one asked for, else as a new agent's is found, the latest of its workspace or one of its own.
-			if (given.canvas || (made && !agent.stageName())) {
+			if (given.canvas || (made && !agent.seat.stageName())) {
 				try {
 					const latest = given.canvas ?? agents().latestCanvas(agent.workspace, agent.id);
-					if (latest) agent.openStage(latest);
-					else agent.newStage?.(agent.chat().name, { provisional: true });
+					if (latest) agent.seat.openStage(latest);
+					else agent.seat.newStage?.(agent.chat().name, { provisional: true });
 				} catch {
 					/* a canvas gone meanwhile: it has one once it draws */
 				}
 				app.publishStages();
 			}
-			const canvas = agent.stageName();
+			const canvas = agent.seat.stageName();
 			return { id: agent.id, name: agent.chat().name, token, made, ...(canvas ? { canvas } : {}) };
 		},
 		"agent.set": async ([id, patch], call) => {
@@ -293,7 +293,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"card.hide": async ([card, options], call) => gesture(call, onCanvas(options, call), "hide", [String(card)]),
 		"card.play": async ([card, options], call) => {
 			const { name, agent } = stageFor((options as { canvas?: unknown } | undefined)?.canvas, call);
-			if (agent) agent.setInPlay([...agent.inPlay, String(card)], { place: true });
+			if (agent) agent.seat.setInPlay([...agent.seat.inPlay, String(card)], { place: true });
 			else if (name && pens()) putOn(pens()!, app.deck, name, [String(card)]);
 		},
 		"card.delete": async ([card], call) => {

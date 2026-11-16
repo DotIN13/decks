@@ -102,8 +102,8 @@ function agentOn(
 		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...rest, ...(restored ? { restored: row } : {}) },
 	);
 	if (camera) cameras.report(agent.id, camera);
-	const context = () => agent.context.join(" ");
-	const inPlay = () => agent.inPlay.join(" ");
+	const context = () => agent.seat.context.join(" ");
+	const inPlay = () => agent.seat.inPlay.join(" ");
 	const last = () => sent.filter((message) => message.type === "agent.context").at(-1);
 	return { agent, cameras, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
@@ -286,11 +286,11 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
 	assert.equal(context(), "", "holding nothing yet");
 
-	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
 	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html");
 
 	// What `decks.canvas.delete` and the board's × both do: off the stage, still held.
-	agent.setInPlay(["canvases/t/cards/b/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/b/index.html"]);
 	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
 	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html", "a board taken off stays held");
 	cleanup();
@@ -298,7 +298,7 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 
 test("both sets travel together, and neither repeats itself", () => {
 	const { agent, last, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 
 	const message = last();
 	assert.ok(message && message.type === "agent.context");
@@ -309,8 +309,8 @@ test("both sets travel together, and neither repeats itself", () => {
 
 test("the chat row carries what is held and what is shown, and they are not the same list", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/a/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
 	assert.deepEqual(agent.chat().boards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 	assert.deepEqual(agent.chat().inPlay, ["canvases/t/cards/a/index.html"]);
 	cleanup();
@@ -318,9 +318,9 @@ test("the chat row carries what is held and what is shown, and they are not the 
 
 test("a deleted board leaves the context, and only the deleted one", () => {
 	const { agent, context, inPlay, last, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 
-	assert.equal(agent.forget("canvases/t/cards/a/index.html"), true);
+	assert.equal(agent.seat.forget("canvases/t/cards/a/index.html"), true);
 	assert.equal(context(), "canvases/t/cards/b/index.html");
 	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
 	const message = last();
@@ -331,23 +331,23 @@ test("a deleted board leaves the context, and only the deleted one", () => {
 
 test("forgetting a board nobody holds says so, and stays quiet", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["canvases/t/cards/a/index.html"]);
-	const before = agent.context.join(" ");
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
+	const before = agent.seat.context.join(" ");
 
 	// The watcher reports every deletion in the deck, so most calls are about boards this
 	// agent never held; those must not emit a context.changed and re-render every rail.
-	assert.equal(agent.forget("canvases/t/cards/b/index.html"), false);
-	assert.equal(agent.context.join(" "), before);
+	assert.equal(agent.seat.forget("canvases/t/cards/b/index.html"), false);
+	assert.equal(agent.seat.context.join(" "), before);
 	cleanup();
 });
 
 test("an agent left holding only a deleted board is holding nothing", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html"]);
-	agent.setInPlay(["canvases/t/cards/a/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/a/index.html"]);
 
 	// This is the case that emptied both the rail and the canvas: a non-empty context of
 	// one dead path, which is not empty enough to trigger the whole-deck fallback.
-	agent.forget("canvases/t/cards/a/index.html");
+	agent.seat.forget("canvases/t/cards/a/index.html");
 	assert.equal(context(), "");
 	assert.equal(inPlay(), "");
 	cleanup();
@@ -762,13 +762,13 @@ test("a restored row shows its last line before its transcript is read", () => {
  */
 test("a board joining the stage lands beside the stage's newest board", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html", "three.html"]);
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	// Two goes under one, so "beside the newest" and "right of them all" are different answers.
-	agent.setPosition("canvases/t/cards/two/index.html", 0, 1000);
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html", "canvases/t/cards/three/index.html"], { place: true });
-	const at = (path: string) => agent.positions()[path];
+	agent.seat.setPosition("canvases/t/cards/two/index.html", 0, 1000);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html", "canvases/t/cards/three/index.html"], { place: true });
+	const at = (path: string) => agent.seat.positions()[path];
 	assert.deepEqual(at("canvases/t/cards/two/index.html"), { x: 0, y: 1000 }, "two kept its place under one");
 	const three = at("canvases/t/cards/three/index.html");
 	assert.equal(three?.y, 1000, `${JSON.stringify(three)} is level with two.html, the newest`);
@@ -778,10 +778,10 @@ test("a board joining the stage lands beside the stage's newest board", () => {
 
 test("a board given a place when it joins keeps it, far from the rest or not", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true, at: { "canvases/t/cards/two/index.html": { x: 50_000, y: 7000 } } });
-	assert.deepEqual(agent.positions()["canvases/t/cards/two/index.html"], { x: 50_000, y: 7000 });
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true, at: { "canvases/t/cards/two/index.html": { x: 50_000, y: 7000 } } });
+	assert.deepEqual(agent.seat.positions()["canvases/t/cards/two/index.html"], { x: 50_000, y: 7000 });
 	cleanup();
 });
 
@@ -794,10 +794,10 @@ test("where any browser is looking, this chat's included, does not move where a 
 	const far = { x: -18_000, y: 950_000, zoom: 1, width: 1378, height: 702 };
 	const { agent, cameras, cleanup } = agentOn(["one.html", "two.html"], { camera: far });
 	cameras.report("someone-else", { ...far, x: 40_000 });
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
-	const two = agent.positions()["canvases/t/cards/two/index.html"];
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	const two = agent.seat.positions()["canvases/t/cards/two/index.html"];
 	assert.ok(two && Math.hypot(two.x, two.y) < 3000, `${JSON.stringify(two)} is beside one.html`);
 	cleanup();
 });
@@ -805,14 +805,14 @@ test("where any browser is looking, this chat's included, does not move where a 
 test("a board whose only place is the old deck-wide column is placed again, beside the canvas", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
 	// One board on the canvas, and another carrying the sort of place the deck-wide layout left.
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	agent.setPosition("canvases/t/cards/two/index.html", 0, 967_333);
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setPosition("canvases/t/cards/two/index.html", 0, 967_333);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
 
-	const two = agent.positions()["canvases/t/cards/two/index.html"];
+	const two = agent.seat.positions()["canvases/t/cards/two/index.html"];
 	assert.ok(two && two.y < 10_000, `the board came back from ${two?.y} to the canvas`);
-	const one = agent.positions()["canvases/t/cards/one/index.html"];
+	const one = agent.seat.positions()["canvases/t/cards/one/index.html"];
 	assert.deepEqual(one, { x: 0, y: 0 }, "and the board already on the canvas did not move");
 	assert.notDeepEqual(two, one, "nor did the newcomer land on top of it");
 	cleanup();
@@ -820,30 +820,30 @@ test("a board whose only place is the old deck-wide column is placed again, besi
 
 test("hiding a board and playing it again puts it back where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setPosition("canvases/t/cards/two/index.html", 1760, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
-	assert.deepEqual(agent.positions()["canvases/t/cards/two/index.html"], { x: 1760, y: 0 }, "a place beside the canvas is the user's, and is kept");
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setPosition("canvases/t/cards/two/index.html", 1760, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	assert.deepEqual(agent.seat.positions()["canvases/t/cards/two/index.html"], { x: 1760, y: 0 }, "a place beside the canvas is the user's, and is kept");
 	cleanup();
 });
 
 test("restoring a canvas places nothing: the arrangement is the one the person left", () => {
 	const { agent, cleanup } = agentOn(["one.html"]);
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 900_000);
-	agent.setInPlay(["canvases/t/cards/one/index.html"]);
-	assert.deepEqual(agent.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 900_000 }, "no place was worked out");
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 900_000);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"]);
+	assert.deepEqual(agent.seat.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 900_000 }, "no place was worked out");
 	cleanup();
 });
 
 test("clearing the canvas and playing a board back leaves it where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html"]);
-	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
-	agent.setInPlay([], { place: true });
-	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.seat.setInPlay([], { place: true });
+	agent.seat.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	// The canvas was empty, and that is no reason to move a board somebody put somewhere.
-	assert.deepEqual(agent.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 0 });
+	assert.deepEqual(agent.seat.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 0 });
 	cleanup();
 });

@@ -14,10 +14,10 @@ export function personAgent(context: { agents: Registry; pens?: StagePens | unde
 	const named = asked.agent ? context.agents.get(asked.agent) : undefined;
 	const fallback = named ?? context.agents.focused();
 	const stage = asked.stage && context.pens?.has(asked.stage) ? asked.stage : undefined;
-	if (!stage || fallback.stageName() === stage) return fallback;
+	if (!stage || fallback.seat.stageName() === stage) return fallback;
 	const looking = context.agents.looking();
-	if (looking?.stageName() === stage) return looking;
-	return context.agents.all().find((one) => one.stageName() === stage) ?? fallback;
+	if (looking?.seat.stageName() === stage) return looking;
+	return context.agents.all().find((one) => one.seat.stageName() === stage) ?? fallback;
 }
 
 /**

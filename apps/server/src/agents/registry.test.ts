@@ -84,7 +84,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 	const agent = agentOn(deck);
 	agent.rename("Kestrel");
 	agent.translator.user("what is the plan");
-	agent.setInPlay(["canvases/t/cards/plan/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/plan/index.html"]);
 	const id = agent.id;
 	agent.dispose();
 
@@ -97,7 +97,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 	assert.equal(back.kind, "pi");
 	assert.equal(back.dormant, true, "readable, but nothing is running behind it");
 	assert.deepEqual(back.boards, ["canvases/t/cards/plan/index.html"], "with the boards it was holding on the row itself");
-	assert.deepEqual([...(registry.get(id)?.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas comes back too");
+	assert.deepEqual([...(registry.get(id)?.seat.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas comes back too");
 	cleanup();
 });
 
@@ -105,17 +105,17 @@ test("where a conversation put its boards comes back after a restart", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
 	agent.translator.user("put those two down here");
-	agent.setInPlay(["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"]);
 	// Two boards, placed differently from any auto-layout — the whole point of a stage owning
 	// its arrangement is that these numbers are not derivable from the deck.
-	agent.setPosition("canvases/t/cards/plan/index.html", 120, 340);
-	agent.setPosition("canvases/t/cards/notes/index.html", 900, 80);
+	agent.seat.setPosition("canvases/t/cards/plan/index.html", 120, 340);
+	agent.seat.setPosition("canvases/t/cards/notes/index.html", 900, 80);
 	const id = agent.id;
 	agent.dispose();
 
 	const { registry } = registryOn(deck);
 	registry.restore();
-	assert.deepEqual(registry.get(id)?.positions(), {
+	assert.deepEqual(registry.get(id)?.seat.positions(), {
 		"canvases/t/cards/plan/index.html": { x: 120, y: 340 },
 		"canvases/t/cards/notes/index.html": { x: 900, y: 80 },
 	});
@@ -128,11 +128,11 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	const one = agentOn(deck);
 	one.rename("One");
 	one.translator.user("here");
-	one.setPosition("canvases/t/cards/plan/index.html", 10, 20);
+	one.seat.setPosition("canvases/t/cards/plan/index.html", 10, 20);
 	const two = agentOn(deck);
 	two.rename("Two");
 	two.translator.user("no, here");
-	two.setPosition("canvases/t/cards/plan/index.html", 900, 400);
+	two.seat.setPosition("canvases/t/cards/plan/index.html", 900, 400);
 	const [firstId, secondId] = [one.id, two.id];
 	one.dispose();
 	two.dispose();
@@ -145,21 +145,21 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	 * handed the browser the arrangement it was leaving.
 	 */
 	registry.focus(firstId);
-	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
+	assert.deepEqual(registry.looking()?.seat.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
 	assert.deepEqual(
 		[
-			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.x,
-			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.y,
+			deck.state(registry.looking()!.seat.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.x,
+			deck.state(registry.looking()!.seat.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.y,
 		],
 		[10, 20],
 	);
 
 	registry.focus(secondId);
-	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 900, y: 400 } });
+	assert.deepEqual(registry.looking()?.seat.positions(), { "canvases/t/cards/plan/index.html": { x: 900, y: 400 } });
 
 	// And back again — the arrangement is a property of the chat, not a last-writer-wins row.
 	registry.focus(firstId);
-	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
+	assert.deepEqual(registry.looking()?.seat.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
 	cleanup();
 });
 
@@ -250,7 +250,7 @@ test("an agent nobody spoke to is not written down", () => {
 	// What `focused()` creates on demand so a deck is never agentless. Persisting these
 	// would leave an empty "Agent" row behind on every single boot.
 	const agent = agentOn(deck);
-	agent.setInPlay(["canvases/t/cards/plan/index.html"]);
+	agent.seat.setInPlay(["canvases/t/cards/plan/index.html"]);
 	agent.rename("Named but silent");
 	agent.dispose();
 
@@ -411,9 +411,9 @@ test("a chat that was on a shared canvas comes back with that canvas as its own 
 	const { registry } = registryOn(deck);
 	assert.equal(registry.restore(), 1, "the dispatcher is not restored");
 	const ada = registry.get("ada");
-	assert.deepEqual([...(ada?.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas's boards that still exist are up");
-	assert.deepEqual([...(ada?.context ?? [])], ["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"], "and held, before what it held already");
-	assert.deepEqual(ada?.positions(), { "canvases/t/cards/plan/index.html": { x: 40, y: 80 } }, "where they sat");
+	assert.deepEqual([...(ada?.seat.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas's boards that still exist are up");
+	assert.deepEqual([...(ada?.seat.context ?? [])], ["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"], "and held, before what it held already");
+	assert.deepEqual(ada?.seat.positions(), { "canvases/t/cards/plan/index.html": { x: 40, y: 80 } }, "where they sat");
 
 	// Written back at once, so the next open reads the chat's own fields.
 	const record = new AgentStore(deck).read("ada")?.record;
@@ -454,7 +454,7 @@ test("work can be sent to an agent by name, and lands in its queue", () => {
 	assert.equal(waiting.length, 1);
 	assert.equal(waiting[0]?.fromName, "Ada", "and it says who sent it");
 	assert.deepEqual(waiting[0]?.boards, ["canvases/t/cards/plan/index.html"], "boards that do not exist are dropped");
-	assert.deepEqual([...(registry.get(kit)?.context ?? [])], [], "and the receiver's own context is untouched");
+	assert.deepEqual([...(registry.get(kit)?.seat.context ?? [])], [], "and the receiver's own context is untouched");
 	cleanup();
 });
 
@@ -510,7 +510,7 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
 	registry.restore();
 	const held = registry.get(id)!;
 	const paths = Array.from({ length: 25 }, (_, index) => `canvases/t/cards/b${index}/index.html`);
-	held.setInPlay(paths);
+	held.seat.setInPlay(paths);
 
 	const summary = registry.summaries().find((row) => row.id === id)!;
 	assert.equal(summary.holding, 25, "the true total is not truncated");

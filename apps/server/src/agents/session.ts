@@ -1,11 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { recordedBoardsToAdopt } from "./old-records.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
-import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../calls/tool.ts";
@@ -22,8 +19,7 @@ import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
 import { canvasNameReminder } from "../stage/canvas-name.ts";
-import type { PenDocument } from "@decks/pen";
-import { canvasNews } from "./canvas-news.ts";
+import { cleanPlaces, Seat } from "./seat.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -74,26 +70,6 @@ function firstLine(task: string): string {
 }
 
 /**
- * Where a stage put its boards, if the stored value is one.
- *
- * The one validator for two readers — a restored record and a rewind's snapshot — because they are the
- * same map arriving by different roads and used to have a copy of this loop each. A pair of finite
- * numbers per path and nothing else: entries that are not that are dropped rather than the whole map,
- * so one hand-edit cannot cost a stage its whole arrangement.
- */
-function cleanPlaces(raw: unknown): Record<string, { x: number; y: number }> | undefined {
-	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-	const kept: Record<string, { x: number; y: number }> = {};
-	for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
-		const at = value as { x?: unknown; y?: unknown } | null;
-		const x = Number(at?.x);
-		const y = Number(at?.y);
-		if (path && Number.isFinite(x) && Number.isFinite(y)) kept[path] = { x, y };
-	}
-	return Object.keys(kept).length > 0 ? kept : undefined;
-}
-
-/**
  * One agent, and everything about it that is not Pi's.
  *
  * The transcript, the identity, the state, the dialog bridge. The backend is
@@ -103,14 +79,13 @@ function cleanPlaces(raw: unknown): Record<string, { x: number; y: number }> | u
  * That matters because the browser draws the composer immediately and a person
  * types faster than a model runtime starts.
  */
-/** What a canvas is called until somebody names it; the first name it is given names its folder too. */
-const UNTITLED = "Untitled canvas";
-
 export class DeckAgent {
 	/** Kept across restarts when the agent was restored: the avatar file is addressed by it. */
 	readonly id: string;
 	readonly translator: Translator;
 	readonly bridge: ExtensionUiBridge;
+	/** Where it sits: its home canvas, the cards it holds, and what it has seen of the canvases it works on (`seat.ts`). */
+	readonly seat: Seat;
 
 	private backend: AgentBackend | undefined;
 	private starting: Promise<void> | undefined;
@@ -165,37 +140,8 @@ export class DeckAgent {
 	 */
 	private modelOptions: ModelOption[] = [];
 
-	/**
-	 * The boards this agent is holding, most-recently-touched first.
-	 *
-	 * The order used to be insertion order, which is how `decks.agent.list()` ended up answering
-	 * "what is this agent working on" with everything it had ever held, oldest first. A held
-	 * board is a decision the agent made — attaching one is it saying *this is what I am
-	 * working from* — so the recent end is the answer to the question, and the rest of the
-	 * list is history. The touch sites (`stage.attach`, a new board, a first `decks.canvas.insert`) put the
-	 * newest board at the front; `setContext` keeps whatever order it is given. Re-attaching a
-	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
-	 * it where it sat.
-	 */
-	private held: string[] = [];
-	/**
-	 * With no stage file to hold them (a host that keeps none), the boards this session was given to
-	 * show. With one, the stage's boards are the file's (`playing`).
-	 */
-	private loosePlaying: string[] = [];
-	/** The boards a restored record had on its stage, written in once if the stage file has none (`adoptStage`). */
-	private restoredPlaying: string[] | undefined;
-	/**
-	 * Where this agent last had each board it took off its stage, by path, so showing it again puts it
-	 * back. The places of boards on the stage are the stage file's own.
-	 */
-	private places: Record<string, { x: number; y: number }> = {};
-	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
-	private firstCanvas: ((self: string) => string | undefined) | undefined;
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
 	private workspaceChosen: string | undefined;
-	/** The folder its stage drawing lives in, once it has one (`stage/pens.ts`). */
-	private stageFolder: string | undefined;
 
 	/** Record the workspace and say so: `setWorkspace` writes through here. */
 	private declareWorkspace(workspace: string | undefined): void {
@@ -212,33 +158,6 @@ export class DeckAgent {
 	 * rides along with whatever the user says next rather than waking the agent up.
 	 */
 	private pending: string[] = [];
-	/**
-	 * Each canvas as it was at this agent's last message: what the next one is compared with, so it is
-	 * told what others changed there since (`agents/canvas-news.ts`). Its home canvas, the ones it wrote,
-	 * and any it was told about before.
-	 */
-	private seen = new Map<string, { rev: number; doc: PenDocument }>();
-	/** The notes `prompt()` puts first, and takes them: each call compares with the one before. */
-	canvasNotes(): string[] {
-		const pens = this.stage.pens;
-		if (!pens) return [];
-		const names = new Set([...(this.stageFolder ? [this.stageFolder] : []), ...pens.takeWritten(this.id), ...this.seen.keys()]);
-		const agents = this.host.agents();
-		const nameOf = (id: string) => agents.find((one) => one.id === id)?.name ?? "another agent";
-		const lines: string[] = [];
-		for (const name of names) {
-			if (!pens.has(name)) {
-				this.seen.delete(name);
-				continue;
-			}
-			const entry = pens.get(name);
-			if (entry.error) continue;
-			const before = this.seen.get(name);
-			if (before && before.rev !== entry.rev) lines.push(...canvasNews(pens.titleOf(name), name, before.doc, entry.doc, pens.changesSince(name, before.rev), this.id, nameOf));
-			this.seen.set(name, { rev: entry.rev, doc: entry.doc });
-		}
-		return lines;
-	}
 	/**
 	 * Work another agent handed over, waiting for this one to be quiet.
 	 *
@@ -416,7 +335,19 @@ export class DeckAgent {
 			this.outside = { key: joined.key, client: joined.client, seen: options.restored?.outside?.seen ?? Date.now() };
 			this.work.push(...(options.restored?.outside?.inbox ?? []));
 		}
-		this.firstCanvas = options.firstCanvas;
+		this.seat = new Seat(
+			{
+				id: this.id,
+				deck,
+				stage,
+				emit,
+				save: () => this.save(),
+				...(host.arranged ? { arranged: () => host.arranged!() } : {}),
+				agents: () => host.agents(),
+				tell: (note) => void this.pending.push(note),
+			},
+			{ firstCanvas: options.firstCanvas, restored: options.restored },
+		);
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
 		/*
@@ -477,10 +408,8 @@ export class DeckAgent {
 			this.workspaceChosen = workspace;
 			this.identity = { ...this.identity, workspace };
 		}
-		this.stageFolder = options.restored?.stage;
-
 		// After construction, so nothing is announced for a chat the browsers have not been told of yet.
-		if (options.restored) setTimeout(() => this.adoptStage(), 0);
+		if (options.restored) setTimeout(() => this.seat.adoptStage(), 0);
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -534,13 +463,7 @@ export class DeckAgent {
 		this.translator.onTool = (event) => this.host.act?.(this.id, { kind: "tool", event });
 
 		/*
-		 * A restored chat is put back before anything can change it.
-		 *
-		 * `held` and `playing` are assigned rather than set through `setContext`, which
-		 * would broadcast a `context.changed` for an agent no browser has been told about
-		 * yet. The greeting is what carries this to a client, and it reads the same fields.
-		 *
-		 * The transcript is **not** put back here. It is read the first time somebody asks for
+		 * A restored chat's transcript is **not** put back here. It is read the first time somebody asks for
 		 * the conversation (`transcript`), because reading it for every row is what made the
 		 * chat list cost the sum of every chat ever held; the row draws from the record alone,
 		 * and `storedLast` is the part of the transcript a row needs.
@@ -550,16 +473,6 @@ export class DeckAgent {
 			if (options.restored.lastLine) {
 				this.storedLast = { text: options.restored.lastLine, at: options.restored.lastAt ?? this.createdAt };
 			}
-			this.held = [...options.restored.context];
-			this.restoredPlaying = options.restored.inPlay.filter((path) => this.held.includes(path));
-			this.loosePlaying = [...this.restoredPlaying];
-			/*
-			 * And where this conversation had put its boards, which is a stage's own state and has no
-			 * other home: the record is read here rather than the model record, so a board dragged before
-			 * a restart is in the same place after it.
-			 */
-			const kept = cleanPlaces(options.restored.positions);
-			if (kept) this.places = kept;
 		}
 
 		this.bridge = new ExtensionUiBridge({
@@ -629,12 +542,12 @@ export class DeckAgent {
 	/** Put a remembered stage back: what the agent held, showed and called itself. */
 	private apply(snapshot: StageSnapshot | undefined): void {
 		if (!snapshot) return;
-		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
-		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
+		if (Array.isArray(snapshot.context)) this.seat.setContext(snapshot.context.filter((path) => typeof path === "string"));
+		if (Array.isArray(snapshot.inPlay)) this.seat.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
 		if (snapshot.positions && typeof snapshot.positions === "object") {
 			const kept = cleanPlaces(snapshot.positions);
 			if (kept) {
-				for (const [path, at] of Object.entries(kept)) this.setPosition(path, at.x, at.y);
+				for (const [path, at] of Object.entries(kept)) this.seat.setPosition(path, at.x, at.y);
 				this.save();
 				this.host.arranged?.();
 			}
@@ -667,11 +580,11 @@ export class DeckAgent {
 		return {
 			id: this.id,
 			identity: () => this.identity,
-			context: () => [...this.held],
-			inPlay: () => [...this.playing],
-			setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => this.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
-			positions: () => ({ ...this.places }),
-			setPosition: (path: string, x: number, y: number) => this.setPosition(path, x, y),
+			context: () => [...this.seat.context],
+			inPlay: () => [...this.seat.inPlay],
+			setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => this.seat.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
+			positions: () => this.seat.remembered(),
+			setPosition: (path: string, x: number, y: number) => this.seat.setPosition(path, x, y),
 			rename: (name: string) => this.rename(name),
 			setTags: (tags: unknown) => this.setTags(tags),
 			setWorkspace: (workspace: unknown) => this.setWorkspace(workspace),
@@ -689,310 +602,21 @@ export class DeckAgent {
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
 			sized: (path: string, size: { w: number; h: number }) => {
-				this.setSize(path, size);
+				this.seat.setSize(path, size);
 				this.host.arranged?.();
 			},
 			drew: (stage: string, ids: string[], boxes: ActBox[]) => this.host.act?.(this.id, { kind: "draw", stage, ids, boxes }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
-			stageName: () => this.stageName(true),
+			stageName: () => this.seat.stageName(true),
 
-			openStage: (name: string) => this.openStage(name, byPerson ? "other" : "itself"),
-			newStage: (title: string) => this.newStage(title, { by: byPerson ? "other" : "itself" }),
-			setHome: (name: string) => this.openStage(name, byPerson ? "other" : "itself"),
+			openStage: (name: string) => this.seat.openStage(name, byPerson ? "other" : "itself"),
+			newStage: (title: string) => this.seat.newStage(title, { by: byPerson ? "other" : "itself" }),
+			setHome: (name: string) => this.seat.openStage(name, byPerson ? "other" : "itself"),
 			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
 			},
 		};
-	}
-
-	get context(): readonly string[] {
-		return this.held;
-	}
-
-	get inPlay(): readonly string[] {
-		return this.playing;
-	}
-
-	/**
-	 * The folder this agent's stage drawing lives in (`stage/pens.ts`).
-	 *
-	 * Named the first time it is needed with `claim`, from the agent's name at that moment, and
-	 * kept on the record — a rename later leaves the folder where it is.
-	 */
-	stageName(claim = false): string | undefined {
-		if (this.stageFolder || !claim) return this.stageFolder;
-		const pens = this.stage.pens;
-		if (!pens) return undefined;
-		// A new agent joins the latest canvas of its workspace; with none, it gets one of its own.
-		const joined = this.firstCanvas?.(this.id);
-		this.firstCanvas = undefined;
-		// A placeholder until the canvas is named for what is on it, which names its folder too (`stage/stage-admin.ts`).
-		this.stageFolder = joined && pens.names().includes(joined) ? joined : pens.claim(UNTITLED, { provisional: true });
-		this.save();
-		return this.stageFolder;
-	}
-
-	// --- the stage file (`stage/pens.ts`) ----------------------------------------------------------
-	/*
-	 * A stage is a `.pen` file, and its boards are pen `browser` items in it. The file is the one record
-	 * of which boards are on the stage, where, and how big: this session keeps no copy of them. It reads
-	 * the file when it needs the boards, and writes each change to it as one operation on one board, so
-	 * several agents on one stage, and a person on it, never put back each other's work.
-	 *
-	 * What it does keep is its own: the boards it holds (`held`), and where it last had a board it took
-	 * off the stage (`places`), so showing that board again puts it back where it was.
-	 */
-
-	/** This agent's stage, when there is a file for it. */
-	canvasName(): string | undefined {
-		const pens = this.stage.pens;
-		const name = this.stageFolder;
-		return pens && name && pens.has(name) ? name : undefined;
-	}
-
-	/** The deck's boards on this agent's stage, as the file has them. */
-	private onCanvas(): OnStage[] {
-		const name = this.canvasName();
-		return name ? boardsOn(this.stage.pens!, this.deck, name) : [];
-	}
-
-	/** The boards on the stage: the file's, or, with no stage file, the ones this session was given. */
-	private get playing(): string[] {
-		return this.canvasName() ? this.onCanvas().map((one) => one.path) : this.loosePlaying;
-	}
-
-	/** Where the stage has its boards, and where this agent last had the ones it took off. */
-	positions(): Record<string, { x: number; y: number }> {
-		const out: Record<string, { x: number; y: number }> = { ...this.places };
-		for (const one of this.onCanvas()) out[one.path] = { x: one.x, y: one.y };
-		return out;
-	}
-
-	/** How big the stage draws its boards: its file's sizes. */
-	boardSizes(): Record<string, { w: number; h: number }> {
-		const out: Record<string, { w: number; h: number }> = {};
-		for (const one of this.onCanvas()) out[one.path] = { w: one.w, h: one.h };
-		return out;
-	}
-
-	/**
-	 * Size one board on this agent's stage, in its file. Nothing else sizes a board: a browser's
-	 * measurement does not, and neither does a new revision of its file. `decks.canvas.fit` and `decks.canvas.update`
-	 * call this; a person's drag sizes the board on the stage on screen, by name (`calls/person-table.ts`).
-	 */
-	setSize(path: string, size: { w?: number; h?: number }): void {
-		const name = this.canvasName();
-		if (!name) return;
-		this.stage.pens!.sizeBoard(name, path, size);
-	}
-
-	/**
-	 * Move one board on this agent's stage, in its file; a board not on it is remembered at that place,
-	 * for when it is shown.
-	 */
-	setPosition(path: string, x: number, y: number): void {
-		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-		const name = this.canvasName();
-		if (name && this.stage.pens!.moveBoard(name, path, x, y)) return;
-		this.places[path] = { x: Math.round(x), y: Math.round(y) };
-		this.save();
-	}
-
-	/**
-	 * The stage file changed, by anyone. Its boards are read from it whenever they are needed, so all
-	 * there is to do is take up a board that joined the stage and say that it changed.
-	 */
-	penChanged(): void {
-		if (!this.canvasName()) return;
-		const before = this.held.length;
-		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
-		if (this.held.length !== before) this.save();
-		this.host.arranged?.();
-		this.publishContext();
-	}
-
-	/**
-	 * After a restore. A stage file with boards in it is the truth. A chat whose boards are only in its
-	 * record (every chat from before boards moved into the file) writes them in, once.
-	 */
-	private adoptStage(): void {
-		if (!this.stage.pens) return;
-		const restored = this.restoredPlaying;
-		this.restoredPlaying = undefined;
-		// A record's own list of boards, from before deck version 0.1.0: only in a deck old enough to hold one (`old-records.ts`).
-		const adopt = this.deck.readsOldShapes ? recordedBoardsToAdopt(this.onCanvas().length, restored) : [];
-		if (adopt.length === 0) {
-			if (this.canvasName()) this.penChanged();
-			return;
-		}
-		this.setInPlay(adopt);
-	}
-
-	/**
-	 * Work on another stage: the browser is sent its drawing, and its boards are the ones this agent sees.
-	 *
-	 * `by`: who moved it. An agent that opened a canvas itself knows; one moved by someone else (a person
-	 * in Decks or Studio, or its canvas deleted) is told with its next message, so its next call that
-	 * names no canvas does not land somewhere it does not expect.
-	 */
-	openStage(name: string, by: "itself" | "other" = "other"): void {
-		const pens = this.stage.pens;
-		if (!pens) throw new Error("This server keeps no stage files.");
-		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
-		if (name === this.stageFolder) return;
-		const from = this.stageFolder;
-		this.stageFolder = name;
-		if (by === "other") {
-			const title = pens.titleOf(name);
-			this.pending.push(`[You were moved ${from ? `from the canvas "${pens.names().includes(from) ? pens.titleOf(from) : from}" ` : ""}to the canvas "${title}" (decks … --canvas ${name}). It is your home canvas now: a call that names no canvas acts on it. Read it before you change it.]`);
-		}
-		this.save();
-		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
-		this.host.arranged?.();
-		this.publishContext();
-		this.emit(pens.frame(this.id, name));
-	}
-
-	/**
-	 * A stage was renamed (`stage/stage-admin.ts`). If it is this agent's, it follows: the stage's
-	 * name, and the paths of boards kept in its folder, wherever this session holds them.
-	 */
-	stageRenamed(from: string, to: string, repoint: (path: string) => string): void {
-		if (this.stageFolder !== from) return;
-		this.stageFolder = to;
-		this.held = this.held.map(repoint);
-		const places: typeof this.places = {};
-		for (const [path, at] of Object.entries(this.places)) places[repoint(path)] = at;
-		this.places = places;
-		this.save();
-		this.host.arranged?.();
-		this.publishContext();
-		const pens = this.stage.pens;
-		if (pens) this.emit(pens.frame(this.id, to));
-	}
-
-	/**
-	 * A canvas was deleted. If it was this agent's, it moves to a fresh, empty canvas of its own; the
-	 * cards it held there are gone with the canvas's folder.
-	 */
-	stageDeleted(name: string): void {
-		if (this.stageFolder !== name) return;
-		const gone = (path: string) => !this.deck.board(path);
-		this.held = this.held.filter((path) => !gone(path));
-		for (const path of Object.keys(this.places)) if (gone(path)) delete this.places[path];
-		this.stageFolder = undefined;
-		this.loosePlaying = [];
-		this.save();
-		const pens = this.stage.pens;
-		if (pens) this.newStage("");
-		else this.publishContext();
-	}
-
-	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
-	newStage(title: string, options: { provisional?: boolean; by?: "itself" | "other" } = {}): string {
-		const pens = this.stage.pens;
-		if (!pens) throw new Error("This server keeps no stage files.");
-		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
-		this.openStage(name, options.by ?? "other");
-		return name;
-	}
-
-	/**
-	 * Set what the agent holds. `held` is most-recently-touched first, and the callers build the
-	 * argument that way. What it holds is its own; the stage is shared, so letting go of a board here
-	 * leaves it on the stage for whoever else is on it.
-	 */
-	setContext(paths: string[]): void {
-		this.held = paths.filter((path, index) => paths.indexOf(path) === index);
-		this.publishContext();
-	}
-
-	/**
-	 * Set what is on this agent's stage, in its file: boards not on it are put on it, and boards on it
-	 * that are not wanted are taken off, their places remembered here for when they are shown again.
-	 * Anything shown is held, so showing is also taking it up. The callers build `paths` from the stage
-	 * as the file has it now (`inPlay`), so a board another agent put on the stage a moment ago stays.
-	 *
-	 * `at` places the boards named in it; every other joining board gets a place by the stage's rule
-	 * (`placeJoining`). `place` is kept for the callers that pass it: every joining board is placed.
-	 */
-	setInPlay(paths: string[], options: { place?: boolean; at?: Record<string, { x: number; y: number }> } = {}): void {
-		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
-		// A board shown for the first time is the most recent touch, so it leads the held list.
-		const hold = (list: string[]) => {
-			for (const path of [...list].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
-		};
-		const pens = this.stage.pens;
-		const name = pens ? this.stageName(true) : undefined;
-		if (!pens || !name || !pens.has(name)) {
-			hold(wanted);
-			// No stage file: the places are this session's own, by the same rule (`deck/place.ts`).
-			const spots = joinPlaces({
-				wanted,
-				...(options.at ? { at: options.at } : {}),
-				playing: this.loosePlaying.filter((path) => this.places[path]),
-				places: this.places,
-				size: (path) => {
-					const board = this.deck.board(path);
-					return board ? { w: board.w, h: board.h } : undefined;
-				},
-			});
-			Object.assign(this.places, spots);
-			this.loosePlaying = wanted;
-			this.save();
-			this.host.arranged?.();
-			this.publishContext();
-			return;
-		}
-		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
-		const own = wanted.map((path) => pens.ownPath(name, path));
-		/*
-		 * What is held is what is on the canvas: the copies, never the other canvas's cards they came
-		 * from, or the panel lists each card twice and the agent's context names files its canvas does
-		 * not show. A path held from before the copy is replaced by its copy.
-		 */
-		wanted.forEach((path, index) => {
-			const copy = own[index]!;
-			if (copy !== path) this.held = this.held.filter((one) => one !== path);
-		});
-		hold(own);
-		// A place asked for another canvas's card is the place of its copy.
-		const at = options.at ? Object.fromEntries(Object.entries(options.at).map(([path, spot]) => [own[wanted.indexOf(path)] ?? path, spot])) : undefined;
-		const leaving = this.onCanvas().filter((one) => !own.includes(one.path)).map((one) => one.path);
-		if (leaving.length) Object.assign(this.places, takeOff(pens, this.deck, name, leaving));
-		for (const path of putOn(pens, this.deck, name, own, { ...(at ? { at } : {}), remembered: this.places })) delete this.places[path];
-		this.save();
-		this.host.arranged?.();
-		this.publishContext();
-	}
-
-	/**
-	 * Forget a board that no longer exists.
-	 *
-	 * A deleted board left in context is worse than it sounds: the rail resolves held
-	 * paths against the deck and the canvas filters the deck by what is in play, so one
-	 * dead path is enough to make an agent that holds only that board show an empty rail
-	 * and an empty canvas — and because the context is not empty, the "holding nothing
-	 * shows the whole deck" fallback does not fire. It reads as the deck being gone.
-	 */
-	forget(path: string): boolean {
-		const playing = this.playing.includes(path);
-		if (!this.held.includes(path) && !playing && !this.places[path]) return false;
-		this.held = this.held.filter((held) => held !== path);
-		this.loosePlaying = this.loosePlaying.filter((one) => one !== path);
-		delete this.places[path];
-		const name = this.canvasName();
-		if (playing && name) this.stage.pens!.removeBoards(name, [path]);
-		this.publishContext();
-		return true;
-	}
-
-	private publishContext(): void {
-		this.emit({ type: "agent.context", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
-		// The boards are part of the record, and this is not a transcript change, so the
-		// translator's hook does not cover it.
-		this.save();
 	}
 
 	// --- the record on disk (§6.2) ----------------------------------------------------
@@ -1129,12 +753,8 @@ export class DeckAgent {
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			color: this.identity.color,
 			...(this.parentId ? { parentId: this.parentId } : {}),
-			context: [...this.held],
-			// What is on a canvas is its file's; only a session with no canvas file keeps its own list.
-			inPlay: this.canvasName() ? [] : [...this.loosePlaying],
-			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
+			...this.seat.record(),
 			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
-			...(this.stageFolder ? { stage: this.stageFolder } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
@@ -1199,7 +819,7 @@ export class DeckAgent {
 			this.sayRow();
 			this.keep();
 		}
-		return { messages, changes: this.canvasNotes() };
+		return { messages, changes: this.seat.canvasNotes() };
 	}
 
 	/** What an outside agent did, as a line in its conversation here: Decks has no transcript of its own to show. */
@@ -1444,7 +1064,7 @@ export class DeckAgent {
 		 * What others changed on its canvases since its last message, before what it is asked now: every
 		 * way in comes through here, a message typed, queued, sent into a running turn or handed over.
 		 */
-		if (!slash) nudges.push(...this.canvasNotes());
+		if (!slash) nudges.push(...this.seat.canvasNotes());
 		/*
 		 * And who it has not said it is, until it has (`agents/identity-reminder.ts`). Never on a
 		 * slash command, which every runtime reads as an exact line.
@@ -1452,7 +1072,7 @@ export class DeckAgent {
 		const unsaid = slash ? undefined : identityReminder(this.identity);
 		if (unsaid) nudges.push(unsaid);
 		// The canvas's name, while it has none of its own or has outgrown it (`stage/canvas-name.ts`).
-		const unnamed = slash ? undefined : canvasNameReminder(this.stage.pens, this.stageFolder);
+		const unnamed = slash ? undefined : canvasNameReminder(this.stage.pens, this.seat.stageName());
 		if (unnamed) nudges.push(unnamed);
 		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
 		try {
@@ -2116,8 +1736,8 @@ export class DeckAgent {
 			kind: this.kind,
 			...(this.backend ? { commands: this.backend.commands() } : {}),
 			identity: this.identity,
-			boards: [...this.held],
-			inPlay: [...this.playing],
+			boards: [...this.seat.context],
+			inPlay: [...this.seat.inPlay],
 			...(model ? { model } : {}),
 			/*
 			 * What it will spend, and what it has spent. Both were once missing from the

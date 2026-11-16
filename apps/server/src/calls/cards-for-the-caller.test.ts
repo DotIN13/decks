@@ -46,9 +46,9 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		// Both have the board up, so both have a place for it — as two agents on one project do.
-		for (const agent of [mover, elsewhere]) agent.setInPlay(["canvases/t/cards/plan/index.html"], { place: true });
+		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/plan/index.html"], { place: true });
 		// Each canvas places its own copy of a library board (`deck/layout.ts`).
-		const plan = app.pens.copyOf(mover.stageName()!, "canvases/t/cards/plan/index.html");
+		const plan = app.pens.copyOf(mover.seat.stageName()!, "canvases/t/cards/plan/index.html");
 		const before = app.stage.boards(mover.id).find((board) => board.path === plan)!;
 
 		// The person is reading the other conversation while this one works.
@@ -72,8 +72,8 @@ test("the other conversation's canvas is untouched, which is what made the stale
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
-		for (const agent of [mover, elsewhere]) agent.setInPlay(["canvases/t/cards/risks/index.html"], { place: true });
-		const own = (agent: typeof mover) => app.pens.copyOf(agent.stageName()!, "canvases/t/cards/risks/index.html");
+		for (const agent of [mover, elsewhere]) agent.seat.setInPlay(["canvases/t/cards/risks/index.html"], { place: true });
+		const own = (agent: typeof mover) => app.pens.copyOf(agent.seat.stageName()!, "canvases/t/cards/risks/index.html");
 		const before = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
 
 		app.agents.look(elsewhere.id);

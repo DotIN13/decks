@@ -223,7 +223,7 @@ export class App {
 
 				const agent = this.agents.get(agentId) ?? this.agents.focused();
 
-				agent.setPosition(path, x, y);
+				agent.seat.setPosition(path, x, y);
 
 				return this.stageState(agent).boards.find((board) => board.path === path);
 
@@ -267,7 +267,7 @@ export class App {
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.boards.wrote(path, who),
 			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
-			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
+			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.stageName()),
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -411,7 +411,7 @@ export class App {
 					this.acts.act(agentId, act);
 				},
 				defaultKind: config.backend,
-				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
+				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.seat.stageName()),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the
@@ -959,17 +959,17 @@ export class App {
 		 * did, and on a deck of 900 boards it is a column a million pixels tall with three boards
 		 * visible anywhere in it.
 		 */
-		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }), agent.inPlay);
+		const state = this.deck.state(agent.seat.positions(), (path, at) => seeded.push({ path, ...at }), agent.seat.inPlay);
 		/*
 		 * A board on a canvas file always has its place there, so nothing is seeded and building a view
 		 * never writes the file. Only a session with no canvas file keeps the places it worked out.
 		 */
-		if (!agent.canvasName()) for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
+		if (!agent.seat.canvasName()) for (const { path, x, y } of seeded) agent.seat.setPosition(path, x, y);
 		/*
 		 * And the size the stage draws each board at, which is its item's in the stage file: the one
 		 * record of it (`DeckAgent.setSize`). A board the stage does not hold keeps its file's size.
 		 */
-		const sizes = agent.boardSizes();
+		const sizes = agent.seat.boardSizes();
 		const boards = state.boards.map((board) => {
 			const size = sizes[board.path];
 			return size && (size.w !== board.w || size.h !== board.h) ? { ...board, w: size.w, h: size.h } : board;
@@ -1104,8 +1104,8 @@ export class App {
 	 * browser is sent it once per agent whose stage it is.
 	 */
 	private publishPen(name: string, entry: PenEntry): void {
-		const on = (this.agents?.all() ?? []).filter((agent) => agent.stageName() === name);
-		for (const agent of on) agent.penChanged();
+		const on = (this.agents?.all() ?? []).filter((agent) => agent.seat.stageName() === name);
+		for (const agent of on) agent.seat.penChanged();
 		/*
 		 * What changed, not the whole drawing: a browser that missed a revision asks for it whole. With
 		 * no agent on the canvas it is still said once, to no agent (`agentId` ""), for a canvas frame
@@ -1147,7 +1147,7 @@ export class App {
 				words,
 				...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
 				agents: everyone
-					.filter((agent) => agent.stageName() === name)
+					.filter((agent) => agent.seat.stageName() === name)
 					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
 			};
 		});
@@ -1160,7 +1160,7 @@ export class App {
 
 	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
 	penMessage(agentId: string): ServerMessage | undefined {
-		const name = this.agents.get(agentId)?.stageName();
+		const name = this.agents.get(agentId)?.seat.stageName();
 		return name ? this.pens.frame(agentId, name) : undefined;
 	}
 

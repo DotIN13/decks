@@ -58,7 +58,7 @@ export function canvasShowsDocument(pens: Pens, canvas: string | undefined, file
 export function conversationForApp(host: { agents: Registry; stage?: Pick<StageService, "pens"> }, name: string): DeckAgent {
 	const looking = host.agents.looking();
 	const all = looking ? [looking, ...host.agents.all().filter((one) => one !== looking)] : [...host.agents.all()];
-	return all.find((one) => canvasShowsApp(host.stage?.pens, one.stageName(), name)) ?? host.agents.focused();
+	return all.find((one) => canvasShowsApp(host.stage?.pens, one.seat.stageName(), name)) ?? host.agents.focused();
 }
 
 /** The tool an app's calls run through, and the conversation it acts for. */
@@ -79,12 +79,12 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		},
 		setTags: () => [],
 		setWorkspace: () => null,
-		context: () => [...conversation.context],
-		inPlay: () => [...conversation.inPlay],
-		setInPlay: (paths, at) => conversation.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
-		positions: () => conversation.positions(),
-		setPosition: (path, x, y) => conversation.setPosition(path, x, y),
-		camera: () => host.cameras.answer(conversation.id, conversation.stageName?.()),
+		context: () => [...conversation.seat.context],
+		inPlay: () => [...conversation.seat.inPlay],
+		setInPlay: (paths, at) => conversation.seat.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
+		positions: () => conversation.seat.positions(),
+		setPosition: (path, x, y) => conversation.seat.setPosition(path, x, y),
+		camera: () => host.cameras.answer(conversation.id, conversation.seat.stageName?.()),
 		queue: () => conversation.queue(),
 		agents: () => host.agents.summaries(),
 		// The sender is the conversation: a reply has to find somebody to land in, and an app has no inbox.
@@ -94,9 +94,9 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		create: (spec) => host.agents.createFor(conversation.id, spec),
 		// The app's canvas: the conversation's when it shows the app, else any that does.
 		here: () => {
-			if (canvasShowsApp(host.stage.pens, conversation.stageName?.(), name)) return conversation.stageName?.();
+			if (canvasShowsApp(host.stage.pens, conversation.seat.stageName?.(), name)) return conversation.seat.stageName?.();
 			const pens = host.stage.pens;
-			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.stageName?.();
+			return pens?.names().find((canvas) => canvasShowsApp(pens, canvas, name)) ?? conversation.seat.stageName?.();
 		},
 		recordRevision: (path) => host.boards.recordRevision(path),
 		boardPathOf: (file) => host.boards.boardPathOf(file),

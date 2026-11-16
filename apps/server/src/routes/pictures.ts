@@ -272,7 +272,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 		"/stage-shot",
 		asyncRoute(async (req, res) => {
 			const agent = app.agents.get(String(req.query.agent ?? ""));
-			const stage = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.stageName(false);
+			const stage = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : agent?.seat.stageName(false);
 			if (!stage) {
 				res.status(404).type("text").send("Say which canvas to picture.");
 				return;

@@ -131,15 +131,15 @@ export class Registry {
 				// `held` is most-recently-touched first, so the front of the list is the
 				// answer to "what is it working on" and twenty is a screen of it — more than
 				// any agent on a deck is genuinely working from at once.
-				context: [...agent.context].slice(0, 20),
-				holding: agent.context.length,
+				context: [...agent.seat.context].slice(0, 20),
+				holding: agent.seat.context.length,
 				tags: agent.tags,
 				// The workspace, or `undefined` for an agent in none — see `agents/workspaces.ts` for
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
 				queued: agent.queued,
 				// The stage it has open, so `decks.canvas.list()` can say who is on each (`stage/pens.ts`).
-				stage: agent.stageName(),
+				stage: agent.seat.stageName(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
 				...(chat.avatar ? { avatar: chat.avatar } : {}),
 				// An agent that works outside Decks: its app, when it last called, what waits for it.
@@ -516,7 +516,7 @@ export class Registry {
 		const canvases = new Set<string>();
 		for (const one of this.agents) {
 			if (one.id === except || one.workspace !== workspace) continue;
-			const name = one.stageName();
+			const name = one.seat.stageName();
 			if (name) canvases.add(name);
 		}
 		let best: { name: string; at: number } | undefined;
@@ -571,8 +571,8 @@ export class Registry {
 		 * (the old send's { name, kind }), it joins its workspace's latest canvas on first use.
 		 */
 		// Where it starts is where it was made, not a move: nothing to tell it.
-		if (spec.canvas) made.openStage(spec.canvas, "itself");
-		else if (spec.newCanvas && this.stage.pens) made.newStage("", { by: "itself" });
+		if (spec.canvas) made.seat.openStage(spec.canvas, "itself");
+		else if (spec.newCanvas && this.stage.pens) made.seat.newStage("", { by: "itself" });
 		this.publish();
 		const model = made.model;
 		const mode = made.mode;
@@ -582,7 +582,7 @@ export class Registry {
 			kind: made.kind,
 			...(model ? { model: `${model.provider}/${model.model}`, thinking: model.thinking } : spec.thinking ? { thinking: spec.thinking } : {}),
 			...(mode ? { mode } : {}),
-			...(made.stageName() ? { canvas: made.stageName()! } : {}),
+			...(made.seat.stageName() ? { canvas: made.seat.stageName()! } : {}),
 		};
 	}
 
@@ -661,7 +661,7 @@ export class Registry {
 	/** A board was deleted: no agent should still be holding it. */
 	boardRemoved(path: string): void {
 		let touched = false;
-		for (const agent of this.agents) touched = agent.forget(path) || touched;
+		for (const agent of this.agents) touched = agent.seat.forget(path) || touched;
 		if (touched) this.publish();
 	}
 
