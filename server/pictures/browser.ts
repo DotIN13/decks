@@ -109,9 +109,16 @@ function wrap(page: PwPage, close: () => Promise<void>): Page {
 }
 
 /** Waits for the page and what it fetches, then two frames, so modules have drawn. */
+const IMAGES_DONE = `Promise.race([
+	Promise.all([...document.images].map((i) => (i.complete ? i.decode().catch(() => {}) : new Promise((r) => { i.addEventListener("load", () => i.decode().catch(() => {}).then(r), { once: true }); i.addEventListener("error", r, { once: true }); })))),
+	new Promise((r) => setTimeout(r, 15000)),
+])`;
+
 async function settle(page: PwPage): Promise<void> {
 	await page.waitForLoadState("networkidle", { timeout: LOAD_MS }).catch(() => {});
 	await page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true").catch(() => {});
+	// Every picture in the page and in its frames, loaded or failed, decoded: a busy machine is slow to idle.
+	for (const frame of page.frames()) await frame.evaluate(IMAGES_DONE).catch(() => {});
 	await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60))))").catch(() => {});
 }
 
