@@ -1,22 +1,82 @@
 {
-	"tokens.json": { "owner": "Keel", "becomes": "adopted: the kernel's tokens, by the same hash; canvas passes dropped" },
-	"revisions": { "owner": "Keel", "becomes": "adopted: card versions as history at negative revisions" },
-	"pairing.json": { "owner": "Keel", "becomes": "dropped: a pairing code lives ten minutes" },
-	"trash": { "owner": "Keel", "becomes": "kept: the folder deck's trash is .decks/trash" },
-	"migrations.json": { "owner": "Warden", "becomes": "kept: the deck's version record, read and moved on by upgrade" },
-	"backups": { "owner": "Warden", "becomes": "kept: upgrade's backups" },
-	"agents": { "owner": "Warden, Roster", "becomes": "adopted: each agent's meta.json into people's store (upgrade 0.6.0)" },
-	"avatars": { "owner": "Warden, Roster", "becomes": "adopted: with the agent's record (upgrade 0.6.0)" },
-	"authors.json": { "owner": "Folio", "becomes": "to confirm: who last wrote each card" },
-	"heights.json": { "owner": "Folio", "becomes": "to confirm: each card's fitted height" },
-	"seen.json": { "owner": "Roster", "becomes": "to confirm: what each agent last saw" },
-	"canvases": { "owner": "Easel", "becomes": "to confirm: a canvas's settings from before canvases had folders" },
-	"ports.json": { "owner": "Depot", "becomes": "to confirm: forwarded ports" },
-	"apps": { "owner": "Depot", "becomes": "to confirm: an app's log and built marker" },
-	"thumbs": { "owner": "Depot", "becomes": "to confirm: card pictures, a cache" },
-	"shots": { "owner": "Depot", "becomes": "to confirm: screenshots" },
-	"studio.json": { "owner": "Roster", "becomes": "to confirm: the Studio connection and its key" },
-	"studio-sync.json": { "owner": "Roster", "becomes": "to confirm: what was last synced with Studio" },
-	"studio-hashes.json": { "owner": "Roster", "becomes": "to confirm: the hashes Studio last had" },
-	"sync": { "owner": "Roster", "becomes": "to confirm: friends' canvases as last synced" }
+	"tokens.json": {
+		"owner": "Keel",
+		"becomes": "adopted: the kernel's tokens, by the same hash; canvas passes dropped"
+	},
+	"revisions": {
+		"owner": "Keel",
+		"becomes": "adopted: card versions as history at negative revisions"
+	},
+	"pairing.json": {
+		"owner": "Keel",
+		"becomes": "dropped: a pairing code lives ten minutes"
+	},
+	"trash": {
+		"owner": "Keel",
+		"becomes": "kept: the folder deck's trash is .decks/trash"
+	},
+	"migrations.json": {
+		"owner": "Warden",
+		"becomes": "kept: the deck's version record, read and moved on by upgrade"
+	},
+	"backups": {
+		"owner": "Warden",
+		"becomes": "kept: upgrade's backups"
+	},
+	"agents": {
+		"owner": "Warden, Roster, Helm",
+		"becomes": "adopted: meta.json into people's store (upgrade 0.6.0); chat.json, chat.log and meta's resumeRef, model, mode, account into the harness's own file when a harness adopts the agent (harness/sessions/deck-history.ts), reached through chat.list; all kept as is in the deck until harnesses have read them; models.json dropped (a cache)"
+	},
+	"avatars": {
+		"owner": "Warden, Roster",
+		"becomes": "adopted: with the agent's record (upgrade 0.6.0)"
+	},
+	"authors.json": {
+		"owner": "Folio",
+		"becomes": "adopted: cards upgrade, claims/<card> in the cards store; reached through card.get's by"
+	},
+	"heights.json": {
+		"owner": "Folio",
+		"becomes": "dropped: fitted heights of old root pages, which are not cards; a card's size is its box and its meta; backed up"
+	},
+	"seen.json": {
+		"owner": "Folio",
+		"becomes": "adopted: cards upgrade, seen/<card> in the cards store; reached through card.get"
+	},
+	"canvases": {
+		"owner": "Easel",
+		"becomes": "dropped: the shared canvases of 2026-09-22, read only by that day's migration; left on disk untouched"
+	},
+	"ports.json": {
+		"owner": "Depot",
+		"becomes": "adopted: apps upgrade, ports.json in the apps store; reached through port.list"
+	},
+	"apps": {
+		"owner": "Depot",
+		"becomes": "adopted: <name>.log as log/<name> in the apps store (last 600 lines), reached through app.logs; <name>.built dropped (builds run in the machine folder)"
+	},
+	"thumbs": {
+		"owner": "Depot",
+		"becomes": "dropped: a cache of card pictures, retaken as asked"
+	},
+	"shots": {
+		"owner": "Depot",
+		"becomes": "kept as is: agents' throwaway screenshots, left unshown"
+	},
+	"studio.json": {
+		"owner": "Roster",
+		"becomes": "adopted: sharing upgrade, 'link' in the sharing store; reached through studio.status"
+	},
+	"studio-sync.json": {
+		"owner": "Roster",
+		"becomes": "adopted: sharing upgrade, 'state' in the sharing store, canvases keyed by folder; owners and inventory rebuilt"
+	},
+	"studio-hashes.json": {
+		"owner": "Roster",
+		"becomes": "dropped: a hash cache; the new sync client hashes files as it goes"
+	},
+	"sync": {
+		"owner": "Roster",
+		"becomes": "adopted: sharing upgrade, base/<id> for the ids the state names; orphans stay behind"
+	}
 }
