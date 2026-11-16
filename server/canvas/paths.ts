@@ -1,48 +1,74 @@
-import { walk, type PenNode } from "@decks/pen";
+import { walk, type PenDocument, type PenNode } from "@decks/pen";
 import { layout } from "../../protocol/index.ts";
 import type { Kinds } from "./kinds.ts";
 
 // A scoped caller (a pass) reaches its canvas's folder and what its canvas already places, and names
 // nothing new outside it (README rule 9). Each path is read decoded and normalised before any test.
 
-/** The fields of a kind's item that name a place in the deck. */
-const PATH_FIELDS = ["card", "path", "file"];
+/** Fields that name a place, wherever they are in a node: a page, a document, a file, a picture. */
+const PATH_FIELDS = new Set(["card", "path", "file", "url"]);
 
-/** Every place these nodes name, each in one spelling (`keyOf`): what the canvas already places. */
-export function placedKeys(nodes: PenNode[], canvas: string, kinds: Kinds): Set<string> {
+/** Every place a drawing names, each in one spelling (`keyOf`): what the canvas already places. */
+export function placedKeys(doc: PenDocument, canvas: string, kinds: Kinds): Set<string> {
 	const keys = new Set<string>();
-	for (const node of walk(nodes)) for (const path of pathsIn(node, canvas, kinds)) keys.add(keyOf(path, canvas).key);
+	for (const node of walk(doc.children)) for (const path of pathsIn(node, canvas, kinds)) keys.add(keyOf(path, canvas).key);
+	for (const path of namedIn(doc.variables ?? {})) keys.add(keyOf(path, canvas).key);
 	return keys;
 }
 
-/** The first path in these nodes a pass may not name, and why; undefined when all may be named. */
+/** The first path these nodes name that a pass may not, and why; undefined when all may be named. */
 export function strayPath(nodes: PenNode[], canvas: string, kinds: Kinds, placed: ReadonlySet<string>): { path: string; why: string } | undefined {
-	const own = `${layout.canvasFolder(canvas)}/`;
 	for (const node of walk(nodes)) {
-		for (const path of pathsIn(node, canvas, kinds)) {
-			const { key, why } = keyOf(path, canvas);
-			if (key.startsWith("web:") || key.startsWith(own) || placed.has(key)) continue;
-			return { path, why: why ?? "its canvas places nothing there yet" };
-		}
+		const stray = firstStray(pathsIn(node, canvas, kinds), canvas, placed);
+		if (stray) return stray;
 	}
 	return undefined;
 }
 
-/** The paths one node names: its kind's path fields, its metadata's path, and every url in it. */
+/** The first path a drawing's variables name that a pass may not: a picture held in a variable. */
+export function strayVariable(doc: PenDocument, canvas: string, placed: ReadonlySet<string>): { path: string; why: string } | undefined {
+	return firstStray(namedIn(doc.variables ?? {}), canvas, placed);
+}
+
+function firstStray(paths: string[], canvas: string, placed: ReadonlySet<string>): { path: string; why: string } | undefined {
+	const own = `${layout.canvasFolder(canvas)}/`;
+	for (const path of paths) {
+		const { key, why } = keyOf(path, canvas);
+		if (key.startsWith("web:") || key.startsWith(own) || placed.has(key)) continue;
+		return { path, why: why ?? "its canvas places nothing there yet" };
+	}
+	return undefined;
+}
+
+/** The places one node names: its kind's path fields, every place field in it, and an app by its name. */
 function pathsIn(node: PenNode, canvas: string, kinds: Kinds): string[] {
 	const out: string[] = [];
 	if (kinds.of(node)) {
 		const item = kinds.toItem(node, canvas) as Record<string, unknown>;
-		for (const key of PATH_FIELDS) if (typeof item[key] === "string") out.push(item[key] as string);
+		for (const key of ["card", "path", "file"]) if (typeof item[key] === "string") out.push(item[key] as string);
+		if (typeof item.app === "string") out.push(`/app/${item.app}/`);
 	}
-	const meta = (node.metadata as { path?: unknown } | undefined)?.path;
-	if (typeof meta === "string") out.push(meta);
-	const urls = (value: unknown): void => {
-		if (Array.isArray(value)) value.forEach(urls);
-		else if (value && typeof value === "object") for (const [key, one] of Object.entries(value)) (key === "url" && typeof one === "string" ? out.push(one) : urls(one));
-	};
+	const meta = node.metadata as { type?: unknown; name?: unknown } | undefined;
+	if (meta?.type === "decks.app" && typeof meta.name === "string") out.push(`/app/${meta.name}/`);
 	const { children: _children, ...own } = node;
-	urls(own);
+	out.push(...namedIn(own));
+	return out;
+}
+
+/** Every place field in a value, at any depth: card, path, file and url as written, app as its page. */
+function namedIn(value: unknown): string[] {
+	const out: string[] = [];
+	const visit = (one: unknown): void => {
+		if (Array.isArray(one)) one.forEach(visit);
+		else if (one && typeof one === "object") {
+			for (const [key, field] of Object.entries(one)) {
+				if (typeof field === "string" && PATH_FIELDS.has(key)) out.push(field);
+				else if (typeof field === "string" && key === "app") out.push(`/app/${field}/`);
+				else visit(field);
+			}
+		}
+	};
+	visit(value);
 	return out;
 }
 

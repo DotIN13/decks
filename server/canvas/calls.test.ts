@@ -167,12 +167,25 @@ test("a pass reaches its canvas's folder and what its canvas already places, and
 	assert.equal(pass(put({ type: "browser", url: "/files/canvases/other/cards/x/index.html" })), "refused", "another route");
 	assert.equal(pass([{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }]), "refused", "a replace in a batch");
 	assert.equal(pass([{ op: "update", id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }]), "refused", "an update that sets one");
-	assert.equal(doc.read().length, 2, "nothing changed");
+	// Reader's third probe: the same app made by every op form, and a set that changes what an item names.
+	assert.equal(pass([{ op: "insert", item: { type: "text", id: "tx", content: "x" }, at: { x: 0, y: 2100 } }]), "ok");
+	for (const ops of [
+		[{ op: "insert", item: { type: "app", app: "other" } }],
+		[{ op: "replace", id: "tx", item: { type: "app", app: "other" } }],
+		[{ op: "update", id: "tx", set: { type: "app", app: "other" } }],
+		[{ op: "update", id: "tx", set: { card: "canvases/other/cards/x/index.html" } }],
+		[{ op: "update", id: "tx", set: { path: "docs/elsewhere.md" } }],
+		[{ op: "update", id: "tx", set: { fill: { type: "image", url: "../other/files/a.png" } } }],
+		[{ op: "insert", item: { type: "note", id: "n9" } }, { op: "update", id: "tx", set: { type: "app", app: "other" } }],
+	]) assert.equal(pass(ops), "refused", JSON.stringify(ops));
+	assert.equal(doc.read().find((i) => i.id === "tx")?.type, "text", "the text is still a text");
+	assert.equal(doc.read().length, 3, "nothing changed but the text");
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "files/a.png" } })), "ok", "its own files");
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } })), "ok", "a web address");
 	// What the person placed, a pass may put in again: a copy, a paste back, an undone delete.
 	doc.apply([{ op: "insert", item: { type: "browser", id: "app1", url: "/app/review/" }, at: { x: 0, y: 1700 } }, { op: "insert", item: { type: "browser", id: "old1", url: "pages/apps/review.html" }, at: { x: 600, y: 1700 } }], ann);
 	assert.equal(pass(put({ type: "browser", url: "/app/review/" })), "ok", "an app the canvas already places");
+	assert.equal(pass([{ op: "update", id: "tx", set: { type: "app", app: "review" } }]), "ok", "the same app, named by its field");
 	assert.equal(pass([{ op: "copy", id: "old1", at: { x: 1200, y: 1700 } }]), "ok", "an old page the canvas already places");
 	await s.close();
 });
