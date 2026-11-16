@@ -1,0 +1,22 @@
+{
+	"tokens.json": { "owner": "Keel", "becomes": "adopted: the kernel's tokens, by the same hash; canvas passes dropped" },
+	"revisions": { "owner": "Keel", "becomes": "adopted: card versions as history at negative revisions" },
+	"pairing.json": { "owner": "Keel", "becomes": "dropped: a pairing code lives ten minutes" },
+	"trash": { "owner": "Keel", "becomes": "kept: the folder deck's trash is .decks/trash" },
+	"migrations.json": { "owner": "Warden", "becomes": "kept: the deck's version record, read and moved on by upgrade" },
+	"backups": { "owner": "Warden", "becomes": "kept: upgrade's backups" },
+	"agents": { "owner": "Warden, Roster", "becomes": "adopted: each agent's meta.json into people's store (upgrade 0.6.0)" },
+	"avatars": { "owner": "Warden, Roster", "becomes": "adopted: with the agent's record (upgrade 0.6.0)" },
+	"authors.json": { "owner": "Folio", "becomes": "to confirm: who last wrote each card" },
+	"heights.json": { "owner": "Folio", "becomes": "to confirm: each card's fitted height" },
+	"seen.json": { "owner": "Roster", "becomes": "to confirm: what each agent last saw" },
+	"canvases": { "owner": "Easel", "becomes": "to confirm: a canvas's settings from before canvases had folders" },
+	"ports.json": { "owner": "Depot", "becomes": "to confirm: forwarded ports" },
+	"apps": { "owner": "Depot", "becomes": "to confirm: an app's log and built marker" },
+	"thumbs": { "owner": "Depot", "becomes": "to confirm: card pictures, a cache" },
+	"shots": { "owner": "Depot", "becomes": "to confirm: screenshots" },
+	"studio.json": { "owner": "Roster", "becomes": "to confirm: the Studio connection and its key" },
+	"studio-sync.json": { "owner": "Roster", "becomes": "to confirm: what was last synced with Studio" },
+	"studio-hashes.json": { "owner": "Roster", "becomes": "to confirm: the hashes Studio last had" },
+	"sync": { "owner": "Roster", "becomes": "to confirm: friends' canvases as last synced" }
+}

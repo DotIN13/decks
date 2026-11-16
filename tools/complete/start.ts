@@ -4,24 +4,25 @@ import { join } from "node:path";
 import { harnessAnswers } from "@decks/harness";
 import { PROTOCOL_VERSION } from "@decks/protocol";
 import { features, startOptions } from "@decks/server";
-import { FolderDeck } from "@decks/server/kernel";
+import { FolderDeck, FolderStore, folderVersion } from "@decks/server/kernel";
 import { testServer, type TestServer } from "@decks/server/kernel/testing";
 
-// The server as main.ts starts it, on a copy of the fixture deck, with its
-// doors open; socket lines that call and hear; what the harness answers.
+// The server as main.ts starts it (its features, the deck's version record,
+// today's .decks/ to adopt), on a copy of a fixture deck, with its doors open;
+// socket lines that call and hear; what the harness answers.
 
-const FIXTURE = new URL("../fixtures/deck", import.meta.url).pathname;
 type Envelope = { ok: boolean; value?: any; error?: { code: string; message: string } };
 export type Line = { call(name: string, args: unknown): Promise<Envelope>; heard: string[]; close(): void };
-export type Started = { server: TestServer; url: string; token: string; options: Record<string, unknown>; stop(): Promise<void> };
+export type Started = { server: TestServer; url: string; token: string; root: string; options: Record<string, unknown>; stop(): Promise<void> };
 
-export async function start(): Promise<Started> {
+/** The server as main starts it, on a copy of a fixture deck in tools/fixtures/ ("deck" or "old-deck"). */
+export async function start(fixture = "deck"): Promise<Started> {
 	const folder = await mkdtemp(join(tmpdir(), "complete-"));
 	const root = join(folder, "decks");
-	await cp(FIXTURE, root, { recursive: true });
+	await cp(new URL(`../fixtures/${fixture}`, import.meta.url).pathname, root, { recursive: true });
 	const deck = new FolderDeck(root);
 	const options = startOptions(root) as Record<string, unknown>;
-	const server = await testServer({ features: features(options), deck });
+	const server = await testServer({ features: features(options), deck, version: folderVersion(root), old: new FolderStore(join(root, ".decks")) });
 	const doors = await server.listen(0);
 	const stop = async () => {
 		await doors.close();
@@ -29,7 +30,7 @@ export async function start(): Promise<Started> {
 		deck.close();
 		await rm(folder, { recursive: true, force: true });
 	};
-	return { server, url: doors.url, token: doors.token, options, stop };
+	return { server, url: doors.url, token: doors.token, root, options, stop };
 }
 
 /** A socket line as the person: hello, watch everything, then calls; heard keeps each event's name. */

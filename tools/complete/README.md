@@ -11,6 +11,8 @@ owns them.
 - `events.test.ts`: drives the same server through the smallest action that causes each event, and
   hears it on a socket; `unheard.json` lists the rest: unheard (owner, why) or not driven here (owner,
   what proves it).
+- `old-deck.test.ts`: opens Warden's old-deck fixture as main does; `old-entries.json` names every
+  entry today's `.decks/` keeps, with its owner and what becomes of it.
 - `start.ts`: the server started as main starts it, socket lines, and what the harness answers.
 
 ## May import
@@ -28,8 +30,11 @@ Anything: `@decks/protocol`, `@decks/server` and its kernel's testing entry, `@d
 5. Every declared event has a step that causes it and a line that hears it within two seconds, or is
    in `unheard.json`. A step that hears a listed event fails the check: take the line out.
 
+6. Every entry in the old-deck fixture's `.decks/` is in `old-entries.json`, and what is adopted is
+   reachable after the start: paired tokens resolve, card versions read, agents are listed.
+
 ## Check
 
 ```
-node --import tsx --test tools/complete/calls.test.ts tools/complete/events.test.ts
+node --import tsx --test tools/complete/*.test.ts
 ```
