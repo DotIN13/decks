@@ -27,20 +27,6 @@ export interface StudioLine {
 
 type Heard = (message: Extract<ServerMessage, { type: "presence.changed" }>) => void;
 
-/** A message on Studio's live socket: a hello catches up, this canvas's changes are followed, and its presence is heard. */
-function heardLive(data: string, canvas: string, follower: CanvasFollower | undefined, heard: Heard | undefined): void {
-	let event: { type?: string; id?: string; canvas?: string };
-	try {
-		event = JSON.parse(data) as { type?: string; id?: string; canvas?: string };
-	} catch {
-		return;
-	}
-	if (event.type === "hello") void follower?.catchUp();
-	else if (event.type === "canvas" && event.id === canvas) follower?.heard(event as never);
-	// Someone else on this canvas, as Studio relays it: the same message a harness's line says.
-	else if (event.type === "presence" && event.canvas === canvas) heard?.({ ...(event as object), type: "presence.changed" } as Extract<ServerMessage, { type: "presence.changed" }>);
-}
-
 export function createStudioLine(api: string, canvas: string, firstToken: string): StudioLine {
 	let token = firstToken;
 	const base = api.replace(/\/+$/, "");
@@ -116,4 +102,18 @@ export function createStudioLine(api: string, canvas: string, firstToken: string
 			token = next;
 		},
 	};
+}
+
+/** A message on Studio's live socket: a hello catches up, this canvas's changes are followed, and its presence is heard. */
+function heardLive(data: string, canvas: string, follower: CanvasFollower | undefined, heard: Heard | undefined): void {
+	let event: { type?: string; id?: string; canvas?: string };
+	try {
+		event = JSON.parse(data) as { type?: string; id?: string; canvas?: string };
+	} catch {
+		return;
+	}
+	if (event.type === "hello") void follower?.catchUp();
+	else if (event.type === "canvas" && event.id === canvas) follower?.heard(event as never);
+	// Someone else on this canvas, as Studio relays it: the same message a harness's line says.
+	else if (event.type === "presence" && event.canvas === canvas) heard?.({ ...(event as object), type: "presence.changed" } as Extract<ServerMessage, { type: "presence.changed" }>);
 }

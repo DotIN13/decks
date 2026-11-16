@@ -31,76 +31,6 @@ interface ClipboardDeps {
 	say: (text: string) => void;
 }
 
-/** A clip's id: random enough that no one guesses another's. */
-const freshId = () => {
-	const bytes = crypto.getRandomValues(new Uint8Array(18));
-	return `c${Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("")}`;
-};
-
-/** Whether the focus is somewhere you type: a field, a text being edited, a card's own, inside shadow roots too. */
-function typing(): boolean {
-	let at: Element | null = document.activeElement;
-	while (at?.shadowRoot?.activeElement) at = at.shadowRoot.activeElement;
-	return !!at && (at.matches("input, textarea, select") || (at as HTMLElement).isContentEditable);
-}
-
-/** Words selected on the page (a note's) or in a card, whose closed root the page's selection does not see into: a copy of those is the browser's. */
-function wordsSelected(): boolean {
-	const selection = getSelection();
-	return (!!selection && !selection.isCollapsed && selection.toString().trim() !== "") || wordsSelectedInCards();
-}
-
-/** Whether an item needs a file copied to land on another canvas: a card or a board, a picture, a film, a file piece. */
-function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
-	const meta = (node.metadata ?? {}) as Record<string, unknown>;
-	if (node.type === "browser" && (meta.type === "decks.card" || meta.type === "decks.board")) return "an HTML card";
-	if (sameCanvas) return undefined;
-	if (node.type === "browser" && meta.type === "decks.document") return "a document";
-	let picture = false;
-	const visit = (value: unknown): void => {
-		if (Array.isArray(value)) value.forEach(visit);
-		else if (value && typeof value === "object")
-			for (const [key, inner] of Object.entries(value)) {
-				if (key === "children" || key === "metadata") continue;
-				if (key === "url" && typeof inner === "string" && !/^(?:https?|data|blob):/i.test(inner)) picture = true;
-				else visit(inner);
-			}
-	};
-	visit(node);
-	if (picture) return "a picture";
-	if (!isArrow(node) && ["path", "file", "poster"].some((key) => typeof meta[key] === "string" && (meta[key] as string).includes("/"))) return "a file";
-	return undefined;
-}
-
-/** A copy or a cut of what is selected: the clip on the clipboard, held by the harness, and a cut's items taken off. */
-function copyItems(deps: ClipboardDeps, event: ClipboardEvent, cut: boolean): void {
-	if (event.defaultPrevented || !event.clipboardData || typing() || wordsSelected()) return;
-	const { handle } = deps;
-	const ids = handle.selection?.() ?? [];
-	if (!ids.length) return;
-	const doc = handle.drawn();
-	const taken = clipItems(doc, ids, placements(doc, { theme: baseTheme(doc, "light") }));
-	if (!taken) return;
-	const id = deps.call ? freshId() : undefined;
-	const clip: Clip = { v: 1, harness: deps.harness(), canvas: deps.canvas, ...(id ? { id } : {}), box: taken.box, items: taken.items };
-	const text = clipText(taken.items);
-	event.preventDefault();
-	event.clipboardData.setData(CLIP_TYPE, JSON.stringify(clip));
-	event.clipboardData.setData("text/html", clipHtml(clip, text));
-	event.clipboardData.setData("text/plain", text);
-	// The items the copy took, by their ids here: what a cut takes off.
-	const tops = taken.items.map((item) => item.id);
-	const takeOff = () => {
-		if (cut && deps.canWrite()) handle.edit(tops.map((one) => ({ op: "delete", id: one })));
-	};
-	if (!deps.call || !id) return takeOff();
-	// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
-	void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
-		if (answer.ok) return takeOff();
-		deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
-	});
-}
-
 export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: string; text?: string }) => void } {
 	const { handle } = deps;
 	/** Where the pointer is over the canvas, on this frame's screen; undefined once it has left. */
@@ -170,6 +100,76 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 
 	// A paste the page heard while it had the focus, handed over (`PageToFrame.paste`).
 	return { paste: (data) => paste({ clip: parseClip(data.clip) ?? clipFromHtml(data.clip), text: data.text }) };
+}
+
+/** A copy or a cut of what is selected: the clip on the clipboard, held by the harness, and a cut's items taken off. */
+function copyItems(deps: ClipboardDeps, event: ClipboardEvent, cut: boolean): void {
+	if (event.defaultPrevented || !event.clipboardData || typing() || wordsSelected()) return;
+	const { handle } = deps;
+	const ids = handle.selection?.() ?? [];
+	if (!ids.length) return;
+	const doc = handle.drawn();
+	const taken = clipItems(doc, ids, placements(doc, { theme: baseTheme(doc, "light") }));
+	if (!taken) return;
+	const id = deps.call ? freshId() : undefined;
+	const clip: Clip = { v: 1, harness: deps.harness(), canvas: deps.canvas, ...(id ? { id } : {}), box: taken.box, items: taken.items };
+	const text = clipText(taken.items);
+	event.preventDefault();
+	event.clipboardData.setData(CLIP_TYPE, JSON.stringify(clip));
+	event.clipboardData.setData("text/html", clipHtml(clip, text));
+	event.clipboardData.setData("text/plain", text);
+	// The items the copy took, by their ids here: what a cut takes off.
+	const tops = taken.items.map((item) => item.id);
+	const takeOff = () => {
+		if (cut && deps.canWrite()) handle.edit(tops.map((one) => ({ op: "delete", id: one })));
+	};
+	if (!deps.call || !id) return takeOff();
+	// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
+	void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
+		if (answer.ok) return takeOff();
+		deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
+	});
+}
+
+/** A clip's id: random enough that no one guesses another's. */
+const freshId = () => {
+	const bytes = crypto.getRandomValues(new Uint8Array(18));
+	return `c${Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("")}`;
+};
+
+/** Whether the focus is somewhere you type: a field, a text being edited, a card's own, inside shadow roots too. */
+function typing(): boolean {
+	let at: Element | null = document.activeElement;
+	while (at?.shadowRoot?.activeElement) at = at.shadowRoot.activeElement;
+	return !!at && (at.matches("input, textarea, select") || (at as HTMLElement).isContentEditable);
+}
+
+/** Words selected on the page (a note's) or in a card, whose closed root the page's selection does not see into: a copy of those is the browser's. */
+function wordsSelected(): boolean {
+	const selection = getSelection();
+	return (!!selection && !selection.isCollapsed && selection.toString().trim() !== "") || wordsSelectedInCards();
+}
+
+/** Whether an item needs a file copied to land on another canvas: a card or a board, a picture, a film, a file piece. */
+function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
+	const meta = (node.metadata ?? {}) as Record<string, unknown>;
+	if (node.type === "browser" && (meta.type === "decks.card" || meta.type === "decks.board")) return "an HTML card";
+	if (sameCanvas) return undefined;
+	if (node.type === "browser" && meta.type === "decks.document") return "a document";
+	let picture = false;
+	const visit = (value: unknown): void => {
+		if (Array.isArray(value)) value.forEach(visit);
+		else if (value && typeof value === "object")
+			for (const [key, inner] of Object.entries(value)) {
+				if (key === "children" || key === "metadata") continue;
+				if (key === "url" && typeof inner === "string" && !/^(?:https?|data|blob):/i.test(inner)) picture = true;
+				else visit(inner);
+			}
+	};
+	visit(node);
+	if (picture) return "a picture";
+	if (!isArrow(node) && ["path", "file", "poster"].some((key) => typeof meta[key] === "string" && (meta[key] as string).includes("/"))) return "a file";
+	return undefined;
 }
 
 /** A line at the foot of the frame for a moment: why a copy or a paste did nothing. */

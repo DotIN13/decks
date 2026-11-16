@@ -1,5 +1,7 @@
 import type { LineClientMessage, ServerMessage } from "@decks/protocol-old";
 
+// The frame's one WebSocket to the harness (`openLine`): its calls, the canvas's changes and its own messages.
+
 /** The answer to one `call` on the line, as the SDK reads it. */
 export type LineAnswer = { ok: boolean; value?: unknown; error?: string; notes?: string[] };
 
@@ -27,23 +29,6 @@ export interface LineClient {
 	stop(): void;
 	/** Whether the line is open now. */
 	open(): boolean;
-}
-
-/** A message on the line: the answer to a call goes to its caller, anything else is heard. */
-function heard(data: string, pending: Map<string, (answer: LineAnswer) => void>, hear: (message: ServerMessage) => void): void {
-	let message: ServerMessage;
-	try {
-		message = JSON.parse(data) as ServerMessage;
-	} catch {
-		return;
-	}
-	if (message.type === "call.answered") {
-		const done = pending.get(message.id);
-		pending.delete(message.id);
-		done?.({ ok: message.ok, ...(message.value !== undefined ? { value: message.value } : {}), ...(message.error ? { error: message.error } : {}), ...(message.notes ? { notes: message.notes } : {}) });
-		return;
-	}
-	hear(message);
 }
 
 /**
@@ -124,4 +109,21 @@ export function openLine(options: LineOptions): LineClient {
 		},
 		open: () => socket?.readyState === WebSocket.OPEN,
 	};
+}
+
+/** A message on the line: the answer to a call goes to its caller, anything else is heard. */
+function heard(data: string, pending: Map<string, (answer: LineAnswer) => void>, hear: (message: ServerMessage) => void): void {
+	let message: ServerMessage;
+	try {
+		message = JSON.parse(data) as ServerMessage;
+	} catch {
+		return;
+	}
+	if (message.type === "call.answered") {
+		const done = pending.get(message.id);
+		pending.delete(message.id);
+		done?.({ ok: message.ok, ...(message.value !== undefined ? { value: message.value } : {}), ...(message.error ? { error: message.error } : {}), ...(message.notes ? { notes: message.notes } : {}) });
+		return;
+	}
+	hear(message);
 }

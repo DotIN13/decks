@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js";
 import type { PenEdit } from "@decks/pen";
 
+// Marks over what agents draw: which items an edit touched, and each marked for a moment in the agent's colour.
+
 /** One item's box on the canvas, as the engine laid it out. */
 export interface ItemBox {
 	x: number;

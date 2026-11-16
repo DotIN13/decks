@@ -15,6 +15,8 @@ import { installClipboard, sayer } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";
 import type { CardSlot } from "../messages.ts";
 
+// What the frame hears once its editor is made, wired one source at a time (`wireFrame`).
+
 type Handle = ReturnType<FrameContext["handle"]>;
 type Follower = ReturnType<typeof drawingFollower>;
 
