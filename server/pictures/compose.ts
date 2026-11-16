@@ -86,7 +86,7 @@ function findTop(tops: PenNode[], canvas: string, ref: string): PenNode | undefi
 }
 
 /** A card's index.html from its folder or path, to match against what the drawing names. */
-const asCard = (path: string) => (/\/cards\/[^/]+\/?$/.test(path) ? `${path.replace(/\/$/, "")}/index.html` : path);
+const asCard = (path: string) => layout.cardIndex(path) ?? path;
 
 /** Items are framed with 24 px of paper round them, out to whole units; a box is taken as given. */
 export const MARGIN = 24;

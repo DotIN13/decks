@@ -85,9 +85,8 @@ export function picturedPath(raw: string): DeckPath {
 
 /** A card named by its folder or its index.html, as its index.html. */
 export function cardPath(raw: string): DeckPath {
-	const trimmed = raw.replace(/\/+$/, "");
-	const index = /\/index\.html$/i.test(trimmed) ? trimmed : `${trimmed}/index.html`;
-	if (!layout.isCardPath(index)) throw new Refused("invalid", `${raw} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
+	const index = layout.cardIndex(raw);
+	if (!index) throw new Refused("invalid", `${raw} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
 	return toDeckPath(index);
 }
 
