@@ -82,7 +82,7 @@ export class CardService {
 	 *
 	 * **Authorship is said, never detected.** A file event has no author, so nothing here reads
 	 * one off the disk: an agent that fits, shows or reports a board through the stage tool is
-	 * its writer (`stage/tool.ts`). `who` is an
+	 * its writer (`calls/tool.ts`). `who` is an
 	 * agent id or `"you"`. Kept in `.decks/authors.json`, so the byline outlives a restart.
 	 *
 	 * The time is the act's own clock rather than the file's. `seen()` takes the later of the two

@@ -2,7 +2,7 @@ import { VERBS, PERSON_VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME, PER
 import express, { type Request, type Response } from "express";
 import type { ServerMessage } from "@decks/protocol";
 import type { App } from "../app.ts";
-import { appActor, callerTool, canvasHolds, conversationFor } from "../stage/caller-run.ts";
+import { appActor, callerTool, canvasHolds, conversationFor } from "./caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
 import { bearerOf } from "../auth/guard.ts";
 import type { Principal } from "../auth/principal.ts";
@@ -11,7 +11,7 @@ import { renamedVerb } from "./renamed.ts";
 import { penEditBy } from "../stage/pens.ts";
 import { settleStage } from "../stage/pending.ts";
 import { personTable, type PersonCall } from "./person-table.ts";
-import type { StageCallResult, StageTool } from "../stage/tool.ts";
+import type { StageCallResult, StageTool } from "./tool.ts";
 
 /**
  * `/api/v1`: every verb in the table (`@decks/api`) as a route, and the one way in for the SDK in
@@ -321,7 +321,7 @@ const PLACE_ONLY = new Set(["x", "y", "width", "height"]);
 function touchesTrustedItems(app: Pick<App, "stage">, verb: string, args: readonly unknown[], canvas: string): boolean {
 	if (!["canvas.insert", "canvas.replace", "canvas.update", "canvas.batch", "canvas.copy"].includes(verb)) return false;
 	if (TRUSTED_ITEMS.some((tag) => JSON.stringify(args).includes(tag))) return true;
-	// The short forms that become one (`{ type: "app", app }`, `{ type: "document", path }`, `verbs/canvas.ts`).
+	// The short forms that become one (`{ type: "app", app }`, `{ type: "document", path }`, `calls/canvas.ts`).
 	if (/"type":"(?:app|document)"/.test(JSON.stringify(args))) return true;
 	const trusted = new Set<string>();
 	try {

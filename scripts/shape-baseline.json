@@ -6,15 +6,19 @@
 		"server folder pairs that import each other": 15,
 		"imports across packages by relative path": 6,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 25
+		"server imports that point up a layer": 24
 	},
 	"upward": [
-		"apps/server/src/agents/agent-state.ts -> apps/server/src/stage/tool.ts",
-		"apps/server/src/agents/backend.ts -> apps/server/src/stage/tool.ts",
-		"apps/server/src/agents/registry.ts -> apps/server/src/stage/tool.ts",
-		"apps/server/src/agents/session.ts -> apps/server/src/stage/tool.ts",
+		"apps/server/src/agents/agent-state.ts -> apps/server/src/calls/tool.ts",
+		"apps/server/src/agents/backend.ts -> apps/server/src/calls/tool.ts",
+		"apps/server/src/agents/registry.ts -> apps/server/src/calls/tool.ts",
+		"apps/server/src/agents/session.ts -> apps/server/src/calls/tool.ts",
 		"apps/server/src/auth/issue.ts -> apps/server/src/app.ts",
 		"apps/server/src/auth/issue.ts -> apps/server/src/studio/index.ts",
+		"apps/server/src/calls/person-table.ts -> apps/server/src/app.ts",
+		"apps/server/src/calls/person-table.ts -> apps/server/src/routes/shared.ts",
+		"apps/server/src/calls/person-table.ts -> apps/server/src/ws.ts",
+		"apps/server/src/calls/router.ts -> apps/server/src/app.ts",
 		"apps/server/src/deck/loader.ts -> apps/server/src/cards/size.ts",
 		"apps/server/src/docs/writers.ts -> apps/server/src/agents/acts.ts",
 		"apps/server/src/http.ts -> apps/server/src/app.ts",
@@ -22,17 +26,12 @@
 		"apps/server/src/routes/cards.ts -> apps/server/src/app.ts",
 		"apps/server/src/routes/mcp.ts -> apps/server/src/app.ts",
 		"apps/server/src/routes/shared.ts -> apps/server/src/app.ts",
-		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/stage/tool.ts",
+		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/calls/tool.ts",
 		"apps/server/src/stage/pens.ts -> apps/server/src/agents/canvas-news.ts",
 		"apps/server/src/stage/pens.ts -> apps/server/src/migrations/index.ts",
-		"apps/server/src/stage/run-code.test-helper.ts -> apps/server/src/stage/tool.ts",
 		"apps/server/src/stage/service.ts -> apps/server/src/apps/check.ts",
 		"apps/server/src/stage/service.ts -> apps/server/src/apps/service.ts",
 		"apps/server/src/stage/stage-admin.ts -> apps/server/src/agents/session.ts",
-		"apps/server/src/verbs/person-table.ts -> apps/server/src/app.ts",
-		"apps/server/src/verbs/person-table.ts -> apps/server/src/routes/shared.ts",
-		"apps/server/src/verbs/person-table.ts -> apps/server/src/ws.ts",
-		"apps/server/src/verbs/router.ts -> apps/server/src/app.ts",
 		"apps/server/src/wire/legacy.ts -> apps/server/src/app.ts"
 	]
 }

@@ -44,7 +44,7 @@ import { eventPercent, toUsageReport } from "./usage.ts";
  * child process per started agent, which is what `dispose` closes.
  *
  * What is *not* here: the transcript (`agents/translator.ts`, shared with Pi), and the
- * guidelines every agent is given (`stage/tool.ts`, likewise).
+ * guidelines every agent is given (`calls/tool.ts`, likewise).
  */
 
 /** Anthropic is the only provider behind this backend. */

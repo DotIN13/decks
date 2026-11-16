@@ -6,9 +6,9 @@ import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import { Forwards } from "../ports.ts";
-import { type StageHost, StageService } from "./service.ts";
+import { type StageHost, StageService } from "../stage/service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
-import { StagePens } from "./pens.ts";
+import { StagePens } from "../stage/pens.ts";
 import { runCode } from "./run-code.test-helper.ts";
 
 /**

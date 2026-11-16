@@ -8,7 +8,7 @@ import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../calls/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -779,7 +779,7 @@ export class DeckAgent {
 	/**
 	 * Size one board on this agent's stage, in its file. Nothing else sizes a board: a browser's
 	 * measurement does not, and neither does a new revision of its file. `decks.canvas.fit` and `decks.canvas.update`
-	 * call this; a person's drag sizes the board on the stage on screen, by name (`verbs/person-table.ts`).
+	 * call this; a person's drag sizes the board on the stage on screen, by name (`calls/person-table.ts`).
 	 */
 	setSize(path: string, size: { w?: number; h?: number }): void {
 		const name = this.canvasName();
@@ -1209,7 +1209,7 @@ export class DeckAgent {
 
 	/**
 	 * This agent's stage tool: the `stage` its code runs against, and what `/api/v1/<verb>` calls
-	 * when a request names this agent (`verbs/router.ts`). Made once and kept, so a verb called
+	 * when a request names this agent (`calls/router.ts`). Made once and kept, so a verb called
 	 * over HTTP before the agent's first turn acts on the same stage its turns will.
 	 */
 	stageTool(): StageTool {
@@ -1225,7 +1225,7 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The stage tool for the person, acting on this agent's stage from the browser (`verbs/person.ts`):
+	 * The stage tool for the person, acting on this agent's stage from the browser (`calls/person.ts`):
 	 * the same verbs, and the same stage, with the person as the one who acted, so nothing they do
 	 * draws this agent's cursor or counts as its work.
 	 */

@@ -144,7 +144,7 @@ export function joinPlaces(options: {
 	/**
 	 * Where the caller said a joining board goes, top-left corner. Taken as given, near or far,
 	 * clear or not: an agent that names a place has decided, and saying what it sits on is the
-	 * tool's job (`stage/tool.ts`), not a reason to move it here.
+	 * tool's job (`calls/tool.ts`), not a reason to move it here.
 	 */
 	at?: Readonly<Record<string, { x: number; y: number }>>;
 }): Record<string, { x: number; y: number }> {

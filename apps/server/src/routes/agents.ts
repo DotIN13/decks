@@ -1,6 +1,6 @@
 import type { Router, Request, Response } from "express";
 import { asyncRoute, type RouteDeps } from "./shared.ts";
-import { runVerb } from "../verbs/router.ts";
+import { runVerb } from "../calls/router.ts";
 
 /**
  * `/api/agents/:id/…`, aliases of the person's verbs (`@decks/api`, `PERSON_VERBS`), kept while

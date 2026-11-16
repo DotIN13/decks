@@ -123,7 +123,7 @@ export function refusal(reason: Refusal | "none"): string {
 
 /**
  * What a canvas pass may ask for (`passes.ts`): the verbs (`POST /api/v1/<verb>`, which the router keeps
- * to that canvas's own calls, `verbs/router.ts`), their list, the canvas's stream (`/api/v1/events`,
+ * to that canvas's own calls, `calls/router.ts`), their list, the canvas's stream (`/api/v1/events`,
  * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, its files and
  * pictures (`passCovers`), and what an app item on it shows of its app (`/api/apps/<name>`). Nothing
  * of the person's, no other canvas, nothing passed on.
@@ -162,7 +162,7 @@ const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
 	passes: Pick<Passes, "openCanvas" | "openApp">;
-	/** Whether a card or board at this deck path is placed on a canvas (`verbs/router.ts`, `boardOnCanvas`): a canvas pass reads it too. */
+	/** Whether a card or board at this deck path is placed on a canvas (`calls/router.ts`, `boardOnCanvas`): a canvas pass reads it too. */
 	placedOn?(path: string, canvas: string): boolean;
 }
 

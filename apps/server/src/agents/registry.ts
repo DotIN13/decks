@@ -8,7 +8,7 @@ import type { StageService } from "../stage/service.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
-import { PERSON, type CreateSpec, type SendSpec } from "../stage/tool.ts";
+import { PERSON, type CreateSpec, type SendSpec } from "../calls/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";

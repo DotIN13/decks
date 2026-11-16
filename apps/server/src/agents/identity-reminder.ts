@@ -8,7 +8,7 @@ import type { Identity } from "@decks/protocol";
  * instructions ask for all three once. Agents skip it: the deck filled with `Agent 3`s working
  * on nothing in particular. An instruction read at the start of a session is easy to pass over,
  * so the same request now travels at the two moments it is cheap to act on: at the head of each
- * message the person sends (`agents/session.ts`), and after each stage call (`stage/tool.ts`),
+ * message the person sends (`agents/session.ts`), and after each stage call (`calls/tool.ts`),
  * until there is nothing left to ask for.
  */
 

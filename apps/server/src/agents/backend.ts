@@ -1,6 +1,6 @@
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { StageAgentHooks, StageTool } from "../stage/tool.ts";
+import type { StageAgentHooks, StageTool } from "../calls/tool.ts";
 import type { ExtensionUiBridge } from "./extension-ui.ts";
 import type { Translator } from "./translator.ts";
 

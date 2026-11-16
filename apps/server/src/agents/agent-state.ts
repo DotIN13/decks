@@ -1,4 +1,4 @@
-import type { StageSnapshot } from "../stage/tool.ts";
+import type { StageSnapshot } from "../calls/tool.ts";
 
 /**
  * What each agent was holding, showing and calling itself, over time (DESIGN §6.2).

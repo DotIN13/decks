@@ -6,7 +6,7 @@ import type { AppKind } from "../apps/service.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
-/** The item that shows an app on a canvas, as `canvas.insert` takes it (`verbs/canvas.ts`). */
+/** The item that shows an app on a canvas, as `canvas.insert` takes it (`calls/canvas.ts`). */
 const appItem = (name: string) => ({ type: "app" as const, app: name });
 
 /** What to do with a new app before the item showing it is worth placing, by its kind. */

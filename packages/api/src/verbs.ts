@@ -81,7 +81,7 @@ export interface Verb {
 	 * Where a card's call to it goes, from the canvas frame a card is drawn in (`@decks/canvas`,
 	 * `frame/inside/card-calls.ts`): `frame`, answered there, the person's view of that canvas; `canvas`,
 	 * by the harness on the frame's canvas token, the canvas's own calls, made as the person on that
-	 * canvas and no other (`verbs/router.ts` refuses the token anything else); `page`, by the app's page
+	 * canvas and no other (`calls/router.ts` refuses the token anything else); `page`, by the app's page
 	 * with the person's own token, asking them before a card's words go to an agent. Absent: nowhere, it
 	 * reaches past the canvas.
 	 */

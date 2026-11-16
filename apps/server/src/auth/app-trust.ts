@@ -5,7 +5,7 @@ import { join } from "node:path";
  * Which apps (and, from before cards, which boards) this install has allowed to call the stage
  * verbs: keys like `apps/<name>`. Was `EvalTrust`, from when boards ran code through data-eval.
  *
- * A board's code calls the stage verbs an agent has (`stage/caller-run.ts`), deliberately,
+ * A board's code calls the stage verbs an agent has (`calls/caller-run.ts`), deliberately,
  * because the agent that wrote the board already has `bash`. What is new here is the *trigger*:
  * the code runs because a person pressed something on a board, and a board is a file that may
  * have been written by an agent that had just read a web page. So the click is not the permission. This is.
@@ -15,7 +15,7 @@ import { join } from "node:path";
  * a path list and nothing else — no capability is granted in degrees, because "some code"
  * is not a thing a server process can be given a little of.
  *
- * **The list is written by the question, not by the panel.** The person's verbs (`verbs/person-table.ts`) raise the
+ * **The list is written by the question, not by the panel.** The person's verbs (`calls/person-table.ts`) raise the
  * question the first time a board asks to run; the answer "Always allow this board" is what
  * calls `allow`. Nothing here decides anything.
  */

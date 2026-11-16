@@ -2,8 +2,8 @@ import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import type { App } from "../app.ts";
 import { settleStage } from "../stage/pending.ts";
 import type { View } from "../ws.ts";
-import { runVerb } from "../verbs/router.ts";
-import { renameCanvas, unpairStudioHere } from "../verbs/person-table.ts";
+import { runVerb } from "../calls/router.ts";
+import { renameCanvas, unpairStudioHere } from "../calls/person-table.ts";
 
 /**
  * The tab socket's old requests, kept while anything sends them: each is an alias of a person's verb (`@decks/api`,

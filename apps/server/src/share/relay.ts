@@ -71,7 +71,7 @@ export class Relay {
 		const rest = req.originalUrl.slice(`/c/${id}`.length) || "/";
 		/*
 		 * The page's own token stays here, and the connection's goes on. What the page says it is acting
-		 * on goes on too, as parameters: the canvas, the agent (`verbs/router.ts`).
+		 * on goes on too, as parameters: the canvas, the agent (`calls/router.ts`).
 		 */
 		const headers: Record<string, string> = { Authorization: `Bearer ${target.token}` };
 		for (const name of ["accept", "content-type", "range", "x-decks-stage", "x-decks-agent", "x-decks-edit"]) {

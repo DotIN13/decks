@@ -1,10 +1,10 @@
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import type { StageService, WebTarget } from "../stage/service.ts";
-import type { StageAgentHooks } from "../stage/tool.ts";
+import type { StageAgentHooks } from "./tool.ts";
 
 /**
  * What every verb's handler is given: the stage service, the caller's hooks, and the helpers the
- * handlers share. Made once per caller by `createStageTool` (`stage/tool.ts`), which also owns the
+ * handlers share. Made once per caller by `createStageTool` (`calls/tool.ts`), which also owns the
  * notes and pictures a call collects and empties them before each one.
  */
 export interface VerbContext {

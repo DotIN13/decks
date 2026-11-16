@@ -7,7 +7,7 @@ import type { View } from "./ws.ts";
 import { verifyOn } from "./auth/guard.ts";
 import { isCanvasPass } from "./auth/passes.ts";
 import type { Principal } from "./auth/principal.ts";
-import { cardRefusedFor, DOC_CALLS, onCanvas, runVerb } from "./verbs/router.ts";
+import { cardRefusedFor, DOC_CALLS, onCanvas, runVerb } from "./calls/router.ts";
 import { settleStage } from "./stage/pending.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */

@@ -95,7 +95,7 @@ const CHANGE_LOG = 400;
 const MADE_LATELY = 64;
 
 /**
- * The agent a write to a drawing is made for, while one of its calls runs (`stage/tool.ts`): each
+ * The agent a write to a drawing is made for, while one of its calls runs (`calls/tool.ts`): each
  * canvas remembers the last, and its placeholder frames are drawn in that agent's colour with its
  * name. A person's own edits leave it as it was.
  */

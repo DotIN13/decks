@@ -148,7 +148,7 @@ export interface AgentRecord {
 	outside?: { key: string; client: string; seen: number; inbox: OutsideMail[] };
 }
 
-/** A message waiting for an outside agent: `QueuedWork` (`stage/tool.ts`) as it is written down. */
+/** A message waiting for an outside agent: `QueuedWork` (`calls/tool.ts`) as it is written down. */
 interface OutsideMail {
 	from: string;
 	fromName: string;

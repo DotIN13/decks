@@ -8,7 +8,7 @@ import type { VerbContext } from "./context.ts";
 
 /**
  * Cards and saved frames: cards listed, made, named and found on their canvas, and frames made
- * (file addresses and the file calls are `verbs/files.ts`). A card is a folder of its canvas's
+ * (file addresses and the file calls are `calls/files.ts`). A card is a folder of its canvas's
  * `cards/`: making one does not place it, which is the canvas's job (`canvas.insert`).
  */
 export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {

@@ -3,15 +3,15 @@ import type { Registry } from "../agents/registry.ts";
 import type { CardService } from "../cards/service.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import { boardActor } from "./caller-actor.ts";
-import type { StageService } from "./service.ts";
+import type { StageService } from "../stage/service.ts";
 import { createStageTool, type StageTool } from "./tool.ts";
 
 /**
  * Verbs called by something that is not an agent: a board's button, or an app.
  *
  * Both get the stage object an agent gets, acting for **the conversation on their canvas** under
- * a name of their own (`stage/caller-actor.ts`). Each verb they call is announced in that
- * conversation (`verbs/router.ts`): a thing that starts on its own and says nothing reads as a
+ * a name of their own (`calls/caller-actor.ts`). Each verb they call is announced in that
+ * conversation (`calls/router.ts`): a thing that starts on its own and says nothing reads as a
  * fault, and an agent reading the chat later needs to know a press or an app did something. Their
  * code runs in their own page or process; the server only answers the verbs.
  */
@@ -85,7 +85,7 @@ export function conversationFor(context: Pick<CallerRun, "agents"> & { stage?: P
 
 /**
  * The stage tool a board or an app acts through: the conversation it acts for (`conversationFor`),
- * under its own name; `/api/v1/<verb>` calls one verb on it at a time (`verbs/router.ts`).
+ * under its own name; `/api/v1/<verb>` calls one verb on it at a time (`calls/router.ts`).
  */
 export function callerTool(context: CallerRun, spec: CallerSpec): { tool: StageTool; focused: DeckAgent } {
 	const focused = conversationFor(context, { board: spec.board, ...(spec.stage ? { stage: spec.stage } : {}) });

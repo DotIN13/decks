@@ -14,7 +14,7 @@ import { applyEdits, capped, globMatcher, isText, LIMIT, matchLines, MAX_READ, M
  *
  * The rules (which paths, how a read is cut, how an edit lands, what a search answers) are
  * `@decks/deck-kit`'s, the same wherever a deck is kept; here they meet the disk. Pure of the server:
- * every function takes the deck's root. The calls are `verbs/files.ts`.
+ * every function takes the deck's root. The calls are `calls/files.ts`.
  */
 
 export interface DeckFile {

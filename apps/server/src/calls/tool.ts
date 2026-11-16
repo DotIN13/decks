@@ -1,34 +1,34 @@
-import { canvasFile } from "./canvas-files.ts";
+import { canvasFile } from "../stage/canvas-files.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { identityReminder } from "../agents/identity-reminder.ts";
-import { canvasNameReminder } from "./canvas-name.ts";
+import { canvasNameReminder } from "../stage/canvas-name.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile } from "@decks/runtime";
 import type { Verbs as Stage } from "@decks/sdk";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
-import { serverText } from "./text.ts";
-import { penWriter } from "./pens.ts";
+import { serverText } from "../stage/text.ts";
+import { penWriter } from "../stage/pens.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
-import type { StageService, WebTarget } from "./service.ts";
-import { imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
-import { verbContext } from "../verbs/context.ts";
-import { appsVerbs } from "../verbs/apps.ts";
-import { webVerbs } from "../verbs/web.ts";
-import { miscVerbs } from "../verbs/misc.ts";
-import { canvasVerbs } from "../verbs/canvas.ts";
-import { boardVerbs } from "../verbs/board.ts";
-import { fileVerbs } from "../verbs/files.ts";
-import { agentVerbs } from "../verbs/agent.ts";
-import { viewVerbs } from "../verbs/view.ts";
-import { renamedVerb } from "../verbs/renamed.ts";
-import { gestures, type Gestures } from "../verbs/gestures.ts";
+import type { StageService, WebTarget } from "../stage/service.ts";
+import { imageSize, type ShotFormat, type ShotOf } from "../stage/shots.ts";
+import { verbContext } from "./context.ts";
+import { appsVerbs } from "./apps.ts";
+import { webVerbs } from "./web.ts";
+import { miscVerbs } from "./misc.ts";
+import { canvasVerbs } from "./canvas.ts";
+import { boardVerbs } from "./cards.ts";
+import { fileVerbs } from "./files.ts";
+import { agentVerbs } from "./agent.ts";
+import { viewVerbs } from "./view.ts";
+import { renamedVerb } from "./renamed.ts";
+import { gestures, type Gestures } from "./gestures.ts";
 
 /**
  * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person, a board or an app.
  *
- * The verbs themselves are in `verbs/`, a module per group, given a `VerbContext` built here; this
+ * The verbs themselves are in `calls/`, a module per group, given a `VerbContext` built here; this
  * file puts them on one object, answers `call` (what `/api/v1/<verb>` runs) with the value, the
  * notes and the pictures, adds the agent's reminders, and keeps the snapshot a rewind restores.
  * Every runtime's agent reaches it the same way, through the `decks` command, so no runtime has
@@ -162,10 +162,10 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
-	/** Set when the caller is a board's own code (`stage/caller-actor.ts`), not an agent. */
+	/** Set when the caller is a board's own code (`calls/caller-actor.ts`), not an agent. */
 	board?: string;
 	/**
-	 * Set when the caller is the person, in the browser, acting on this agent's stage (`verbs/person.ts`):
+	 * Set when the caller is the person, in the browser, acting on this agent's stage (`calls/person.ts`):
 	 * their change is theirs, so it draws no agent cursor, is undoable, and hears no agent's reminders.
 	 */
 	person?: boolean;
@@ -212,7 +212,7 @@ export interface StageTool {
 	readonly guidelines: string[];
 	/**
 	 * The `stage` object the verbs act through, bound to this caller: an agent, or a board or app
-	 * acting for a conversation (`stage/caller-actor.ts`).
+	 * acting for a conversation (`calls/caller-actor.ts`).
 	 */
 	readonly stage: Stage;
 	/**
@@ -225,12 +225,12 @@ export interface StageTool {
 	/**
 	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`); an old name is refused with its new call, with its arguments as a list.
 	 *
-	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes the verb added
+	 * What `/api/v1/<verb>` answers with (`calls/router.ts`): the value, the notes the verb added
 	 * (where an item went, what `decks.canvas.fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
 	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<StageCallResult>;
-	/** What the person's hands did on the canvas, sent over the socket (`verbs/gestures.ts`): not a verb. */
+	/** What the person's hands did on the canvas, sent over the socket (`calls/gestures.ts`): not a verb. */
 	gesture<G extends keyof Gestures>(name: G, args: Parameters<Gestures[G]>): Promise<StageCallResult>;
 	snapshot(): StageSnapshot;
 }
@@ -273,7 +273,7 @@ export function createStageTool(deps: {
 	const { notes, images } = ctx;
 
 	/**
-	 * The verbs, one module per group (`verbs/`), on one object: what `call` looks a verb up on, and
+	 * The verbs, one module per group (`calls/`), on one object: what `call` looks a verb up on, and
 	 * what a board or an app acts through. Typed by the SDK's generated `Verbs`, so the table, the
 	 * routes and these handlers cannot disagree about a verb's name or its arguments.
 	 */

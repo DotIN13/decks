@@ -11,7 +11,7 @@ import { CallRefused } from "../protocol.ts";
  *   `now`. No round trip, nothing to ask.
  * - **By the harness** (`canvas`), on the frame's canvas token: the canvas's own calls (reading and
  *   changing it, its cards, frames and files, undo), made as the person on this canvas and no other.
- *   The harness refuses the token anything else (`verbs/router.ts`, `CANVAS_FRAME_VERBS`).
+ *   The harness refuses the token anything else (`calls/router.ts`, `CANVAS_FRAME_VERBS`).
  * - **By the app's page** (`page`): the agent calls and showing another canvas, the only ones that
  *   need the person's own token. The page asks the person before a card's message goes to an agent.
  * - **Nowhere**: everything that reaches past the canvas (apps, the shared Chrome tab, pairing, ports,
