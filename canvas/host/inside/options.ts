@@ -89,8 +89,8 @@ export function installHost(ctx: FrameContext): void {
 			focus: (targets) => focusOn(ctx, targets),
 			viewport: () => ({ width: innerWidth, height: innerHeight }),
 			reload: (path) => ctx.handle().reloadCard(path),
-			harness: (verb, args) => (studio ? Promise.resolve({ ok: false, error: `${verb}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.call(verb, args)),
-			page: (verb, args, card) => end.call("agent", { verb, args, card }),
+			harness: (name, args) => (studio ? Promise.resolve({ ok: false, error: `${name}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.act(name, args)),
+			page: (name, args, card) => end.call("agent", { name, args, card }),
 		}),
 	});
 }

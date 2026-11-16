@@ -1,88 +1,83 @@
-import type { Camera } from "@decks/protocol";
-import { cardCalls as cardCallsTo } from "@decks/api";
+import { CALL_BY_NAME, type Camera } from "@decks/protocol";
+import { cardCall } from "@decks/protocol/compat";
 import { CallRefused } from "../messages.ts";
 
 /**
- * Where a card's `card.decks` call is answered, in the canvas frame (`card.ts`, `CanvasHost.cardCall`):
- * the verb table's `card` column (`@decks/api`, `Verb.card`), which the harness and the app's page
- * read too.
+ * Where a card's `card.decks` call is answered, in the canvas frame (`card.ts`, `CanvasHost.cardCall`).
+ * Old or new is decided per call by its arguments (`@decks/protocol/compat`, `cardCall`): a card written
+ * for the old SDK, or by the boards-to-cards migration, keeps working, forever, and gets its old answer
+ * back. Only the calls a card may make pass, on the card's own canvas, whichever shape it uses.
  *
- * - **In the frame** (`frame`): the person's view of this canvas (`view.*` but `goto`), `here` and
- *   `now`. No round trip, nothing to ask.
- * - **By the harness** (`canvas`), on the frame's canvas token: the canvas's own calls (reading and
- *   changing it, its cards, frames and files, undo), made as the person on this canvas and no other.
- *   The harness refuses the token anything else (`server/frame/passes.ts`).
- * - **By the app's page** (`page`): the agent calls and showing another canvas, the only ones that
- *   need the person's own token. The page asks the person before a card's message goes to an agent.
- * - **Nowhere**: everything that reaches past the canvas (apps, the shared Chrome tab, pairing, ports,
- *   changing who an agent is, other canvases).
+ * - **In the frame**: the person's view of this canvas (`view.*` but `goto`), `canvas.here`, `deck.now`.
+ * - **By the app's page**: the agent calls and showing another canvas, which need the person's own token;
+ *   the page asks the person before a card's message goes to an agent.
+ * - **On the frame's socket**: everything else, as the person on this canvas (the pass's) and no other.
  */
-const IN_FRAME = cardCallsTo("frame");
-const ON_CANVAS = cardCallsTo("canvas");
-/** The page's, with your token: the agents, and moving your screen to another canvas. */
-const BY_THE_PAGE = cardCallsTo("page");
+const IN_FRAME = new Set(["view.get", "view.move", "view.focus", "view.reload", "view.cursor", "canvas.here", "deck.now"]);
+const byThePage = (name: string) => name.startsWith("agent.") || name === "view.goto";
 
 /** What the frame lends its card calls. */
 interface CardCallDeps {
 	canvas: string;
 	camera(): Camera;
 	move(camera: Camera, glide?: number): void;
-	/** Frame these items, cards or boards, by id or path. */
+	/** Frame these items or cards, by id or path. */
 	focus(targets: string[]): void;
 	viewport(): { width: number; height: number };
 	reload(path: string): void;
-	/** One call on this canvas, to the harness on the canvas token. */
-	harness(verb: string, args: unknown[]): Promise<{ ok: boolean; value?: unknown; error?: string }>;
-	/** One of the page's, as the card that asked. */
-	page(verb: string, args: unknown[], card: string): Promise<unknown>;
+	/** One call on this canvas, on the frame's socket, by its protocol name. */
+	harness(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; error?: string }>;
+	/** One of the page's, by its protocol name, as the card that asked. */
+	page(name: string, args: Record<string, unknown>, card: string): Promise<unknown>;
 }
 
 export function cardCalls(deps: CardCallDeps): (verb: string, args: unknown[], card: string) => Promise<unknown> {
-	const here = (verb: string, args: unknown[]): unknown => {
-		switch (verb) {
-			case "view.camera":
-				return deps.camera();
-			case "view.viewport":
-				return deps.viewport();
-			case "view.move": {
-				const asked = (args[0] ?? {}) as Partial<Camera> & { animate?: boolean };
-				const now = deps.camera();
-				const next = { x: asked.x ?? now.x, y: asked.y ?? now.y, zoom: asked.zoom ?? now.zoom };
-				deps.move(next, asked.animate ? 400 : undefined);
-				return next;
-			}
-			case "view.focus": {
-				const target = args[0];
-				deps.focus(Array.isArray(target) ? target.map(String) : [String(target)]);
-				return { canvas: deps.canvas, target };
-			}
-			case "view.reload": {
-				const card = ((args[0] ?? {}) as { card?: unknown }).card;
-				if (typeof card !== "string") throw new CallRefused('view.reload names a card: { card: "<path>" }.', "refused");
-				deps.reload(card);
-				return { reloaded: 1 };
-			}
-			case "view.cursor":
-				// A labelled dot is an agent's; a card draws its own pointer.
-				return undefined;
-			case "here":
-				return { name: deps.canvas, title: deps.canvas, open: [], cards: 0, boards: 0 };
-			case "now": {
-				const now = new Date();
-				return { iso: now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, words: now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }), epoch: now.getTime() };
-			}
-		}
-		throw new CallRefused(`${verb} is answered nowhere.`, "refused");
-	};
 	return async (verb, args, card) => {
 		const list = Array.isArray(args) ? args : [];
-		if (IN_FRAME.has(verb)) return here(verb, list);
-		if (ON_CANVAS.has(verb)) {
-			const answer = await deps.harness(verb, list);
-			if (!answer.ok) throw new Error(answer.error ?? `${verb} failed.`);
-			return answer.value;
-		}
-		if (BY_THE_PAGE.has(verb)) return deps.page(verb, list, card);
-		throw new CallRefused(`${verb} is not a card's to call: it reaches past this canvas.`, "not-for-cards");
+		// card.decks hands every call over as a list: one object alone in it may be the new shape's arguments.
+		const raw = list.length === 1 && CALL_BY_NAME.has(verb) && isObject(list[0]) ? list[0] : list;
+		const call = cardCall(verb, raw, deps.canvas);
+		if ("refusal" in call) throw new CallRefused(call.refusal.message, "not-for-cards");
+		if (IN_FRAME.has(call.name)) return call.back(here(deps, call.name, call.args));
+		if (byThePage(call.name)) return call.back(await deps.page(call.name, call.args, card));
+		const answer = await deps.harness(call.name, call.args);
+		if (!answer.ok) throw new Error(answer.error ?? `${call.name} failed.`);
+		return call.back(answer.value);
 	};
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** A call the frame answers itself, by its protocol name: the view of this canvas, here, now. */
+function here(deps: CardCallDeps, name: string, args: Record<string, unknown>): unknown {
+	const view = () => ({ canvas: deps.canvas, camera: deps.camera(), screen: { w: deps.viewport().width, h: deps.viewport().height } });
+	switch (name) {
+		case "view.get":
+			return view();
+		case "view.move": {
+			const now = deps.camera();
+			const next = { x: typeof args.x === "number" ? args.x : now.x, y: typeof args.y === "number" ? args.y : now.y, zoom: typeof args.zoom === "number" ? args.zoom : now.zoom };
+			deps.move(next, args.animate ? 400 : undefined);
+			return { ...view(), camera: next, moved: true };
+		}
+		case "view.focus": {
+			const target = args.target;
+			deps.focus(Array.isArray(target) ? target.map(String) : [String(target)]);
+			return { ...view(), moved: true };
+		}
+		case "view.reload":
+			if (typeof args.card !== "string") throw new CallRefused('view.reload names a card: { card: "<path>" }.', "refused");
+			deps.reload(args.card);
+			return 1;
+		case "view.cursor":
+			// A labelled dot is an agent's; a card draws its own pointer.
+			return view();
+		case "canvas.here":
+			return { name: deps.canvas, title: deps.canvas, open: [], cards: 0 };
+		case "deck.now": {
+			const now = new Date();
+			return { iso: now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, words: now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }), epoch: now.getTime() };
+		}
+	}
+	throw new CallRefused(`${name} is answered nowhere.`, "refused");
 }

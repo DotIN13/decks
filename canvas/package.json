@@ -30,7 +30,6 @@
 		"build:live-doc": "node documents/build-live-doc.mjs"
 	},
 	"dependencies": {
-		"@decks/api": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
 		"@decks/protocol-old": "*",
