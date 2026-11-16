@@ -180,7 +180,7 @@
 	"canvas/ink/model.ts: stage": 8,
 	"canvas/ink/shaper.ts: board": 3,
 	"canvas/input/canvas-input.ts: board": 13,
-	"canvas/input/canvas-input.ts: stage": 52,
+	"canvas/input/canvas-input.ts: stage": 51,
 	"canvas/input/item-keys.ts: stage": 6,
 	"canvas/input/keys.ts: board": 9,
 	"canvas/input/keys.ts: stage": 5,

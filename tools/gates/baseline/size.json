@@ -20,8 +20,6 @@
 	"canvas/host/outside/framed-editor.tsx: function keepInStep over 80 lines": 1,
 	"canvas/host/outside/framed-editor.tsx: function wire over 80 lines": 1,
 	"canvas/ink/InkLayer.tsx: function StageInk over 80 lines": 1,
-	"canvas/input/canvas-input.ts: function (anonymous) over 80 lines": 1,
-	"canvas/input/canvas-input.ts: function createStageInput over 80 lines": 1,
 	"canvas/view/CanvasView.tsx: function Stage over 80 lines": 1,
 	"canvas/view/items-layer.tsx: function createItemsLayer over 80 lines": 1,
 	"canvas/view/selection.tsx: function createSelection over 80 lines": 1,
