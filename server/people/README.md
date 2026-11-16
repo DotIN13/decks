@@ -44,16 +44,16 @@ model, a login or a transcript.
     screens that follow it; with none, the answer says it waits. The person acts for the agent
     their newest screen follows, else the newest agent (`agent.me`, `view.goto`); their here is that agent's home, else
     the canvas that screen shows, else the deck's first canvas.
-13. Cameras are kept per person or agent, canvas and device. `view.get` answers the newest on the
-    canvas, or the origin.
+13. Cameras are kept per person or agent, canvas and device; `view.get` answers the newest, or 0,0.
 14. Only the socket that hosts an agent sets its `state` and `queued` (`agent.update`). An agent
     whose state is thinking or tool is not deleted (`conflict`).
 15. A canvas frame's line reports with `view.move` device `frame`: it can answer `view.screenshot`,
     and is never counted, moved or followed. `view.screenshot` tells every line on the canvas and
     takes the first `view.answer`, or is unavailable after 20 s.
+16. An agent's change that worked is told as `agent.acted` (the kernel's `after`), in its name and
+    colour: the cards it touched by path, a file's card included, and the items by id.
 
 ## Check
-
 ```
 node tools/check.mjs server
 node tools/gates/run.mjs

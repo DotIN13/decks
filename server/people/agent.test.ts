@@ -179,3 +179,15 @@ test("the person's new agent joins its workspace's latest canvas, else gets its 
 	assert.equal((await s.value<Agent>("agent.create", { name: "Helper", kind: "pi" }, asAgent)).canvas, "helper", "an agent's new agent gets its own");
 	await s.close();
 });
+
+test("an agent's change on a card is told as agent.acted, in its name and colour; the person's is not", async () => {
+	const { s } = await peopleServer();
+	const ann = await s.value<Agent>("agent.attach", { name: "Ann", canvas: "a" });
+	const card = "canvases/a/cards/x/index.html";
+	await s.value("item.insert", { item: { type: "card", card }, canvas: "a" }, s.callers.resolve(ann.token)!);
+	await s.value("item.insert", { item: { type: "card", card }, canvas: "a" }, person);
+	const acted = s.heard.filter((h) => h.name === "agent.acted");
+	assert.equal(acted.length, 1);
+	assert.deepEqual([acted[0]!.payload.ids, acted[0]!.payload.by, acted[0]!.payload.label, acted[0]!.payload.color, acted[0]!.payload.canvas], [[card], ann.id, "Ann", ann.color, "a"]);
+	await s.close();
+});

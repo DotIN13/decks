@@ -1,6 +1,7 @@
 import { Refused, events, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
 import { LOCAL_PERSON } from "../kernel/index.ts";
-import type { Context, Kernel, Store, Tokens } from "../kernel/types.ts";
+import type { Context, Done, Kernel, Store, Tokens } from "../kernel/types.ts";
+import { actOf } from "./acts.ts";
 import { Answers } from "./answers.ts";
 import { Presence } from "./presence.ts";
 import { Hosts } from "./hosts.ts";
@@ -38,6 +39,7 @@ export class People {
 		kernel.callers.describe("agent", (id) => people.roster.callerOf(id));
 		kernel.relay((call) => people.hosts.answerer(call));
 		kernel.callers.describe("person", (_id, issued) => people.withHere(issued));
+		kernel.after((done) => people.acted(done));
 		const learn = () => void people.learnCanvases(kernel);
 		kernel.events.on(events.canvasChanged, learn);
 		learn();
@@ -73,6 +75,16 @@ export class People {
 		if (!canvas || !this.events) return;
 		const others = this.screens.drawing(canvas).map((s) => s.client).filter((c) => c !== client);
 		if (others.length) this.events.emit(events.viewChanged, { canvas, ids: [], by: who.id, rev: ++this.revs, gone: true }, { clients: others });
+	}
+
+	/** An agent's change that worked is told as agent.acted, for its glow and cursor on what it touched. */
+	acted({ call, args, caller, envelope }: Done): void {
+		const done = { name: call.name, effect: call.effect, args, who: caller.kind, ok: envelope.ok, ...(envelope.ok ? { value: envelope.value } : {}) };
+		const act = actOf(done, caller.canvas);
+		const record = act ? this.roster.byIdOrUndefined(caller.id) : undefined;
+		if (!act || !record || !this.events) return;
+		const payload = { ...(act.canvas ? { canvas: act.canvas } : {}), ids: act.ids, by: record.id, rev: ++this.revs, phase: "done" as const, what: act.what, label: record.name, color: record.color };
+		this.events.emit(events.agentActed, payload);
 	}
 
 	/** A person's here: the home of the agent on their screen, else that screen's canvas, else the first. */
