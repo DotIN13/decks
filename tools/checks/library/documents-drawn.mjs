@@ -22,6 +22,8 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 // A page of its own origin, so the page's storage (the PDF pane's saved width) can be read.
 await page.route("http://drawn.test/", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body></body></html>" }));
+// A fixed day: \maketitle with no \date draws today's date, as LaTeX does.
+await page.clock.setFixedTime(new Date("2026-11-15T12:00:00"));
 await page.goto("http://drawn.test/");
 await page.addScriptTag({ content: readFileSync(join(scratch, "draw.js"), "utf8") });
 const drawn = {};
