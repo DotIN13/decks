@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { fromDeck } from "./deck-history.ts";
 import { Sessions, Transcripts } from "./index.ts";
 
@@ -80,4 +81,29 @@ test("adopting the agent writes the harness's file and archive once; the deck's 
 	assert.equal(transcripts.read("a_1")?.sessionRef, "sess-123", "the harness's own file wins once written");
 	assert.deepEqual(transcripts.archived("a_1").map((one) => one.id), ["u1", "a1"], "archived once, not twice");
 	again.dispose();
+});
+
+// Warden's fixture of today's deck (tools/fixtures/old-deck), read where it is: fromDeck only reads.
+const OLD_DECK = fileURLToPath(new URL("../../tools/fixtures/old-deck", import.meta.url));
+const ADA = "0f3c1a2e-0000-4000-8000-000000000001";
+const BO = "0f3c1a2e-0000-4000-8000-000000000002";
+const ADA_ANTIGRAVITY = "0f3c1a2e-0000-4000-8000-000000000003";
+
+test("old-deck: each of the three agents reads whole, of its own kind, with every item kept", () => {
+	const ada = fromDeck(OLD_DECK, ADA, "claude")!;
+	assert.equal(ada.saved.sessionRef, "11111111-aaaa-4bbb-8ccc-000000000001");
+	assert.deepEqual([ada.saved.mode, ada.saved.account, ada.saved.model?.model], ["auto", "default", "opus"]);
+	assert.deepEqual(ada.saved.items.map((one) => one.kind), ["user", "assistant", "tool"]);
+	assert.deepEqual(ada.archive.map((one) => one.id), [`${ADA}:n0`], "the log's one item before the window");
+	const bo = fromDeck(OLD_DECK, BO, "pi")!;
+	assert.deepEqual([bo.saved.sessionRef, bo.saved.mode, bo.saved.items.length, bo.archive.length], ["/sessions/pi-0002.jsonl", "manual", 3, 0]);
+	const other = fromDeck(OLD_DECK, ADA_ANTIGRAVITY, "antigravity")!;
+	assert.equal(other.saved.sessionRef, undefined, "no session to resume yet");
+	assert.equal(other.saved.mode, undefined, "a mode of null is left out");
+	assert.equal(other.saved.items.length, 3);
+});
+
+test("old-deck: an agent asked for as another kind, and models.json, read as nothing", () => {
+	assert.equal(fromDeck(OLD_DECK, ADA, "antigravity"), undefined);
+	assert.equal(fromDeck(OLD_DECK, "models.json", "claude"), undefined);
 });
