@@ -91,12 +91,6 @@ export function lowMemory(): boolean | undefined {
 	return typeof memory === "number" ? memory <= 2 : undefined;
 }
 
-/**
- * The backend to open the stage with. WebGPU present but with no adapter (a blocklisted card,
- * WebGPU turned off) is as if it were not there. WebGL 2 counts only where an `OffscreenCanvas`
- * has it too, since the render worker paints there: iOS 16 has WebGL 2 on the page and not in a
- * worker, and gets the notice rather than a stage with no drawing (decision D2).
- */
 /** The renderer this browser asked for in a settings page (Studio's), kept in `decks.backend`; else the best there is. */
 const PREFERRED_BACKEND_KEY = "decks.backend";
 function preferred(): BackendName | undefined {
@@ -108,6 +102,12 @@ function preferred(): BackendName | undefined {
 	}
 }
 
+/**
+ * The backend to open the stage with. WebGPU present but with no adapter (a blocklisted card,
+ * WebGPU turned off) is as if it were not there. WebGL 2 counts only where an `OffscreenCanvas`
+ * has it too, since the render worker paints there: iOS 16 has WebGL 2 on the page and not in a
+ * worker, and gets the notice rather than a stage with no drawing (decision D2).
+ */
 export function detect(): Promise<Detected> {
 	// Once a frame: the next canvas it moves to in place (`host/inside/frame.tsx`) finds the answer here. One that failed is asked again.
 	const asked = (detected ??= detectNow());

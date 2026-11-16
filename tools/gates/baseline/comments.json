@@ -178,7 +178,7 @@
 	"canvas/render/backends/detect.ts: comment over 5 lines": 2,
 	"canvas/render/backends/webgl.ts: comment over 5 lines": 1,
 	"canvas/render/backends/webgpu.ts: comment over 5 lines": 1,
-	"canvas/render/device.ts: comment over 5 lines": 8,
+	"canvas/render/device.ts: comment over 5 lines": 7,
 	"canvas/render/engine-doc.ts: comment over 5 lines": 8,
 	"canvas/render/engine-frame.ts: comment over 5 lines": 10,
 	"canvas/render/engine-hits.ts: comment over 5 lines": 1,

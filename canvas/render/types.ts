@@ -88,19 +88,26 @@ export interface CardGeometry {
 
 /** Messages to the render worker (`render.worker.ts`). */
 export type ToWorker =
-	/**
-	 * `backend` is the page's (`backends/detect.ts`): the worker loads the same build and opens the
-	 * same API. `lowMemory` is the page's guess too, so both draw with as many samples a pixel.
-	 */
-	/**
-	 * `fontsDue`: the page is fetching the drawing's fonts, which come as `fonts` messages; `docDue`:
-	 * the page has no drawing yet (`doc` is empty), which comes as a `doc` message. The worker paints
-	 * nothing until they have, or for 300 ms, rather than paint every tile twice.
-	 */
 	/** First, as soon as the page has the engine: the backend's build, as the page's compiled module when it has one, for the worker to open its device with before the drawing comes. */
 	| { type: "boot"; backend: string; lowMemory?: boolean; module?: WebAssembly.Module }
-	/** `pixels`: hand tiles over as their bytes, not as pictures (`pixelsFirst` in `engine.ts`); WebGPU only. */
-	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean; pixels?: boolean }
+	| {
+			type: "init";
+			doc: string;
+			dark: boolean;
+			/** The page's (`backends/detect.ts`): the worker loads the same build and opens the same API. */
+			backend?: string;
+			/** The page's guess too, so both draw with as many samples a pixel. */
+			lowMemory?: boolean;
+			/**
+			 * The page is fetching the drawing's fonts, which come as `fonts` messages: the worker paints
+			 * nothing until they have, or for 300 ms, rather than paint every tile twice.
+			 */
+			fontsDue?: boolean;
+			/** The page has no drawing yet (`doc` is empty); it comes as a `doc` message, waited for as `fontsDue`. */
+			docDue?: boolean;
+			/** Hand tiles over as their bytes, not as pictures (`pixelsFirst` in `engine.ts`); WebGPU only. */
+			pixels?: boolean;
+	  }
 	/** Tiles from now on as their bytes, or as pictures: for measuring one way against the other in one page. */
 	| { type: "pixels"; on: boolean }
 	/** How long after the camera last changed the worker still paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measuring in one page. */
@@ -127,9 +134,20 @@ export type ToWorker =
 	| { type: "view"; view: string }
 	| { type: "lift"; ids: string[] }
 	| { type: "drop"; ids: string[] }
-	/** `zooming`: the zoom changed while the camera moves, so tiles are painted at the power of two under it; a pan keeps the exact scale. */
-	/** `fast`: the zoom changes faster than about one doubling a second: paint nothing new until it slows or rests (`zoomRate` in `engine.ts`). */
-	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean; zooming?: boolean; fast?: boolean }
+	| {
+			type: "camera";
+			x: number;
+			y: number;
+			zoom: number;
+			dpr: number;
+			width: number;
+			height: number;
+			moving: boolean;
+			/** The zoom changed while the camera moves, so tiles are painted at the power of two under it; a pan keeps the exact scale. */
+			zooming?: boolean;
+			/** The zoom changes faster than about one doubling a second: paint nothing new until it slows or rests (`zoomRate` in `engine.ts`). */
+			fast?: boolean;
+	  }
 	| { type: "dropped"; keys: Array<[number, number, number]> };
 
 /**
