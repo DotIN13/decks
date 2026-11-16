@@ -1,5 +1,5 @@
 import { deckFiles, FILES_PATH, layout, Refused } from "../../protocol/index.ts";
-import type { Context, Route, RouteAnswer } from "../kernel/types.ts";
+import { deckPathFrom, inside, type Context, type Route, type RouteAnswer, type Scope } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { titleOf } from "./cards.ts";
 import { stat } from "./files.ts";
@@ -25,7 +25,7 @@ const TYPES: Record<string, string> = {
 
 // --- the route: every file, a card's page, its modules ---
 
-export const routes: Route[] = [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query) }];
+export const routes: Route[] = [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query), scoped: (scope, asked) => passMayRead(scope, asked.path) }];
 
 /** GET /files/<path>: a file, a card's page, or one of its modules. */
 export async function answerFile(ctx: Context, rest: string, query: URLSearchParams): Promise<RouteAnswer> {
@@ -48,6 +48,21 @@ export async function answerFile(ctx: Context, rest: string, query: URLSearchPar
 		if (error instanceof Refused) return refusal(error.code === "not_found" ? 404 : error.code === "refused" ? 403 : 400, error.message);
 		throw error;
 	}
+}
+
+/** Rule 14: what a pass may read under /files, from its address, decoded and fenced before any folder test. */
+export function passMayRead(scope: Scope, address: string): boolean {
+	if (!scope.canvas) return false;
+	try {
+		return scopedMayRead(scope.canvas, deckPathFrom(address.startsWith(FILES) ? address.slice(FILES.length) : address));
+	} catch {
+		return false;
+	}
+}
+
+/** A pass reads its own canvas's folder, the deck's assets/ and lib/ (the card page's stylesheet and runtime), nothing else. */
+export function scopedMayRead(canvas: string, path: string): boolean {
+	return layout.canvasOfPath(path)?.name === canvas || inside(path, "assets") || inside(path, "lib");
 }
 
 const refusal = (status: number, message: string): RouteAnswer => ({ status, type: "text/plain", body: message });

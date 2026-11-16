@@ -30,6 +30,8 @@ export function documents(given: DocumentsOptions = {}): Feature {
 		start(kernel) {
 			deck = kernel.deck;
 			run = kernel.run;
+			// A pass hears a file's events when its canvas shows that document, though the file lives in docs/.
+			kernel.belongs((scope, event, payload) => (event === "file.changed" || event === "file.compiled") && !!scope.canvas && shownOn(kernel, scope.canvas, payload.ids));
 			const store = kernel.store("documents");
 			const open = new Documents(kernel.deck, kernel.events, store, options.pauseMs ?? PAUSE_MS);
 			docs = open;
@@ -45,3 +47,15 @@ export function documents(given: DocumentsOptions = {}): Feature {
 	});
 }
 
+
+
+/** Whether every id is a document the canvas's drawing shows. */
+function shownOn(kernel: Kernel, canvas: string, ids: unknown): boolean {
+	if (!Array.isArray(ids) || ids.length === 0) return false;
+	try {
+		const shown = new Set(kernel.canvas(canvas).read().filter((item) => item.type === "document").map((item) => item.path));
+		return ids.every((id) => shown.has(id));
+	} catch {
+		return false;
+	}
+}

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { callers, testServer } from "../kernel/testing.ts";
 import { cards } from "./feature.ts";
+import { passMayRead, scopedMayRead } from "./page.ts";
 
 // Rule 14 through the real HTTP door: a card's page and module, with card.url's pass.
 
@@ -24,4 +25,23 @@ test("a card's page and its module are served with the pass card.url gives", asy
 		await served.close();
 		await s.close();
 	}
+});
+
+test("rule 14: a pass reads its canvas's folder, assets/ and lib/ under /files, nothing else", () => {
+	assert.equal(scopedMayRead("a", "canvases/a/cards/x/index.html"), true);
+	assert.equal(scopedMayRead("a", "canvases/a/files/s.txt"), true);
+	assert.equal(scopedMayRead("a", "assets/libs/x.js"), true);
+	assert.equal(scopedMayRead("a", "lib/card.css"), true);
+	assert.equal(scopedMayRead("a", "canvases/b/files/secret.txt"), false);
+	assert.equal(scopedMayRead("a", "canvases/ab/files/secret.txt"), false);
+	assert.equal(scopedMayRead("a", "docs/notes.md"), false);
+});
+
+test("rule 14: a pass's /files address is decoded and fenced before the folder test", () => {
+	const scope = { canvas: "a", until: Date.now() + 1000 };
+	assert.equal(passMayRead(scope, "/files/canvases/a/cards/x/index.html"), true);
+	assert.equal(passMayRead(scope, "/files/assets/..%2fcanvases%2fb%2ffiles%2fs.txt"), false);
+	assert.equal(passMayRead(scope, "/files/assets/%252e%252e/canvases/b/files/s.txt"), false);
+	assert.equal(passMayRead(scope, "/files/canvases/b/files/s.txt"), false);
+	assert.equal(passMayRead({ until: Date.now() + 1000 }, "/files/assets/a.png"), false, "a pass with no canvas reads nothing here");
 });

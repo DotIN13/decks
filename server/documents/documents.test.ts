@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { events } from "../../protocol/index.ts";
 import { callers, testServer } from "../kernel/testing.ts";
+import { defineFeature, type Item } from "../kernel/types.ts";
 import { documents } from "./feature.ts";
 import { documentKind } from "./item.ts";
 
@@ -94,5 +96,21 @@ test("rule 10: without Google, the google calls answer unavailable", async () =>
 		const answer = await s.call(name, args, "person");
 		assert.equal(answer.ok ? "ok" : answer.error.code, "unavailable", name);
 	}
+	await s.close();
+});
+
+test("a canvas pass hears a document's file events when its canvas shows that document, though the file is in docs/", async () => {
+	const drawing = { a: [{ type: "document", id: "d", path: "docs/notes.md" }], b: [] } as Record<string, Item[]>;
+	const canvases = defineFeature({ name: "canvases", calls: [], canvases: () => ({ doc: (name) => ({ read: () => drawing[name] ?? [], apply: () => ({ items: [], rev: 0 }), since: () => [] }) as never, name: (raw) => raw }) });
+	const s = await testServer({ features: [canvases, documents()], deck: seed });
+	const pass = s.callers.resolve(s.callers.issue({ ...callers.person, id: "person~frame-1" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
+	const other = s.callers.resolve(s.callers.issue({ ...callers.person, id: "person~frame-2" }, "canvas pass", { canvas: "b", until: Date.now() + 60_000 }))!;
+	const heard: string[] = [];
+	s.events.subscribe({ caller: pass }, (one) => void heard.push(`a ${one.name}:${(one.payload.ids as string[]).join()}`));
+	s.events.subscribe({ caller: other }, (one) => void heard.push(`b ${one.name}:${(one.payload.ids as string[]).join()}`));
+	s.events.emit(events.fileChanged, { ids: ["docs/notes.md"], by: "x", rev: 1, part: "words" });
+	s.events.emit(events.fileChanged, { ids: ["docs/other.md"], by: "x", rev: 2, part: "words" });
+	s.events.emit(events.fileCompiled, { ids: ["docs/notes.md"], by: "x", rev: 3, ok: true, errors: [], at: 1, ms: 1 });
+	assert.deepEqual(heard, ["a file.changed:docs/notes.md", "a file.compiled:docs/notes.md"]);
 	await s.close();
 });
