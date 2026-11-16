@@ -89,15 +89,25 @@ const MAX_CELLS = 4_000_000;
 
 /** Splices that turn from into to: one per changed run of lines, each trimmed to what changed. */
 export function diff(from: string, to: string): Splice[] {
+	return diffBy(from, to, lines, (c) => c === "\n");
+}
+
+/** The same, by words: a changed word keeps the styles of the words around it (a Google Doc's runs). */
+export function wordDiff(from: string, to: string): Splice[] {
+	return diffBy(from, to, words, (c) => /[\s<>]/.test(c));
+}
+
+function diffBy(from: string, to: string, split: (text: string) => string[], boundary: (c: string) => boolean): Splice[] {
 	if (from === to) return [];
 	let head = 0;
 	const max = Math.min(from.length, to.length);
 	while (head < max && from.charCodeAt(head) === to.charCodeAt(head)) head++;
-	while (head > 0 && from[head - 1] !== "\n") head--;
+	while (head > 0 && !boundary(from[head - 1]!)) head--;
 	let tail = 0;
 	while (tail < max - head && from.charCodeAt(from.length - 1 - tail) === to.charCodeAt(to.length - 1 - tail)) tail++;
-	const a = lines(from.slice(head, from.length - tail));
-	const b = lines(to.slice(head, to.length - tail));
+	while (tail > 0 && !boundary(from[from.length - tail]!)) tail--;
+	const a = split(from.slice(head, from.length - tail));
+	const b = split(to.slice(head, to.length - tail));
 	const hunks = a.length * b.length > MAX_CELLS ? [{ before: a.join(""), text: b.join(""), skip: 0 }] : hunksOf(a, b);
 	const out: Splice[] = [];
 	let at = head;
@@ -115,6 +125,7 @@ export function diff(from: string, to: string): Splice[] {
 }
 
 const lines = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+const words = (text: string): string[] => text.match(/<[^>]*>|\s+|[^\s<]+/g) ?? [];
 
 /** Changed runs from a longest common sequence of lines; skip is the unchanged length before each run. */
 function hunksOf(a: string[], b: string[]): { before: string; text: string; skip: number }[] {

@@ -8,10 +8,14 @@ import { syncOnce, type DocsRemote, type Link } from "./google.ts";
 export const TICK_MS = 2000;
 export type GoogleDoc = { id: string; title: string; url: string; modified?: number };
 
-/** The Docs API, as the server's entry gives it. */
+/** The Docs API, as the server's entry gives it: the mirror's index-aligned text, and markdown for agents. */
 export interface GoogleDocs extends DocsRemote {
 	list(query?: string): Promise<GoogleDoc[]>;
 	title(id: string): Promise<string>;
+	/** The Doc as markdown, the words its page shows, with the revision it was read at. */
+	markdown(id: string): Promise<{ text: string; revision: string; title?: string }>;
+	/** Make the Doc read as this markdown, by the smallest Docs edits; a Doc that moved since revision is a conflict. */
+	writeMarkdown(id: string, markdown: string, revision: string): Promise<void>;
 }
 
 const encoder = new TextEncoder();
@@ -67,18 +71,18 @@ async function creditOf(store: Store, id: string, now: number): Promise<Caller> 
 /** A Doc's words and title, by its address or id. */
 export async function readDoc(docs: GoogleDocs, url: string): Promise<{ doc: string; title?: string; text: string }> {
 	const id = docIdOf(url);
-	const [doc, title] = await Promise.all([docs.read(id), docs.title(id).catch(() => undefined)]);
-	return { doc: id, ...(title ? { title } : {}), text: doc.text };
+	const doc = await docs.markdown(id);
+	return { doc: id, ...(doc.title ? { title: doc.title } : {}), text: doc.text };
 }
 
 /** Replace one exact piece of a Doc's words, all of it or none; the Doc's words as they now are. */
 export async function editDoc(docs: GoogleDocs, store: Store, url: string, old: string, next: string, by: Caller, now = Date.now()): Promise<{ doc: string; text: string }> {
 	const id = docIdOf(url);
-	const doc = await docs.read(id);
+	const doc = await docs.markdown(id);
 	const count = old ? doc.text.split(old).length - 1 : 0;
 	if (count !== 1) throw new Refused("invalid", count === 0 ? "Those exact words are not in the Doc: google.read shows its words as they are now." : `Those words are in the Doc ${count} times: give more of them, so they are found once.`, "google.read");
 	const at = doc.text.indexOf(old);
-	await docs.write(id, [{ at, before: old, text: next }], doc.revision);
+	await docs.writeMarkdown(id, doc.text.slice(0, at) + next + doc.text.slice(at + old.length), doc.revision);
 	await store.put(`credit/${id}`, encoder.encode(JSON.stringify({ caller: by, until: now + CREDIT_MS })));
-	return { doc: id, text: (await docs.read(id)).text };
+	return { doc: id, text: (await docs.markdown(id)).text };
 }

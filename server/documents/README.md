@@ -44,6 +44,8 @@ and Google Docs.
 
 13. `google.read` gives a Doc's words; `google.edit` replaces one exact piece of them, found once,
    and the Doc's next pull into its mirror is credited to the editor, as a change to review.
+14. With a googleStore (today's `<data>/google/`: client.json, token.json), the sign-in and the
+   Docs API are real: Docs and Drive over HTTPS, the mirror as Google's indices, agents' markdown.
 
 Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
 

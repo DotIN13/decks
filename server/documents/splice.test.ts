@@ -41,5 +41,5 @@ test("diff turns one text into the other, and invert takes it back", () => {
 		assert.equal(applyAll(from!, splices), to, `${from} -> ${to}`);
 		assert.equal(applyAll(to!, invert(splices)), from);
 	}
-	assert.deepEqual(diff("a small step", "a small but sure step"), [{ at: 7, before: "", text: " but sure" }]);
+	assert.deepEqual(diff("a small step", "a small but sure step"), [{ at: 8, before: "", text: "but sure " }]);
 });

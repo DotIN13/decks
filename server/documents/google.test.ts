@@ -78,6 +78,14 @@ class FakeLibrary extends FakeDocs {
 	async title() {
 		return "Field notes";
 	}
+	async markdown() {
+		return { text: this.text, revision: String(this.revision), title: "Field notes" };
+	}
+	async writeMarkdown(_id: string, markdown: string, revision: string) {
+		if (revision !== String(this.revision)) throw new Refused("conflict", "The Doc moved.");
+		this.text = markdown;
+		this.revision++;
+	}
 }
 
 test("google.list and google.link: the mirror is made once, and syncs while a page has it open", async () => {
