@@ -1,5 +1,6 @@
 import { Refused, type Caller, type Envelope } from "../../protocol/index.ts";
 import { randomUUID } from "node:crypto";
+import { adopt } from "./adopt.ts";
 import { Callers } from "./callers.ts";
 import { machineFolder } from "./disk.ts";
 import { EventBus } from "./events.ts";
@@ -20,6 +21,7 @@ export type Built = { kernel: Kernel; router: Router; events: EventBus; callers:
 
 export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const clock = options.clock ?? Date.now;
+	if (options.old) await adopt(options.old, options.stores);
 	const history = new HistoryDeck(options.deck, options.stores("history"));
 	await history.load();
 	options.deck.startAt?.(history.lastRev());

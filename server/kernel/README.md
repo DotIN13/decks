@@ -9,6 +9,7 @@ no feature; only `server/main.ts` does. Keel owns it.
 - `deck.ts` (the deck on a folder), `memory-deck.ts` (in memory), `history.ts` (every write a
   revision), `disk.ts` and `store.ts` (a feature's private store), `callers.ts` (tokens to callers).
 - `router.ts`, `events.ts`, `relay.ts`, `kernel.ts` (builds it all), `own-calls.ts` (`deck.*`).
+- `adopt.ts`: today's `.decks/` adopted once: paired tokens, and card versions as history.
 - `run.ts`: a program a feature starts on this machine (`Kernel.run`), Decks-local only.
 - `doors/`: `http.ts`, `socket.ts`, `ws.ts`, `mcp.ts`. `lockfile.ts`, `server.ts` (`startServer`).
 - `testing.ts`: `testServer` and `testContext`, for every feature's tests. `index.ts`: the entry.
@@ -37,7 +38,8 @@ no feature; only `server/main.ts` does. Keel owns it.
    `ask` on its socket; its `reply` comes back. No host, a host gone, or 30 s: `unavailable`.
 9. A feature route needs a token or `?pass=`, unless it is `public` (GET only, a caller that may call
    nothing). A route may take the raw request (`serve`) or an upgrade under its prefix (`upgrade`).
-10. `Kernel.machine()` is a user-only folder outside any deck; `Kernel.deckId()` is made once per deck.
+10. A deck from today's server keeps its paired tokens and card versions: adopted once, before history
+   loads, its versions at negative revisions, oldest lowest. `Kernel.machine()` is a user-only folder outside any deck; `Kernel.deckId()` is made once per deck.
 11. A running server keeps `<deck>/.decks/server.json`, mode 0600, with the person's token. A second
    server on the same deck, or the same port, fails with a sentence.
 12. A feature's `feature.ts` exports one named factory that makes a fresh `Feature` (options as its one
