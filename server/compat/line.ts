@@ -112,7 +112,8 @@ function openLine(peer: Peer, door: SocketDoor, deck: () => Deck, url: () => str
 		// A change is announced after its write lands, so an older one may come first: the edit is made at
 		// the revision the canvas has once it is answered (that one has it), never on an announcement before.
 		if (edit && envelope.ok && edit.canvas) {
-			const got = await door.call("canvas.get", { canvas: edit.canvas }, caller, client);
+			// canvas.drawing, a pass's call, carries the revision (canvas.get is not a pass's).
+			const got = await door.call("canvas.drawing", { canvas: edit.canvas }, caller, client);
 			edit.at = got.ok ? ((got.value as { rev?: number }).rev ?? 0) : 0;
 		}
 		if (edit && (!envelope.ok || !edit.canvas)) state.edits.splice(state.edits.indexOf(edit), 1);
@@ -130,7 +131,7 @@ async function watchOn(w: LineParts, canvas: string, since: unknown, whole: unkn
 	const bound = boundTo(caller);
 	if (!canvas) return;
 	if (bound && bound !== canvas) return w.send({ type: "harness.error", text: `This line is ${bound}'s: it hears no other canvas.` });
-	const got = await w.door.call("canvas.get", { canvas }, caller, w.client as never);
+	const got = await w.door.call("canvas.drawing", { canvas }, caller, w.client as never);
 	if (!got.ok) return w.send({ type: "harness.error", text: `There is no canvas called ${canvas}.` });
 	const base = filesBase(w.state, canvas);
 	const drawing = (name: string) => readDrawing(w.deck(), name, base);

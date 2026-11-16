@@ -122,9 +122,11 @@ export function refusalsOf(file) {
 			continue;
 		}
 		const what = String(one.call ?? one.route ?? "something");
-		counts.set(what, (counts.get(what) ?? 0) + 1);
+		const was = counts.get(what);
+		counts.set(what, { n: (was?.n ?? 0) + 1, why: was?.why ?? String(one.why ?? "") });
 	}
-	return [...counts].sort((a, b) => b[1] - a[1]);
+	// Each kind with its count and the first reason given, so a log says why as well as what.
+	return [...counts].sort((a, b) => b[1].n - a[1].n).map(([what, { n, why }]) => [why ? `${what} (${why.slice(0, 160)})` : what, n]);
 }
 
 /** The first line of a check's output that says it failed, else the exit. */

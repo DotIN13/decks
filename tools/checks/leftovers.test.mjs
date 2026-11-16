@@ -30,8 +30,8 @@ test("a check's refusals are counted by what was refused", async () => {
 	try {
 		const { refusalsOf } = await import("./run.mjs");
 		const file = join(dir, "refusals.jsonl");
-		writeFileSync(file, [{ call: "file.read" }, { route: "POST /compat/snapshot" }, { call: "file.read" }].map((one) => JSON.stringify(one)).join("\n") + "\nnot json\n");
-		assert.deepEqual(refusalsOf(file), [["file.read", 2], ["POST /compat/snapshot", 1]]);
+		writeFileSync(file, [{ call: "file.read", why: "outside its canvas" }, { route: "POST /compat/snapshot" }, { call: "file.read", why: "again" }].map((one) => JSON.stringify(one)).join("\n") + "\nnot json\n");
+		assert.deepEqual(refusalsOf(file), [["file.read (outside its canvas)", 2], ["POST /compat/snapshot", 1]]);
 		assert.deepEqual(refusalsOf(join(dir, "none.jsonl")), []);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
