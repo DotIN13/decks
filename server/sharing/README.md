@@ -6,11 +6,10 @@ one `.decks` file (`bundle/`). Handles `studio.status`, `studio.connect` and `st
 ## Owns
 
 - `feature.ts`: the feature, `sharingFeature(opts)`, and its three calls.
-- `client/link.ts`: Studio's key and the sync state, kept in the kernel's private `Store`.
-- `client/`: the sync client that keeps a deck in step with Studio, over a `Transport`.
-- `hub/`: Studio's side kept in memory: the store, the merge, the `/sync/v1` routes, the live socket.
-  Its entry is `hub/index.ts`; a store is any `HubStore`, a database in Studio's repo.
-- `hash.ts`: a file's hash as both sides name it.
+- `client/`: the sync client that keeps a deck in step with Studio, over a `Transport`; `link.ts`
+  keeps Studio's key and the sync state in the kernel's private `Store`.
+- `hub/` (entry `hub/index.ts`): Studio's side: the store (any `HubStore`), the merge, the routes,
+  the live socket. `hash.ts`: a file's hash as both sides name it.
 
 ## May import
 
@@ -42,7 +41,8 @@ own modules. Never another feature.
 11. The app list goes to Studio once a connection, then only when a name, title or kind changes.
 12. Studio closing the live socket for a revoked key (4001) unlinks the deck; a token asked on the
     socket is answered on that socket.
-13. On the hub, who may read and edit is the store's role: a viewer may read, never write.
+13. On the hub, who may read and edit is the store's role: a viewer may read, never write (403);
+    a canvas one may not see answers 404 on every route, edits included.
 14. `GET /api/bundle/<canvas>` (`bundle/`) gives the person the canvas as one `.decks` zip: a
     manifest, its folder, `lib/`, and the files its cards name. Pictures wait for `pictures/`.
 15. Studio may pass a call down the live socket (`ask`, answered by `reply`, `Live.askCall` on the

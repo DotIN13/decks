@@ -77,3 +77,15 @@ test("a file outside a canvas's bundle, or a secret, is refused; a stale write i
 	assert.equal((await s.call("ada-key", "GET", `/sync/v1/blobs/${first.hash}`)).status, 200);
 	assert.equal((await s.call("bob-key", "GET", `/sync/v1/blobs/${first.hash}`)).status, 404);
 });
+
+test("edits to a canvas one may not see answer 404, as the file routes do; a viewer's answer 403", async () => {
+	const s = studio();
+	const made = await s.call("ada-key", "POST", "/sync/v1/canvases", { name: "plan" });
+	const id = made.body.canvas.id;
+	const stranger = await s.call("bob-key", "POST", `/sync/v1/canvases/${id}/edits`, { base: 0, edits: [note("n1")] });
+	assert.deepEqual([stranger.status, stranger.body.error], [404, "No such canvas."]);
+	assert.equal((await s.call("bob-key", "GET", `/sync/v1/canvases/${id}/files`)).status, 404, "the same as a file route");
+	s.hub.share(id, "bob", "view");
+	assert.equal((await s.call("bob-key", "POST", `/sync/v1/canvases/${id}/edits`, { base: 0, edits: [note("n1")] })).status, 403);
+	assert.equal((await s.call("ada-key", "POST", `/sync/v1/canvases/${id}/edits`, { base: 0, edits: [note("n1")] })).status, 200);
+});

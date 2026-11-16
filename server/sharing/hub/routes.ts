@@ -77,7 +77,7 @@ function routeTable(o: HubOptions): Map<string, Handler> {
 		const rev = hub.canvas(c.params.id!)!.rev;
 		return json(200, got ? { rev, changes: got.map((x) => x.edits) } : { rev, tooOld: true });
 	});
-	add(R.edits, async (c) => pushEdits(o, c, by(c.who)));
+	add(R.edits, async (c) => (editable(c), pushEdits(o, c, by(c.who))));
 	add(R.files, (c) => (roleOf(c), json(200, { files: hub.canvasFiles(c.params.id!) })));
 	add(R.putFile, async (c) => (editable(c), putFile(o, c, by(c.who))));
 	add(R.deleteFile, (c) => {
@@ -107,9 +107,8 @@ async function createCanvas(o: HubOptions, { who, req }: Ctx): Promise<Response>
 	return json(201, { canvas });
 }
 
-/** A push of drawing edits, merged onto the canvas as it is now. */
+/** A push of drawing edits, merged onto the canvas as it is now; editable() has checked the role. */
 async function pushEdits(o: HubOptions, c: Ctx, by: string): Promise<Response> {
-	if (!mayEdit(o.hub.role(c.who.user.id, c.params.id!))) throw new HubError(403, "You may not edit this canvas.");
 	const sent = (await bodyOf(c.req, o.maxBytes)) as { edits?: unknown; client?: unknown };
 	if (!Array.isArray(sent.edits)) throw new HubError(400, "Send edits: a list from the pen diff.");
 	if (sent.edits.length > sync.EDITS_MAX) throw new HubError(413, `At most ${sync.EDITS_MAX} edits in one push.`);
