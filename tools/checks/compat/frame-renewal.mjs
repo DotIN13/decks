@@ -1,5 +1,5 @@
 /**
- * The canvas frame held past pass renewals, a dropped line and a restarted server (cases 1-4 below):
+ * The canvas frame held past pass renewals, a dropped line and a restarted server (cases 1, 2, 3a, 3b and 4 below):
  * do the person's edits and undo go on? The pass lives PASS_MS: DECKS_PASS_MS on a restarted server,
  * else its answer shortened on the way to the page. Run: node tools/checks/run.mjs <this file>.
  */
@@ -144,26 +144,46 @@ const line = () => `renewals ${seen.passes}${seen.shortened ? " (shortened on th
 	say("2. the line stays open", seen.closes.length === closed, line());
 }
 
-// 3. The line dropped while the drawing changes; the frame catches up and keeps its undo.
-{
-	await select("rn-b");
-	const from = onServer("rn-b")?.x;
-	await nudge();
-	await until(async () => onServer("rn-b")?.x === from + 10);
-	const live = lines.filter((one) => one.open);
-	const opened = seen.opened;
-	for (const one of live) {
+// 3a. The line dropped and back, nobody else changing the drawing: ⌘Z still takes back the nudge before the drop.
+const drop = async () => {
+	for (const one of lines.filter((l) => l.open)) {
 		one.open = false;
 		seen.closes.push("dropped by the check");
 		await one.ws.close({ code: 1006 }).catch(() => one.ws.close().catch(() => {}));
 		await one.server.close().catch(() => {});
 	}
-	wire.link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "rn-c", fill: "#5cbf6a" }, box: at(-100, -150) }] });
-	say("3. the frame opens its line again", !!(await until(async () => seen.opened > opened, 15000)), line());
-	say("3. …and draws what changed while it was down", !!(await until(async () => await inFrame("rn-c"), 10000)));
+};
+{
+	await select("rn-b");
+	const from = onServer("rn-b")?.x;
+	await nudge();
+	await until(async () => onServer("rn-b")?.x === from + 10);
+	const opened = seen.opened;
+	await drop();
+	say("3a. the frame opens its line again", !!(await until(async () => seen.opened > opened, 15000)), line());
+	await settle(page, 1000);
 	await undo();
 	const back = await until(async () => onServer("rn-b")?.x === from);
-	say("3. ⌘Z after the drop takes back the nudge made before it", !!back, `${from} → ${onServer("rn-b")?.x}`);
+	say("3a. ⌘Z after the drop takes back the nudge made before it", !!back, `${from} → ${onServer("rn-b")?.x}`);
+	say("3a. …and the frame draws it back", !!(await until(async () => (await inFrame("rn-b"))?.x === from)), String((await inFrame("rn-b"))?.x));
+}
+
+// 3b. An agent changes the drawing after the person's nudge: ⌘Z is refused (server/canvas/log.ts), and the person is told why.
+{
+	await select("rn-b");
+	const from = onServer("rn-b")?.x;
+	await nudge();
+	await until(async () => onServer("rn-b")?.x === from + 10);
+	wire.link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "rn-c", fill: "#5cbf6a" }, box: at(-100, -150) }] });
+	say("3b. the agent's rectangle reaches the frame", !!(await until(async () => await inFrame("rn-c"), 10000)));
+	await undo();
+	await settle(page, 1500);
+	say("3b. ⌘Z after an agent's edit leaves the nudge in place", onServer("rn-b")?.x === from + 10, `${from + 10} → ${onServer("rn-b")?.x}`);
+	const told = await until(async () => {
+		const words = [await page.evaluate(() => document.body.innerText), await (await cv()).evaluate(() => document.body.innerText)].join(" ");
+		return /cannot be undone|changed the drawing since/i.test(words) && words.match(/[^.\n]*(cannot be undone|changed the drawing since)[^.\n]*/i)?.[0];
+	}, 5000);
+	say("3b. …and the person is told why", !!told, told || "no notice with 'cannot be undone' on the page or in the frame");
 }
 
 // 4. The server restarted: the frame reads the drawing again and goes on.
