@@ -1,10 +1,10 @@
 # canvas/look
 
-How things look: fonts and their coverage, icons, code colours, maths, media.
+How things look: the fonts a drawing's words need (the files are `protocol/fonts.ts`), icons, code colours, maths, media.
 
 ## Owns
 
-- `font-files.ts`, `font-coverage.ts`, `icons.ts`, `icon-index.ts`, `highlight.ts`, `math.ts`, `media-look.ts`, `look.ts`.
+- `font-files.ts`, `icons.ts`, `icon-index.ts`, `highlight.ts`, `math.ts`, `media-look.ts`, `look.ts`.
 
 ## May import
 

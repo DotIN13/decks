@@ -166,7 +166,7 @@
 	"canvas/items/natural-size.ts: em dash": 1,
 	"canvas/items/news.ts: comment over 5 lines": 2,
 	"canvas/items/news.ts: em dash": 3,
-	"canvas/look/font-files.ts: comment over 5 lines": 3,
+	"canvas/look/font-files.ts: comment over 5 lines": 1,
 	"canvas/look/icon-index.ts: comment over 5 lines": 1,
 	"canvas/look/icons.ts: comment over 5 lines": 2,
 	"canvas/look/icons.ts: em dash": 2,

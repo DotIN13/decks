@@ -32,6 +32,7 @@
 	"dependencies": {
 		"@decks/api": "*",
 		"@decks/pen": "*",
+		"@decks/protocol": "*",
 		"@decks/protocol-old": "*",
 		"@decks/engine": "*",
 		"@decks/ui": "*",

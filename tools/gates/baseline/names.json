@@ -203,7 +203,7 @@
 	"canvas/look/math.ts: stage": 2,
 	"canvas/look/media-look.ts: board": 1,
 	"canvas/look/media-look.ts: stage": 3,
-	"canvas/package.json: stage": 2,
+	"canvas/package.json: stage": 1,
 	"canvas/render/backends/detect.ts: stage": 15,
 	"canvas/render/backends/notice.ts: stage": 6,
 	"canvas/render/backends/webgl.ts: stage": 1,
