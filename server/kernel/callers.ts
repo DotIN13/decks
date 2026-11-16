@@ -49,7 +49,7 @@ export class Callers implements Tokens {
 		if (this.kept.delete(hashOf(token))) this.save();
 	}
 
-		describe(kind: Who, now: (id: string, issued: Caller) => Caller | undefined): void {
+	describe(kind: Who, now: (id: string, issued: Caller) => Caller | undefined): void {
 		this.now.set(kind, now);
 	}
 
