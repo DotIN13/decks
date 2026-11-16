@@ -1,5 +1,6 @@
 import type { JSX } from "solid-js";
 import { serialize, type PenEdit } from "@decks/pen";
+import { penOps } from "@decks/protocol";
 import { untrack } from "solid-js";
 import type { Page } from "@decks/protocol-old";
 import type { createEditor } from "../../editor/editor.tsx";
@@ -207,12 +208,12 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			// Your edits, straight to the harness; one it refuses is dropped, and the drawing read again.
 			send: async (ops, edit) => {
 				changed();
-				const answer = await backend.call("canvas.batch", [ops], edit);
+				const answer = await backend.act("item.batch", { canvas: start.canvas.name, ops: ops.map(penOps.itemOpOf), ...(edit ? { edit } : {}) });
 				if (!answer.ok) reread();
 				return answer.ok;
 			},
 			step: (direction, edit) => {
-				void backend.call("canvas.step", [direction], edit).then((answer) => {
+				void backend.act("canvas.undo", { canvas: start.canvas.name, ...(direction === "redo" ? { redo: true } : {}), ...(edit ? { edit } : {}) }).then((answer) => {
 					if (answer.ok) return;
 					if (edit) ctx.handle().refused(edit);
 					console.info(answer.error);
@@ -235,7 +236,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 		onDeleteCard: async (path) => {
 			if (studio) return takeOff(path);
 			// An item with no file of its own (an app, a document) is named by its id, which its page path carries (`item:<id>`).
-			const answer = await backend.call("canvas.delete", [path.startsWith("item:") ? path.slice(5) : path]);
+			const answer = await backend.act("item.delete", { canvas: start.canvas.name, id: path.startsWith("item:") ? path.slice(5) : path });
 			return answer.ok;
 		},
 	};
@@ -280,7 +281,7 @@ function pagesOptions(ctx: FrameContext): Parameters<typeof createEditor>[0]["pa
 		onRead: (path) => void (studio ? undefined : backend.post("card-seen", { path })),
 		// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
 		onHide: (path) => {
-			if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path]);
+			if (!takeOff(path) && !studio) void backend.act("item.delete", { canvas: ctx.start.canvas.name, id: path });
 		},
 	};
 }

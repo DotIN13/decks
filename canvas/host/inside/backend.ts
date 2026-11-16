@@ -20,8 +20,10 @@ export interface Backend {
 	 * so what was missed while the line was down comes back as `canvas.changed`. Answers what stops it.
 	 */
 	follow(hear: (message: Heard) => void, since?: () => number): () => void;
-	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
+	/** One call on this canvas by today's name, on the old line, with the edit's name when it is one. */
 	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	/** One call by its protocol name, on the socket (an edit's name goes in its `edit` argument). */
+	act(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
 	/** This frame's name, once its stream's; kept on a document message for a harness that still answers by it. */
 	frame: string;
 	/** One of the frame's own messages on the line (`doc`, `card-seen`, `card-extent`): sent, and answered `ok` at once. */
@@ -101,6 +103,11 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 
 		async call(verb, args, edit) {
 			return line().call(verb, args, edit);
+		},
+
+		async act(name, args) {
+			const answer = await sock().call(name, args);
+			return answer.ok ? { ok: true, value: answer.value, notes: answer.notes } : { ok: false, error: answer.error.message, notes: answer.notes };
 		},
 
 		frame,

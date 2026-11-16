@@ -63,7 +63,7 @@ function wireClipboard(ctx: FrameContext, handle: Handle): void {
 		canvas: start.canvas.name,
 		harness: () => harness,
 		canWrite: ctx.canWrite,
-		...(studio ? {} : { call: (verb: string, args: unknown[]) => backend.call(verb, args) }),
+		...(studio ? {} : { call: (name: string, args: Record<string, unknown>) => backend.act(name, args) }),
 		upload: (files, at) =>
 			void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
 				end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),

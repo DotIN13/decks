@@ -26,7 +26,7 @@ interface ClipboardDeps {
 	harness: () => string;
 	canWrite: () => boolean;
 	/** The harness's calls, on the canvas's pass; none on Studio. */
-	call?: (verb: string, args: unknown[]) => Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	call?: (name: string, args: Record<string, unknown>) => Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
 	upload: (files: File[], at: { x: number; y: number }) => void;
 	say: (text: string) => void;
 }
@@ -58,7 +58,7 @@ export function installClipboard(deps: ClipboardDeps): { paste: (data: { clip?: 
 	const pasteClip = async (clip: Clip) => {
 		const at = worldAt();
 		if (deps.call) {
-			const answer = await deps.call("canvas.paste", [{ v: 1, id: clip.id, canvas: clip.canvas }, { at }]);
+			const answer = await deps.call("item.paste", { clip: { id: clip.id, canvas: clip.canvas }, at });
 			if (!answer.ok) return deps.say(answer.error ?? "Nothing was pasted.");
 			if (answer.notes?.length) deps.say(answer.notes.join(" "));
 			return selectWhenDrawn(((answer.value ?? []) as Array<{ id?: string }>).map((one) => one.id).filter((one): one is string => !!one));
@@ -125,7 +125,7 @@ function copyItems(deps: ClipboardDeps, event: ClipboardEvent, cut: boolean): vo
 	};
 	if (!deps.call || !id) return takeOff();
 	// The harness holds the copy before a cut takes the items off: what it holds is read off the drawing.
-	void deps.call("canvas.clip", [ids, { id }]).then((answer) => {
+	void deps.call("item.clip", { ids, id }).then((answer) => {
 		if (answer.ok) return takeOff();
 		deps.say(`The copy was not made: ${answer.error ?? "the harness did not answer"}`);
 	});
