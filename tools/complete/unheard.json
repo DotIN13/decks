@@ -1,0 +1,46 @@
+{
+	"unheard": {
+		"file.created": {
+			"owner": "Folio",
+			"why": "Declared for a file made at a client's named request; nothing emits it yet."
+		}
+	},
+	"notDrivenHere": {
+		"file.compiled": {
+			"owner": "Quire",
+			"provedBy": "Emitted when a LaTeX document compiles, which needs tectonic; Quire's tests in server/documents drive it with a fake Kernel.run."
+		},
+		"chat.added": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"chat.changed": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"chat.asked": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"chat.answered": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"chat.drafted": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"account.changed": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"runtime.changed": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		},
+		"runtime.noticed": {
+			"owner": "Helm",
+			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+		}
+	}
+}

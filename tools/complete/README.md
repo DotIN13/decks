@@ -1,12 +1,17 @@
 # tools/complete
 
-The completeness check: every call the protocol declares is answered by someone. Keel owns it.
+The completeness checks: every call the protocol declares is answered, and every event is heard. Keel
+owns them.
 
 ## Owns
 
 - `calls.test.ts`: starts the server with every feature as `server/main.ts` starts it, on a copy of
   the fixture deck, connects a host that offers what the harness answers, and checks every call.
 - `unhandled.json`: the calls answered by no one yet, each with its owner and why.
+- `events.test.ts`: drives the same server through the smallest action that causes each event, and
+  hears it on a socket; `unheard.json` lists the rest: unheard (owner, why) or not driven here (owner,
+  what proves it).
+- `start.ts`: the server started as main starts it, socket lines, and what the harness answers.
 
 ## May import
 
@@ -20,9 +25,11 @@ Anything: `@decks/protocol`, `@decks/server` and its kernel's testing entry, `@d
    need the Google sign-in's store) counts as answered only when main's start options give it.
 3. A call answered by no one fails the check unless `unhandled.json` lists it, with its owner and why.
 4. A listed call that is answered now, or no longer declared, fails the check too: the list only shrinks.
+5. Every declared event has a step that causes it and a line that hears it within two seconds, or is
+   in `unheard.json`. A step that hears a listed event fails the check: take the line out.
 
 ## Check
 
 ```
-node --import tsx --test tools/complete/calls.test.ts
+node --import tsx --test tools/complete/calls.test.ts tools/complete/events.test.ts
 ```
