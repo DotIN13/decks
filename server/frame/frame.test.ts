@@ -1,12 +1,16 @@
 // The page is public; a pass needs the person's token and opens one canvas's files only.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
 import { frameFeature } from "./feature.ts";
+
+/** Every temp folder a test here makes, removed when the file's tests end. */
+const made: string[] = [];
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 const deck = {
 	"canvases/plan/canvas.pen": JSON.stringify({ version: "2.14", children: [] }),
@@ -18,6 +22,7 @@ const deck = {
 
 test("the built page is public, and says how to build it when it is not", async () => {
 	const dist = `${mkdtempSync(join(tmpdir(), "frame-"))}/`;
+	made.push(dist);
 	const server = await testServer({ features: [frameFeature({ dist })] });
 	const doors = await server.listen(0);
 	assert.equal((await fetch(`${doors.url}/canvas-frame.html`)).status, 503);

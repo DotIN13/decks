@@ -1,13 +1,18 @@
 // A moved file's or folder's baseline keys move with it, same counts, in every gate's baseline.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moved, rekey, splitKeys } from "./rekey.mjs";
 
+/** Every temp folder a test here makes, removed when the file's tests end. */
+const made = [];
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
 const scratch = (baselines) => {
 	const root = mkdtempSync(join(tmpdir(), "rekey-"));
+	made.push(root);
 	mkdirSync(join(root, "tools/gates/baseline"), { recursive: true });
 	for (const [name, keys] of Object.entries(baselines)) writeFileSync(join(root, `tools/gates/baseline/${name}.json`), JSON.stringify(keys));
 	return root;

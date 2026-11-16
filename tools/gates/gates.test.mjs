@@ -1,16 +1,21 @@
 // Each gate, planted with one break in a scratch folder, fails and names it; the clean twin passes.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ROOT, compare, context } from "./lib.mjs";
 import { runGates } from "./run.mjs";
 import { outsideLane, overlaps } from "./lanes.mjs";
 
+/** Every temp folder a test here makes, removed when the file's tests end. */
+const made = [];
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
 function scratch(files, git = false) {
 	const dir = mkdtempSync(join(tmpdir(), "gates-"));
+	made.push(dir);
 	for (const [path, text] of Object.entries(files)) {
 		mkdirSync(dirname(join(dir, path)), { recursive: true });
 		writeFileSync(join(dir, path), text);

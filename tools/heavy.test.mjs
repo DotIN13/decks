@@ -1,15 +1,21 @@
 // Tests for tools/heavy.mjs, each on its own lock in a scratch folder, with disk sizes injected.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/** Every temp folder a test here makes, removed when the file's tests end. */
+const made = [];
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
 const HEAVY = new URL("./heavy.mjs", import.meta.url).pathname;
 
 function heavy(args, env = {}) {
-	const lock = join(mkdtempSync(join(tmpdir(), "heavy-")), "lock");
+	const dir = mkdtempSync(join(tmpdir(), "heavy-"));
+	made.push(dir);
+	const lock = join(dir, "lock");
 	const run = (more = {}) => spawnSync(process.execPath, [HEAVY, ...args], {
 		encoding: "utf8",
 		env: { ...process.env, HEAVY_LOCK: lock, HEAVY_FREE_GB: "50", REWRITE_AGENT: "Test", ...env, ...more },

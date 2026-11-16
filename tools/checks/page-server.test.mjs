@@ -1,12 +1,16 @@
 // The checks' page server: the dev server's proxy rules, the token in index.html, and sockets passed through.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { proxied, startPageServer, withSession } from "./page-server.mjs";
+
+/** Every temp folder a test here makes, removed when the file's tests end. */
+const made = [];
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 test("the dev server's paths go to Decks-local; the page's own are served", () => {
 	for (const path of ["/api", "/api/v1/x", "/files/a.png", "/compat/v1/socket", "/ws", "/frame-assets/a.js", "/app/x/"]) assert.ok(proxied(path), path);
@@ -28,6 +32,7 @@ function upstream() {
 test("the built page is served with the token, and HTTP and sockets reach Decks-local", async () => {
 	const up = await upstream();
 	const scratch = mkdtempSync(join(tmpdir(), "page-"));
+	made.push(scratch);
 	const dist = join(scratch, "dist");
 	const deck = join(scratch, "deck");
 	mkdirSync(dist);
