@@ -114,7 +114,10 @@ function firstFailure(log, code) {
 /** The three programs up on a fresh fixture copy, work(ports, deck) run, then all stopped and the copy gone. */
 export async function runPrograms(work, { i = 0, onlyServer = false, log = [], dist = RUN.dist } = {}) {
 	const ports = portsFor(i);
-	// The slot is ours, but the last caller's programs may still be closing its ports: wait for them.
+	// The slot is ours: any program a dead holder of it left running is no live run's, so it goes first.
+	const left = endLeftovers(i);
+	if (left.length) log.push(`[runner] ended ${left.length} program(s) a dead run of slot ${i} left running: ${left.join(", ")}\n`);
+	// The last caller's programs may still be closing its ports: wait for them.
 	await portsFree(Object.values(ports));
 	const scratch = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 	const deck = join(scratch, "deck");
@@ -129,6 +132,7 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 		const child = launch(name, { ...spec, env: { ...spec.env, ...extra } }, log);
 		started.push(child);
 		running.set(name, child);
+		remember(i, started);
 		await until(ready(name), child, name);
 	};
 	/**
@@ -151,8 +155,48 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 		return await work({ ports, deck, started, log, restart });
 	} finally {
 		await Promise.all(started.reverse().map(stopAndWait));
+		// The slot goes back only once its ports are closed, so the next holder never meets these programs.
+		await portsFree(Object.values(ports), { ms: 15_000 }).catch((error) => log.push(`[runner] ${error.message}\n`));
+		forget(i);
 		rmSync(scratch, { recursive: true, force: true });
 	}
+}
+
+// What a slot's programs are, kept beside the heavy lock: a run killed outright (a Decks restart ends the
+// command that started it) leaves its programs up, each in a group of its own, and the next holder ends them.
+
+const programsFile = (slot) => `${process.env.HEAVY_LOCK || "/tmp/decks-rewrite-heavy.lock"}.programs-${slot}.json`;
+
+/** Write down the process groups this run started on its slot. */
+function remember(slot, children) {
+	writeFileSync(programsFile(slot), JSON.stringify(children.map((child) => child.pid).filter(Boolean)));
+}
+
+/** The run is over and its programs are stopped: nothing is left to end. */
+function forget(slot) {
+	rmSync(programsFile(slot), { force: true });
+}
+
+/** End every process group a dead run of this slot wrote down and left running; answers the ones ended. */
+export function endLeftovers(slot) {
+	let pids = [];
+	try {
+		pids = JSON.parse(readFileSync(programsFile(slot), "utf8"));
+	} catch {
+		return [];
+	}
+	const ended = [];
+	for (const pid of pids) {
+		try {
+			process.kill(-pid, 0);
+			process.kill(-pid, "SIGKILL");
+			ended.push(String(pid));
+		} catch {
+			/* that group is gone already */
+		}
+	}
+	forget(slot);
+	return ended;
 }
 
 /** Where a check is: its path in checks.json, or the path it was named by (tools/checks/<feature>/<name>.mjs). */
