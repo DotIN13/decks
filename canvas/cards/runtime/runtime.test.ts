@@ -1,3 +1,4 @@
+// Tests of the card runtime's lib/ files and its signed read passes.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { libFile, libName, passes } from "./index.ts";

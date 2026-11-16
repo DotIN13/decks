@@ -1,3 +1,5 @@
+// The card runtime for whoever serves cards: its lib/ files, the headers a live card goes out with,
+// and the signed read passes that open one.
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
@@ -15,11 +17,29 @@ export { CARD_SANDBOX } from "./sandbox.ts";
  * and the address that opens a card is a signed, expiring read pass (`passes`).
  */
 
+// The card runtime's lib/ and its files
 /** The card runtime's folder: card.css, theme.css, card.js, the live pages, their fonts and libraries. */
 export function libDir(): string {
 	return resolve(dirname(fileURLToPath(import.meta.url)), "lib");
 }
 
+/** A file of `lib/` by its path inside it (`card.css`, `fonts/x.woff2`), or nothing for one that is not there or climbs out. */
+export function libFile(path: string): { bytes: Uint8Array; type: string } | undefined {
+	const root = libDir();
+	const full = join(root, normalize(libName(path)));
+	if (!full.startsWith(root + sep) || !existsSync(full) || !statSync(full).isFile()) return undefined;
+	return { bytes: readFileSync(full), type: contentType(full) };
+}
+
+/**
+ * The file a page asks `lib/` for: board.css and board.js, which pages written before cards
+ * (a friend's leftover board, a card written then) ask for by name, are `card.css` and `card.js`.
+ */
+export function libName(path: string): string {
+	return path.replace(/(^|\/)board\.(css|js)$/, "$1card.$2");
+}
+
+// What a card's file goes out with
 /** The sandbox a card from someone else runs in (`CARD_SANDBOX`), as a Content-Security-Policy. */
 export const LIVE_CARD_POLICY = `sandbox ${CARD_SANDBOX}`;
 
@@ -33,22 +53,7 @@ export function contentType(path: string): string {
 	return TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
 }
 
-/**
- * The file a page asks `lib/` for: board.css and board.js, which pages written before cards
- * (a friend's leftover board, a card written then) ask for by name, are `card.css` and `card.js`.
- */
-export function libName(path: string): string {
-	return path.replace(/(^|\/)board\.(css|js)$/, "$1card.$2");
-}
-
-/** A file of `lib/` by its path inside it (`card.css`, `fonts/x.woff2`), or nothing for one that is not there or climbs out. */
-export function libFile(path: string): { bytes: Uint8Array; type: string } | undefined {
-	const root = libDir();
-	const full = join(root, normalize(libName(path)));
-	if (!full.startsWith(root + sep) || !existsSync(full) || !statSync(full).isFile()) return undefined;
-	return { bytes: readFileSync(full), type: contentType(full) };
-}
-
+// Read passes
 /**
  * Signed, expiring read passes: what goes in a live card's address so the address alone opens it.
  * `make` signs any JSON value with an expiry; `read` gives it back only when the signature holds and

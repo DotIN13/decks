@@ -1,3 +1,5 @@
+// Copies and bundles the card runtime's vendored libraries (d3, marked, KaTeX, pdf.js, Mermaid,
+// highlight.js) into canvas/cards/runtime/lib. Run with npm run vendor.
 /**
  * Put the board primitives into `canvas/cards/runtime/lib`, from the packages in node_modules.
  *

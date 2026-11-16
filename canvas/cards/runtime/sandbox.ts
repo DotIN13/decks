@@ -1,3 +1,5 @@
+// The sandbox tokens a card from someone else runs in, one list for every server of another
+// person's page.
 /**
  * The sandbox a card (or an old board) from someone else runs in, as the tokens of an iframe's
  * `sandbox` attribute or a `Content-Security-Policy: sandbox …`: scripts, forms, pop-ups, dialogs

@@ -1,3 +1,5 @@
+// A card's inline scripts as modules served beside it: which scripts run, their addresses, and a
+// card folder's revision stamp.
 /**
  * A card's scripts, as whoever serves cards serves them (a harness, Decks Studio): each inline script
  * that runs is a module at its own address beside the card, `sales.html.m0.js`, so its relative
