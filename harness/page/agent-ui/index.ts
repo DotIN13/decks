@@ -3,7 +3,7 @@
 
 export { AgentUi } from "./view.tsx";
 export { mountAgentUi, type AgentUiMount } from "./actions.ts";
-export { HOST_FIELDS, missingFromHost } from "./model.ts";
+export { HOST_FIELDS, HOST_TOKENS, missingFromHost, OPTIONAL_TOKENS } from "./model.ts";
 export { setAgentUiHost, type AgentMenuProps, type AgentUiHost, type FaceProps } from "../composer/host.ts";
 
 // The conversation.

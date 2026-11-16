@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { HOST_FIELDS, missingFromHost } from "./model.ts";
+import { HOST_FIELDS, HOST_TOKENS, missingFromHost, OPTIONAL_TOKENS } from "./model.ts";
 
 // The entry's promise to another program: it reaches nothing of the harness's page but the chat, the
 // composer and itself, and nothing else but packages Studio has; and a host may leave any field out.
@@ -49,4 +49,12 @@ test("and names no package another program would not have", () => {
 	const { packages } = reach("agent-ui/index.ts");
 	const unknown = [...packages].filter((spec) => !PACKAGES.some((name) => spec === name || spec.startsWith(`${name}/`)));
 	assert.deepEqual(unknown, []);
+});
+
+test("the tokens the sheets read from the host are exactly HOST_TOKENS and OPTIONAL_TOKENS", () => {
+	const sheets = [...readFileSync(join(PAGE, "agent-ui/styles.css"), "utf8").matchAll(/@import "\.\.\/([^"]+)"/g)].map((m) => readFileSync(join(PAGE, m[1]!), "utf8").replace(/\/\*[\s\S]*?\*\//g, ""));
+	const read = new Set(sheets.flatMap((css) => [...css.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]!)));
+	const own = new Set(sheets.flatMap((css) => [...css.matchAll(/(?<![\w-])(--[\w-]+)\s*:/g)].map((m) => m[1]!)));
+	const fromHost = [...read].filter((token) => !own.has(token)).sort();
+	assert.deepEqual(fromHost, [...HOST_TOKENS, ...OPTIONAL_TOKENS].sort());
 });

@@ -23,9 +23,10 @@ harness's page: `model.test.ts` walks the whole import graph to hold this.
    them out. A page with its own layout mounts `Stream` and `Composer` apart, after
    `setAgentUiHost(host)` once.
 2. **Styles**: import `@decks/page/agent-ui/styles.css` (or the sheets it lists, in that order).
-   They read the host page's design tokens (`--fg`, `--muted`, `--line`, `--layer`, `--radius-*`,
-   `--type-*`, the canvas surface tokens) and its kit classes (`float`, `icon-button`,
-   `chip-button`, `data-row`); the host page loads those, as Studio's page does.
+   The tokens they read from the host page are `HOST_TOKENS` (each needed) and `OPTIONAL_TOKENS`
+   (read with a fallback), exported from the entry and held to the sheets by `model.test.ts`; the
+   harness's page defines them in `shell/tokens.css`. They also use the host's kit classes
+   (`float`, `icon-button`, `chip-button`, `data-row`). Mount inside an element carrying both.
 3. **Host** (`AgentUiHost`, every field optional): `notice(level, text)`; `api(path)` and
    `authHeaders()` for the speech recogniser at `/stt`; `AgentFace` and `AgentMenu`, how agents are
    drawn and picked; `FiveHour`, a subscription's five-hour reading. Left out: the console, the
