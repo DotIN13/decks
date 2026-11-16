@@ -1,7 +1,7 @@
 import { Refused } from "../../protocol/index.ts";
 import type { Context, Item } from "../kernel/index.ts";
 import type * as S from "./shapes.ts";
-import type { Machine } from "./machine.ts";
+import type { PictureTools } from "./tools.ts";
 import { cardPath } from "./picture.ts";
 import type { Extents } from "./extent.ts";
 import { noteOf, PRESS, READ, type Reading, type Views } from "./reading.ts";
@@ -15,7 +15,7 @@ const STILL_MS = 600;
 const LONGEST_MS = 3000;
 
 /** Fit a card on a canvas: answers its placement as it now is, and notes what was read. */
-export async function fit(ctx: Context, m: Machine, args: { card: string; margin?: number; canvas?: string }, extents?: Extents): Promise<S.Placement> {
+export async function fit(ctx: Context, m: PictureTools, args: { card: string; margin?: number; canvas?: string }, extents?: Extents): Promise<S.Placement> {
 	const card = cardPath(args.card);
 	const canvas = ctx.canvasName(args.canvas);
 	const item = placedCard(ctx, card, canvas);
@@ -32,7 +32,7 @@ export async function fit(ctx: Context, m: Machine, args: { card: string; margin
 }
 
 /** Load a card's page at a width and read it. */
-export async function measure(m: Machine, card: string, canvas: string, width: number): Promise<Measured> {
+export async function measure(m: PictureTools, card: string, canvas: string, width: number): Promise<Measured> {
 	const page = m.cardPage(card, canvas);
 	const tab = await m.browser.page({ width, height: 800, scale: 1, scheme: "light" });
 	try {

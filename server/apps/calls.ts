@@ -40,7 +40,7 @@ export function appCalls(apps: () => Apps, kernel: () => Kernel): Handled<Contex
 		remove: async (ctx, { name }) => {
 			await manifestOf(ctx.deck, name);
 			await apps().forget(name);
-			apps().machine.place(name, undefined);
+			apps().folders.place(name, undefined);
 			await unplace(ctx, name);
 			await ctx.deck.remove(folderOf(name), ctx.caller);
 			return { deleted: `${APPS}/${name}` };
@@ -61,7 +61,7 @@ export async function describe(ctx: Context, apps: Apps, name: string, withRepo 
 	const files = inDeck ? await sourceFiles(ctx.deck, name) : [];
 	const version = inDeck ? Math.max(0, ...files.map((one) => one.rev)) : kept.at;
 	const errors = kept.status === "broken" ? await apps.logs.errors(name) : [];
-	const repo = withRepo ? await repoOf(apps.machine.folder(name)) : undefined;
+	const repo = withRepo ? await repoOf(apps.folders.folder(name)) : undefined;
 	return {
 		name,
 		title: manifest.title ?? name,

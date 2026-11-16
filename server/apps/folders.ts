@@ -9,7 +9,7 @@ import { dirname, join, resolve, sep } from "node:path";
 
 export type Output = (text: string) => void;
 
-export class Machine {
+export class AppFolders {
 	private outside = new Map<string, string>();
 
 	constructor(readonly workdir: string) {}

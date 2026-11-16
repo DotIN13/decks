@@ -1,6 +1,6 @@
 import { Refused } from "../../protocol/index.ts";
 import type { Context, Route, RouteAnswer } from "../kernel/index.ts";
-import type { Machine } from "./machine.ts";
+import type { PictureTools } from "./tools.ts";
 import { take, type ShotArgs } from "./shot.ts";
 
 // A picture to download (rule 13): GET /pictures/shot?canvas=&agent=&of=&box=&format=&scale=&scheme=&live=&name=.
@@ -9,9 +9,9 @@ import { take, type ShotArgs } from "./shot.ts";
 export const SHOT = "/pictures/shot";
 const TYPES = { png: "image/png", jpeg: "image/jpeg", pdf: "application/pdf" } as const;
 
-export const shotRoute = (m: () => Machine): Route => ({ method: "GET", prefix: SHOT, answer: (ctx, _path, query) => answer(ctx, m(), query) });
+export const shotRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: SHOT, answer: (ctx, _path, query) => answer(ctx, m(), query) });
 
-async function answer(ctx: Context, m: Machine, query: URLSearchParams): Promise<RouteAnswer> {
+async function answer(ctx: Context, m: PictureTools, query: URLSearchParams): Promise<RouteAnswer> {
 	const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });
 	try {
 		const canvas = await canvasOf(ctx, query);

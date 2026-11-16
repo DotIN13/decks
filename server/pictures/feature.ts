@@ -1,7 +1,7 @@
 import { defineFeature, type Feature, type Kernel } from "../kernel/index.ts";
 import { chromium, type Browser } from "./browser.ts";
 import { pictureCalls } from "./calls.ts";
-import { machine, type Machine } from "./machine.ts";
+import { pictureTools, type PictureTools } from "./tools.ts";
 import { pictureRoute } from "./picture.ts";
 import { tileRoute } from "./tile.ts";
 import { shotRoute } from "./download.ts";
@@ -17,7 +17,7 @@ export function picturesFeature(options: PicturesOptions = {}): Feature {
 	let kernel: Kernel | undefined;
 	const browser = options.browser ?? chromium();
 	const origin = options.origin ?? (() => kernel?.url());
-	const m: Machine = machine(browser, origin, () => kernel, options.native ?? true);
+	const m: PictureTools = pictureTools(browser, origin, () => kernel, options.native ?? true);
 	const extents = new Extents();
 	return defineFeature({
 		name: "pictures",

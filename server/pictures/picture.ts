@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { layout, PICTURE_LADDER, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
-import type { Machine } from "./machine.ts";
+import type { PictureTools } from "./tools.ts";
 
 // A card's picture for the canvas at /pictures/ (rule 11): its page at a rung of
 // the canvas's ladder, kept in the store, and compressed for the GPU when asked.
@@ -13,9 +13,9 @@ export const LADDER: readonly number[] = PICTURE_LADDER;
 /** The widest picture an export or a screenshot draws a card from. */
 const WIDEST = 2000;
 
-export const pictureRoute = (m: () => Machine): Route => ({ method: "GET", prefix: PICTURES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });
+export const pictureRoute = (m: () => PictureTools): Route => ({ method: "GET", prefix: PICTURES, answer: (ctx, path, query) => answer(ctx, m(), path, query) });
 
-async function answer(ctx: Context, m: Machine, path: string, query: URLSearchParams): Promise<RouteAnswer> {
+async function answer(ctx: Context, m: PictureTools, path: string, query: URLSearchParams): Promise<RouteAnswer> {
 	try {
 		const card = decodeURIComponent(path.slice(PICTURES.length));
 		const asked = Number(query.get("w") ?? 480);
@@ -32,7 +32,7 @@ async function answer(ctx: Context, m: Machine, path: string, query: URLSearchPa
 }
 
 /** The page's picture as JPEG bytes, taken once per version, rung and scheme. */
-export async function cardPicture(ctx: Context, m: Machine, card: string, asked: number, scheme: "light" | "dark", exact = false): Promise<Uint8Array> {
+export async function cardPicture(ctx: Context, m: PictureTools, card: string, asked: number, scheme: "light" | "dark", exact = false): Promise<Uint8Array> {
 	const path = picturedPath(card);
 	const source = await ctx.deck.read(path).catch(() => {
 		throw new Refused("not_found", `There is no page at ${path}.`, "file.find");
@@ -59,7 +59,7 @@ export async function cardPicture(ctx: Context, m: Machine, card: string, asked:
 }
 
 /** The picture compressed for the GPU, kept beside it; undefined when this machine has no encoder. */
-export async function compressedPicture(ctx: Context, m: Machine, jpeg: Uint8Array, encode = encoder()): Promise<Uint8Array | undefined> {
+export async function compressedPicture(ctx: Context, m: PictureTools, jpeg: Uint8Array, encode = encoder()): Promise<Uint8Array | undefined> {
 	if (!encode) return undefined;
 	const key = `${createHash("sha256").update(jpeg).digest("hex").slice(0, 24)}.astc`;
 	const kept = await ctx.store.get(key);

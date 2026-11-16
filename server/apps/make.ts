@@ -22,14 +22,14 @@ export async function create(ctx: Context, apps: Apps, describe: Describe, args:
 	if (args.source) {
 		personOnly(ctx.caller, "an app's source folder", "app.create");
 		const path = await freeFolder(apps, args.source.path);
-		apps.machine.place(name, path);
-		for (const [file, bytes] of Object.entries(files)) await apps.machine.put(name, file, bytes);
+		apps.folders.place(name, path);
+		for (const [file, bytes] of Object.entries(files)) await apps.folders.put(name, file, bytes);
 		await writeAll(ctx, name, { "app.json": withSource(decode(files["app.json"]!), { ...args.source, path }) });
 	} else {
 		await writeAll(ctx, name, files);
 		await apps.sync(name);
 	}
-	await commitAll(apps.machine.folder(name), `Start ${name} from the ${starter} starter`).catch((error: Error) => ctx.note(`No git repository: ${error.message}`));
+	await commitAll(apps.folders.folder(name), `Start ${name} from the ${starter} starter`).catch((error: Error) => ctx.note(`No git repository: ${error.message}`));
 	return describe(ctx, apps, name, true);
 }
 
@@ -37,18 +37,18 @@ export async function cloneApp(ctx: Context, apps: Apps, describe: Describe, arg
 	const name = args.name ?? nameFromUrl(args.url);
 	folderOf(name);
 	const had = (await hasRecord(ctx, name)) ? await apps.manifest(name).catch(() => undefined) : undefined;
-	if (had?.source && args.to && !(await apps.machine.look(had.source.path)).exists) {
+	if (had?.source && args.to && !(await apps.folders.look(had.source.path)).exists) {
 		personOnly(ctx.caller, "the folder an app is cloned into", "app.clone");
 		return cloneMissing(ctx, apps, describe, name, args.url, args.to);
 	}
 	if (await hasRecord(ctx, name)) throw new Refused("conflict", `An app called ${name} is here already; give another name.`, "app.list");
 	if (args.to) personOnly(ctx.caller, "the folder an app is cloned into", "app.clone");
 	const outside = args.to ? await freeFolder(apps, args.to) : undefined;
-	if (!outside && (await apps.machine.isDir(name, "."))) throw new Refused("conflict", `An app called ${name} is here already; give another name.`, "app.list");
-	await clone(args.url, outside ? dirname(outside) : apps.machine.workdir, outside ? basename(outside) : name);
-	apps.machine.place(name, outside);
+	if (!outside && (await apps.folders.isDir(name, "."))) throw new Refused("conflict", `An app called ${name} is here already; give another name.`, "app.list");
+	await clone(args.url, outside ? dirname(outside) : apps.folders.workdir, outside ? basename(outside) : name);
+	apps.folders.place(name, outside);
 	const files: Record<string, Uint8Array> = {};
-	for (const path of await apps.machine.files(name)) files[path] = (await apps.machine.read(name, path))!;
+	for (const path of await apps.folders.files(name)) files[path] = (await apps.folders.read(name, path))!;
 	let json = files["app.json"] ? decode(files["app.json"]) : guessManifest(args.title ?? name, files["package.json"] ? decode(files["package.json"]) : undefined);
 	if (!files["app.json"]) ctx.note(`${args.url} had no app.json; one was written from its package.json.`);
 	parseManifest(name, json);
@@ -93,11 +93,11 @@ export async function moveOut(ctx: Context, apps: Apps, describe: Describe, name
 	const manifest = await apps.manifest(name);
 	if (manifest.source) throw new Refused("conflict", `${name} already lives in ${manifest.source.path}; app.update with source points it elsewhere.`, "app.update");
 	const path = await freeFolder(apps, to);
-	const repo = (await repoOf(apps.machine.folder(name)))?.remote;
+	const repo = (await repoOf(apps.folders.folder(name)))?.remote;
 	apps.stop(name);
 	const files = await sourceFiles(ctx.deck, name);
-	apps.machine.place(name, path);
-	for (const file of files) await apps.machine.put(name, file.path, await ctx.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`)));
+	apps.folders.place(name, path);
+	for (const file of files) await apps.folders.put(name, file.path, await ctx.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`)));
 	const record = toDeckPath(`${folderOf(name)}/app.json`);
 	await ctx.deck.write(record, withSource(decode(await ctx.deck.read(record)), { path, ...(repo ? { repo } : {}) }), ctx.caller);
 	for (const file of files) if (file.path !== "app.json") await ctx.deck.remove(toDeckPath(`${folderOf(name)}/${file.path}`), ctx.caller);
@@ -124,7 +124,7 @@ function withSource(json: string, source: Source): Uint8Array {
 /** A folder an outside app may take: missing, or empty. */
 async function freeFolder(apps: Apps, raw: string): Promise<string> {
 	const path = outsideFolder(raw);
-	const seen = await apps.machine.look(path);
+	const seen = await apps.folders.look(path);
 	if (seen.entries > 0) throw new Refused("conflict", `${path} already has files; an app is made in a new or empty folder.`, "app.move");
 	return path;
 }

@@ -1,6 +1,6 @@
 import { layout, Refused } from "../../protocol/index.ts";
 import type { Bytes, Context, Route, RouteAnswer } from "../kernel/index.ts";
-import type { Machine } from "./machine.ts";
+import type { PictureTools } from "./tools.ts";
 import { picturedPath } from "./picture.ts";
 
 // A card drawn from markup the reader's page posted (rule 14): POST /pictures/snapshot?path=&w=&h=&scheme=.
@@ -11,9 +11,9 @@ const LIMIT = 24 * 1024 * 1024;
 const text = (status: number, body: string): RouteAnswer => ({ status, type: "text/plain; charset=utf-8", body });
 const escapeAttr = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-export const snapshotRoute = (m: () => Machine): Route => ({ method: "POST", prefix: SNAPSHOT, answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
+export const snapshotRoute = (m: () => PictureTools): Route => ({ method: "POST", prefix: SNAPSHOT, answer: (ctx, _path, query, body) => answer(ctx, m(), query, body) });
 
-async function answer(ctx: Context, m: Machine, query: URLSearchParams, body: Bytes): Promise<RouteAnswer> {
+async function answer(ctx: Context, m: PictureTools, query: URLSearchParams, body: Bytes): Promise<RouteAnswer> {
 	try {
 		if (body.length > LIMIT) return text(413, "The markup is over 24 MB.");
 		const path = picturedPath(query.get("path") ?? "");

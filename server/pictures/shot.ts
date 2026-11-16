@@ -4,7 +4,7 @@ import { toDeckPath, type Bytes, type Context, type Item } from "../kernel/index
 import { compose, factorFor, type Composed, type Of } from "./compose.ts";
 import { drawNatively } from "./native-shot.ts";
 import { cardPath, cardPicture } from "./picture.ts";
-import type { Machine } from "./machine.ts";
+import type { PictureTools } from "./tools.ts";
 import type { Writer } from "./marks.ts";
 
 // canvas.screenshot (rules 7 to 9): a composed page of the drawing and its
@@ -15,7 +15,7 @@ export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
 
 // Keeping the picture in the deck.
 /** Take the picture, keep it in the deck, answer where and how big. */
-export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
+export async function screenshot(ctx: Context, m: PictureTools, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
 	const taken = await take(ctx, m, args);
 	const { canvas, card } = taken;
 	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
@@ -41,7 +41,7 @@ export async function keep(ctx: Context, path: string, bytes: Bytes): Promise<st
 
 // Taking it: a card as a screen has it, a card's own page, or the composed drawing.
 /** Take the picture and keep nothing: its bytes, size, box and how it was made. */
-export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean; live?: boolean }> {
+export async function take(ctx: Context, m: PictureTools, args: ShotArgs): Promise<Taken & { canvas: string; how: string; card: boolean; live?: boolean }> {
 	const canvas = ctx.canvasName(args.canvas);
 	// A card's PDF is the card on its canvas with paper round it, as today; its picture its own page.
 	const card = isCard(args.of) && args.format !== "pdf" ? cardPath(args.of) : undefined;
@@ -83,7 +83,7 @@ function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
 }
 
 /** One card's own page at its width on the canvas, or 1000 when it is not there. */
-async function cardShot(ctx: Context, m: Machine, card: string, canvas: string, args: ShotArgs): Promise<Taken> {
+async function cardShot(ctx: Context, m: PictureTools, card: string, canvas: string, args: ShotArgs): Promise<Taken> {
 	const on = placedOn(ctx, canvas, card);
 	const width = on?.box ? Math.round(on.box.x2 - on.box.x1) : 1000;
 	const tall = on?.box ? Math.round(on.box.y2 - on.box.y1) : 800;
@@ -102,7 +102,7 @@ async function cardShot(ctx: Context, m: Machine, card: string, canvas: string, 
 }
 
 /** The drawing and its cards, composed in one page. */
-export async function canvasShot(ctx: Context, m: Machine, canvas: string, args: ShotArgs): Promise<Taken> {
+export async function canvasShot(ctx: Context, m: PictureTools, canvas: string, args: ShotArgs): Promise<Taken> {
 	const passes: { done(): void }[] = [];
 	const cardUrl = (path: string) => {
 		const page = m.cardPage(path, canvas);
@@ -130,7 +130,7 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 }
 
 /** The composed box drawn by the engine's native tool; undefined, with a note, when the browser must. */
-async function tryNatively(ctx: Context, m: Machine, canvas: string, args: ShotArgs, drawing: { text: string; made: Composed; writer: Writer | undefined }): Promise<Taken | undefined> {
+async function tryNatively(ctx: Context, m: PictureTools, canvas: string, args: ShotArgs, drawing: { text: string; made: Composed; writer: Writer | undefined }): Promise<Taken | undefined> {
 	const native = !args.live && args.format !== "pdf" ? m.native?.() : undefined;
 	if (!native) return undefined;
 	const { text, made, writer } = drawing;

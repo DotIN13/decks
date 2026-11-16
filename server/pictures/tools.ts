@@ -7,7 +7,7 @@ import { Native, nativeBinary } from "./native.ts";
 // What the pictures' calls need beyond ctx (rule 2): the browser, the server's
 // own address, a pass for a page and the native tool.
 
-export interface Machine {
+export interface PictureTools {
 	browser: Browser;
 	/** The server's address, http://host:port; refuses unavailable when it is not known. */
 	origin(): string;
@@ -19,7 +19,7 @@ export interface Machine {
 	shutdown?(): void;
 }
 
-export function machine(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined, useNative = true): Machine {
+export function pictureTools(browser: Browser, origin: () => string | undefined, kernel: () => Kernel | undefined, useNative = true): PictureTools {
 	const known = () => {
 		const at = origin();
 		if (!at) throw new Refused("unavailable", "This server has not said its own address, so its browser cannot load a page from it.", "card.get");

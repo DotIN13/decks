@@ -1,7 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { toDeckPath, type Deck, type Store } from "../kernel/index.ts";
 import { Logs } from "./logs.ts";
-import { freePort, kill, listening, Machine } from "./machine.ts";
+import { freePort, kill, listening, AppFolders } from "./folders.ts";
 import { folderOf, manifestOf, sourceFiles, type Manifest } from "./manifest.ts";
 
 // Apps built and run: their state, their jobs and their processes. Rules 2 to 5.
@@ -17,7 +17,7 @@ const IDLE_MINUTES = 10;
 export type AppsOptions = { workdir: string; env?: (name: string) => Record<string, string>; clock?: () => number };
 
 export class Apps {
-	readonly machine: Machine;
+	readonly folders: AppFolders;
 	readonly logs: Logs;
 	private kept = new Map<string, Kept>();
 	private running = new Map<string, Running>();
@@ -26,7 +26,7 @@ export class Apps {
 	onChange?: (name: string) => void;
 
 	constructor(private deck: Deck, store: Store, private options: AppsOptions) {
-		this.machine = new Machine(options.workdir);
+		this.folders = new AppFolders(options.workdir);
 		this.logs = new Logs(store);
 		this.clock = options.clock ?? Date.now;
 	}
@@ -35,20 +35,20 @@ export class Apps {
 	/** The app's manifest, with where it builds and runs told to the machine. Rule 14. */
 	async manifest(name: string): Promise<Manifest> {
 		const manifest = await manifestOf(this.deck, name);
-		this.machine.place(name, manifest.source?.path);
+		this.folders.place(name, manifest.source?.path);
 		return manifest;
 	}
 
 	/** What happened to an app, merged with what it is when nothing has. */
 	async stateOf(name: string, manifest: Manifest): Promise<Kept & { status: AppStatus }> {
 		const kept = this.kept.get(name) ?? {};
-		if (manifest.source && !(await this.machine.look(manifest.source.path)).exists) return { ...kept, status: "missing" };
+		if (manifest.source && !(await this.folders.look(manifest.source.path)).exists) return { ...kept, status: "missing" };
 		return { ...kept, status: kept.status ?? (await this.idleStatus(name, manifest)) };
 	}
 
 	private async idleStatus(name: string, manifest: Manifest): Promise<AppStatus> {
 		if (manifest.kind === "server") return "stopped";
-		if (manifest.kind === "build") return (await this.machine.isDir(name, manifest.root ?? "dist")) ? "running" : "stopped";
+		if (manifest.kind === "build") return (await this.folders.isDir(name, manifest.root ?? "dist")) ? "running" : "stopped";
 		return "running";
 	}
 
@@ -120,24 +120,24 @@ export class Apps {
 
 	private async runBuild(name: string, manifest: Manifest): Promise<boolean> {
 		const t0 = this.clock();
-		if (manifest.source && !(await this.machine.look(manifest.source.path)).exists) {
+		if (manifest.source && !(await this.folders.look(manifest.source.path)).exists) {
 			return this.failed(name, `${manifest.source.path} is not on this machine; app.clone takes it from ${manifest.source.repo ?? "its repository"}.`);
 		}
 		await this.sync(name);
 		const out = (text: string) => this.logs.write(name, text);
-		if ((await this.needsInstall(name)) && !(await this.machine.isDir(name, "node_modules"))) {
+		if ((await this.needsInstall(name)) && !(await this.folders.isDir(name, "node_modules"))) {
 			this.set(name, { status: "installing", error: undefined });
 			const install = manifest.install ?? "npm install --include=dev --no-audit --no-fund";
-			const code = await this.machine.exec(name, install, this.env(name), out);
+			const code = await this.folders.exec(name, install, this.env(name), out);
 			if (code !== 0) return this.failed(name, `${install} exited with code ${code}`);
 		}
 		const command = manifest.build ?? (manifest.kind === "build" ? "npm run build" : undefined);
 		if (command) {
 			this.set(name, { status: "building", error: undefined });
-			const code = await this.machine.exec(name, command, this.env(name), out);
+			const code = await this.folders.exec(name, command, this.env(name), out);
 			if (code !== 0) return this.failed(name, `${command} exited with code ${code}`);
 		}
-		if (manifest.kind === "build" && !(await this.machine.isDir(name, manifest.root ?? "dist"))) {
+		if (manifest.kind === "build" && !(await this.folders.isDir(name, manifest.root ?? "dist"))) {
 			return this.failed(name, `the build wrote no ${manifest.root ?? "dist"}/ folder to serve`);
 		}
 		const status: AppStatus = manifest.kind === "server" ? (this.running.has(name) ? "running" : "stopped") : "running";
@@ -149,16 +149,16 @@ export class Apps {
 	/** Copy the source into the running copy, writing only what differs. Rule 2. */
 	async sync(name: string): Promise<number> {
 		let wrote = 0;
-		if (this.machine.isOutside(name)) return 0;
+		if (this.folders.isOutside(name)) return 0;
 		for (const file of await sourceFiles(this.deck, name)) {
 			const bytes = await this.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`));
-			if (await this.machine.put(name, file.path, bytes)) wrote += 1;
+			if (await this.folders.put(name, file.path, bytes)) wrote += 1;
 		}
 		return wrote;
 	}
 
 	private async needsInstall(name: string): Promise<boolean> {
-		const bytes = await this.machine.read(name, "package.json");
+		const bytes = await this.folders.read(name, "package.json");
 		if (!bytes) return false;
 		try {
 			const pkg = JSON.parse(new TextDecoder().decode(bytes)) as { dependencies?: object; devDependencies?: object };
@@ -173,12 +173,12 @@ export class Apps {
 	}
 
 	private async start(name: string, manifest: Manifest): Promise<boolean> {
-		const command = manifest.start ?? ((await this.machine.isFile(name, "package.json")) ? "npm start" : undefined);
+		const command = manifest.start ?? ((await this.folders.isFile(name, "package.json")) ? "npm start" : undefined);
 		if (!command) return this.failed(name, `apps/${name}/app.json has no "start" command`);
 		const port = await freePort();
 		this.set(name, { status: "starting", port, error: undefined, seenAt: this.clock() });
 		this.logs.write(name, `$ ${command}    (PORT=${port})`);
-		const child = this.machine.spawn(name, command, this.env(name, { PORT: String(port), HOST: "127.0.0.1", HOSTNAME: "127.0.0.1" }), (text) => this.logs.write(name, text));
+		const child = this.folders.spawn(name, command, this.env(name, { PORT: String(port), HOST: "127.0.0.1", HOSTNAME: "127.0.0.1" }), (text) => this.logs.write(name, text));
 		let gone = false;
 		const ready = listening(port, START_MS, () => gone);
 		const live: Running = { child, port, ready };
@@ -205,22 +205,22 @@ export class Apps {
 	/** An in-deck app's data folder (rule 2) is the deck's: what the app writes there in its copy is
 	 *  written to the deck, and what a call writes there in the deck reaches the copy, while it runs. */
 	private keepData(name: string, live: Running, data: string): void {
-		if (this.machine.isOutside(name)) return;
+		if (this.folders.isOutside(name)) return;
 		const by = { kind: "app" as const, id: name, name };
 		const folder = `${folderOf(name)}/${data}/`;
-		const toDeck = this.machine.watchCopy(name, data, (path) => void this.backToDeck(name, path, by));
+		const toDeck = this.folders.watchCopy(name, data, (path) => void this.backToDeck(name, path, by));
 		const fromDeck = this.deck.watch((change) => {
 			if (!change.path.startsWith(folder) || change.by === name) return;
 			const inner = change.path.slice(folderOf(name).length + 1);
-			if (change.kind === "deleted") void this.machine.drop(name, inner);
-			else void this.deck.read(change.path).then((bytes) => this.machine.put(name, inner, bytes)).catch(() => {});
+			if (change.kind === "deleted") void this.folders.drop(name, inner);
+			else void this.deck.read(change.path).then((bytes) => this.folders.put(name, inner, bytes)).catch(() => {});
 		});
 		live.unwatch = () => (toDeck(), fromDeck());
 	}
 
 	private async backToDeck(name: string, path: string, by: { kind: "app"; id: string; name: string }): Promise<void> {
 		const at = toDeckPath(`${folderOf(name)}/${path}`);
-		const bytes = await this.machine.read(name, path);
+		const bytes = await this.folders.read(name, path);
 		if (!bytes) return void (await this.deck.remove(at, by).catch(() => {}));
 		const had = await this.deck.read(at).catch(() => undefined);
 		if (had && Buffer.compare(Buffer.from(had), Buffer.from(bytes)) === 0) return;

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { verdict } from "./check.ts";
-import { secretEnv } from "./machine.ts";
+import { secretEnv } from "./folders.ts";
 import { folderOf, parseManifest } from "./manifest.ts";
 import { forwardTarget } from "./ports.ts";
 import { underBase, withoutPass } from "./proxy.ts";

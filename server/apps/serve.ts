@@ -97,7 +97,7 @@ async function fromDeck(ctx: Context, name: string, root: string, inner: string)
 
 async function fromCopy(apps: Apps, name: string, root: string, inner: string): Promise<RouteAnswer | undefined> {
 	for (const path of candidates(inner)) {
-		const bytes = await apps.machine.read(name, root ? `${root}/${path}` : path);
+		const bytes = await apps.folders.read(name, root ? `${root}/${path}` : path);
 		if (bytes) return { type: typeOf(path), body: bytes, headers: { "cache-control": "no-cache" } };
 	}
 	return undefined;
