@@ -5,10 +5,9 @@ import { call as callServer } from "../state/line.ts";
 import { cardCall, cardMayCall } from "./card-calls.ts";
 
 /**
- * A card's agent call, from the canvas frame, made with your token. Anything in the frame can make one,
- * a card's script or a library it loaded, and which card asked is only what the frame says, so a call
- * that sends an agent words or makes one is put to you each time, naming the card and what it would
- * say; reading who the agents are, and showing another canvas, are not.
+ * A card's agent call. Anything in the frame can make one and which card asked is only what the
+ * frame says, so a call that sends an agent words or starts one is put to you each time, naming the
+ * card and what it would say.
  */
 export async function cardAgentCall(call: { verb: string; args: unknown[]; card: string }): Promise<unknown> {
 	if (!cardMayCall(call.verb)) throw new Error(`${call.verb} is not a card's to call.`);
