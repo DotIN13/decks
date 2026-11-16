@@ -136,7 +136,7 @@ export interface AgentBackendContext {
 	/** What it last asked before acting, on a runtime that has modes. */
 	mode?: AgentMode;
 	/**
-	 * The Claude subscriptions this install can use (`claude/accounts.ts`).
+	 * The Claude subscriptions this install can use (`accounts/accounts.ts`).
 	 *
 	 * On the context rather than reached for globally, because it is the *shell's* — one
 	 * store for the install, handed to whichever backends can use it. Pi ignores it: its

@@ -47,7 +47,6 @@ export async function forkRef(session: Session, entry: string): Promise<string |
 const FILE = /(?:^|[\s"'=(])((?:\/|\.\/)?[\w.@-]+(?:\/[\w.@-]+)*\.(?:html|css|js|mjs|json|md|svg|pen))(?=$|[\s"',)])/g;
 
 /** The deck files the agent's tool calls named: paths in their arguments, made relative to the deck. */
-
 export function touchedFiles(session: Session, deckPath: string): string[] {
 	const found = new Set<string>();
 	for (const item of session.history() as Array<{ kind: string; args?: unknown; title?: string }>) {

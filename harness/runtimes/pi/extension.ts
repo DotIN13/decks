@@ -38,7 +38,7 @@ export function decksTools(deps: {
 				});
 				pi.registerTool({ ...bash, execute: (id, params, signal, onUpdate) => bash.execute(id, params, signal, onUpdate) });
 			}
-			// Google Docs, read and edited as markdown (`google/docs.ts`); a failure is thrown, so Pi marks it as one.
+			// Google Docs, read and edited as markdown (the protocol's `google.read` and `google.edit`); a failure is thrown, so Pi marks it as one.
 			for (const t of gdocs ? GDOCS_TOOLS : []) {
 				pi.registerTool({
 					name: t.name,

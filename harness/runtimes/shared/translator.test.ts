@@ -180,7 +180,7 @@ test("the last reply can be taken back, and only the last one", () => {
  *
  * The transcript is capped, and what falls off used to be gone for good — so a
  * conversation of a thousand messages could only ever be scrolled back through five
- * hundred of them. The rows now leave through `onEvict`, which is what `agents/store.ts`
+ * hundred of them. The rows now leave through `onEvict`, which is what `sessions/transcript.ts`
  * appends to its log, and the two properties that matter are that **every** evicted row is
  * handed over and that each is handed over **once**: a row delivered twice is drawn twice
  * when the reader scrolls back, and one missed is a hole in the middle of a conversation.

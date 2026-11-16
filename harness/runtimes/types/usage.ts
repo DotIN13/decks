@@ -30,7 +30,7 @@ export interface UsageReport {
 	 * The account these limits belong to.
 	 *
 	 * An install can have several Claude subscriptions signed in at once
-	 * (`claude/accounts.ts`), so "42% of the 5-hour window" is a reading with no subject
+	 * (`accounts/accounts.ts`), so "42% of the 5-hour window" is a reading with no subject
 	 * until this says whose. Null when the install has no account store — the CLI's own
 	 * login, or a pi agent.
 	 */

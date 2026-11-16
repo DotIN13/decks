@@ -6,7 +6,7 @@ import { readToolResult, titleFor, type Translator } from "../shared/translator.
  * Pi's event stream, read into the transcript's terms.
  *
  * Only the *reading* of Pi's shapes lives here. What a transcript is belongs to
- * `agents/translator.ts` and would be shared by any other agent backend.
+ * `shared/translator.ts` and would be shared by any other agent backend.
  */
 export function handlePiEvent(t: Translator, event: AgentSessionEvent): void {
 	switch (event.type) {

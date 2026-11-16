@@ -7,7 +7,7 @@ import type { Translator } from "../shared/translator.ts";
  * opencode's event stream, read into the transcript's terms.
  *
  * The counterpart of `pi/events.ts` and `claude/events.ts`, and the only file that reads
- * opencode's shapes. What a transcript *is* belongs to `agents/translator.ts` and is
+ * opencode's shapes. What a transcript *is* belongs to `shared/translator.ts` and is
  * shared — a fourth runtime must not become a fourth idea of what a reply looks like.
  *
  * Three things about this stream shape the code.

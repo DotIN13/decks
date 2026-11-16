@@ -12,7 +12,7 @@ import { pi } from "./pi/index.ts";
  * Every runtime this build knows, and the one place its name is written.
  *
  * **A fifth runtime is this file plus a directory.** Before, it was four edits in
- * the old server's `agents/session.ts`: an import, `BACKENDS`, `CAPABILITIES`, `DORMANT_COMMANDS` — the
+ * the old server's agent class: an import, `BACKENDS`, `CAPABILITIES`, `DORMANT_COMMANDS` — the
  * union and its array in `packages/protocol`, three entries in the browser's mark file, and
  * a new backend directory. The shell imported every runtime to be able to start one.
  *

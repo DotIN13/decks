@@ -125,11 +125,6 @@ export class ExtensionUiBridge {
 	}
 
 	/**
-	 * The object handed to `bindExtensions`.
-	 *
-	 * Cast at the call site, deliberately — see the note at the top of this file.
-	 */
-	/**
 	 * Questions still waiting for an answer.
 	 *
 	 * Replayed to a browser that connects after one was asked. Without this, reloading the
@@ -140,6 +135,11 @@ export class ExtensionUiBridge {
 		return [...this.pending.values()].map((entry) => entry.prompt);
 	}
 
+	/**
+	 * The object handed to `bindExtensions`.
+	 *
+	 * Cast at the call site, deliberately — see the note at the top of this file.
+	 */
 	context() {
 		return {
 			select: (title: string, options: string[], opts?: DialogOptions) =>

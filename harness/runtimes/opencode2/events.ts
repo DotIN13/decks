@@ -6,7 +6,7 @@ import type { Translator } from "../shared/translator.ts";
  * OpenCode 2's event stream, read into the transcript's terms.
  *
  * The counterpart of `opencode/events.ts` for opencode 1, and the only file that reads OpenCode
- * 2's event shapes. What a transcript is belongs to `agents/translator.ts`.
+ * 2's event shapes. What a transcript is belongs to `shared/translator.ts`.
  *
  * What is different from opencode 1, and shapes the code:
  *

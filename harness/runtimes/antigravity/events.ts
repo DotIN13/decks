@@ -8,7 +8,7 @@ import type { Translator } from "../shared/translator.ts";
  *
  * The counterpart of `pi/events.ts`, `claude/events.ts` and `opencode/events.ts`, and the
  * only file that reads agy's shapes. What a transcript *is* belongs to
- * `agents/translator.ts` and is shared.
+ * `shared/translator.ts` and is shared.
  *
  * The stream is one NDJSON line per event. Four things about it shape the code, each
  * learned from a live session rather than from a spec page:

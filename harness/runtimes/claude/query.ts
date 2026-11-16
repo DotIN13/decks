@@ -190,7 +190,7 @@ export abstract class ClaudeQuery {
 			...(this.currentModel ? { model: this.currentModel } : {}),
 			...(effortOf(this.currentThinking) ? { effort: effortOf(this.currentThinking) } : {}),
 			/*
-			 * Which subscription this session spends (`claude/accounts.ts`).
+			 * Which subscription this session spends (`accounts/accounts.ts`).
 			 *
 			 * A symlink — **this agent's own** — so re-pointing it switches the account inside
 			 * this session and no other. The CLI re-reads its credentials per request, so the
@@ -547,7 +547,7 @@ export abstract class ClaudeQuery {
 	 *
 	 * The id can be right and the store still be the wrong one, with nothing about the person,
 	 * the deck or the task at fault: `--resume` is looked up inside the config directory the
-	 * process is handed (`claude/accounts.ts`), and that directory can have moved under a
+	 * process is handed (`accounts/accounts.ts`), and that directory can have moved under a
 	 * stored id. It did here: the id was written before the per-agent link existed, the account
 	 * it ended up on kept a private `projects/` instead of the shared store, and the session was
 	 * in the 53 transcripts that copy did not have. The morning's scheduled task ended as

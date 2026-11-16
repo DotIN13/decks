@@ -20,17 +20,6 @@ import { decksTools } from "./extension.ts";
 import { skillsDir } from "../../prompts/paths.ts";
 import { handlePiEvent } from "./events.ts";
 
-/**
- * Pi behind one Decks agent.
- *
- * Everything Pi owns — history, context, compaction, tool execution, the session
- * tree — stays inside `AgentSession`. This supplies the environment around it: the
- * deck as cwd, the deck's description as a context file, Decks' own skills, and a
- * dialog surface so an installed extension can ask the user something.
- *
- * What is *not* here: the transcript (that is `agents/translator.ts`, shared), and
- * any permission gate (that is an extension's job — DESIGN §6.8).
- */
 /** Pi has no notion of asking first: that is an extension's business (§6.8). */
 export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
 
@@ -49,6 +38,17 @@ export const PI_COMMANDS: SlashCommand[] = [
 	{ name: "help", hint: "The commands Decks understands", source: "deck" },
 ];
 
+/**
+ * Pi behind one Decks agent.
+ *
+ * Everything Pi owns — history, context, compaction, tool execution, the session
+ * tree — stays inside `AgentSession`. This supplies the environment around it: the
+ * deck as cwd, the deck's description as a context file, Decks' own skills, and a
+ * dialog surface so an installed extension can ask the user something.
+ *
+ * What is *not* here: the transcript (that is `shared/translator.ts`, shared), and
+ * any permission gate (that is an extension's job — DESIGN §6.8).
+ */
 export class PiBackend implements AgentBackend {
 	readonly capabilities = PI_CAPABILITIES;
 
@@ -375,12 +375,11 @@ export class PiBackend implements AgentBackend {
 	 * the transcript.
 	 *
 	 * Walked from the end: the transcript in memory is a capped tail
-	 * (`KEEP` in `agents/translator.ts`), so the two sequences share a *suffix*, not a
+	 * (`KEEP` in `shared/translator.ts`), so the two sequences share a *suffix*, not a
 	 * prefix — pairing from the start would line the oldest entry up against a message
 	 * from the middle of the conversation. Checked as it goes, and stopping at the first
 	 * disagreement: a missing id costs one message its rewind affordance, which is the
-	 * right way to be wrong. (The algorithm is Picone's, at
-	 * `picone/apps/server/src/pi/backend.ts:503`.)
+	 * right way to be wrong. (The algorithm is Picone's, from its own Pi backend.)
 	 */
 	async syncEntryIds(): Promise<void> {
 		const entries = (this.session?.sessionManager.getBranch() ?? []).filter(
@@ -447,6 +446,11 @@ export class PiBackend implements AgentBackend {
 		return { cancelled: Boolean(result.cancelled), ...(result.editorText ? { editorText: result.editorText } : {}) };
 	}
 
+	/** The session file this conversation is being written to (`AgentBackend.sessionRef`). */
+	sessionRef(): string | undefined {
+		return this.session?.sessionManager.getSessionFile() ?? undefined;
+	}
+
 	/**
 	 * Write the path up to an entry into a new session file, for a new chat to open.
 	 *
@@ -454,11 +458,6 @@ export class PiBackend implements AgentBackend {
 	 * file, which would hijack this session — so it runs on a throwaway manager opened
 	 * on the same path and only the filename is kept. (Picone found this one first.)
 	 */
-	/** The session file this conversation is being written to (`AgentBackend.sessionRef`). */
-	sessionRef(): string | undefined {
-		return this.session?.sessionManager.getSessionFile() ?? undefined;
-	}
-
 	async forkFrom(entryId: string): Promise<string | undefined> {
 		const entry = this.session.sessionManager.getEntry(entryId);
 		// Fork *before* the message, so the new chat opens with it unasked.
@@ -478,13 +477,6 @@ export class PiBackend implements AgentBackend {
 		this.session?.dispose();
 	}
 }
-
-/**
- * Whether a session entry's content begins with the text that was displayed.
- *
- * Pi stores message content as a string or as content parts; both shapes turn up
- * depending on how the message was built.
- */
 
 /** Pi reports extension failures as a structured record, not a string. */
 function formatExtensionError(error: unknown): string {

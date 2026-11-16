@@ -75,6 +75,8 @@ export async function claudeIdentity(configDir?: string): Promise<{ email?: stri
 }
 
 /**
+ * A terminal line as its text, with the escape sequences taken out.
+ *
  * Reading what the Claude CLI prints, when there is no terminal to print it to.
  *
  * `/login` runs the CLI's own `auth login` as a child process and has to find the OAuth
@@ -88,8 +90,6 @@ export async function claudeIdentity(configDir?: string): Promise<{ email?: stri
  * So a regex over the raw line matches both copies and the escape between them, and hands
  * back an address nothing can open. Strip first, then match.
  */
-
-/** A terminal line as its text, with the escape sequences taken out. */
 export function plain(text: string): string {
 	return (
 		text

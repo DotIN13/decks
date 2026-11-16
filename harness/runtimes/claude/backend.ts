@@ -22,7 +22,7 @@ import { ClaudeQuery, CLI_MODE, DEFAULT_MODE, PROVIDER, describe, effortOf } fro
  * would re-pay process start every turn and lose every one of them. The cost is a `claude`
  * child process per started agent, which is what `dispose` closes.
  *
- * What is *not* here: the transcript (`agents/translator.ts`, shared with Pi), and the
+ * What is *not* here: the transcript (`shared/translator.ts`, shared with Pi), and the
  * guidelines every agent is given (the canvas tool, likewise).
  */
 
@@ -254,7 +254,7 @@ export class ClaudeBackend extends ClaudeQuery implements AgentBackend {
 
 		/*
 		 * Signed in to a directory of its own, so this *adds* an account rather than replacing
-		 * one (`claude/accounts.ts`).
+		 * one (`accounts/accounts.ts`).
 		 *
 		 * Which is the whole of how several subscriptions come to be signed in at once: the
 		 * CLI writes its credentials wherever `CLAUDE_CONFIG_DIR` points, so pointing it
@@ -415,7 +415,7 @@ export class ClaudeBackend extends ClaudeQuery implements AgentBackend {
 			notice("info", remembered.replaced ? `Signed in again as ${who}: its row now has the new login, and is in use.` : `Signed in as ${who}, and now using it.`);
 			this.context.accountsChanged?.();
 			// No restart: the account is a symlink every session reads its credentials through,
-			// so this one picks it up on its next request (`claude/accounts.ts`).
+			// so this one picks it up on its next request (`accounts/accounts.ts`).
 			return;
 		}
 		notice("info", `Signed in to Claude with your ${method.noun}.`);

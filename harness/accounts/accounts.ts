@@ -161,7 +161,7 @@ export class ClaudeAccounts extends AccountFolders {
 			const temporary = `${this.file}.tmp`;
 			writeFileSync(temporary, JSON.stringify(index, null, 2));
 			// Renamed over, so a reader sees the whole list or the previous one. The same
-			// bargain `agents/store.ts` makes, and for the same reason.
+			// bargain `sessions/transcript.ts` makes, and for the same reason.
 			renameSync(temporary, this.file);
 		} catch {
 			/*

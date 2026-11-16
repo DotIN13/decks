@@ -17,7 +17,7 @@ import type { ModelSpend, PlanLimit, SessionSpend, TokenCounts, UsageReport, Usa
  * are the fallback because they are the ones actually specified, and a bucket that appears
  * next month lands in the panel without a change to it.
  *
- * Ported from picone's `claude/usage.ts`, which worked this out first against the same
+ * Ported from Picone's Claude usage reader, which worked this out first against the same
  * payload. What is different here is `account`: this install rotates between several
  * subscriptions on its own, so a window's utilisation has no subject until the report says
  * whose it is.
