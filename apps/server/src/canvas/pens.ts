@@ -99,7 +99,7 @@ export const measure = serverText.measure;
 
 const FILE = CANVAS_FILE;
 
-export class StagePens {
+export class CanvasPens {
 	/** The cards on each canvas: placed, moved, sized, taken off, and copied in from another canvas (`cards-on.ts`). */
 	readonly cards: CanvasCards = new CanvasCards(this);
 	/** Saved frames and any other `.pen` file by its path: read, edited, made, placed by a ref, and watched (`pen-files.ts`). */

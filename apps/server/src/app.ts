@@ -10,7 +10,7 @@ import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
 import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
-import { StageBridge } from "./canvas/bridge.ts";
+import { CanvasBridge } from "./canvas/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
@@ -19,8 +19,8 @@ import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { studioLink } from "./studio/index.ts";
-import { StageShots } from "./canvas/shots.ts";
-import { StageService } from "./canvas/service.ts";
+import { CanvasShots } from "./canvas/shots.ts";
+import { CanvasService } from "./canvas/service.ts";
 import { PageCalls } from "./canvas/page-calls.ts";
 import { ClaudeAccounts } from "./runtimes/claude/accounts.ts";
 import { AccountList } from "./runtimes/claude/account-list.ts";
@@ -32,7 +32,7 @@ import { Cameras } from "./deck/cameras.ts";
 import { Broadcast } from "./connections/broadcast.ts";
 import type { Hub } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
-import { StagePens, type PenEntry } from "./canvas/pens.ts";
+import { CanvasPens, type PenEntry } from "./canvas/pens.ts";
 import { Forwards } from "./ports.ts";
 import { Apps } from "./apps/service.ts";
 import { checkApp } from "./apps/check.ts";
@@ -59,9 +59,9 @@ import { deckImportPaths } from "./cards/cards.ts";
 export class App {
 	deck: Deck;
 	readonly agents: Registry;
-	readonly stage: StageService;
+	readonly stage: CanvasService;
 	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`canvas/pens.ts`). */
-	readonly pens: StagePens;
+	readonly pens: CanvasPens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
 	readonly forwards: Forwards;
 	/** The apps agents build in the deck's `apps/` (`apps/service.ts`). */
@@ -129,7 +129,7 @@ export class App {
 		return this.config.port;
 	}
 	/** The canvas tool's other end, for the runtimes that are not in this process. */
-	readonly bridge: StageBridge;
+	readonly bridge: CanvasBridge;
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: PictureService;
@@ -189,7 +189,7 @@ export class App {
 			},
 			passSecret(config.dataDir),
 		);
-		this.bridge = new StageBridge(this.tokens);
+		this.bridge = new CanvasBridge(this.tokens);
 		this.appTrust = new AppTrust(config.dataDir);
 		this.boards = new CardService(deck, {
 			send: (message) => {
@@ -203,7 +203,7 @@ export class App {
 			state: () => this.stageState(),
 			removed: (path) => this.agents.boardRemoved(path),
 		});
-		this.stage = new StageService(deck, {
+		this.stage = new CanvasService(deck, {
 			/*
 
 			 * Move a board on the stage being served, and answer with the board as that stage sees it.
@@ -269,7 +269,7 @@ export class App {
 		 * The stage drawings. A change — through the tool or by hand — goes to every browser, keyed by
 		 * the agents whose stage it is, since two chats never share a folder but the browser draws per chat.
 		 */
-		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
+		this.pens = new CanvasPens(deck.path, (name, entry) => this.publishPen(name, entry));
 		// A canvas's copy of a board from elsewhere is a board of the deck the moment it is made.
 		this.pens.cards.copied = (path) => this.boards?.appeared(path);
 		this.stage.pens = this.pens;
@@ -364,7 +364,7 @@ export class App {
 				return { why: `the card ${path} has no picture of its current revision yet (one is being taken)` };
 			},
 		});
-		this.stage.shots = new StageShots({
+		this.stage.shots = new CanvasShots({
 			deck: deck.path,
 			pens: this.pens,
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),

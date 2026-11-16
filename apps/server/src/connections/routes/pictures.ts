@@ -240,7 +240,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 
 	/**
 	 * Any .pen file as `shot.html` draws it: a saved frame, or a stage by its file. `path` is relative
-	 * to the deck or absolute (`StagePens.penFile`).
+	 * to the deck or absolute (`CanvasPens.penFile`).
 	 */
 	api.get("/pen-file", (req, res) => {
 		const pens = app.stage.pens;

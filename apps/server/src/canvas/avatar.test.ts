@@ -69,10 +69,10 @@ test("the emoji avatar the tool writes is already valid, so the check leaves it 
  * browser is served, so this is the assertion that actually pins the bug.
  */
 test("writeAvatar puts the repaired svg on disk and hands back what changed", async () => {
-	const { StageService } = await import("./service.ts");
+	const { CanvasService } = await import("./service.ts");
 	const data = mkdtempSync(join(tmpdir(), "decks-avatar-"));
 	try {
-		const service = new StageService({ path: data } as never, {} as never);
+		const service = new CanvasService({ path: data } as never, {} as never);
 		const written = service.writeAvatar("agent-1", '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30"/></svg>');
 		assert.match(written.url, /^\/api\/avatar\/agent-1\?rev=/);
 		assert.match(String(written.changed), /xmlns/);

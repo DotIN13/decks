@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { Box } from "@decks/pen";
 import { containedIn, realPathOf, resolveInDeck } from "../deck/roots.ts";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 import type { NativeShots } from "./native-shots.ts";
 
 /**
@@ -44,7 +44,7 @@ export type ShotOf = string | string[] | Partial<Box> | undefined;
 
 interface ShotRequest {
 	stage: string;
-	/** A .pen file to picture instead of the stage, whole: a saved frame, or any other (`StagePens.penFile`). */
+	/** A .pen file to picture instead of the stage, whole: a saved frame, or any other (`CanvasPens.penFile`). */
 	file?: string;
 	of?: ShotOf;
 	scale?: number;
@@ -70,7 +70,7 @@ export interface Shot {
 
 interface ShotHost {
 	deck: string;
-	pens: StagePens;
+	pens: CanvasPens;
 	/** Where the web app is served, as the server can reach it: `shot.html` is part of it. */
 	webOrigin: () => string;
 	/**
@@ -81,7 +81,7 @@ interface ShotHost {
 	borrow: <T>(use: (browser: Browser) => Promise<T>) => Promise<T>;
 	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
 	native?: NativeShots;
-	/** Who last wrote a canvas, as its placeholder frames are marked on the canvas (`StagePens.writerOf`); none: the accent, no name. */
+	/** Who last wrote a canvas, as its placeholder frames are marked on the canvas (`CanvasPens.writerOf`); none: the accent, no name. */
 	writer?: (stage: string) => { name?: string; color: string } | undefined;
 }
 
@@ -91,7 +91,7 @@ const MARGIN = 24;
 const READY_MS = 20_000;
 
 /** The box `of` names on this stage, with a margin; a sentence when it names nothing. */
-export function shotBox(pens: StagePens, stage: string, of: ShotOf): Box {
+export function shotBox(pens: CanvasPens, stage: string, of: ShotOf): Box {
 	const pad = (b: Box, m: number): Box => ({ x1: Math.floor(b.x1 - m), y1: Math.floor(b.y1 - m), x2: Math.ceil(b.x2 + m), y2: Math.ceil(b.y2 + m) });
 	if (of && typeof of === "object" && !Array.isArray(of)) {
 		const { x1, y1, x2, y2 } = of;
@@ -127,7 +127,7 @@ export function shotBox(pens: StagePens, stage: string, of: ShotOf): Box {
 	);
 }
 
-export class StageShots {
+export class CanvasShots {
 	constructor(private host: ShotHost) {}
 
 	async take(request: ShotRequest): Promise<Shot> {

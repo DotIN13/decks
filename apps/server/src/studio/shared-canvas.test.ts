@@ -9,7 +9,7 @@ import { WebSocketServer } from "ws";
 import { Live, MemoryStore, syncHandler, type Who } from "@decks/hub";
 import { nodeHandler } from "@decks/hub/node";
 import { HarnessSync } from "@decks/sync-client";
-import { StagePens } from "../canvas/pens.ts";
+import { CanvasPens } from "../canvas/pens.ts";
 
 /**
  * Two harnesses on one Studio account, one canvas: an edit on either is applied there at once, sent to
@@ -49,7 +49,7 @@ function harness(url: string, key: string) {
 	mkdirSync(join(deck, "canvases"), { recursive: true });
 	const heard: string[] = [];
 	const present: Array<{ name: string; by: { kind: string; id: string; name?: string; harness?: string }; pointer?: { x: number; y: number } | null; gone?: true }> = [];
-	const pens = new StagePens(deck, () => {});
+	const pens = new CanvasPens(deck, () => {});
 	const sync = new HarnessSync({
 		deck,
 		studio: url,
@@ -79,7 +79,7 @@ const until = async (test: () => boolean, ms = 4000) => {
 	}
 	return test();
 };
-const content = (pens: StagePens, name: string, id: string) => (pens.get(name).doc.children.find((n) => n.id === id) as { content?: string } | undefined)?.content;
+const content = (pens: CanvasPens, name: string, id: string) => (pens.get(name).doc.children.find((n) => n.id === id) as { content?: string } | undefined)?.content;
 
 test("two harnesses on one canvas: an edit on either reaches the other through Studio, as Studio's, and a tie ends the same on both", async () => {
 	const s = await studio();

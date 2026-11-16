@@ -5,7 +5,7 @@ import { apply, baseTheme, clone, IMPORTED, indexOf, parse, PEN_VERSION, PenErro
 import { slug } from "@decks/deck-kit";
 import { fileUrl } from "../deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas } from "@decks/hub/layout";
-import { measure, withBox, withColors, type ReadMore, type StagePens } from "./pens.ts";
+import { measure, withBox, withColors, type ReadMore, type CanvasPens } from "./pens.ts";
 
 /**
  * Saved frames, and any other `.pen` file named by its path.
@@ -20,7 +20,7 @@ export class PenFiles {
 	/** Frame files that changed and wait a moment, so one save is one message. */
 	private readonly settling = new Map<string, NodeJS.Timeout>();
 
-	constructor(private readonly of: StagePens) {}
+	constructor(private readonly of: CanvasPens) {}
 
 	/**
 	 * A frame's file changed, by anyone: it is read again when next placed, and every canvas using it

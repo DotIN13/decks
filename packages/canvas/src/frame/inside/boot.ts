@@ -98,7 +98,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	};
 	/*
 	 * Where each card is, read off the drawing at each change: the same boxes the harness gives
-	 * (`StagePens.boards`). A card placed or taken off that the list does not know yet is read again.
+	 * (`CanvasPens.boards`). A card placed or taken off that the list does not know yet is read again.
 	 */
 	let cardsReading = false;
 	/** How often the card list was read again from the harness (`placeCards`): for the checks. */

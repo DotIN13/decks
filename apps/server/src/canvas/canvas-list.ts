@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import type { ServerMessage } from "@decks/protocol";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 
 /**
  * Every stage in the deck, and who is on it: the manager's whole list (`protocol/StageRow`).
@@ -10,7 +10,7 @@ import type { StagePens } from "./pens.ts";
  * that has never been drawn on still has one. A server with no stage files answers with nothing,
  * and the manager draws nothing rather than an empty room.
  */
-export function canvasListMessage(pens: StagePens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { stageName(): string | undefined } }>): ServerMessage {
+export function canvasListMessage(pens: CanvasPens, everyone: ReadonlyArray<{ id: string; name: string; color: string; seat: { stageName(): string | undefined } }>): ServerMessage {
 	const stages = pens.names().map((name) => {
 		const { boards, rev, words } = pens.summary(name);
 		let changedAt: number | undefined;

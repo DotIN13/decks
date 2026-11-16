@@ -3,12 +3,12 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { StagePens } from "./pens.ts";
+import { CanvasPens } from "./pens.ts";
 import { shotBox, shotTarget } from "./shots.ts";
 
 test("a picture frames what it names with a margin: an item, a board, several, everything, or a box", () => {
 	const dir = mkdtempSync(join(tmpdir(), "shots-"));
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("s");
 		pens.edit(name, [

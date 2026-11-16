@@ -167,7 +167,7 @@ export type ClientMessage =
 	| { type: "stage.rename"; name: string; to: string }
 	/** Delete a stage from the manager, with its drawing and the boards kept in its folder. */
 	| { type: "stage.delete"; name: string }
-	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
+	/** Take back the person's last edit to the drawing, or put it back (`CanvasPens.step`). */
 	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo"; /** The stage on screen. */ stage?: string; /** The browser's name for this step, as `stage.pen.edit`'s `edit`. */ edit?: string }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.

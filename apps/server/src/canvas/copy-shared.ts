@@ -4,7 +4,7 @@ import { emptyDocument, parse, serialize, type PenDocument } from "@decks/pen";
 import { canvasFolder, isSharedCanvas } from "@decks/hub/layout";
 import { rewriteLinks } from "./links.ts";
 import { CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 
 /**
  * Your own copy of a canvas a friend shared with you (`shared/canvases/<owner>/<canvas>/`), made in a
@@ -108,7 +108,7 @@ export function relinkDrawing(value: unknown, plan: ReadonlyMap<string, string>)
  * Copy the friend's canvas `from` into a new canvas of this deck, titled `title` or "Copy of …".
  * Answers the new canvas's name (its folder under canvases/).
  */
-export function copySharedCanvas(deck: string, pens: StagePens, from: string, title?: string): string {
+export function copySharedCanvas(deck: string, pens: CanvasPens, from: string, title?: string): string {
 	if (!isSharedCanvas(from)) throw new Error(`${from} is not a canvas shared with you: a friend's canvas is named shared/<owner>/<canvas> (decks canvas list says which).`);
 	if (!pens.has(from)) throw new Error(`There is no shared canvas ${from}: decks canvas list names them.`);
 	const sharing = pens.rights.sharing(from);

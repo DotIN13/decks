@@ -1,5 +1,5 @@
 import type { Deck } from "../deck/loader.ts";
-import type { StagePens } from "../canvas/pens.ts";
+import type { CanvasPens } from "../canvas/pens.ts";
 import { documentItemPath } from "./item-path.ts";
 import { resolveDoc } from "./resolve.ts";
 
@@ -7,7 +7,7 @@ import { resolveDoc } from "./resolve.ts";
  * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
  * the document service keys it: the only files a canvas frame may open (`connections/routes/v1.ts`, `connections/line.ts`). Each is listed under the path written on its item, under the file it means as the deck names it (an older item may name it from the canvas's folder), and under its key: any of them opens the same file.
  */
-export function documentsOnCanvas(pens: Pick<StagePens, "get">, deck: Deck, canvas: string): Map<string, string> {
+export function documentsOnCanvas(pens: Pick<CanvasPens, "get">, deck: Deck, canvas: string): Map<string, string> {
 	const out = new Map<string, string>();
 	let doc: { children?: unknown[] } | undefined;
 	try {

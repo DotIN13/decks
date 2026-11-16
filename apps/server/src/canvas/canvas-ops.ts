@@ -7,10 +7,10 @@
  */
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces, type Box } from "../deck/place.ts";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 import type { BoardSpot } from "./cards-on.ts";
 
-export interface OnStage {
+export interface OnCanvas {
 	path: string;
 	x: number;
 	y: number;
@@ -19,7 +19,7 @@ export interface OnStage {
 }
 
 /** The deck's boards on a stage, as its file has them. */
-export function boardsOn(pens: StagePens, deck: Deck, name: string): OnStage[] {
+export function boardsOn(pens: CanvasPens, deck: Deck, name: string): OnCanvas[] {
 	if (!pens.has(name)) return [];
 	try {
 		return pens.cards.boards(name).filter((one) => deck.board(one.path));
@@ -29,7 +29,7 @@ export function boardsOn(pens: StagePens, deck: Deck, name: string): OnStage[] {
 }
 
 /** What is drawn on a stage besides its boards, which a joining board keeps clear of. */
-function drawnOn(pens: StagePens, name: string): Box[] {
+function drawnOn(pens: CanvasPens, name: string): Box[] {
 	try {
 		return pens.cards.drawn(name);
 	} catch {
@@ -45,7 +45,7 @@ function drawnOn(pens: StagePens, name: string): Box[] {
  * put on.
  */
 export function putOn(
-	pens: StagePens,
+	pens: CanvasPens,
 	deck: Deck,
 	name: string,
 	paths: readonly string[],
@@ -53,7 +53,7 @@ export function putOn(
 ): string[] {
 	const on = boardsOn(pens, deck, name);
 	const present = new Set(on.map((one) => one.path));
-	// A copy a canvas has just made of a board (`StagePens.ownPath`) is read now, before the watcher finds it.
+	// A copy a canvas has just made of a board (`CanvasPens.ownPath`) is read now, before the watcher finds it.
 	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && (deck.board(path) ?? deck.refresh(path)));
 	if (joining.length === 0) return [];
 	const known: Record<string, { x: number; y: number }> = { ...(options.remembered ?? {}) };
@@ -85,7 +85,7 @@ export function putOn(
 }
 
 /** Take boards off a stage. Returns where each was, for whoever wants to put it back there. */
-export function takeOff(pens: StagePens, deck: Deck, name: string, paths: readonly string[]): Record<string, { x: number; y: number }> {
+export function takeOff(pens: CanvasPens, deck: Deck, name: string, paths: readonly string[]): Record<string, { x: number; y: number }> {
 	const was: Record<string, { x: number; y: number }> = {};
 	for (const one of boardsOn(pens, deck, name)) if (paths.includes(one.path)) was[one.path] = { x: one.x, y: one.y };
 	if (Object.keys(was).length) pens.cards.removeBoards(name, Object.keys(was));

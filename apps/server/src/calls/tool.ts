@@ -4,9 +4,9 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentState, Camera, Identity } from "@decks/protocol";
 import { guidelinesFile } from "@decks/runtime";
 import type { Verbs as Stage } from "@decks/sdk";
-import type { CreateSpec, QueuedWork, SendSpec, StageSnapshot } from "../agents/work.ts";
+import type { CreateSpec, QueuedWork, SendSpec, CanvasSnapshot } from "../agents/work.ts";
 import { penWriter } from "../canvas/pens.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import { verbContext } from "./context.ts";
 import { appsVerbs } from "./apps.ts";
 import { webVerbs } from "./web.ts";
@@ -29,7 +29,7 @@ import { gestures, type Gestures } from "./gestures.ts";
  * words of its own about what a board is for.
  */
 
-export interface StageAgentHooks {
+export interface AgentHooks {
 	id: string;
 	identity(): Identity;
 	context(): string[];
@@ -108,7 +108,7 @@ export interface StageAgentHooks {
 	setHome?(name: string): void;
 }
 
-export interface StageTool {
+export interface DecksTool {
 	/** The guidelines appended to every agent's context (`runtime/guidelines.txt`). */
 	readonly guidelines: string[];
 	/**
@@ -130,14 +130,14 @@ export interface StageTool {
 	 * (where an item went, what `decks.canvas.fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
-	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<StageCallResult>;
+	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<CallResult>;
 	/** What the person's hands did on the canvas, sent over the socket (`calls/gestures.ts`): not a verb. */
-	gesture<G extends keyof Gestures>(name: G, args: Parameters<Gestures[G]>): Promise<StageCallResult>;
-	snapshot(): StageSnapshot;
+	gesture<G extends keyof Gestures>(name: G, args: Parameters<Gestures[G]>): Promise<CallResult>;
+	snapshot(): CanvasSnapshot;
 }
 
-/** One verb called over HTTP: see `StageTool.call`. */
-export interface StageCallResult {
+/** One verb called over HTTP: see `DecksTool.call`. */
+export interface CallResult {
 	ok: boolean;
 	value?: unknown;
 	error?: string;
@@ -162,13 +162,13 @@ function guidelines(): string[] {
 }
 const GUIDELINES = guidelines();
 
-export function createStageTool(deps: {
-	stage: StageService;
-	agent: StageAgentHooks;
+export function createDecksTool(deps: {
+	stage: CanvasService;
+	agent: AgentHooks;
 	port: number;
 	/** Where the snapshot goes after every run, so a resume or a rewind can restore it. */
-	persist?: (snapshot: StageSnapshot) => void;
-}): StageTool {
+	persist?: (snapshot: CanvasSnapshot) => void;
+}): DecksTool {
 	const { stage: service, agent, port } = deps;
 	const ctx = verbContext({ stage: service, agent, port });
 	const { notes, images } = ctx;
@@ -191,7 +191,7 @@ export function createStageTool(deps: {
 
 	const hands = gestures(ctx);
 
-	const snapshot = (): StageSnapshot => ({
+	const snapshot = (): CanvasSnapshot => ({
 		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards
 		// were and not merely which ones were up.
 		positions: deps.agent.positions?.(),
@@ -210,7 +210,7 @@ export function createStageTool(deps: {
 		async gesture(name, args) {
 			notes.length = 0;
 			images.length = 0;
-			let answer: StageCallResult;
+			let answer: CallResult;
 			try {
 				const value = await (hands[name] as (...given: unknown[]) => Promise<unknown>)(...args);
 				answer = { ok: true, value, notes: [...notes] };
@@ -221,7 +221,7 @@ export function createStageTool(deps: {
 			return answer;
 		},
 
-		async call(name: string, args: readonly unknown[], on: { stage?: string } = {}): Promise<StageCallResult> {
+		async call(name: string, args: readonly unknown[], on: { stage?: string } = {}): Promise<CallResult> {
 			notes.length = 0;
 			images.length = 0;
 			// The canvas the request says it was made on, which is what `here()` means for this call.
@@ -231,7 +231,7 @@ export function createStageTool(deps: {
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown> | undefined)?.[key];
 			const verb = (owner as Record<string, unknown> | undefined)?.[path[path.length - 1]!];
 			if (typeof verb !== "function") return { ok: false, error: renamedVerb(name) ?? `${name} is not a verb.`, notes: [] };
-			let answer: StageCallResult;
+			let answer: CallResult;
 			try {
 				const run = () => (verb as (...given: unknown[]) => Promise<unknown>).apply(owner, [...args]);
 				// What an agent draws is its own: the canvas remembers it as the last writer (`penWriter`).

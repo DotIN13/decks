@@ -1,9 +1,9 @@
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 
 /**
  * Asking an agent to name the canvas it is on, and to rename it once it has outgrown the name.
  *
- * A canvas's name is what the person reads in the pill and the stage manager (`StagePens.titleOf`).
+ * A canvas's name is what the person reads in the pill and the stage manager (`CanvasPens.titleOf`).
  * A new canvas is called after the agent that landed on it, which says who, not what; and a name
  * given for three boards stops describing a canvas that now holds ten others. So the request
  * travels where the identity request does (`agents/identity-reminder.ts`): at the head of each
@@ -16,7 +16,7 @@ import type { StagePens } from "./pens.ts";
 /** How many boards have to be new since the naming, at least, before a rename is suggested. */
 const NEW_AT_LEAST = 3;
 
-export function canvasNameReminder(pens: StagePens | undefined, stage: string | undefined): string | undefined {
+export function canvasNameReminder(pens: CanvasPens | undefined, stage: string | undefined): string | undefined {
 	if (!pens || !stage || !pens.names().includes(stage)) return undefined;
 	let boards: string[];
 	try {

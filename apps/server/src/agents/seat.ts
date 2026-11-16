@@ -2,8 +2,8 @@ import type { PenDocument } from "@decks/pen";
 import type { DeckState, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
-import { boardsOn, putOn, takeOff, type OnStage } from "../canvas/canvas-ops.ts";
-import type { StageService } from "../canvas/service.ts";
+import { boardsOn, putOn, takeOff, type OnCanvas } from "../canvas/canvas-ops.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import { canvasNews } from "./canvas-news.ts";
 import { recordedBoardsToAdopt } from "./old-records.ts";
 import type { AgentRecord } from "./store.ts";
@@ -26,7 +26,7 @@ const UNTITLED = "Untitled canvas";
 export interface SeatHost {
 	readonly id: string;
 	readonly deck: Deck;
-	readonly stage: StageService;
+	readonly stage: CanvasService;
 	emit(message: ServerMessage): void;
 	/** Something the record keeps changed: write it shortly. */
 	save(): void;
@@ -177,7 +177,7 @@ export class Seat {
 	}
 
 	/** The deck's boards on this agent's stage, as the file has them. */
-	private onCanvas(): OnStage[] {
+	private onCanvas(): OnCanvas[] {
 		const name = this.canvasName();
 		return name ? boardsOn(this.of.stage.pens!, this.of.deck, name) : [];
 	}

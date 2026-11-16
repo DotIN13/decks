@@ -5,8 +5,8 @@ import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { DeckAgent } from "../agents/session.ts";
 import { Deck } from "../deck/loader.ts";
-import { StagePens } from "./pens.ts";
-import { deleteStage, renameStage } from "./admin.ts";
+import { CanvasPens } from "./pens.ts";
+import { deleteCanvas, renameStage } from "./admin.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
@@ -27,7 +27,7 @@ function fixture() {
 	mkdirSync(join(deckPath, "boards"), { recursive: true });
 	put(join(deckPath, "canvases", "t", "cards", "plan", "index.html"), "<title>Plan</title>PLAN");
 	const deck = Deck.open(deckPath);
-	const pens = new StagePens(deckPath, () => undefined);
+	const pens = new CanvasPens(deckPath, () => undefined);
 	pens.claim("deploy");
 	pens.cards.syncBoards("deploy", [{ path: "canvases/t/cards/plan/index.html", x: 10, y: 20, w: 800, h: 500, title: "Plan" }]);
 	// A second canvas that keeps its own copy of the board in its folder.
@@ -63,11 +63,11 @@ test("a rename moves the folder and re-points the boards kept in it, keeping the
 test("a delete takes the stage and the boards kept in its folder, and never the deck's own boards", () => {
 	const { deckPath, deck, pens, context, done } = fixture();
 	try {
-		deleteStage(context, "deploy-copy");
+		deleteCanvas(context, "deploy-copy");
 		assert.ok(!pens.names().includes("deploy-copy"));
 		assert.ok(!existsSync(join(deckPath, "canvases", "deploy-copy")));
 		assert.ok(!deck.board("canvases/deploy-copy/cards/plan/index.html"));
-		deleteStage(context, "deploy");
+		deleteCanvas(context, "deploy");
 		assert.equal(readFileSync(join(deckPath, "canvases", "t", "cards", "plan", "index.html"), "utf8"), "<title>Plan</title>PLAN");
 	} finally {
 		done();
@@ -80,7 +80,7 @@ test("neither is allowed while an agent on that stage is in the middle of a turn
 		const busy = { name: "Ada", conversation: { running: true }, seat: { stageName: () => "deploy" } } as unknown as DeckAgent;
 		const withBusy = { ...context, agents: [busy] };
 		assert.throws(() => renameStage(withBusy, "deploy", "other"), /Ada is working on "deploy"/);
-		assert.throws(() => deleteStage(withBusy, "deploy"), /Ada is working on "deploy"/);
+		assert.throws(() => deleteCanvas(withBusy, "deploy"), /Ada is working on "deploy"/);
 	} finally {
 		done();
 	}

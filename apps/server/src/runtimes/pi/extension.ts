@@ -1,6 +1,6 @@
 import { createBashTool, type ExtensionAPI, type InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { StageAgentHooks } from "../../calls/tool.ts";
+import type { AgentHooks } from "../../calls/tool.ts";
 import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**
@@ -15,7 +15,7 @@ import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
  */
 
 export function decksStage(deps: {
-	agent: StageAgentHooks;
+	agent: AgentHooks;
 	gdocs?: GdocsCall;
 	/** The agent's shell: where it runs, and the variables that put `decks` in it (`runtimes/decks-env.ts`). */
 	shell?: { cwd: string; env: Record<string, string> };

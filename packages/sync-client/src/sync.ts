@@ -875,7 +875,7 @@ export class HarnessSync {
 
 	/**
 	 * What `canvas.json` says about a synced canvas: the Studio canvas it is, and for a friend's, who
-	 * shared it and as what (`StagePens.sharing`). `fresh` writes a title too, for one that came down.
+	 * shared it and as what (`CanvasPens.sharing`). `fresh` writes a title too, for one that came down.
 	 */
 	private writeMeta(name: string, set: { title?: string; studio?: string; shared?: { owner: string; ownerName: string; role: string }; othersEdit?: boolean }, fresh = false) {
 		const file = join(this.folder(name), "canvas.json");
@@ -1232,7 +1232,7 @@ export class HarnessSync {
 	// ---- edits made here, sent as they are logged ----
 
 	/**
-	 * An edit made on this harness, as its canvas store logged it (`StagePens.wrote`): for a canvas on
+	 * An edit made on this harness, as its canvas store logged it (`CanvasPens.wrote`): for a canvas on
 	 * Studio, the edits go up at once, with Studio's revision as their base, instead of waiting for the
 	 * file to be compared with the last agreed drawing (which stays as the repair for anything missed).
 	 * One Studio made (author `studio`, written through `remote.write`) is Studio's already.

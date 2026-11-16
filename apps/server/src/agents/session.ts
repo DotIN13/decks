@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Identity, MessagePart, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { StageService } from "../canvas/service.ts";
-import { createStageTool, type StageTool } from "../calls/tool.ts";
-import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "./work.ts";
+import type { CanvasService } from "../canvas/service.ts";
+import { createDecksTool, type DecksTool } from "../calls/tool.ts";
+import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type CanvasSnapshot } from "./work.ts";
 import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
-import type { StageBridge } from "../canvas/bridge.ts";
+import type { CanvasBridge } from "../canvas/bridge.ts";
 import type { Act } from "./acts.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
@@ -42,8 +42,8 @@ export class DeckAgent {
 	readonly turns: Turns;
 	readonly inbox: Inbox;
 
-	private tool: StageTool | undefined;
-	private personal: StageTool | undefined;
+	private tool: DecksTool | undefined;
+	private personal: DecksTool | undefined;
 
 	private identity: Identity;
 
@@ -62,7 +62,7 @@ export class DeckAgent {
 	constructor(
 		private readonly deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
-		private readonly stage: StageService,
+		private readonly stage: CanvasService,
 		private readonly host: {
 			port: number;
 			camera(agentId: string): Camera;
@@ -156,7 +156,7 @@ export class DeckAgent {
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
 			commandsChanged?(): void;
-			bridge?: StageBridge;
+			bridge?: CanvasBridge;
 			/** For an agent that works outside Decks (`kind` "outside"): the key it joins by and the app it runs in. */
 			outside?: { key: string; client: string };
 			/**
@@ -364,7 +364,7 @@ export class DeckAgent {
 	}
 
 	/** Put a remembered stage back: what the agent held, showed and called itself. */
-	private apply(snapshot: StageSnapshot | undefined): void {
+	private apply(snapshot: CanvasSnapshot | undefined): void {
 		if (!snapshot) return;
 		if (Array.isArray(snapshot.context)) this.seat.setContext(snapshot.context.filter((path) => typeof path === "string"));
 		if (Array.isArray(snapshot.inPlay)) this.seat.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
@@ -528,8 +528,8 @@ export class DeckAgent {
 	 * when a request names this agent (`calls/caller.ts`). Made once and kept, so a verb called
 	 * over HTTP before the agent's first turn acts on the same stage its turns will.
 	 */
-	stageTool(): StageTool {
-		this.tool ??= createStageTool({
+	stageTool(): DecksTool {
+		this.tool ??= createDecksTool({
 			stage: this.stage,
 			agent: this.stageHooks(),
 			port: this.host.port,
@@ -545,8 +545,8 @@ export class DeckAgent {
 	 * the same verbs, and the same stage, with the person as the one who acted, so nothing they do
 	 * draws this agent's cursor or counts as its work.
 	 */
-	personTool(): StageTool {
-		this.personal ??= createStageTool({
+	personTool(): DecksTool {
+		this.personal ??= createDecksTool({
 			stage: this.stage,
 			agent: {
 				...this.stageHooks(true),

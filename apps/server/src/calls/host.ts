@@ -4,7 +4,7 @@ import type { AppTrust } from "../auth/app-trust.ts";
 import type { CardService } from "../cards/service.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import type { Deck } from "../deck/loader.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 
 /**
  * What the calls need of the harness to find who is calling and run a call for them: the agents,
@@ -15,7 +15,7 @@ import type { StageService } from "../canvas/service.ts";
 export interface CallsHost {
 	deck: Deck;
 	readonly agents: Registry;
-	readonly stage: StageService;
+	readonly stage: CanvasService;
 	readonly boards: CardService;
 	readonly cameras: Cameras;
 	readonly apps: Apps;

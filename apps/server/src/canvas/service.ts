@@ -7,8 +7,8 @@ import { withCardSize } from "@decks/deck-kit";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 import { checkAvatar } from "./avatar.ts";
-import type { StageShots } from "./shots.ts";
-import type { StagePens } from "./pens.ts";
+import type { CanvasShots } from "./shots.ts";
+import type { CanvasPens } from "./pens.ts";
 import type { Forwards } from "../ports.ts";
 import type { Apps } from "../apps/service.ts";
 import type { AppCheck } from "../apps/check.ts";
@@ -27,7 +27,7 @@ import type { AppCheck } from "../apps/check.ts";
  * makes a headless run possible at all.
  */
 
-export interface StageHost {
+export interface CanvasServiceHost {
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Page;
 	/** Delete a board's file, keeping its last revision, and tell everyone; the refusal's words, if it is refused. */
@@ -78,8 +78,8 @@ export interface StageHost {
 	 * agent moved four boards while the person was reading another chat and `decks.canvas.read()`
 	 * gave back all four places from before.
 	 *
-	 * Optional, like `StageAgentHooks.positions`, so a host that does not arrange omits it and a
-	 * test can build one without a stage behind it. `StageService.boards` falls back to the deck's
+	 * Optional, like `AgentHooks.positions`, so a host that does not arrange omits it and a
+	 * test can build one without a stage behind it. `CanvasService.boards` falls back to the deck's
 	 * own list; no id means the conversation on screen, which is what a board's own code gets.
 	 */
 	boards?(agentId?: string): Page[];
@@ -121,7 +121,7 @@ const FIT_WAIT_MS = 5000;
 /** How long `decks.canvas.fit` waits for a canvas before measuring the board in the server's own browser as well. */
 const AWAY_AFTER_MS = 1200;
 
-export class StageService {
+export class CanvasService {
 	/**
 	 * The user's shared Chrome, if the app has one (`browser/bridge.ts`).
 	 *
@@ -136,7 +136,7 @@ export class StageService {
 	 * On the service for the reason `web` is: one per server, and the stage tool is what reads it.
 	 * `undefined` in tests that build a service without a deck on disk.
 	 */
-	pens: StagePens | undefined;
+	pens: CanvasPens | undefined;
 	/** The ports forwarded through Decks, which agents open and close (`ports.ts`). `undefined` in tests without one. */
 	forwards: Forwards | undefined;
 	/** The deck's apps (`apps/service.ts`). `undefined` in tests without one. */
@@ -146,13 +146,13 @@ export class StageService {
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`canvas/shots.ts`). */
-	shots: StageShots | undefined;
+	shots: CanvasShots | undefined;
 	/** The server's own picture of a whole board, fresh from its file (`pictures/service.ts`): what a screenshot falls back to. */
 	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;
 
 	constructor(
 		private deck: Deck,
-		private readonly host: StageHost,
+		private readonly host: CanvasServiceHost,
 	) {}
 
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
@@ -181,7 +181,7 @@ export class StageService {
 		if (board) this.host.broadcast({ type: "card.changed", path: board.path, rev: board.rev, card: board });
 	}
 
-	/** Name a canvas (`StageHost.retitle`); without a host that can, only its title changes. */
+	/** Name a canvas (`CanvasServiceHost.retitle`); without a host that can, only its title changes. */
 	retitle(name: string, title: string): string {
 		if (this.host.retitle) return this.host.retitle(name, title);
 		this.pens?.setTitle(name, title);

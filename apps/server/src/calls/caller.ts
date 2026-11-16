@@ -4,7 +4,7 @@ import type { Principal } from "../auth/principal.ts";
 import { appTool, conversationForApp } from "./app-caller.ts";
 import type { CallsHost } from "./host.ts";
 import { personAgent } from "./person.ts";
-import type { StageCallResult, StageTool } from "./tool.ts";
+import type { CallResult, DecksTool } from "./tool.ts";
 
 /**
  * Who is calling, as the thing a call runs through: made from the token's principal
@@ -16,7 +16,7 @@ import type { StageCallResult, StageTool } from "./tool.ts";
  * - an app: the tool of the conversation on screen, under the app's name, once the person has let it;
  * - a canvas frame: the person's tool, on its one canvas.
  */
-export type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
+export type Caller = { tool: DecksTool; announce?: (verb: string, answer: CallResult) => void; on?: { stage?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
 
 /** The caller a request is: its token's principal, as the tool its calls run through. */
 export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & { principal?: Principal }): Promise<Caller> {
@@ -40,7 +40,7 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
 			// An agent that works outside Decks is here while it calls, and what it changes is said in its conversation.
 			agent.inbox.touch();
-			return { tool: agent.stageTool(), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: StageCallResult) => {
+			return { tool: agent.stageTool(), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: CallResult) => {
 						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.inbox.noteAct(actLine(name, answer));
 					},
 				}
@@ -56,7 +56,7 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 }
 
 /** One changing call by an outside agent, as a line in its conversation: the command, and the card or item it named. */
-function actLine(name: string, answer: StageCallResult): string {
+function actLine(name: string, answer: CallResult): string {
 	const value = answer.value as { path?: unknown; card?: unknown; id?: unknown; name?: unknown; deleted?: unknown } | undefined;
 	const what = value && typeof value === "object" ? [value.path, value.card, value.name, value.deleted, value.id].find((one) => typeof one === "string") : undefined;
 	return `decks ${name.replace(/\./g, " ")}${what ? `: ${what}` : ""}`;

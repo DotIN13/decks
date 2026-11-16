@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { AgentChat, AgentKind, AgentMode, ServerMessage, ThinkingLevel } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import { Registry } from "./registry.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import { DeckAgent } from "./session.ts";
@@ -46,7 +46,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 	return new DeckAgent(
 		deck,
 		() => {},
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -66,7 +66,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 
 function registryOn(deck: Deck): { registry: Registry; sent: ServerMessage[] } {
 	const sent: ServerMessage[] = [];
-	const registry = new Registry(deck, (message) => sent.push(message), {} as StageService, {
+	const registry = new Registry(deck, (message) => sent.push(message), {} as CanvasService, {
 		port: 4329,
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -562,7 +562,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			const agent = new SpyChild(
 				deck,
 				() => {},
-				{} as StageService,
+				{} as CanvasService,
 				{
 					port: 4329,
 					camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -588,7 +588,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 		}
 	}
 
-	const registry = new SpyRegistry(deck, (message) => sent.push(message), {} as StageService, {
+	const registry = new SpyRegistry(deck, (message) => sent.push(message), {} as CanvasService, {
 		port: 4329,
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -601,7 +601,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 	const parent = new DeckAgent(
 		deck,
 		(message) => sent.push(message),
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -738,7 +738,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 			const agent = new DrainingChild(
 				deck,
 				(message) => sent.push(message),
-				{} as StageService,
+				{} as CanvasService,
 				{
 					port: 4329,
 					camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -759,7 +759,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 			created.push(agent);
 			return agent;
 		}
-	})(deck, (message) => sent.push(message), {} as StageService, {
+	})(deck, (message) => sent.push(message), {} as CanvasService, {
 		port: 4329,
 		defaultKind: "pi",
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -881,7 +881,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 	const agent = new NamingAgent(
 		deck,
 		() => {},
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),

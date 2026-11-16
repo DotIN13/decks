@@ -3,7 +3,7 @@ import { watch } from "node:fs";
 import { emptyDocument, ids, PenError, read, serialize, type PenDocument, type PenEdit, diff } from "@decks/pen";
 import type { ServerMessage } from "@decks/protocol";
 import { fileUrl } from "../deck/roots.ts";
-import { penEditBy, penOrigin, penWriter, type PenEntry, type StagePens } from "./pens.ts";
+import { penEditBy, penOrigin, penWriter, type PenEntry, type CanvasPens } from "./pens.ts";
 
 /**
  * What was written to each canvas, and by whom.
@@ -39,7 +39,7 @@ const MADE_LATELY = 64;
 const HISTORY = 100;
 
 export class CanvasLog {
-	constructor(private readonly of: StagePens) {}
+	constructor(private readonly of: CanvasPens) {}
 
 	/**
 	 * The store wrote a drawing. Whose write it was is read from what surrounds the call: Studio's

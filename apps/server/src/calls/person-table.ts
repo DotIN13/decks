@@ -10,7 +10,7 @@ import type { DeckAgent } from "../agents/session.ts";
 import { joinSpot } from "../deck/place.ts";
 import { putOn } from "../canvas/canvas-ops.ts";
 import { penEditBy } from "../canvas/pens.ts";
-import { deleteStage, titleCanvas } from "../canvas/admin.ts";
+import { deleteCanvas, titleCanvas } from "../canvas/admin.ts";
 import { unpairStudio } from "../studio/index.ts";
 import type { View } from "../connections/tab-socket.ts";
 import { personAgent } from "./person.ts";
@@ -353,7 +353,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"canvas.remove": async ([canvas]) => {
 			const held = pens();
 			if (!held) throw new Error("This server keeps no canvases.");
-			deleteStage({ deck: app.deck, pens: held, agents: agents().all() }, String(canvas));
+			deleteCanvas({ deck: app.deck, pens: held, agents: agents().all() }, String(canvas));
 			app.publishStages();
 		},
 

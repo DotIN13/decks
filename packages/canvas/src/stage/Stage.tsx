@@ -59,8 +59,8 @@ import { createSelection } from "./selection.tsx";
  * finger on the canvas moves the canvas unless it landed on something that says
  * otherwise, which on a board means a title bar or a component already selected.
  */
-export type { InkRequest, StageComment, StageShots } from "../types.ts";
-import type { InkRequest, StageComment, StageShots } from "../types.ts";
+export type { InkRequest, StageComment, CanvasShots } from "../types.ts";
+import type { InkRequest, StageComment, CanvasShots } from "../types.ts";
 
 
 /** What the stage is given by its host. */
@@ -118,7 +118,7 @@ export type StageProps = {
 	 */
 	frame: Component<ItemSlotProps>;
 	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
-	shots: () => StageShots;
+	shots: () => CanvasShots;
 	/**
 	 * Comment on a board or on drawn items, from the button in a bar or a pill: `path` is the board
 	 * (or the drawing's file, with the item ids in `items`), `anchor` where the button is on screen.

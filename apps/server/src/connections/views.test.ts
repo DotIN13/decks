@@ -10,7 +10,7 @@ import { DeckAgent } from "../agents/session.ts";
 import { AgentStore } from "../agents/store.ts";
 import { Deck } from "../deck/loader.ts";
 import { realPathOf } from "../deck/roots.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import type { Hub, View } from "./tab-socket.ts";
 import { greet, handleTabRequest } from "./greeting.ts";
 
@@ -33,7 +33,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 	const agent = new DeckAgent(
 		deck,
 		() => {},
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),

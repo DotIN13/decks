@@ -8,7 +8,7 @@ import { refusedForCanvas } from "./canvas-frame.ts";
 import type { CallsHost } from "./host.ts";
 import { personTable, type PersonCall, type PersonHost } from "./person-table.ts";
 import { renamedVerb } from "./renamed.ts";
-import type { StageCallResult } from "./tool.ts";
+import type { CallResult } from "./tool.ts";
 
 /**
  * The one way a call is run, whoever makes it and however it arrives: `POST /api/v1/<verb>`
@@ -25,7 +25,7 @@ import type { StageCallResult } from "./tool.ts";
  */
 
 /** The answer to one call, as the SDK reads it. */
-interface VerbAnswer extends StageCallResult {}
+interface VerbAnswer extends CallResult {}
 
 /**
  * One verb called for a principal, as `POST /api/v1/<verb>` and the line's `call` both run it: the verb
@@ -69,7 +69,7 @@ export async function runVerb(app: CallsHost & PersonHost, principal: Principal 
 	const caller = await callerOf(app, { headers, principal });
 	if ("error" in caller) return refuse(caller.status, caller.error);
 	const call = () => caller.tool.call(name, args, caller.on ?? {});
-	// The person's name for an edit to the drawing, sent back with the revision that has it (`StagePens`, `penEditBy`).
+	// The person's name for an edit to the drawing, sent back with the revision that has it (`CanvasPens`, `penEditBy`).
 	const answer = caller.edit ? await penEditBy.run(caller.edit, call) : await call();
 	if (caller.announce) caller.announce(name, answer);
 	return { status: answer.ok ? 200 : 422, answer };

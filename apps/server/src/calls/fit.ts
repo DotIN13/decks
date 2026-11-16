@@ -13,7 +13,7 @@ export async function fitOn(ctx: VerbContext, asked: string, named: string | und
 	const { service, agent, notes } = ctx;
 	const pens = service.pens;
 	const on = named ?? agent.stageName?.();
-	// A board from elsewhere is the canvas's own copy of it (`StagePens.copyOf`): that is what is fitted.
+	// A board from elsewhere is the canvas's own copy of it (`CanvasPens.copyOf`): that is what is fitted.
 	const path = on && pens ? pens.cards.copyOf(on, asked) : asked;
 	const held = on && pens ? pens.cards.boards(on).find((one) => one.path === path) : undefined;
 	if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your canvas"}, so there is no width to fit it at. Put it there first (${isCardPath(path) ? `decks canvas insert --type card --card ${path}` : `decks canvas insert '{"type":"board","board":"${path}"}'`}), or name a canvas that holds it with --canvas.`);

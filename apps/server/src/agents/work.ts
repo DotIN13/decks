@@ -82,7 +82,7 @@ export interface QueuedWork {
  * equivalent — `structuredContent` looks like one but replaces the tool's own text — so
  * both runtimes now use one store and there is one code path to be wrong in.
  */
-export interface StageSnapshot {
+export interface CanvasSnapshot {
 	context: string[];
 	/** What was on the canvas — a set, so a rewind restores the whole view. */
 	inPlay: string[];

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, ChatItem, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
-import type { StageBridge } from "../canvas/bridge.ts";
+import type { CanvasBridge } from "../canvas/bridge.ts";
 import type { AgentBackend, AgentBackendContext, ClaudeAccountSwitcher } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
@@ -85,7 +85,7 @@ export interface ConversationStart {
 	accounts?: ClaudeAccountSwitcher | undefined;
 	accountsChanged?: (() => void) | undefined;
 	commandsChanged?: (() => void) | undefined;
-	bridge?: StageBridge | undefined;
+	bridge?: CanvasBridge | undefined;
 	/** A chat read back off disk: a row first and a conversation second. */
 	restored?: { lastLine?: string | undefined; lastAt?: number | undefined; model?: AgentModel | undefined; mode?: AgentMode | undefined; usage?: AgentUsage | undefined; account?: string | undefined } | undefined;
 }
@@ -163,7 +163,7 @@ export class Conversation {
 	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
 	private readonly commandsChanged: (() => void) | undefined;
 	/** Where an out-of-process runtime's canvas tool calls back to. */
-	private readonly stageBridge: StageBridge | undefined;
+	private readonly stageBridge: CanvasBridge | undefined;
 
 	constructor(
 		private readonly of: ConversationHost,

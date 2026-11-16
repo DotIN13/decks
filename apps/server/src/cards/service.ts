@@ -148,7 +148,7 @@ export class CardService {
 	 */
 	/**
 	 * A board file that appeared without this service writing it (a canvas's copy of a board from
-	 * elsewhere, `StagePens.ownPath`): read now and told to every browser, as a new board is.
+	 * elsewhere, `CanvasPens.ownPath`): read now and told to every browser, as a new board is.
 	 */
 	appeared(path: string): void {
 		const board = this.deck.refresh(path);

@@ -1,6 +1,6 @@
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
-import type { StagePens } from "../canvas/pens.ts";
+import type { CanvasPens } from "../canvas/pens.ts";
 
 /**
  * Whose stage the person's click acts on.
@@ -10,7 +10,7 @@ import type { StagePens } from "../canvas/pens.ts";
  * canvas, the one the browser is looking at first; with no canvas named, to the agent it names, and
  * then to the focused conversation, which is what every board frame acts on.
  */
-export function personAgent(context: { agents: Registry; pens?: StagePens | undefined }, asked: { stage?: string; agent?: string }): DeckAgent {
+export function personAgent(context: { agents: Registry; pens?: CanvasPens | undefined }, asked: { stage?: string; agent?: string }): DeckAgent {
 	const named = asked.agent ? context.agents.get(asked.agent) : undefined;
 	const fallback = named ?? context.agents.focused();
 	const stage = asked.stage && context.pens?.has(asked.stage) ? asked.stage : undefined;
@@ -26,7 +26,7 @@ export function personAgent(context: { agents: Registry; pens?: StagePens | unde
  * A refusal comes back as the notice the person sees.
  */
 export async function asPerson(
-	context: { agents: Registry; pens?: StagePens | undefined },
+	context: { agents: Registry; pens?: CanvasPens | undefined },
 	asked: { stage?: string; agent?: string },
 	verb: string,
 	args: unknown[],

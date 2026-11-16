@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canvasNameReminder } from "./canvas-name.ts";
-import { StagePens } from "./pens.ts";
+import { CanvasPens } from "./pens.ts";
 
 
 /* When an agent is asked to name its canvas: no name of its own, or a name the canvas has outgrown. */
@@ -13,7 +13,7 @@ const board = (path: string, x: number) => ({ type: "browser", id: path.replace(
 
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "decks-canvas-name-"));
-	const pens = new StagePens(root, () => {});
+	const pens = new CanvasPens(root, () => {});
 	const put = (stage: string, paths: string[]) => {
 		writeFileSync(pens.fileOf(stage), JSON.stringify({ version: "2.14", children: paths.map((path, i) => board(path, i * 500)) }));
 		// The cache holds what it read; a fresh read is what the next call should see.

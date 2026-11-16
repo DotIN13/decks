@@ -3,8 +3,8 @@ import { join } from "node:path";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { nowWords, processZone } from "../lib/clock.ts";
-import type { StageBridge } from "../canvas/bridge.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasBridge } from "../canvas/bridge.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
@@ -42,7 +42,7 @@ export class Registry {
 	constructor(
 		private deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
-		private readonly stage: StageService,
+		private readonly stage: CanvasService,
 		private readonly host: {
 			port: number;
 			/** The runtime a new agent gets unless it asks for another one. */
@@ -63,7 +63,7 @@ export class Registry {
 			/** Tell the browser the list moved, after a login or an automatic switch. */
 			accountsChanged?(): void;
 			/** The canvas tool's HTTP end, for a runtime that is not in this process. */
-			bridge?: StageBridge;
+			bridge?: CanvasBridge;
 		},
 	) {
 		this.store = new AgentStore(deck);

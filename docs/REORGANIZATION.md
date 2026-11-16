@@ -435,7 +435,7 @@ well-described module. Three things belong in this pass, and one does not yet.
 - **The vocabulary.** The data was migrated (`2026-10-16-stages-to-canvases`,
   `2026-10-29-boards-to-cards`), the wire renamed (`names.ts`), the verbs renamed (`renamed.ts` lists
   the old ones). The code's own names were not: `stage/` is the canvas service (`service.ts`: "the
-  single path from a tool to the canvas"), `StagePens` is the canvas's drawing, `App.boards` is the
+  single path from a tool to the canvas"), `CanvasPens` is the canvas's drawing, `App.boards` is the
   cards, `deck/stage-boards.ts` is a canvas's own cards, `calls/cards.ts` returns the `card`, `frame`
   and `file` verbs, `stage-admin.ts` renames canvases. A reader who knows the product's words has to
   learn a second set to read the server. A rename pass is pure (typecheck proves it) but wide; do it
@@ -617,7 +617,7 @@ Each line is a commit or a short run of them. Each leaves `npm run typecheck`, `
 
 **Phase 6: the release that removes the compat layers** (when the clients allow)
 28. `wire/legacy.ts` and its directory; the alias routes once Studio's `harness.ts` calls the verbs (§4.6); `OLD_EVENT_NAMES` once the iOS app says `v: 2`; `renamed.ts`'s wording stays as long as agents may say an old verb. Each with its line struck from `COMPAT.md`. Checks: `router.test`, `line.test`, `canvas-frame`, `apps-in-frame`.
-29. Then, and only then, the server's vocabulary rename: `stage/` → `canvas/`, `StagePens` → `CanvasPens`, `App.boards` → `App.cards`, `stage-boards.ts` → `canvas-cards.ts`, `calls/cards.ts` → `verbs/card.ts`, `stage-admin.ts` → `canvas-admin.ts`. Pure renames, one per commit, after the files that mention the old names most have been deleted rather than renamed. (§4.3)
+29. Then, and only then, the server's vocabulary rename: `stage/` → `canvas/`, `CanvasPens` → `CanvasPens`, `App.boards` → `App.cards`, `stage-boards.ts` → `canvas-cards.ts`, `calls/cards.ts` → `verbs/card.ts`, `stage-admin.ts` → `canvas-admin.ts`. Pure renames, one per commit, after the files that mention the old names most have been deleted rather than renamed. (§4.3)
 
 Phases 1 and 2 can go in any order and in parallel. Phase 3 before Phase 4 only because the canvas
 moves change import paths the app uses; doing the app first would touch the same imports twice.

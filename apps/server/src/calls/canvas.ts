@@ -21,7 +21,7 @@ import { heldClip, holdClip, pasteItems } from "./paste.ts";
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
  * own light/dark Decks variables (`$decks-fill-slate`, … : `@decks/pen` colors.ts, defined in the same
- * edit by `StagePens.edit`), so it reads on a dark canvas too. Only an item at the top level with
+ * edit by `CanvasPens.edit`), so it reads on a dark canvas too. Only an item at the top level with
  * neither a fill nor a stroke: a rectangle, an ellipse, an icon or an arrow, and a frame with nothing in it
  * and no metadata (a frame holding items is a layout as often as a box, and a card or a library
  * shape is drawn its own way). Anything given a colour keeps it.
@@ -93,7 +93,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (frame === undefined || frame === null) return { canvas: canvasOf(options?.canvas) };
 		if (options?.canvas !== undefined && options.canvas !== null) throw new Error("Say a canvas or a frame, not both: { frame } edits the frame file itself, and that shows on every canvas placing it.");
 		if (typeof frame !== "string" || !frame.trim()) throw new Error('frame names a frame file, as in { frame: "frames/agent-card" }.');
-		// `frames/<name>`: the agent's own canvas's copy when it has one (`StagePens.frameOn`), else the deck's.
+		// `frames/<name>`: the agent's own canvas's copy when it has one (`CanvasPens.frameOn`), else the deck's.
 		let home: string | undefined;
 		try {
 			home = canvasOf(undefined);
@@ -129,7 +129,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (note) docNotes.push(note);
 		return path;
 	};
-	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`StagePens.copyOf`). */
+	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`CanvasPens.copyOf`). */
 	const ownOn = (path: string): string => (onCanvas ? needPens().cards.copyOf(onCanvas, path) : path);
 
 	/** An item's id, or a board's path on this document turned into its item's id. */
@@ -384,7 +384,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	/**
 	 * Apply ops to a canvas or a frame, all or nothing, and answer with each item as it now is.
 	 * The canvas first, then a board's file when a board was sized, as a person's resize does. A
-	 * frame's file is written once, and every canvas placing it is sent it again (`StagePens.editFile`).
+	 * frame's file is written once, and every canvas placing it is sent it again (`CanvasPens.editFile`).
 	 */
 	const change = (target: Target, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
 		const pens = needPens();
@@ -574,7 +574,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, values: shortVariables(doc), ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
 			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
-			/** Undo and redo of the person's own edits (`StagePens.step`), as the socket's `stage.pen.step` does them. */
+			/** Undo and redo of the person's own edits (`CanvasPens.step`), as the socket's `stage.pen.step` does them. */
 			step: async (direction: "undo" | "redo", options?: { canvas?: string }) => {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();

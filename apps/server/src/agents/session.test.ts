@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } from "@decks/protocol";
 import { Cameras } from "../deck/cameras.ts";
 import { Deck } from "../deck/loader.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
@@ -82,7 +82,7 @@ function agentOn(
 	const agent = new DeckAgent(
 		deck,
 		(message) => sent.push(message),
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: (id: string) => cameras.answer(id),
@@ -396,7 +396,7 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ 
 	const agent = new Probe(
 		deck,
 		(message) => sent.push(message),
-		{} as StageService,
+		{} as CanvasService,
 		{
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),

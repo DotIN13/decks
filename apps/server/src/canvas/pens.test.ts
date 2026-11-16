@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { test } from "node:test";
-import { StagePens, type PenEntry } from "./pens.ts";
+import { CanvasPens, type PenEntry } from "./pens.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
@@ -17,7 +17,7 @@ const deck = () => mkdtempSync(join(tmpdir(), "pens-"));
 test("an edit writes a native .pen file, answers with results, and announces the change", () => {
 	const dir = deck();
 	const heard: Array<[string, PenEntry]> = [];
-	const pens = new StagePens(dir, (name, entry) => heard.push([name, entry]));
+	const pens = new CanvasPens(dir, (name, entry) => heard.push([name, entry]));
 	try {
 		const name = pens.claim("Wren");
 		assert.equal(name, "wren");
@@ -39,7 +39,7 @@ test("an edit writes a native .pen file, answers with results, and announces the
 
 test("a failed edit writes nothing; a hand edit is read back; a broken file keeps the last good document", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("s");
 		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a" } }]);
@@ -63,7 +63,7 @@ test("a failed edit writes nothing; a hand edit is read back; a broken file keep
 
 test("an arrow to a board is drawn on edit, and follows the board when it moves", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("s");
 		let board = { x: 400, y: 0, w: 200, h: 100 };
@@ -89,7 +89,7 @@ test("an arrow to a board is drawn on edit, and follows the board when it moves"
 
 test("a stage's boards are browser items: synced in, read back in order, moved, resized and removed", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("s");
 		const a = { path: "canvases/s/cards/a/index.html", x: 0, y: 0, w: 1000, h: 700, title: "A" };
@@ -116,7 +116,7 @@ test("a stage's boards are browser items: synced in, read back in order, moved, 
 
 test("the person's edits undo and redo, and a step is refused once an agent has drawn since", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("u");
 		const ids = () => pens.get(name).doc.children.map((n) => n.id);
@@ -141,7 +141,7 @@ test("the person's edits undo and redo, and a step is refused once an agent has 
 
 test("what is drawn on a stage, for placement: top-level items, not boards, not arrows", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("s");
 		pens.edit(name, [
@@ -160,7 +160,7 @@ test("what is drawn on a stage, for placement: top-level items, not boards, not 
 
 test("a stage's name is its own: kept as written, changed freely, and the folder never moves", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-titles-"));
-	const pens = new StagePens(root, () => {});
+	const pens = new CanvasPens(root, () => {});
 	try {
 		const folder = pens.claim("Launch plan: Q4 (draft)");
 		assert.equal(folder, "launch-plan-q4-draft");
@@ -179,7 +179,7 @@ test("a stage's name is its own: kept as written, changed freely, and the folder
 
 test("a stage's imports are read from inside the deck, used for its boxes and its frame, and never saved", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		put(join(dir, "components.pen"), JSON.stringify({ version: "2.14", children: [{ id: "card", type: "rectangle", reusable: true, width: 120, height: 40 }] }));
 		const outside = mkdtempSync(join(tmpdir(), "outside-"));
@@ -212,7 +212,7 @@ test("a stage's imports are read from inside the deck, used for its boxes and it
 test("an item saved as a frame goes to its canvas's own frames/, placed there by frames/<name>, and a change to the file reaches that canvas", async () => {
 	const dir = deck();
 	const heard: string[] = [];
-	const pens = new StagePens(dir, (name) => heard.push(name));
+	const pens = new CanvasPens(dir, (name) => heard.push(name));
 	try {
 		const one = pens.claim("One");
 		pens.edit(one, [{ op: "insert", node: { type: "frame", id: "card", layout: "vertical", width: 200, height: 80, fill: "#ffffff", children: [{ type: "text", id: "title", content: "Wren" }] }, box: { x1: 40, y1: 50 } }]);
@@ -248,7 +248,7 @@ test("an item saved as a frame goes to its canvas's own frames/, placed there by
 test("any .pen file by path: create one in frames/, read and edit it by path, and place it by its ref", () => {
 	const dir = deck();
 	const heard: string[] = [];
-	const pens = new StagePens(dir, (name) => heard.push(name));
+	const pens = new CanvasPens(dir, (name) => heard.push(name));
 	try {
 		const stage = pens.claim("One");
 		const made = pens.files.createFile("frames/ui/button", { type: "frame", layout: "horizontal", padding: 8, fill: "#3b5cf6", children: [{ type: "text", id: "label", content: "Go" }] });
@@ -288,7 +288,7 @@ test("any .pen file by path: create one in frames/, read and edit it by path, an
 test("a .pen file outside the deck is read and edited by its absolute path", () => {
 	const dir = deck();
 	const elsewhere = mkdtempSync(join(tmpdir(), "elsewhere-"));
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const file = join(elsewhere, "kit.pen");
 		const made = pens.files.createFile(file, { type: "rectangle", width: 10, height: 10 });
@@ -305,7 +305,7 @@ test("a .pen file outside the deck is read and edited by its absolute path", () 
 
 test("a canvas stands alone: a card placed from another canvas is copied in, and a picture filled from the deck's assets/ too", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		mkdirSync(join(dir, "assets"), { recursive: true });
 		put(join(dir, "canvases", "t", "cards", "plan", "index.html"), '<link rel="stylesheet" href="../../lib/card.css"><img src="../../assets/a.png">');
@@ -347,7 +347,7 @@ const fileCardNode = (id: string) => ({
 
 test("an edit sent with no variables op (a file card dropped with no canvas showing it) has its Decks colours defined; one that has them adds nothing", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("drop");
 		const { results } = pens.edit(name, [{ op: "insert", node: fileCardNode("card") as never, box: { x1: 0, y1: 0 } }]);
@@ -368,7 +368,7 @@ test("an edit sent with no variables op (a file card dropped with no canvas show
 
 test("an edit whose own variables op already defines them (as the canvas sends one) is taken as it is", () => {
 	const dir = deck();
-	const pens = new StagePens(dir, () => {});
+	const pens = new CanvasPens(dir, () => {});
 	try {
 		const name = pens.claim("both");
 		const own = { op: "variables", set: { "decks-fill-slate": { type: "color", value: [{ value: "#123456" }, { value: "#654321", theme: { mode: "dark" } }] } }, themes: { mode: ["light", "dark"] } };
@@ -386,7 +386,7 @@ test("an edit whose own variables op already defines them (as the canvas sends o
 test("every write is logged with its edits: changesSince and editsSince answer them, the change published is the log's, and a gap falls back to comparing drawings", () => {
 	const dir = deck();
 	const heard: Array<[string, PenEntry]> = [];
-	const pens = new StagePens(dir, (name, entry) => heard.push([name, entry]));
+	const pens = new CanvasPens(dir, (name, entry) => heard.push([name, entry]));
 	const wrote: Array<{ name: string; rev: number; ops: string[]; by: string }> = [];
 	pens.log.wrote = (name, change) => wrote.push({ name, rev: change.rev, ops: change.edits.map((e) => e.op), by: change.by.kind });
 	try {

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { StageSnapshot } from "./work.ts";
+import type { CanvasSnapshot } from "./work.ts";
 import { AgentStateStore } from "./agent-state.ts";
 
-const snapshot = (context: string[], name = "Agent"): StageSnapshot => ({
+const snapshot = (context: string[], name = "Agent"): CanvasSnapshot => ({
 	context,
 	inPlay: context,
 	camera: { x: 0, y: 0, zoom: 1 },

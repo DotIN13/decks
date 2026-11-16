@@ -4,7 +4,7 @@ import { slug } from "@decks/deck-kit";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Deck } from "../deck/loader.ts";
 import { canvasFolder } from "@decks/hub/layout";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 
 /**
  * Renaming and deleting stages, from the stage manager.
@@ -18,7 +18,7 @@ import type { StagePens } from "./pens.ts";
 
 interface Context {
 	deck: Deck;
-	pens: StagePens;
+	pens: CanvasPens;
 	agents: readonly DeckAgent[];
 }
 
@@ -69,7 +69,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 }
 
 /** Delete a stage, with its drawing and any boards kept in its own folder. The deck's own boards are untouched. */
-export function deleteStage(context: Context, name: string): { boards: number } {
+export function deleteCanvas(context: Context, name: string): { boards: number } {
 	refuseIfBusy(context, name, "delete");
 	const folder = join(context.deck.path, canvasFolder(name), "cards");
 	const boards = existsSync(folder) ? readdirSync(folder).length : 0;

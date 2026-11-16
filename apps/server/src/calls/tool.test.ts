@@ -6,10 +6,10 @@ import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import { Forwards } from "../ports.ts";
-import { type StageHost, StageService } from "../canvas/service.ts";
-import { createStageTool } from "./tool.ts";
+import { type CanvasServiceHost, CanvasService } from "../canvas/service.ts";
+import { createDecksTool } from "./tool.ts";
 import type { CreateSpec, QueuedWork, SendSpec } from "../agents/work.ts";
-import { StagePens } from "../canvas/pens.ts";
+import { CanvasPens } from "../canvas/pens.ts";
 import { runCode } from "./run-code.test-helper.ts";
 
 /**
@@ -23,7 +23,7 @@ import { runCode } from "./run-code.test-helper.ts";
 /** The board the tests fit, show and move: the agent's canvas's own. */
 const PLAN = "canvases/ada/cards/plan/index.html";
 
-function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: StageHost["measureAway"] } = {}) {
+function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: CanvasServiceHost["measureAway"] } = {}) {
 	/*
 	 * A stage that remembers what is up, for the checks on the person's gestures. Placement here is a
 	 * stand-in (a named place is kept, anything else goes to x 5000): the rule is `deck/place.ts`.
@@ -54,7 +54,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const calls: unknown[] = [];
 	/** Every move written, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
-	const service = new StageService(deck, {
+	const service = new CanvasService(deck, {
 		writeBoard: (path, html) => {
 			// A card in its own folder, as the real service writes it (`newBoard` writes a card now).
 			mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -96,7 +96,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		...(options.stageful ? { boards: () => deck.boards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
-	const tool = createStageTool({
+	const tool = createDecksTool({
 		stage: service,
 		port: 4329,
 		agent: {
@@ -137,7 +137,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		},
 	});
 	/** The deck's canvases, which `card.create` and every canvas call need. */
-	const withPens = () => (service.pens ??= new StagePens(root, () => {}));
+	const withPens = () => (service.pens ??= new CanvasPens(root, () => {}));
 	/** Put a board on the agent's canvas ("ada") at its file's size: `canvas.fit` measures at the width it has there. */
 	const hold = (path: string) => {
 		const pens = withPens();
@@ -710,7 +710,7 @@ test("a person's hide takes off only what it names", async () => {
 		writeFileSync(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	const deck = Deck.open(root);
-	const service = new StageService(deck, {
+	const service = new CanvasService(deck, {
 		writeBoard: () => {
 			throw new Error("not used here");
 		},
@@ -724,7 +724,7 @@ test("a person's hide takes off only what it names", async () => {
 	});
 	let up: string[] = ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html", "canvases/t/cards/c/index.html"];
 	let held: string[] = [];
-	const tool = createStageTool({
+	const tool = createDecksTool({
 		stage: service,
 		port: 4329,
 		agent: {
@@ -760,7 +760,7 @@ test("a person's hide takes off only what it names", async () => {
 test("the person's drawing edit is pen's own words, answers with boxes, and canvas.read reads it back", async () => {
 	const { tool, service, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	assert.match((await runCode(tool, `return await stage.canvas.read()`)).text, /keeps no stage drawing/);
-	service.pens = new StagePens(deck.path, () => {});
+	service.pens = new CanvasPens(deck.path, () => {});
 	try {
 		const edited = await tool.gesture("edit", [[
 			{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } },
@@ -790,7 +790,7 @@ test("the person's drawing edit is pen's own words, answers with boxes, and canv
  */
 test("view.focus takes a drawn item's id and sends the browser its box", async () => {
 	const { tool, service, deck, hold, calls, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	service.pens = new StagePens(deck.path, () => {});
+	service.pens = new CanvasPens(deck.path, () => {});
 	try {
 		await tool.gesture("edit", [[{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } }]]);
 		hold(PLAN);
@@ -849,7 +849,7 @@ test("canvas.screenshot of a .pen path pictures that file whole; an item's id pa
 			return { file: ".decks/shots/x.png", bytes: Buffer.from("png!"), format: "png", width: 20, height: 10, box: { x1: 0, y1: 0, x2: 10, y2: 5 } };
 		},
 	} as unknown as NonNullable<typeof service.shots>;
-	service.pens = new StagePens(deckPath, () => {});
+	service.pens = new CanvasPens(deckPath, () => {});
 	try {
 		mkdirSync(join(deckPath, "frames", "ui"), { recursive: true });
 		writeFileSync(join(deckPath, "frames", "ui", "button.pen"), JSON.stringify({ version: "2.14", children: [{ id: "button", type: "rectangle", width: 10, height: 10 }] }));

@@ -1,6 +1,6 @@
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { StageAgentHooks, StageTool } from "../calls/tool.ts";
+import type { AgentHooks, DecksTool } from "../calls/tool.ts";
 import type { ExtensionUiBridge } from "./extension-ui.ts";
 import type { Translator } from "./translator.ts";
 
@@ -37,13 +37,13 @@ export interface AgentBackendContext {
 	 * takes an in-process MCP server, and the description and guidelines are the part
 	 * that matters and must not drift between them.
 	 */
-	tool: StageTool;
+	tool: DecksTool;
 	/**
 	 * The agent behind the tool, for the parts of a backend that are not the tool itself.
 	 *
 	 * Pi's adapter needs it to attribute a board revision to a turn; nothing else does.
 	 */
-	stageAgent: StageAgentHooks;
+	stageAgent: AgentHooks;
 	/**
 	 * The port Decks' own HTTP server is on.
 	 *
@@ -69,7 +69,7 @@ export interface AgentBackendContext {
 	 * backend needs the bridge to bind that session to this agent (`canvas/bridge.ts`). The
 	 * in-process runtimes have no use for it and antigravity authenticates by token alone.
 	 */
-	stageBridge?: import("../canvas/bridge.ts").StageBridge;
+	stageBridge?: import("../canvas/bridge.ts").CanvasBridge;
 	/** A session file to open instead of starting a new one — see `forkFrom`. */
 	resumeRef?: string;
 	/**

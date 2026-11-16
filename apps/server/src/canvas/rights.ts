@@ -3,7 +3,7 @@ import { CANVAS_META } from "./canvas-files.ts";
 import { join } from "node:path";
 import { parse, PenError, read } from "@decks/pen";
 import { isSharedCanvas, sharedParts, viewOnlySentence } from "@decks/hub/layout";
-import type { StagePens } from "./pens.ts";
+import type { CanvasPens } from "./pens.ts";
 
 /**
  * Whose a canvas is, and what you may do to it.
@@ -15,7 +15,7 @@ import type { StagePens } from "./pens.ts";
  */
 
 export class CanvasRights {
-	constructor(private readonly of: StagePens) {}
+	constructor(private readonly of: CanvasPens) {}
 
 	/** The Studio canvas a canvas of this deck is synced with, when it is (`studio/sync.ts` writes it in `canvas.json`). */
 	studioId(name: string): string | undefined {

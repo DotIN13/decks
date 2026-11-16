@@ -6,7 +6,7 @@ import { ARROW, ids, walk, type Op, type PenNode } from "@decks/pen";
 import { CANVAS_META } from "./canvas-files.ts";
 import type { Adopt } from "./canvas-refs.ts";
 import { copyCardInto, copyFileInto, copyFrameInto } from "./copy-in.ts";
-import { boardOf, CARD_ITEM, type StagePens } from "./pens.ts";
+import { boardOf, CARD_ITEM, type CanvasPens } from "./pens.ts";
 
 /**
  * The cards on a canvas: which are placed, where and how big, as its file has them, and each change
@@ -36,7 +36,7 @@ export interface BoardSpot {
 }
 
 export class CanvasCards {
-	constructor(private readonly of: StagePens) {}
+	constructor(private readonly of: CanvasPens) {}
 
 	/**
 	 * How a canvas takes in a board or a frame from elsewhere: copied into its own folder

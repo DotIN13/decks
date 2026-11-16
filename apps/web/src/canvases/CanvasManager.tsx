@@ -332,7 +332,7 @@ function StageCard(props: {
 		settled = true;
 		const to = input?.value.trim() ?? "";
 		setEditing(false);
-		// The name only: the folder is the stage's id and stays (`StagePens.setTitle`).
+		// The name only: the folder is the stage's id and stays (`CanvasPens.setTitle`).
 		if (to && to !== stage().title) props.onRename(stage().name, to);
 	};
 	const cancel = () => {

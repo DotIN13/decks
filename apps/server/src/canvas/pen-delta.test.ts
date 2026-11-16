@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { applyEdits, type PenDocument } from "@decks/pen";
-import { penEditBy, StagePens } from "./pens.ts";
+import { penEditBy, CanvasPens } from "./pens.ts";
 
 /** Browsers are sent what changed, and what they apply comes out as the server's drawing. */
 test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", () => {
 	const deck = mkdtempSync(join(tmpdir(), "pen-delta-"));
-	const pens = new StagePens(deck, () => {});
+	const pens = new CanvasPens(deck, () => {});
 	try {
 		const name = pens.claim("Delta test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
@@ -41,8 +41,8 @@ test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", (
 test("an edit or a step made under a browser's name says so in the delta that has it", () => {
 	const deck = mkdtempSync(join(tmpdir(), "pen-made-"));
 	const sent: Array<{ type: string; made?: string[] }> = [];
-	let pens!: StagePens;
-	pens = new StagePens(deck, (name) => sent.push(...(pens.log.changes(["agent"], name) as never[])));
+	let pens!: CanvasPens;
+	pens = new CanvasPens(deck, (name) => sent.push(...(pens.log.changes(["agent"], name) as never[])));
 	try {
 		const name = pens.claim("Made test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
@@ -68,7 +68,7 @@ test("an edit or a step made under a browser's name says so in the delta that ha
 /** A drawing sent whole to one browser (asked again, a picture of the stage) leaves the names for the rest. */
 test("a drawing sent whole to one browser takes no names from the others' next delta, and carries the recent ones", () => {
 	const deck = mkdtempSync(join(tmpdir(), "pen-made-frame-"));
-	const pens = new StagePens(deck, () => {});
+	const pens = new CanvasPens(deck, () => {});
 	try {
 		const name = pens.claim("Frame test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);

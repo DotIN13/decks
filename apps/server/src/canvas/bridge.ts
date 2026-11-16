@@ -16,7 +16,7 @@ import type { TokenStore } from "../auth/tokens.ts";
  * is the process Decks spawned. Its plugin trades the two for the session's agent token before a shell
  * command runs (`POST /api/tokens/session`, `auth/issue.ts`), and its Google Docs tools send them.
  */
-export class StageBridge {
+export class CanvasBridge {
 	/** Each agent's token, kept here only so a second start answers the same one. */
 	private readonly byAgent = new Map<string, string>();
 	/** One opencode session, resolved from the id its tool sends back. */

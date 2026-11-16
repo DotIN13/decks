@@ -1,4 +1,4 @@
-import type { StageSnapshot } from "./work.ts";
+import type { CanvasSnapshot } from "./work.ts";
 
 /**
  * What each agent was holding, showing and calling itself, over time (DESIGN §6.2).
@@ -30,7 +30,7 @@ import type { StageSnapshot } from "./work.ts";
 
 interface Recorded {
 	at: number;
-	snapshot: StageSnapshot;
+	snapshot: CanvasSnapshot;
 }
 
 /** Enough to cover any conversation worth rewinding, and bounded so it cannot grow forever. */
@@ -40,7 +40,7 @@ export class AgentStateStore {
 	private readonly series = new Map<string, Recorded[]>();
 
 	/** Note what the stage looked like after a run. */
-	record(agentId: string, snapshot: StageSnapshot, at = Date.now()): void {
+	record(agentId: string, snapshot: CanvasSnapshot, at = Date.now()): void {
 		const kept = this.series.get(agentId) ?? [];
 		kept.push({ at, snapshot });
 		if (kept.length > KEEP) kept.splice(0, kept.length - KEEP);
@@ -48,7 +48,7 @@ export class AgentStateStore {
 	}
 
 	/** The most recent one, for an agent that has just started. */
-	latest(agentId: string): StageSnapshot | undefined {
+	latest(agentId: string): CanvasSnapshot | undefined {
 		return this.series.get(agentId)?.at(-1)?.snapshot;
 	}
 
@@ -58,7 +58,7 @@ export class AgentStateStore {
 	 * Scanned rather than indexed, and not assuming the series is sorted: `record` is
 	 * called from a tool run and a clock is not a guarantee of order.
 	 */
-	at(agentId: string, when: number): StageSnapshot | undefined {
+	at(agentId: string, when: number): CanvasSnapshot | undefined {
 		let best: Recorded | undefined;
 		for (const entry of this.series.get(agentId) ?? []) {
 			if (entry.at > when) continue;

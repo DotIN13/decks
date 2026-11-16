@@ -13,7 +13,7 @@ import type { PenTool } from "./edit/pen-tools.ts";
  */
 
 /** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
-export interface StageShots {
+export interface CanvasShots {
 	/** The picture of a board or a card, as an address the sheet can fetch. */
 	picture(board: Pick<Page, "path" | "rev">, scheme: "light" | "dark"): string;
 }

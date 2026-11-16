@@ -17,7 +17,7 @@ export const canvasFile = (name: string): string => `${CANVAS_DIR}/${name}/${CAN
  * A deck-relative path written before canvases moved out of `stages/` (2026-10-16), pointed at where it
  * is now: `stages/<n>/…` → `canvases/<m>/…`, `stage.pen` → `canvas.pen`. `renamed` gives a folder its
  * new name where the move renamed it. Used by the move itself (`migrations/2026-10-16-stages-to-canvases.ts`)
- * and by a call that still names a canvas the old way (`StagePens.penFile`).
+ * and by a call that still names a canvas the old way (`CanvasPens.penFile`).
  */
 export function movedPath(path: string, renamed: ReadonlyMap<string, string>): string {
 	const match = /^stages\/([^/]+)(\/.*)?$/.exec(path);

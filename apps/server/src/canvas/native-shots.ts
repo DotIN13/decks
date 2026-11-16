@@ -37,7 +37,7 @@ interface NativeBoard {
 export interface NativeRequest {
 	/** The `.pen` document, whole, as the page's engine is given it. */
 	doc: unknown;
-	/** The folder its image fills are read against: a `file:` URL, as `StagePens.frame` gives it. */
+	/** The folder its image fills are read against: a `file:` URL, as `CanvasPens.frame` gives it. */
 	base: string;
 	boards: NativeBoard[];
 	box: Box;

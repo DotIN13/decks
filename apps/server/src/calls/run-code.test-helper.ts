@@ -1,13 +1,13 @@
-import type { StageTool } from "./tool.ts";
+import type { DecksTool } from "./tool.ts";
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...names: string[]) => (...args: unknown[]) => Promise<unknown>;
 
 /**
  * For tests: run a snippet against a tool the way an agent's node script does, with every verb it
- * calls going through `StageTool.call` (the path `/api/v1/<verb>` takes), and answer with the text
+ * calls going through `DecksTool.call` (the path `/api/v1/<verb>` takes), and answer with the text
  * a model would read: the value as JSON, or the error, then the notes the verbs added.
  */
-export async function runCode(tool: StageTool, code: string): Promise<{ text: string; isError: boolean; images?: Array<{ data: string; mimeType: string }> }> {
+export async function runCode(tool: DecksTool, code: string): Promise<{ text: string; isError: boolean; images?: Array<{ data: string; mimeType: string }> }> {
 	const notes: string[] = [];
 	const images: Array<{ data: string; mimeType: string }> = [];
 	const verbs = (path: string[]): unknown =>

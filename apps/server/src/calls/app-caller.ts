@@ -1,9 +1,9 @@
 import type { Identity } from "@decks/protocol";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Registry } from "../agents/registry.ts";
-import type { StageService } from "../canvas/service.ts";
+import type { CanvasService } from "../canvas/service.ts";
 import type { CallsHost } from "./host.ts";
-import { createStageTool, type StageAgentHooks, type StageTool } from "./tool.ts";
+import { createDecksTool, type AgentHooks, type DecksTool } from "./tool.ts";
 
 /**
  * An app as a caller: the calls its own code makes, once the person has let it (`calls/caller.ts`).
@@ -27,7 +27,7 @@ import { createStageTool, type StageAgentHooks, type StageTool } from "./tool.ts
 /** A grey that is no agent's: an app is not in the colour rotation. */
 const APP_COLOR = "#8a8f98";
 
-type Pens = StageService["pens"];
+type Pens = CanvasService["pens"];
 const tagOf = (node: { type?: unknown; metadata?: unknown }) => (node.type === "browser" ? (node.metadata as { type?: unknown } | undefined)?.type : undefined);
 
 /** Whether a canvas shows an app: a top-level item of it (`decks.app`) is on its drawing. */
@@ -55,17 +55,17 @@ export function canvasShowsDocument(pens: Pens, canvas: string | undefined, file
  * An app on no agent's canvas falls back to the focused conversation, made if nobody has spoken
  * yet. Never simply the last agent any browser touched, which may be on another canvas entirely.
  */
-export function conversationForApp(host: { agents: Registry; stage?: Pick<StageService, "pens"> }, name: string): DeckAgent {
+export function conversationForApp(host: { agents: Registry; stage?: Pick<CanvasService, "pens"> }, name: string): DeckAgent {
 	const looking = host.agents.looking();
 	const all = looking ? [looking, ...host.agents.all().filter((one) => one !== looking)] : [...host.agents.all()];
 	return all.find((one) => canvasShowsApp(host.stage?.pens, one.seat.stageName(), name)) ?? host.agents.focused();
 }
 
 /** The tool an app's calls run through, and the conversation it acts for. */
-export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | "stage" | "port">, name: string): { tool: StageTool; conversation: DeckAgent } {
+export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | "stage" | "port">, name: string): { tool: DecksTool; conversation: DeckAgent } {
 	const conversation = conversationForApp(host, name);
 	let identity: Identity = { name: `app ${name}`, color: APP_COLOR };
-	const actor: StageAgentHooks = {
+	const actor: AgentHooks = {
 		id: conversation.id,
 		app: name,
 		identity: () => identity,
@@ -101,5 +101,5 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		recordRevision: (path) => host.boards.recordRevision(path),
 		boardPathOf: (file) => host.boards.boardPathOf(file),
 	};
-	return { tool: createStageTool({ stage: host.stage, agent: actor, port: host.port }), conversation };
+	return { tool: createDecksTool({ stage: host.stage, agent: actor, port: host.port }), conversation };
 }

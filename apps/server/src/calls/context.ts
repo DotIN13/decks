@@ -1,27 +1,27 @@
 import { cleanWorkspace } from "../agents/workspaces.ts";
-import type { StageService, WebTarget } from "../canvas/service.ts";
-import type { StageAgentHooks } from "./tool.ts";
+import type { CanvasService, WebTarget } from "../canvas/service.ts";
+import type { AgentHooks } from "./tool.ts";
 
 /**
  * What every verb's handler is given: the stage service, the caller's hooks, and the helpers the
- * handlers share. Made once per caller by `createStageTool` (`calls/tool.ts`), which also owns the
+ * handlers share. Made once per caller by `createDecksTool` (`calls/tool.ts`), which also owns the
  * notes and pictures a call collects and empties them before each one.
  */
 export interface VerbContext {
-	service: StageService;
-	agent: StageAgentHooks;
+	service: CanvasService;
+	agent: AgentHooks;
 	port: number;
 	/** Lines a verb adds beside its value: what `decks.canvas.fit` measured, a card's width. */
 	notes: string[];
 	/** Pictures a verb produced, which go back beside its value. */
 	images: Array<{ data: string; mimeType: string }>;
 	asList(path: string | string[]): string[];
-	viewport(): ReturnType<StageService["viewport"]>;
-	needPens(): NonNullable<StageService["pens"]>;
+	viewport(): ReturnType<CanvasService["viewport"]>;
+	needPens(): NonNullable<CanvasService["pens"]>;
 	needStage(): string;
-	needWeb(): NonNullable<StageService["web"]>;
+	needWeb(): NonNullable<CanvasService["web"]>;
 	needTarget(value: unknown, sentence: string): WebTarget;
-	here(): ReturnType<StageService["boards"]>;
+	here(): ReturnType<CanvasService["boards"]>;
 	askedWorkspace(raw: unknown): string;
 	/**
 	 * The canvas a call means when it names none (`decks.here()`): the one the call says it was made
@@ -33,11 +33,11 @@ export interface VerbContext {
 	canvasOf(asked?: unknown): string;
 	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
 	canvasRow(name: string): { name: string; title: string; open: string[]; cards: number };
-	/** The canvas the request says it was made on, for this one call (`StageTool.call`). */
+	/** The canvas the request says it was made on, for this one call (`DecksTool.call`). */
 	callOn: { stage?: string };
 }
 
-export function verbContext(deps: { stage: StageService; agent: StageAgentHooks; port: number }): VerbContext {
+export function verbContext(deps: { stage: CanvasService; agent: AgentHooks; port: number }): VerbContext {
 	const { stage: service, agent, port } = deps;
 	const notes: string[] = [];
 	const images: Array<{ data: string; mimeType: string }> = [];
