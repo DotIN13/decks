@@ -90,6 +90,17 @@ export const DocState = named(
 	"A document as an open page holds it: its words and the edits waiting for review.",
 );
 export const Spliced = named("Spliced", obj({ path: str(), rev: int(), refused: arr(int()), text: opt(str()) }), "What came of typing: the new revision, the splices refused, the words when they differ.");
+export const Compiled = named(
+	"Compiled",
+	obj({ path: str(), ok: bool(), pdf: opt(str("The PDF, docs/build/<the document's path>.pdf.")), errors: arr(obj({ message: str(), line: opt(int()) })), at: num(), ms: int(), error: opt(str("Why nothing ran, in a sentence.")) }),
+	"What typesetting a LaTeX document gave: the PDF when there is one, and LaTeX's errors with their lines.",
+);
+export const DocRepo = named(
+	"DocRepo",
+	obj({ branch: str(), upstream: opt(str()), remote: opt(str()), label: opt(str()), ahead: int(), behind: int(), changed: int() }),
+	"The git repository a document is in: its branch, its remote and how far apart they are, and files not yet committed.",
+);
+export const Synced = named("Synced", obj({ ok: bool(), message: str(), status: opt(DocRepo) }), "What a pull or a push did, in a sentence, and the repository after.");
 export const Version = named("Version", obj({ sha: str(), at: num() }), "A kept version of a document.");
 export const FileMatch = named("FileMatch", obj({ path: str(), line: int(), text: str() }), "One line that matched a search.");
 export const TextEdit = named("TextEdit", obj({ find: str(), replace: str(), all: opt(bool()) }), "Replace exact words in a file.");

@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 136 calls (116 on the server, 20 in the harness) and 23 events, from 120 calls and 52 events today.
+**Counts.** 144 calls (124 on the server, 20 in the harness) and 24 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -110,6 +110,10 @@ Any file in the deck, named by its path from the deck's root.
 | new | | `file.review` | person, agent, app | Added in 0.3.0: accept or reject an edit waiting for review. |
 | new | | `file.versions` | anyone | Added in 0.3.0: a document's kept versions. |
 | new | | `file.restore` | person, agent, app | Added in 0.3.0: put a document back as it was at a version. |
+| new | | `file.compile` | person, agent, app | Added in 0.28.0 for Quire: typeset a .tex document; today's line message doc.compile. |
+| new | | `file.repo` | person, agent | Added in 0.28.0: the document's git repository; today's doc.git status. |
+| new | | `file.pull` | person, agent | Added in 0.28.0: today's doc.git pull. |
+| new | | `file.push` | person, agent | Added in 0.28.0: today's doc.git push. |
 
 ### frame
 
@@ -235,6 +239,10 @@ The Google sign-in the server edits Google Docs with.
 | new | | `google.link` | person | Added in 0.10.0: link a Google Doc, making its mirror in docs/; today's doc.place took a link. |
 | new | | `google.read` | person, agent | Added in 0.25.0 for Helm: a Doc as markdown; today's agent tool gdocs_read over /api/gdocs/call. |
 | new | | `google.edit` | person, agent | Added in 0.25.0: replace one exact piece of a Doc's markdown, as a reviewable change; today's gdocs_edit. |
+| new | | `google.get` | person, agent | Added in 0.28.0 for Folio: a linked Doc for drawing, by its mirror's path; today's line message doc.gdoc. |
+| new | | `google.style` | person, agent | Added in 0.28.0: Docs style requests; today's doc.gstyle. |
+| new | | `google.comments` | person, agent | Added in 0.28.0: a Doc's open comments; today's doc.gcomments. |
+| new | | `google.comment` | person, agent | Added in 0.28.0: create, reply to or resolve a comment; today's doc.gcomment. |
 | `account.google` | person | `google.status` | person | Google's sign-in is the server's, for Google Docs; see the decision. |
 
 ### chat
@@ -304,6 +312,7 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `stage.pen` | alias of `item.changed` | canvas | A copy of the drawing's change per agent; one item.changed now. |
 | `stage.pen.delta` | alias of `item.changed` | canvas | Renamed. |
 | `card.changed` | `card.changed` | canvas | No card body: card.get reads it. |
+| new | `file.compiled` | canvas | Added in 0.28.0: a LaTeX document was typeset; today's line message doc.compiled. |
 | `doc.created` | `file.created` | canvas | Renamed. |
 | `doc.state` | alias of `file.changed` | canvas | `part: state`. |
 | `doc.changed` | `file.changed` | canvas | `part` says what changed. |
@@ -372,17 +381,17 @@ fields. A snapshot (a whole list, a history) is a call. *Heard by*: everyone who
 | `Camera` as a type (stage.ts) | `Camera` (`protocol/shapes.ts`, type export) | `x, y, zoom`. The old optional `width` and `height` are the screen's size, `View.screen`, a `Size`. |
 | `cardCalls(route)` (`@decks/api`, verbs.ts) | `callsFor("card")` (`protocol/calls/index.ts`) | The calls a card may make, by who may call. The old route is the frame's to choose: `view.*` it answers itself, `agent.*` goes through the page, and the rest go to the server on the canvas's pass. |
 
-## Drafted, not yet declared: a document's compile, git and Google Docs
+## The old line's document messages (declared in 0.28.0)
 
 The canvas library's document messages on the old line (today's `doc.compile`, `doc.git`, `doc.gstyle`, `doc.gcomment`, told back
 as `doc.compiled`, `doc.repo`, `doc.remote`, `doc.gdoc`, `doc.gcomments`) were missed by the table above; Warden's
-`server/compat/messages.gaps.ts` lists them. Lexicon's draft, from the shapes at tag `rewrite-stop-3`; each is declared
-when Quire (compile, git) or Folio (Google Docs) agrees its rules.
+`server/compat/messages.gaps.ts` lists them. Declared in 0.28.0, from the shapes at tag `rewrite-stop-3`, as Quire (compile,
+git: `server/documents/latex/` and `git/` READMEs) and Folio (Google Docs) agreed. A Google path is the mirror's, `docs/google/<name>.md`.
 
 | Today (line message) | Drafted as | Who | What changes |
 |---|---|---|---|
-| `doc.compile` | `file.compile { path }` -> `Compiled { path, ok, pdf?, errors: [{ message, line? }], at, ms, error? }` | person, agent, app | A call that answers; `pdf` is a deck path, not an absolute one. |
-| `doc.compiled` | event `file.compiled { path, ok, pdf?, errors, ms, error? }` (heard by everyone on the canvas) | | Told to every page on the document, not only the one that asked. |
+| `doc.compile` | `file.compile { path }` -> `Compiled { path, ok, pdf?, errors: [{ message, line? }], at, ms, error? }` | person, agent, app | A call that answers; `pdf` is `docs/build/<path>.pdf`. No engine is ok false, not a refusal. |
+| `doc.compiled` | event `file.compiled { ids: [path], by, rev, ok, pdf?, errors, at, ms, error? }` | | Told to everyone who may see the file. |
 | `doc.git` `status` | `file.repo { path }` -> `Repo { branch, upstream?, remote?, label?, ahead, behind, changed }` or nothing | person, agent | Status is a read of its own. |
 | `doc.git` `pull`, `push` | `file.pull { path }`, `file.push { path }` -> `GitResult { ok, message, status? }` | person, agent | Two calls, one verb each; what a pull changed arrives as `file.changed`. |
 | `doc.repo` | dropped | | It was the answer to `doc.git`; the three calls answer. |

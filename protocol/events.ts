@@ -1,5 +1,5 @@
 import { defineEvent } from "./event.ts";
-import { any, arr, bool, int, lit, nul, opt, str, union } from "./schema.ts";
+import { any, arr, bool, int, lit, nul, num, obj, opt, str, union } from "./schema.ts";
 import { ChangeAuthor } from "./page.ts";
 import { Box, Camera, ChatItem, DocChange, Message, Point, Splice } from "./shapes.ts";
 
@@ -26,7 +26,16 @@ export const fileChanged = defineEvent("file.changed", "A file changed: its word
 	batch: opt(str()),
 	change: opt(str()),
 	record: opt(DocChange),
+	remote: opt(obj({ state: lit("synced", "syncing", "signin", "error"), at: opt(num()), message: opt(str()) })),
 	settled: opt(bool()),
+});
+export const fileCompiled = defineEvent("file.compiled", "A LaTeX document was typeset; ids holds its path, rev the document's revision.", {
+	ok: bool(),
+	pdf: opt(str()),
+	errors: arr(obj({ message: str(), line: opt(int()) })),
+	at: num(),
+	ms: int(),
+	error: opt(str()),
 });
 export const appChanged = defineEvent("app.changed", "An app's state changed; app.get reads it.", { status: opt(str()) });
 // Agents.
@@ -71,6 +80,7 @@ export const EVENTS = [
 	cardChanged,
 	fileCreated,
 	fileChanged,
+	fileCompiled,
 	appChanged,
 	agentChanged,
 	agentDeleted,

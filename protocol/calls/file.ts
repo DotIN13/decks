@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
-import { arr, bool, int, opt, str } from "../schema.ts";
-import { Deleted, DocState, File, FileMatch, FileText, Spliced, Splice, TextEdit, Version } from "../shapes.ts";
-import { ANYONE, NOT_CARD } from "./parts.ts";
+import { arr, bool, int, nul, opt, str, union } from "../schema.ts";
+import { Compiled, Deleted, DocRepo, DocState, File, FileMatch, FileText, Spliced, Splice, Synced, TextEdit, Version } from "../shapes.ts";
+import { ANYONE, NOT_CARD, PEOPLE } from "./parts.ts";
 
 // Every file in the deck, and only the deck: no hidden folder, and no folder
 // outside it, an app's source included; there is no mount (DESIGN section 10).
@@ -118,3 +118,40 @@ export const review = defineCall({
 
 export const versions = defineCall({ name: "file.versions", summary: "A document's kept versions, newest first. The deck only: never a folder outside it, an app's source included.", who: ANYONE, args: { path: Path }, answer: arr(Version), effect: "read" });
 export const restore = defineCall({ name: "file.restore", summary: "Put a document back as it was at a version; the restore is itself a version. The deck only: never a folder outside it, an app's source included.", who: NOT_CARD, args: { path: Path, sha: str() }, answer: File, effect: "change" });
+
+// A document's LaTeX and its git repository.
+export const compile = defineCall({
+	name: "file.compile",
+	summary: "Typeset a .tex document into docs/build/<its path>.pdf; LaTeX's errors come with their lines. No engine is an answer with ok false.",
+	who: NOT_CARD,
+	args: { path: Path },
+	answer: Compiled,
+	effect: "change",
+});
+
+export const repo = defineCall({
+	name: "file.repo",
+	summary: "The git repository a document is in, or null when it is in none inside the deck.",
+	who: PEOPLE,
+	args: { path: Path },
+	answer: union(DocRepo, nul),
+	effect: "read",
+});
+
+export const pull = defineCall({
+	name: "file.pull",
+	summary: "Pull the document's repository from its upstream; what changed arrives as file.changed. A failed login or a merge conflict is ok false with a sentence.",
+	who: PEOPLE,
+	args: { path: Path },
+	answer: Synced,
+	effect: "change",
+});
+
+export const push = defineCall({
+	name: "file.push",
+	summary: "Commit and push the document's repository to its upstream. A failed login or an unreachable remote is ok false with a sentence.",
+	who: PEOPLE,
+	args: { path: Path },
+	answer: Synced,
+	effect: "change",
+});
