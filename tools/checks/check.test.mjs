@@ -34,6 +34,15 @@ test("a folder passes while its neighbour fails", () => {
 });
 
 test("a folder with no sources yet passes and says so", () => {
-	const r = spawnSync(process.execPath, [CHECK, "tools/fixtures"], { cwd: ROOT, encoding: "utf8" });
+	const r = spawnSync(process.execPath, [CHECK, "tools/fixtures/drawings"], { cwd: ROOT, encoding: "utf8" });
 	assert.equal(r.status, 0);
+});
+
+test("a hanging test file is killed, named, and fails the folder; the others run (tools/fixtures/check-hang)", () => {
+	const started = Date.now();
+	const r = spawnSync(process.execPath, [CHECK, "tools/fixtures/check-hang"], { cwd: ROOT, encoding: "utf8", env: { ...process.env, CHECK_FILE_MS: "3000" }, timeout: 60_000 });
+	assert.equal(r.status, 1, r.stdout + r.stderr);
+	assert.match(r.stdout, /hang\.test\.mjs: HUNG, killed after 3 s/);
+	assert.match(r.stdout, /2 test files fail \(0 failing, 1 hung; hung: tools\/fixtures\/check-hang\/hang\.test\.mjs\)/);
+	assert.ok(Date.now() - started < 30_000, "it did not wait for the hanging file");
 });

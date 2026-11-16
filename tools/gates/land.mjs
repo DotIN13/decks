@@ -11,6 +11,9 @@ import { LOCK } from "./hold.mjs";
 // Paths as they are written, in any script: git quotes non-ASCII names unless told not to.
 const git = (args, cwd) => execFileSync("git", ["-c", "core.quotePath=false", ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+/** How long a landing may take from the lock to the fast-forward before it gives up and lets the lock go. */
+export const LAND_MS = Number(process.env.LAND_MS ?? 600_000);
+
 /** The folders tools/check.mjs checks alone, the longest first so clients/sdk wins over clients. */
 const FOLDERS = ["clients/sdk", "clients/cli", "clients/mcp", "clients/extension", "harness/page", "protocol", "server", "harness", "canvas", "engine", "pen", "ui", "tools"];
 
@@ -57,14 +60,26 @@ function main() {
 			spawnSync("git", ["rebase", "--abort"], { cwd: here, stdio: "ignore" });
 			return fail("The rebase stopped on a conflict and was taken back: resolve it on your branch, then land again.");
 		}
+		const deadline = Date.now() + LAND_MS;
+		/** A step with what is left of the landing's time; undefined when it ran out, naming the step. */
+		const step = (args) => {
+			const left = deadline - Date.now();
+			if (left <= 0) return { timedOut: true };
+			const r = spawnSync(process.execPath, args, { cwd: here, stdio: "inherit", timeout: left, killSignal: "SIGKILL" });
+			return { timedOut: r.error?.code === "ETIMEDOUT" || (r.signal === "SIGKILL" && Date.now() >= deadline), status: r.status };
+		};
 		const files = git(["diff", "--name-only", "rewrite...HEAD"], here).split("\n").filter(Boolean);
 		if (!files.length) return fail(`${branch} has nothing rewrite does not have.`);
 		for (const folder of foldersOf(files)) {
 			say(`checking ${folder}`);
-			if (spawnSync(process.execPath, [join(here, "tools/check.mjs"), folder], { cwd: here, stdio: "inherit" }).status !== 0) return fail(`node tools/check.mjs ${folder} fails: fix it, then land again.`);
+			const ran = step([join(here, "tools/check.mjs"), folder]);
+			if (ran.timedOut) return fail(`gave up after ${LAND_MS / 60000} minutes in node tools/check.mjs ${folder} (a test that hangs is named above): the lock is let go.`);
+			if (ran.status !== 0) return fail(`node tools/check.mjs ${folder} fails: fix it, then land again.`);
 		}
 		say("running the gates");
-		if (spawnSync(process.execPath, [join(here, "tools/gates/run.mjs")], { cwd: here, stdio: "inherit" }).status !== 0) return fail("The gates fail: fix them, then land again.");
+		const gates = step([join(here, "tools/gates/run.mjs")]);
+		if (gates.timedOut) return fail(`gave up after ${LAND_MS / 60000} minutes in the gates: the lock is let go.`);
+		if (gates.status !== 0) return fail("The gates fail: fix them, then land again.");
 		say(`fast-forwarding rewrite to ${branch} in ${mainTree}`);
 		if (spawnSync("git", ["merge", "--ff-only", branch], { cwd: mainTree, stdio: "inherit" }).status !== 0) return fail("The fast-forward was refused (a file of yours edited in the main tree, or rewrite moved): stop and tell Mason; never force it.");
 		say(`landed: rewrite is at ${git(["rev-parse", "--short", "HEAD"], mainTree)}. Send Mason a done line.`);
