@@ -134,11 +134,14 @@ An agent whose work would break another's checks in the shared tree gets a check
 
 - Work and commit there as in the main checkout: your own paths, `REWRITE_AGENT`, the folder's check and
   the gates after each commit. The heavy lock and the two check slots are the machine's: the same rules.
-- **Landing.** Take the landing turn (`mkdir /tmp/decks-rewrite-land.lock`; if it exists and is younger
-  than ten minutes, wait). In your checkout: `git rebase rewrite`, then the folder's check and the gates.
-  In the main checkout: `git merge --ff-only rewrite-<agent>`. Then `rmdir` the lock and send Mason a
-  done line. If the merge is refused because a file of yours is edited in the main tree, stop and tell
-  Mason; never force it.
+- **Landing.** Land only with `REWRITE_AGENT=<you> node tools/gates/land.mjs`, run in your own
+  checkout: it refuses while `/tmp/decks-rewrite-land.lock` is held, a full run included, and says by
+  whom. Otherwise it takes the lock with an owner file, rebases on rewrite, runs the check of each folder
+  you touched and the gates, fast-forwards the main checkout, and lets the lock go. Never take, remove
+  or rmdir the lock by hand. A full run takes it with
+  `mkdir /tmp/decks-rewrite-land.lock && echo <name> > /tmp/decks-rewrite-land.lock/owner`; while it is
+  held the commit hook also refuses commits in the main checkout from anyone else. If the landing is
+  refused because a file of yours is edited in the main tree, stop and tell Mason; never force it.
 - A conflict in `tools/gates/baseline/*` on the rebase: take `rewrite`'s side and carry your split's
   exceptions again, as below.
 - Engine builds stay in the main checkout (`engine/target` is not cloned).
