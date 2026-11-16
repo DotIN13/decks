@@ -1,7 +1,7 @@
 // The protocol's version, said by both sides when a client connects. Within a
 // major only calls, events and optional fields are added.
 
-export const PROTOCOL_VERSION = "0.30.1";
+export const PROTOCOL_VERSION = "0.31.0";
 
 export function major(version: string): number {
 	return Number(version.split(".")[0] ?? "0");
