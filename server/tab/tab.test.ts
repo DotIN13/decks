@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testServer } from "../kernel/testing.ts";
 import { FakeExtension, type FakePage } from "./fake-extension.ts";
-import { tabFeature, TabHub } from "./feature.ts";
+import { pairingCode, tabFeature, TabHub } from "./feature.ts";
 
 // The README's rules, as calls through the real router, against an extension
 // that speaks the real one's wire.
@@ -161,4 +161,12 @@ test("stop closes the line as the person's own stop; a hang-up says so", async (
 	assert.match(state.closed ?? "", /disconnected/);
 	await s.close();
 	await again.s.close();
+});
+
+test("rule 2: today's pairing code (web-bridge.json beside the deck) is kept, so the extension need not pair again", async () => {
+	assert.equal(pairingCode('{ "code": "abc-123" }\n'), "abc-123");
+	assert.equal(pairingCode("not json"), undefined);
+	const s = await testServer({ features: [tabFeature({ oldPairing: async () => '{ "code": "abc-123" }' })] });
+	assert.equal((await s.value<{ code: string }>("tab.pair", {})).code, "abc-123");
+	await s.close();
 });

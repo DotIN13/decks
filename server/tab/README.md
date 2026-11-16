@@ -43,6 +43,8 @@ The person's shared Chrome tab: `tab.*`, relayed to the Decks extension they pai
    with the caller, and answers its path and size. A tab Chrome is not painting answers in 15 s
    with a sentence saying to bring it to the front.
 10. An action answers the Tab as it now is, and every change of the tab emits `tab.changed`.
+11. Opening a deck from before keeps the code in today's `web-bridge.json` (main reads it beside
+    the deck, `oldPairing`), so the extension need not pair again; a kept code is not replaced.
 
 ## Check
 

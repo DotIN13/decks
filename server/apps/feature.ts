@@ -7,6 +7,7 @@ import { portCalls } from "./port-calls.ts";
 import { serveForward, upgradeForward } from "./ports.ts";
 import { passInPath, serveApp, upgradeApp } from "./serve.ts";
 import { Apps } from "./service.ts";
+import { upgradeApps } from "./upgrade.ts";
 import { openRoute } from "./open.ts";
 
 // The apps feature: app folders served, built or run, and forwarded ports.
@@ -27,6 +28,9 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 		calls: [...appCalls(need, () => kernel!), ...portCalls(clock)],
 		items: [appKind],
 		routes: appRoutes(need, () => kernel!),
+		async upgrade(_deck, _version, parts) {
+			await upgradeApps(parts.old, parts.stores("apps"), (line) => console.log(`[upgrade] ${line}`));
+		},
 		start(given) {
 			kernel = given;
 			const workdir = options.workdir ?? join(given.machine(), "app-run", given.deckId());

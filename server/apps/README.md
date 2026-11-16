@@ -4,8 +4,7 @@ Apps (folders in the deck's `apps/` served, built or run) and forwarded local po
 
 ## Owns
 
-- The app and port calls (calls.ts, port-calls.ts); `decks-canvas.js` (guest.ts); open.ts.
-- The app as an item kind (item.ts): `{ type: "app", app, box }`, a `browser` node tagged `decks.app`.
+- The app and port calls; `decks-canvas.js` (guest.ts); the app item kind, a `decks.app` node (item.ts).
 - `/app/<name>/` (serve.ts) and `/node/<host>/<port>/`, `/rnode/<host>/<port>/` (ports.ts).
 
 ## May import
@@ -53,6 +52,7 @@ check.ts only. No other feature.
    home itself, a system folder or under a hidden one; a new app's folder must be missing or empty.
 16. A source folder not on this machine makes the app `missing`; app.clone with `to` takes it again.
 17. app.move copies the source to the folder and keeps only app.json in the deck, with source.
+18. Opening a deck from before keeps its `.decks/ports.json` and app logs; nothing is overwritten.
 
 ## Check
 
