@@ -1,5 +1,5 @@
 import { shortVariables } from "@decks/pen";
-import { events, idsOf, layout, Refused, type Caller, type Infer, type shapes } from "../../protocol/index.ts";
+import { events, idsOf, layout, Refused, type Caller, type Infer, type Payload, type shapes } from "../../protocol/index.ts";
 import { toDeckPath, type Change, type Deck, type DeckPath, type Kernel, type Stop } from "../kernel/types.ts";
 import { PenCanvas, type Told } from "./doc.ts";
 import { Kinds } from "./kinds.ts";
@@ -12,8 +12,11 @@ const EMPTY = `${JSON.stringify({ version: "2.14", children: [] }, null, 2)}\n`;
 export const emptyDrawing = (): string => EMPTY;
 const enc = new TextEncoder(), dec = new TextDecoder();
 
-/** mine: what this server wrote and has not yet heard back, oldest first. */
-type Kept = { doc: PenCanvas; canvas: string; file: DeckPath; mine: string[]; queue: Promise<unknown> };
+/** mine: what this server wrote and has not yet heard back, oldest first; told: what item.changed said, last 500. */
+type Kept = { doc: PenCanvas; canvas: string; file: DeckPath; mine: string[]; told: Payload<typeof events.itemChanged>[]; queue: Promise<unknown> };
+
+/** How many item.changed a drawing keeps for a watcher catching up. */
+const TOLD = 500;
 
 export class CanvasStore {
 	private kernel!: Kernel;
@@ -154,7 +157,7 @@ export class CanvasStore {
 	}
 
 	private keep(file: DeckPath, canvas: string, text: string): Kept {
-		const kept: Kept = { canvas, file, mine: [], queue: Promise.resolve(), doc: undefined as never };
+		const kept: Kept = { canvas, file, mine: [], told: [], queue: Promise.resolve(), doc: undefined as never };
 		kept.doc = new PenCanvas(canvas, text, this.kinds, (out, change, ids, by, told) => this.save(kept, out, change, ids, by, told), () => this.clock());
 		this.drawings.set(file, kept);
 		return kept;
@@ -164,13 +167,25 @@ export class CanvasStore {
 	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller, told: Told): void {
 		kept.mine.push(text);
 		if (kept.mine.length > 20) kept.mine.shift();
-		const announce = () => this.announce(kept.canvas, change, ids, told);
+		const announce = () => this.announce(kept, change, ids, told);
 		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(announce, () => undefined);
 	}
 
 	/** A change, told as item.changed once it is on disk. */
-	private announce(canvas: string, change: Change, ids: string[], told: Told): void {
-		this.kernel.events.emit(events.itemChanged, { canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops, pen: told.pen as never, ...(told.made ? { made: told.made } : {}) });
+	private announce(kept: Kept, change: Change, ids: string[], told: Told): void {
+		const payload = { canvas: kept.canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops, pen: told.pen as never, ...(told.made ? { made: told.made } : {}) };
+		kept.told.push(payload);
+		if (kept.told.length > TOLD) kept.told.shift();
+		this.kernel.events.emit(events.itemChanged, payload);
+	}
+
+	/** A watcher catching up: what item.changed said after since, oldest first, or missed when the log no longer reaches it. */
+	replay(name: string, since: number): Payload<typeof events.itemChanged>[] | { missed: true } {
+		const kept = this.drawing(this.file(this.name(name)));
+		if (since === kept.doc.rev) return [];
+		const first = kept.told[0];
+		if (since > kept.doc.rev || !first || first.rev > since + 1) return { missed: true };
+		return kept.told.filter((one) => one.rev > since);
 	}
 
 	private async heard(path: DeckPath, kind: "written" | "deleted", by: string): Promise<void> {
@@ -188,7 +203,7 @@ export class CanvasStore {
 		} catch {
 			return;
 		}
-		if (read) this.announce(kept!.canvas, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen });
+		if (read) this.announce(kept!, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen });
 		if (kept) return;
 		if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
 			if (!this.titles.has(at.name)) this.titles.set(at.name, readTitle(await this.text(this.metaFile(at.name))) ?? at.name);
@@ -224,7 +239,7 @@ export class CanvasStore {
 		const read = kept.doc.reload(text, by.id);
 		if (!read) return;
 		kept.mine.push(text);
-		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(() => this.announce(name, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen }), () => undefined);
+		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(() => this.announce(kept, read.change, read.change.ops.flatMap(idsOf), { pen: read.pen }), () => undefined);
 		await kept.queue;
 	}
 

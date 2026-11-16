@@ -1,7 +1,7 @@
 import { baseTheme, isArrow, placements, reroute, walk, type PenDocument } from "@decks/pen";
 
 // Joined arrows, routed again between their ends after every change, so the
-// file holds the path the page draws (README rule 11).
+// file holds the path the page draws (README rule 10).
 
 /** Route every joined arrow again between its ends, in place; the ids of those that moved. */
 export function routeArrows(doc: PenDocument, canvas: string): string[] {

@@ -4,6 +4,7 @@ import { applyEdits, type PenDocument } from "@decks/pen";
 import { callers, testServer } from "../kernel/testing.ts";
 import { toDeckPath, type Item } from "../kernel/types.ts";
 import { canvasFeature } from "./feature.ts";
+import type { CanvasStore } from "./store.ts";
 import { DECK, NOTE, stickerFeature } from "./test-deck.ts";
 
 // The canvas feature's calls, made through the kernel's test server on an
@@ -128,6 +129,20 @@ test("an edit name given to batch, delete, paste or undo comes back in item.chan
 	assert.deepEqual(made(), ["e4"]);
 	await s.value("item.update", { id: "a", set: { content: "y" } }, ann);
 	assert.equal(made(), undefined);
+	await s.close();
+});
+
+test("a watcher catching up gets every item.changed after its revision, as told live, or missed past the log", async () => {
+	const canvas = canvasFeature();
+	const s = await testServer({ features: [canvas, stickerFeature()], deck: DECK });
+	await s.value("item.update", { id: "a", set: { content: "1" } }, ann);
+	await s.value("item.batch", { ops: [{ op: "update", id: "b", set: { content: "2" } }], edit: "e9", canvas: "plan" });
+	const live = s.heard.filter((e) => e.name === "item.changed").map((e) => e.payload);
+	const source = canvas.canvases!(s.kernel) as CanvasStore;
+	assert.deepEqual(source.replay("plan", 0), live);
+	assert.deepEqual(source.replay("plan", 1), live.slice(1));
+	assert.deepEqual(source.replay("plan", 2), []);
+	assert.deepEqual(source.replay("plan", 7), { missed: true });
 	await s.close();
 });
 

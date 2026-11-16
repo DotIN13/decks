@@ -5,7 +5,7 @@ import type { Item } from "../kernel/types.ts";
 import { canvasFeature } from "./feature.ts";
 import { leafFeature, DECK, stickerFeature } from "./test-deck.ts";
 
-// README rule 10: anywhere an item's id is taken, a page's path is too: a
+// README rule 9: anywhere an item's id is taken, a page's path is too: a
 // card's as its folder or its index.html, an older page's as its file.
 
 const ann = callers.agent("ann", "plan");
