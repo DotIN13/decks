@@ -11,6 +11,7 @@ export type PlaceArgs = { at?: Corner; beside?: string; below?: string };
 
 export const GAP = 160;
 
+// Named places: at, beside, below
 /** The corner a place names, given how to find another item's box. */
 export function cornerOf(place: PlaceArgs, boxOf: (id: string) => Box | undefined): Corner | undefined {
 	const said = [place.at !== undefined, !!place.beside, !!place.below].filter(Boolean).length;
@@ -30,6 +31,7 @@ export function cornerOf(place: PlaceArgs, boxOf: (id: string) => Box | undefine
 export const besideOf = (box: Box): Corner => ({ x: Math.round(box.x2 + GAP), y: Math.round(box.y1) });
 export const belowOf = (box: Box): Corner => ({ x: Math.round(box.x1), y: Math.round(box.y2 + GAP) });
 
+// Free room: item.space, and where an item joins
 /** Room for a box of size: on one side of near, or nearest the middle of everything. */
 export function freeCorner(items: readonly Box[], size: Size, options: { near?: Box; side?: Side; margin?: number } = {}): Corner {
 	const margin = options.margin ?? GAP;

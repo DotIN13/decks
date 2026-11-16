@@ -1,8 +1,8 @@
 import { baseTheme, parse, PenError, read as penRead, themeFrom, type PenDocument, type PenNode } from "@decks/pen";
-import { Refused, type Caller } from "../../protocol/index.ts";
+import { idsOf, Refused, type Caller } from "../../protocol/index.ts";
 import type { CanvasDoc, Change, Item, ItemOp, ItemQuery } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
-import { Log, opsBetween } from "./log.ts";
+import { Log } from "./log.ts";
 import { routeArrows } from "./arrows.ts";
 import { findId as findIn, step } from "./ops.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
@@ -19,12 +19,12 @@ export class PenCanvas implements CanvasDoc {
 	private log = new Log();
 	rev = 0;
 
-	// Reading the drawing
 	constructor(readonly name: string, text: string, private kinds: Kinds, private saved: Saved, private clock: () => number = Date.now) {
 		this.doc = parseOrRefuse(text, name);
 		this.source = sourceOf(text);
 	}
 
+	// Reading the drawing
 	/** The drawing as pen.dev keeps it, a copy. */
 	pen(): PenDocument {
 		return structuredClone(this.doc);
@@ -105,7 +105,7 @@ export class PenCanvas implements CanvasDoc {
 	undo(by: Caller, redo = false): number {
 		const taken = this.log.take(redo);
 		const ops = opsBetween(this.doc, taken.doc);
-		this.commit(taken.doc, ops, by, ops.flatMap((o) => (o.op === "insert" ? [String(o.item.id)] : o.op === "variables" ? [] : [o.id])), true);
+		this.commit(taken.doc, ops, by, ops.flatMap(idsOf), true);
 		taken.done();
 		return this.rev;
 	}
@@ -138,4 +138,18 @@ function failed(error: unknown, i: number, op: ItemOp): Refused {
 	const code = error instanceof Refused ? error.code : error instanceof PenError ? "invalid" : "invalid";
 	const hint = error instanceof Refused ? error.hint : "item.batch";
 	return new Refused(code, `Op ${i + 1} (${(op as { op?: string })?.op ?? "?"}) failed, so nothing changed: ${why}`, hint);
+}
+
+/** The ops that turn one drawing into another, top-level item by item. */
+export function opsBetween(from: PenDocument, to: PenDocument): ItemOp[] {
+	const was = new Map(from.children.map((n) => [n.id, n] as const));
+	const now = new Set(to.children.map((n) => n.id));
+	const ops: ItemOp[] = [];
+	for (const node of from.children) if (!now.has(node.id)) ops.push({ op: "delete", id: node.id });
+	to.children.forEach((node: PenNode, index) => {
+		const old = was.get(node.id);
+		if (!old) ops.push({ op: "insert", item: node as never, parent: null, index });
+		else if (JSON.stringify(old) !== JSON.stringify(node)) ops.push({ op: "replace", id: node.id, item: node as never });
+	});
+	return ops;
 }

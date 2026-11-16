@@ -1,6 +1,6 @@
-import type { PenDocument, PenNode } from "@decks/pen";
+import type { PenDocument } from "@decks/pen";
 import { Refused } from "../../protocol/index.ts";
-import type { Change, ItemOp } from "../kernel/types.ts";
+import type { Change } from "../kernel/types.ts";
 
 // A drawing's changes, oldest first, and the person's undo and redo.
 // An undo or redo applies only while the step it takes back is the latest
@@ -52,18 +52,4 @@ export class Log {
 		if (!last) throw new Refused("refused", redo ? "Nothing on this canvas to redo." : "Nothing on this canvas to undo.", "canvas.get");
 		return { doc: redo ? last.after : last.before, done: () => { from.pop(); to.push(last); } };
 	}
-}
-
-/** The ops that turn one drawing into another, top-level item by item. */
-export function opsBetween(from: PenDocument, to: PenDocument): ItemOp[] {
-	const was = new Map(from.children.map((n) => [n.id, n] as const));
-	const now = new Set(to.children.map((n) => n.id));
-	const ops: ItemOp[] = [];
-	for (const node of from.children) if (!now.has(node.id)) ops.push({ op: "delete", id: node.id });
-	to.children.forEach((node: PenNode, index) => {
-		const old = was.get(node.id);
-		if (!old) ops.push({ op: "insert", item: node as never, parent: null, index });
-		else if (JSON.stringify(old) !== JSON.stringify(node)) ops.push({ op: "replace", id: node.id, item: node as never });
-	});
-	return ops;
 }

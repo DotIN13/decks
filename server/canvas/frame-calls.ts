@@ -1,7 +1,6 @@
 import { calls, Refused } from "../../protocol/index.ts";
 import { handleAll, type Context, type Item } from "../kernel/types.ts";
 import type { PenCanvas } from "./doc.ts";
-import { canvasOf } from "./item-calls.ts";
 import type { CanvasStore } from "./store.ts";
 
 // Frame files: frames/<name>.pen in a canvas's folder, each holding one
@@ -10,7 +9,6 @@ import type { CanvasStore } from "./store.ts";
 type FrameShape = { path: string; id: string; ref?: string };
 
 export function frameCalls(store: CanvasStore) {
-	const named = (ctx: Context, canvas: string | undefined) => canvasOf(store, ctx, canvas);
 	const create = async (ctx: Context, name: string, path: string, item: Item | undefined): Promise<FrameShape> => {
 		const file = store.frameFile(name, path);
 		if ((await store.text(file)) !== undefined) throw new Refused("conflict", `${path} already exists on ${name}.`, "frame.get");
@@ -18,14 +16,14 @@ export function frameCalls(store: CanvasStore) {
 		return shape(rel, await store.create(file, name, frameText(item), ctx.caller));
 	};
 	return handleAll(calls.frame, {
-		list: (ctx, a) => store.frames(named(ctx, a.canvas)).map((f) => shape(f.path, f.doc)),
+		list: (ctx, a) => store.frames(ctx.canvasName(a.canvas)).map((f) => shape(f.path, f.doc)),
 		get: (ctx, a) => {
-			const name = named(ctx, a.canvas);
+			const name = ctx.canvasName(a.canvas);
 			return shape(a.path.replace(/\.pen$/, ""), store.frame(name, a.path));
 		},
-		create: (ctx, a) => create(ctx, named(ctx, a.canvas), a.path, a.item),
+		create: (ctx, a) => create(ctx, ctx.canvasName(a.canvas), a.path, a.item),
 		save: async (ctx, { id, path, replace, canvas }) => {
-			const name = named(ctx, canvas);
+			const name = ctx.canvasName(canvas);
 			const doc = store.doc(name);
 			const real = doc.idOf(id);
 			const node = doc.pen().children.find((n) => n.id === real) ?? findDeep(doc, real);

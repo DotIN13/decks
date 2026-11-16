@@ -27,6 +27,14 @@ test("insert, update, replace, move, copy and delete each answer the item as it 
 	await s.close();
 });
 
+test("item.variables sets a colour that follows the theme, and the change is in the log", async () => {
+	const s = await start();
+	const canvas = await s.value<{ variables: Record<string, unknown> }>("item.variables", { set: { brand: { light: "#111111", dark: "#eeeeee" } } }, ann);
+	assert.deepEqual(canvas.variables.brand, { light: "#111111", dark: "#eeeeee" });
+	assert.equal(s.kernel.canvas("plan").since(0)[0]!.ops[0]!.op, "variables");
+	await s.close();
+});
+
 test("a batch with one bad op changes nothing, and says which op and why", async () => {
 	const s = await start();
 	const before = await text(s, "canvases/plan/canvas.pen");
@@ -57,6 +65,38 @@ test("item.changed comes after the file is written, so a listener reads the new 
 	await s.value("item.update", { id: "a", set: { content: "fresh" } }, ann);
 	await new Promise((r) => setTimeout(r, 5));
 	assert.match(seen, /"fresh"/);
+	await s.close();
+});
+
+test("a write from outside the server is read in as one change by its writer", async () => {
+	const s = await start();
+	const writer = callers.agent("pen.dev");
+	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(JSON.stringify({ version: "2.14", children: [NOTE("a", 0, 0, "outside")] })), writer);
+	await waitFor(async () => s.kernel.canvas("plan").since(0).length, (n) => n > 0);
+	assert.deepEqual(s.kernel.canvas("plan").since(0).map((c) => c.by), ["pen.dev"]);
+	assert.deepEqual(s.heard.filter((e) => e.name === "item.changed").map((e) => [e.payload.by, [...(e.payload.ids as string[])].sort()]), [["pen.dev", ["a", "b"]]]);
+	await s.close();
+});
+
+async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
+	for (let i = 0; i < 50; i++) {
+		const v = await read();
+		if (ok(v)) return v;
+		await new Promise((r) => setTimeout(r, 5));
+	}
+	return read();
+}
+
+test("a drawing written back to an earlier text of its own is read in, not taken for an echo", async () => {
+	const s = await start();
+	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
+	await new Promise((r) => setTimeout(r, 10));
+	const old = await text(s, "canvases/plan/canvas.pen");
+	await s.value("item.update", { id: "a", set: { content: "two" } }, ann);
+	await new Promise((r) => setTimeout(r, 10));
+	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(old), callers.agent("studio"));
+	await waitFor(async () => (await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, (c) => c === "one");
+	assert.equal((await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, "one");
 	await s.close();
 });
 
@@ -109,20 +149,6 @@ test("canvas.undo takes back the person's edit, and refuses naming who when an a
 	await s.close();
 });
 
-test("a kind another feature registers owns its nodes; clip and paste carry its files and give new ids", async () => {
-	const s = await start();
-	const st = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 400 } }, ann);
-	assert.equal(st.type, "sticker");
-	assert.match(await text(s, "canvases/plan/canvas.pen").then(() => s.deck.read(toDeckPath("canvases/plan/canvas.pen"))).then((b) => new TextDecoder().decode(b)), /decks\.sticker/);
-	await s.value("item.clip", { ids: [st.id!, "a"], id: "clip1" }, ann);
-	const pasted = await s.value<Item[]>("item.paste", { clip: { id: "clip1", canvas: "plan" }, canvas: "other", at: { x: 10, y: 10 } }, ann);
-	assert.equal(pasted.length, 2);
-	assert.ok(pasted.every((i) => i.id !== "a" && i.id !== st.id));
-	assert.equal(await text(s, "canvases/other/stickers/s1/index.html"), "<p>sticker</p>");
-	assert.equal(pasted.find((i) => i.type === "sticker")!.path, "canvases/other/stickers/s1/index.html");
-	await s.close();
-});
-
 test("before a kind's item is inserted, the kind may prepare it", async () => {
 	const s = await start();
 	const st = await s.value<Item>("item.insert", { item: { type: "sticker", title: "new one" }, at: { x: 0, y: 600 } }, ann);
@@ -158,11 +184,17 @@ test("an item you did not touch is byte for byte the same in the file after an e
 	await s.close();
 });
 
-test("item.variables sets a colour that follows the theme, and the change is in the log", async () => {
+test("a kind another feature registers owns its nodes; clip and paste carry its files and give new ids", async () => {
 	const s = await start();
-	const canvas = await s.value<{ variables: Record<string, unknown> }>("item.variables", { set: { brand: { light: "#111111", dark: "#eeeeee" } } }, ann);
-	assert.deepEqual(canvas.variables.brand, { light: "#111111", dark: "#eeeeee" });
-	assert.equal(s.kernel.canvas("plan").since(0)[0]!.ops[0]!.op, "variables");
+	const st = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 400 } }, ann);
+	assert.equal(st.type, "sticker");
+	assert.match(await text(s, "canvases/plan/canvas.pen").then(() => s.deck.read(toDeckPath("canvases/plan/canvas.pen"))).then((b) => new TextDecoder().decode(b)), /decks\.sticker/);
+	await s.value("item.clip", { ids: [st.id!, "a"], id: "clip1" }, ann);
+	const pasted = await s.value<Item[]>("item.paste", { clip: { id: "clip1", canvas: "plan" }, canvas: "other", at: { x: 10, y: 10 } }, ann);
+	assert.equal(pasted.length, 2);
+	assert.ok(pasted.every((i) => i.id !== "a" && i.id !== st.id));
+	assert.equal(await text(s, "canvases/other/stickers/s1/index.html"), "<p>sticker</p>");
+	assert.equal(pasted.find((i) => i.type === "sticker")!.path, "canvases/other/stickers/s1/index.html");
 	await s.close();
 });
 
@@ -201,38 +233,6 @@ test("a canvas made from outside takes its title from canvas.json, and a rename 
 	await put("canvases/garden/canvas.json", JSON.stringify({ title: "Kitchen garden" }));
 	assert.equal(await waitFor(titleOf, (t) => t === "Kitchen garden"), "Kitchen garden");
 	assert.ok(s.heard.some((e) => e.name === "canvas.changed" && e.payload.canvas === "garden" && e.payload.by === "studio"));
-	await s.close();
-});
-
-test("a write from outside the server is read in as one change by its writer", async () => {
-	const s = await start();
-	const writer = callers.agent("pen.dev");
-	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(JSON.stringify({ version: "2.14", children: [NOTE("a", 0, 0, "outside")] })), writer);
-	await waitFor(async () => s.kernel.canvas("plan").since(0).length, (n) => n > 0);
-	assert.deepEqual(s.kernel.canvas("plan").since(0).map((c) => c.by), ["pen.dev"]);
-	assert.deepEqual(s.heard.filter((e) => e.name === "item.changed").map((e) => [e.payload.by, [...(e.payload.ids as string[])].sort()]), [["pen.dev", ["a", "b"]]]);
-	await s.close();
-});
-
-async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
-	for (let i = 0; i < 50; i++) {
-		const v = await read();
-		if (ok(v)) return v;
-		await new Promise((r) => setTimeout(r, 5));
-	}
-	return read();
-}
-
-test("a drawing written back to an earlier text of its own is read in, not taken for an echo", async () => {
-	const s = await start();
-	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
-	await new Promise((r) => setTimeout(r, 10));
-	const old = await text(s, "canvases/plan/canvas.pen");
-	await s.value("item.update", { id: "a", set: { content: "two" } }, ann);
-	await new Promise((r) => setTimeout(r, 10));
-	await s.deck.write(toDeckPath("canvases/plan/canvas.pen"), new TextEncoder().encode(old), callers.agent("studio"));
-	await waitFor(async () => (await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, (c) => c === "one");
-	assert.equal((await s.value<Item & { content: string }>("item.get", { id: "a" }, ann)).content, "one");
 	await s.close();
 });
 

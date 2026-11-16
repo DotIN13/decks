@@ -1,6 +1,5 @@
 import { calls, events, layout, Refused, type Caller } from "../../protocol/index.ts";
 import { handleAll, toDeckPath, type Context, type Deck, type DeckPath } from "../kernel/types.ts";
-import { canvasOf } from "./item-calls.ts";
 import { emptyDrawing, type CanvasStore } from "./store.ts";
 
 // The canvas calls this feature answers, named one by one so a call added to
@@ -11,24 +10,23 @@ const { list, get, here, create, update, remove, copy, undo } = calls.canvas;
 const mine = { list, get, here, create, update, remove, copy, undo };
 
 export function canvasCalls(store: CanvasStore) {
-	const named = (ctx: Context, canvas: string | undefined) => canvasOf(store, ctx, canvas);
 	const changed = (ctx: Context, name: string) => ctx.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: ctx.caller.id, rev: 0 });
 	return handleAll(mine, {
 		list: () => store.list().map((name) => store.describe(name)),
-		get: (ctx, a) => store.describe(named(ctx, a.canvas)),
-		here: (ctx) => store.describe(named(ctx, undefined)),
+		get: (ctx, a) => store.describe(ctx.canvasName(a.canvas)),
+		here: (ctx) => store.describe(ctx.canvasName()),
 		create: async (ctx, { title }) => {
 			const name = await make(store, title, ctx.caller);
 			changed(ctx, name);
 			return store.describe(name);
 		},
 		update: async (ctx, { title, canvas }) => {
-			const name = named(ctx, canvas);
+			const name = ctx.canvasName(canvas);
 			await store.setTitle(name, title, ctx.caller);
 			return store.describe(name);
 		},
 		remove: async (ctx, { canvas }) => {
-			const name = named(ctx, canvas);
+			const name = ctx.canvasName(canvas);
 			await store.flush();
 			await ctx.deck.remove(toDeckPath(layout.canvasFolder(name)), ctx.caller);
 			store.forget(name);
@@ -36,7 +34,7 @@ export function canvasCalls(store: CanvasStore) {
 			return { deleted: name };
 		},
 		copy: async (ctx, { canvas, title }) => {
-			const from = named(ctx, canvas);
+			const from = ctx.canvasName(canvas);
 			await store.flush();
 			const name = nameFor(title ?? `Copy of ${store.title(from)}`, (n) => store.list().includes(n));
 			await copyFolder(ctx.deck, toDeckPath(layout.canvasFolder(from)), toDeckPath(layout.canvasFolder(name)), ctx.caller);
@@ -45,7 +43,7 @@ export function canvasCalls(store: CanvasStore) {
 			return store.describe(name);
 		},
 		undo: async (ctx, { redo, canvas }) => {
-			const name = named(ctx, canvas);
+			const name = ctx.canvasName(canvas);
 			if (ctx.caller.kind !== "person" && ctx.caller.kind !== "card") throw new Refused("refused", "Only the person's own edits are undone.", "item.batch");
 			store.doc(name).undo(ctx.caller, redo ?? false);
 			await store.flush();

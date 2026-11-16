@@ -27,21 +27,20 @@ export function step(doc: PenDocument, op: ItemOp, where: Where): Step {
 	return { doc: result.doc, op: written, id: made };
 }
 
+/** Every item's box in the light theme, by id. */
+export function boxes(doc: PenDocument): Map<string, Box> {
+	const out = new Map<string, Box>();
+	for (const [id, placed] of placements(doc, { theme: baseTheme(doc, "light") })) {
+		const box = penBox(placed);
+		if (box) out.set(id, box);
+	}
+	return out;
+}
+
 function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>, boxOf: Found): { pen: PenOp; written: ItemOp } {
 	switch (op.op) {
 		case "insert": return insertOf(doc, op, where, boxOf);
-		case "update": {
-			const id = must(doc, op.id, where);
-			const now = all.get(id);
-			const box: Partial<Box> = {};
-			if (op.at) Object.assign(box, { x1: op.at.x, y1: op.at.y });
-			if (op.size && now) {
-				const x1 = box.x1 ?? now.x1, y1 = box.y1 ?? now.y1;
-				Object.assign(box, { x1, y1, ...(op.size.w !== undefined ? { x2: x1 + op.size.w } : {}), ...(op.size.h !== undefined ? { y2: y1 + op.size.h } : {}) });
-			}
-			const pen: PenOp = { op: "update", id, ...(op.set ? { set: op.set } : {}), ...(Object.keys(box).length ? { box } : {}) };
-			return { pen, written: { ...op, id } };
-		}
+		case "update": return updateOf(doc, op, where, all);
 		case "replace": {
 			const id = must(doc, op.id, where);
 			const node = where.kinds.toNode({ ...op.item, id }, where.canvas);
@@ -73,6 +72,20 @@ function toPen(doc: PenDocument, op: ItemOp, where: Where, all: Map<string, Box>
 	throw new Refused("invalid", `${(op as { op?: unknown }).op} is not an op: insert, update, replace, delete, move or copy.`, "item.batch");
 }
 
+function updateOf(doc: PenDocument, op: Extract<ItemOp, { op: "update" }>, where: Where, all: Map<string, Box>): { pen: PenOp; written: ItemOp } {
+	const id = must(doc, op.id, where);
+	const now = all.get(id);
+	const box: Partial<Box> = {};
+	if (op.at) Object.assign(box, { x1: op.at.x, y1: op.at.y });
+	if (op.size && now) {
+		const x1 = box.x1 ?? now.x1, y1 = box.y1 ?? now.y1;
+		Object.assign(box, { x1, y1, ...(op.size.w !== undefined ? { x2: x1 + op.size.w } : {}), ...(op.size.h !== undefined ? { y2: y1 + op.size.h } : {}) });
+	}
+	const pen: PenOp = { op: "update", id, ...(op.set ? { set: op.set } : {}), ...(Object.keys(box).length ? { box } : {}) };
+	return { pen, written: { ...op, id } };
+}
+
+// Inserting: an item, and where it goes when it names no place
 function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where: Where, boxOf: Found): { pen: PenOp; written: ItemOp } {
 	if (!op.item || typeof op.item.type !== "string") throw new Refused("invalid", "insert needs an item with a type, as in { type: note, content: Hi }.", "item.insert");
 	if (op.item.id && findId(doc, op.item.id, where)) throw new Refused("conflict", `An item called ${op.item.id} is already on this canvas.`, "item.update");
@@ -93,18 +106,6 @@ function insertOf(doc: PenDocument, op: Extract<ItemOp, { op: "insert" }>, where
 	return { pen, written: { op: "insert", item: given ? { ...item, box: given } : item, ...inside(op), ...(corner ? { at: corner } : {}) } };
 }
 
-/** A move's box: its corner, and its drawn size too when it changes parent, so it keeps that size. */
-function movedBox(doc: PenDocument, id: string, parent: string | null | undefined, corner: Corner | undefined, now: Box | undefined): { box?: Partial<Box> } {
-	const was = indexOf(doc).get(id)?.parent?.id ?? null;
-	const leaves = parent !== undefined && parent !== was && now;
-	if (!leaves) return corner ? { box: { x1: corner.x, y1: corner.y } } : {};
-	const x1 = corner?.x ?? now.x1, y1 = corner?.y ?? now.y1;
-	return { box: { x1, y1, x2: x1 + now.x2 - now.x1, y2: y1 + now.y2 - now.y1 } };
-}
-
-const inside = (op: { parent?: string | null; index?: number }) => ({ ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}) });
-
-// Where an insert goes when it names no place
 /** The newest top-level item a kind owns (a page: a card, a document, an app), else the newest one drawn. */
 function newestPage(doc: PenDocument, where: Where): Box | undefined {
 	const all = boxes(doc);
@@ -121,6 +122,18 @@ function tops(doc: PenDocument): Box[] {
 
 const sizeOf = (node: Partial<PenNode>, given: Box | undefined): { w: number; h: number } =>
 	given ? { w: given.x2 - given.x1, h: given.y2 - given.y1 } : { w: typeof node.width === "number" ? node.width : 240, h: typeof node.height === "number" ? node.height : 120 };
+
+// Moving into or out of a frame
+/** A move's box: its corner, and its drawn size too when it changes parent, so it keeps that size. */
+function movedBox(doc: PenDocument, id: string, parent: string | null | undefined, corner: Corner | undefined, now: Box | undefined): { box?: Partial<Box> } {
+	const was = indexOf(doc).get(id)?.parent?.id ?? null;
+	const leaves = parent !== undefined && parent !== was && now;
+	if (!leaves) return corner ? { box: { x1: corner.x, y1: corner.y } } : {};
+	const x1 = corner?.x ?? now.x1, y1 = corner?.y ?? now.y1;
+	return { box: { x1, y1, x2: x1 + now.x2 - now.x1, y2: y1 + now.y2 - now.y1 } };
+}
+
+const inside = (op: { parent?: string | null; index?: number }) => ({ ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(op.index !== undefined ? { index: op.index } : {}) });
 
 // Finding an item by its id or a page path
 /** An id as the file has it, from an id or a card's path. */
@@ -150,14 +163,4 @@ function pageKey(path: string, canvas: string): string {
 	const prefix = `canvases/${canvas}/`;
 	const local = path.startsWith(prefix) ? path.slice(prefix.length) : path;
 	return local.replace(/\/+$/, "").replace(/\/index\.html$/i, "");
-}
-
-/** Every item's box in the light theme, by id. */
-export function boxes(doc: PenDocument): Map<string, Box> {
-	const out = new Map<string, Box>();
-	for (const [id, placed] of placements(doc, { theme: baseTheme(doc, "light") })) {
-		const box = penBox(placed);
-		if (box) out.set(id, box);
-	}
-	return out;
 }

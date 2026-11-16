@@ -1,5 +1,5 @@
 import { shortVariables } from "@decks/pen";
-import { events, layout, Refused, type Caller, type Infer, type shapes } from "../../protocol/index.ts";
+import { events, idsOf, layout, Refused, type Caller, type Infer, type shapes } from "../../protocol/index.ts";
 import { toDeckPath, type Change, type Deck, type DeckPath, type Kernel, type Stop } from "../kernel/types.ts";
 import { PenCanvas } from "./doc.ts";
 import { Kinds } from "./kinds.ts";
@@ -9,7 +9,7 @@ import { Kinds } from "./kinds.ts";
 // from outside is read back in. A canvas's title is in its canvas.json.
 
 const EMPTY = `${JSON.stringify({ version: "2.14", children: [] }, null, 2)}\n`;
-const SERVER: Caller = { kind: "person", id: "server", name: "Decks" };
+export const emptyDrawing = (): string => EMPTY;
 const enc = new TextEncoder(), dec = new TextDecoder();
 
 /** mine: what this server wrote and has not yet heard back, oldest first. */
@@ -79,31 +79,6 @@ export class CanvasStore {
 		return toDeckPath(`${layout.canvasFolder(name)}/canvas.json`);
 	}
 
-	// Drawings: a canvas, its frames, its file, its shape
-	doc(name: string): PenCanvas {
-		return this.drawing(this.file(name)).doc;
-	}
-
-	/** A frame file's drawing: frames/<name> in a canvas's folder. */
-	frame(name: string, frame: string): PenCanvas {
-		return this.drawing(this.frameFile(name, frame)).doc;
-	}
-
-	frameFile(name: string, frame: string): DeckPath {
-		const rel = frame.replace(/\.pen$/, "");
-		if (!/^frames\/[A-Za-z0-9][\w.-]*(\/[A-Za-z0-9][\w.-]*)*$/.test(rel)) throw new Refused("invalid", `${frame} is not a frame's path: frames/<name>, as in frames/ui/button.`, "frame.list");
-		return toDeckPath(`${layout.canvasFolder(name)}/${rel}.pen`);
-	}
-
-	frames(name: string): { path: string; doc: PenCanvas }[] {
-		const prefix = `${layout.canvasFolder(name)}/`;
-		return [...this.drawings.entries()].filter(([file, kept]) => kept.canvas === name && file !== this.file(name)).map(([file, kept]) => ({ path: file.slice(prefix.length).replace(/\.pen$/, ""), doc: kept.doc }));
-	}
-
-	file(name: string): DeckPath {
-		return toDeckPath(`${layout.canvasFolder(name)}/canvas.pen`);
-	}
-
 	/** The Canvas shape the calls answer. */
 	describe(name: string): Infer<typeof shapes.Canvas> {
 		const doc = this.doc(name);
@@ -118,12 +93,38 @@ export class CanvasStore {
 		};
 	}
 
+	// Finding a drawing
+	file(name: string): DeckPath {
+		return toDeckPath(`${layout.canvasFolder(name)}/canvas.pen`);
+	}
+
+	frameFile(name: string, frame: string): DeckPath {
+		const rel = frame.replace(/\.pen$/, "");
+		if (!/^frames\/[A-Za-z0-9][\w.-]*(\/[A-Za-z0-9][\w.-]*)*$/.test(rel)) throw new Refused("invalid", `${frame} is not a frame's path: frames/<name>, as in frames/ui/button.`, "frame.list");
+		return toDeckPath(`${layout.canvasFolder(name)}/${rel}.pen`);
+	}
+
+	doc(name: string): PenCanvas {
+		return this.drawing(this.file(name)).doc;
+	}
+
+	/** A frame file's drawing: frames/<name> in a canvas's folder. */
+	frame(name: string, frame: string): PenCanvas {
+		return this.drawing(this.frameFile(name, frame)).doc;
+	}
+
+	frames(name: string): { path: string; doc: PenCanvas }[] {
+		const prefix = `${layout.canvasFolder(name)}/`;
+		return [...this.drawings.entries()].filter(([file, kept]) => kept.canvas === name && file !== this.file(name)).map(([file, kept]) => ({ path: file.slice(prefix.length).replace(/\.pen$/, ""), doc: kept.doc }));
+	}
+
 	private drawing(file: DeckPath): Kept {
 		const kept = this.drawings.get(file);
 		if (!kept) throw new Refused("not_found", `There is no drawing at ${file}.`, "frame.list");
 		return kept;
 	}
 
+	// Opening and forgetting a drawing
 	/** A new drawing file, written now. */
 	async create(file: DeckPath, canvas: string, text: string, by: Caller): Promise<PenCanvas> {
 		const kept = this.keep(file, canvas, text);
@@ -157,8 +158,13 @@ export class CanvasStore {
 	private save(kept: Kept, text: string, change: Change, ids: string[], by: Caller): void {
 		kept.mine.push(text);
 		if (kept.mine.length > 20) kept.mine.shift();
-		const announce = () => this.kernel.events.emit(events.itemChanged, { canvas: kept.canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+		const announce = () => this.announce(kept.canvas, change, ids);
 		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(announce, () => undefined);
+	}
+
+	/** A change, told as item.changed once it is on disk. */
+	private announce(canvas: string, change: Change, ids: string[]): void {
+		this.kernel.events.emit(events.itemChanged, { canvas, ids, by: change.by, rev: change.rev, base: change.rev - 1, edits: change.ops });
 	}
 
 	private async heard(path: DeckPath, kind: "written" | "deleted", by: string): Promise<void> {
@@ -176,7 +182,7 @@ export class CanvasStore {
 		} catch {
 			return;
 		}
-		if (change) this.kernel.events.emit(events.itemChanged, { canvas: kept!.canvas, ids: idsOf(change.ops), by, rev: change.rev, base: change.rev - 1, edits: change.ops });
+		if (change) this.announce(kept!.canvas, change, change.ops.flatMap(idsOf));
 		if (kept) return;
 		if (at.rest === "canvas.pen" || at.rest.startsWith("frames/")) {
 			if (!this.titles.has(at.name)) this.titles.set(at.name, readTitle(await this.text(this.metaFile(at.name))) ?? at.name);
@@ -231,9 +237,6 @@ export class CanvasStore {
 	}
 }
 
-export const emptyDrawing = (): string => EMPTY;
-export const server = SERVER;
-
 function readTitle(meta: string | undefined): string | undefined {
 	if (!meta) return undefined;
 	try {
@@ -243,5 +246,3 @@ function readTitle(meta: string | undefined): string | undefined {
 		return undefined;
 	}
 }
-
-const idsOf = (ops: Change["ops"]): string[] => ops.flatMap((o) => (o.op === "insert" ? [String(o.item.id)] : o.op === "variables" ? [] : [o.id]));
