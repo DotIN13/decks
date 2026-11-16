@@ -11,15 +11,14 @@ export type Pt = { x: number; y: number };
 /** A box on the stage, in stage pixels. */
 export type Rect = Frame;
 /**
- * A board as the stage places it. `least` is the height a
- * board that reads top to bottom needs for its content: what it is drawn at, at least, and what a
- * drag of its height cannot go under, since its height is a floor its content raises.
+ * A card, board, document or app as the stage places it; `corners` its item's own (`Page.corners`), the
+ * canvas's 12 when absent. `least` is the height a board reading top to bottom needs for its content:
+ * drawn at it at least, and no drag of its height goes under it, since its height is a floor.
  */
-/** A card, board, document or app on the stage; `corners` its item's own (`Page.corners`), the canvas's 12 when absent. */
 export type PageBox = { path: string; x: number; y: number; w: number; h: number; least?: number; corners?: readonly number[] };
 /**
  * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
- * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).
+ * hands back to `select`. The page keeps the armed one (`editor/pen-tools.ts`).
  */
 export type PenTool = "select" | "note" | "card" | "text" | "rectangle" | "ellipse" | "frame" | "arrow" | "shape" | "icon";
 /** A tool that makes an item at a point, by a click or a drag: all but `select` and `arrow`. */
@@ -40,9 +39,9 @@ export type Offset = { dx: number; dy: number };
 export type Corners = { x1: number; y1: number; x2: number; y2: number };
 /** An item being resized: its box now, and where its given box starts (a path drawn inside its viewBox differs). */
 export type ResizeBox = Rect & { id: string; given?: Pt };
-/** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
 /** A board drag let go: where each board was asked to go, and when it is let go of anyway. */
 type PageDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
+/** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
 type PageResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
 /** A shape being drawn with a tool, corner to corner. */
 export type DraftBox = Corners & { tool: PenTool };
@@ -54,7 +53,7 @@ export type SideHintBox = { box: Rect; side?: "top" | "right" | "bottom" | "left
  * gesture in hand, and what the canvas draws for it until the engine has drawn the answer.
  *
  * `core/gesture.ts` steps it; `dom/controller.ts` keeps it in a signal and hands each part to the
- * page. `mode` and `tool` are copies: the app owns the mode and `state/pen-tools.ts` the tool.
+ * page. `mode` and `tool` are copies: the app owns the mode and `editor/pen-tools.ts` the tool.
  */
 export type EditorState = {
 	mode: "browse" | "edit";

@@ -1,7 +1,8 @@
+// What a press, a hover or a tap on the canvas starts, decided from facts the page gives.
 /**
  * What a press, a hover or a tap on the stage starts, decided: given what it landed on, the tool
  * in hand, whether the drawing can be edited, and what is pressing (a mouse, a pen or a finger).
- * `dom/pointer.ts` asks here and does what it says; the gestures themselves are `gesture.ts`'s.
+ * `input/pointer.ts` asks here and does what it says; the gestures themselves are `gesture.ts`'s.
  *
  * Nothing here reads the page. What is under the press is said by the page as facts, the costly
  * ones (`onItem`, `picture`) as questions asked only when the answer matters, as the page asked
@@ -24,6 +25,7 @@ export const PANNED_MS = 400;
 /** A double-click this soon after a tool made an item is that click's second press. */
 export const MADE_MS = 500;
 
+// A press.
 /** Where a press landed: the bare stage, a drawn item's click shape over a board, or anything else (a board, a handle, chrome). */
 export type PressTarget = "stage" | "drawn" | "other";
 
@@ -116,6 +118,7 @@ export function handPans(facts: { hand: boolean; pointer: PointerKind; button: n
 	return facts.hand && facts.pointer !== "touch" && facts.button === 0 && !facts.control;
 }
 
+// A hover with nothing in hand.
 /** What the page knows about a pointer moving over the stage with nothing in hand. */
 export type HoverFacts = {
 	pointer: PointerKind;
@@ -151,6 +154,7 @@ export function decideHover(facts: HoverFacts): HoverAction {
 	return { do: "track", outlines: facts.editing };
 }
 
+// A second tap.
 /** A tap on a drawn item before this one. */
 export type LastTap = { id: string; at: number };
 

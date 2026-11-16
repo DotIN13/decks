@@ -1,3 +1,5 @@
+// The editor's gestures as one reducer: each pointer input, drawing and tick steps the state and says
+// the ops, preview and effects it brings. The presses, carries and handles are in the gesture-*.ts files.
 import { shapeRadius, type MediaItem, type Op, type PenNode } from "@decks/pen";
 import { bendStart, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
 import type { EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
@@ -11,6 +13,7 @@ export { withSelection, selectMade, prunePages } from "./gesture-press.ts";
 export { landPageResize } from "./gesture-handle.ts";
 export { landPageDrag } from "./gesture-carry.ts";
 
+// How long things wait.
 /** How long a let-go gesture waits for the drawing that answers it before its preview goes anyway. */
 export const SETTLE_MS = 2000;
 /** How long a let-go radius is held for the drawing to have it. */
@@ -19,6 +22,8 @@ export const RADIUS_HOLD_MS = 3000;
 export const PAGE_HOLD_MS = 4000;
 /** Two presses on one handle within this long, with no drag: the handle's double-click. */
 export const HANDLE_TAP_MS = 400;
+
+// What goes in, what is in hand, and what comes out.
 /** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
 export type PointerInput = { at: Pt; client: Pt; mods: Mods; pointer: PointerKind; time: number };
 /** What a click that does not move does, besides selecting: follow a card's link, or play a film or a sound. */
@@ -122,6 +127,8 @@ export type GestureContext = {
 };
 /** One step's answer. `preview` absent leaves the engine's preview as it is; `null` takes it away. */
 export type Step = { state: EditorState; ops: Op[]; preview?: ReadonlyMap<string, PreviewChange> | null; effects: Effect[] };
+
+// The step.
 export const ZERO: Offset = { dx: 0, dy: 0 };
 /** The editor before anything is selected or pressed. */
 export function initialState(mode: EditorState["mode"] = "browse", tool: PenTool = "select"): EditorState {

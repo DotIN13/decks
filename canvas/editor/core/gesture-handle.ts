@@ -1,3 +1,5 @@
+// The gestures on what the overlay draws: a resize handle, a page's handle, the radius, an arrow's
+// end or middle, and the marquee; their press, each move and the lift.
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd } from "./arrows.ts";
 import type { PageBox, EditorState, ResizeBox } from "./model.ts";
 import { marqueePick, marqueeRect } from "./pick.ts";
@@ -8,27 +10,6 @@ import { type Effect, type GestureContext, HANDLE_TAP_MS, type Input, PAGE_HOLD_
 import { done, isFree, moveCarry, releaseCarry, settle } from "./gesture-carry.ts";
 import { withSelection } from "./gesture-press.ts";
 
-/**
- * A board size let go is let go of once the board is at it: the write's revision has come (or the
- * board is exactly the box already) and the board is where the box is, as wide, and at least as
- * tall, since a board's height is a floor its content can raise. A board gone lets it go too.
- */
-export function landPageResize(state: EditorState, board: (PageBox & { rev: number }) | undefined): EditorState {
-	const held = state.pageResize;
-	if (!held?.released) return state;
-	if (!board) return { ...state, pageResize: undefined };
-	const at = board.x === held.x && board.y === held.y && board.w === held.w;
-	if (board.rev === held.released.rev && !(at && board.h === held.h)) return state;
-	return at && board.h >= held.h ? { ...state, pageResize: undefined } : state;
-}
-/** A second press on the same handle, without a drag, soon after: a handle's double-click. */
-function handleTap(state: EditorState, key: string, time: number): { state: EditorState; again: boolean } {
-	const was = state.handleTap;
-	const again = was?.key === key && time - was.at < HANDLE_TAP_MS;
-	return { state: { ...state, handleTap: again ? undefined : { key, at: time } }, again };
-}
-/** The drag's offset and the resized outline gone: the drawing has the change, or has given up waiting. */
-export const landed = (state: EditorState): EditorState => ({ ...state, drag: ZERO, resize: undefined, shownResize: undefined });
 /** A press that starts a gesture on something the overlay drew: a handle, the radius, an arrow's end or middle. */
 export function pressHandle(state: EditorState, input: Input & PointerInput, scene: SceneQuery, ctx: GestureContext): Step | undefined {
 	switch (input.type) {
@@ -202,4 +183,27 @@ export function release(state: EditorState, p: PointerInput, scene: SceneQuery, 
 			return done(next, [], g.next ? [arrowOp(g.id, g.next)] : []);
 		}
 	}
+}
+
+/** A second press on the same handle, without a drag, soon after: a handle's double-click. */
+function handleTap(state: EditorState, key: string, time: number): { state: EditorState; again: boolean } {
+	const was = state.handleTap;
+	const again = was?.key === key && time - was.at < HANDLE_TAP_MS;
+	return { state: { ...state, handleTap: again ? undefined : { key, at: time } }, again };
+}
+/** The drag's offset and the resized outline gone: the drawing has the change, or has given up waiting. */
+export const landed = (state: EditorState): EditorState => ({ ...state, drag: ZERO, resize: undefined, shownResize: undefined });
+
+/**
+ * A board size let go is let go of once the board is at it: the write's revision has come (or the
+ * board is exactly the box already) and the board is where the box is, as wide, and at least as
+ * tall, since a board's height is a floor its content can raise. A board gone lets it go too.
+ */
+export function landPageResize(state: EditorState, board: (PageBox & { rev: number }) | undefined): EditorState {
+	const held = state.pageResize;
+	if (!held?.released) return state;
+	if (!board) return { ...state, pageResize: undefined };
+	const at = board.x === held.x && board.y === held.y && board.w === held.w;
+	if (board.rev === held.released.rev && !(at && board.h === held.h)) return state;
+	return at && board.h >= held.h ? { ...state, pageResize: undefined } : state;
 }

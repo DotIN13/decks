@@ -1,3 +1,4 @@
+// Carrying the selection: its start, each move (snapping, dropping into frames, the composer), and the lift.
 import { isCard, type Op } from "@decks/pen";
 import { snapMove, type Guide } from "../snap.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";

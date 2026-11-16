@@ -1,9 +1,14 @@
+// Which handles the selection wears (an item's eight, a page's, an arrow's ends and anchors, the
+// radius) and where each one sits.
 import { ARROW, sidePoint, type ArrowSide } from "@decks/pen";
 import { arrowHandles, type ArrowHandles } from "./arrows.ts";
 import type { PageBox, Pt, Rect } from "./model.ts";
 import { HANDLES, radiusStart, type Handle } from "./resize.ts";
 import type { SceneQuery } from "./scene.ts";
 import { type Offset, type Outline, type PageHandles, type RadiusHandle } from "./overlay.ts";
+
+/** What the arrow anchors and the radius handle wait for: an edit allowed, and nothing being drawn, sized or carried. */
+export type HandleInput = { editable: boolean; drafting: boolean; resizing: boolean; drag: Offset };
 
 /** Handles hide when the box they would sit on is under this many screen pixels both ways: they would cover it. */
 const HANDLES_MIN_PX = 10;
@@ -21,8 +26,6 @@ export function itemHandles(outlines: readonly Outline[], scene: SceneQuery, zoo
 	if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
 	return outlines[0]!;
 }
-/** What the arrow anchors and the radius handle wait for: an edit allowed, and nothing being drawn, sized or carried. */
-export type HandleInput = { editable: boolean; drafting: boolean; resizing: boolean; drag: Offset };
 /** One drawn item selected, not a line or words, and nothing being drawn or sized: where an arrow can leave it. */
 export function arrowAnchors(handles: Outline | undefined, input: Omit<HandleInput, "drag">, scene: SceneQuery): Outline | undefined {
 	if (!handles || input.drafting || input.resizing || !input.editable) return undefined;
@@ -57,7 +60,7 @@ export function arrowEnds(input: { selection: readonly string[]; pagePicks: read
 
 /** The handles a board has: all eight (`resize.ts`, `pageResizeStep`). */
 export const pageHandleList = (): readonly Handle[] => HANDLES;
-/** A resize handle answers a press this many screen pixels across under a pointer, whatever size it is drawn; a finger gets 44 (`dom/touch-rules.ts`). */
+/** A resize handle answers a press this many screen pixels across under a pointer, whatever size it is drawn; a finger gets 44 (`input/touch-rules.ts`). */
 export const HANDLE_HIT_PX = 15;
 /** How far a handle's hit zone reaches past its drawn box on each side, in stage pixels: `size` is the drawn width, in stage pixels, `hit` how wide it answers on the screen. */
 export const hitReach = (size: number, zoom: number, hit = HANDLE_HIT_PX) => Math.max(0, (hit / zoom - size) / 2);

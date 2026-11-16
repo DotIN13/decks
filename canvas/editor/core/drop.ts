@@ -5,6 +5,7 @@ import { isShape, type PenNode } from "@decks/pen";
 import type { Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
+// The frame under the pointer.
 /**
  * The topmost frame under a point. Only frames that place their children where they say, unless
  * `stacking`, which counts frames that lay their children out too. Never an instance's inside or
@@ -32,6 +33,7 @@ export function frameUnder(scene: SceneQuery, point: Pt, carrying: readonly stri
 	return found;
 }
 
+// Where among a frame's children.
 /**
  * Where in a frame that arranges its children a drop would land: the place among them nearest
  * the pointer, and the line drawn on that boundary. `undefined` for a frame with no layout,
@@ -89,6 +91,7 @@ function slotLine(frame: LaidOut, before: Rect | undefined, after: Rect | undefi
 	return down ? { x: box.x + inset(pl), y: on, w: Math.max(8, box.w - inset(pl) - inset(pr)), h: 0 } : { x: on, y: box.y + inset(pt), w: 0, h: Math.max(8, box.h - inset(pt) - inset(pb)) };
 }
 
+// Every place near the pointer a drag could land.
 /** Screen pixels round the pointer within which a drag shows the places it could drop into. */
 export const NEAR_PX = 200;
 

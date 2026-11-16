@@ -1,9 +1,11 @@
+// What adding something to the canvas decides: what a made item opens, what a drawn arrow lights up,
+// and what a pick in the insert panel does.
 /**
  * What adding something to the stage decides, with no page under it: what an item a tool makes
  * opens (`opensWords`), what an arrow being drawn lights up (`drawHints`), and what a pick in the
  * insert panel does (`insertPick`).
  *
- * The page's half is `dom/InsertMenu.tsx`: the press a tool follows, the dashed outline kept until
+ * The page's half is `chrome/InsertMenu.tsx`: the press a tool follows, the dashed outline kept until
  * the item is drawn, and the insert panel.
  */
 import type { Op } from "@decks/pen";
@@ -22,7 +24,7 @@ export function drawHints(start: Join | undefined, end: Join | undefined): { joi
 	return { joins: [...(start ? [start.box] : []), ...(other ? [other.box] : [])], sides: other ? [{ box: other.box, ...(other.side ? { side: other.side } : {}) }] : [] };
 }
 
-/** The insert panel as it was opened (`state/pen-tools.ts`, `InsertPanel`): at a stage point, or for an icon to change. */
+/** The insert panel as it was opened (`editor/pen-tools.ts`, `InsertPanel`): at a stage point, or for an icon to change. */
 type InsertOpen = { at?: Pt | undefined; replace?: string | undefined };
 /**
  * A pick in the insert panel: another icon for one already drawn (the same place, size and colour, a

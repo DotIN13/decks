@@ -1,3 +1,4 @@
+// What a key does to the drawing in edit mode: the ops it writes, the selection after, the tool it arms.
 /**
  * The keys of the drawing, in edit mode, decided: given the key and its modifiers, what is
  * selected and the tool in hand, what the key does — the ops it writes, what is selected after,

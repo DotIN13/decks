@@ -1,3 +1,4 @@
+// An arrow's handles edited: its ends joined and slid, its middle pulled, and the ops letting go writes.
 /**
  * Editing an arrow: what its ends join, the side they keep to, a join slid along its side, its
  * middle pulled, and the ops that letting go writes. Each move of the pointer is one call here,
@@ -34,6 +35,7 @@ type Metadata = Record<string, unknown>;
 
 const copy = (box: Rect): Rect => ({ x: box.x, y: box.y, w: box.w, h: box.h });
 
+// What an end joins, and the side it keeps to.
 /** The board under a stage point, the last on top: an arrow may start or end on it. */
 export function pageAt(scene: SceneQuery, point: Pt): string | undefined {
 	return scene.boards().findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
@@ -98,6 +100,7 @@ export const endOf = (join: { name: string; side?: ArrowSide }): ArrowEnd => (jo
 /** A point end, to a tenth of a pixel. */
 export const pointEnd = (point: Pt): [number, number] => [Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10];
 
+// The selected arrow's handles, and the dashed route a handle's drag shows.
 /**
  * The handles of an arrow as drawn, moved by `drag` (the selection's carried offset). Undefined for
  * anything that is not an arrow, or an arrow an end of which cannot be found. A joined end's side
@@ -164,6 +167,7 @@ export function routeDraft(scene: SceneQuery, metadata: Metadata, node: PenNode)
 	return { d: shape.geometry, x: shape.x, y: shape.y };
 }
 
+// A joined end slid along its side.
 /**
  * Where along a side a point slides a join: 0 at its top or left end, 1 at the other, to a
  * thousandth. It clicks to the ends and the middle within `JOIN_SNAP_PX` on screen, unless `free`.
@@ -194,6 +198,7 @@ export function slideJoin(own: JoinedEnd | undefined, point: Pt, options: { zoom
 	return own && nearSide(own.box, own.side, point, options.zoom) ? { item: own.item, side: own.side, at: slideAt(own.box, own.side, point, options) } : undefined;
 }
 
+// Letting go of an end.
 /** An arrow's metadata with one end set. */
 export const withEnd = (metadata: Metadata, which: Which, end: unknown): Metadata => ({ ...metadata, [which]: end });
 
@@ -218,6 +223,7 @@ export function resetEndOp(id: string, metadata: Metadata | undefined, which: Wh
 	return arrowOp(id, withEnd(metadata, which, kept));
 }
 
+// The middle pulled.
 /** The start of a middle handle's drag: the metadata with no bend, and the automatic route it gives. */
 export function bendStart(scene: SceneQuery, metadata: Metadata): { unbent: Metadata; auto: Array<[number, number]> } | undefined {
 	const { bend: _was, ...unbent } = metadata;
@@ -251,6 +257,7 @@ export function resetBendOp(id: string, metadata: Metadata | undefined): Op | un
 	return arrowOp(id, kept);
 }
 
+// A new arrow's ends.
 /**
  * The ends of a new arrow drawn from `at` to `end`: each joins what it was pressed or let go on, or
  * is a point there. Undefined for a click with no drag unless it joins two different things.
