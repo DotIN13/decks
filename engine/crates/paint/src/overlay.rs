@@ -1,6 +1,6 @@
 //! What the editor draws over the canvas, painted by the engine in the same frame as the drawing
 //! (`stage-web`, `Page::frame`): outlines, handles, guides, slots and drafts. The page sends the
-//! geometry in canvas units with its sizes in screen pixels (`edit/core/overlay-json.ts`), and keeps
+//! geometry in canvas units with its sizes in screen pixels (`canvas/editor/core/overlay-json.ts`), and keeps
 //! its own elements only as hit areas (`canvas.css`, `[data-engine-overlays]`), so an outline moves
 //! with the drawing it marks, never a frame behind it.
 use crate::list::{Affine, Align, Color, Op, Paint, Shape};

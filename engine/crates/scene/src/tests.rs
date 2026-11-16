@@ -190,7 +190,7 @@ fn a_hugs_number_is_its_floor() {
 
 #[test]
 fn arrows_match_pen() {
-	// Cases pen's own router wrote (`packages/pen/src/arrow-fixtures.test.ts`): the same points to
+	// Cases pen's own router wrote (`pen/arrow-fixtures.test.ts`): the same points to
 	// a thousandth of a pixel, and the same path, character for character.
 	let cases: Vec<Value> = serde_json::from_str(include_str!("../fixtures/arrows.json")).unwrap();
 	assert!(cases.len() >= 1000);

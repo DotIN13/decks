@@ -4,7 +4,7 @@
 use super::*;
 
 impl Page {
-	/// What the editor draws over the canvas, as `edit/core/overlay-json.ts` writes it; empty or bad JSON clears it.
+	/// What the editor draws over the canvas, as `canvas/editor/core/overlay-json.ts` writes it; empty or bad JSON clears it.
 	pub fn set_overlay(&mut self, json: &str) {
 		self.overlay = stage_paint::overlay::Overlay::parse(json).filter(|o| !o.is_empty());
 	}

@@ -214,7 +214,6 @@ addEventListener("keydown", (e) => {
 addEventListener("resize", () => changed(false));
 
 // --- pictures --------------------------------------------------------------------------------
-
 // Pictures by address, loaded once for both engines: relative to the stage's file.
 const asked = new Set();
 async function loadPictures(urls) {

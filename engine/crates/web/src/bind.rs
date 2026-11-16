@@ -520,7 +520,7 @@ impl PageEngine {
 	}
 
 	/// What the editor draws over the canvas (outlines, handles, guides, slots, drafts), painted by the
-	/// engine last in every frame (`stage_paint::overlay`): the JSON `edit/core/overlay-json.ts` writes.
+	/// engine last in every frame (`stage_paint::overlay`): the JSON `canvas/editor/core/overlay-json.ts` writes.
 	#[wasm_bindgen(js_name = setOverlay)]
 	pub fn set_overlay(&mut self, json: &str) {
 		self.page.set_overlay(json);

@@ -1,4 +1,4 @@
-//! Arrows that stay joined to what they join: pen's router (`packages/pen/src/arrows.ts`), ported
+//! Arrows that stay joined to what they join: pen's router (`pen/arrows.ts`), ported
 //! so a drag can bend the arrows on what it carries in the page's own scene, every frame, with
 //! nothing crossing from the page's JavaScript.
 //!
