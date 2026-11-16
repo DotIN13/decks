@@ -307,6 +307,9 @@
 		"documents-drawn": {
 			"path": "tools/checks/library/documents-drawn.mjs"
 		},
+		"old-root-board": {
+			"path": "tools/checks/compat/old-root-board.mjs"
+		},
 		"card-tab": {
 			"path": "tools/checks/cards/card-tab.mjs"
 		},
