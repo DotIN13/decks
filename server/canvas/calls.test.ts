@@ -171,7 +171,7 @@ test("a pass reaches its canvas's folder and what its canvas already places, and
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "files/a.png" } })), "ok", "its own files");
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } })), "ok", "a web address");
 	// What the person placed, a pass may put in again: a copy, a paste back, an undone delete.
-	doc.apply([{ op: "insert", item: { type: "browser", id: "app1", url: "/app/review/" }, at: { x: 0, y: 1700 } }, { op: "insert", item: { type: "browser", id: "old1", url: "boards/apps/review.html" }, at: { x: 600, y: 1700 } }], ann);
+	doc.apply([{ op: "insert", item: { type: "browser", id: "app1", url: "/app/review/" }, at: { x: 0, y: 1700 } }, { op: "insert", item: { type: "browser", id: "old1", url: "pages/apps/review.html" }, at: { x: 600, y: 1700 } }], ann);
 	assert.equal(pass(put({ type: "browser", url: "/app/review/" })), "ok", "an app the canvas already places");
 	assert.equal(pass([{ op: "copy", id: "old1", at: { x: 1200, y: 1700 } }]), "ok", "an old page the canvas already places");
 	await s.close();
