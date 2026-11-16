@@ -1,5 +1,6 @@
 import { Refused, type Caller } from "../../../protocol/index.ts";
 import { toDeckPath, type Deck, type DeckPath, type Kernel } from "../../kernel/types.ts";
+import { Queues } from "../queue.ts";
 import { buildPath, readErrors, tectonicJob, type CompileError } from "./tectonic.ts";
 
 // Typesetting a LaTeX document: one run at a time per document, the PDF and log written through the deck.
@@ -12,7 +13,7 @@ const decoder = new TextDecoder();
 
 /** One per server: the runs going now, one queue per document (rule 9). */
 export class Typesetter {
-	private queues = new Map<string, Promise<unknown>>();
+	private queues = new Queues();
 
 	constructor(
 		private machine: () => Kernel["run"],
@@ -24,12 +25,7 @@ export class Typesetter {
 		const path = texPath(raw);
 		const run = this.machine();
 		if (!run) throw new Refused("unavailable", "This server has no machine to run a typesetter on.", "file.read");
-		const go = () => typeset(run, deck, path, by, this.candidates);
-		const next = (this.queues.get(path) ?? Promise.resolve()).then(go, go);
-		const settled = next.then(() => undefined, () => undefined);
-		this.queues.set(path, settled);
-		void settled.then(() => this.queues.get(path) === settled && this.queues.delete(path));
-		return next;
+		return this.queues.run(path, () => typeset(run, deck, path, by, this.candidates));
 	}
 }
 

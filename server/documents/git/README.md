@@ -10,7 +10,7 @@ A document's git repository, kept in step with a remote such as Overleaf: `file.
 
 ## May import
 
-`protocol/` and `server/kernel/`, through their entry files. Nothing else in `server/documents/`.
+`protocol/` and `server/kernel/`, through their entry files. In `server/documents/`, only `queue.ts`.
 
 ## Rules
 

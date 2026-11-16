@@ -1,5 +1,6 @@
 import { Refused } from "../../../protocol/index.ts";
 import { toDeckPath, type DeckPath, type Kernel } from "../../kernel/types.ts";
+import { Queues } from "../queue.ts";
 import { capital, cleanRemote, plural, readStatus, remoteLabel, why, type DocRepo, type GitRun } from "./status.ts";
 
 // A document's git repository: read it, pull it (commit first, then merge), push it (pull first, then send).
@@ -19,7 +20,7 @@ type Found = { top: DeckPath | ""; file: string; git: (args: string[]) => Promis
 
 /** One per server: pulls and pushes of one repository run one at a time (rule 10). */
 export class Repos {
-	private queues = new Map<string, Promise<unknown>>();
+	private queues = new Queues();
 
 	constructor(private machine: () => Kernel["run"]) {}
 
@@ -31,7 +32,7 @@ export class Repos {
 
 	async pull(raw: string): Promise<Synced> {
 		const found = await this.needed(raw);
-		return this.queued(found.top, async () => {
+		return this.queues.run(found.top, async () => {
 			const pulled = await pullInto(found);
 			return { ok: pulled.ok, message: pulled.message, ...(await withStatus(found)) };
 		});
@@ -39,7 +40,7 @@ export class Repos {
 
 	async push(raw: string): Promise<Synced> {
 		const found = await this.needed(raw);
-		return this.queued(found.top, async () => {
+		return this.queues.run(found.top, async () => {
 			const pulled = await pullInto(found);
 			if (!pulled.ok) return { ok: false, message: pulled.message, ...(await withStatus(found)) };
 			const sent = await send(found, pulled.label);
@@ -54,14 +55,6 @@ export class Repos {
 		if (!found) throw new Refused("not_found", `${raw} is not in a git repository inside the deck.`, "file.repo");
 		if (!(await statusOf(found))?.upstream) throw new Refused("conflict", "This branch has no remote branch to pull from or push to.", "file.repo");
 		return found;
-	}
-
-	private queued<T>(top: string, work: () => Promise<T>): Promise<T> {
-		const next = (this.queues.get(top) ?? Promise.resolve()).then(work, work);
-		const settled = next.then(() => undefined, () => undefined);
-		this.queues.set(top, settled);
-		void settled.then(() => this.queues.get(top) === settled && this.queues.delete(top));
-		return next;
 	}
 
 	/** Ask git where the top is, as ups from the document's folder; above the deck is none (rule 1). */
