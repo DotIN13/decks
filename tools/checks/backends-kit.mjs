@@ -1,5 +1,5 @@
 /**
- * What the backend checks share (`checks/backends.mjs`, `checks/context-loss.mjs`,
+ * What the backend checks share (`library/backends.mjs`, `library/context-loss.mjs`,
  * the picture checks): the two browsers they run in, the APIs they take away, and how
  * they tell the stage's canvas drew something.
  */

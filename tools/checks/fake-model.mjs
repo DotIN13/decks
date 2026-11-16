@@ -5,10 +5,10 @@
  * the agent's real tools (read, edit, bash with the decks command), takes a moment to think and streams
  * its words, and otherwise answers briefly. Pi is the real agent; only the model is fake.
  *
- *     node e2e/fake-model.mjs &                                   # on 127.0.0.1:4700
- *     PI_CODING_AGENT_DIR=$PWD/e2e/fake-agent DECKS_E2E_AGENT=1 npm run test:e2e   # absolute: the server runs from apps/server
+ *     node tools/checks/run.mjs --agent <check>    # starts it on 127.0.0.1:4700, Pi pointed at the fake agent
+ *     node tools/checks/fake-model.mjs &           # or alone, on 127.0.0.1:4700
  *
- * `e2e/fake-agent/` is a pi agent directory whose models.json names this endpoint and whose
+ * `tools/checks/fake-agent/` is a pi agent directory whose models.json names this endpoint and whose
  * settings.json makes it the default model; pi writes its sessions beside them, which git ignores.
  * FAKE_MODEL_PORT, FAKE_MODEL_LOG (every request and answer), FAKE_MODEL_THINK_MS and
  * FAKE_MODEL_WORD_MS change the port, the log and the pace.

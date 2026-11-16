@@ -1,6 +1,6 @@
 /**
  * The `awake` canvas: a canvas heavy with placed items of every kind, made the same every time, for
- * `checks/awake-bench.mjs` (the numbers) and `checks/awake.mjs` (the behaviour). Not the render-perf grid,
+ * `bench/awake-bench.mjs` (the numbers) and `pictures/awake.mjs` (the behaviour). Not the render-perf grid,
  * which is drawing-heavy: this one is about the items that wake and sleep.
  *
  * `writeAwakeCanvas(deck, { cards, apps, documents })` writes `canvases/awake/` into a deck: a grid of cells,
@@ -12,7 +12,7 @@
  * Every app is the same small static page that animates (a clock redrawn ten times a second), which is
  * what made an app expensive on canvas-frame: a window painted at every camera step.
  *
- *   node e2e/awake-canvas.mjs <deck folder> [cards] [apps] [documents]
+ *   node tools/checks/awake-canvas.mjs <deck folder> [cards] [apps] [documents]
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -166,7 +166,7 @@ export function writeAwakeCanvas(deck, options = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const [deck, cards, apps, documents] = process.argv.slice(2);
 	if (!deck) {
-		console.error("usage: node e2e/awake-canvas.mjs <deck folder> [cards] [apps] [documents]");
+		console.error("usage: node tools/checks/awake-canvas.mjs <deck folder> [cards] [apps] [documents]");
 		process.exit(2);
 	}
 	console.log(JSON.stringify(writeAwakeCanvas(resolve(deck), { cards: Number(cards ?? 100), apps: Number(apps ?? 8), documents: Number(documents ?? 4) })));

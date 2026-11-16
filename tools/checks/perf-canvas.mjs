@@ -1,5 +1,5 @@
 /**
- * The `perf` canvas: a big, busy canvas for `checks/render-perf.mjs`, made the same every time.
+ * The `perf` canvas: a big, busy canvas for `bench/render-perf.mjs`, made the same every time.
  *
  * 100 cells on a 10 × 10 grid centred on the origin, each 1,600 × 1,200: a small card (its own folder under the
  * canvas's `cards/`), and twenty items round it — notes, text, rectangles and ellipses, a frame with
@@ -8,7 +8,7 @@
  * It is written into a deck when the check runs, not kept in `e2e/fixture/`: the deck lists every
  * canvas's cards as its own, so 100 cards in the fixture would be in every other check's deck too.
  *
- *   node e2e/perf-canvas.mjs <deck folder> [items] [cards]    # write it into a deck
+ *   node tools/checks/perf-canvas.mjs <deck folder> [items] [cards]    # write it into a deck
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -157,7 +157,7 @@ export function writePerfCanvas(deck, options) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const [deck, items, cards] = process.argv.slice(2);
 	if (!deck) {
-		console.error("usage: node e2e/perf-canvas.mjs <deck folder> [items] [cards]");
+		console.error("usage: node tools/checks/perf-canvas.mjs <deck folder> [items] [cards]");
 		process.exit(2);
 	}
 	console.log(JSON.stringify(writePerfCanvas(resolve(deck), { items: Number(items ?? 2000), cards: Number(cards ?? 100) })));
