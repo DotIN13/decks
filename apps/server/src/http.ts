@@ -9,7 +9,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { NotFound, PathRefused } from "./deck/roots.ts";
 import { UploadRefused } from "./files/upload.ts";
-import { verbRoutes } from "./calls/router.ts";
+import { verbRoutes } from "./routes/v1.ts";
 import type { App } from "./app.ts";
 import { guard } from "./auth/guard.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "./auth/hosts.ts";
@@ -95,7 +95,7 @@ export function createHttpApp(app: App): Express {
 	server.use(express.json({ limit: "8mb" }));
 
 	const api = express.Router();
-	// Every verb in the table, for the SDK's three forms (`calls/router.ts`).
+	// Every verb in the table, for the SDK's three forms (`routes/v1.ts`).
 	api.use("/v1", verbRoutes(app));
 	// The doors, where tokens are handed out (`auth/issue.ts`).
 	api.use(doorRoutes(app));

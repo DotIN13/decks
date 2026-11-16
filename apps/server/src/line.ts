@@ -6,8 +6,9 @@ import type { App } from "./app.ts";
 import type { View } from "./ws.ts";
 import { verifyOn } from "./auth/guard.ts";
 import { isCanvasPass } from "./auth/passes.ts";
-import type { Principal } from "./auth/principal.ts";
-import { cardRefusedFor, DOC_CALLS, onCanvas, runVerb } from "./calls/router.ts";
+import { actsAsPerson, type Principal } from "./auth/principal.ts";
+import { cardRefusedFor, DOC_CALLS, onCanvas } from "./calls/canvas-frame.ts";
+import { runVerb } from "./calls/run.ts";
 import { settleStage } from "./stage/pending.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */
@@ -136,7 +137,7 @@ export class Line {
 			clearTimeout(state.hello);
 			state.principal = principal;
 			state.token = message.token;
-			state.all = message.all === true && (principal.kind === "person" || principal.kind === "site");
+			state.all = message.all === true && actsAsPerson(principal);
 			if (principal.kind === "canvas") this.app.canvasFrames += 1;
 			// Checked again while open, as the stream checks its pass before each message and each beat.
 			state.recheck = setInterval(() => {
@@ -145,7 +146,7 @@ export class Line {
 			state.recheck.unref?.();
 			send(socket, { type: "line.hello", who: principal.kind as "person" | "site" | "agent" | "canvas", ...(principal.kind === "canvas" ? { canvas: principal.canvas, role: principal.role } : {}) });
 			// A page: greeted as the tab's socket greeted it, with a screen of its own that `forView` renders for.
-			if (message.greet === true && (principal.kind === "person" || principal.kind === "site")) {
+			if (message.greet === true && actsAsPerson(principal)) {
 				state.view = {};
 				this.app.greet((said) => send(socket, said), state.view);
 			}

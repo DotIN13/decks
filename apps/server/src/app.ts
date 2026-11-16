@@ -19,7 +19,7 @@ import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
-import { boardOnCanvas } from "./calls/router.ts";
+import { boardOnCanvas } from "./calls/canvas-frame.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { studioLink } from "./studio/index.ts";
 import { StageShots } from "./stage/shots.ts";
@@ -160,7 +160,7 @@ export class App {
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** Stage calls waiting for the browser to carry them out. */
-	/** Canvas frames following their canvas's stream now (`calls/router.ts`): each can answer an agent's view of its canvas. */
+	/** Canvas frames following their canvas's stream now (`routes/v1.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
 	/** How many lines are open (`line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
 	lines: () => number = () => 0;
@@ -283,7 +283,7 @@ export class App {
 		this.apps = new Apps(deck.path);
 		this.apps.decksPort = config.port;
 		this.apps.passes = this.passes;
-		// A canvas frame showing the app hears its state change (`calls/router.ts`, `onCanvas`), instead of asking every ten seconds.
+		// A canvas frame showing the app hears its state change (`calls/canvas-frame.ts`, `onCanvas`), instead of asking every ten seconds.
 		this.apps.onChange = (name, state) => this.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
 		this.stage.apps = this.apps;
 		this.pens.watch();
@@ -1014,10 +1014,10 @@ export class App {
 		for (const listener of this.listeners) listener(message);
 	}
 
-	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/router.ts`, `line.ts`). */
+	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */
 	readonly appsAllowedOnce = new Set<string>();
 
-	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `calls/router.ts`). */
+	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `routes/v1.ts`). */
 	private readonly listeners = new Set<(message: ServerMessage) => void>();
 
 	/** Hear every broadcast, as it goes to the browsers; the answer stops it. */
@@ -1028,7 +1028,7 @@ export class App {
 
 	/**
 	 * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
-	 * the document service keys it: the only files a canvas frame may open (`calls/router.ts`).
+	 * the document service keys it: the only files a canvas frame may open (`routes/v1.ts`, `line.ts`).
 	 */
 	documentsOn(canvas: string): Map<string, string> {
 		const out = new Map<string, string>();

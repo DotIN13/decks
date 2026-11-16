@@ -79,7 +79,7 @@ item carry more than a drawing:
   (`server`), shown on the canvas as the app itself at `/app/<name>/` (`apps/server/src/apps`).
 
 Only the person and agents make document and app items; a card's script may move, size or delete
-one, never make one or change what it names (`verbs/router.ts`, `touchesTrustedItems`).
+one, never make one or change what it names (`calls/canvas-frame.ts`, `touchesTrustedItems`).
 
 ## 4. Trust
 
@@ -116,7 +116,7 @@ allow"), remembered in `AppTrust` (`auth/app-trust.ts`).
 changes it, its parameters and its result as schemas. From it:
 
 - the harness makes a route of each (`POST /api/v1/<name>`), checks the arguments against the
-  schema before the handler runs, and answers `{ ok, value, notes }` (`verbs/router.ts`);
+  schema before the handler runs, and answers `{ ok, value, notes }` (`calls/run.ts`);
 - `scripts/gen-sdk.mjs` writes the SDK's types and verb list, `verbs.json` for the command and the
   MCP server, and `runtime/decks-commands.md`, the reference every agent is given.
 

@@ -2,7 +2,7 @@ import { SDK_FILE } from "../apps/service.ts";
 import { appActor, canvasHolds } from "../calls/caller-run.ts";
 import { type RouteDeps } from "./shared.ts";
 import { type Request, type Response, type Router } from "express";
-import { runVerb } from "../calls/router.ts";
+import { runVerb } from "../calls/run.ts";
 
 /**
  * The deck's apps (`apps/service.ts`) and the SDK an app's page imports.

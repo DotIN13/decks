@@ -44,7 +44,7 @@ const hub = new Hub(
 	// A hello's token opens the socket as an address's did: the person's or a paired site's.
 	(token, headers) => {
 		const seen = verifyOn(app, token, headers);
-		return seen.ok && (seen.principal.kind === "person" || seen.principal.kind === "site");
+		return seen.ok && actsAsPerson(seen.principal);
 	},
 );
 app.attach(hub);

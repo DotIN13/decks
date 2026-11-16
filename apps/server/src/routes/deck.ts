@@ -1,6 +1,6 @@
 import type { RouteDeps } from "./shared.ts";
 import type { Router } from "express";
-import { runVerb } from "../calls/router.ts";
+import { runVerb } from "../calls/run.ts";
 
 /**
  * The deck: the relay's connections and the deck's state.

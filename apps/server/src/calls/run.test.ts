@@ -241,7 +241,7 @@ test("an app is shown by an item: apps.item names it, canvas.insert places it, a
 });
 
 test("each principal calls as itself: an app as the app, a site as the person, whatever board it names", async () => {
-	const { callerOf } = await import("./router.ts");
+	const { callerOf } = await import("./caller.ts");
 	const { app, call, bearer, cleanup } = await open();
 	try {
 		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
@@ -264,10 +264,10 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 
 		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
 		assert.equal((await call("card.list", [], site)).status, 200);
-		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("canvases/t/cards/tall/index.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
+		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("canvases/t/cards/tall/index.html") }, principal: { kind: "site", label: "Studio" } });
 		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
 
-		const none = await callerOf(app, { headers: { "x-decks-person": "1" } }, new Set());
+		const none = await callerOf(app, { headers: { "x-decks-person": "1" } });
 		assert.ok("error" in none && none.status === 401, "a header is nobody");
 	} finally {
 		cleanup();

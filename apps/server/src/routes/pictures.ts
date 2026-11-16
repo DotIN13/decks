@@ -1,6 +1,7 @@
 import { normalizeBoardPath } from "../deck/schema.ts";
 import { UploadRefused } from "../files/upload.ts";
-import { boardOnCanvas, runVerb } from "../calls/router.ts";
+import { boardOnCanvas } from "../calls/canvas-frame.ts";
+import { runVerb } from "../calls/run.ts";
 import { renderSnapshot } from "../pictures/snapshot.ts";
 import { compressedName, squeezed, wireEncoding } from "../pictures/compress.ts";
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";

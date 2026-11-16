@@ -187,7 +187,7 @@ wraps it. The map, from `apps/server/src/routes/agents.ts`:
 | `agentDialogs(p, id)` → `GET /agents/:id/dialogs` | `agent.dialogs(id)` | same shape (`{ dialogs }`) |
 | `answerDialog(p, id, answer)` → `POST /agents/:id/dialog` | `agent.answer(answer)` | |
 
-A paired site's token may call every one of these (`verbs/router.ts`: the person's verbs are the
+A paired site's token may call every one of these (`calls/run.ts`: the person's verbs are the
 person's or a paired site's, over HTTP and on the line alike), and `GET /api/v1` lists them to that
 token. The three `door(…)` helpers in `harness.ts` become `verb(…)` calls; the "this harness may need
 updating" fallbacks they carry are for a harness older than the verbs, and can say so for a

@@ -225,7 +225,7 @@ export interface StageTool {
 	/**
 	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`); an old name is refused with its new call, with its arguments as a list.
 	 *
-	 * What `/api/v1/<verb>` answers with (`calls/router.ts`): the value, the notes the verb added
+	 * What `/api/v1/<verb>` answers with (`calls/run.ts`): the value, the notes the verb added
 	 * (where an item went, what `decks.canvas.fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */

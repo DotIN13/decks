@@ -1209,7 +1209,7 @@ export class DeckAgent {
 
 	/**
 	 * This agent's stage tool: the `stage` its code runs against, and what `/api/v1/<verb>` calls
-	 * when a request names this agent (`calls/router.ts`). Made once and kept, so a verb called
+	 * when a request names this agent (`calls/caller.ts`). Made once and kept, so a verb called
 	 * over HTTP before the agent's first turn acts on the same stage its turns will.
 	 */
 	stageTool(): StageTool {

@@ -38,7 +38,10 @@ type Impl = (args: readonly unknown[], call: PersonCall) => Promise<unknown>;
 const DOCUMENT_SIZE = { w: 1000, h: 1100 };
 
 /** The person's verbs (`@decks/api`, `PERSON_VERBS`), each run against the harness itself. */
-export function personTable(app: App): Record<string, Impl> {
+/** What the person's own calls need: the harness whole, since they are its settings, its accounts and its doors. */
+export type PersonHost = App;
+
+export function personTable(app: PersonHost): Record<string, Impl> {
 	const agents = () => app.agents;
 	const pens = () => app.stage.pens;
 	const need = (id: unknown): DeckAgent => {

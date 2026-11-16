@@ -6,7 +6,7 @@
 		"server folder pairs that import each other": 15,
 		"imports across packages by relative path": 6,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 24
+		"server imports that point up a layer": 23
 	},
 	"upward": [
 		"apps/server/src/agents/agent-state.ts -> apps/server/src/calls/tool.ts",
@@ -18,7 +18,6 @@
 		"apps/server/src/calls/person-table.ts -> apps/server/src/app.ts",
 		"apps/server/src/calls/person-table.ts -> apps/server/src/routes/shared.ts",
 		"apps/server/src/calls/person-table.ts -> apps/server/src/ws.ts",
-		"apps/server/src/calls/router.ts -> apps/server/src/app.ts",
 		"apps/server/src/deck/loader.ts -> apps/server/src/cards/size.ts",
 		"apps/server/src/docs/writers.ts -> apps/server/src/agents/acts.ts",
 		"apps/server/src/http.ts -> apps/server/src/app.ts",
