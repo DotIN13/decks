@@ -168,6 +168,10 @@ function drawingSocket(origin: string, token: () => string, canvas: string, tell
 			const heard = drawingHeard(canvas, name, payload);
 			if (heard) tell(heard);
 		},
+		// Back after a drop with no revision held yet (the frame not following): nothing can be replayed, so read whole.
+		onState: (open, again) => {
+			if (open && again && since() === undefined) tell({ type: "reconnected" });
+		},
 	});
 }
 

@@ -132,3 +132,26 @@ test("a change that arrives while the frame boots is held, then applied once it 
 	assert.deepEqual(applied, [1]);
 	assert.equal(follower.rev(), 6);
 });
+
+test("a drop before the frame follows is read whole once it does, since nothing could be replayed", () => {
+	mock.timers.enable({ apis: ["setTimeout"] });
+	try {
+		FakeSocket.all = [];
+		(globalThis as { WebSocket?: unknown }).WebSocket = FakeSocket;
+		const backend = createBackend("http://127.0.0.1:4329/compat", "plan", "t1", "http://127.0.0.1:4329/api/t/p/card/");
+		void backend.drawing().catch(() => undefined);
+		const ws = FakeSocket.all.find((one) => one.url.pathname === "/api/v1/socket")!;
+		ws.open();
+		ws.hello();
+		ws.close();
+		mock.timers.tick(600);
+		const again = FakeSocket.all.filter((one) => one.url.pathname === "/api/v1/socket").at(-1)!;
+		again.open();
+		again.hello();
+		const heard: Heard[] = [];
+		backend.follow((message) => heard.push(message), () => 3);
+		assert.equal(heard.at(-1)?.type, "reconnected");
+	} finally {
+		mock.timers.reset();
+	}
+});
