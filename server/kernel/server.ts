@@ -1,9 +1,9 @@
 import { stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { PROTOCOL_VERSION } from "../../protocol/index.ts";
 import { LOCAL_PERSON } from "./callers.ts";
 import { FolderDeck } from "./deck.ts";
-import { folderStores, folderVersion } from "./disk.ts";
+import { FolderStore, folderStores, folderVersion } from "./disk.ts";
 import { listen, type Served } from "./doors/http.ts";
 import { folderRunner } from "./run.ts";
 import { buildKernel, type Built } from "./kernel.ts";
@@ -27,7 +27,7 @@ export async function startServer(options: ServerOptions): Promise<Running> {
 	if (!(await stat(root).then((s) => s.isDirectory(), () => false))) throw new Error(`${root} is not a folder.`);
 	await checkLock(root);
 	const deck = new FolderDeck(root, options.clock);
-	const built = await buildKernel({ deck, stores: folderStores(root), version: folderVersion(root), run: folderRunner(root), features: options.features, ...(options.clock ? { clock: options.clock } : {}) });
+	const built = await buildKernel({ deck, stores: folderStores(root), version: folderVersion(root), old: new FolderStore(join(root, ".decks")), run: folderRunner(root), features: options.features, ...(options.clock ? { clock: options.clock } : {}) });
 	let served: Served;
 	try {
 		served = await listen(built, options.port, options.host);

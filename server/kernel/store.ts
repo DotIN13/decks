@@ -1,8 +1,8 @@
 import type { Bytes, Store, VersionFile } from "./types.ts";
 
 // A feature's private state kept in memory, for tests (the folder's is in
-// disk.ts), with readJson and writeJson for any store, and a version record
-// kept in memory. A key is any string; prefix filters keys().
+// disk.ts), with readJson and writeJson for any store, a version record kept
+// in memory, and a store an upgrade may only read. Keys are any string.
 
 /** Every feature's store, made once per name. */
 export type Stores = (feature: string) => Store;
@@ -52,4 +52,17 @@ export function writeJson(store: Store, key: string, value: unknown): Promise<vo
 export function memoryVersion(text?: string): VersionFile {
 	const kept = { text };
 	return { read: async () => kept.text, write: async (next) => void (kept.text = next) };
+}
+
+/** A store that may be read freely and written only under backups/: today's .decks/ for an upgrade. */
+export function readMostly(store: Store): Store {
+	const refuse = (key: string) => {
+		if (!key.startsWith("backups/")) throw new Error(`An upgrade writes today's leftovers only under backups/, not ${key}.`);
+	};
+	return {
+		get: (key) => store.get(key),
+		keys: (prefix) => store.keys(prefix),
+		put: async (key, bytes) => (refuse(key), store.put(key, bytes)),
+		delete: async (key) => (refuse(key), store.delete(key)),
+	};
 }

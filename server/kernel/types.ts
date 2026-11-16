@@ -24,7 +24,7 @@ export interface Feature {
 	/** Calls this feature declares itself, beside the protocol's (Studio's own); checked the same way. */
 	declares?: AnyCall[];
 	/** Brings an old deck up to date, run in feature order before any start. */
-	upgrade?(deck: Deck, version: VersionFile): Promise<void>;
+	upgrade?(deck: Deck, version: VersionFile, parts: UpgradeParts): Promise<void>;
 }
 
 /** Declare a feature: its name, its handled calls, its item kinds, its start. */
@@ -133,6 +133,10 @@ export interface Deck {
 	/** Write the file back as it was at a revision, as a new revision. */
 	restore?(path: DeckPath, rev: number, by: Caller): Promise<Revision>;
 }
+
+/** What an upgrade reaches beside the deck: every feature's store, and today's .decks/ leftovers,
+ *  read freely and written only under backups/. */
+export type UpgradeParts = { stores: (feature: string) => Store; old: Store };
 
 /** The deck's version record: exactly .decks/migrations.json, as text. */
 export interface VersionFile {

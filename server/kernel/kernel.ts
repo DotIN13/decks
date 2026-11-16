@@ -7,14 +7,14 @@ import { HistoryDeck } from "./history.ts";
 import { ownFeature } from "./own-calls.ts";
 import { Relay } from "./relay.ts";
 import { declaredOf, Router, handledOf, type MakeContext } from "./router.ts";
-import { memoryVersion, readJson, writeJson, type Stores } from "./store.ts";
+import { MemoryStore, memoryVersion, readJson, readMostly, writeJson, type Stores } from "./store.ts";
 import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Store, VersionFile } from "./types.ts";
 
 // Builds the kernel from a deck, a store per feature and the features: the
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
 
-export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string; run?: Kernel["run"] };
+export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string; run?: Kernel["run"]; old?: Store };
 
 export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; replay(canvas: string, since: number): ReturnType<NonNullable<CanvasSource["replay"]>> | undefined; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
@@ -56,7 +56,8 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const declared = declaredOf(features);
 	const router: Router = new Router(handledOf(features, declared), makeContext, options.checkAnswers ?? false, (name, args, caller) => relay.forward(name, args, caller), declared);
 	const version = options.version ?? memoryVersion();
-	for (const one of features) await one.upgrade?.(history, version);
+	const parts = { stores: options.stores, old: readMostly(options.old ?? new MemoryStore()) };
+	for (const one of features) await one.upgrade?.(history, version, parts);
 	const stops: Stop[] = [];
 	for (const one of features) {
 		const stop = await one.start?.(kernel);

@@ -23,3 +23,28 @@ test("the kernel gives a machine folder and a deck id that stays across starts",
 		await machine.remove();
 	}
 });
+
+test("an upgrade reads today's leftovers, backs them up, and writes a feature's store before it starts", async () => {
+	const { MemoryStore, readJson, writeJson } = await import("./store.ts");
+	const { defineFeature } = await import("./types.ts");
+	const old = new MemoryStore();
+	await writeJson(old, "agents/a1/meta.json", { name: "Ann" });
+	let seen: unknown;
+	const feature = defineFeature({
+		name: "people",
+		calls: [],
+		async upgrade(_deck, _version, parts) {
+			const meta = await readJson(parts.old, "agents/a1/meta.json", {});
+			await writeJson(parts.old, "backups/agents/a1/meta.json", meta);
+			await writeJson(parts.stores("people"), "agents/a1", meta);
+			await assert.rejects(writeJson(parts.old, "agents/a1/meta.json", {}), /only under backups/);
+		},
+		async start(kernel) {
+			seen = await readJson(kernel.store("people"), "agents/a1", undefined);
+		},
+	});
+	const server = await testServer({ features: [feature], old });
+	assert.deepEqual(seen, { name: "Ann" });
+	assert.deepEqual(await readJson(old, "backups/agents/a1/meta.json", undefined), { name: "Ann" });
+	await server.close();
+});
