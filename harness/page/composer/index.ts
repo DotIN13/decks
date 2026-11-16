@@ -1,6 +1,8 @@
 // The composer's entry: what the shell mounts, and the names Studio imports as @decks/agent-ui/composer.
 export * from "./bar/view.tsx";
 export * from "./bar/model.ts";
+export * from "./bar/sending.ts";
+export * from "./bar/destination.ts";
 export * from "./draft/view.tsx";
 export * from "./draft/model.ts";
 export * from "./draft/mention.ts";

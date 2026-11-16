@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { withComments } from "../../markup/comments.ts";
 import { draftForAgent, draftComments, fileMention, type Draft, type DraftMention } from "../draft/model.ts";
-import { withoutName } from "../../app/send-from-bar.ts";
+import { withoutName } from "../bar/destination.ts";
 import { commentPill } from "./about.ts";
 import { aboutSent, messageParts, readParts, readSent } from "./sent.ts";
 import { card, drawn, handed, item, itemName, longTitle, mine, titleOf } from "./sample-comments.ts";
