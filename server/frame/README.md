@@ -30,6 +30,10 @@ The kernel and the protocol through their entries. No other feature.
 4. The page and its assets are public: an iframe and a module script send no token. Nothing on
    them reads the deck.
 
+5. A pass is held to its canvas on every door (`guard.ts`, on the kernel's guard): it makes only the frame's
+   own calls and the card set (`callsFor("card")`), names no other canvas, and reaches files and cards only
+   in its canvas's folder, the deck's shared roots, or a document its drawing places.
+
 ## Check
 
 ```

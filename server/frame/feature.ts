@@ -1,5 +1,6 @@
 // The canvas page clients frame, and the pass its frame calls with.
 import { defineFeature, type Feature, type Kernel } from "../kernel/index.ts";
+import { passGuard } from "./guard.ts";
 import { Passes, type PassTokens } from "./passes.ts";
 import { passFilesRoute, passRoute } from "./routes.ts";
 import { DIST, staticRoutes } from "./static.ts";
@@ -17,7 +18,7 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 		return kernel;
 	};
 	const tokens: PassTokens = {
-		issue: (who, label) => started().callers.issue(who, label),
+		issue: (who, label, scope) => started().callers.issue(who, label, scope),
 		forget: (token) => started().callers.forget!(token),
 	};
 	const passes = new Passes(tokens, options.clock, options.passMs ?? (Number(process.env.DECKS_PASS_MS) || undefined));
@@ -27,6 +28,7 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 		routes: [...(options.page === false ? [] : staticRoutes(options.dist ?? DIST)), passRoute(passes), passFilesRoute(passes, () => kernel?.url())],
 		start(k) {
 			kernel = k;
+			k.guard(passGuard(() => kernel));
 		},
 	});
 }

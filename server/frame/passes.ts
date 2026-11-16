@@ -1,10 +1,16 @@
 // Canvas passes (README rule 2): a kernel token for the asker on one canvas, an hour long,
 // kept in memory; revoked when it runs out. Its id is <asker id>~frame-<n>, so a guard reads who.
 // A renewal keeps its pass's id, so the frame's socket takes the new token as the same caller.
-import type { Caller } from "../../protocol/index.ts";
+import { callsFor, type Caller } from "../../protocol/index.ts";
 import type { Tokens } from "../kernel/index.ts";
 
 export const PASS_MS = 3_600_000;
+
+/** What the frame itself calls, beyond the card set: its presence, its answers to view calls, the cards it lists, its drawing. */
+export const FRAME_OWN: readonly string[] = ["view.update", "view.answer", "card.list", "canvas.drawing"];
+
+/** Every call a pass may make: the card set and the frame's own (its Scope's calls). */
+export const PASS_CALLS: readonly string[] = [...new Set([...callsFor("card"), ...FRAME_OWN])].sort();
 
 /** Whether a caller id is a canvas pass's: <asker id>~frame-<n>. */
 export const isPass = (id: string): boolean => /(^|~)frame-/.test(id);
@@ -25,8 +31,9 @@ export class Passes {
 	 */
 	issue(canvas: string, asker: Caller, renewing?: string): { pass: string; expires: number } {
 		const id = this.renewedId(canvas, asker, renewing) ?? this.freshId(asker);
-		const pass = this.tokens.issue({ kind: asker.kind, id, name: asker.name, canvas }, `canvas pass for ${canvas}`);
 		const expires = this.clock() + this.life;
+		// Its Scope holds it to its canvas and the frame's calls on every door, and ends it at expires even across a restart.
+		const pass = this.tokens.issue({ kind: asker.kind, id, name: asker.name, canvas }, `canvas pass for ${canvas}`, { canvas, calls: [...PASS_CALLS], until: expires });
 		this.held.set(pass, { canvas, id, expires });
 		setTimeout(() => this.end(pass), this.life).unref?.();
 		return { pass, expires };
