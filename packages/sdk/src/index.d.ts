@@ -2,7 +2,7 @@
 /**
  * Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own
  * pen.dev fields and its `box`. A card is { type: "card", card: <path>, width? }, or { type:
- * "card", html, title? } to write one; an old board reads as { type: "board", board: <path> }.
+ * "card", html, title? } to write one.
  */
 export type Item = { type: string; id?: string; card?: string; html?: string; title?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
 /** A box on a canvas: both corners, so an edge is never a sum. */
@@ -93,17 +93,16 @@ export interface Verbs {
 		 * Everything on the canvas, cards included, each with its box; an item cut by a frame round it that
 		 * clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside), as
 		 * does a text whose words overflow its fixed width and height. A card is { type: "card", card:
-		 * <path>, box } (an old board, { type: "board", board }); every other item has pen.dev's own
-		 * fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its
-		 * items in its own space; this and the item calls below take `frame` in place of `canvas`, and a
-		 * change to a frame shows on every canvas placing it. `of` (an id, a card's path, or an id inside
-		 * an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that
-		 * many levels of children (0: the items alone), and an item whose children were left out says how
-		 * many in `childCount`. `resolve` works values out instead of reading them as written, each off by
-		 * default: `variables` puts each $name's value in, for the light theme or `theme` ({ mode: "dark"
-		 * }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children`
-		 * with ids "ref/child"; `geometry` adds a path's or shape's `outline`, an SVG path in its own space
-		 * (0,0 its top-left corner).
+		 * <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
+		 * `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the
+		 * item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas
+		 * placing it. `of` (an id, a card's path, or an id inside an instance such as "card-1/label") reads
+		 * that one item and what is in it; `depth` keeps that many levels of children (0: the items alone),
+		 * and an item whose children were left out says how many in `childCount`. `resolve` works values
+		 * out instead of reading them as written, each off by default: `variables` puts each $name's value
+		 * in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its expanded
+		 * copy, overrides applied, its items under `children` with ids "ref/child"; `geometry` adds a
+		 * path's or shape's `outline`, an SVG path in its own space (0,0 its top-left corner).
 		 */
 		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; values?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**

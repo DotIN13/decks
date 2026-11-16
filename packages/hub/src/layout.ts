@@ -4,26 +4,29 @@
  *     deck/
  *       canvases/<name>/                 a canvas, standing alone
  *         canvas.pen  canvas.json
- *         boards/  frames/  files/       its own boards, frames, and the pictures and files they use
+ *         cards/  frames/  files/        its own cards, frames, and the pictures and files they use
  *       shared/canvases/<owner>/<name>/  a canvas a friend shared, the same shape
  *       assets/  docs/  apps/            the deck's own, which a canvas points at by their deck path
- *       boards/                          the library: boards on no canvas, read only
- *       lib/                             the board runtime, served beside every canvas's boards/
+ *       lib/                             the card runtime, served beside every canvas's cards/
  *
- * A canvas's drawing and its boards may point at its own folder, at the deck's `assets/`, `docs/`
- * and `apps/` by their deck path, and at web addresses and icons. Not at another canvas, the
- * library or the old `frames/`, nothing outside the deck, no hidden folder and no `..` past the
- * deck: placing a board from somewhere else copies it in (`stage/pens.ts`).
+ * A card is the only page there is: `cards/<name>/index.html` in a canvas's folder, with what it
+ * keeps beside it. A deck from before cards may still hold a `boards/` folder, at its root or in a
+ * canvas: those are plain files now, listed nowhere and shown on no canvas.
  *
- * Inside the harness a board is still named by its deck path (`canvases/plan/boards/a.html`), as
- * every record, picture and route always named it. A canvas's drawing names its boards relative
- * to its own folder (`boards/a.html`), so the folder can be copied anywhere whole; the drawing is
- * read and written through `resolveReference` and `referenceFor`, which turn one into the other.
+ * A canvas's drawing and its cards may point at its own folder, at the deck's `assets/`, `docs/`
+ * and `apps/` by their deck path, and at web addresses and icons. Not at another canvas or the old
+ * `frames/`, nothing outside the deck, no hidden folder and no `..` past the deck: placing a card
+ * from another canvas copies it in (`stage/pens.ts`).
+ *
+ * Inside the harness a card is named by its deck path (`canvases/plan/cards/a/index.html`), as
+ * every record, picture and route names it. A canvas's drawing names its cards relative to its own
+ * folder (`cards/a/index.html`), so the folder can be copied anywhere whole; the drawing is read
+ * and written through `resolveReference` and `referenceFor`, which turn one into the other.
  *
  * A friend's canvas is named `shared/<owner>/<canvas>` inside the harness, and lives in
  * `shared/canvases/<owner>/<canvas>/`. What it points at in the owner's deck (`assets/…`, `docs/…`)
  * came with it, mirrored at the same paths inside its folder, so it reads its own copy and never
- * this deck's. The owner's apps did not come: an app board shows its picture there.
+ * this deck's. The owner's apps did not come: an app item shows its picture there.
  */
 
 /** Where a deck keeps its canvases, where a friend's land, and what a canvas's own folder holds besides its drawing. */
@@ -158,9 +161,10 @@ export function resolveReference(name: string, reference: string): Resolution {
 }
 
 /**
- * The reference a canvas writes for a deck path, the other way round: `canvases/plan/boards/a.html`
- * on `plan` is `boards/a.html`. Refused for a path the canvas may not point at; a board from another
- * canvas or the library is copied in first (`stage/pens.ts`), and then has a reference here.
+ * The reference a canvas writes for a deck path, the other way round:
+ * `canvases/plan/cards/a/index.html` on `plan` is `cards/a/index.html`. Refused for a path the canvas
+ * may not point at; a card from another canvas is copied in first (`stage/pens.ts`), and then has a
+ * reference here.
  */
 export function referenceFor(name: string, deckPath: string): Resolution {
 	const clean = deckPath.split("\\").join("/").replace(/^\/+/, "");
@@ -208,15 +212,6 @@ export function servedAs(path: string): Resolution {
 	}
 	if ((DECK_PARTS as readonly string[]).includes(top!)) return { path: `${top}/${rest.join("/")}` };
 	return { path };
-}
-
-/** Whether a deck path is a page: a card in a canvas's own `cards/`, or an old board in its `boards/` or the library. */
-export function isPagePath(path: string): boolean {
-	const clean = path.split("\\").join("/").replace(/^\/+/, "");
-	if (!/\.x?html?$/i.test(clean) || clean.includes("\0")) return false;
-	if (/^boards\//.test(clean)) return true;
-	const at = canvasOfPath(clean);
-	return !!at && (at.rest.startsWith("boards/") || isCardPath(clean));
 }
 
 /**

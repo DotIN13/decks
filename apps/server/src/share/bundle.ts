@@ -1,6 +1,7 @@
 import { CANVAS_FILE } from "../stage/canvas-files.ts";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
+import { isCardPath } from "@decks/hub/layout";
 import type { Page } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import type { ThumbScheme } from "../pictures/ladder.ts";
@@ -11,11 +12,11 @@ import { zip, type ZipEntry } from "./zip.ts";
  *
  * The zip holds two folders and a manifest:
  *
- * - `deck/` is files as they sit in the deck, at their deck paths: the stage's folder, the cards on
- *   it (an old board goes as its file, as the harness serves it), every file those name by a relative
- *   path, and the whole of `lib/`, since the card runtime and styles are there.
- * - `pictures/` is each board's whole picture in both schemes, so the canvas has something to draw
- *   for a board before its page is opened, which is what it always draws first.
+ * - `deck/` is files as they sit in the deck, at their deck paths: the canvas's folder, the cards on
+ *   it, every file those name by a relative path, and the whole of `lib/`, since the card runtime
+ *   and styles are there.
+ * - `pictures/` is each card's whole picture in both schemes, so the canvas has something to draw
+ *   for a card before it is opened, which is what it always draws first.
  *
  * Nothing from the agents is in it: no transcript, no settings, no other stage. The manifest is
  * the greeting a server would have sent (`App.greet`), cut to the frames a reader needs.
@@ -152,7 +153,7 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 	}
 	const onStage = new Set(boards.map((board) => board.path));
 
-	// Boards, and what they name, one level of CSS deep: a stylesheet's own `url()`s are fonts and pictures.
+	// Cards, and what they name, one level of CSS deep: a stylesheet's own `url()`s are fonts and pictures.
 	const queue: string[] = [];
 	for (const board of boards) {
 		if (isFile(join(deckPath, board.path))) {
@@ -172,8 +173,8 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 			continue;
 		}
 		for (const target of referencesOf(deckPath, file, text)) {
-			// Another board is a link to open beside this one, not a part of it: only the canvas's own come along.
-			if (/^(?:boards|stages\/[^/]+\/boards)\//.test(target) && /\.x?html?$/i.test(target) && !onStage.has(target)) continue;
+			// Another card is a link to open beside this one, not a part of it: only the canvas's own come along.
+			if (isCardPath(target) && !onStage.has(target)) continue;
 			if (files.has(target)) continue;
 			files.add(target);
 			if (/\.css$/i.test(target) || /\.svg$/i.test(target)) queue.push(target);

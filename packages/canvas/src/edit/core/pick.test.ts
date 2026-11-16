@@ -24,7 +24,7 @@ const stage = (): FakeItem[] => [
 	{ id: "line", type: "path", box: { x: 400, y: 800, w: 200, h: 2 }, line: false },
 	{ id: "line2", type: "path", box: { x: 400, y: 900, w: 200, h: 2 }, line: true },
 	{ id: "ref/inside", box: { x: 1100, y: 0, w: 50, h: 50 } },
-	{ id: "board", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.board") },
+	{ id: "board", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.card") },
 ];
 
 test("a press picks exactly what is under it: the item in a frame in a group, the frame's padding, the group's gap", () => {
@@ -138,7 +138,7 @@ test("a board's picture: the last in file order, never one drawn as a page", () 
 });
 
 test("a marquee picks what is wholly inside it, leaving children of a picked parent to it", () => {
-	const scene = fakeScene(stage(), [{ path: "boards/x.html", x: 0, y: 1000, w: 100, h: 100 }]);
+	const scene = fakeScene(stage(), [{ path: "canvases/t/cards/x/index.html", x: 0, y: 1000, w: 100, h: 100 }]);
 	assert.deepEqual(marqueeRect({ x1: 100, y1: 50, x2: 10, y2: 80 }), { x: 10, y: 50, w: 90, h: 30 });
 	// Just the rectangle: its frame and group are not wholly inside.
 	assert.deepEqual(marqueePick(scene, { x: 5, y: 5, w: 60, h: 60 }), { items: ["r"], boards: [] });
@@ -149,7 +149,7 @@ test("a marquee picks what is wholly inside it, leaving children of a picked par
 	// A shape's parts are never picked by themselves, even with the shape outside.
 	assert.deepEqual(marqueePick(scene, { x: 510, y: 30, w: 80, h: 40 }).items, []);
 	// A card takes its blocks; an instance's inside and a board's node are left out; boards wholly inside are picked.
-	assert.deepEqual(marqueePick(scene, { x: -10, y: 490, w: 2000, h: 700 }), { items: ["card", "line", "line2"], boards: ["boards/x.html"] });
+	assert.deepEqual(marqueePick(scene, { x: -10, y: 490, w: 2000, h: 700 }), { items: ["card", "line", "line2"], boards: ["canvases/t/cards/x/index.html"] });
 	assert.deepEqual(marqueePick(scene, { x: 1090, y: -10, w: 200, h: 100 }).items, []);
 });
 

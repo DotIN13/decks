@@ -39,46 +39,16 @@ export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string
 ];
 
 /**
- * A card on a canvas, or an old board a canvas still holds (a friend's, drawn as its picture): its file, its
- * place and size, and what the canvas marks on it.
+ * A card on a canvas (or a document or an app item, drawn in a card's place): its file, its place and
+ * size, and what the canvas marks on it.
  */
 export interface Page {
-	/** Deck-relative, forward slashes on every platform: "boards/plan.html". */
+	/** Deck-relative, forward slashes on every platform: "canvases/plan/cards/q3/index.html". */
 	path: string;
 	title: string;
 	/**
-	 * How the frame has to be *given* this board, when the file is not a document already.
-	 *
-	 * Absent for a board this app wrote: it is a complete document already. Present for a
-	 * file that has to be rendered *into* one — `content`, which is a `.md` — and for `foreign`,
-	 * an HTML page from somewhere else, which gets a document too and is put in a sandboxed
-	 * frame inside it because it may carry scripts.
-	 *
-	 * On the wire because the browser sizes on it: a sandboxed page cannot be measured from
-	 * outside, so that one board keeps the height in its file where every other board
-	 * reports its own.
-	 */
-	shell?: "content" | "foreign";
-	/**
-	 * What this board is a live view of, when it is one: `web` for the
-	 * shared-Chrome card, `agents` for an orchestration board.
-	 *
-	 * Read off the file's own `data-live` attribute — a cheap source scan — because the board
-	 * that draws itself from `postMessage` has no content of its own to look at. On the wire because two decisions depend on it and both are the
-	 * app's: a live board has nothing to open in a tab (there is no app in a bare tab to feed
-	 * it), and nothing to fill a window with.
-	 */
-	live?: string;
-	/**
-	 * The board is one box filling it, a document or a single file, so it can be laid out at any size.
-	 *
-	 * The focus view reads it: a board like this takes the whole work area at its own scale and its own
-	 * bar becomes the view's header, where any other board is a designed page that is scaled to the width.
-	 */
-	fills?: true;
-	/**
 	 * A card: a piece of HTML in a canvas's `cards/`, drawn in a shadow root of the stage's own page
-	 * instead of a frame (`card.ts`). Every other rule of a board holds for it.
+	 * instead of a frame (`card.ts`). Every page that is a file is one.
 	 */
 	card?: true;
 	/**

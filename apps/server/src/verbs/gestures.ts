@@ -36,7 +36,6 @@ export function gestures(ctx: VerbContext): Gestures {
 		 * - **The canvas first, then the file.** The file's write is what the canvas on screen waits for
 		 *   to let go of the box it was dragged to, and it reads the card's size there from the canvas:
 		 *   the other way round, a card made shorter came back at its old height for a moment.
-		 * - A card that fills its frame has no size in its file to write.
 		 */
 		resize: async (path: string, size: { w?: number; h?: number }) => {
 			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
@@ -49,7 +48,7 @@ export function gestures(ctx: VerbContext): Gestures {
 			if (w === undefined && h === undefined) throw new Error("A resize needs a width, a height, or both, as numbers");
 			const sized = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
 			agent.sized?.(path, { w: w ?? file.w, h: h ?? file.h });
-			if (!file.fills && ((w !== undefined && w !== file.w) || (h !== undefined && h !== file.h))) service.resize(path, sized);
+			if ((w !== undefined && w !== file.w) || (h !== undefined && h !== file.h)) service.resize(path, sized);
 			if (agent.person) service.wrote(path, "you");
 			else agent.acted?.("resize", path);
 			service.announce(agent.id, path);

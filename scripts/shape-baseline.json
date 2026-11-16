@@ -6,7 +6,7 @@
 		"server folder pairs that import each other": 15,
 		"imports across packages by relative path": 6,
 		"\"one release\" notes": 0,
-		"server imports that point up a layer": 29
+		"server imports that point up a layer": 28
 	},
 	"upward": [
 		"apps/server/src/agents/agent-state.ts -> apps/server/src/stage/tool.ts",
@@ -24,7 +24,6 @@
 		"apps/server/src/routes/mcp.ts -> apps/server/src/app.ts",
 		"apps/server/src/routes/shared.ts -> apps/server/src/app.ts",
 		"apps/server/src/runtimes/pi/extension.ts -> apps/server/src/stage/tool.ts",
-		"apps/server/src/stage/copy-in.ts -> apps/server/src/migrations/2026-10-29-boards-to-cards.ts",
 		"apps/server/src/stage/pens.ts -> apps/server/src/agents/canvas-news.ts",
 		"apps/server/src/stage/pens.ts -> apps/server/src/agents/slug.ts",
 		"apps/server/src/stage/pens.ts -> apps/server/src/migrations/index.ts",

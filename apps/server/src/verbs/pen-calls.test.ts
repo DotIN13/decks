@@ -2,11 +2,18 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /**
  * The calls borrowed from pen.dev's drawing API, end to end over `/api/v1`: ids from names,
@@ -21,7 +28,7 @@ async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-pen-calls-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "a.html"), board("Revenue is up"));
+	put(join(deck, "canvases", "t", "cards", "a", "index.html"), board("Revenue is up"));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -97,12 +104,12 @@ test("a field pen has no place for, or one Decks does not draw, is a note and ne
 test("canvas.read of one item, by id or a board's path, and to a depth", async () => {
 	const { must, call, cleanup } = await open();
 	try {
-		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }]);
 		await must("canvas.insert", [{ type: "frame", name: "Panel", layout: "none", width: 300, height: 200, children: [{ type: "frame", name: "Row", layout: "none", width: 100, height: 40, children: [{ type: "text", name: "Cell", content: "x" }] }] }, { at: { x1: 0, y1: 600 } }]);
 		const panel = (await must("canvas.read", [{ of: "panel" }])).value;
 		assert.deepEqual(panel.items.map((n: { id: string }) => n.id), ["panel"]);
 		assert.equal(panel.items[0].children[0].children[0].id, "cell");
-		const board = (await must("canvas.read", [{ of: "boards/a.html" }])).value.items;
+		const board = (await must("canvas.read", [{ of: "canvases/t/cards/a/index.html" }])).value.items;
 		assert.equal(board.length, 1);
 		assert.equal(board[0].type, "card", "a library board lands as a card");
 		const top = (await must("canvas.read", [{ depth: 0 }])).value.items;
@@ -171,10 +178,10 @@ test("an item read and written back keeps none of what the read added", async ()
 test("canvas.space finds room near an item or the middle, and places nothing", async () => {
 	const { must, call, cleanup } = await open();
 	try {
-		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }]);
 		await must("canvas.insert", [{ type: "rectangle", name: "Block", width: 500, height: 500 }, { at: { x1: 1100, y1: 100 } }]);
 		const before = (await must("canvas.read")).value.items.length;
-		assert.deepEqual((await must("canvas.space", [{ w: 300, h: 200 }, { near: "boards/a.html" }])).value, { x1: 1760, y1: 0 });
+		assert.deepEqual((await must("canvas.space", [{ w: 300, h: 200 }, { near: "canvases/t/cards/a/index.html" }])).value, { x1: 1760, y1: 0 });
 		assert.deepEqual((await must("canvas.space", [{ w: 300, h: 200 }, { near: "block", side: "below", margin: 40 }])).value, { x1: 1100, y1: 640 });
 		const free = (await must("canvas.space", [{ w: 100, h: 100 }])).value;
 		assert.equal(typeof free.x1, "number");

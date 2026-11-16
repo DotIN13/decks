@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
 import { placeBy, toItem } from "./canvas.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /**
  * The calls of the SDK redesign, end to end over `/api/v1`: a board as a canvas item, beside and
@@ -22,8 +29,8 @@ async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-redesign-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "a.html"), board("Revenue is up"));
-	writeFileSync(join(deck, "boards", "b.html"), board("Costs are flat", 600, 300));
+	put(join(deck, "canvases", "t", "cards", "a", "index.html"), board("Revenue is up"));
+	put(join(deck, "canvases", "t", "cards", "b", "index.html"), board("Costs are flat", 600, 300));
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const server = createHttpApp(app).listen(0, "127.0.0.1");
 	await new Promise((done) => server.once("listening", done));
@@ -61,9 +68,9 @@ test("beside and below sit 160 px clear, tops or lefts aligned", () => {
 	assert.deepEqual(placeBy({ x: 100, y: 50, w: 900, h: 400 }, "below"), { x1: 100, y1: 610 });
 });
 
-test("a pen browser item tagged decks.board reads as a board item, and other items as they are", () => {
-	const item = toItem({ type: "browser", id: "a", name: "Revenue is up", url: "../../boards/a.html", width: 900, height: 400, metadata: { type: "decks.board", path: "boards/a.html" }, box: { x1: 0, y1: 0, x2: 900, y2: 400 } });
-	assert.deepEqual(item, { type: "board", id: "a", width: 900, height: 400, box: { x1: 0, y1: 0, x2: 900, y2: 400 }, board: "boards/a.html", title: "Revenue is up" });
+test("a pen browser item tagged decks.card reads as a card item, and other items as they are", () => {
+	const item = toItem({ type: "browser", id: "a", name: "Revenue is up", url: "../../boards/a.html", width: 900, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/a/index.html" }, box: { x1: 0, y1: 0, x2: 900, y2: 400 } });
+	assert.deepEqual(item, { type: "card", id: "a", width: 900, height: 400, box: { x1: 0, y1: 0, x2: 900, y2: 400 }, card: "canvases/t/cards/a/index.html", title: "Revenue is up" });
 	assert.deepEqual(toItem({ type: "note", id: "n", content: "hi" }), { type: "note", id: "n", content: "hi" });
 	// A browser item that is not a deck board stays pen's own.
 	assert.equal(toItem({ type: "browser", id: "w", url: "https://example.com" }).type, "browser");
@@ -74,35 +81,35 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 	try {
 		const here = (await must("here")).value;
 		assert.ok(here.name, "an agent always has a canvas here");
-		const put = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value;
+		const put = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }])).value;
 		assert.equal(put.type, "card");
-		// A board from the library is copied into the canvas as a card, and is the canvas's copy from then on (`stage/copy-in.ts`).
+		// A card of another canvas is copied into this one, and is this canvas's copy from then on (`stage/copy-in.ts`).
 		const a = `canvases/${here.name}/cards/a/index.html`;
 		const b = `canvases/${here.name}/cards/b/index.html`;
 		assert.equal(put.card, a);
-		assert.ok(app.deck.board("boards/a.html"), "the library keeps its own");
+		assert.ok(app.deck.board("canvases/t/cards/a/index.html"), "the other canvas keeps its own");
 		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
 		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
 		const node = file.children.find((one: { id: string }) => one.id === put.id);
 		assert.equal(node.type, "browser");
 		assert.deepEqual(node.metadata, { type: "decks.card", path: "cards/a/index.html" });
 
-		const next = (await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: "boards/a.html" }])).value;
+		const next = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/b/index.html" }, { beside: "canvases/t/cards/a/index.html" }])).value;
 		assert.deepEqual(next.box, { x1: 1060, y1: 0, x2: 1660, y2: 300 }, "beside a board named by its path");
-		const note = (await must("canvas.insert", [{ type: "note", id: "n1", content: "Why?" }, { below: "boards/a.html" }])).value;
+		const note = (await must("canvas.insert", [{ type: "note", id: "n1", content: "Why?" }, { below: "canvases/t/cards/a/index.html" }])).value;
 		assert.equal(note.box.x1, 0);
 		assert.equal(note.box.y1, 560, "below works for a note too");
 
-		const moved = (await must("canvas.move", ["boards/b.html", { below: "n1" }])).value;
+		const moved = (await must("canvas.move", ["canvases/t/cards/b/index.html", { below: "n1" }])).value;
 		assert.equal(moved.box.x1, 0, "and a board below a note");
-		const sized = (await must("canvas.update", ["boards/a.html", { size: { w: 1000 } }])).value;
+		const sized = (await must("canvas.update", ["canvases/t/cards/a/index.html", { size: { w: 1000 } }])).value;
 		assert.equal(sized.box.x2 - sized.box.x1, 1000);
 
-		const again = await call("canvas.insert", [{ type: "board", board: "boards/a.html" }]);
+		const again = await call("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }]);
 		assert.equal(again.ok, false);
 		assert.match(again.error!, /already on this canvas/);
-		const missing = await call("canvas.insert", [{ type: "board", board: "boards/nope.html" }]);
-		assert.match(missing.error!, /no board boards\/nope\.html/);
+		const missing = await call("canvas.insert", [{ type: "card", card: "canvases/t/cards/nope/index.html" }]);
+		assert.match(missing.error!, /no card canvases\/t\/cards\/nope\/index\.html/);
 
 		const read = (await must("canvas.read")).value;
 		assert.equal(read.canvas, here.name);
@@ -112,7 +119,7 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		assert.equal(gone.deleted, b);
 		assert.ok(app.deck.board(b), "a board's file stays in the deck");
 		assert.deepEqual((await must("card.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's card is on that canvas, and only there");
-		assert.deepEqual((await must("card.canvases", ["boards/a.html"])).value.map((one: { card: string }) => one.card), [a], "the library's board says where it was copied");
+		assert.deepEqual((await must("card.canvases", ["canvases/t/cards/a/index.html"])).value, [], "the card it was copied from is on no canvas, and says so");
 		assert.deepEqual((await must("card.canvases", [b])).value, []);
 	} finally {
 		cleanup();
@@ -123,8 +130,8 @@ test("a batch is all or nothing, and a later op can be beside what an earlier on
 	const { must, call, cleanup } = await open();
 	try {
 		const made = (await must("canvas.batch", [[
-			{ op: "insert", item: { type: "board", board: "boards/a.html" }, at: { x1: 0, y1: 0 } },
-			{ op: "insert", item: { type: "note", id: "why", content: "Why?" }, beside: "boards/a.html" },
+			{ op: "insert", item: { type: "card", card: "canvases/t/cards/a/index.html" }, at: { x1: 0, y1: 0 } },
+			{ op: "insert", item: { type: "note", id: "why", content: "Why?" }, beside: "canvases/t/cards/a/index.html" },
 		]])).value;
 		assert.equal(made.length, 2);
 		assert.equal(made[1].box.x1, 1060);
@@ -146,7 +153,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		const other = (await must("canvas.create", ["Launch plan"])).value;
 		assert.equal(other.title, "Launch plan");
 		assert.notEqual(other.name, home);
-		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
 		assert.equal((await must("here")).value.name, home, "making and writing a canvas does not move you to it");
 		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { card?: string }) => one.card), [`canvases/${other.name}/cards/a/index.html`]);
 		assert.deepEqual((await must("canvas.read")).value.items, [], "your own canvas is untouched");
@@ -206,16 +213,16 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 	const { app, agent, as, must, cleanup } = await open();
 	try {
 		const other = app.agents.create({ name: "Rune" });
-		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", cards: ["boards/a.html"] }])).value;
+		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", cards: ["canvases/t/cards/a/index.html"] }])).value;
 		assert.deepEqual(queued, { queued: true, position: 1 });
 		const theirs = (await must("agent.inbox", [], as(other.id))).value;
 		assert.equal(theirs.length, 1);
 		assert.equal(theirs[0].task, "Read the plan");
 		assert.equal(theirs[0].from, agent.name);
-		assert.deepEqual(theirs[0].cards, ["boards/a.html"]);
+		assert.deepEqual(theirs[0].cards, ["canvases/t/cards/a/index.html"]);
 		assert.equal(theirs[0].boards, undefined, "no old field beside it");
-		await must("agent.queue", ["Rune", { task: "And this one", cards: ["boards/b.html"] }]);
-		assert.deepEqual((await must("agent.inbox", [], as(other.id))).value[1].cards, ["boards/b.html"]);
+		await must("agent.queue", ["Rune", { task: "And this one", cards: ["canvases/t/cards/b/index.html"] }]);
+		assert.deepEqual((await must("agent.inbox", [], as(other.id))).value[1].cards, ["canvases/t/cards/b/index.html"]);
 
 		const seen: string[] = [];
 		(other as unknown as { prompt: (text: string) => Promise<void> }).prompt = async (text: string) => {
@@ -275,8 +282,8 @@ test("an arrow joined at both ends goes between them, with no note to say where"
 	const { must, cleanup } = await open();
 	try {
 		// A placed board is copied into the canvas and has an id there; an arrow joins those ids.
-		const a = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value.id;
-		const b = (await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: a }])).value.id;
+		const a = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { at: { x1: 0, y1: 0 } }])).value.id;
+		const b = (await must("canvas.insert", [{ type: "card", card: "canvases/t/cards/b/index.html" }, { beside: a }])).value.id;
 		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: a, side: "right" }, to: { item: b, side: "left" } } }]);
 		assert.ok(!arrow.notes.some((note) => /say where/.test(note)), arrow.notes.join(" | "));
 		assert.ok(arrow.value.box.x1 >= 880 && arrow.value.box.x2 <= 1080, `between the boards: ${JSON.stringify(arrow.value.box)}`);
@@ -318,8 +325,8 @@ test("the item calls take a frame file instead of a canvas, and its change shows
 
 		const both = await call("canvas.read", [{ canvas: home, frame: "frames/card" }]);
 		assert.ok(!both.ok && /canvas or a frame, not both/.test(both.error ?? ""), both.error);
-		const board = await call("canvas.insert", [{ type: "board", board: "boards/a.html" }, { frame: "frames/card" }]);
-		assert.ok(!board.ok && /not boards/.test(board.error ?? ""), board.error);
+		const board = await call("canvas.insert", [{ type: "card", card: "canvases/t/cards/a/index.html" }, { frame: "frames/card" }]);
+		assert.ok(!board.ok && /not cards/.test(board.error ?? ""), board.error);
 		const notFrame = await call("canvas.read", [{ frame: `canvases/${home}/canvas.pen` }]);
 		assert.ok(!notFrame.ok && /not a frame/.test(notFrame.error ?? ""), notFrame.error);
 		const missing = await call("canvas.read", [{ frame: "frames/nope" }]);

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import type { NextFunction, Request, Response } from "express";
-import { isPagePath, SHARED_SANDBOX } from "@decks/hub/layout";
+import { SHARED_SANDBOX } from "@decks/hub/layout";
 import type { App } from "../app.ts";
 import type { Relay } from "../share/relay.ts";
 
@@ -18,20 +18,7 @@ export function asyncRoute(handler: (req: Request, res: Response) => Promise<voi
 }
 
 /**
- * Whether a deck-relative path is a board, as opposed to a file a board uses.
- *
- * Answered from the shape of the path rather than by asking the open deck, on
- * purpose: a board written a moment ago is on disk before the watcher has told the
- * deck about it, and a board served as an asset would lose the origin the editor
- * needs — a wrong answer that reads as "editing stopped working".
- */
-export function isBoardPath(requested: string): boolean {
-	// The library's `boards/`, or a canvas's own (`deck/layout.ts`): both are boards.
-	return isPagePath(requested);
-}
-
-/**
- * A friend's board, or anything else from a canvas shared with you, is someone else's page on your
+ * A friend's card, or anything else from a canvas shared with you, is someone else's page on your
  * machine: sent with a sandbox of its own, so it has a blank origin wherever it is opened, a frame or
  * a tab, and can reach nothing of the harness's (`deck/layout.ts`).
  */

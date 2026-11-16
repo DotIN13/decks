@@ -1,12 +1,10 @@
 import { BOARD_W } from "../cards/size.ts";
 /**
- * What a board says about itself, read from the top of the file.
+ * What a card says about itself, read from the top of its file: its title, its size and its poster.
  *
- * Deliberately regex and not a parser: this runs for every board on every deck
- * load and on every file change, and the three things it wants are in the head of
- * a document the agent just wrote. `parse5` earns its place where correctness is
- * load-bearing — applying a user's edit to the file (§6.5) — not here, where a
- * missing title costs a heading in the rail.
+ * Deliberately regex and not a parser: this runs for every card on every deck load and on every
+ * file change, and the three things it wants are at the top of a file the agent just wrote. A
+ * missing title costs a name in a list, not a wrong edit.
  */
 
 interface BoardMeta {
@@ -80,43 +78,14 @@ export function readBoardMeta(html: string): BoardMeta {
 }
 
 /**
- * The same document with a different size in it.
+ * The same card with a different size in it.
  *
- * Sizing a board is editing the one place that board keeps its size, which is exactly the kind of edit
- * an agent should not be doing by hand. For HTML it is JSON inside an attribute and the write has to
- * keep every other byte where it was. For markdown it is front-matter — and until this knew that, a
- * resize wrote a `<meta>` tag in above the `---`, where the front-matter parser stopped seeing it and
- * a reader saw the tag as text.
- *
- * Other keys are carried through, in either place: `bg`, `theme` and anything a later version adds to
- * the tag; `title` and the rest of the front-matter. A board with neither gets one, because
- * a board written by hand is still a board and refusing to resize it would be a rule about how it was
- * authored.
+ * Sizing a card is editing the one place it keeps its size, the JSON inside its `<meta name="card">`
+ * tag, and the write keeps every other byte where it was. Other keys of the tag are carried through.
+ * A card with no tag gets one, because a card written by hand is still a card.
  */
-export function withBoardSize(path: string, source: string, size: { w?: number; h?: number }): string {
-	if (!HTML_FILE.test(path)) return withFrontMatterWidth(source, size);
+export function withBoardSize(_path: string, source: string, size: { w?: number; h?: number }): string {
 	return withTagSize(source, size, BOARD_W);
-}
-
-/**
- * A markdown board's width, in the front-matter it already reads.
- *
- * **A height called on its own is nothing to write.** A markdown board's height is its content's and
- * the browser measures it, so a number in the file would be one nothing reads and every later write
- * has to carry — which is what `decks.canvas.fit` would otherwise add on every call.
- */
-function withFrontMatterWidth(source: string, size: { w?: number; h?: number }): string {
-	if (size.w === undefined) return source;
-	const width = Math.max(1, Math.round(size.w));
-	const line = `w: ${width}`;
-	const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
-	if (!block) return `---\n${line}\n---\n\n${source}`;
-	const lines = (block[1] ?? "").split(/\r?\n/);
-	const at = lines.findIndex((one) => /^w\s*:/.test(one));
-	if (at >= 0) lines[at] = line;
-	else lines.unshift(line);
-	const rest = source.slice(block[0].length).replace(/^\r?\n/, "");
-	return `---\n${lines.join("\n")}\n---\n\n${rest}`;
 }
 
 /**
@@ -125,7 +94,7 @@ function withFrontMatterWidth(source: string, size: { w?: number; h?: number }):
  * not reloaded for it (`card.changed`'s `sized`).
  */
 export function onlySizeChanged(path: string, before: string, after: string): boolean {
-	if (!HTML_FILE.test(path) || before === after) return false;
+	if (before === after) return false;
 	const { w, h } = readBoardMeta(after);
 	if (w === undefined && h === undefined) return false;
 	return withBoardSize(path, before, { ...(w === undefined ? {} : { w }), ...(h === undefined ? {} : { h }) }) === after;
@@ -177,7 +146,7 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 		return html.slice(0, tag.index) + written + html.slice(tag.index + tag[0].length);
 	}
 
-	const tag = `<meta name="board" content='${JSON.stringify({ ...stated, bg: "grid" })}' />`;
+	const tag = `<meta name="card" content='${JSON.stringify(stated)}' />`;
 	const title = /<\/title>/i.exec(html);
 	if (title) return `${html.slice(0, title.index + title[0].length)}\n\t\t${tag}${html.slice(title.index + title[0].length)}`;
 	const head = /<head[^>]*>/i.exec(html);
@@ -187,54 +156,13 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 
 
 /**
- * What a board says about itself — an HTML document or a markdown file.
- *
- * The interesting field is the title, and the interesting decision is that it comes from the
- * **content**. A rail listing `notes.md`, `report.html`, `plan.html` has no information
- * in it; a rail listing what those documents are called is the whole point of having one. So
- * the first `#` of a markdown file, or the `<title>` of a document, and the filename only
- * when neither exists.
- *
- * Front-matter is read for `title` and `w`, and deliberately not for anything else. It is
- * how a board an agent writes can declare its own width the way an HTML board can — without
- * it, an agent could create a markdown board but not size it, and would have to ask the user
- * to drag the edge. Not a full YAML parser: two keys, one line each, at the top of the
- * file, in the same spirit as the regex above.
- *
- * **An HTML file has no front-matter**, so for one of those the same fields are taken
- * from `<meta name="board">` — the tag every board in every deck already carries.
+ * What a card says about itself: `readBoardMeta`, with a title found for a card that has no
+ * `<title>`: its first `<h1>`. With neither, nothing, and the caller falls back to its folder's name.
  */
-export function readMeta(path: string, source: string): BoardMeta {
-	const meta: BoardMeta = HTML_FILE.test(path) ? readBoardMeta(source) : {};
-	const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(source);
-	if (front) {
-		for (const line of (front[1] ?? "").split(/\r?\n/)) {
-			const pair = /^([a-z_]+)\s*:\s*(.+?)\s*$/i.exec(line);
-			if (!pair) continue;
-			const value = (pair[2] ?? "").replace(/^["']|["']$/g, "");
-			if (pair[1] === "title" && value) meta.title = value;
-			else if (pair[1] === "w") {
-				const w = Number(value);
-				if (Number.isFinite(w) && w > 0) meta.w = Math.round(w);
-			}
-		}
-	}
+export function readMeta(_path: string, source: string): BoardMeta {
+	const meta = readBoardMeta(source);
 	if (meta.title) return meta;
-
-	// `<title>` for a document, then the first heading, then nothing — and `nothing` is
-	// what makes the caller fall back to the filename.
-	const titled = TITLE.exec(source);
-	if (titled?.[1]?.trim()) return { ...meta, title: titled[1].trim() };
-	const body = front ? source.slice(front[0].length) : source;
-	const heading = /^\s*#\s+(.+?)\s*$/m.exec(body);
-	if (heading?.[1]) return { ...meta, title: heading[1].replace(/\s*#*\s*$/, "") };
-	// An HTML document with an `<h1>` but no `<title>`, which a lot of exports are.
 	const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(source);
-	if (h1?.[1]) return { ...meta, title: h1[1].replace(/<[^>]*>/g, "").trim() || undefined };
-	void path;
-	return meta;
+	const title = h1?.[1]?.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+	return title ? { ...meta, title } : meta;
 }
-
-/** Whether a path is HTML, for deciding where its metadata lives. */
-const HTML_FILE = /\.html?$/i;
-

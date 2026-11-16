@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { watchDeck, type DeckChange } from "./watcher.ts";
 import { realPathOf } from "./roots.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 function deck(): string {
 	const root = realPathOf(mkdtempSync(join(tmpdir(), "decks-watch-")));
@@ -39,7 +46,7 @@ async function watching(root: string, changes: DeckChange[]): Promise<() => void
 	const probe = join(root, "probe.txt");
 	const deadline = Date.now() + 10_000;
 	for (let n = 0; Date.now() < deadline && changes.length === 0; n++) {
-		writeFileSync(probe, String(n));
+		put(probe, String(n));
 		await new Promise((resolve) => setTimeout(resolve, 50));
 	}
 	// Let the probe's last write be reported before forgetting it; the file stays, unwritten.
@@ -52,14 +59,14 @@ const boards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "boar
 
 test("an in-place write to a board is reported as that board", async () => {
 	const root = deck();
-	const file = join(root, "boards", "a.html");
-	writeFileSync(file, board(800));
+	const file = join(root, "canvases", "t", "cards", "a", "index.html");
+	put(file, board(800));
 
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
-		writeFileSync(file, board(860));
-		assert.ok(await until(changes, (seen) => boards(seen).includes("boards/a.html")));
+		put(file, board(860));
+		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html")));
 	} finally {
 		stop();
 		rmSync(root, { recursive: true, force: true });
@@ -76,21 +83,21 @@ test("an in-place write to a board is reported as that board", async () => {
  */
 test("a board is still heard after a rename replaces its file", async () => {
 	const root = deck();
-	const file = join(root, "boards", "a.html");
-	writeFileSync(file, board(800));
+	const file = join(root, "canvases", "t", "cards", "a", "index.html");
+	put(file, board(800));
 
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
 		const temp = join(root, "boards", ".tmp-a");
-		writeFileSync(temp, board(860));
+		put(temp, board(860));
 		renameSync(temp, file);
 		assert.ok(await until(changes, (seen) => seen.some((c) => c.kind === "rescan")), "a rename asks for a rescan");
 
 		changes.length = 0;
-		writeFileSync(file, board(920));
+		put(file, board(920));
 		assert.ok(
-			await until(changes, (seen) => boards(seen).includes("boards/a.html") || seen.some((c) => c.kind === "rescan")),
+			await until(changes, (seen) => boards(seen).includes("canvases/t/cards/a/index.html") || seen.some((c) => c.kind === "rescan")),
 			"the write after the rename is still heard",
 		);
 	} finally {
@@ -106,10 +113,10 @@ test("the revision store is not watched, or every save would loop", async () => 
 	const changes: DeckChange[] = [];
 	const stop = await watching(root, changes);
 	try {
-		writeFileSync(join(root, ".decks", "revisions", "index.json"), "{}");
-		writeFileSync(join(root, "boards", "b.html"), board(800));
+		put(join(root, ".decks", "revisions", "index.json"), "{}");
+		put(join(root, "canvases", "t", "cards", "b", "index.html"), board(800));
 		// The board is the thing that proves the watcher was listening at all.
-		assert.ok(await until(changes, (seen) => boards(seen).includes("boards/b.html")));
+		assert.ok(await until(changes, (seen) => boards(seen).includes("canvases/t/cards/b/index.html")));
 		assert.deepEqual(
 			changes.filter((c) => c.kind === "asset").map((c) => c.path),
 			[],
@@ -125,7 +132,7 @@ test("nothing is reported after the watch is stopped", async () => {
 	const changes: DeckChange[] = [];
 	const stop = watchDeck(root, (change) => changes.push(change), 20);
 	stop();
-	writeFileSync(join(root, "boards", "c.html"), board(800));
+	put(join(root, "canvases", "t", "cards", "c", "index.html"), board(800));
 	await new Promise((resolve) => setTimeout(resolve, 300));
 	assert.deepEqual(changes, []);
 	rmSync(root, { recursive: true, force: true });

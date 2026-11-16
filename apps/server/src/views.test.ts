@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { ServerMessage } from "@decks/protocol";
 import { App } from "./app.ts";
@@ -12,6 +12,13 @@ import { Deck } from "./deck/loader.ts";
 import { realPathOf } from "./deck/roots.ts";
 import type { StageService } from "./stage/service.ts";
 import type { Hub, View } from "./ws.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /*
  * Two devices on one deck, each on its own conversation.
@@ -41,7 +48,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 	);
 	agent.rename(name);
 	agent.translator.user("here");
-	agent.setPosition("boards/plan.html", place.x, place.y);
+	agent.setPosition("canvases/t/cards/plan/index.html", place.x, place.y);
 	const id = agent.id;
 	agent.dispose();
 	return id;
@@ -51,7 +58,7 @@ function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-views-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "plan.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
+	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
 	const one = seeded(deck, "One", { x: 10, y: 20 });
 	const two = seeded(deck, "Two", { x: 900, y: 400 });
 
@@ -78,7 +85,7 @@ function open() {
 	const last = <T extends ServerMessage["type"]>(view: View, type: T) =>
 		inbox.get(view)!.filter((message): message is Extract<ServerMessage, { type: T }> => message.type === type).at(-1);
 	const plan = (message: Extract<ServerMessage, { type: "deck.changed" }> | undefined) => {
-		const board = message?.deck.boards.find((one) => one.path === "boards/plan.html");
+		const board = message?.deck.boards.find((one) => one.path === "canvases/t/cards/plan/index.html");
 		return board && [board.x, board.y];
 	};
 	return {
@@ -128,9 +135,9 @@ test("each device's board list carries its own conversation's arrangement", () =
 		assert.deepEqual(plan(last(phone, "deck.changed")), [900, 400]);
 
 		// And a board moved on the laptop lands on the laptop's conversation, not the phone's.
-		app.handle({ type: "card.move", path: "boards/plan.html", x: 64, y: 64 }, replyTo(laptop), laptop);
-		assert.deepEqual(app.agents.get(one)?.positions()["boards/plan.html"], { x: 64, y: 64 });
-		assert.deepEqual(app.agents.get(two)?.positions()["boards/plan.html"], { x: 900, y: 400 });
+		app.handle({ type: "card.move", path: "canvases/t/cards/plan/index.html", x: 64, y: 64 }, replyTo(laptop), laptop);
+		assert.deepEqual(app.agents.get(one)?.positions()["canvases/t/cards/plan/index.html"], { x: 64, y: 64 });
+		assert.deepEqual(app.agents.get(two)?.positions()["canvases/t/cards/plan/index.html"], { x: 900, y: 400 });
 	} finally {
 		cleanup();
 	}

@@ -67,14 +67,8 @@ export function deckContext(deck: Deck, options: { web?: boolean } = {}): string
 		return `You are working in a deck at ${deck.path}. Each canvas keeps its cards in canvases/<name>/cards/<card>/index.html. The decks command in your shell reaches the canvas: decks --help.`;
 	}
 
-	// The cards, then any old boards a canvas still holds, which show and can be read but get no new work.
-	const line = (one: { path: string; title: string; w: number; h: number }) => `- \`${one.path}\` — ${one.title} (${one.w}×${one.h})`;
-	const cards = deck.boards.filter((one) => isCardPath(one.path));
-	const boards = deck.boards.filter((one) => !isCardPath(one.path));
-	const cardList = [
-		cards.length === 0 ? "_None yet. Write the first one._" : cards.map(line).join("\n"),
-		...(boards.length ? ["", "Old boards, which show and can be read (new work is a card):", "", boards.map(line).join("\n")] : []),
-	].join("\n");
+	const cards = deck.boards;
+	const cardList = cards.length === 0 ? "_None yet. Write the first one._" : cards.map((one) => `- \`${one.path}\` — ${one.title} (${one.w}×${one.h})`).join("\n");
 
 	const roots = deck.roots.roots;
 	const rootList =

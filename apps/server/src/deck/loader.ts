@@ -1,11 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { pageFolders } from "./stage-boards.ts";
+import { cardFolders } from "./card-folders.ts";
 import { isCardPath, pageName } from "@decks/hub/layout";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Page, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
-import { fillsOf, isBoardFile, liveKindOf, shellFor } from "./kinds.ts";
 import { BOARD_W } from "../cards/size.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
@@ -13,15 +12,10 @@ import { readsOldShapes } from "./old-shapes.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
 
 /**
- * A board's height until a frame measures it, and a *foreign* one's for good.
- *
- * The short one, because a board that grows into its content on load looks like it is arriving where
- * one that shrinks looks broken. The long one, because a sandboxed document from somewhere else
- * cannot measure itself at all, so its placeholder has to be a usable page rather than a box that
- * grows.
+ * A card's height until it is measured: short, because a card that grows into its content on load
+ * looks like it is arriving where one that shrinks looks broken.
  */
 const START_H = 240;
-const FOREIGN_H = 600;
 /** Space between auto-placed boards, and how many go in a row before wrapping. */
 const GUTTER = 160;
 const PER_ROW = 3;
@@ -163,7 +157,7 @@ export class Deck {
 		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots, pens: this.pens() };
 	}
 
-	/** The `.pen` files in `boards/` and `frames/`, each with the ref that places it and a title to list it by. */
+	/** The `.pen` files in the deck's `frames/`, each with the ref that places it and a title to list it by. */
 	pens(): DeckPen[] {
 		const out: DeckPen[] = [];
 		const walk = (current: string) => {
@@ -185,7 +179,6 @@ export class Deck {
 				}
 			}
 		};
-		walk(join(this.path, "boards"));
 		walk(join(this.path, "frames"));
 		return out.sort((a, b) => a.path.localeCompare(b.path));
 	}
@@ -272,7 +265,7 @@ export class Deck {
 			if (!root.exists) this.warnings.push(`Root ${root.path} does not exist; embeds under it will not resolve.`);
 		}
 
-		const found = pageFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
+		const found = cardFolders(this.path).flatMap((folder) => scanCards(join(this.path, folder), this.path));
 		/*
 		 * No positions in the scan. Where a board sits is a stage's business now and this is only the
 		 * list of boards; `arrange` gives them a place when they are sent.
@@ -298,7 +291,7 @@ export class Deck {
 	 * server restarts.
 	 */
 	resync(): { changed: Page[]; removed: string[] } {
-		const found = pageFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
+		const found = cardFolders(this.path).flatMap((folder) => scanCards(join(this.path, folder), this.path));
 		const changed: Page[] = [];
 
 		const removed: string[] = [];
@@ -384,10 +377,6 @@ export class Deck {
 	private describe(path: string): Page {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
-		// A stub that draws itself from `postMessage`, if this is one.
-		const live = liveKindOf(source);
-		// Whether the file is a document already, or content that has to be wrapped in one.
-		const shell = shellFor(path, source);
 		const meta = readMeta(path, source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
@@ -410,25 +399,19 @@ export class Deck {
 		 * Two formats used to answer this, and the honest reading of the difference is that one of them
 		 * always stated a height and the other never did. It is one line now, and which line a board
 		 * takes is the file's to say rather than the format's.
-		 *
-		 * A *sandboxed* board — a document from somewhere else — never gets a measurement at all, so for
-		 * it the placeholder is the answer rather than a start. Hence the two: a usable page for a
-		 * document nobody can measure, and the short one for ours, because a board that grows into its
-		 * content on load looks like it is arriving where one that shrinks looks broken.
 		 */
 		const floor = meta.h ?? 0;
 		this.floors.set(path, floor);
 		// A card is its folder: a change to its `chart.js` is a new revision of the card, as a change to its HTML is.
-		const rev = revisionOf(isCardPath(path) ? `${source}\n${folderSignature(dirname(absolute))}` : source);
+		const rev = revisionOf(`${source}\n${folderSignature(dirname(absolute))}`);
 		// Read before, at this revision, when browsers still sized boards (`heights`).
 		const known = this.heights.get(path);
 		// The file's own height when it states one, as its agent wrote it; an old reading only when it does not.
-		const height = floor || (known?.rev === rev ? known.h : shell === "foreign" ? FOREIGN_H : START_H);
+		const height = floor || (known?.rev === rev ? known.h : START_H);
 		return {
 			path,
-			title: meta.title ?? pageName(path).replace(/\.(html?|mdx?)$/i, ""),
-			...(shell ? { shell } : {}),
-			...(isCardPath(path) ? { card: true as const } : {}),
+			title: meta.title ?? pageName(path),
+			card: true as const,
 			x: 0,
 			y: 0,
 			w: width,
@@ -446,17 +429,15 @@ export class Deck {
 			// number it kept private.
 			modifiedAt: modifiedAtOf(absolute),
 			...(meta.poster ? { poster: meta.poster } : {}),
-			...(live ? { live } : {}),
-			...(fillsOf(source, live) ? { fills: true as const } : {}),
 			inContext: [],
 		};
 	}
 }
 
-/** A board's file, or a card's whole folder: what `resync` compares to tell it changed. */
+/** A card's whole folder: what `resync` compares to tell it changed. */
 function pageSignature(deck: string, path: string): string {
 	const absolute = join(deck, path);
-	return isCardPath(path) ? `${signatureOf(absolute)}|${folderSignature(dirname(absolute))}` : signatureOf(absolute);
+	return `${signatureOf(absolute)}|${folderSignature(dirname(absolute))}`;
 }
 
 /** Every file in a card's folder, by its place, time and size; hidden ones left out. */
@@ -499,24 +480,15 @@ function modifiedAtOf(absolute: string): number {
 	}
 }
 
-/** Every board file under one board folder (`deck/stage-boards.ts`), deck-relative, sorted, dotfiles skipped. */
-function scanBoards(dir: string, deckRoot: string): string[] {
+/** Every card under one `cards/` folder (`deck/card-folders.ts`): each folder's `index.html`, deck-relative, sorted, hidden folders skipped. */
+function scanCards(dir: string, deckRoot: string): string[] {
 	if (!existsSync(dir)) return [];
 	const out: string[] = [];
-	const walk = (current: string) => {
-		for (const entry of readdirSync(current, { withFileTypes: true })) {
-			if (entry.name.startsWith(".")) continue;
-			const full = join(current, entry.name);
-			if (entry.isDirectory()) walk(full);
-			else if (isBoardFile(entry.name)) {
-				const path = normalizeBoardPath(relative(deckRoot, full));
-				// In a canvas's `cards/`, the card is each folder's `index.html`; the rest is the card's own.
-				if (/(?:^|\/)cards\//.test(path) && /^(?:shared\/)?canvases\//.test(path) && !isCardPath(path)) continue;
-				out.push(path);
-			}
-		}
-	};
-	walk(dir);
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+		const path = normalizeBoardPath(relative(deckRoot, join(dir, entry.name, "index.html")));
+		if (isCardPath(path) && existsSync(join(deckRoot, path))) out.push(path);
+	}
 	return out.sort((a, b) => a.localeCompare(b));
 }
 

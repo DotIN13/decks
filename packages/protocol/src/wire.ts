@@ -358,7 +358,7 @@ export type ServerMessage =
 	 * started reports a different catalogue.
 	 */
 	| { type: "harness.runtimes"; list: RuntimeInfo[] }
-	/** A card (or an old board a canvas still holds) was written or removed. */
+	/** A card was written or removed. */
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; /** Only the size in its own tag changed: a page showing it keeps its document. */ sized?: true }
 	/** An app's state changed (`apps/service.ts`): for the canvas frames showing it, instead of each asking again every few seconds. */
 	| { type: "app.changed"; name: string; title?: string; status: string }

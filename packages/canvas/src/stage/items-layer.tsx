@@ -257,7 +257,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 						picture: board.item === "app" && board.app ? props.shots().picture({ ...board, path: `apps/${board.app}` }, look) : board.item === "document" && board.file ? props.shots().picture({ path: board.file, rev: board.rev }, look) : board.item ? "" : props.shots().picture(board, look),
 						// Painted on its paper until its picture comes; an app's window carries its name and status in every state.
 						title: board.title,
-						kind: board.card ? (missing().has(board.path) ? "missing" : "card") : (board.item ?? "board"),
+						kind: board.item ?? (missing().has(board.path) ? "missing" : "card"),
 						...(board.item === "app" && board.app ? { status: states.get(board.app) ?? "" } : {}),
 						...(news?.[board.path] ? { news: resolveColour(news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
@@ -288,7 +288,7 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
 	const LIVE_FILES = 12;
 	/**
-	 * For the browser checks: every card (and old board) on the canvas and where it is on screen, node or
+	 * For the browser checks: every card, document and app on the canvas and where it is on screen, node or
 	 * picture (`rendered`).
 	 */
 	const cardsOnScreen = () => {

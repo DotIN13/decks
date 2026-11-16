@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { clipItems, clone, isArrow, pastedItems, walk, type PenDocument, type PenNode } from "@decks/pen";
-import { copyBoardInto } from "../stage/copy-in.ts";
 import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas } from "@decks/hub/layout";
 
 /**
@@ -60,7 +59,7 @@ export function heldClip(id: unknown): Held {
 	return one;
 }
 
-const PAGE_TAGS = new Set(["decks.card", "decks.board", "decks.document", "decks.app"]);
+const PAGE_TAGS = new Set(["decks.card", "decks.document", "decks.app"]);
 const sha = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
 const isFile = (file: string) => {
 	try {
@@ -95,10 +94,8 @@ function filesIn(dir: string, at = ""): string[] {
 
 interface PasteDeps {
 	deck: string;
-	/** Write a card's or a board's page, recorded and announced as any write of one is. */
+	/** Write a card's page, recorded and announced as any write of one is. */
 	writePage(path: string, html: string): void;
-	/** The pages placed on the target canvas now, by deck path. */
-	placedPages(canvas: string): Set<string>;
 }
 
 /**
@@ -118,7 +115,6 @@ export function pasteItems(deps: PasteDeps, copy: Held, target: string, taken: S
 	/** Each page's new path, by its old one: what the items and arrows are pointed at. */
 	const paths = new Map<string, string>();
 	const busy = new Set<string>();
-	const onTarget = deps.placedPages(target);
 
 	/** A deck path held inside the source canvas's folder; undefined for a deck file outside every canvas; refused otherwise. */
 	const inSource = (path: string, what: string): string | undefined => {
@@ -175,15 +171,6 @@ export function pasteItems(deps: PasteDeps, copy: Held, target: string, taken: S
 				plan.set(`${folder}/`, `${place.path}/`);
 				paths.set(path, `${place.path}/index.html`);
 				if (isSharedCanvas(source) && !isSharedCanvas(target)) node.metadata = { ...meta, scripts: false, from: source } as unknown as PenNode["metadata"];
-			} else if (meta.type === "decks.board") {
-				const inside = inSource(path, what);
-				if (inside && (!same || onTarget.has(inside))) {
-					plan.set(inside, `>board`);
-					paths.set(path, inside);
-				} else if (onTarget.has(path)) {
-					notes.push(`${what} is on this canvas already, and a canvas holds a board once: it was left out.`);
-					dropped.add(node);
-				}
 			} else if (meta.type === "decks.document") {
 				// A document in the canvas's folder comes along; one elsewhere in the deck is named as it is.
 				if (!same) {
@@ -219,12 +206,6 @@ export function pasteItems(deps: PasteDeps, copy: Held, target: string, taken: S
 	// Every path is in order: copy what the items need, then point them at it.
 	for (const [path, place] of plan) {
 		if (place.startsWith("=")) continue;
-		if (place === ">board") {
-			const copied = copyBoardInto(deck, path, target);
-			deps.writePage(copied, readFileSync(join(deck, copied), "utf8"));
-			paths.set(path, copied);
-			continue;
-		}
 		if (path.endsWith("/")) {
 			const files = filesIn(join(deck, path));
 			for (const rel of files) {

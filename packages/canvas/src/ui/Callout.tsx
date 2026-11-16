@@ -254,7 +254,7 @@ export function PageCallout(props: {
 			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the card to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
-			<Show when={props.board && !props.board.live ? props.board : undefined}>
+			<Show when={props.board}>
 				{(board) => (
 				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (board().item === "app" && board().app) canvasHost().apps?.open(board().app!); else openInTab(canvasHost().fileUrl(board().path)); }}>
 					<Icon of={ExternalLink} size={16} />

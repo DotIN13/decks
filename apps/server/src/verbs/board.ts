@@ -1,4 +1,4 @@
-import { canvasFolder, canvasOfPath, isCardPath } from "@decks/hub/layout";
+import { canvasFolder, canvasOfPath } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cardShell } from "../cards/cards.ts";
@@ -8,9 +8,9 @@ import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";
 
 /**
- * Boards and the deck's other files: board files listed, made, named and found on canvases, and frames
- * (file addresses and the file calls are `verbs/files.ts`). A board file is the deck's, on any number of canvases or none: making one does
- * not place it, which is the canvas's job (`canvas.insert`).
+ * Cards and saved frames: cards listed, made, named and found on their canvas, and frames made
+ * (file addresses and the file calls are `verbs/files.ts`). A card is a folder of its canvas's
+ * `cards/`: making one does not place it, which is the canvas's job (`canvas.insert`).
  */
 export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 	const { service, agent, notes, needPens } = ctx;
@@ -47,34 +47,23 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "card" | "frame"> {
 
 	const card = {
 			/** Every card in the deck, placed or not. */
-			list: async () => service.allBoards().filter((one) => isCardPath(one.path)).map(asBoard),
+			list: async () => service.allBoards().map(asBoard),
 			get: async (path: string) => asBoard(needBoard(path)),
 			canvases: async (path: string) => {
-				needBoard(path);
+				const file = needBoard(path);
 				const pens = needPens();
-				const out: Array<{ card: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
-				const file = service.fileBoard(path);
-				/*
-				 * A board in a canvas's folder is on that canvas and no other (`deck/layout.ts`), so this answers
-				 * one canvas at most. A board in the library is on none; the canvases that copied it are said,
-				 * each with its copy's path.
-				 */
+				// A card is in a canvas's folder, and on that canvas or on none (`deck/layout.ts`).
 				const home = canvasOfPath(path);
-				for (const name of home ? [home.name] : pens.names()) {
-					const own = home ? path : pens.copyOf(name, path);
-					if (!home && own === path) continue;
-					let held;
-					try {
-						held = pens.boards(name).find((one) => one.path === own);
-					} catch {
-						continue;
-					}
-					if (!held) continue;
-					const content = (home ? file : service.fileBoard(own))?.content;
-					const clipped = content ? content.w > held.w || content.h > held.h : undefined;
-					out.push({ card: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
+				if (!home) return [];
+				let held;
+				try {
+					held = pens.boards(home.name).find((one) => one.path === path);
+				} catch {
+					return [];
 				}
-				return out;
+				if (!held) return [];
+				const clipped = file.content ? file.content.w > held.w || file.content.h > held.h : undefined;
+				return [{ card: path, canvas: home.name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) }];
 			},
 			url: async (path: string) => {
 				needBoard(path);

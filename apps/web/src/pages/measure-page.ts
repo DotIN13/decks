@@ -1,7 +1,7 @@
 import { countWords, readingOfBody } from "@decks/canvas/card-reading";
 
 /**
- * How much room a page takes (a document, or an old board on a friend's canvas), measured for
+ * How much room a page takes (a document, or the page a picture card links to), measured for
  * `decks.canvas.fit` by the server's own Chromium when no canvas has (`../measure.ts`,
  * `server/stage/shots.ts`). A card is not measured here: `measure.ts` mounts it as the canvas does.
  *

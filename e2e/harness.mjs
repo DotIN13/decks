@@ -111,8 +111,8 @@ export const CANVAS = "auth-refresh";
 export const card = (name) => `canvases/${CANVAS}/cards/${name}/index.html`;
 
 /**
- * The fixture's one leftover board: a friend's shared canvas (`shared/canvases/ada/old-notes/`, view
- * only), whose board is drawn as a picture and never runs. For the checks of an old board's drawing.
+ * The fixture's one board item from before cards: on a friend's shared canvas
+ * (`shared/canvases/ada/old-notes/`, view only), kept in its file and drawn as an item with nothing in it.
  */
 export const SHARED_CANVAS = "shared/ada/old-notes";
 export const SHARED_BOARD = "shared/canvases/ada/old-notes/boards/notes.html";

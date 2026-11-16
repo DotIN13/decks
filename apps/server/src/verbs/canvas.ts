@@ -2,7 +2,7 @@ import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
-import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
+import { boardOf, CARD_ITEM, type ReadMore } from "../stage/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
@@ -40,17 +40,17 @@ function colourDefaults(node: Record<string, unknown>): void {
 }
 
 /**
- * The canvas calls: everything on one canvas, boards included, read and changed as items.
+ * The canvas calls: everything on one canvas, cards included, read and changed as items.
  *
- * A board on a canvas is pen's own `browser` item tagged `{ type: "decks.board", path }`
- * (`stage/pens.ts`); here it reads and is written as `{ type: "board", board: <path>, width? }`,
- * and anywhere an item's id is taken a board's path is taken too. Every call names its canvas or
+ * A card on a canvas is pen's own `browser` item tagged `{ type: "decks.card", path }`
+ * (`stage/pens.ts`); here it reads and is written as `{ type: "card", card: <path>, width? }`,
+ * and anywhere an item's id is taken a card's path is taken too. Every call names its canvas or
  * means `decks.here()`; none changes which canvas anybody is on. Every change is one edit of the
  * canvas's file, all of a batch or none of it.
  *
  * The item calls (read, insert, update, replace, delete, move, copy, variables, batch) take
  * `{ frame: "frames/<name>" }` instead to act on a frame file, with the same items and answers; the
- * change shows on every canvas placing the frame. A frame holds drawn items, never a board.
+ * change shows on every canvas placing the frame. A frame holds drawn items, never a card.
  */
 
 /** A read's variables also short (`shortVariables`: `"#hex"`, `16`, `{ light, dark }`), as `canvas.variables` takes them, under `values`. */
@@ -74,15 +74,13 @@ type CanvasOpIn =
 	| { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null }
 	| { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 
-/** A pen item as a caller reads it: a board as `{ type: "board", board }`, everything else as pen has it. */
+/** A pen item as a caller reads it: a card as `{ type: "card", card }`, everything else as pen has it. */
 export function toItem(node: Record<string, unknown>): Record<string, unknown> {
 	const children = Array.isArray(node.children) ? (node.children as Record<string, unknown>[]).map(toItem) : undefined;
 	const path = boardOf(node as unknown as PenNode);
 	if (path) {
 		const { type: _type, url: _url, metadata: _metadata, name, children: _children, ...rest } = node;
-		// A card reads as one (`{ type: "card", card }`), every other page as a board.
-		if (isCardPath(path)) return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
-		return { type: "board", ...rest, board: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
+		return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
 	}
 	return { ...node, ...(children ? { children } : {}) };
 }
@@ -163,7 +161,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	/** Whether a deck path is a file already, recorded or not. */
 	const existsIn = (path: string): boolean => existsSync(resolveInDeck(service.deckPath(), path) ?? "");
 	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
-		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "board", board: "boards/plan.html" }.');
+		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "card", card: "canvases/<canvas>/cards/plan" }.');
 		let item = raw as Record<string, unknown>;
 		/*
 		 * A card from its HTML, `{ type: "card", html, title?, width?, height? }`: written to the canvas's own
@@ -207,32 +205,28 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			const meta = item.metadata as { path: string };
 			item = { ...item, metadata: { ...meta, path: documentPath(meta.path.trim()) } };
 		}
-		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
-		if (item.type === "card") {
-			const { card: named, ...others } = item;
-			if (typeof named !== "string" || !named) throw new Error('A card item names its folder: { type: "card", card: "canvases/<canvas>/cards/sales" }.');
-			// Its folder or the folder's index.html, either way.
-			const card = /\.html$/i.test(named) ? named : `${named.replace(/\/+$/, "")}/index.html`;
-			if (!isCardPath(card)) throw new Error(`${named} is not a card: a card is a folder in a canvas's cards/, with its index.html in it.`);
-			item = { ...others, type: "board", board: card };
-		}
+		if (item.type === "board") throw new Error("Boards are from before cards, and a canvas no longer takes one: decks card create makes a card, and decks file read reads an old board's file.");
 		// What a read adds and no file keeps (`read.ts`), so an item read and written back is the item.
-		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, card: _card, ...rest } = item;
+		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, ...rest } = item;
 		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken, frame)) : undefined;
-		if (item.type !== "board") return { ...rest, ...(children ? { children } : {}) };
-		if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items, not boards: place the board on a canvas, beside the frame.`);
-		const { type: _type, board, title: _title, ...own } = rest as Record<string, unknown>;
-		if (typeof board !== "string" || !board) throw new Error('A board item names its file: { type: "board", board: "boards/plan.html" }.');
-		const file = service.fileBoard(board);
-		if (!file) throw new Error(`There is no board ${board} in the deck. decks card create makes a card; decks card list lists them.`);
+		if (item.type !== "card") return { ...rest, ...(children ? { children } : {}) };
+		// A card is placed by its file in a canvas's `cards/`: `{ type: "card", card: "canvases/<canvas>/cards/sales" }`.
+		if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items, not cards: place the card on a canvas, beside the frame.`);
+		const { type: _type, card: named, title: _title, ...own } = rest as Record<string, unknown>;
+		if (typeof named !== "string" || !named) throw new Error('A card item names its folder: { type: "card", card: "canvases/<canvas>/cards/sales" }.');
+		// Its folder or the folder's index.html, either way.
+		const card = /\.html$/i.test(named) ? named : `${named.replace(/\/+$/, "")}/index.html`;
+		if (!isCardPath(card)) throw new Error(`${named} is not a card: a card is a folder in a canvas's cards/, with its index.html in it.`);
+		const file = service.fileBoard(card);
+		if (!file) throw new Error(`There is no card ${card} in the deck. decks card create makes one; decks card list lists them.`);
 		let id = typeof own.id === "string" && own.id ? own.id : undefined;
 		if (!id) {
-			const base = slug(pageName(board), 40) || "board";
+			const base = slug(pageName(card), 40) || "card";
 			id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 		}
 		taken.add(id);
-		return { ...own, id, type: "browser", name: file.title, url: `../../${board}`, width: own.width ?? file.w, height: own.height ?? file.h, metadata: { type: pageTag(board), path: board }, ...(children ? { children } : {}) };
+		return { ...own, id, type: "browser", name: file.title, url: `../../${card}`, width: own.width ?? file.w, height: own.height ?? file.h, metadata: { type: CARD_ITEM, path: card }, ...(children ? { children } : {}) };
 	};
 
 	/** Where an op puts its item: a corner, or beside or below another item on the document as it is now. */
@@ -288,7 +282,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					const given = { ...raw } as Record<string, unknown>;
 					if (typeof given.id === "string") given.id = idIn(doc, given.id);
 					if (typeof given.parent === "string") given.parent = idIn(doc, given.parent, "parent");
-					if (given.node && (given.node as { type?: unknown }).type === "board") given.node = fromItem(given.node, ids(doc), frame);
+					if (given.node && ["card", "app", "document", "board"].includes(String((given.node as { type?: unknown }).type))) given.node = fromItem(given.node, ids(doc), frame);
 					pen = given as unknown as Op;
 					warn(pen);
 					doc = apply(doc, [pen], { theme, measure }).doc;
@@ -322,13 +316,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						const node = [...walk(doc.children)].find((one) => one.id === id);
 						const path = node ? boardOf(node) : undefined;
 						const set: Record<string, unknown> = { ...(op.set ?? {}) };
-						if (path && typeof set.board === "string") {
-							const file = service.fileBoard(set.board);
-							if (!file) throw new Error(`There is no board ${set.board} in the deck.`);
-							set.url = `../../${set.board}`;
-							set.metadata = { ...(node?.metadata ?? {}), type: pageTag(set.board), path: set.board };
+						// A card item pointed at another card: `set: { card: <path> }`.
+						if (path && typeof set.card === "string") {
+							const file = isCardPath(set.card) ? service.fileBoard(set.card) : undefined;
+							if (!file) throw new Error(`There is no card ${set.card} in the deck.`);
+							set.url = `../../${set.card}`;
+							set.metadata = { ...(node?.metadata ?? {}), type: CARD_ITEM, path: set.card };
 							set.name = file.title;
-							delete set.board;
+							delete set.card;
 						}
 						if (op.size) {
 							// A board is held to the sizes a resize always allowed: a resize is not the place to find a typo.
@@ -425,7 +420,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			variables = () => (edited.entry.doc.variables ?? {}) as Record<string, unknown>;
 			for (const one of sized) {
 				const file = service.fileBoard(one.path);
-				if (!file || file.fills) continue;
+				if (!file) continue;
 				service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
 				if (agent.person) service.wrote(one.path, "you");
 			}
@@ -452,8 +447,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			if (!node) return { type: "unknown", id: result.id };
 			const item = toItem(node);
 			const box = node.box as { x1: number; y1: number; x2: number; y2: number } | undefined;
-			if (item.type === "board") agent.acted?.(result.op === "insert" ? "show" : "move", item.board as string);
-			else if (box) {
+			if (box) {
 				drawn.push(result.id);
 				boxes.push(box);
 			}
@@ -580,7 +574,6 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					{
 						deck,
 						writePage: (path, html) => void service.writeCard(path, html),
-						placedPages: (canvas) => new Set(pens.boards(canvas).map((one) => one.path)),
 					},
 					copy,
 					name,

@@ -7,7 +7,7 @@ const sample = (): PenDocument => ({
 	version: "2.14",
 	children: [
 		{ type: "note", id: "a", content: "one", x: 0, y: 0, width: 200, height: 100 },
-		{ type: "browser", id: "b", name: "Plan", url: "boards/plan.html", x: 400, y: 10, width: 600, height: 400, metadata: { type: "decks.board", path: "boards/plan.html" } },
+		{ type: "browser", id: "b", name: "Plan", url: "canvases/t/cards/plan/index.html", x: 400, y: 10, width: 600, height: 400, metadata: { type: "decks.card", path: "canvases/t/cards/plan/index.html" } },
 	],
 });
 
@@ -73,14 +73,14 @@ test("a drawing from elsewhere is shown, not reported, and undo starts again fro
 	assert.equal(drawing.doc().children[0]?.content, "from another device");
 });
 
-test("boards are the drawing's decks.board items, and moving one moves its item", () => {
+test("cards are the drawing's decks.card items, and moving one moves its item", () => {
 	const drawing = createDrawing(sample());
 	assert.deepEqual(
 		pagesOf(drawing.doc()).map(({ path, title, x, y, w, h }) => ({ path, title, x, y, w, h })),
-		[{ path: "boards/plan.html", title: "Plan", x: 400, y: 10, w: 600, h: 400 }],
+		[{ path: "canvases/t/cards/plan/index.html", title: "Plan", x: 400, y: 10, w: 600, h: 400 }],
 	);
-	drawing.movePage("boards/plan.html", 420.4, -7.6);
-	drawing.resizePage("boards/plan.html", { w: 640, h: 380 });
+	drawing.movePage("canvases/t/cards/plan/index.html", 420.4, -7.6);
+	drawing.resizePage("canvases/t/cards/plan/index.html", { w: 640, h: 380 });
 	const board = drawing.doc().children[1]!;
 	assert.deepEqual([board.x, board.y, board.width, board.height], [420, -8, 640, 380]);
 });
@@ -236,7 +236,7 @@ test("a step is not shown ahead when anything else changed the drawing since the
 test("the host's boards are shown as the person's edits on their way leave them", () => {
 	const given = sample();
 	const shown = served(given, [{ op: "update", id: "b", set: { x: 700, y: 40 } }]);
-	const list = [{ path: "boards/plan.html", title: "Plan", x: 400, y: 10, w: 600, h: 520, rev: 3, inContext: [] }];
+	const list = [{ path: "canvases/t/cards/plan/index.html", title: "Plan", x: 400, y: 10, w: 600, h: 520, rev: 3, inContext: [] }];
 	assert.deepEqual(pagesAhead(list, given, shown).map(({ x, y, w, h }) => ({ x, y, w, h })), [{ x: 700, y: 40, w: 600, h: 520 }], "moved, its raised height kept");
 	assert.deepEqual(pagesAhead(list, given, served(given, [{ op: "delete", id: "b" }])), [], "taken off");
 	assert.equal(pagesAhead(list, given, given), list);

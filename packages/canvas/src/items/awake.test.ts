@@ -6,7 +6,7 @@ import { chooseAwake, sameAwake, surfaceState, type AwakeItem } from "./awake.ts
 const view = { width: 1000, height: 800 };
 /**
  * A row of 300×200 items 400 apart along y = 0, `i0` at x = 0: card, card, card, app, card, card, card,
- * document, … (every fourth an app, every eighth a document in an app's place), and one old board.
+ * document, … (every fourth an app, every eighth a document in an app's place), and one card whose file is missing.
  */
 const kindOf = (i: number) => (i % 8 === 7 ? "document" : i % 4 === 3 ? "app" : "card");
 const items: AwakeItem[] = [...Array.from({ length: 24 }, (_, i) => ({ path: `i${i}`, x: i * 400, y: 0, w: 300, h: 200, kind: kindOf(i) as "card" | "app" | "document" })), { path: "board", x: 1200, y: 2000, w: 300, h: 200 }];
@@ -40,7 +40,7 @@ test("an app that becomes nearest takes the place of one that was", () => {
 	assert.deepEqual(moved.kept, ["i3"]);
 });
 
-test("an old board is never awake, not even selected", () => {
+test("an item with no kind, a card whose file is missing, is never awake, not even selected", () => {
 	const { live } = chooseAwake({ index, items, rest: at(1350, 1), view, budget, selected: "board" });
 	assert.ok(!live.includes("board"));
 });

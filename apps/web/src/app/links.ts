@@ -101,17 +101,18 @@ export function createFraming(stagePages: () => Page[]) {
  */
 export const openLinkedPage = (path: string, from: string): boolean => {
 	if (!state.pages.some((one) => one.path === path)) {
-		notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
+		notice("warn", `No card at ${path}: the link points at something this deck does not have.`);
 		return false;
 	}
 	/*
-	 * A link names the library file (`../../../boards/x.html` from a canvas's copy), and the canvas
-	 * shows its own copy of it (`canvases/<canvas>/boards/x.html`): the copy is what moves, is
-	 * selected and is flown to, once the canvas has one.
+	 * A link may name a card of another canvas, and this canvas shows its own copy of it
+	 * (`cards/<name>/index.html` in its own folder): the copy is what moves, is selected and is flown
+	 * to, once the canvas has one.
 	 */
-	const rest = path.replace(/^boards\//, "");
+	const inCanvas = (one: string) => /^(?:canvases\/[^/]+|shared\/canvases\/[^/]+\/[^/]+)\/(.+)$/.exec(one)?.[1];
+	const rest = inCanvas(path);
 	const playing = () => (state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
-	const onCanvas = () => playing().find((one) => one === path || (one.startsWith("canvases/") && one.split("/").slice(2).join("/") === `boards/${rest}`));
+	const onCanvas = () => playing().find((one) => one === path || (rest !== undefined && inCanvas(one) === rest));
 	const opening = !onCanvas();
 	const land = (at: string) => {
 		const board = state.pages.find((one) => one.path === at);
@@ -127,7 +128,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 		return true;
 	}
 	void call("card.play", [path]).then(warnIfFailed);
-	// The server copies the board into the canvas; it is landed when the copy arrives.
+	// The server copies the card into the canvas; it is landed when the copy arrives.
 	const started = performance.now();
 	const wait = () => {
 		const copy = onCanvas();

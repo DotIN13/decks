@@ -160,7 +160,7 @@ export class StageService {
 		this.host.stagesChanged?.();
 	}
 
-	/** A board as its file has it (whether it fills its frame), not as a stage places it. */
+	/** A card as its file has it, not as a canvas places it. */
 	fileBoard(path: string): Page | undefined {
 		return this.deck.board(path);
 	}
@@ -234,7 +234,7 @@ export class StageService {
 		return fileUrl(resolveFileRequest(this.deck.roots, { path: file }));
 	}
 
-	/** Where Playwright should point to look at a card (or an old board), under `/api/card/`. */
+	/** Where Playwright should point to look at a card, under `/api/card/`. */
 	url(path: string, port: number): string {
 		const board = this.deck.board(path);
 		const rev = board ? `?rev=${board.rev}` : "";
@@ -323,7 +323,7 @@ export class StageService {
 		 * given: the box ends at the board's foot because the board does, so fitting it to the box
 		 * plus a margin grew it by the margin every time it was asked.
 		 */
-		const h = board.fills ? board.h : ends ? measured.h : measured.h + margin;
+		const h = ends ? measured.h : measured.h + margin;
 		const reading = away ?? this.host.reading?.(path, board.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);

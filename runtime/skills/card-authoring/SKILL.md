@@ -5,7 +5,7 @@ description: How to write a card. One format: a one-screen piece of HTML you des
 
 # Card authoring
 
-Boards are retired: everything that used to be a board is now a card. Old boards on a canvas still show and can be read; new work is a card.
+Everything that used to be a board is a card. A board file left in a deck from before cards (`boards/…`) is a plain file: read it with your own tools, and write what it said as a card if it is wanted again.
 
 **One screen**
 

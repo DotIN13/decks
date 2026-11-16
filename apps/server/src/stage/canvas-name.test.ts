@@ -6,9 +6,10 @@ import { test } from "node:test";
 import { canvasNameReminder } from "./canvas-name.ts";
 import { StagePens } from "./pens.ts";
 
+
 /* When an agent is asked to name its canvas: no name of its own, or a name the canvas has outgrown. */
 
-const board = (path: string, x: number) => ({ type: "browser", id: path.replace(/\W+/g, "-"), url: `../../${path}`, x, y: 0, width: 400, height: 300, metadata: { type: "decks.board", path } });
+const board = (path: string, x: number) => ({ type: "browser", id: path.replace(/\W+/g, "-"), url: `../../${path}`, x, y: 0, width: 400, height: 300, metadata: { type: "decks.card", path } });
 
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "decks-canvas-name-"));
@@ -36,7 +37,7 @@ test("a canvas with boards and only its agent's name is asked to be named, until
 	const { root, pens, put } = setup();
 	try {
 		const stage = pens.claim("Agent 3", { provisional: true });
-		put(stage, ["boards/a.html"]);
+		put(stage, ["cards/a/index.html"]);
 		assert.match(canvasNameReminder(pens, stage) ?? "", /says nothing about what is on it/);
 		pens.setTitle(stage, "Pricing study");
 		assert.equal(canvasNameReminder(pens, stage), undefined);
@@ -50,11 +51,11 @@ test("a named canvas that now holds mostly other boards is asked whether the nam
 	const { root, pens, put } = setup();
 	try {
 		const stage = pens.claim("Pricing study");
-		put(stage, ["boards/a.html", "boards/b.html"]);
+		put(stage, ["cards/a/index.html", "cards/b/index.html"]);
 		pens.setTitle(stage, "Pricing study");
-		put(stage, ["boards/a.html", "boards/b.html", "boards/c.html", "boards/d.html"]);
+		put(stage, ["cards/a/index.html", "cards/b/index.html", "cards/c/index.html", "cards/d/index.html"]);
 		assert.equal(canvasNameReminder(pens, stage), undefined, "two new of four is not mostly new");
-		put(stage, ["boards/a.html", "boards/b.html", "boards/c.html", "boards/d.html", "boards/e.html"]);
+		put(stage, ["cards/a/index.html", "cards/b/index.html", "cards/c/index.html", "cards/d/index.html", "cards/e/index.html"]);
 		assert.match(canvasNameReminder(pens, stage) ?? "", /3 of 5/);
 		pens.setTitle(stage, "Pricing study");
 		assert.equal(canvasNameReminder(pens, stage), undefined);
@@ -68,7 +69,7 @@ test("a canvas named before anything was on it keeps its name without asking", (
 	const { root, pens, put } = setup();
 	try {
 		const stage = pens.claim("Launch plan");
-		put(stage, ["boards/a.html", "boards/b.html", "boards/c.html", "boards/d.html"]);
+		put(stage, ["cards/a/index.html", "cards/b/index.html", "cards/c/index.html", "cards/d/index.html"]);
 		assert.equal(canvasNameReminder(pens, stage), undefined);
 	} finally {
 		pens.close();

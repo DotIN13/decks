@@ -13,7 +13,7 @@ interface PlacedItem {
 	id: string;
 	box: Box;
 	name?: string;
-	/** Its tag (`decks.card`, `decks.board`, `decks.document`, `decks.app`), when it has one. */
+	/** Its tag (`decks.card`, `decks.document`, `decks.app`), when it has one. */
 	type?: string;
 	/** The file a card or board names. */
 	path?: string;
@@ -75,7 +75,7 @@ export function placedItems(doc: PenDocument, look: "light" | "dark" = "light"):
 /** The boxes of a drawing's top-level items: what a fit frames. */
 export const topBoxes = (doc: PenDocument, look: "light" | "dark" = "light"): Box[] => placedItems(doc, look).map((item) => item.box);
 
-const isPageNode = (node: { metadata?: { path?: unknown; type?: unknown } }) => typeof node.metadata?.path === "string" && (node.metadata.type === "decks.card" || node.metadata.type === "decks.board");
+const isPageNode = (node: { metadata?: { path?: unknown; type?: unknown } }) => typeof node.metadata?.path === "string" && node.metadata.type === "decks.card";
 
 /**
  * The cards and boards a drawing places, by the file each names. Only they are read, so the notes

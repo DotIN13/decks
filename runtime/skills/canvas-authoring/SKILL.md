@@ -17,8 +17,6 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   `decks.card.create` (it goes in your canvas's `cards/`, or `{ canvas }`'s), then place it with
   `decks.canvas.insert({ type: "card", card: path }, { beside })`; `canvas.move`, `canvas.update`
   (`{ size: { w, h } }`) and `canvas.delete` (the folder stays) do the rest, or put it inside a frame.
-  Older canvases also hold **boards** (`{ type: "board", board }`, HTML pages in `boards/`): they are
-  read, moved and sized the same way, but boards are retired and new work is a card.
 - **Apps and documents** are items with no file of their own: `{ type: "app", app: "<name>" }` shows an
   app from `apps/` (`decks apps list`), and `{ type: "document", path: "canvases/<canvas>/files/notes.md" }`
   opens a document as a page the person types into. A document's `path` names the file **as the deck
@@ -170,7 +168,7 @@ no field for: `{ type: "…", … }`).
 | `group` | a container, no layout: its box is its children's | `children` |
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
-| `browser` | a card (see above), an app or a document, or an old board | `url`, `metadata: { type: "decks.card", path }` — read and written as `{ type: "card", card }` through the canvas calls (a board: `decks.board`, `{ type: "board", board }`); an app `metadata: { type: "decks.app", name }` and a document `metadata: { type: "decks.document", path }`, inserted as `{ type: "app", app }` and `{ type: "document", path }`; its frame is pen's own `cornerRadius`, `stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash` and `effect` (12 px corner and the canvas's 1 px outline when left out) |
+| `browser` | a card (see above), an app or a document | `url`, `metadata: { type: "decks.card", path }` — read and written as `{ type: "card", card }` through the canvas calls; an app `metadata: { type: "decks.app", name }` and a document `metadata: { type: "decks.document", path }`, inserted as `{ type: "app", app }` and `{ type: "document", path }`; its frame is pen's own `cornerRadius`, `stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash` and `effect` (12 px corner and the canvas's 1 px outline when left out) |
 | `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
 
 Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;

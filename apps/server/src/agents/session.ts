@@ -24,7 +24,6 @@ import { identityReminder } from "./identity-reminder.ts";
 import { canvasNameReminder } from "../stage/canvas-name.ts";
 import type { PenDocument } from "@decks/pen";
 import { canvasNews } from "./canvas-news.ts";
-import { stageBoardsDir } from "../deck/stage-boards.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -874,12 +873,12 @@ export class DeckAgent {
 	}
 
 	/**
-	 * A stage was deleted. If it was this agent's, it moves to a fresh, empty stage of its own, and keeps holding the deck's boards it had; boards that were
-	 * kept in the deleted stage's folder are gone with it.
+	 * A canvas was deleted. If it was this agent's, it moves to a fresh, empty canvas of its own; the
+	 * cards it held there are gone with the canvas's folder.
 	 */
 	stageDeleted(name: string): void {
 		if (this.stageFolder !== name) return;
-		const gone = (path: string) => path.startsWith(`${stageBoardsDir(name)}/`) || !this.deck.board(path);
+		const gone = (path: string) => !this.deck.board(path);
 		this.held = this.held.filter((path) => !gone(path));
 		for (const path of Object.keys(this.places)) if (gone(path)) delete this.places[path];
 		this.stageFolder = undefined;
@@ -949,16 +948,16 @@ export class DeckAgent {
 		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
 		const own = wanted.map((path) => pens.ownPath(name, path));
 		/*
-		 * What is held is what is on the canvas: the copies, never the library files they came from, or
-		 * the panel lists each board twice and the agent's context names files its canvas does not show.
-		 * A library path held from before is replaced by its copy.
+		 * What is held is what is on the canvas: the copies, never the other canvas's cards they came
+		 * from, or the panel lists each card twice and the agent's context names files its canvas does
+		 * not show. A path held from before the copy is replaced by its copy.
 		 */
 		wanted.forEach((path, index) => {
 			const copy = own[index]!;
 			if (copy !== path) this.held = this.held.filter((one) => one !== path);
 		});
 		hold(own);
-		// A place asked for a library board is the place of its copy.
+		// A place asked for another canvas's card is the place of its copy.
 		const at = options.at ? Object.fromEntries(Object.entries(options.at).map(([path, spot]) => [own[wanted.indexOf(path)] ?? path, spot])) : undefined;
 		const leaving = this.onCanvas().filter((one) => !own.includes(one.path)).map((one) => one.path);
 		if (leaving.length) Object.assign(this.places, takeOff(pens, this.deck, name, leaving));

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { AgentChat, AgentKind, AgentMode, ServerMessage, ThinkingLevel } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
@@ -11,6 +11,13 @@ import { runtimeOf } from "../runtimes/registry.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /**
  * That the chat list survives the process (DESIGN §6.2).
@@ -28,9 +35,8 @@ import { AgentStore } from "./store.ts";
  */
 function deckOn(): { deck: Deck; cleanup: () => void } {
 	const root = mkdtempSync(join(tmpdir(), "decks-registry-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	for (const name of ["plan.html", "notes.html"]) {
-		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
+	for (const name of ["plan", "notes"]) {
+		put(join(root, "canvases", "t", "cards", name, "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	return { deck: Deck.open(root), cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
@@ -78,7 +84,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 	const agent = agentOn(deck);
 	agent.rename("Kestrel");
 	agent.translator.user("what is the plan");
-	agent.setInPlay(["boards/plan.html"]);
+	agent.setInPlay(["canvases/t/cards/plan/index.html"]);
 	const id = agent.id;
 	agent.dispose();
 
@@ -90,8 +96,8 @@ test("a chat that was spoken to comes back after a restart", () => {
 	assert.equal(back.name, "Kestrel");
 	assert.equal(back.kind, "pi");
 	assert.equal(back.dormant, true, "readable, but nothing is running behind it");
-	assert.deepEqual(back.boards, ["boards/plan.html"], "with the boards it was holding on the row itself");
-	assert.deepEqual([...(registry.get(id)?.inPlay ?? [])], ["boards/plan.html"], "the canvas comes back too");
+	assert.deepEqual(back.boards, ["canvases/t/cards/plan/index.html"], "with the boards it was holding on the row itself");
+	assert.deepEqual([...(registry.get(id)?.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas comes back too");
 	cleanup();
 });
 
@@ -99,19 +105,19 @@ test("where a conversation put its boards comes back after a restart", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
 	agent.translator.user("put those two down here");
-	agent.setInPlay(["boards/plan.html", "boards/notes.html"]);
+	agent.setInPlay(["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"]);
 	// Two boards, placed differently from any auto-layout — the whole point of a stage owning
 	// its arrangement is that these numbers are not derivable from the deck.
-	agent.setPosition("boards/plan.html", 120, 340);
-	agent.setPosition("boards/notes.html", 900, 80);
+	agent.setPosition("canvases/t/cards/plan/index.html", 120, 340);
+	agent.setPosition("canvases/t/cards/notes/index.html", 900, 80);
 	const id = agent.id;
 	agent.dispose();
 
 	const { registry } = registryOn(deck);
 	registry.restore();
 	assert.deepEqual(registry.get(id)?.positions(), {
-		"boards/plan.html": { x: 120, y: 340 },
-		"boards/notes.html": { x: 900, y: 80 },
+		"canvases/t/cards/plan/index.html": { x: 120, y: 340 },
+		"canvases/t/cards/notes/index.html": { x: 900, y: 80 },
 	});
 	cleanup();
 });
@@ -122,11 +128,11 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	const one = agentOn(deck);
 	one.rename("One");
 	one.translator.user("here");
-	one.setPosition("boards/plan.html", 10, 20);
+	one.setPosition("canvases/t/cards/plan/index.html", 10, 20);
 	const two = agentOn(deck);
 	two.rename("Two");
 	two.translator.user("no, here");
-	two.setPosition("boards/plan.html", 900, 400);
+	two.setPosition("canvases/t/cards/plan/index.html", 900, 400);
 	const [firstId, secondId] = [one.id, two.id];
 	one.dispose();
 	two.dispose();
@@ -139,21 +145,21 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	 * handed the browser the arrangement it was leaving.
 	 */
 	registry.focus(firstId);
-	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 10, y: 20 } });
+	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
 	assert.deepEqual(
 		[
-			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "boards/plan.html")?.x,
-			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "boards/plan.html")?.y,
+			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.x,
+			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "canvases/t/cards/plan/index.html")?.y,
 		],
 		[10, 20],
 	);
 
 	registry.focus(secondId);
-	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 900, y: 400 } });
+	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 900, y: 400 } });
 
 	// And back again — the arrangement is a property of the chat, not a last-writer-wins row.
 	registry.focus(firstId);
-	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 10, y: 20 } });
+	assert.deepEqual(registry.looking()?.positions(), { "canvases/t/cards/plan/index.html": { x: 10, y: 20 } });
 	cleanup();
 });
 
@@ -244,7 +250,7 @@ test("an agent nobody spoke to is not written down", () => {
 	// What `focused()` creates on demand so a deck is never agentless. Persisting these
 	// would leave an empty "Agent" row behind on every single boot.
 	const agent = agentOn(deck);
-	agent.setInPlay(["boards/plan.html"]);
+	agent.setInPlay(["canvases/t/cards/plan/index.html"]);
 	agent.rename("Named but silent");
 	agent.dispose();
 
@@ -390,14 +396,14 @@ test("a chat that was on a shared canvas comes back with that canvas as its own 
 	const { deck, cleanup } = deckOn();
 	const dir = join(deck.path, ".decks", "canvases");
 	mkdirSync(dir, { recursive: true });
-	writeFileSync(
+	put(
 		join(dir, "bench.json"),
-		JSON.stringify({ version: 1, id: "cv_bench", name: "Bench", boards: ["boards/plan.html", "boards/gone.html"], places: { "boards/plan.html": { x: 40, y: 80 } }, links: [], groups: [], changedAt: 1 }),
+		JSON.stringify({ version: 1, id: "cv_bench", name: "Bench", boards: ["canvases/t/cards/plan/index.html", "canvases/t/cards/gone/index.html"], places: { "canvases/t/cards/plan/index.html": { x: 40, y: 80 } }, links: [], groups: [], changedAt: 1 }),
 	);
 	const agents = join(deck.path, ".decks", "agents");
 	const meta = (id: string, extra: Record<string, unknown>) => {
 		mkdirSync(join(agents, id), { recursive: true });
-		writeFileSync(join(agents, id, "meta.json"), JSON.stringify({ id, kind: "pi", name: id, color: "#3b5cf6", context: ["boards/notes.html"], createdAt: 1, lastAt: 2, ...extra }));
+		put(join(agents, id, "meta.json"), JSON.stringify({ id, kind: "pi", name: id, color: "#3b5cf6", context: ["canvases/t/cards/notes/index.html"], createdAt: 1, lastAt: 2, ...extra }));
 	};
 	meta("ada", { canvas: "cv_bench", canvases: ["cv_bench"] });
 	meta("dispatcher", { role: "dispatcher" });
@@ -405,13 +411,13 @@ test("a chat that was on a shared canvas comes back with that canvas as its own 
 	const { registry } = registryOn(deck);
 	assert.equal(registry.restore(), 1, "the dispatcher is not restored");
 	const ada = registry.get("ada");
-	assert.deepEqual([...(ada?.inPlay ?? [])], ["boards/plan.html"], "the canvas's boards that still exist are up");
-	assert.deepEqual([...(ada?.context ?? [])], ["boards/plan.html", "boards/notes.html"], "and held, before what it held already");
-	assert.deepEqual(ada?.positions(), { "boards/plan.html": { x: 40, y: 80 } }, "where they sat");
+	assert.deepEqual([...(ada?.inPlay ?? [])], ["canvases/t/cards/plan/index.html"], "the canvas's boards that still exist are up");
+	assert.deepEqual([...(ada?.context ?? [])], ["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"], "and held, before what it held already");
+	assert.deepEqual(ada?.positions(), { "canvases/t/cards/plan/index.html": { x: 40, y: 80 } }, "where they sat");
 
 	// Written back at once, so the next open reads the chat's own fields.
 	const record = new AgentStore(deck).read("ada")?.record;
-	assert.deepEqual(record?.inPlay, ["boards/plan.html"]);
+	assert.deepEqual(record?.inPlay, ["canvases/t/cards/plan/index.html"]);
 	assert.equal(record?.fromCanvas, undefined);
 	registry.dispose();
 	cleanup();
@@ -441,13 +447,13 @@ test("work can be sent to an agent by name, and lands in its queue", () => {
 	const { deck, cleanup } = deckOn();
 	const { registry, ada, kit } = twoRestored(deck);
 
-	const result = registry.send(ada, "Kit", { task: "Remeasure the panel", boards: ["boards/plan.html", "boards/gone.html"] });
+	const result = registry.send(ada, "Kit", { task: "Remeasure the panel", boards: ["canvases/t/cards/plan/index.html", "canvases/t/cards/gone/index.html"] });
 	assert.deepEqual(result, { queued: true, position: 1 });
 
 	const waiting = registry.get(kit)?.queue() ?? [];
 	assert.equal(waiting.length, 1);
 	assert.equal(waiting[0]?.fromName, "Ada", "and it says who sent it");
-	assert.deepEqual(waiting[0]?.boards, ["boards/plan.html"], "boards that do not exist are dropped");
+	assert.deepEqual(waiting[0]?.boards, ["canvases/t/cards/plan/index.html"], "boards that do not exist are dropped");
 	assert.deepEqual([...(registry.get(kit)?.context ?? [])], [], "and the receiver's own context is untouched");
 	cleanup();
 });
@@ -503,7 +509,7 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
 	const { registry } = registryOn(deck);
 	registry.restore();
 	const held = registry.get(id)!;
-	const paths = Array.from({ length: 25 }, (_, index) => `boards/b${index}.html`);
+	const paths = Array.from({ length: 25 }, (_, index) => `canvases/t/cards/b${index}/index.html`);
 	held.setInPlay(paths);
 
 	const summary = registry.summaries().find((row) => row.id === id)!;
@@ -773,10 +779,10 @@ test("a reply is delivered as a notice in the sender's transcript — and never 
 	const { deck, cleanup } = deckOn();
 	const { registry, sender, receiver, sent } = replyHarness(deck);
 
-	registry.send(sender.id, receiver.id, { task: "Remeasure the panel numbers", boards: ["boards/plan.html"], reply: true });
+	registry.send(sender.id, receiver.id, { task: "Remeasure the panel numbers", boards: ["canvases/t/cards/plan/index.html"], reply: true });
 	await settle(80);
 
-	assert.deepEqual(receiver.ran, ["Remeasure the panel numbers [boards/plan.html]"], "the receiver did the work");
+	assert.deepEqual(receiver.ran, ["Remeasure the panel numbers [canvases/t/cards/plan/index.html]"], "the receiver did the work");
 	assert.equal(receiver.queued, 0, "and its queue drained");
 	const notices = sent.filter(
 		(message): message is Extract<ServerMessage, { type: "chat.item" }> => message.type === "chat.item" && message.item.kind === "notice",
@@ -859,17 +865,17 @@ test("the summaries carry the workspace, and `undefined` is a real answer", () =
 
 test("a turn's boards are the ones the agent named, not the ones that moved meanwhile", async () => {
 	const { deck, cleanup } = deckOn();
-	writeFileSync(join(deck.path, "boards", "other.html"), "<!doctype html><title>Other</title><body class=\"board\"></body>");
-	deck.refresh("boards/other.html");
+	put(join(deck.path, "canvases", "t", "cards", "other", "index.html"), "<!doctype html><title>Other</title><body class=\"board\"></body>");
+	deck.refresh("canvases/t/cards/other/index.html");
 	const wrote: Array<[string, string]> = [];
 	class NamingAgent extends DeckAgent {
 		override async prompt(): Promise<void> {
 			// Somebody else rewrites a board during the turn; this agent only names its own.
-			writeFileSync(join(deck.path, "boards", "other.html"), "<!doctype html><title>Other, rewritten</title><body class=\"board\"></body>");
-			deck.refresh("boards/other.html");
-			this.workedOn("boards/plan.html");
-			this.workedOn("boards/plan.html");
-			this.workedOn("boards/gone.html");
+			put(join(deck.path, "canvases", "t", "cards", "other", "index.html"), "<!doctype html><title>Other, rewritten</title><body class=\"board\"></body>");
+			deck.refresh("canvases/t/cards/other/index.html");
+			this.workedOn("canvases/t/cards/plan/index.html");
+			this.workedOn("canvases/t/cards/plan/index.html");
+			this.workedOn("canvases/t/cards/gone/index.html");
 		}
 	}
 	const agent = new NamingAgent(
@@ -891,7 +897,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	const result = await agent.run("do it");
-	assert.deepEqual(result.boards, ["boards/plan.html"]);
-	assert.deepEqual(wrote, [["boards/plan.html", agent.id], ["boards/plan.html", agent.id]]);
+	assert.deepEqual(result.boards, ["canvases/t/cards/plan/index.html"]);
+	assert.deepEqual(wrote, [["canvases/t/cards/plan/index.html", agent.id], ["canvases/t/cards/plan/index.html", agent.id]]);
 	cleanup();
 });

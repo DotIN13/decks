@@ -47,10 +47,9 @@ export interface CanvasOptions {
 	 */
 	onEdits?: (edits: PenEdit[], doc: PenDocument) => void;
 	/**
-	 * The cards and boards on the drawing (its `browser` items with `metadata.type` `decks.card` or
-	 * `decks.board`), by their deck path: the address of a card's file, and the picture of each, for
-	 * the sheet that draws every board and every card not awake. A board is only ever its picture: the
-	 * canvas runs no board's page. Absent: they are drawn as empty frames.
+	 * The cards on the drawing (its `browser` items with `metadata.type` `decks.card`), by their deck
+	 * path: the address of a card's file, and the picture of each, for the sheet that draws every card
+	 * not awake. Absent: they are drawn as empty frames.
 	 */
 	pages?: {
 		/** A card's address (its `index.html`); for a document or an app item, anything at all. */

@@ -20,7 +20,7 @@ import { runCode } from "./run-code.test-helper.ts";
  * call a tool at all — and both are the part a model actually reads.
  */
 /** The board the tests fit, show and move: the agent's canvas's own. */
-const PLAN = "canvases/ada/boards/plan.html";
+const PLAN = "canvases/ada/cards/plan/index.html";
 
 function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: StageHost["measureAway"] } = {}) {
 	/*
@@ -32,8 +32,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const spots: Record<string, { x: number; y: number }> = {};
 	const root = mkdtempSync(join(tmpdir(), "decks-tool-"));
 	// The board the agent's canvas holds, in that canvas's own folder (`deck/layout.ts`).
-	mkdirSync(join(root, "canvases", "ada", "boards"), { recursive: true });
-	mkdirSync(join(root, "boards"), { recursive: true });
+	mkdirSync(join(root, "canvases", "ada", "cards", "plan"), { recursive: true });
 	writeFileSync(join(root, PLAN), `<!doctype html><title>plan</title><body class="board"></body>`);
 	const deck = Deck.open(root);
 
@@ -41,8 +40,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const created: CreateSpec[] = [];
 	const others = [
 		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: [PLAN], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
-		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: [PLAN, "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
-		{ id: "a3", name: "Iris", state: "idle" as const, kind: "claude" as const, context: ["boards/notes.html"], holding: 1, tags: [], queued: 0 },
+		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: [PLAN, "canvases/t/cards/notes/index.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
+		{ id: "a3", name: "Iris", state: "idle" as const, kind: "claude" as const, context: ["canvases/t/cards/notes/index.html"], holding: 1, tags: [], queued: 0 },
 	];
 	const waiting: QueuedWork[] = [];
 	/** The workspace the fake session is in, so `me.setWorkspace` → `me.get` is one round trip. */
@@ -161,6 +160,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
 		/** For a test that needs a board `card.create` does not write. */
 		write: (path: string, html: string) => {
+			mkdirSync(dirname(join(root, path)), { recursive: true });
 			writeFileSync(join(root, path), html);
 			deck.refresh(path);
 		},
@@ -308,7 +308,7 @@ test("a card is the agent's once it is named: card.create, canvas.fit and agent.
 	const claimed = await runCode(tool, `return await stage.agent.claim(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"])`);
 	assert.equal(claimed.isError, false, claimed.text);
 	assert.equal(worked.length, 3);
-	assert.match((await runCode(tool, `return await stage.agent.claim("boards/none.html")`)).text, /No such card/);
+	assert.match((await runCode(tool, `return await stage.agent.claim("canvases/t/cards/none/index.html")`)).text, /No such card/);
 	assert.equal(worked.length, 3);
 	cleanup();
 });
@@ -426,10 +426,10 @@ test("fit says what to do when the board is not on the canvas, rather than picki
 	const missing = await runCode(tool, `return await stage.canvas.fit("${PLAN}", { canvas: "nowhere" })`);
 	assert.equal(missing.isError, true);
 	assert.match(missing.text, /No canvas is called "nowhere"/);
-	write("boards/loose.html", `<!doctype html><title>loose</title><body class="board"></body>`);
-	const loose = await runCode(tool, `return await stage.canvas.fit("boards/loose.html")`);
+	write("canvases/t/cards/loose/index.html", `<!doctype html><title>loose</title><body class="board"></body>`);
+	const loose = await runCode(tool, `return await stage.canvas.fit("canvases/t/cards/loose/index.html")`);
 	assert.equal(loose.isError, true);
-	assert.match(loose.text, /boards\/loose\.html is not on the canvas "ada"/);
+	assert.match(loose.text, /cards\/loose\/index\.html is not on the canvas "ada"/);
 	cleanup();
 });
 
@@ -462,16 +462,16 @@ test("fit takes the height from the content and leaves the width alone", async (
  */
 test("a board that ends in its own padding is fitted exactly, with no margin to scroll", async () => {
 	const { tool, hold, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	write("canvases/ada/boards/page.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
-	const page = deck.board("canvases/ada/boards/page.html");
+	write("canvases/ada/cards/page/index.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
+	const page = deck.board("canvases/ada/cards/page/index.html");
 	assert.ok(page);
-	extents.set("canvases/ada/boards/page.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
+	extents.set("canvases/ada/cards/page/index.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
-	hold("canvases/ada/boards/page.html");
-	await runCode(tool, `return await stage.canvas.fit("canvases/ada/boards/page.html")`);
+	hold("canvases/ada/cards/page/index.html");
+	await runCode(tool, `return await stage.canvas.fit("canvases/ada/cards/page/index.html")`);
 	// The file, not the record: the tag is what `board.js` makes the body's height, and those
 	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
-	assert.match(read("canvases/ada/boards/page.html"), /"h":604/, "the measurement, and nothing added to it");
+	assert.match(read("canvases/ada/cards/page/index.html"), /"h":604/, "the measurement, and nothing added to it");
 	// A reading whose page is shorter than its height (from an older frame) still gets the margin.
 	const plan = deck.board(PLAN);
 	extents.set(PLAN, { rev: plan!.rev, w: 700, h: 1400, page: 900 });
@@ -705,7 +705,8 @@ test("a person's hide takes off only what it names", async () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-additive-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of ["a.html", "b.html", "c.html"]) {
-		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
+		mkdirSync(join(root, "canvases", "t", "cards", name.replace(/\.html$/, "")), { recursive: true });
+		writeFileSync(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	const deck = Deck.open(root);
 	const service = new StageService(deck, {
@@ -720,7 +721,7 @@ test("a person's hide takes off only what it names", async () => {
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		agents: () => [],
 	});
-	let up: string[] = ["boards/a.html", "boards/b.html", "boards/c.html"];
+	let up: string[] = ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html", "canvases/t/cards/c/index.html"];
 	let held: string[] = [];
 	const tool = createStageTool({
 		stage: service,
@@ -746,10 +747,10 @@ test("a person's hide takes off only what it names", async () => {
 		},
 	});
 
-	assert.equal((await tool.gesture("hide", ["boards/b.html"])).ok, true);
-	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "an out-of-date board comes off by name");
+	assert.equal((await tool.gesture("hide", ["canvases/t/cards/b/index.html"])).ok, true);
+	assert.deepEqual(up, ["canvases/t/cards/a/index.html", "canvases/t/cards/c/index.html"], "an out-of-date board comes off by name");
 
-	const emptied = await tool.gesture("hide", [["boards/a.html", "boards/c.html"]]);
+	const emptied = await tool.gesture("hide", [["canvases/t/cards/a/index.html", "canvases/t/cards/c/index.html"]]);
 	assert.equal(emptied.ok, true, emptied.error);
 	assert.deepEqual(up, [], "a stage can be cleared");
 	rmSync(root, { recursive: true, force: true });

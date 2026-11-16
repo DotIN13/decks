@@ -1,31 +1,13 @@
-import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, cpSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
-import { canvasFolder, canvasOfPath, isCardPath, isHidden, isSharedCanvas, servedAs } from "@decks/hub/layout";
-import { rewriteLinks } from "./links.ts";
-import { boardToCard, notACard } from "../migrations/2026-10-29-boards-to-cards.ts";
+import { canvasFolder, canvasOfPath, isCardPath, isHidden } from "@decks/hub/layout";
 
 /**
- * A board placed on a canvas from somewhere else (another canvas, the library, a friend's canvas) is
- * copied into the canvas's own `boards/`, with what it is made of, so the canvas still stands alone
- * (`deck/layout.ts`). The copy is the canvas's from then on, and changes apart from the original.
- *
- * What comes along, by where each link of the board leads:
- * - a file in the canvas it came from (its `files/`, a stylesheet beside it in `boards/`), or in the
- *   copies a friend's canvas came with (`assets/`, `docs/`): copied to the same place in this one;
- * - a sibling file beside a library board that is not a board (a stylesheet, a script): beside the copy;
- * - the runtime (`lib/`), and this deck's own `assets/`, `docs/` and `apps/`: nothing, they are served
- *   beside every canvas's boards;
- * - another board: the link is pointed at where that board is, from the copy's place.
- *
- * Boards are retired: a board's page placed on one of the deck's own canvases from the library or a
- * friend's canvas lands as a card (`cards/<name>/`), converted as the boards-to-cards migration
- * converts one (`boardToCard`). A page no converter reads, and a copy onto a friend's canvas, stay a
- * board, as before.
+ * What a canvas takes in when it is given something from elsewhere, so its folder still stands alone
+ * (`deck/layout.ts`): a card from another canvas (its own or a friend's) is copied into its `cards/`,
+ * a saved frame into its `frames/`, and a deck file its drawing fills with into its `files/`. The
+ * copy is the canvas's from then on, and changes apart from the original.
  */
-
-/** A link in a board's text: in quotes, `url(…)` or a markdown link, with a file extension. */
-const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
-const BOARD_FILE = /\.(?:x?html?|mdx?)$/i;
 
 function clone(deck: string, from: string, to: string): void {
 	if (existsSync(join(deck, to))) return;
@@ -41,86 +23,6 @@ const isFile = (full: string): boolean => {
 	}
 };
 
-/** Where in the board folder a board sits: `boards/x/a.html` → `x/a.html`, `canvases/n/boards/a.html` → `a.html`. */
-function insideBoards(path: string): string {
-	const at = canvasOfPath(path);
-	const rest = at ? at.rest : path;
-	return rest.replace(/^boards\//, "");
-}
-
-/**
- * Copy the board at deck path `from` into `canvas`'s `boards/`, under the same name or the next free
- * one (`-2`), with what it uses. Answers the copy's deck path.
- */
-export function copyBoardInto(deck: string, from: string, canvas: string): string {
-	const source = join(deck, from);
-	if (!isFile(source)) throw new Error(`There is no board ${from} to copy onto the canvas.`);
-	if (isCardPath(from)) return copyCardInto(deck, from, canvas);
-	const folder = canvasFolder(canvas);
-	const inside = insideBoards(from);
-	let to = `${folder}/boards/${inside}`;
-	for (let n = 2; existsSync(join(deck, to)); n++) {
-		to = `${folder}/boards/${inside.replace(/(\.[^./]+)?$/, (ext) => `-${n}${ext ?? ""}`)}`;
-		if (n > 500) throw new Error(`Too many copies of ${inside} on ${canvas}.`);
-	}
-	const fromDir = posix.dirname(from);
-	const toDir = posix.dirname(to);
-	const origin = canvasOfPath(from);
-	const text = readFileSync(source, "utf8");
-	const links: Array<{ from: string; to: string }> = [];
-	const seen = new Set<string>();
-	for (const match of text.matchAll(LINK)) {
-		const link = match[2]!;
-		if (seen.has(link)) continue;
-		seen.add(link);
-		const asked = posix.normalize(posix.join(fromDir, link));
-		if (asked.startsWith("..") || isHidden(asked)) continue;
-		const served = servedAs(asked);
-		if (!("path" in served) || !isFile(join(deck, served.path))) continue;
-		const real = served.path;
-		let place: string | undefined;
-		if (origin && real.startsWith(`${origin.folder}/`)) {
-			// Its own canvas's file, or a copy its friend's canvas came with: the same place here.
-			const rest = real.slice(origin.folder.length + 1);
-			if (rest.startsWith("boards/") && BOARD_FILE.test(rest)) place = real;
-			else {
-				// A friend's copies of their assets/ and docs/ go in files/ here: this deck's own are served at assets/ and docs/.
-				const kept = /^(?:assets|docs)\//.test(rest) && !isSharedCanvas(canvas) ? `files/${rest.replace(/^assets\//, "")}` : rest;
-				place = `${folder}/${kept}`;
-				clone(deck, real, place);
-			}
-		} else if (real.startsWith("boards/") && !BOARD_FILE.test(real)) {
-			// A stylesheet or script beside a library board: beside the copy too.
-			place = `${folder}/${real}`;
-			clone(deck, real, place);
-		} else if (/^(?:lib|assets|docs|apps)\//.test(real)) {
-			place = `${folder}/${real}`;
-		} else place = real;
-		let next = posix.relative(toDir, place);
-		if (link.startsWith("./") && !next.startsWith(".")) next = `./${next}`;
-		if (next !== link) links.push({ from: link, to: next });
-	}
-	const copied = links.length ? rewriteLinks(text, links) : text;
-	// A board's page directly in boards/, onto the deck's own canvas: a card, its links one folder deeper.
-	if (!isSharedCanvas(canvas) && /\.html?$/i.test(to) && toDir === `${folder}/boards` && !notACard(copied)) return asCard(deck, copied, posix.basename(to).replace(/\.html?$/i, ""), folder);
-	mkdirSync(dirname(join(deck, to)), { recursive: true });
-	writeFileSync(join(deck, to), copied);
-	return to;
-}
-
-/** A board's page, its links already the canvas's, written as a card in the canvas's `cards/`: its deck path. */
-function asCard(deck: string, html: string, base: string, folder: string): string {
-	let name = base;
-	for (let n = 2; existsSync(join(deck, folder, "cards", name)); n++) {
-		name = `${base}-${n}`;
-		if (n > 500) throw new Error(`Too many copies of the card ${base} in ${folder}.`);
-	}
-	const to = `${folder}/cards/${name}/index.html`;
-	mkdirSync(dirname(join(deck, to)), { recursive: true });
-	writeFileSync(join(deck, to), boardToCard(html, new Map()));
-	return to;
-}
-
 /**
  * Copy the card at deck path `from` (`canvases/a/cards/sales/index.html`) into `canvas`'s `cards/`,
  * its whole folder (its scripts, styles and data are its own), under the same name or the next free
@@ -128,7 +30,8 @@ function asCard(deck: string, html: string, base: string, folder: string): strin
  * inside every canvas, so it needs no rewriting; a link out of its folder into its old canvas's
  * `files/` is left as it is, and finds that name in this canvas's `files/` or nothing.
  */
-function copyCardInto(deck: string, from: string, canvas: string): string {
+export function copyCardInto(deck: string, from: string, canvas: string): string {
+	if (!isCardPath(from) || !isFile(join(deck, from))) throw new Error(`There is no card ${from} to copy onto the canvas.`);
 	const name = from.split("/").at(-2)!;
 	const folder = canvasFolder(canvas);
 	let to = `${folder}/cards/${name}`;

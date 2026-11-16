@@ -1,25 +1,22 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { Deck } from "./loader.ts";
 import { withBoardSize } from "./meta.ts";
 import { realPathOf } from "./roots.ts";
 
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, text: string): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, text);
+}
+
+
 function board(title: string, w?: number, h?: number): string {
 	const meta = w && h ? `<meta name="board" content='{"w":${w},"h":${h}}'>` : "";
 	return `<!doctype html><html><head><title>${title}</title>${meta}</head><body class="board"></body></html>`;
-}
-
-/** A deck in reveal's own markup, left from when slide decks were a board format: read as any HTML page now. */
-function slideDeck(title: string): string {
-	return `<!doctype html><html><head><title>${title}</title></head><body class="reveal"><div class="slides"></div></body></html>`;
-}
-
-/** A page from somewhere else: neither class, so it is sandboxed and cannot measure itself. */
-function foreign(title: string): string {
-	return `<!doctype html><html><head><title>${title}</title></head><body><p>Saved.</p></body></html>`;
 }
 
 function emptyDeck(withFile = true) {
@@ -34,13 +31,13 @@ test("an unnamed deck takes the name of the data directory it sits in", () => {
 	// The shape the app actually creates: <data dir>/decks.
 	const root = join(base, "my-project", "decks");
 	mkdirSync(join(root, "boards"), { recursive: true });
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A"));
 	assert.equal(Deck.open(root).name, "my-project");
 
 	// A dotted data directory is a convention, not a name.
 	const dotted = join(base, ".decks", "decks");
 	mkdirSync(join(dotted, "boards"), { recursive: true });
-	writeFileSync(join(dotted, "boards", "a.html"), board("A"));
+	put(join(dotted, "canvases", "t", "cards", "a", "index.html"), board("A"));
 	assert.equal(Deck.open(dotted).name, "decks");
 
 	// And deck.json always wins.
@@ -51,7 +48,7 @@ test("an unnamed deck takes the name of the data directory it sits in", () => {
 
 test("a directory of boards with no deck.json is still a deck", () => {
 	const root = emptyDeck(false);
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 800, 600));
 	const deck = Deck.open(root);
 	assert.equal(deck.boards.length, 1);
 	assert.equal(deck.boards[0]?.title, "A");
@@ -62,7 +59,7 @@ test("a directory of boards with no deck.json is still a deck", () => {
 
 test("boards nobody arranged get placed in rows, not on top of each other", () => {
 	const root = emptyDeck();
-	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	for (const name of ["a", "b", "c", "d"]) put(join(root, "canvases", "t", "cards", name, "index.html"), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
 	// Through `state()`: the arrangement is computed when the boards are sent, not stored on them, which
 	// is what a stage's positions made true. The board list itself is only the list of boards.
@@ -81,9 +78,9 @@ test("boards nobody arranged get placed in rows, not on top of each other", () =
 
 test("a stage's own place wins over the auto-layout, and the deck file is not where it is written", () => {
 	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 800, 600));
 	const deck = Deck.open(root);
-	const state = deck.state({ "boards/a.html": { x: 42, y: 99 } });
+	const state = deck.state({ "canvases/t/cards/a/index.html": { x: 42, y: 99 } });
 	assert.deepEqual([state.boards[0]?.x, state.boards[0]?.y], [42, 99]);
 
 	// The place belongs to a stage's own record — `AgentRecord.positions` — and nowhere else, so the
@@ -96,11 +93,11 @@ test("a stage's own place wins over the auto-layout, and the deck file is not wh
 
 test("a board nobody placed lands under this stage's arrangement, not the deck's", () => {
 	const root = emptyDeck();
-	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	for (const name of ["a", "b", "c", "d"]) put(join(root, "canvases", "t", "cards", name, "index.html"), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
 	// One board down at y=2000, and three with no place of their own.
-	const state = deck.state({ "boards/a.html": { x: 0, y: 2000 } });
-	const others = state.boards.filter((one) => one.path !== "boards/a.html");
+	const state = deck.state({ "canvases/t/cards/a/index.html": { x: 0, y: 2000 } });
+	const others = state.boards.filter((one) => one.path !== "canvases/t/cards/a/index.html");
 	// The rows start under the stage's own arrangement rather than at the origin — which is the one
 	// line the per-stage change actually touched: whose boards `autoPlace` counts as placed.
 	for (const other of others) assert.ok(other.y > 2300, `${other.path} sits below the placed board`);
@@ -111,39 +108,38 @@ test("a board nobody placed lands under this stage's arrangement, not the deck's
 
 test("the auto-layout reports the places it worked out, and a stage that keeps them stops chasing", () => {
 	const root = emptyDeck();
-	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	for (const name of ["a", "b", "c", "d"]) put(join(root, "canvases", "t", "cards", name, "index.html"), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
-	const places: Record<string, { x: number; y: number }> = { "boards/a.html": { x: 0, y: 0 } };
+	const places: Record<string, { x: number; y: number }> = { "canvases/t/cards/a/index.html": { x: 0, y: 0 } };
 	const worked: string[] = [];
 	deck.state(places, (path, at) => {
 		worked.push(path);
 		places[path] = at;
 	});
-	assert.deepEqual(worked.sort(), ["boards/b.html", "boards/c.html", "boards/d.html"]);
+	assert.deepEqual(worked.sort(), ["canvases/t/cards/b/index.html", "canvases/t/cards/c/index.html", "canvases/t/cards/d/index.html"]);
 
 	// Keeping them is the whole point: move the one board that *was* placed and the others stay put.
 	// Derived on every send, they would follow the frontier down — a board that moves because you
 	// moved a different one, which is what "haunted" means here.
 	const before = deck.state(places).boards.map((one) => [one.path, one.x, one.y] as const);
-	const after = deck.state({ ...places, "boards/a.html": { x: 0, y: 6000 } }).boards.map((one) => [one.path, one.x, one.y] as const);
+	const after = deck.state({ ...places, "canvases/t/cards/a/index.html": { x: 0, y: 6000 } }).boards.map((one) => [one.path, one.x, one.y] as const);
 	for (const [path, x, y] of before) {
-		if (path === "boards/a.html") continue;
+		if (path === "canvases/t/cards/a/index.html") continue;
 		assert.deepEqual(after.find((entry) => entry[0] === path)?.slice(1), [x, y], `${path} did not move`);
 	}
 
 	// And with every place kept, a send has nothing left to work out.
 	const again: string[] = [];
-	deck.state({ ...places, "boards/a.html": { x: 0, y: 6000 } }, (path) => again.push(path));
+	deck.state({ ...places, "canvases/t/cards/a/index.html": { x: 0, y: 6000 } }, (path) => again.push(path));
 	assert.deepEqual(again, []);
 	rmSync(root, { recursive: true, force: true });
 });
 
 test("a board's size is its own file's, and deck.json's copy is ignored", () => {
 	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	// A resize writes the file, whichever format it is: the tag for HTML, front-matter for markdown.
-	writeFileSync(join(root, "boards", "saved.html"), withBoardSize("boards/saved.html", foreign("Saved"), { w: 900, h: 700 }));
-	writeFileSync(join(root, "boards", "talk.slides.html"), withBoardSize("boards/talk.slides.html", slideDeck("Talk"), { w: 1440 }));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 800, 600));
+	// A resize writes the file's own tag.
+	put(join(root, "canvases", "t", "cards", "saved", "index.html"), withBoardSize("canvases/t/cards/saved/index.html", board("Saved"), { w: 900, h: 700 }));
 	/*
 	 * And an older `deck.json`'s numbers are not read at all.
 	 *
@@ -157,19 +153,15 @@ test("a board's size is its own file's, and deck.json's copy is ignored", () => 
 			version: 1,
 			name: "T",
 			boards: {
-				"boards/saved.html": { x: 0, y: 0, w: 320, h: 240 },
-				"boards/talk.slides.html": { x: 0, y: 0, w: 400 },
+				"canvases/t/cards/saved/index.html": { x: 0, y: 0, w: 320, h: 240 },
 			},
 		}),
 	);
 
 	const deck = Deck.open(root);
-	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700], "the file's numbers, not the record's");
-	assert.equal(deck.board("boards/talk.slides.html")?.w, 1440);
-	assert.equal(deck.board("boards/talk.slides.html")?.shell, "foreign", "a leftover deck is a page from somewhere else, not a deck");
-	assert.ok((deck.board("boards/talk.slides.html")?.h ?? 0) > 0);
+	assert.deepEqual([deck.board("canvases/t/cards/saved/index.html")?.w, deck.board("canvases/t/cards/saved/index.html")?.h], [900, 700], "the file's numbers, not the record's");
 	assert.deepEqual(
-		[deck.board("boards/a.html")?.w, deck.board("boards/a.html")?.h],
+		[deck.board("canvases/t/cards/a/index.html")?.w, deck.board("canvases/t/cards/a/index.html")?.h],
 		[800, 600],
 		"and a component board is its own <meta> as it always was",
 	);
@@ -178,15 +170,15 @@ test("a board's size is its own file's, and deck.json's copy is ignored", () => 
 
 test("a legacy boards map gives its places as a seed, and none of its sizes", () => {
 	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
+	put(join(root, "canvases", "t", "cards", "saved", "index.html"), board("Saved"));
 	writeFileSync(
 		join(root, "deck.json"),
-		JSON.stringify({ version: 1, name: "T", boards: { "boards/saved.html": { x: 120, y: 340, w: 900, h: 700 } } }),
+		JSON.stringify({ version: 1, name: "T", boards: { "canvases/t/cards/saved/index.html": { x: 120, y: 340, w: 900, h: 700 } } }),
 	);
 	const deck = Deck.open(root);
 	// A size in this file is not a size any more: the board's own file is the only place one lives, and
 	// this board's file says nothing, so it takes the placeholder for a foreign page.
-	assert.notDeepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700]);
+	assert.notDeepEqual([deck.board("canvases/t/cards/saved/index.html")?.w, deck.board("canvases/t/cards/saved/index.html")?.h], [900, 700]);
 
 	/*
 	 * The place is the seed a stage starts from — reported through `onPlace` so the stage writes it
@@ -196,7 +188,7 @@ test("a legacy boards map gives its places as a seed, and none of its sizes", ()
 	const kept: Record<string, { x: number; y: number }> = {};
 	const state = deck.state(undefined, (path, at) => (kept[path] = at));
 	assert.deepEqual([state.boards[0]?.x, state.boards[0]?.y], [120, 340], "the deck's own arrangement");
-	assert.deepEqual(kept, { "boards/saved.html": { x: 120, y: 340 } }, "and the caller is told, so it can keep it");
+	assert.deepEqual(kept, { "canvases/t/cards/saved/index.html": { x: 120, y: 340 } }, "and the caller is told, so it can keep it");
 
 	// A stage that already has a place is not seeded again — and reading a deck writes nothing at all,
 	// which is why the old map is still on disk for the next conversation to seed from.
@@ -214,10 +206,10 @@ test("a legacy boards map gives its places as a seed, and none of its sizes", ()
 
 test("a board that has been deleted leaves the deck", () => {
 	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A"));
 	const deck = Deck.open(root);
-	rmSync(join(root, "boards", "a.html"));
-	assert.equal(deck.refresh("boards/a.html"), undefined);
+	rmSync(join(root, "canvases", "t", "cards", "a", "index.html"));
+	assert.equal(deck.refresh("canvases/t/cards/a/index.html"), undefined);
 	assert.equal(deck.boards.length, 0);
 	rmSync(root, { recursive: true, force: true });
 });
@@ -226,9 +218,9 @@ test("a board that has been deleted leaves the deck", () => {
 
 test("removing from a deck with no arrangement does not write one", () => {
 	const root = emptyDeck(false);
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A"));
 	const deck = Deck.open(root);
-	assert.equal(deck.remove("boards/a.html"), true);
+	assert.equal(deck.remove("canvases/t/cards/a/index.html"), true);
 	assert.equal(existsSync(join(root, "deck.json")), false, "opening a deck must not write to it, and neither must this");
 	rmSync(root, { recursive: true, force: true });
 });
@@ -246,32 +238,27 @@ test("a path that climbs out of the deck cannot be removed", () => {
 });
 
 /*
- * Markdown used to be on the "not a board" side of this test, and now it is a board — see
- * `deck/kinds.ts`. Kept as one test rather than split, because what it is really asserting
- * has not changed: the glob walks subdirectories, skips dotfiles, and takes only the
- * extensions it knows.
+ * A card is the only page there is: each folder of a canvas's `cards/` with an `index.html`. What a
+ * deck from before cards left in `boards/` is a plain file, listed nowhere.
  */
-test("boards are found in subdirectories, and non-boards are not", () => {
+test("cards are each folder of a canvas's cards/ with an index.html, and nothing else is a page", () => {
 	const root = emptyDeck();
-	mkdirSync(join(root, "boards", "nested"), { recursive: true });
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
-	writeFileSync(join(root, "boards", "nested", "b.htm"), board("B"));
-	writeFileSync(join(root, "boards", "notes.md"), "# Notes");
-	writeFileSync(join(root, "boards", "talk.slides.md"), "# One\n\n---\n\n# Two");
-	writeFileSync(join(root, "boards", "readme.txt"), "not a board");
-	writeFileSync(join(root, "boards", ".hidden.html"), board("H"));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A"));
+	put(join(root, "canvases", "t", "cards", "a", "chart.html"), board("A file of the card's own"));
+	put(join(root, "canvases", "t", "cards", ".hidden", "index.html"), board("H"));
+	put(join(root, "canvases", "t", "cards", "empty", "notes.md"), "# No index");
+	put(join(root, "canvases", "t", "files", "page.html"), board("A file of the canvas"));
+	put(join(root, "shared", "canvases", "ada", "plan", "cards", "b", "index.html"), board("B"));
+	put(join(root, "boards", "old.html"), board("An old board"));
+	put(join(root, "canvases", "t", "boards", "old.html"), board("An old board of the canvas's"));
 	const deck = Deck.open(root);
 	assert.deepEqual(
 		deck.boards.map((b) => b.path),
-		["boards/a.html", "boards/nested/b.htm", "boards/notes.md", "boards/talk.slides.md"],
+		["canvases/t/cards/a/index.html", "shared/canvases/ada/plan/cards/b/index.html"],
 	);
-	// And each one knows how it is delivered: ours as it is, markdown wrapped, a leftover deck too.
-	assert.deepEqual(
-		deck.boards.map((b) => b.shell),
-		[undefined, undefined, "content", "content"],
-	);
-	// The title comes from the content: a rail full of filenames is a rail with nothing in it.
-	assert.equal(deck.boards.find((b) => b.path === "boards/notes.md")?.title, "Notes");
+	assert.ok(deck.boards.every((b) => b.card === true));
+	// The title comes from the content: a list of folder names is a list with nothing in it.
+	assert.equal(deck.board("canvases/t/cards/a/index.html")?.title, "A");
 	rmSync(root, { recursive: true, force: true });
 });
 
@@ -282,36 +269,34 @@ test("boards are found in subdirectories, and non-boards are not", () => {
  */
 test("resync reports what changed, what arrived and what went away — and nothing else", () => {
 	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 800, 600));
 	const deck = Deck.open(root);
 	assert.deepEqual(deck.resync(), { changed: [], removed: [] });
 
 	// An edit the watcher never mentioned.
-	writeFileSync(join(root, "boards", "a.html"), board("A", 1200, 900));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 1200, 900));
 	const edited = deck.resync();
 	assert.deepEqual(
 		edited.changed.map((b) => [b.path, b.w, b.h]),
-		[["boards/a.html", 1200, 900]],
+		[["canvases/t/cards/a/index.html", 1200, 900]],
 	);
 	assert.deepEqual(edited.removed, []);
 
 	// A board that arrived without an event, and one that left the same way.
-	writeFileSync(join(root, "boards", "b.html"), board("B", 400, 300));
-	rmSync(join(root, "boards", "a.html"));
+	put(join(root, "canvases", "t", "cards", "b", "index.html"), board("B", 400, 300));
+	rmSync(join(root, "canvases", "t", "cards", "a", "index.html"));
 	const moved = deck.resync();
 	assert.deepEqual(
 		moved.changed.map((b) => b.path),
-		["boards/b.html"],
+		["canvases/t/cards/b/index.html"],
 	);
-	assert.deepEqual(moved.removed, ["boards/a.html"]);
+	assert.deepEqual(moved.removed, ["canvases/t/cards/a/index.html"]);
 	assert.deepEqual(
 		deck.boards.map((b) => b.path),
-		["boards/b.html"],
+		["canvases/t/cards/b/index.html"],
 	);
 
-	// Touched, not edited: a new signature and the same bytes is not news.
-	const same = readFileSync(join(root, "boards", "b.html"), "utf8");
-	writeFileSync(join(root, "boards", "b.html"), same);
+	// Nothing touched since: nothing to say.
 	assert.deepEqual(deck.resync(), { changed: [], removed: [] });
 
 	rmSync(root, { recursive: true, force: true });
@@ -319,25 +304,25 @@ test("resync reports what changed, what arrived and what went away — and nothi
 
 test("a board nobody has put on a canvas is not given a place to keep", () => {
 	const root = emptyDeck();
-	for (const name of ["a", "b"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	for (const name of ["a", "b"]) put(join(root, "canvases", "t", "cards", name, "index.html"), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
 	const worked: string[] = [];
 	// The canvas is the third argument: only what is on it is worth a place, because a place is a
 	// fact about where a board sits among the boards beside it. Recording one for every board in the
 	// deck is what built the column a new board used to land at the bottom of.
-	deck.state({}, (path) => worked.push(path), ["boards/a.html"]);
-	assert.deepEqual(worked, ["boards/a.html"]);
+	deck.state({}, (path) => worked.push(path), ["canvases/t/cards/a/index.html"]);
+	assert.deepEqual(worked, ["canvases/t/cards/a/index.html"]);
 	rmSync(root, { recursive: true, force: true });
 });
 
 test("the fallback layout measures itself against the canvas, not every board the stage has placed", () => {
 	const root = emptyDeck();
-	for (const name of ["a", "b", "c"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	for (const name of ["a", "b", "c"]) put(join(root, "canvases", "t", "cards", name, "index.html"), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
 	// `c` is nowhere near: the sort of place the old deck-wide layout left behind. `a` is the canvas.
-	const places = { "boards/a.html": { x: 0, y: 0 }, "boards/c.html": { x: 0, y: 900_000 } };
-	const state = deck.state(places, undefined, ["boards/a.html", "boards/b.html"]);
-	const b = state.boards.find((one) => one.path === "boards/b.html");
+	const places = { "canvases/t/cards/a/index.html": { x: 0, y: 0 }, "canvases/t/cards/c/index.html": { x: 0, y: 900_000 } };
+	const state = deck.state(places, undefined, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	const b = state.boards.find((one) => one.path === "canvases/t/cards/b/index.html");
 	assert.ok(b && b.y < 10_000, `the unplaced board landed at ${b?.y}, beside the canvas rather than below the deck`);
 	rmSync(root, { recursive: true, force: true });
 });
@@ -348,31 +333,31 @@ test("the fallback layout measures itself against the canvas, not every board th
  */
 test("a board is the height its file states, through edits, and a new number in the file replaces it", () => {
 	const root = emptyDeck();
-	const file = join(root, "boards", "a.html");
-	writeFileSync(file, board("A", 900, 400));
+	const file = join(root, "canvases", "t", "cards", "a", "index.html");
+	put(file, board("A", 900, 400));
 	const deck = Deck.open(root);
-	assert.equal(deck.board("boards/a.html")?.h, 400);
+	assert.equal(deck.board("canvases/t/cards/a/index.html")?.h, 400);
 
 	writeFileSync(file, board("A", 900, 400).replace("<body", "<body data-x=1"));
-	assert.equal(deck.refresh("boards/a.html")?.h, 400, "an edit leaves it as it was");
+	assert.equal(deck.refresh("canvases/t/cards/a/index.html")?.h, 400, "an edit leaves it as it was");
 
-	writeFileSync(file, withBoardSize("boards/a.html", readFileSync(file, "utf8"), { h: 500 }));
-	assert.equal(deck.refresh("boards/a.html")?.h, 500, "a fit or a resize lands at once");
+	writeFileSync(file, withBoardSize("canvases/t/cards/a/index.html", readFileSync(file, "utf8"), { h: 500 }));
+	assert.equal(deck.refresh("canvases/t/cards/a/index.html")?.h, 500, "a fit or a resize lands at once");
 	rmSync(root, { recursive: true, force: true });
 });
 
 test("an old reading answers only for a file that states no height, at the revision it was read at", () => {
 	const root = emptyDeck();
 	mkdirSync(join(root, ".decks"), { recursive: true });
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
-	writeFileSync(join(root, "boards", "b.html"), board("B", 1000, 259));
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A"));
+	put(join(root, "canvases", "t", "cards", "b", "index.html"), board("B", 1000, 259));
 	const first = Deck.open(root);
-	const kept = { "boards/a.html": { rev: first.board("boards/a.html")!.rev, h: 418 }, "boards/b.html": { rev: first.board("boards/b.html")!.rev, h: 418 } };
+	const kept = { "canvases/t/cards/a/index.html": { rev: first.board("canvases/t/cards/a/index.html")!.rev, h: 418 }, "canvases/t/cards/b/index.html": { rev: first.board("canvases/t/cards/b/index.html")!.rev, h: 418 } };
 	writeFileSync(join(root, ".decks", "heights.json"), JSON.stringify(kept));
 	const deck = Deck.open(root);
-	assert.equal(deck.board("boards/a.html")?.h, 418, "no height in the file, so the old reading");
-	assert.equal(deck.board("boards/b.html")?.h, 259, "the file's own height wins");
-	writeFileSync(join(root, "boards", "a.html"), board("A, edited"));
-	assert.notEqual(Deck.open(root).board("boards/a.html")?.h, 418, "another revision is not what was read");
+	assert.equal(deck.board("canvases/t/cards/a/index.html")?.h, 418, "no height in the file, so the old reading");
+	assert.equal(deck.board("canvases/t/cards/b/index.html")?.h, 259, "the file's own height wins");
+	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A, edited"));
+	assert.notEqual(Deck.open(root).board("canvases/t/cards/a/index.html")?.h, 418, "another revision is not what was read");
 	rmSync(root, { recursive: true, force: true });
 });

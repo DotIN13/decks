@@ -2,19 +2,26 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /** A deck with one board, its HTTP server on a free port, and the focused agent's id. */
 async function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-verbs-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(
-		join(deck, "boards", "tall.html"),
+	put(
+		join(deck, "canvases", "t", "cards", "tall", "index.html"),
 		`<!doctype html><html><head><title>Tall</title><meta name="board" content='{"w":900,"h":400,"bg":"grid"}' /></head><body class="board"></body></html>`,
 	);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
@@ -82,10 +89,10 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 test("a verb is called for the agent whose token the request carries, whatever a header says", async () => {
 	const { app, call, agent, token, bearer, cleanup } = await open();
 	try {
-		const byId = await call("card.get", ["boards/tall.html"]);
+		const byId = await call("card.get", ["canvases/t/cards/tall/index.html"]);
 		assert.equal(byId.status, 200);
 		assert.ok(byId.body.ok);
-		assert.equal((byId.body.value as { path: string }).path, "boards/tall.html");
+		assert.equal((byId.body.value as { path: string }).path, "canvases/t/cards/tall/index.html");
 
 		const renamed = await call("agent.update", [{ name: "Wren", tags: ["testing"], workspace: "decks", avatar: { emoji: "🐦" } }]);
 		assert.ok(renamed.body.ok, renamed.body.error);
@@ -136,7 +143,7 @@ test("wrong calls are answered with a sentence and the verb's signature", async 
 		const stranger = await call("card.list", [], bearer("dk_a_nobody-here"));
 		assert.equal(stranger.status, 401);
 
-		const refused = await call("canvas.fit", ["boards/no-such.html"]);
+		const refused = await call("canvas.fit", ["canvases/t/cards/no-such/index.html"]);
 		assert.equal(refused.status, 422, "a verb that throws is an answer, not a crash");
 		assert.equal(refused.body.ok, false);
 		assert.ok(refused.body.error);
@@ -153,8 +160,8 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 	const { base, agent, token, cleanup } = await open();
 	try {
 		const env = { ...process.env, DECKS_TOKEN: "", ...decksEnv(Number(new URL(base).port), agent.id, token) };
-		const listed = await run("sh", ["-c", "decks card get boards/tall.html | head -c 2000"], { env });
-		assert.equal(JSON.parse(listed.stdout).path, "boards/tall.html");
+		const listed = await run("sh", ["-c", "decks card get canvases/t/cards/tall/index.html | head -c 2000"], { env });
+		assert.equal(JSON.parse(listed.stdout).path, "canvases/t/cards/tall/index.html");
 		const made = await run("sh", ["-c", 'decks card create --title "From the shell"'], { env });
 		assert.match(made.stdout, /canvases\/[^/]+\/cards\/from-the-shell\//);
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
@@ -192,12 +199,12 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 		// On screen first, so there is a board to move (`canvas.insert`, as the person).
 		// The person's token, as a Decks tab has it; the agent they talk to is a parameter.
 		const person = { "content-type": "application/json", authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id };
-		const put = await fetch(`${base}/canvas.insert`, { method: "POST", headers: person, body: JSON.stringify({ args: [{ type: "board", board: "boards/tall.html" }, { at: { x1: 0, y1: 0 } }] }) });
+		const put = await fetch(`${base}/canvas.insert`, { method: "POST", headers: person, body: JSON.stringify({ args: [{ type: "card", card: "canvases/t/cards/tall/index.html" }, { at: { x1: 0, y1: 0 } }] }) });
 		assert.ok(((await put.json()) as { ok: boolean }).ok);
 		const response = await fetch(`${base}/canvas.move`, {
 			method: "POST",
 			headers: person,
-			body: JSON.stringify({ args: ["boards/tall.html", { at: { x1: 40, y1: 80 } }] }),
+			body: JSON.stringify({ args: ["canvases/t/cards/tall/index.html", { at: { x1: 40, y1: 80 } }] }),
 		});
 		const answer = (await response.json()) as { ok: boolean; value?: { box: { x1: number; y1: number } }; notes: string[] };
 		assert.ok(answer.ok);
@@ -212,8 +219,8 @@ test("an app is shown by an item: apps.item names it, canvas.insert places it, a
 	const { app, call, cleanup } = await open();
 	try {
 		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
-		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static", title: "Notes" }));
-		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
+		put(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static", title: "Notes" }));
+		put(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
 		const item = await call("apps.item", ["notes"]);
 		assert.deepEqual(item.body.value, { type: "app", app: "notes" }, "the item to insert, and no file written");
 		assert.equal(existsSync(join(app.deck.path, "boards", "apps", "notes.html")), false);
@@ -238,8 +245,8 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 	const { app, call, bearer, cleanup } = await open();
 	try {
 		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
-		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static" }));
-		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
+		put(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static" }));
+		put(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
 		// Let it in ahead, so no question waits on a person.
 		app.appTrust.allow("apps/notes");
 
@@ -257,7 +264,7 @@ test("each principal calls as itself: an app as the app, a site as the person, w
 
 		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
 		assert.equal((await call("card.list", [], site)).status, 200);
-		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("boards/tall.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
+		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("canvases/t/cards/tall/index.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
 		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
 
 		const none = await callerOf(app, { headers: { "x-decks-person": "1" } }, new Set());

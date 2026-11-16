@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /*
  * Whose arrangement `decks.canvas.read()` answers with.
@@ -26,7 +33,7 @@ function open() {
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
 	for (const name of ["plan.html", "risks.html"]) {
-		writeFileSync(join(deck, "boards", name), `<!doctype html><html><head><title>${name}</title></head><body class="board"></body></html>`);
+		put(join(deck, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><html><head><title>${name}</title></head><body class="board"></body></html>`);
 	}
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
@@ -39,14 +46,14 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		// Both have the board up, so both have a place for it — as two agents on one project do.
-		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/plan.html"], { place: true });
+		for (const agent of [mover, elsewhere]) agent.setInPlay(["canvases/t/cards/plan/index.html"], { place: true });
 		// Each canvas places its own copy of a library board (`deck/layout.ts`).
-		const plan = app.pens.copyOf(mover.stageName()!, "boards/plan.html");
+		const plan = app.pens.copyOf(mover.stageName()!, "canvases/t/cards/plan/index.html");
 		const before = app.stage.boards(mover.id).find((board) => board.path === plan)!;
 
 		// The person is reading the other conversation while this one works.
 		app.agents.look(elsewhere.id);
-		const moved = app.stage.move(mover.id, "boards/plan.html", { x: before.x - 1140, y: before.y + 60 });
+		const moved = app.stage.move(mover.id, "canvases/t/cards/plan/index.html", { x: before.x - 1140, y: before.y + 60 });
 		assert.equal(moved?.x, before.x - 1140, "the move answers with what was asked for");
 
 		const read = app.stage.boards(mover.id).find((board) => board.path === plan)!;
@@ -65,12 +72,12 @@ test("the other conversation's canvas is untouched, which is what made the stale
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
-		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/risks.html"], { place: true });
-		const own = (agent: typeof mover) => app.pens.copyOf(agent.stageName()!, "boards/risks.html");
+		for (const agent of [mover, elsewhere]) agent.setInPlay(["canvases/t/cards/risks/index.html"], { place: true });
+		const own = (agent: typeof mover) => app.pens.copyOf(agent.stageName()!, "canvases/t/cards/risks/index.html");
 		const before = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
 
 		app.agents.look(elsewhere.id);
-		app.stage.move(mover.id, "boards/risks.html", { x: before.x - 2000, y: before.y });
+		app.stage.move(mover.id, "canvases/t/cards/risks/index.html", { x: before.x - 2000, y: before.y });
 
 		const theirs = app.stage.boards(elsewhere.id).find((board) => board.path === own(elsewhere))!;
 		assert.equal(theirs.x, before.x, "a move on one canvas is not a move on another");

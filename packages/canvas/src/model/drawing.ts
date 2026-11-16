@@ -82,11 +82,11 @@ interface DrawingOptions {
 export const PENDING_MS = 6000;
 
 /**
- * A board's tag, or a card's: a card is a board drawn in a shadow root of the stage's page (`card.ts`);
- * or a document's or an app's, items with no file of their own that the stage places as it places a board.
+ * A card's tag (drawn in a shadow root of the canvas's page, `card.ts`), or a document's or an app's,
+ * items with no file of their own that the canvas places as it places a card.
  */
-export const PAGE_TAGS = new Set(["decks.board", "decks.card", "decks.document", "decks.app"]);
-/** A document or an app item: what it is, or nothing for a board or a card. */
+export const PAGE_TAGS = new Set(["decks.card", "decks.document", "decks.app"]);
+/** A document or an app item: what it is, or nothing for a card. */
 export const itemKind = (node: PenNode): "document" | "app" | undefined => {
 	const type = (node.metadata as { type?: string } | undefined)?.type;
 	return type === "decks.document" ? "document" : type === "decks.app" ? "app" : undefined;

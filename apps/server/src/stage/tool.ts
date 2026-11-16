@@ -2,7 +2,6 @@ import { canvasFile } from "./canvas-files.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { identityReminder } from "../agents/identity-reminder.ts";
 import { canvasNameReminder } from "./canvas-name.ts";
-import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile } from "@decks/runtime";

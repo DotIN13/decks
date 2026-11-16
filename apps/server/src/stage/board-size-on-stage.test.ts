@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /*
  * How big a board is drawn is its stage's: the size of its item in the stage file. Only an agent's
@@ -16,13 +23,13 @@ function open() {
 	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-board-size-")));
 	const deck = join(dataDir, "decks");
 	mkdirSync(join(deck, "boards"), { recursive: true });
-	writeFileSync(join(deck, "boards", "plan.html"), `<!doctype html><html><head><title>Plan</title><meta name="board" content='{"w":900,"h":400}' /></head><body class="board"></body></html>`);
+	put(join(deck, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><html><head><title>Plan</title><meta name="board" content='{"w":900,"h":400}' /></head><body class="board"></body></html>`);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
 /** A library board; each canvas it is put on places its own copy, as a card (`stage/copy-in.ts`). */
-const PATH = "boards/plan.html";
+const PATH = "canvases/t/cards/plan/index.html";
 const settle = () => new Promise((done) => setTimeout(done, 250));
 
 test("a board is drawn at its stage's size, which a browser's reading does not move and a drag does", async () => {
@@ -63,10 +70,10 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 test("two agents on one stage: a save by one does not put back a size or a place the other set", async () => {
 	const { app, cleanup } = open();
 	try {
-		writeFileSync(join(app.deck.path, "boards", "notes.html"), `<!doctype html><html><head><title>Notes</title><meta name="board" content='{"w":600,"h":300}' /></head><body class="board"></body></html>`);
-		app.deck.refresh("boards/notes.html");
+		put(join(app.deck.path, "canvases", "t", "cards", "notes", "index.html"), `<!doctype html><html><head><title>Notes</title><meta name="board" content='{"w":600,"h":300}' /></head><body class="board"></body></html>`);
+		app.deck.refresh("canvases/t/cards/notes/index.html");
 		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
-		one.setInPlay([PATH, "boards/notes.html"], { place: true });
+		one.setInPlay([PATH, "canvases/t/cards/notes/index.html"], { place: true });
 		await settle();
 		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
 		two.openStage(one.stageName()!);
@@ -74,12 +81,12 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		// One sizes and moves the plan, and Two moves the notes a moment later: Two's write is already
 		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
 		const plan = app.pens.copyOf(one.stageName()!, PATH);
-		const notesOwn = app.pens.copyOf(one.stageName()!, "boards/notes.html");
+		const notesOwn = app.pens.copyOf(one.stageName()!, "canvases/t/cards/notes/index.html");
 		const before = app.stage.boards(one.id).find((board) => board.path === plan)!;
 		const notes = app.stage.boards(two.id).find((board) => board.path === notesOwn)!;
 		one.setSize(PATH, { h: 640 });
 		one.setPosition(PATH, before.x + 500, before.y);
-		two.setPosition("boards/notes.html", notes.x, notes.y + 900);
+		two.setPosition("canvases/t/cards/notes/index.html", notes.x, notes.y + 900);
 		await settle();
 		await settle();
 		const item = app.pens.boards(one.stageName()!).find((board) => board.path === plan);

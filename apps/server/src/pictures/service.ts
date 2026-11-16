@@ -763,7 +763,7 @@ export class PictureService {
 				await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
 				await page.waitForTimeout(400);
 			} else {
-				// Anything else pictured (a friend's old board, the page a picture card links to) is a page of its own.
+				// Anything else pictured (the page a picture card links to) is a page of its own.
 				const url = `${this.host.origin()}/api/card/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
 				await page.goto(url, { waitUntil: "load", timeout: 20_000 });
 				/*

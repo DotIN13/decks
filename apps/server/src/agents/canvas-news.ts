@@ -49,7 +49,6 @@ function indexOf(doc: PenDocument): Map<string, Seen> {
 const num = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 const meta = (node: PenNode): Record<string, unknown> => (node.metadata && typeof node.metadata === "object" ? (node.metadata as Record<string, unknown>) : {});
 const isInk = (node: PenNode) => meta(node).type === "decks.ink";
-const isBoard = (node: PenNode) => meta(node).type === "decks.board";
 
 /** Everything but where the item is, how big, and what is in it: a change here is a change of the item itself. */
 function body(node: PenNode): string {
@@ -59,15 +58,12 @@ function body(node: PenNode): string {
 
 /** What a person would call the item, in a few words. */
 export function label(node: PenNode): string {
-	if (isBoard(node)) {
-		const path = String(meta(node).path ?? (node as { url?: unknown }).url ?? node.id);
-		return `the board ${path.split("/").pop()?.replace(/\.html$/, "")}`;
-	}
 	const words = typeof (node as { content?: unknown }).content === "string" ? ((node as { content: string }).content).replace(/\s+/g, " ").trim() : "";
 	const short = (s: string) => (s.length > 40 ? `${s.slice(0, 39)}…` : s);
 	if (node.type === "note") return words ? `the note "${short(words)}" (${node.id})` : `an empty note (${node.id})`;
 	if (node.type === "text") return words ? `the text "${short(words)}" (${node.id})` : `a text (${node.id})`;
 	const name = typeof node.name === "string" && node.name.trim() ? `"${short(node.name.trim())}" ` : "";
+	if (node.type === "browser" && meta(node).type === "decks.card") return `the card ${name}(${String(meta(node).path ?? node.id)})`;
 	const kind = node.type === "ref" ? "component" : node.type;
 	return `the ${kind} ${name}(${node.id})`;
 }

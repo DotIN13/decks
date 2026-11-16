@@ -58,7 +58,7 @@ test("a board that is still broken falls back rather than throwing", () => {
  */
 test("resizing a board rewrites the two numbers and nothing else", () => {
 	const html = `<!doctype html>\n<html><head><title>A</title>\n<meta name="board" content='{"w":800,"h":600,"bg":"dots"}' />\n</head><body class="board"><p>hi</p></body></html>`;
-	const out = withBoardSize("boards/a.html", html, { w: 1200, h: 900 });
+	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 1200, h: 900 });
 	assert.deepEqual(readBoardMeta(out), { title: "A", w: 1200, h: 900, bg: "dots" });
 	assert.ok(out.includes("<p>hi</p>"));
 	assert.equal(out.match(/name="board"/g)?.length, 1);
@@ -66,26 +66,26 @@ test("resizing a board rewrites the two numbers and nothing else", () => {
 
 test("a missing dimension keeps the one the board already had", () => {
 	const html = `<html><head><meta name="board" content='{"w":800,"h":600}'></head><body></body></html>`;
-	assert.deepEqual(readBoardMeta(withBoardSize("boards/a.html", html, { h: 1500 })), { w: 800, h: 1500 });
+	assert.deepEqual(readBoardMeta(withBoardSize("canvases/t/cards/a/index.html", html, { h: 1500 })), { w: 800, h: 1500 });
 });
 
 test("a board with no meta tag gets one, under its title", () => {
 	const html = `<!doctype html>\n<html><head><title>Hand written</title></head><body class="board"></body></html>`;
-	const out = withBoardSize("boards/a.html", html, { w: 640, h: 480 });
-	assert.deepEqual(readBoardMeta(out), { title: "Hand written", w: 640, h: 480, bg: "grid" });
-	assert.ok(out.indexOf("name=\"board\"") > out.indexOf("</title>"), "and it goes after the title, not before it");
+	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 640, h: 480 });
+	assert.deepEqual(readBoardMeta(out), { title: "Hand written", w: 640, h: 480 });
+	assert.ok(out.indexOf("name=\"card\"") > out.indexOf("</title>"), "and it goes after the title, not before it");
 });
 
 test("an entity-escaped tag survives being resized", () => {
 	const html = `<html><head><meta name="board" content="{&quot;w&quot;:800,&quot;h&quot;:600,&quot;theme&quot;:&quot;dark&quot;}"></head><body></body></html>`;
-	const out = withBoardSize("boards/a.html", html, { w: 900, h: 700 });
+	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 900, h: 700 });
 	assert.equal(readBoardMeta(out).w, 900);
 	assert.ok(out.includes('"theme":"dark"'), "and keeps the key this build does not use itself");
 });
 
 test("a size is a positive whole number of pixels", () => {
 	const html = `<html><head><meta name="board" content='{"w":800,"h":600}'></head><body></body></html>`;
-	assert.deepEqual(readBoardMeta(withBoardSize("boards/a.html", html, { w: 640.4, h: -12 })), { w: 640, h: 1 });
+	assert.deepEqual(readBoardMeta(withBoardSize("canvases/t/cards/a/index.html", html, { w: 640.4, h: -12 })), { w: 640, h: 1 });
 });
 
 test("a leftover deck file is read like any other: its size from the tag, an aspect ignored", () => {
@@ -98,62 +98,13 @@ test("a leftover deck file is read like any other: its size from the tag, an asp
 	assert.deepEqual(meta, { title: "The talk", w: 1200 });
 });
 
-test("a markdown file reads front-matter, and a tag in it is text", () => {
-	const md = readMeta("boards/notes.md", "---\ntitle: Talk\nw: 800\n---\n\n# One\n");
-	assert.equal(md.w, 800);
-	assert.equal(md.title, "Talk");
-
-	// A markdown file with a `<meta>` tag in it is a markdown file with a tag in it.
-	const stray = readMeta("boards/notes.md", `<meta name="board" content='{"w":640}' />\n\n# Notes\n`);
-	assert.equal(stray.w, undefined);
-	assert.equal(stray.title, "Notes");
-});
-
-test("front-matter outranks the tag on an HTML file, because it is the more deliberate one", () => {
-	// Not a shape anybody writes on purpose; asserted so the precedence is decided rather
-	// than emergent, and so a future reader knows which line to change.
-	const meta = readMeta("boards/odd.html", `---\nw: 700\n---\n<meta name="board" content='{"w":900}' />\n<section>One</section>\n`);
-	assert.equal(meta.w, 700);
-});
-
 test("an HTML document with no tag keeps saying nothing about its size", () => {
 	const meta = readMeta("boards/report.html", "<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
 	assert.equal(meta.w, undefined);
 	assert.equal(meta.title, "Report");
 });
 
-/*
- * And the write half for markdown, which is front-matter rather than a tag.
- *
- * Until `withBoardSize` knew about it, resizing a `.md` wrote a `<meta>` in above the `---`: the
- * front-matter parser then never matched, and the reader saw the tag as text. These are the cases
- * that were wrong, one per shape of front-matter.
- */
-test("a markdown board's width goes to its front-matter, not into a tag", () => {
-	const out = withBoardSize("boards/notes.md", `---\ntitle: Notes\n---\n\n# Notes\n\nBody.\n`, { w: 900 });
-	assert.equal(readMeta("boards/notes.md", out).w, 900);
-	assert.equal(readMeta("boards/notes.md", out).title, "Notes");
-	assert.equal(out.split("\n")[0], "---");
-	assert.ok(out.includes("\nw: 900\n"), out.slice(0, 40));
-	assert.ok(out.includes("# Notes") && out.includes("Body."), "and the document is untouched");
-	assert.equal(/<meta/.test(out), false, "no HTML in a markdown file");
-});
-
-test("a width already in the front-matter is replaced, not added twice", () => {
-	const out = withBoardSize("boards/notes.md", `---\nw: 700\ntitle: T\n---\n\n# T\n`, { w: 880 });
-	assert.equal(readMeta("boards/notes.md", out).w, 880);
-	assert.equal(out.match(/^w:/gm)?.length, 1);
-});
-
-test("a markdown board with no front-matter gets one, and keeps its heading for a title", () => {
-	const out = withBoardSize("boards/notes.md", `# A heading\n\nBody.\n`, { w: 760 });
-	assert.equal(readMeta("boards/notes.md", out).w, 760);
-	assert.equal(readMeta("boards/notes.md", out).title, "A heading");
-});
-
-test("a height on its own writes nothing to a markdown board", () => {
-	// Its height is its content's, and `decks.canvas.fit` asks for one on every call: a number written
-	// here would be one nothing reads and every later write has to carry.
-	const md = `---\nw: 700\n---\n\n# T\n`;
-	assert.equal(withBoardSize("boards/notes.md", md, { h: 1400 }), md);
+test("a card with no title is called by its first heading, and by nothing when it has neither", () => {
+	assert.equal(readMeta("canvases/t/cards/a/index.html", `<meta name="card" content='{"w":900}' /><div class="doc"><h1>Sales <em>are up</em></h1></div>`).title, "Sales are up");
+	assert.equal(readMeta("canvases/t/cards/a/index.html", `<div class="doc"><p>No heading</p></div>`).title, undefined);
 });

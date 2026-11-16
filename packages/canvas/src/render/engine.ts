@@ -2270,7 +2270,7 @@ export class StageEngine {
 		}
 		for (const placed of this.list()) {
 			const { node, box } = placed;
-			if (node.type === "group" || isShape(node) || (node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type)))) continue;
+			if (node.type === "group" || isShape(node) || (node.type === "browser" && ["decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type)))) continue;
 			let top = placed;
 			while (top.parent) top = this.placed.get(top.parent) ?? top;
 			if (top.parent) continue;

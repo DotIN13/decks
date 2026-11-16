@@ -1,5 +1,5 @@
 /**
- * The sandbox a card (or an old board) from someone else runs in, as the tokens of an iframe's
+ * The sandbox a card from someone else runs in, as the tokens of an iframe's
  * `sandbox` attribute or a `Content-Security-Policy: sandbox …`: scripts, forms, pop-ups, dialogs
  * and downloads, and never `allow-same-origin`, so its page has an opaque origin of its own and
  * reaches nothing of the page that shows it and no cookie of the address it came from.

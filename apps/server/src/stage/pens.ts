@@ -15,28 +15,26 @@ import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
 import { canvasFolder, isCardPath, pageName, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "@decks/hub/layout";
-import { copyBoardInto, copyFileInto, copyFrameInto } from "./copy-in.ts";
+import { copyCardInto, copyFileInto, copyFrameInto } from "./copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
 /**
- * A deck board on a stage: pen's own `browser` item, a live web page, pointed at the board's file
- * and tagged in pen's extension field with the board's path, so the server knows which board it is
+ * A card on a canvas: pen's own `browser` item, a live web page, pointed at the card's file and
+ * tagged in pen's extension field with the card's path, so the server knows which card it is
  * without parsing a URL.
  *
- *     { "type": "browser", "id": "report", "name": "The finding", "url": "../../boards/report.html",
- *       "x": 0, "y": 0, "width": 1000, "height": 700, "metadata": { "type": "decks.board", "path": "boards/report.html" } }
+ *     { "type": "browser", "id": "report", "name": "The finding", "url": "cards/report/index.html",
+ *       "x": 0, "y": 0, "width": 1000, "height": 700, "metadata": { "type": "decks.card", "path": "cards/report/index.html" } }
  *
- * pen.dev shows it as a web page; Decks draws the board itself in its place.
+ * pen.dev shows it as a web page; Decks draws the card itself in its place, in a shadow root of the
+ * canvas's own page (`deck/layout.ts`). A `decks.board` item, left on a friend's canvas by a Decks
+ * from before cards, is no page: it is kept in the file as it is, and drawn as an item with nothing in it.
  */
-export const BOARD_ITEM = "decks.board";
-/** A card's tag: a board in `cards/`, drawn in a shadow root of the stage's page (`deck/layout.ts`). */
 export const CARD_ITEM = "decks.card";
-/** The tag a page item takes for its path: a card's in a canvas's `cards/`, a board's anywhere else. */
-export const pageTag = (path: string): string => (isCardPath(path) ? CARD_ITEM : BOARD_ITEM);
 
-/** The deck board an item stands for, by path, or undefined when it is not one. */
+/** The card an item stands for, by its deck path, or undefined when it is not one. */
 export function boardOf(node: PenNode): string | undefined {
-	if (node.type !== "browser" || !node.metadata || (node.metadata.type !== BOARD_ITEM && node.metadata.type !== CARD_ITEM)) return undefined;
+	if (node.type !== "browser" || !node.metadata || node.metadata.type !== CARD_ITEM) return undefined;
 	const path = node.metadata.path;
 	return typeof path === "string" && path ? path : undefined;
 }
@@ -310,7 +308,7 @@ export class StagePens {
 
 	/** Copy a board into a canvas, and write down where the copy came from (`canvas.json`'s `copiedFrom`). */
 	private copyIn(canvas: string, path: string): string {
-		const copy = copyBoardInto(this.deckPath, path, canvas);
+		const copy = copyCardInto(this.deckPath, path, canvas);
 		const file = join(this.folderOf(canvas), CANVAS_META);
 		let meta: Record<string, unknown> = {};
 		try {
@@ -345,9 +343,9 @@ export class StagePens {
 	}
 
 	/**
-	 * The board a canvas places for a deck path, copied in now when the canvas has no copy of it yet
-	 * (`stage/copy-in.ts`): what an agent's list of boards on its canvas is turned into, so the same
-	 * library board asked for twice is one copy, not two. A path with no file is left as it is.
+	 * The card a canvas places for a deck path, copied in now when the canvas has no copy of it yet
+	 * (`stage/copy-in.ts`): what an agent's list of cards on its canvas is turned into, so another
+	 * canvas's card asked for twice is one copy, not two. A path with no file is left as it is.
 	 */
 	ownPath(name: string, path: string): string {
 		const known = this.copyOf(name, path);
@@ -965,13 +963,13 @@ export class StagePens {
 		for (const spot of wanted) {
 			const node = present.get(spot.path);
 			if (!node) {
-				const base = slug(basename(spot.path).replace(/\.[^.]+$/, ""), 40) || "board";
+				const base = slug(pageName(spot.path), 40) || "card";
 				let id = base;
 				for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 				taken.add(id);
 				ops.push({
 					op: "insert",
-					node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: pageTag(spot.path), path: spot.path } },
+					node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: CARD_ITEM, path: spot.path } },
 					box: { x1: spot.x, y1: spot.y },
 				});
 				continue;
@@ -1022,11 +1020,11 @@ export class StagePens {
 				if (node.name !== spot.title) ops.push({ op: "update", id: node.id, set: { name: spot.title } });
 				continue;
 			}
-			const base = slug(basename(spot.path).replace(/\.[^.]+$/, ""), 40) || "board";
+			const base = slug(pageName(spot.path), 40) || "card";
 			let id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 			taken.add(id);
-			ops.push({ op: "insert", node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: pageTag(spot.path), path: spot.path } }, box: { x1: spot.x, y1: spot.y } });
+			ops.push({ op: "insert", node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: CARD_ITEM, path: spot.path } }, box: { x1: spot.x, y1: spot.y } });
 		}
 		if (ops.length) this.edit(name, ops);
 	}
@@ -1067,7 +1065,7 @@ export class StagePens {
 	repointBoard(name: string, from: string, to: string): void {
 		const node = this.boardItems(name).get(from);
 		if (!node) return;
-		this.edit(name, [{ op: "update", id: node.id, set: { url: `../../${to}`, metadata: { ...(node.metadata ?? {}), type: pageTag(to), path: to } } }]);
+		this.edit(name, [{ op: "update", id: node.id, set: { url: `../../${to}`, metadata: { ...(node.metadata ?? {}), type: CARD_ITEM, path: to } } }]);
 	}
 
 	/**

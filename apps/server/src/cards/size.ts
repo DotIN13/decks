@@ -1,7 +1,6 @@
 /**
  * What a new card's size and head are made from: the width it starts at, and the import map
- * its head carries (`cards.ts`). Boards are no longer made; the boards-to-cards migration reads
- * `BOARD_W` for an old board that named no width.
+ * its head carries (`cards.ts`).
  */
 
 /**

@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "./app.ts";
 import { realPathOf } from "./deck/roots.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /*
  * The measuring loop, end to end through the App rather than through a stub.
@@ -20,15 +27,15 @@ function open() {
 	const deck = join(dataDir, "decks");
 	// A canvas's own board: the library (`boards/`) is read only (`deck/layout.ts`).
 	mkdirSync(join(deck, "canvases", "work", "boards"), { recursive: true });
-	writeFileSync(
-		join(deck, "canvases", "work", "boards", "tall.html"),
+	put(
+		join(deck, "canvases", "work", "cards", "tall", "index.html"),
 		`<!doctype html><html><head><title>Tall</title><meta name="board" content='{"w":900,"h":400,"bg":"grid"}' /></head><body class="board"></body></html>`,
 	);
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	return { app, deck, cleanup: () => (app.dispose(), rmSync(dataDir, { recursive: true, force: true })) };
 }
 
-const TALL = "canvases/work/boards/tall.html";
+const TALL = "canvases/work/cards/tall/index.html";
 const boardOf = (app: App) => app.stage.boards().find((one) => one.path === TALL)!;
 
 test("a frame's measurement is reported but sizes nothing, and fit writes it back", async () => {

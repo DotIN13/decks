@@ -29,7 +29,7 @@ export type Kind = "card" | "app" | "document";
 
 export interface AwakeItem extends Rect {
 	path: string;
-	/** What the item is; an old board, which is only ever its picture, has none. */
+	/** What the item is; a card whose file is missing has none, and is never awake. */
 	kind?: Kind | undefined;
 }
 

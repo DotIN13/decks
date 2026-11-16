@@ -50,10 +50,10 @@ function wordsSelected(): boolean {
 	return (!!selection && !selection.isCollapsed && selection.toString().trim() !== "") || wordsSelectedInCards();
 }
 
-/** Whether an item needs a file copied to land on another canvas: a card or a board, a picture, a film, a file piece. */
+/** Whether an item needs a file copied to land on another canvas: a card, a picture, a film, a file piece. */
 function needsFiles(node: PenNode, sameCanvas: boolean): string | undefined {
 	const meta = (node.metadata ?? {}) as Record<string, unknown>;
-	if (node.type === "browser" && (meta.type === "decks.card" || meta.type === "decks.board")) return "an HTML card";
+	if (node.type === "browser" && meta.type === "decks.card") return "an HTML card";
 	if (sameCanvas) return undefined;
 	if (node.type === "browser" && meta.type === "decks.document") return "a document";
 	let picture = false;

@@ -12,8 +12,8 @@ const EDGE_OUT_PX = COARSE ? 16 : 8;
 const EDGE_IN_PX = COARSE ? 6 : 4;
 
 /**
- * What the stage hands the slot of one placed item (`Stage`'s `frame` prop): a card, a document, an
- * app, or an old board, which is drawn only as its picture.
+ * What the stage hands the slot of one placed item (`Stage`'s `frame` prop): a card, a document or
+ * an app.
  *
  * The stage decides where it is, whether it is awake and what its gestures do; the host adds what it
  * knows of the item's file (`ItemSlotExtras`).
@@ -81,9 +81,6 @@ interface ItemSlotExtras {
 /**
  * One placed item on the stage: a card (`card-surface.tsx`), a document or an app (`item-surfaces.tsx`)
  * in its place while it is awake, its title above it to move it by, and the band along its edge.
- *
- * A board (`decks.board`) is drawn as its picture by the stage's sheet and nothing else: its slot has
- * the title and is pressed and moved as any item, but holds no page.
  */
 export function ItemSlot(props: ItemSlotProps & ItemSlotExtras) {
 	const at = createMemo(() => {

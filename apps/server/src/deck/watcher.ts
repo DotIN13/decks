@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
-import { pageFolders, inPageFolder } from "./stage-boards.ts";
+import { cardFolders } from "./card-folders.ts";
 import { cardOf } from "@decks/hub/layout";
-import { isBoardFile } from "./kinds.ts";
 import { basename, join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";
 
@@ -62,7 +61,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 	 * Learn the inode of every board *before* the first event, so the very first save can
 	 * be recognised as a replacement.
 	 *
-	 * Only `boards/`, and that is the whole of the judgement: it is the set whose silence
+	 * Only the cards' folders, and that is the whole of the judgement: it is the set whose silence
 	 * costs something (a board that stops tracking its file looks fine and is wrong), it
 	 * is bounded by the number of boards, and it is walked again on every re-arm. An
 	 * assets directory can hold ten thousand files and none of them has a record here to
@@ -89,7 +88,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				}
 			}
 		};
-		for (const folder of pageFolders(root)) walk(join(root, folder), folder);
+		for (const folder of cardFolders(root)) walk(join(root, folder), folder);
 	};
 
 	// The deck's own folder, which a Mac names by its last segment, as if it were inside itself.
@@ -130,8 +129,6 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				if (path === "deck.json") onChange({ kind: "deck" });
 				// Anything in a card's folder is the card's: its `chart.js` changing is the card changing.
 				else if (cardOf(path)) onChange({ kind: "board", path: cardOf(path)! });
-				// Every format the loader lists, so a saved `.md` reloads its frame like a `.html`.
-				else if (inPageFolder(path) && isBoardFile(path)) onChange({ kind: "board", path });
 				else onChange({ kind: "asset", path });
 			}, quietMs),
 		);

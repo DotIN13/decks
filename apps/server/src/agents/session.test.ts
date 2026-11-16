@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, readdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } from "@decks/protocol";
 import { Cameras } from "../deck/cameras.ts";
@@ -11,6 +11,13 @@ import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
 import { HISTORY_ITEMS, TOOL_PREVIEW } from "./wire.ts";
+
+/** Write a file, making its folder: a card is `cards/<name>/index.html`. */
+function put(file: string, data: string | Uint8Array): void {
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, data);
+}
+
 
 /**
  * The two sets and the invariant between them (DESIGN §2).
@@ -51,7 +58,7 @@ function agentOn(
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of boards) {
-		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
+		put(join(root, "canvases", "t", "cards", name.replace(/\.html$/, ""), "index.html"), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	const sent: ServerMessage[] = [];
 	const deck = Deck.open(root);
@@ -69,7 +76,7 @@ function agentOn(
 	if (restored && restored.items.length > 0) {
 		const folder = join(deck.path, ".decks", "agents", restored.id);
 		mkdirSync(folder, { recursive: true });
-		writeFileSync(join(folder, "chat.json"), JSON.stringify(restored.items));
+		put(join(folder, "chat.json"), JSON.stringify(restored.items));
 	}
 	const { items: _transcript, ...row } = restored ?? ({} as NonNullable<typeof restored>);
 	const agent = new DeckAgent(
@@ -251,7 +258,7 @@ function agentOn(
 	test("a dormant chat without a recorded model recovers it from its pi session file", () => {
 		const root = mkdtempSync(join(tmpdir(), "decks-session-model-"));
 		const session = join(root, "resume.jsonl");
-		writeFileSync(
+		put(
 			session,
 			[
 				JSON.stringify({ type: "session", version: 1, cwd: root }),
@@ -279,68 +286,68 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
 	assert.equal(context(), "", "holding nothing yet");
 
-	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
-	assert.equal(context(), "boards/a.html boards/b.html");
+	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
+	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html");
 
 	// What `decks.canvas.delete` and the board's × both do: off the stage, still held.
-	agent.setInPlay(["boards/b.html"]);
-	assert.equal(inPlay(), "boards/b.html");
-	assert.equal(context(), "boards/a.html boards/b.html", "a board taken off stays held");
+	agent.setInPlay(["canvases/t/cards/b/index.html"]);
+	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
+	assert.equal(context(), "canvases/t/cards/a/index.html canvases/t/cards/b/index.html", "a board taken off stays held");
 	cleanup();
 });
 
 test("both sets travel together, and neither repeats itself", () => {
 	const { agent, last, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html", "boards/a.html", "boards/b.html"]);
+	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 
 	const message = last();
 	assert.ok(message && message.type === "agent.context");
-	assert.deepEqual(message.inPlay, ["boards/a.html", "boards/b.html"], "deduplicated");
-	assert.deepEqual(message.boards, ["boards/a.html", "boards/b.html"]);
+	assert.deepEqual(message.inPlay, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], "deduplicated");
+	assert.deepEqual(message.boards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 	cleanup();
 });
 
 test("the chat row carries what is held and what is shown, and they are not the same list", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
-	agent.setInPlay(["boards/a.html"]);
-	assert.deepEqual(agent.chat().boards, ["boards/a.html", "boards/b.html"]);
-	assert.deepEqual(agent.chat().inPlay, ["boards/a.html"]);
+	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/a/index.html"]);
+	assert.deepEqual(agent.chat().boards, ["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
+	assert.deepEqual(agent.chat().inPlay, ["canvases/t/cards/a/index.html"]);
 	cleanup();
 });
 
 test("a deleted board leaves the context, and only the deleted one", () => {
 	const { agent, context, inPlay, last, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html", "boards/b.html"]);
+	agent.setInPlay(["canvases/t/cards/a/index.html", "canvases/t/cards/b/index.html"]);
 
-	assert.equal(agent.forget("boards/a.html"), true);
-	assert.equal(context(), "boards/b.html");
-	assert.equal(inPlay(), "boards/b.html");
+	assert.equal(agent.forget("canvases/t/cards/a/index.html"), true);
+	assert.equal(context(), "canvases/t/cards/b/index.html");
+	assert.equal(inPlay(), "canvases/t/cards/b/index.html");
 	const message = last();
 	assert.ok(message && message.type === "agent.context");
-	assert.deepEqual(message.boards, ["boards/b.html"], "the removal is published, not just recorded");
+	assert.deepEqual(message.boards, ["canvases/t/cards/b/index.html"], "the removal is published, not just recorded");
 	cleanup();
 });
 
 test("forgetting a board nobody holds says so, and stays quiet", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html"]);
+	agent.setInPlay(["canvases/t/cards/a/index.html"]);
 	const before = agent.context.join(" ");
 
 	// The watcher reports every deletion in the deck, so most calls are about boards this
 	// agent never held; those must not emit a context.changed and re-render every rail.
-	assert.equal(agent.forget("boards/b.html"), false);
+	assert.equal(agent.forget("canvases/t/cards/b/index.html"), false);
 	assert.equal(agent.context.join(" "), before);
 	cleanup();
 });
 
 test("an agent left holding only a deleted board is holding nothing", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html"]);
-	agent.setInPlay(["boards/a.html"]);
+	agent.setInPlay(["canvases/t/cards/a/index.html"]);
 
 	// This is the case that emptied both the rail and the canvas: a non-empty context of
 	// one dead path, which is not empty enough to trigger the whole-deck fallback.
-	agent.forget("boards/a.html");
+	agent.forget("canvases/t/cards/a/index.html");
 	assert.equal(context(), "");
 	assert.equal(inPlay(), "");
 	cleanup();
@@ -381,7 +388,7 @@ class Probe extends DeckAgent {
 function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ agentId: string; text: string }>; sentTos: string[]; cleanup: () => void } {
 	const root = mkdtempSync(join(tmpdir(), "decks-queue-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
-	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
+	put(join(root, "canvases", "t", "cards", "plan", "index.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
 	const sent: ServerMessage[] = [];
 	const reportCalls: Array<{ agentId: string; text: string }> = [];
 	const sentTos: string[] = [];
@@ -443,7 +450,7 @@ test("a queue is capped, and the item over the cap is refused rather than droppe
 test("the queue drains once the agent has been quiet, one item at a time", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, cleanup } = probeOn();
-	agent.enqueue(item("first", ["boards/plan.html"]));
+	agent.enqueue(item("first", ["canvases/t/cards/plan/index.html"]));
 	agent.enqueue(item("second"));
 
 	// Two quiet spells of 10 ms each: waited for rather than timed, since a loaded machine (the whole
@@ -451,7 +458,7 @@ test("the queue drains once the agent has been quiet, one item at a time", async
 	for (let tries = 0; tries < 100 && agent.ran.length < 2; tries++) await settle(20);
 	// The brief is composed when the item runs, so the board source is the one that exists
 	// then — here the stub just names what it was handed.
-	assert.deepEqual(agent.ran, ["first [boards/plan.html]", "second"]);
+	assert.deepEqual(agent.ran, ["first [canvases/t/cards/plan/index.html]", "second"]);
 	assert.equal(agent.queued, 0);
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
@@ -502,7 +509,7 @@ test("an item is popped before it runs, so a failure cannot loop", async () => {
 test("a reply asked for goes back to the sender as a notice — never as another queued task", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, reportCalls, sentTos, cleanup } = probeOn();
-	agent.enqueue(item("Remeasure the panel numbers", ["boards/plan.html"], true));
+	agent.enqueue(item("Remeasure the panel numbers", ["canvases/t/cards/plan/index.html"], true));
 
 	await settle(80);
 	// The report reached the sender, named with who finished what…
@@ -755,15 +762,15 @@ test("a restored row shows its last line before its transcript is read", () => {
  */
 test("a board joining the stage lands beside the stage's newest board", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html", "three.html"]);
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	// Two goes under one, so "beside the newest" and "right of them all" are different answers.
-	agent.setPosition("boards/two.html", 0, 1000);
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
-	agent.setInPlay(["boards/one.html", "boards/two.html", "boards/three.html"], { place: true });
+	agent.setPosition("canvases/t/cards/two/index.html", 0, 1000);
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html", "canvases/t/cards/three/index.html"], { place: true });
 	const at = (path: string) => agent.positions()[path];
-	assert.deepEqual(at("boards/two.html"), { x: 0, y: 1000 }, "two kept its place under one");
-	const three = at("boards/three.html");
+	assert.deepEqual(at("canvases/t/cards/two/index.html"), { x: 0, y: 1000 }, "two kept its place under one");
+	const three = at("canvases/t/cards/three/index.html");
 	assert.equal(three?.y, 1000, `${JSON.stringify(three)} is level with two.html, the newest`);
 	assert.ok(three && three.x > 0 && three.x < 2000, "and just to its right");
 	cleanup();
@@ -771,10 +778,10 @@ test("a board joining the stage lands beside the stage's newest board", () => {
 
 test("a board given a place when it joins keeps it, far from the rest or not", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setInPlay(["boards/one.html"], { place: true });
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true, at: { "boards/two.html": { x: 50_000, y: 7000 } } });
-	assert.deepEqual(agent.positions()["boards/two.html"], { x: 50_000, y: 7000 });
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true, at: { "canvases/t/cards/two/index.html": { x: 50_000, y: 7000 } } });
+	assert.deepEqual(agent.positions()["canvases/t/cards/two/index.html"], { x: 50_000, y: 7000 });
 	cleanup();
 });
 
@@ -787,10 +794,10 @@ test("where any browser is looking, this chat's included, does not move where a 
 	const far = { x: -18_000, y: 950_000, zoom: 1, width: 1378, height: 702 };
 	const { agent, cameras, cleanup } = agentOn(["one.html", "two.html"], { camera: far });
 	cameras.report("someone-else", { ...far, x: 40_000 });
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setInPlay(["boards/one.html"], { place: true });
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
-	const two = agent.positions()["boards/two.html"];
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	const two = agent.positions()["canvases/t/cards/two/index.html"];
 	assert.ok(two && Math.hypot(two.x, two.y) < 3000, `${JSON.stringify(two)} is beside one.html`);
 	cleanup();
 });
@@ -798,14 +805,14 @@ test("where any browser is looking, this chat's included, does not move where a 
 test("a board whose only place is the old deck-wide column is placed again, beside the canvas", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
 	// One board on the canvas, and another carrying the sort of place the deck-wide layout left.
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setInPlay(["boards/one.html"], { place: true });
-	agent.setPosition("boards/two.html", 0, 967_333);
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.setPosition("canvases/t/cards/two/index.html", 0, 967_333);
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
 
-	const two = agent.positions()["boards/two.html"];
+	const two = agent.positions()["canvases/t/cards/two/index.html"];
 	assert.ok(two && two.y < 10_000, `the board came back from ${two?.y} to the canvas`);
-	const one = agent.positions()["boards/one.html"];
+	const one = agent.positions()["canvases/t/cards/one/index.html"];
 	assert.deepEqual(one, { x: 0, y: 0 }, "and the board already on the canvas did not move");
 	assert.notDeepEqual(two, one, "nor did the newcomer land on top of it");
 	cleanup();
@@ -813,30 +820,30 @@ test("a board whose only place is the old deck-wide column is placed again, besi
 
 test("hiding a board and playing it again puts it back where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setPosition("boards/two.html", 1760, 0);
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
-	agent.setInPlay(["boards/one.html"], { place: true });
-	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
-	assert.deepEqual(agent.positions()["boards/two.html"], { x: 1760, y: 0 }, "a place beside the canvas is the user's, and is kept");
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setPosition("canvases/t/cards/two/index.html", 1760, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html", "canvases/t/cards/two/index.html"], { place: true });
+	assert.deepEqual(agent.positions()["canvases/t/cards/two/index.html"], { x: 1760, y: 0 }, "a place beside the canvas is the user's, and is kept");
 	cleanup();
 });
 
 test("restoring a canvas places nothing: the arrangement is the one the person left", () => {
 	const { agent, cleanup } = agentOn(["one.html"]);
-	agent.setPosition("boards/one.html", 0, 900_000);
-	agent.setInPlay(["boards/one.html"]);
-	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 900_000 }, "no place was worked out");
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 900_000);
+	agent.setInPlay(["canvases/t/cards/one/index.html"]);
+	assert.deepEqual(agent.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 900_000 }, "no place was worked out");
 	cleanup();
 });
 
 test("clearing the canvas and playing a board back leaves it where it was", () => {
 	const { agent, cleanup } = agentOn(["one.html"]);
-	agent.setPosition("boards/one.html", 0, 0);
-	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setPosition("canvases/t/cards/one/index.html", 0, 0);
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	agent.setInPlay([], { place: true });
-	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setInPlay(["canvases/t/cards/one/index.html"], { place: true });
 	// The canvas was empty, and that is no reason to move a board somebody put somewhere.
-	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 0 });
+	assert.deepEqual(agent.positions()["canvases/t/cards/one/index.html"], { x: 0, y: 0 });
 	cleanup();
 });

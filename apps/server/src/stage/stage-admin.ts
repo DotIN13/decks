@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { slug } from "../agents/slug.ts";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Deck } from "../deck/loader.ts";
-import { stageBoardsDir } from "../deck/stage-boards.ts";
+import { canvasFolder } from "@decks/hub/layout";
 import type { StagePens } from "./pens.ts";
 
 /**
  * Renaming and deleting stages, from the stage manager.
  *
  * A stage's name is its folder, and the boards a stage keeps in its own folder carry that name in
- * their paths (`deck/stage-boards.ts`). So both change more than a label: the deck's list of boards,
+ * their paths (`deck/card-folders.ts`). So both change more than a label: the deck's list of boards,
  * the stage file's board items, and every agent on the stage follow. Neither is allowed while an
  * agent on that stage is in the middle of a turn, because its tools would be holding paths that
  * are about to stop existing.
@@ -42,8 +42,8 @@ export function renameStage(context: Context, from: string, title: string): stri
 
 /** Move a canvas to a new folder; its kept boards and its agents follow. */
 function moveCanvas(context: Context, from: string, to: string): string {
-	const before = `${stageBoardsDir(from)}/`;
-	const after = `${stageBoardsDir(to)}/`;
+	const before = `${canvasFolder(from)}/`;
+	const after = `${canvasFolder(to)}/`;
 	const repoint = (path: string) => (path.startsWith(before) ? after + path.slice(before.length) : path);
 	context.pens.rename(from, to, repoint);
 	context.deck.reload();
@@ -63,7 +63,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 	const clean = context.pens.setTitle(name, title);
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
-	const keepsBoards = existsSync(join(context.deck.path, stageBoardsDir(name)));
+	const keepsBoards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
 	if (keepsBoards && context.agents.some((agent) => agent.stageName(false) === name && agent.running)) return name;
 	return moveCanvas(context, name, context.pens.freshName(clean));
 }
@@ -71,7 +71,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 /** Delete a stage, with its drawing and any boards kept in its own folder. The deck's own boards are untouched. */
 export function deleteStage(context: Context, name: string): { boards: number } {
 	refuseIfBusy(context, name, "delete");
-	const folder = join(context.deck.path, stageBoardsDir(name));
+	const folder = join(context.deck.path, canvasFolder(name), "cards");
 	const boards = existsSync(folder) ? readdirSync(folder).length : 0;
 	context.pens.remove(name);
 	context.deck.reload();

@@ -32,8 +32,7 @@ interface BoardHooks {
 }
 
 /**
- * The card files: writing them, revisioning them, and deleting them. Old boards left in a deck
- * (the library's, a friend's) are only read: a library board is copied in as a card when placed.
+ * The card files: writing them, revisioning them, and deleting them.
  *
  * This was 340 lines of `app.ts` sitting between the WebSocket router and the account
  * panel, and it is the only part of the server that writes a file a person did not name.
@@ -263,18 +262,6 @@ export class CardService {
 		return this.writeBoard(path, withBoardSize(path, html, size));
 	}
 
-	/**
-	 * Why a board may not be changed, or undefined when it may: a board in the library (`boards/`, on
-	 * no canvas) is read and copied from, and a friend's canvas shared with you to view follows theirs
-	 * (`deck/layout.ts`).
-	 */
-	readOnly(path: string): string | undefined {
-		if (/^boards\//.test(path)) {
-			return `${path} is in the library, on no canvas, and is read only: place it on a canvas (decks canvas insert copies it in) and change the copy.`;
-		}
-		return this.viewOnly(path);
-	}
-
 	/** Why a board on a friend's canvas shared with you to view may not be changed or deleted, or undefined. */
 	viewOnly(path: string): string | undefined {
 		const at = canvasOfPath(path);
@@ -294,7 +281,7 @@ export class CardService {
 	}
 
 	writeBoard(path: string, html: string): Page {
-		const refused = this.readOnly(path);
+		const refused = this.viewOnly(path);
 		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
 		const before = existsSync(file) ? readFileSync(file, "utf8") : undefined;
@@ -367,9 +354,8 @@ export class CardService {
 	/**
 	 * An absolute (or relative) file an agent wrote -> the board it is, if it is one.
 	 *
-	 * Agents write with absolute paths as often as not, and only paths inside
-	 * `boards/` are boards — an agent editing `lib/board.css` has not produced a new
-	 * revision of anything.
+	 * Agents write with absolute paths as often as not, and only a card's `index.html` is a
+	 * card: an agent editing `lib/card.css` has not produced a new revision of anything.
 	 */
 	boardPathOf(file: string): string | undefined {
 		const relative = file.startsWith(this.deck.path)
