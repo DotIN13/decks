@@ -1,3 +1,6 @@
+//! The painter's draw lists, tested without a graphics card: scopes, clips and layers, what an area
+//! draws, pictures and placeholders, gradients, shadows and blurs, and real stages.
+
 use crate::painter::{Context, paint_area};
 use crate::*;
 use serde_json::json;

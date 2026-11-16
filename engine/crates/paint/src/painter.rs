@@ -7,7 +7,7 @@
 //! drawn when its scope closes, over its children, as pen.dev draws it.
 //!
 //! Boards (`browser` items) are not drawn here: the page draws their pictures under their pages.
-//! Words come at the text step; until then text items draw nothing but their card's paper.
+//! Words, markdown cards and icons are drawn by `painter/words.rs`.
 
 use serde_json::Value;
 use stage_scene::layout::NOTE_PAD;
@@ -118,6 +118,7 @@ struct Scope {
 	closing: Vec<Op>,
 }
 
+// Painting an area: the items that meet it, in order, inside the scopes they open.
 /// Every item meeting `area` (stage units), drawn at `scale` target pixels per stage unit, with the
 /// area's corner at the target's origin.
 pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawList {
@@ -209,31 +210,6 @@ fn ancestors(root: &Root, i: u32) -> Vec<u32> {
 	chain
 }
 
-/// An item's blur (its `blur` effects', added up) as a layer's: its Gaussian in target pixels and
-/// what the item and everything in it paint on, there. `None` for an item with no blur.
-fn layer_blur(ctx: &Context, root: &Root, i: u32, target: &Mat) -> Option<LayerBlur> {
-	let item = &root.tree.items[i as usize];
-	let radius = stage_scene::blur_radius(&ctx.scene.vars, item, &root.placed[i as usize].theme);
-	if radius <= 0.0 {
-		return None;
-	}
-	// pen's radius, as a CSS blur radius, is two of the Gaussian's sigmas, as a shadow's blur is.
-	let sigma = (radius / 2.0) as f32 * to_affine(&target.then(&root.world[i as usize])).scale_factor();
-	let mut ink = root.ink[i as usize];
-	let mut stack = item.children.clone();
-	while let Some(c) = stack.pop() {
-		ink = ink.union(&root.ink[c as usize]);
-		stack.extend(root.tree.items[c as usize].children.iter().copied());
-	}
-	let r = target.then(&Mat::translate(ink.x, ink.y)).bounds(ink.w, ink.h);
-	Some(LayerBlur { sigma, area: [r.x as f32, r.y as f32, r.w as f32, r.h as f32] })
-}
-
-fn opacity(ctx: &Context, root: &Root, i: u32) -> f32 {
-	let item = &root.tree.items[i as usize];
-	ctx.scene.vars.num(item.get("opacity"), &root.placed[i as usize].theme, 1.0).clamp(0.0, 1.0) as f32
-}
-
 #[allow(clippy::too_many_arguments)]
 fn open(ctx: &Context, root: &Root, r: u32, i: u32, target: &Mat, draw: bool, stack: &mut Vec<Scope>, list: &mut DrawList) {
 	let item = &root.tree.items[i as usize];
@@ -268,245 +244,45 @@ fn close(scope: Scope, list: &mut DrawList) {
 	}
 }
 
-fn to_affine(m: &Mat) -> Affine {
-	Affine(m.0.map(|v| v as f32))
-}
-
-/// An op with an opacity multiplied into its colours.
-fn fade(op: Op, alpha: f32) -> Op {
-	if alpha >= 1.0 {
-		return op;
-	}
-	let paint = |p: Paint| match p {
-		Paint::Solid(c) => Paint::Solid(Color(c.0.map(|v| v * alpha))),
-		Paint::Linear { from, to, stops } => Paint::Linear { from, to, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
-		Paint::Radial { center, radius, stops } => Paint::Radial { center, radius, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
-		Paint::Conic { center, radius, start, stops } => Paint::Conic { center, radius, start, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
-		Paint::Image { texture, opacity, uv } => Paint::Image { texture, opacity: opacity * alpha, uv },
-	};
-	match op {
-		Op::Shape { shape, transform, paint: p, stroke } => Op::Shape { shape, transform, paint: paint(p), stroke },
-		Op::Mesh { vertices, indices, transform, paint: p } => Op::Mesh { vertices, indices, transform, paint: paint(p) },
-		Op::Shadow { shape, transform, color, blur, spread } => Op::Shadow { shape, transform, color: Color(color.0.map(|v| v * alpha)), blur, spread },
-		Op::InnerShadow { shape, transform, offset, color, blur, spread } => Op::InnerShadow { shape, transform, offset, color: Color(color.0.map(|v| v * alpha)), blur, spread },
-		Op::Glyphs { texture, quads, color, transform, colored } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)), transform, colored },
-		Op::Picture { texture, x, y, w, h, uv, opacity } => Op::Picture { texture, x, y, w, h, uv, opacity: opacity * alpha },
-		other => other,
-	}
-}
-
-fn rrect(vars: &Vars, item: &Item, theme: &Theme, w: f64, h: f64) -> Shape {
-	let r = vars.radii(&item.props, theme);
-	// No corner rounder than half the shorter side.
-	let limit = (w.min(h) / 2.0).max(0.0);
-	Shape { w: w as f32, h: h as f32, radii: r.map(|v| v.clamp(0.0, limit) as f32), ellipse: false }
-}
-
-fn color(vars: &Vars, value: Option<&Value>, theme: &Theme) -> Option<[f32; 4]> {
-	vars.color(value, theme)
-}
-
-fn fills_of(value: Option<&Value>) -> Vec<&Value> {
-	match value {
-		None | Some(Value::Null) => Vec::new(),
-		Some(Value::Array(list)) => list.iter().collect(),
-		Some(one) => vec![one],
-	}
-}
-
-/// A fill as a paint over a `w` × `h` box, or `None` when it draws nothing (yet).
-fn paint_of(ctx: &Context, fill: &Value, theme: &Theme, w: f64, h: f64) -> Option<Paint> {
-	let vars = &ctx.scene.vars;
-	if let Some(s) = fill.as_str() {
-		return color(vars, Some(fill), theme).map(|c| Paint::Solid(Color::straight(c, 1.0))).or_else(|| parse_color(s).map(|c| Paint::Solid(Color::straight(c, 1.0))));
-	}
-	let object = fill.as_object()?;
-	if !vars.bool(object.get("enabled"), theme, true) {
+/// An item's blur (its `blur` effects', added up) as a layer's: its Gaussian in target pixels and
+/// what the item and everything in it paint on, there. `None` for an item with no blur.
+fn layer_blur(ctx: &Context, root: &Root, i: u32, target: &Mat) -> Option<LayerBlur> {
+	let item = &root.tree.items[i as usize];
+	let radius = stage_scene::blur_radius(&ctx.scene.vars, item, &root.placed[i as usize].theme);
+	if radius <= 0.0 {
 		return None;
 	}
-	let kind = object.get("type").and_then(Value::as_str).unwrap_or("");
-	let alpha = vars.num(object.get("opacity"), theme, 1.0) as f32;
-	match kind {
-		"color" | "solid" => color(vars, object.get("color"), theme).map(|c| Paint::Solid(Color::straight(c, 1.0))),
-		"gradient" => {
-			let mut stops: Vec<(f32, Color)> = object
-				.get("colors")
-				.and_then(Value::as_array)
-				.map(|list| list.iter().filter_map(|s| Some((vars.num(s.get("position"), theme, 0.0) as f32, Color::straight(color(vars, s.get("color"), theme)?, alpha)))).collect())
-				.unwrap_or_default();
-			stops.sort_by(|a, b| a.0.total_cmp(&b.0));
-			if stops.is_empty() {
-				return None;
-			}
-			if stops.len() == 1 {
-				stops.push(stops[0]);
-			}
-			let center = object.get("center");
-			let size = object.get("size");
-			let cx = w * vars.num(center.and_then(|c| c.get("x")), theme, 0.5);
-			let cy = h * vars.num(center.and_then(|c| c.get("y")), theme, 0.5);
-			let sw = w * vars.num(size.and_then(|s| s.get("width")), theme, 1.0);
-			let sh = h * vars.num(size.and_then(|s| s.get("height")), theme, 1.0);
-			let radius = ((sw / 2.0).max(1.0) as f32, (sh / 2.0).max(1.0) as f32);
-			match object.get("gradientType").and_then(Value::as_str).unwrap_or("linear") {
-				"radial" => Some(Paint::Radial { center: (cx as f32, cy as f32), radius, stops }),
-				// Clockwise round the centre from straight up, started turned counter-clockwise by the rotation.
-				"angular" => Some(Paint::Conic { center: (cx as f32, cy as f32), radius, start: vars.num(object.get("rotation"), theme, 0.0).to_radians() as f32, stops }),
-				_ => {
-					// 0° points up and angles run counter-clockwise; the length is the size's height.
-					let rad = vars.num(object.get("rotation"), theme, 0.0).to_radians();
-					let (dx, dy) = (-rad.sin(), -rad.cos());
-					let half = sh / 2.0;
-					Some(Paint::Linear { from: ((cx - dx * half) as f32, (cy - dy * half) as f32), to: ((cx + dx * half) as f32, (cy + dy * half) as f32), stops })
-				}
-			}
-		}
-		"image" => {
-			let url = object.get("url").and_then(Value::as_str)?;
-			let Some((texture, iw, ih)) = (ctx.image)(url) else {
-				ctx.wanted.borrow_mut().push(url.to_owned());
-				return None;
-			};
-			let (iw, ih) = (iw.max(1) as f64, ih.max(1) as f64);
-			let (sx, sy) = (w / iw, h / ih);
-			let (sx, sy) = match object.get("mode").and_then(Value::as_str) {
-				Some("stretch") => (sx, sy),
-				Some("fit") => (sx.min(sy), sx.min(sy)),
-				_ => (sx.max(sy), sx.max(sy)),
-			};
-			// The part of the picture across the box, centred.
-			let (pw, ph) = (w / sx / iw, h / sy / ih);
-			let (u0, v0) = ((1.0 - pw) / 2.0, (1.0 - ph) / 2.0);
-			Some(Paint::Image { texture, opacity: alpha, uv: [u0 as f32, v0 as f32, (u0 + pw) as f32, (v0 + ph) as f32] })
-		}
-		_ => None,
+	// pen's radius, as a CSS blur radius, is two of the Gaussian's sigmas, as a shadow's blur is.
+	let sigma = (radius / 2.0) as f32 * to_affine(&target.then(&root.world[i as usize])).scale_factor();
+	let mut ink = root.ink[i as usize];
+	let mut stack = item.children.clone();
+	while let Some(c) = stack.pop() {
+		ink = ink.union(&root.ink[c as usize]);
+		stack.extend(root.tree.items[c as usize].children.iter().copied());
 	}
+	let r = target.then(&Mat::translate(ink.x, ink.y)).bounds(ink.w, ink.h);
+	Some(LayerBlur { sigma, area: [r.x as f32, r.y as f32, r.w as f32, r.h as f32] })
 }
 
-/// Outer shadows, or with `inner` inner ones: `(dx, dy, blur, spread, color)` each.
-fn shadows(vars: &Vars, item: &Item, theme: &Theme, inner: bool) -> Vec<(f32, f32, f32, f32, Color)> {
-	let mut out = Vec::new();
-	for effect in fills_of(item.get("effect")) {
-		if effect.get("type").and_then(Value::as_str) != Some("shadow") || (effect.get("shadowType").and_then(Value::as_str) == Some("inner")) != inner {
-			continue;
-		}
-		if !vars.bool(effect.get("enabled"), theme, true) {
-			continue;
-		}
-		let Some(c) = color(vars, effect.get("color"), theme).or_else(|| parse_color("#00000040")) else { continue };
-		let off = effect.get("offset");
-		out.push((
-			vars.num(off.and_then(|o| o.get("x")), theme, 0.0) as f32,
-			vars.num(off.and_then(|o| o.get("y")), theme, 0.0) as f32,
-			vars.num(effect.get("blur"), theme, 0.0) as f32,
-			vars.num(effect.get("spread"), theme, 0.0) as f32,
-			Color::straight(c, 1.0),
-		));
-	}
-	out
+fn opacity(ctx: &Context, root: &Root, i: u32) -> f32 {
+	let item = &root.tree.items[i as usize];
+	ctx.scene.vars.num(item.get("opacity"), &root.placed[i as usize].theme, 1.0).clamp(0.0, 1.0) as f32
 }
 
-/// A box's or an ellipse's inner shadows, over its fills and under its outline and children, as CSS
-/// draws an inset box-shadow. Paths, polygons, arcs and rings have none drawn yet.
-fn inner_shadows(vars: &Vars, item: &Item, theme: &Theme, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
-	for (dx, dy, blur, spread, color) in shadows(vars, item, theme, true) {
-		ops.push(Op::InnerShadow { shape, transform, offset: (dx, dy), color, blur, spread });
-	}
-}
-
-struct Stroke<'v> {
-	fills: Vec<&'v Value>,
-	widths: [f32; 4],
-	align: Align,
-	cap: lyon_tessellation::LineCap,
-	join: lyon_tessellation::LineJoin,
-}
-
-/// The stroke an item draws, from either spelling pen.dev has used.
-fn stroke_of<'v>(vars: &Vars, item: &'v Item, theme: &Theme) -> Option<Stroke<'v>> {
-	use lyon_tessellation::{LineCap, LineJoin};
-	let raw = item.get("stroke");
-	let legacy = raw.and_then(Value::as_object).filter(|o| !o.contains_key("type") && (o.contains_key("thickness") || o.contains_key("align") || o.contains_key("fill")));
-	let fills = match legacy {
-		Some(l) => fills_of(l.get("fill")),
-		None => fills_of(raw),
-	};
-	if fills.is_empty() {
-		return None;
-	}
-	let width = if legacy.is_some() { legacy.and_then(|l| l.get("thickness")) } else { item.get("strokeWidth") };
-	let widths = match width {
-		Some(Value::Object(sides)) => ["top", "right", "bottom", "left"].map(|k| vars.num(sides.get(k), theme, 0.0) as f32),
-		other => [vars.num(other, theme, 1.0) as f32; 4],
-	};
-	if widths.iter().all(|w| *w <= 0.0) {
-		return None;
-	}
-	let legacy_align = legacy.and_then(|l| l.get("align")).and_then(Value::as_str).map(|a| match a {
-		"inside" => "inner",
-		"outside" => "outer",
-		_ => "center",
-	});
-	let align = match item.get("strokeAlignment").and_then(Value::as_str).or(legacy_align).unwrap_or("center") {
-		"inner" => Align::Inside,
-		"outer" => Align::Outside,
-		_ => Align::Center,
-	};
-	let text = |key: &str, old: &str| item.get(key).and_then(Value::as_str).or_else(|| legacy.and_then(|l| l.get(old)).and_then(Value::as_str));
-	let cap = match text("strokeLinecap", "cap") {
-		Some("round") => LineCap::Round,
-		Some("square") => LineCap::Square,
-		_ => LineCap::Butt,
-	};
-	let join = match text("strokeLinejoin", "join") {
-		Some("round") => LineJoin::Round,
-		Some("bevel") => LineJoin::Bevel,
-		_ => LineJoin::Miter,
-	};
-	Some(Stroke { fills, widths, align, cap, join })
-}
-
-fn dash_of(item: &Item, width: f32) -> Option<Vec<f64>> {
-	let w = width.max(1.0) as f64;
-	match item.get("strokeDash").and_then(Value::as_str) {
-		Some("dashed") => Some(vec![w * 4.0, w * 3.0]),
-		Some("dotted") => Some(vec![0.01, w * 2.5]),
-		_ => None,
-	}
-}
-
+// One item's own ops, by what kind of item it is.
 const ARROW: &str = "decks.arrow";
+
 const CARD: &str = "decks.markdown-card";
+
 /// A markdown card's old tag, still read on a frame until its harness rewrites it.
 const OLD_CARD: &str = "decks.card";
+
 const MARKDOWN: &str = "decks.markdown";
+
 const MEDIA: &str = "decks.media";
 
 fn meta_type(item: &Item) -> Option<&str> {
 	item.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str)
-}
-
-/// The stroke still under the pen: an SVG path in stage units, filled or stroked `size` wide.
-#[derive(Clone, Debug)]
-pub struct LiveInk {
-	pub d: String,
-	pub filled: bool,
-	pub color: [f32; 4],
-	pub size: f32,
-	pub opacity: f32,
-}
-
-/// Live strokes, drawn with `target` (stage units to target pixels).
-pub fn paint_ink(strokes: &[LiveInk], target: &Mat, ops: &mut Vec<Op>) {
-	let transform = to_affine(target);
-	let pixels = transform.scale_factor().max(1e-3);
-	for stroke in strokes {
-		let Ok(path) = kurbo::BezPath::from_svg(&stroke.d) else { continue };
-		let mesh = if stroke.filled { mesh::fill(&path, false, pixels) } else { mesh::stroke(&path, stroke.size, lyon_tessellation::LineCap::Round, lyon_tessellation::LineJoin::Round, None, pixels) };
-		if let Some((vertices, indices)) = mesh {
-			ops.push(Op::Mesh { vertices, indices, transform, paint: Paint::Solid(Color::straight(stroke.color, stroke.opacity)) });
-		}
-	}
 }
 
 /// The ops an item draws of its own (its children are drawn after): `ops` now, `closing` after its
@@ -650,42 +426,242 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 	}
 }
 
-/// The outline's width and dashes, and the name tag's inset and padding, in stage units.
-const PLACEHOLDER_LINE: f64 = 2.0;
-const PLACEHOLDER_DASH: [f64; 2] = [8.0, 6.0];
-const PLACEHOLDER_TAG_INSET: f64 = 6.0;
-const PLACEHOLDER_TAG_PAD: (f64, f64) = (6.0, 3.0);
+/// An arrow's words (`metadata.label`, "yes", "then"), set on the middle of its line, on a patch of the
+/// canvas's ground so the line does not run through them: in its own space, so they move and scale with it.
+fn arrow_label(ctx: &Context, item: &Item, path: &kurbo::BezPath, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let Some(words) = item.get("metadata").and_then(|meta| meta.get("label")).and_then(Value::as_str).map(str::trim).filter(|w| !w.is_empty()) else { return };
+	let Some(mid) = halfway(path) else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 14.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let laid = text.lay(&[Span::plain(words, &style)], None, stage_text::Align::Left);
+	let (lw, lh) = (laid.width as f64, laid.height as f64);
+	let (pad_x, pad_y) = (6.0, 2.0);
+	let (x, y) = (mid.x - lw / 2.0, mid.y - lh / 2.0);
+	let ground = if ctx.dark { [0.118, 0.118, 0.125, 1.0] } else { [0.961, 0.961, 0.961, 1.0] };
+	let patch = Shape { w: (lw + pad_x * 2.0) as f32, h: (lh + pad_y * 2.0) as f32, radii: [4.0; 4], ellipse: false };
+	ops.push(Op::Shape { shape: patch, transform: transform.then(&Affine::translate((x - pad_x) as f32, (y - pad_y) as f32)), paint: Paint::Solid(Color::straight(ground, 1.0)), stroke: None });
+	let ink = if ctx.dark { [0.78, 0.78, 0.8, 1.0] } else { [0.33, 0.34, 0.37, 1.0] };
+	draw_laid(ctx, &laid, (x, y), &[Color::straight(ink, 1.0)], m, ops);
+}
 
-/// A frame still being made (`placeholder: true`): a dashed outline just inside its edge in the
-/// writer's colour, over what is in it, and the writer's name on a tag of that colour inside its
-/// top-left corner. Inside the box, so it is drawn on every tile the frame is drawn on; a frame too
-/// small for the tag has the outline alone.
-fn placeholder_mark(ctx: &Context, shape: Shape, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
-	let (w, h) = (shape.w as f64, shape.h as f64);
-	let colour = ctx.writer.map_or(PLACEHOLDER_ACCENT, |by| by.color);
-	let line = PLACEHOLDER_LINE.min(w / 2.0).min(h / 2.0);
-	if line <= 0.0 {
-		return;
+// Ink, painted fresh each frame by the page rather than into tiles.
+/// The stroke still under the pen: an SVG path in stage units, filled or stroked `size` wide.
+#[derive(Clone, Debug)]
+pub struct LiveInk {
+	pub d: String,
+	pub filled: bool,
+	pub color: [f32; 4],
+	pub size: f32,
+	pub opacity: f32,
+}
+
+/// Live strokes, drawn with `target` (stage units to target pixels).
+pub fn paint_ink(strokes: &[LiveInk], target: &Mat, ops: &mut Vec<Op>) {
+	let transform = to_affine(target);
+	let pixels = transform.scale_factor().max(1e-3);
+	for stroke in strokes {
+		let Ok(path) = kurbo::BezPath::from_svg(&stroke.d) else { continue };
+		let mesh = if stroke.filled { mesh::fill(&path, false, pixels) } else { mesh::stroke(&path, stroke.size, lyon_tessellation::LineCap::Round, lyon_tessellation::LineJoin::Round, None, pixels) };
+		if let Some((vertices, indices)) = mesh {
+			ops.push(Op::Mesh { vertices, indices, transform, paint: Paint::Solid(Color::straight(stroke.color, stroke.opacity)) });
+		}
 	}
-	let half = line / 2.0;
-	let radius = (shape.radii[0] as f64 - half).max(0.0);
-	let path = mesh::rounded_rect_path(w - line, h - line, radius);
-	let inset = transform.then(&Affine::translate(half as f32, half as f32));
-	if let Some((vertices, indices)) = mesh::stroke(&path, line as f32, lyon_tessellation::LineCap::Butt, lyon_tessellation::LineJoin::Miter, Some(&PLACEHOLDER_DASH), inset.scale_factor()) {
-		ops.push(Op::Mesh { vertices, indices, transform: inset, paint: Paint::Solid(Color::straight(colour, 1.0)) });
+}
+
+// Fills, paints and shadows.
+fn to_affine(m: &Mat) -> Affine {
+	Affine(m.0.map(|v| v as f32))
+}
+
+/// An op with an opacity multiplied into its colours.
+fn fade(op: Op, alpha: f32) -> Op {
+	if alpha >= 1.0 {
+		return op;
 	}
-	let (Some(name), Some(text)) = (ctx.writer.and_then(|by| by.name.as_deref()).map(str::trim).filter(|n| !n.is_empty()), ctx.text) else { return };
-	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
-	let laid = text.lay(&[Span::plain(name, &style)], None, stage_text::Align::Left);
-	let (pad_x, pad_y) = PLACEHOLDER_TAG_PAD;
-	let (tag_w, tag_h) = (laid.width as f64 + pad_x * 2.0, laid.height as f64 + pad_y * 2.0);
-	let at = PLACEHOLDER_TAG_INSET;
-	if tag_w + at * 2.0 > w || tag_h + at * 2.0 > h {
-		return;
+	let paint = |p: Paint| match p {
+		Paint::Solid(c) => Paint::Solid(Color(c.0.map(|v| v * alpha))),
+		Paint::Linear { from, to, stops } => Paint::Linear { from, to, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
+		Paint::Radial { center, radius, stops } => Paint::Radial { center, radius, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
+		Paint::Conic { center, radius, start, stops } => Paint::Conic { center, radius, start, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
+		Paint::Image { texture, opacity, uv } => Paint::Image { texture, opacity: opacity * alpha, uv },
+	};
+	match op {
+		Op::Shape { shape, transform, paint: p, stroke } => Op::Shape { shape, transform, paint: paint(p), stroke },
+		Op::Mesh { vertices, indices, transform, paint: p } => Op::Mesh { vertices, indices, transform, paint: paint(p) },
+		Op::Shadow { shape, transform, color, blur, spread } => Op::Shadow { shape, transform, color: Color(color.0.map(|v| v * alpha)), blur, spread },
+		Op::InnerShadow { shape, transform, offset, color, blur, spread } => Op::InnerShadow { shape, transform, offset, color: Color(color.0.map(|v| v * alpha)), blur, spread },
+		Op::Glyphs { texture, quads, color, transform, colored } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)), transform, colored },
+		Op::Picture { texture, x, y, w, h, uv, opacity } => Op::Picture { texture, x, y, w, h, uv, opacity: opacity * alpha },
+		other => other,
 	}
-	let tag = Shape { w: tag_w as f32, h: tag_h as f32, radii: [4.0; 4], ellipse: false };
-	ops.push(Op::Shape { shape: tag, transform: transform.then(&Affine::translate(at as f32, at as f32)), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
-	draw_laid(ctx, &laid, (at + pad_x, at + pad_y), &[Color::straight([1.0, 1.0, 1.0, 1.0], 1.0)], m, ops);
+}
+fn rrect(vars: &Vars, item: &Item, theme: &Theme, w: f64, h: f64) -> Shape {
+	let r = vars.radii(&item.props, theme);
+	// No corner rounder than half the shorter side.
+	let limit = (w.min(h) / 2.0).max(0.0);
+	Shape { w: w as f32, h: h as f32, radii: r.map(|v| v.clamp(0.0, limit) as f32), ellipse: false }
+}
+fn color(vars: &Vars, value: Option<&Value>, theme: &Theme) -> Option<[f32; 4]> {
+	vars.color(value, theme)
+}
+fn fills_of(value: Option<&Value>) -> Vec<&Value> {
+	match value {
+		None | Some(Value::Null) => Vec::new(),
+		Some(Value::Array(list)) => list.iter().collect(),
+		Some(one) => vec![one],
+	}
+}
+/// A fill as a paint over a `w` × `h` box, or `None` when it draws nothing (yet).
+fn paint_of(ctx: &Context, fill: &Value, theme: &Theme, w: f64, h: f64) -> Option<Paint> {
+	let vars = &ctx.scene.vars;
+	if let Some(s) = fill.as_str() {
+		return color(vars, Some(fill), theme).map(|c| Paint::Solid(Color::straight(c, 1.0))).or_else(|| parse_color(s).map(|c| Paint::Solid(Color::straight(c, 1.0))));
+	}
+	let object = fill.as_object()?;
+	if !vars.bool(object.get("enabled"), theme, true) {
+		return None;
+	}
+	let kind = object.get("type").and_then(Value::as_str).unwrap_or("");
+	let alpha = vars.num(object.get("opacity"), theme, 1.0) as f32;
+	match kind {
+		"color" | "solid" => color(vars, object.get("color"), theme).map(|c| Paint::Solid(Color::straight(c, 1.0))),
+		"gradient" => {
+			let mut stops: Vec<(f32, Color)> = object
+				.get("colors")
+				.and_then(Value::as_array)
+				.map(|list| list.iter().filter_map(|s| Some((vars.num(s.get("position"), theme, 0.0) as f32, Color::straight(color(vars, s.get("color"), theme)?, alpha)))).collect())
+				.unwrap_or_default();
+			stops.sort_by(|a, b| a.0.total_cmp(&b.0));
+			if stops.is_empty() {
+				return None;
+			}
+			if stops.len() == 1 {
+				stops.push(stops[0]);
+			}
+			let center = object.get("center");
+			let size = object.get("size");
+			let cx = w * vars.num(center.and_then(|c| c.get("x")), theme, 0.5);
+			let cy = h * vars.num(center.and_then(|c| c.get("y")), theme, 0.5);
+			let sw = w * vars.num(size.and_then(|s| s.get("width")), theme, 1.0);
+			let sh = h * vars.num(size.and_then(|s| s.get("height")), theme, 1.0);
+			let radius = ((sw / 2.0).max(1.0) as f32, (sh / 2.0).max(1.0) as f32);
+			match object.get("gradientType").and_then(Value::as_str).unwrap_or("linear") {
+				"radial" => Some(Paint::Radial { center: (cx as f32, cy as f32), radius, stops }),
+				// Clockwise round the centre from straight up, started turned counter-clockwise by the rotation.
+				"angular" => Some(Paint::Conic { center: (cx as f32, cy as f32), radius, start: vars.num(object.get("rotation"), theme, 0.0).to_radians() as f32, stops }),
+				_ => {
+					// 0° points up and angles run counter-clockwise; the length is the size's height.
+					let rad = vars.num(object.get("rotation"), theme, 0.0).to_radians();
+					let (dx, dy) = (-rad.sin(), -rad.cos());
+					let half = sh / 2.0;
+					Some(Paint::Linear { from: ((cx - dx * half) as f32, (cy - dy * half) as f32), to: ((cx + dx * half) as f32, (cy + dy * half) as f32), stops })
+				}
+			}
+		}
+		"image" => {
+			let url = object.get("url").and_then(Value::as_str)?;
+			let Some((texture, iw, ih)) = (ctx.image)(url) else {
+				ctx.wanted.borrow_mut().push(url.to_owned());
+				return None;
+			};
+			let (iw, ih) = (iw.max(1) as f64, ih.max(1) as f64);
+			let (sx, sy) = (w / iw, h / ih);
+			let (sx, sy) = match object.get("mode").and_then(Value::as_str) {
+				Some("stretch") => (sx, sy),
+				Some("fit") => (sx.min(sy), sx.min(sy)),
+				_ => (sx.max(sy), sx.max(sy)),
+			};
+			// The part of the picture across the box, centred.
+			let (pw, ph) = (w / sx / iw, h / sy / ih);
+			let (u0, v0) = ((1.0 - pw) / 2.0, (1.0 - ph) / 2.0);
+			Some(Paint::Image { texture, opacity: alpha, uv: [u0 as f32, v0 as f32, (u0 + pw) as f32, (v0 + ph) as f32] })
+		}
+		_ => None,
+	}
+}
+
+/// Outer shadows, or with `inner` inner ones: `(dx, dy, blur, spread, color)` each.
+fn shadows(vars: &Vars, item: &Item, theme: &Theme, inner: bool) -> Vec<(f32, f32, f32, f32, Color)> {
+	let mut out = Vec::new();
+	for effect in fills_of(item.get("effect")) {
+		if effect.get("type").and_then(Value::as_str) != Some("shadow") || (effect.get("shadowType").and_then(Value::as_str) == Some("inner")) != inner {
+			continue;
+		}
+		if !vars.bool(effect.get("enabled"), theme, true) {
+			continue;
+		}
+		let Some(c) = color(vars, effect.get("color"), theme).or_else(|| parse_color("#00000040")) else { continue };
+		let off = effect.get("offset");
+		out.push((
+			vars.num(off.and_then(|o| o.get("x")), theme, 0.0) as f32,
+			vars.num(off.and_then(|o| o.get("y")), theme, 0.0) as f32,
+			vars.num(effect.get("blur"), theme, 0.0) as f32,
+			vars.num(effect.get("spread"), theme, 0.0) as f32,
+			Color::straight(c, 1.0),
+		));
+	}
+	out
+}
+
+/// A box's or an ellipse's inner shadows, over its fills and under its outline and children, as CSS
+/// draws an inset box-shadow. Paths, polygons, arcs and rings have none drawn yet.
+fn inner_shadows(vars: &Vars, item: &Item, theme: &Theme, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
+	for (dx, dy, blur, spread, color) in shadows(vars, item, theme, true) {
+		ops.push(Op::InnerShadow { shape, transform, offset: (dx, dy), color, blur, spread });
+	}
+}
+
+// Strokes: outlines, dashes and the paths they follow.
+struct Stroke<'v> {
+	fills: Vec<&'v Value>,
+	widths: [f32; 4],
+	align: Align,
+	cap: lyon_tessellation::LineCap,
+	join: lyon_tessellation::LineJoin,
+}
+
+/// The stroke an item draws, from either spelling pen.dev has used.
+fn stroke_of<'v>(vars: &Vars, item: &'v Item, theme: &Theme) -> Option<Stroke<'v>> {
+	use lyon_tessellation::{LineCap, LineJoin};
+	let raw = item.get("stroke");
+	let legacy = raw.and_then(Value::as_object).filter(|o| !o.contains_key("type") && (o.contains_key("thickness") || o.contains_key("align") || o.contains_key("fill")));
+	let fills = match legacy {
+		Some(l) => fills_of(l.get("fill")),
+		None => fills_of(raw),
+	};
+	if fills.is_empty() {
+		return None;
+	}
+	let width = if legacy.is_some() { legacy.and_then(|l| l.get("thickness")) } else { item.get("strokeWidth") };
+	let widths = match width {
+		Some(Value::Object(sides)) => ["top", "right", "bottom", "left"].map(|k| vars.num(sides.get(k), theme, 0.0) as f32),
+		other => [vars.num(other, theme, 1.0) as f32; 4],
+	};
+	if widths.iter().all(|w| *w <= 0.0) {
+		return None;
+	}
+	let legacy_align = legacy.and_then(|l| l.get("align")).and_then(Value::as_str).map(|a| match a {
+		"inside" => "inner",
+		"outside" => "outer",
+		_ => "center",
+	});
+	let align = match item.get("strokeAlignment").and_then(Value::as_str).or(legacy_align).unwrap_or("center") {
+		"inner" => Align::Inside,
+		"outer" => Align::Outside,
+		_ => Align::Center,
+	};
+	let text = |key: &str, old: &str| item.get(key).and_then(Value::as_str).or_else(|| legacy.and_then(|l| l.get(old)).and_then(Value::as_str));
+	let cap = match text("strokeLinecap", "cap") {
+		Some("round") => LineCap::Round,
+		Some("square") => LineCap::Square,
+		_ => LineCap::Butt,
+	};
+	let join = match text("strokeLinejoin", "join") {
+		Some("round") => LineJoin::Round,
+		Some("bevel") => LineJoin::Bevel,
+		_ => LineJoin::Miter,
+	};
+	Some(Stroke { fills, widths, align, cap, join })
 }
 
 /// A shape's outline: uniform as one op, per side as bars cut to the shape.
@@ -727,7 +703,44 @@ fn shape_stroke(ctx: &Context, item: &Item, theme: &Theme, shape: Shape, transfo
 	}
 	ops.push(Op::PopClip);
 }
-
+fn dash_of(item: &Item, width: f32) -> Option<Vec<f64>> {
+	let w = width.max(1.0) as f64;
+	match item.get("strokeDash").and_then(Value::as_str) {
+		Some("dashed") => Some(vec![w * 4.0, w * 3.0]),
+		Some("dotted") => Some(vec![0.01, w * 2.5]),
+		_ => None,
+	}
+}
+/// A dashed or dotted outline as plain shapes along a box's four straight edges: a bar per dash, a circle
+/// per dot, on the line its alignment puts it on; the corners' curves are left out.
+#[allow(clippy::too_many_arguments)]
+fn dashes(shape: Shape, transform: Affine, width: f32, align: Align, dash: &[f64], dotted: bool, paint: Paint, ops: &mut Vec<Op>) {
+	let w = width as f64;
+	// Where the line's middle runs, in from the box's edge.
+	let inset = match align {
+		Align::Inside => w / 2.0,
+		Align::Center => 0.0,
+		Align::Outside => -w / 2.0,
+	};
+	let (bw, bh) = (shape.w as f64 - 2.0 * inset, shape.h as f64 - 2.0 * inset);
+	let r = (shape.radii[0] as f64 - inset).max(0.0).min(bw / 2.0).min(bh / 2.0);
+	let (on, off) = (dash.first().copied().unwrap_or(w * 4.0).max(0.0), dash.get(1).copied().unwrap_or(w * 3.0).max(0.5));
+	// Each edge: where it starts, which way it runs, and how long its straight part is.
+	let edges = [((inset + r, inset), (1.0, 0.0), bw - 2.0 * r), ((inset + bw, inset + r), (0.0, 1.0), bh - 2.0 * r), ((inset + bw - r, inset + bh), (-1.0, 0.0), bw - 2.0 * r), ((inset, inset + bh - r), (0.0, -1.0), bh - 2.0 * r)];
+	for ((x0, y0), (dx, dy), run) in edges {
+		let mut t = 0.0;
+		while t < run {
+			let len = if dotted { 0.0 } else { on.min(run - t) };
+			let (ax, ay) = (x0 + dx * t, y0 + dy * t);
+			let (bx, by) = (ax + dx * len, ay + dy * len);
+			let (left, top) = (ax.min(bx) - w / 2.0, ay.min(by) - w / 2.0);
+			let (sw, sh) = (if dotted { w } else { (bx - ax).abs() + if dx == 0.0 { w } else { 0.0 } }, if dotted { w } else { (by - ay).abs() + if dy == 0.0 { w } else { 0.0 } });
+			let (left, top) = if dotted { (ax - w / 2.0, ay - w / 2.0) } else if dx == 0.0 { (left, ay.min(by)) } else { (ax.min(bx), top) };
+			ops.push(Op::Shape { shape: Shape { w: sw as f32, h: sh as f32, radii: [0.0; 4], ellipse: dotted }, transform: transform.then(&Affine::translate(left as f32, top as f32)), paint: paint.clone(), stroke: None });
+			t += if dotted { off.max(w * 1.5) } else { on + off };
+		}
+	}
+}
 #[allow(clippy::too_many_arguments)]
 fn path_ops(ctx: &Context, item: &Item, theme: &Theme, path: &kurbo::BezPath, w: f64, h: f64, transform: Affine, pixels: f32, closed_shape: bool, ops: &mut Vec<Op>) {
 	let vars = &ctx.scene.vars;
@@ -774,51 +787,51 @@ fn halfway(path: &kurbo::BezPath) -> Option<kurbo::Point> {
 	points.last().copied()
 }
 
-/// An arrow's words (`metadata.label`, "yes", "then"), set on the middle of its line, on a patch of the
-/// canvas's ground so the line does not run through them: in its own space, so they move and scale with it.
-fn arrow_label(ctx: &Context, item: &Item, path: &kurbo::BezPath, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
-	let Some(text) = ctx.text else { return };
-	let Some(words) = item.get("metadata").and_then(|meta| meta.get("label")).and_then(Value::as_str).map(str::trim).filter(|w| !w.is_empty()) else { return };
-	let Some(mid) = halfway(path) else { return };
-	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 14.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
-	let laid = text.lay(&[Span::plain(words, &style)], None, stage_text::Align::Left);
-	let (lw, lh) = (laid.width as f64, laid.height as f64);
-	let (pad_x, pad_y) = (6.0, 2.0);
-	let (x, y) = (mid.x - lw / 2.0, mid.y - lh / 2.0);
-	let ground = if ctx.dark { [0.118, 0.118, 0.125, 1.0] } else { [0.961, 0.961, 0.961, 1.0] };
-	let patch = Shape { w: (lw + pad_x * 2.0) as f32, h: (lh + pad_y * 2.0) as f32, radii: [4.0; 4], ellipse: false };
-	ops.push(Op::Shape { shape: patch, transform: transform.then(&Affine::translate((x - pad_x) as f32, (y - pad_y) as f32)), paint: Paint::Solid(Color::straight(ground, 1.0)), stroke: None });
-	let ink = if ctx.dark { [0.78, 0.78, 0.8, 1.0] } else { [0.33, 0.34, 0.37, 1.0] };
-	draw_laid(ctx, &laid, (x, y), &[Color::straight(ink, 1.0)], m, ops);
-}
+// Marks round frames and cards: placeholders, outlines, papers.
+/// The outline's width and dashes, and the name tag's inset and padding, in stage units.
+const PLACEHOLDER_LINE: f64 = 2.0;
 
-/// A card's paper: the app's two-layer shadow for the scheme, then the paper.
-fn card_paper(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
-	let paper = if dark { [0.141, 0.141, 0.141, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
-	card_paper_colour(dark, shape, transform, paper, ops);
-}
+const PLACEHOLDER_DASH: [f64; 2] = [8.0, 6.0];
 
-fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4], ops: &mut Vec<Op>) {
-	let layers: [(f32, f32, f32); 2] = if dark { [(1.0, 2.0, 0.4), (6.0, 18.0, 0.3)] } else { [(1.0, 2.0, 0.06), (4.0, 12.0, 0.05)] };
-	for (y, blur, a) in layers {
-		ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(0.0, y)), color: Color::straight([0.0, 0.0, 0.0, a], 1.0), blur, spread: 0.0 });
+const PLACEHOLDER_TAG_INSET: f64 = 6.0;
+
+const PLACEHOLDER_TAG_PAD: (f64, f64) = (6.0, 3.0);
+
+/// A frame still being made (`placeholder: true`): a dashed outline just inside its edge in the
+/// writer's colour, over what is in it, and the writer's name on a tag of that colour inside its
+/// top-left corner. Inside the box, so it is drawn on every tile the frame is drawn on; a frame too
+/// small for the tag has the outline alone.
+fn placeholder_mark(ctx: &Context, shape: Shape, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
+	let (w, h) = (shape.w as f64, shape.h as f64);
+	let colour = ctx.writer.map_or(PLACEHOLDER_ACCENT, |by| by.color);
+	let line = PLACEHOLDER_LINE.min(w / 2.0).min(h / 2.0);
+	if line <= 0.0 {
+		return;
 	}
-	ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(paper, 1.0)), stroke: None });
+	let half = line / 2.0;
+	let radius = (shape.radii[0] as f64 - half).max(0.0);
+	let path = mesh::rounded_rect_path(w - line, h - line, radius);
+	let inset = transform.then(&Affine::translate(half as f32, half as f32));
+	if let Some((vertices, indices)) = mesh::stroke(&path, line as f32, lyon_tessellation::LineCap::Butt, lyon_tessellation::LineJoin::Miter, Some(&PLACEHOLDER_DASH), inset.scale_factor()) {
+		ops.push(Op::Mesh { vertices, indices, transform: inset, paint: Paint::Solid(Color::straight(colour, 1.0)) });
+	}
+	let (Some(name), Some(text)) = (ctx.writer.and_then(|by| by.name.as_deref()).map(str::trim).filter(|n| !n.is_empty()), ctx.text) else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let laid = text.lay(&[Span::plain(name, &style)], None, stage_text::Align::Left);
+	let (pad_x, pad_y) = PLACEHOLDER_TAG_PAD;
+	let (tag_w, tag_h) = (laid.width as f64 + pad_x * 2.0, laid.height as f64 + pad_y * 2.0);
+	let at = PLACEHOLDER_TAG_INSET;
+	if tag_w + at * 2.0 > w || tag_h + at * 2.0 > h {
+		return;
+	}
+	let tag = Shape { w: tag_w as f32, h: tag_h as f32, radii: [4.0; 4], ellipse: false };
+	ops.push(Op::Shape { shape: tag, transform: transform.then(&Affine::translate(at as f32, at as f32)), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
+	draw_laid(ctx, &laid, (at + pad_x, at + pad_y), &[Color::straight([1.0, 1.0, 1.0, 1.0], 1.0)], m, ops);
 }
 
-/// A card's hairline edge, outside its box as a CSS outline is.
-/// A browser item (a card, an app, a document, a board): its page or its picture lies under the
-/// drawing, so the drawing has a hole for it, its own `cornerRadius`'s shape. Its pen fields frame it:
-/// its `effect` shadows go under the hole (only what falls outside the box shows), and its outline
-/// (`stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash`) over it. A `strokeWidth` with no `stroke`
-/// is drawn in the canvas's line colour, outside the edge, as the canvas's own 1 px outline is; with
-/// neither, nothing is drawn here and the canvas keeps that outline (`.card-node > .shade`).
-fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, ops: &mut Vec<Op>) {
-	let shape = rrect(&ctx.scene.vars, item, theme, w, h);
-	let (under, over) = frame_parts(ctx, item, theme, w, h, transform, false);
-	ops.extend(under);
-	ops.push(Op::Erase { shape, transform });
-	ops.extend(over);
+/// Whether a browser item frames itself (its own outline or shadow), so a drag must carry the frame with it.
+pub fn has_frame(item: &Item) -> bool {
+	item.get("stroke").is_some_and(|v| !v.is_null()) || item.get("strokeWidth").is_some() || item.get("effect").is_some_and(|v| !v.is_null())
 }
 
 /// A browser item's frame in two halves: what goes under its page or picture (its shadows) and what
@@ -860,44 +873,37 @@ pub fn frame_parts(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, tr
 	(under, over)
 }
 
-/// A dashed or dotted outline as plain shapes along a box's four straight edges: a bar per dash, a circle
-/// per dot, on the line its alignment puts it on; the corners' curves are left out.
-#[allow(clippy::too_many_arguments)]
-fn dashes(shape: Shape, transform: Affine, width: f32, align: Align, dash: &[f64], dotted: bool, paint: Paint, ops: &mut Vec<Op>) {
-	let w = width as f64;
-	// Where the line's middle runs, in from the box's edge.
-	let inset = match align {
-		Align::Inside => w / 2.0,
-		Align::Center => 0.0,
-		Align::Outside => -w / 2.0,
-	};
-	let (bw, bh) = (shape.w as f64 - 2.0 * inset, shape.h as f64 - 2.0 * inset);
-	let r = (shape.radii[0] as f64 - inset).max(0.0).min(bw / 2.0).min(bh / 2.0);
-	let (on, off) = (dash.first().copied().unwrap_or(w * 4.0).max(0.0), dash.get(1).copied().unwrap_or(w * 3.0).max(0.5));
-	// Each edge: where it starts, which way it runs, and how long its straight part is.
-	let edges = [((inset + r, inset), (1.0, 0.0), bw - 2.0 * r), ((inset + bw, inset + r), (0.0, 1.0), bh - 2.0 * r), ((inset + bw - r, inset + bh), (-1.0, 0.0), bw - 2.0 * r), ((inset, inset + bh - r), (0.0, -1.0), bh - 2.0 * r)];
-	for ((x0, y0), (dx, dy), run) in edges {
-		let mut t = 0.0;
-		while t < run {
-			let len = if dotted { 0.0 } else { on.min(run - t) };
-			let (ax, ay) = (x0 + dx * t, y0 + dy * t);
-			let (bx, by) = (ax + dx * len, ay + dy * len);
-			let (left, top) = (ax.min(bx) - w / 2.0, ay.min(by) - w / 2.0);
-			let (sw, sh) = (if dotted { w } else { (bx - ax).abs() + if dx == 0.0 { w } else { 0.0 } }, if dotted { w } else { (by - ay).abs() + if dy == 0.0 { w } else { 0.0 } });
-			let (left, top) = if dotted { (ax - w / 2.0, ay - w / 2.0) } else if dx == 0.0 { (left, ay.min(by)) } else { (ax.min(bx), top) };
-			ops.push(Op::Shape { shape: Shape { w: sw as f32, h: sh as f32, radii: [0.0; 4], ellipse: dotted }, transform: transform.then(&Affine::translate(left as f32, top as f32)), paint: paint.clone(), stroke: None });
-			t += if dotted { off.max(w * 1.5) } else { on + off };
-		}
-	}
-}
-
-/// Whether a browser item frames itself (its own outline or shadow), so a drag must carry the frame with it.
-pub fn has_frame(item: &Item) -> bool {
-	item.get("stroke").is_some_and(|v| !v.is_null()) || item.get("strokeWidth").is_some() || item.get("effect").is_some_and(|v| !v.is_null())
+/// A card's hairline edge, outside its box as a CSS outline is.
+/// A browser item (a card, an app, a document, a board): its page or its picture lies under the
+/// drawing, so the drawing has a hole for it, its own `cornerRadius`'s shape. Its pen fields frame it:
+/// its `effect` shadows go under the hole (only what falls outside the box shows), and its outline
+/// (`stroke`, `strokeWidth`, `strokeAlignment`, `strokeDash`) over it. A `strokeWidth` with no `stroke`
+/// is drawn in the canvas's line colour, outside the edge, as the canvas's own 1 px outline is; with
+/// neither, nothing is drawn here and the canvas keeps that outline (`.card-node > .shade`).
+fn browser_frame(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, ops: &mut Vec<Op>) {
+	let shape = rrect(&ctx.scene.vars, item, theme, w, h);
+	let (under, over) = frame_parts(ctx, item, theme, w, h, transform, false);
+	ops.extend(under);
+	ops.push(Op::Erase { shape, transform });
+	ops.extend(over);
 }
 
 fn card_edge(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
 	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.1] };
 	ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, Align::Outside)) });
+}
+
+/// A card's paper: the app's two-layer shadow for the scheme, then the paper.
+fn card_paper(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
+	let paper = if dark { [0.141, 0.141, 0.141, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
+	card_paper_colour(dark, shape, transform, paper, ops);
+}
+
+fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4], ops: &mut Vec<Op>) {
+	let layers: [(f32, f32, f32); 2] = if dark { [(1.0, 2.0, 0.4), (6.0, 18.0, 0.3)] } else { [(1.0, 2.0, 0.06), (4.0, 12.0, 0.05)] };
+	for (y, blur, a) in layers {
+		ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(0.0, y)), color: Color::straight([0.0, 0.0, 0.0, a], 1.0), blur, spread: 0.0 });
+	}
+	ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(paper, 1.0)), stroke: None });
 }
 
