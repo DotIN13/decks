@@ -17,8 +17,8 @@ import { inkKey } from "../ink/ink-keys.ts";
 // there while the draw tool is on.
 
 /**
- * What is drawn goes on the stage (`canvas/ink/InkLayer.tsx`), so undo and redo are the stage's
- * own, and delete takes what the lasso holds off the stage.
+ * What is drawn goes on the canvas (`canvas/ink/InkLayer.tsx`), so undo and redo are the canvas's
+ * own, and delete takes what the lasso holds off the canvas.
  */
 export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void; onDelete: (ids: string[]) => void }) {
 	const deleteSelection = () => {
@@ -29,7 +29,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 	};
 	/*
 	 * The keys, while the tool is on. On the window and in the capture phase, because the
-	 * stage answers the same keys for the board (⌘Z is "undo on this board") and while you
+	 * canvas answers the same keys for the card (⌘Z is "undo on this card") and while you
 	 * are drawing they mean the drawing.
 	 */
 	onMount(() => {

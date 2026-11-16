@@ -17,20 +17,21 @@ import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "
 import { Icon } from "@decks/ui";
 import { Properties } from "./Properties.tsx";
 
-// The drawing's controls in edit mode: the column of tools on the canvas's left edge, with undo and redo.
+// The drawing's controls in edit mode: the column of tools on the canvas's left edge, with undo
+// and redo, and the properties panel for what is selected.
 
 /**
  * The drawing's controls, in edit mode: a column of tools and a properties panel.
  *
  * **The tools** are a column on the canvas's left edge, halfway down, with undo and redo under
- * them. They add to the stage — shapes, icons, a frame, a note, a card, words, arrows — and are the
- * only tools there are: the ones that inserted components into a board are gone. They are always
- * there while editing, so they stand where no board's title bar is framed (`camera/insets.ts` on
+ * them. They add to the canvas, shapes, icons, a frame, a note, a card, words, arrows, and are the
+ * only tools there are: the ones that inserted components into a card are gone. They are always
+ * there while editing, so they stand where no card's title bar is framed (`camera/insets.ts` on
  * what may float over the canvas and what may not). Shapes and icons are chosen first, in the
  * insert panel beside the column (`Insert.tsx`), which arms the tool for the next press.
  *
- * **What the selection is** — every property it has, its place, its order, a copy and a delete — is
- * the properties panel (`Properties.tsx`), in the board inspector's corner, only while something in
+ * **What the selection is**, every property it has, its place, its order, a copy and a delete, is
+ * the properties panel (`Properties.tsx`), in the card inspector's corner, only while something in
  * the drawing is selected. Every control sends a pen operation, the same one an agent would.
  */
 export function PenBar(props: {
@@ -62,43 +63,43 @@ export function PenBar(props: {
 
 	return (
 		<>
-		<Show when={props.tools !== false}>
-		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
-			{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
-			<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
-				<Icon of={GripHorizontal} size={14} />
+			<Show when={props.tools !== false}>
+			<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
+				{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
+				<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+					<Icon of={GripHorizontal} size={14} />
+				</div>
+				<For each={TOOLS}>
+					{(entry) => (
+						<>
+							{/* A file of any kind, chosen in the file picker and placed by what it is (`app/files.ts`, `fileAt`). */}
+							<Show when={entry.tool === "arrow" && props.onOpenFile}>
+								<button type="button" class="icon-button" data-writes data-file-button title="A file: a document, a picture, a film, a sound, anything" aria-label="Add a file" onClick={() => props.onOpenFile?.()}>
+									<Icon of={Paperclip} size={15} />
+								</button>
+							</Show>
+							<Show when={entry.after}>
+								<span class="pen-rule" aria-hidden="true" />
+							</Show>
+							<ToolButton entry={entry} besideTab={besideTab} onArm={props.onArm} />
+						</>
+					)}
+				</For>
+				<span class="pen-rule" aria-hidden="true" />
+				<button type="button" class="icon-button" title="Undo your last change to the drawing (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
+					<Icon of={Undo2} size={15} />
+				</button>
+				<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
+					<Icon of={Redo2} size={15} />
+				</button>
+				{/* Put away behind an edge, this is the part left showing, and the way back. */}
+				<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
+					<Icon of={ChevronLeft} size={14} />
+				</button>
 			</div>
-			<For each={TOOLS}>
-				{(entry) => (
-					<>
-					{/* A file of any kind, chosen in the file picker and placed by what it is (`app/files.ts`, `fileAt`). */}
-					<Show when={entry.tool === "arrow" && props.onOpenFile}>
-						<button type="button" class="icon-button" data-writes data-file-button title="A file: a document, a picture, a film, a sound, anything" aria-label="Add a file" onClick={() => props.onOpenFile?.()}>
-							<Icon of={Paperclip} size={15} />
-						</button>
-					</Show>
-					<Show when={entry.after}>
-						<span class="pen-rule" aria-hidden="true" />
-					</Show>
-					<ToolButton entry={entry} besideTab={besideTab} onArm={props.onArm} />
-					</>
-				)}
-			</For>
-			<span class="pen-rule" aria-hidden="true" />
-			<button type="button" class="icon-button" title="Undo your last change to the drawing (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
-				<Icon of={Undo2} size={15} />
-			</button>
-			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
-				<Icon of={Redo2} size={15} />
-			</button>
-			{/* Put away behind an edge, this is the part left showing, and the way back. */}
-			<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
-				<Icon of={ChevronLeft} size={14} />
-			</button>
-		</div>
-		</Show>
+			</Show>
 
-		<Properties doc={props.doc} onEdit={props.onEdit} onExport={props.onExport} />
+			<Properties doc={props.doc} onEdit={props.onEdit} onExport={props.onExport} />
 		</>
 	);
 }

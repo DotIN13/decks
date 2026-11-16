@@ -25,24 +25,18 @@ import Link from "lucide-solid/icons/link";
 // The pill over a selected item or card: its place beside the selection, and its actions,
 // from the words of a stroke of ink to the More menu.
 
-/** The gap between the pill and the board's edge, in screen pixels. */
+/** The gap between the pill and the selection's edge, in screen pixels. */
 const GAP = 10;
 
 /**
- * A board's title bar, now that boards have none: a small pill over the selected board, as a phone
- * shows over selected text, on every device. Selecting a board — a click or a tap on it — shows it:
- * the actions the bar had, with the bar's own icons, on the comment popup's card, so it follows the theme. It sits over the board's top
- * edge or under its bottom one, never on the board, taking the one clear of other boards and items
- * and on the screen, and stays there as the camera moves (hidden while it does).
- *
- * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
- * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
- * actions (a new tab, hide) are not offered. A card's pill is Fit, New tab, Comment, ✕ (hide)
- * and ⋯, a menu of Export as PNG or PDF, Copy path and Delete; drawn items' and a group's end in ⋯ too.
+ * A small pill over the selected card or drawn items, as a phone shows over selected text. It sits over
+ * the selection's top edge or under its bottom one, clear of other cards and items and on the screen.
+ * A card's pill is Fit, New tab, Comment, ✕ (hide) and ⋯ (Export as PNG or PDF, Copy path, Delete);
+ * drawn items get zoom to it, comment, duplicate, properties and delete. Without `card`, no new tab or hide.
  */
 export function PageCallout(props: {
-	board?: Page;
-	/** What the pill sits over, on the stage: the board's box, or the drawn items' together. */
+	card?: Page;
+	/** What the pill sits over, on the canvas: the card's box, or the drawn items' together. */
 	box: { x: number; y: number; w: number; h: number };
 	/** What a screen reader calls it. */
 	label: string;
@@ -55,13 +49,13 @@ export function PageCallout(props: {
 	/** In the ⋯ menu: a picture of what is selected to download, taken as `decks canvas screenshot` takes it; a card's path to the clipboard. */
 	onExport?: (format: "png" | "pdf") => void;
 	onCopyPath?: () => void;
-	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
+	/** Comment on the whole card: the popup a selection gets, opened by the pill. */
 	onComment?: () => void;
 	/** For drawn items: copy them, take them off the canvas. */
 	onDuplicate?: () => void;
 	onDelete?: () => void;
 	/**
-	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or send it as it
+	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a card of it, or send it as it
 	 * is, for the agent to read and act on (a command written by hand is carried out). First, in words.
 	 */
 	ink?: { agent: string; onDrawing: () => void; onCard: () => void; onSend: () => void };
@@ -69,14 +63,14 @@ export function PageCallout(props: {
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
 	gap?: number;
-	/** The other boards and items on the canvas, in its coordinates: the pill takes the slot that covers none of them. */
+	/** The other cards and items on the canvas, in its coordinates: the pill takes the slot that covers none of them. */
 	obstacles?: () => ReadonlyArray<{ x: number; y: number; w: number; h: number }>;
 }) {
 	let element: HTMLDivElement | undefined;
 	const place = pillPlace(props, () => element);
 	const stop = (event: Event) => event.stopPropagation();
 	/** A card's pill, or drawn items' and a group's that can be exported: a ⋯ menu in place of the Delete button. The lasso's has none. */
-	const withMenu = () => !!props.board || !!props.onExport;
+	const withMenu = () => !!props.card || !!props.onExport;
 	const remove = () => props.onDelete;
 	return (
 		<div
@@ -91,28 +85,31 @@ export function PageCallout(props: {
 			onClick={stop}
 		>
 			<Show when={props.ink}>{(ink) => <InkWords ink={ink()} />}</Show>
-			<PillActions card={props.board} ink={!!props.ink} onOpen={props.onOpen} onComment={props.onComment} onDuplicate={props.onDuplicate} />
+			<PillActions card={props.card} ink={!!props.ink} onOpen={props.onOpen} onComment={props.onComment} onDuplicate={props.onDuplicate} />
 			<Show
 				when={withMenu()}
 				fallback={<PlainEnd onDelete={props.onDelete} onHide={props.onHide} />}
 			>
 				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
-				<Show when={props.board && props.onHide}>
+				<Show when={props.card && props.onHide}>
 					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
 						<Icon of={X} size={17} />
 					</button>
 				</Show>
 				<span class="callout-rule" aria-hidden="true" />
-				<MoreMenu pill={() => element} hidden={props.hidden} card={props.board} onExport={props.onExport} onCopyPath={props.onCopyPath} onDelete={remove()} />
+				<MoreMenu pill={() => element} hidden={props.hidden} card={props.card} onExport={props.onExport} onCopyPath={props.onCopyPath} onDelete={remove()} />
 			</Show>
 		</div>
 	);
 }
-// Where the pill sits.
+
+// Placing the pill.
 /** Where the pill sits: measured, on the edge chosen once the box rests, centred on what it is for. */
 function pillPlace(props: Parameters<typeof PageCallout>[0], elementOf: () => HTMLDivElement | undefined) {
-	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
+	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the selection. */
 	const [width, setWidth] = createSignal(0);
+	/* The pill's own height, measured: it goes above the selection only if it fits there whole. */
+	const [tall, setTall] = createSignal(40);
 	onMount(() => {
 		const element = elementOf();
 		if (!element) return;
@@ -123,14 +120,12 @@ function pillPlace(props: Parameters<typeof PageCallout>[0], elementOf: () => HT
 		observer.observe(element);
 		onCleanup(() => observer.disconnect());
 	});
-	/* The pill's own height, measured: it goes above the board only if it fits there whole. */
-	const [tall, setTall] = createSignal(40);
 	const edges = () => edgesOf(props);
 	const choose = () => chooseSide(props, elementOf(), width(), tall());
 	const [side, setSide] = createSignal<{ below: boolean; sure: boolean }>({ below: false, sure: false });
 	/*
 	 * Chosen once the box has stopped changing, not at every step it moves: choosing reads the page's
-	 * layout (the stage's rect, elementFromPoint for each slot), which at every step of a drag or a
+	 * layout (the canvas's rect, elementFromPoint for each slot), which at every step of a drag or a
 	 * glide cost more than the drawing did. The edge it had rides with the box meanwhile; out of
 	 * sight (hidden while something moves) it is chosen when it shows again.
 	 */
@@ -178,7 +173,7 @@ function edgesOf(props: { box: { x: number; y: number; w: number; h: number }; c
  * Which edge the pill is on, chosen when the selection appears and again only when what it is on
  * moves or changes size: never as the camera moves, so a pan carries the pill with its edge, off
  * the screen with it, rather than sending it looking for room. Of the two edges, the one whose
- * slot is on screen, clear of floating chrome and covering no other board or item; else the one
+ * slot is on screen, clear of floating chrome and covering no other card or item; else the one
  * covering less of them. With neither on screen when it was chosen (the camera on its way to the
  * selection), it is chosen again once the camera has stopped.
  */
@@ -189,13 +184,13 @@ function chooseSide(props: Parameters<typeof PageCallout>[0], element: HTMLDivEl
 	const x = top.x;
 	const half = width / 2;
 	const gap = props.gap ?? GAP;
-	const stage = element?.parentElement?.getBoundingClientRect();
+	const canvas = element?.parentElement?.getBoundingClientRect();
 	// Chrome floating over the canvas (the composer, a toolbar, a float): the room leaves out only what is docked.
 	const underChrome = (slot: { from: number; to: number }) => {
-		if (!stage || typeof document === "undefined") return false;
-		const y = stage.top + (slot.from + slot.to) / 2;
+		if (!canvas || typeof document === "undefined") return false;
+		const y = canvas.top + (slot.from + slot.to) / 2;
 		return [x - half + 8, x, x + half - 8].some((at) => {
-			const hit = document.elementFromPoint(stage.left + at, y);
+			const hit = document.elementFromPoint(canvas.left + at, y);
 			return !!hit && !hit.closest(".stage");
 		});
 	};
@@ -221,6 +216,7 @@ function chooseSide(props: Parameters<typeof PageCallout>[0], element: HTMLDivEl
 	const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
 	return { below: best.slot.below, sure: true };
 }
+
 // What the pill holds.
 /** Ink selected: hand it to the agent, as a drawing, as a card, or as it is. */
 function InkWords(props: { ink: NonNullable<Parameters<typeof PageCallout>[0]["ink"]> }) {
@@ -308,16 +304,16 @@ function MoreMenu(props: { pill: () => HTMLDivElement | undefined; hidden?: bool
 	let moreButton: HTMLButtonElement | undefined;
 	/*
 	 * Where the menu opens, measured once it is drawn: always down, under the pill, as the person asked;
-	 * its left edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the stage.
+	 * its left edge under the ⋯ button, as a menu bar's menu hangs from its title, kept on the canvas.
 	 */
 	const [menuAt, setMenuAt] = createSignal<{ left: number }>();
 	const placeMenu = (menu: HTMLDivElement) => {
-		const stage = props.pill()?.parentElement?.getBoundingClientRect();
+		const canvas = props.pill()?.parentElement?.getBoundingClientRect();
 		const element = props.pill();
-		if (!element || !moreButton || !stage) return;
+		if (!element || !moreButton || !canvas) return;
 		const pill = element.getBoundingClientRect();
 		const button = moreButton.getBoundingClientRect();
-		setMenuAt({ left: menuLeft(stage, pill, button, menu.offsetWidth) });
+		setMenuAt({ left: menuLeft(canvas, pill, button, menu.offsetWidth) });
 	};
 	createEffect(on(more, (open) => open || setMenuAt(undefined)));
 	createEffect(on(() => props.hidden, (hidden) => hidden && setMore(false)));

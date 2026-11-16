@@ -442,7 +442,7 @@ function pagePillOf(ctx: {
 					const board = () => (last = calloutPage() ?? last);
 					return (
 					<PageCallout
-						board={board()}
+						card={board()}
 						box={boxOf(board())}
 						obstacles={() => pillObstacles(boxOf(board()))}
 						label={`${board().title}: card actions`}

@@ -25,7 +25,7 @@ type Hsv = { h: number; s: number; v: number };
  * not where the rest of the panel is. This one opens under the swatch that asked for it, in the
  * page (`Portal`, so the panel's scrolling does not clip it), and keeps to the screen.
  *
- * A drag in the square or the strip draws the colour on the stage at every step (`onLive`) and saves
+ * A drag in the square or the strip draws the colour on the canvas at every step (`onLive`) and saves
  * it when the pointer is let go, so the item changes under the pointer and the drawing still takes
  * one edit and not sixty.
  */
@@ -163,6 +163,7 @@ function dragAcross(event: PointerEvent, el: HTMLElement, move: (fx: number, fy:
 	el.addEventListener("pointerup", up);
 	el.addEventListener("pointercancel", up);
 }
+
 // The square of shade and the strip of hues.
 /** The shade-and-brightness square and the hue strip, each dragged across. */
 function ShadeAndHue(props: { hsv: Hsv; hex: string; setHsv: (next: Hsv) => void; dragOver: (event: PointerEvent, el: HTMLElement, move: (fx: number, fy: number) => void) => void }) {
@@ -182,6 +183,7 @@ function ShadeAndHue(props: { hsv: Hsv; hex: string; setHsv: (next: Hsv) => void
 		</>
 	);
 }
+
 // The swatches, the hex and the dropper.
 /** The adaptive colours, which follow the canvas between light and dark, row by row. */
 function AdaptiveSwatches(props: { value: string | undefined; onPick: (name: string) => void }) {
@@ -260,6 +262,7 @@ async function pickFromScreen(pick: (hex: string) => void): Promise<void> {
 		// Closed with Escape: nothing picked.
 	}
 }
+
 // Colour as hue, saturation and value.
 function hexToHsv(hex: string): Hsv {
 	const m = /^#?([0-9a-f]{6})/i.exec(hex);

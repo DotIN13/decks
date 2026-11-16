@@ -1,5 +1,5 @@
 /**
- * Adding to the stage: an item made by a tool (a press, or a drag corner to corner, followed to its
+ * Adding to the canvas: an item made by a tool (a press, or a drag corner to corner, followed to its
  * lift: `create`), one made at a point (`makeAt`), the note a double-click or a double tap on bare
  * canvas makes (`noteAt`), an arrow drawn from an item's anchor (`fromAnchor`), and the insert
  * panel a shape or an icon is picked in (`InsertMenu`).
@@ -25,9 +25,6 @@ import type { SceneQuery } from "../editor/core/scene.ts";
 import type { Editor } from "../editor/dom/controller.ts";
 import type { TextEditing } from "../editor/dom/TextEditing.tsx";
 
-// The insert menu a press on empty canvas opens: what can be made there, and making it at that point,
-// joined to what it was dragged from.
-
 /** A point on the screen, as a pointer or mouse event has it. */
 type Client = { clientX: number; clientY: number };
 
@@ -35,7 +32,7 @@ export type InsertHost = {
 	scene: SceneQuery;
 	/** The camera's zoom: how near an arrow's end has to be to join something. */
 	zoom: () => number;
-	/** Where a screen point is on the stage, from the camera now. */
+	/** Where a screen point is on the canvas, from the camera now. */
 	worldAt: (event: Client) => Pt;
 	edit: (ops: Op[]) => void;
 	/** An id no item has. */
@@ -135,7 +132,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 const makeOptions = (m: MenuRun, id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: m.host.idsBut(id), card: newCard });
 
 /**
- * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
+ * One item of a tool, at its own size, at a canvas point: a click with a tool armed, and a pick
  * from the canvas menu. Words open for typing at once.
  */
 function makeAt(m: MenuRun, tool: Exclude<PenTool, "select" | "arrow">, at: Pt, centred = false): void {

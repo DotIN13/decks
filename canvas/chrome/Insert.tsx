@@ -10,7 +10,7 @@ import { iconUrl } from "../look/icons.ts";
 // or at a point; a pick arms the tool or is put there at once.
 
 /**
- * The insert panel: the shape library, or the icons — two panels, one for each button in the tool
+ * The insert panel: the shape library, or the icons, two panels, one for each button in the tool
  * column, each with its own search. No tabs between them and no close button: it closes with a
  * pick, a press anywhere else, Escape, or its button pressed again.
  *

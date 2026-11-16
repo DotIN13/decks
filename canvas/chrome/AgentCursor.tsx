@@ -25,14 +25,14 @@ const JUMP_PX = 1200;
  * Four behaviours, each for a reason a person watching would give:
  *
  * - **Drift, 380 ms.** A cursor never teleports; it eases to the new point on the app's own
- *   curve (a CSS transition on `left`/`top`, in the board's coordinates). A jump longer than a
+ *   curve (a CSS transition on `left`/`top`, in the card's coordinates). A jump longer than a
  *   screen fades out and back in instead, because a streak across the canvas reads as a glitch.
  * - **Breathe, 3.2 s.** At rest the arrow rises and falls a little. A still agent is still
  *   working, and a dead arrow says it is not.
- * - **Act, 520 ms.** One ring out of the tip when it arrives somewhere — the only loud thing it
+ * - **Act, 520 ms.** One ring out of the tip when it arrives somewhere, the only loud thing it
  *   does, so it means something.
- * - **Stay.** It is drawn one level up, on the stage (`CanvasView.tsx`), for as long as the agent is
- *   working, so it glides from one board or drawn item to the next instead of leaving one and
+ * - **Stay.** It is drawn one level up, on the canvas (`CanvasView.tsx`), for as long as the agent is
+ *   working, so it glides from one card or drawn item to the next instead of leaving one and
  *   appearing on the other, and its name stays beside it.
  *
  * And it leaves with a 600 ms fade rather than vanishing mid-sentence. Counter-scaled like the
@@ -58,7 +58,7 @@ export function AgentCursor(props: { cursor: CursorAt | null | undefined; zoom: 
 			/*
 			 * A plain snapshot, not the object handed in. The cursor comes out of a store, and a
 			 * store *merges* a new value into the one it has, so "the previous cursor" would be the
-			 * same object with the new numbers already in it — every move would look like standing
+			 * same object with the new numbers already in it, every move would look like standing
 			 * still. Reading the fields here also makes the effect run when only a field changed.
 			 */
 			(): CursorAt | undefined => (props.cursor ? { x: props.cursor.x, y: props.cursor.y, label: props.cursor.label, color: props.cursor.color, ...(props.cursor.key === undefined ? {} : { key: props.cursor.key }) } : undefined),
