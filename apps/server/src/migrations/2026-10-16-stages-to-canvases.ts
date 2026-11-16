@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { slug } from "../agents/slug.ts";
+import { slug } from "@decks/deck-kit";
 import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "../stage/canvas-files.ts";
 
 /**

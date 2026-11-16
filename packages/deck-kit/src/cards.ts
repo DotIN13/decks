@@ -1,13 +1,76 @@
-import { BOARD_W } from "../cards/size.ts";
 /**
- * What a card says about itself, read from the top of its file: its title, its size and its poster.
- *
- * Deliberately regex and not a parser: this runs for every card on every deck load and on every
- * file change, and the three things it wants are at the top of a file the agent just wrote. A
- * missing title costs a name in a list, not a wrong edit.
+ * A card, as far as its file goes: the name its folder takes from its title, the file a new one
+ * starts as, and what the top of its file says about it (its title, its size, its poster).
  */
 
-interface BoardMeta {
+/**
+ * The one slug rule, shared by everything that needs one: a card's folder from its title, an agent's tag and workspace.
+ *
+ * A tag and a workspace are both free text an agent writes into itself, and both have to end up
+ * as a word that can be *compared* — `"Panel CSS"` and `panel-css` have to be one tag, and
+ * `"Political LLM"` and `political-llm` one workspace, or "who else is on this" has no answer at
+ * all. Two copies of the rule would be two answers to that, so it lives here.
+ *
+ * What stays with the callers is everything that is a *policy* rather than the rule: how long
+ * something may be, and whether an empty result is a value or an absence.
+ *
+ * Slugging keeps Unicode letters and digits (`\p{L}\p{N}`), because an agent working on 水墨花卉
+ * should be able to say so; only punctuation and whitespace collapse.
+ *
+ * Truncation happens **after** slugging and **falls back to the last word boundary**, which is
+ * the difference between `reading-panel-css-and` and `reading-panel-css-and-me`. A model told to
+ * tag itself writes a sentence, so this is the common case rather than the edge one — and a word
+ * cut in half reads as a typo, which is worse than a word that says less.
+ *
+ * Whatever is longer than the cap with no boundary in it is hard-cut, because there is nothing
+ * to fall back to and returning nothing would lose it entirely.
+ */
+export function slug(raw: string, max: number): string {
+	const slugged = raw
+		.normalize("NFC")
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, "-")
+		.replace(/^-+|-+$/g, "");
+	if (slugged.length <= max) return slugged;
+	const cut = slugged.slice(0, max);
+	const boundary = cut.lastIndexOf("-");
+	return (boundary > 0 ? cut.slice(0, boundary) : cut).replace(/-+$/g, "");
+}
+
+const escapeTitle = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+/**
+ * A new card's `index.html`: its title, its size, a style for its one block, the block with the title
+ * in it, and a module that is handed the card. The agent fills it in with its own tools; what it
+ * keeps beside it (a stylesheet, a module, data) goes in the same folder.
+ */
+export function cardShell(title: string, size: { w: number; h?: number }): string {
+	return `<title>${escapeTitle(title)}</title>
+<meta name="card" content='${JSON.stringify(size)}' />
+<style>
+	/* The card is as wide as its item on the canvas (a phone's, a person's resize): a size container named card. */
+	.doc { padding: clamp(20px, 5cqi, 48px); font-size: 17px; line-height: 1.5 }
+	.doc img, .doc video { max-width: 100%; height: auto }
+	/* your design: grids and flex rows that wrap, no fixed block widths, and narrow rules by the card's width:
+	@container card (width < 640px) { .cols { grid-template-columns: 1fr } } */
+</style>
+<div class="doc" data-id="doc">
+	<h1>${escapeTitle(title)}</h1>
+</div>
+<script type="module">
+	// Runs each time the card wakes; return a function to stop what it started.
+	export default function (card) {
+		// card.root is what document is to a page: card.root.querySelector("h1").
+	}
+</script>
+`;
+}
+
+/** The width a new card starts at when nobody asked for one, and the one a file that states none is read at. */
+export const CARD_W = 1000;
+
+/** What a card's file says about the card. */
+export interface CardHead {
 	title?: string;
 	w?: number;
 	h?: number;
@@ -41,8 +104,15 @@ function unescapeAttribute(value: string): string {
 		.replace(/&amp;/g, "&");
 }
 
-export function readBoardMeta(html: string): BoardMeta {
-	const meta: BoardMeta = {};
+/**
+ * A card's title, size and poster, read from the top of its file.
+ *
+ * Deliberately regex and not a parser: this runs for every card on every deck load and on every
+ * file change, and what it wants is at the top of a file an agent just wrote. A missing title costs
+ * a name in a list, not a wrong edit.
+ */
+export function cardHead(html: string): CardHead {
+	const meta: CardHead = {};
 
 	const title = TITLE.exec(html)?.[1]?.replace(/\s+/g, " ").trim();
 	if (title) meta.title = title;
@@ -84,8 +154,8 @@ export function readBoardMeta(html: string): BoardMeta {
  * tag, and the write keeps every other byte where it was. Other keys of the tag are carried through.
  * A card with no tag gets one, because a card written by hand is still a card.
  */
-export function withBoardSize(_path: string, source: string, size: { w?: number; h?: number }): string {
-	return withTagSize(source, size, BOARD_W);
+export function withCardSize(source: string, size: { w?: number; h?: number }): string {
+	return withTagSize(source, size, CARD_W);
 }
 
 /**
@@ -93,16 +163,16 @@ export function withBoardSize(_path: string, source: string, size: { w?: number;
  * fit or a person's resize makes. A page showing the board already has it, or is given it, so it is
  * not reloaded for it (`card.changed`'s `sized`).
  */
-export function onlySizeChanged(path: string, before: string, after: string): boolean {
+export function onlySizeChanged(before: string, after: string): boolean {
 	if (before === after) return false;
-	const { w, h } = readBoardMeta(after);
+	const { w, h } = cardHead(after);
 	if (w === undefined && h === undefined) return false;
-	return withBoardSize(path, before, { ...(w === undefined ? {} : { w }), ...(h === undefined ? {} : { h }) }) === after;
+	return withCardSize(before, { ...(w === undefined ? {} : { w }), ...(h === undefined ? {} : { h }) }) === after;
 }
 
 /** The HTML half: one number, in the one `<meta name="board">` tag. */
 function withTagSize(html: string, size: { w?: number; h?: number }, fallback: number): string {
-	const meta = readBoardMeta(html);
+	const meta = cardHead(html);
 	// The same default the loader uses, and it has to be the same one: a file that says nothing
 	// about its width would otherwise be given one number on disk and read back as another.
 	const w = Math.max(1, Math.round(size.w ?? meta.w ?? fallback));
@@ -156,11 +226,11 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 
 
 /**
- * What a card says about itself: `readBoardMeta`, with a title found for a card that has no
+ * What a card says about itself: `readCardHead`, with a title found for a card that has no
  * `<title>`: its first `<h1>`. With neither, nothing, and the caller falls back to its folder's name.
  */
-export function readMeta(_path: string, source: string): BoardMeta {
-	const meta = readBoardMeta(source);
+export function cardMeta(source: string): CardHead {
+	const meta = cardHead(source);
 	if (meta.title) return meta;
 	const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(source);
 	const title = h1?.[1]?.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();

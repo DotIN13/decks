@@ -144,32 +144,3 @@ ${withDeckImports(input.deckImports)}
 </html>
 `;
 }
-
-const escapeTitle = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-
-/**
- * A new card's `index.html`: its title, its size, a style for its one block, the block with the title
- * in it, and a module that is handed the card. The agent fills it in with its own tools; what it
- * keeps beside it (a stylesheet, a module, data) goes in the same folder.
- */
-export function cardShell(title: string, size: { w: number; h?: number }): string {
-	return `<title>${escapeTitle(title)}</title>
-<meta name="card" content='${JSON.stringify(size)}' />
-<style>
-	/* The card is as wide as its item on the canvas (a phone's, a person's resize): a size container named card. */
-	.doc { padding: clamp(20px, 5cqi, 48px); font-size: 17px; line-height: 1.5 }
-	.doc img, .doc video { max-width: 100%; height: auto }
-	/* your design: grids and flex rows that wrap, no fixed block widths, and narrow rules by the card's width:
-	@container card (width < 640px) { .cols { grid-template-columns: 1fr } } */
-</style>
-<div class="doc" data-id="doc">
-	<h1>${escapeTitle(title)}</h1>
-</div>
-<script type="module">
-	// Runs each time the card wakes; return a function to stop what it started.
-	export default function (card) {
-		// card.root is what document is to a page: card.root.querySelector("h1").
-	}
-</script>
-`;
-}

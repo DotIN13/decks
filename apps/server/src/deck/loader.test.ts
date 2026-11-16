@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { Deck } from "./loader.ts";
-import { withBoardSize } from "./meta.ts";
+import { withCardSize } from "@decks/deck-kit";
 import { realPathOf } from "./roots.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
@@ -139,7 +139,7 @@ test("a board's size is its own file's, and deck.json's copy is ignored", () => 
 	const root = emptyDeck();
 	put(join(root, "canvases", "t", "cards", "a", "index.html"), board("A", 800, 600));
 	// A resize writes the file's own tag.
-	put(join(root, "canvases", "t", "cards", "saved", "index.html"), withBoardSize("canvases/t/cards/saved/index.html", board("Saved"), { w: 900, h: 700 }));
+	put(join(root, "canvases", "t", "cards", "saved", "index.html"), withCardSize(board("Saved"), { w: 900, h: 700 }));
 	/*
 	 * And an older `deck.json`'s numbers are not read at all.
 	 *
@@ -341,7 +341,7 @@ test("a board is the height its file states, through edits, and a new number in 
 	writeFileSync(file, board("A", 900, 400).replace("<body", "<body data-x=1"));
 	assert.equal(deck.refresh("canvases/t/cards/a/index.html")?.h, 400, "an edit leaves it as it was");
 
-	writeFileSync(file, withBoardSize("canvases/t/cards/a/index.html", readFileSync(file, "utf8"), { h: 500 }));
+	writeFileSync(file, withCardSize(readFileSync(file, "utf8"), { h: 500 }));
 	assert.equal(deck.refresh("canvases/t/cards/a/index.html")?.h, 500, "a fit or a resize lands at once");
 	rmSync(root, { recursive: true, force: true });
 });

@@ -1,5 +1,5 @@
 import type { AgentState } from "@decks/protocol";
-import { slug } from "./slug.ts";
+import { slug } from "@decks/deck-kit";
 
 /**
  * What a workspace is allowed to be, and who is in which one.

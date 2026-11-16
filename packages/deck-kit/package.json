@@ -1,0 +1,18 @@
+{
+  "name": "@decks/deck-kit",
+  "version": "0.1.0",
+  "description": "The rules of a deck that hold wherever one is kept: how its text files are read, edited and searched, what a new card is, and where an item goes beside another. For a Decks harness on a disk and a service that keeps decks in a database alike",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3"
+  }
+}

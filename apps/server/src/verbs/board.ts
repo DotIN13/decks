@@ -1,8 +1,7 @@
 import { canvasFolder, canvasOfPath } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { cardShell } from "../cards/cards.ts";
-import { slug } from "../agents/slug.ts";
+import { cardShell, slug } from "@decks/deck-kit";
 import { boardWidth } from "../cards/size.ts";
 import type { Verbs as Stage } from "@decks/sdk";
 import type { VerbContext } from "./context.ts";

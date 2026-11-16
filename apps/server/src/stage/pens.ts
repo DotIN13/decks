@@ -12,7 +12,7 @@ import { apply, ARROW, baseTheme, withDecksColors, clone, emptyDocument, ids, IM
 export type ReadMore = Omit<ReadOptions, "theme" | "measure"> & { theme?: Record<string, string> };
 import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
-import { slug } from "../agents/slug.ts";
+import { slug } from "@decks/deck-kit";
 import { fileUrl } from "../deck/roots.ts";
 import { canvasFolder, isCardPath, pageName, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "@decks/hub/layout";
 import { copyCardInto, copyFileInto, copyFrameInto } from "./copy-in.ts";

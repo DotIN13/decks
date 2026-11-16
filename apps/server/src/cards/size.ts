@@ -1,3 +1,4 @@
+import { CARD_W } from "@decks/deck-kit";
 /**
  * What a new card's size and head are made from: the width it starts at, and the import map
  * its head carries (`cards.ts`).
@@ -7,7 +8,7 @@
  * The width a new board starts at when nobody asked for one: 1000, which is the measure a board is
  * written to and about as wide as one is read at.
  */
-export const BOARD_W = 1000;
+export const BOARD_W = CARD_W;
 
 /**
  * The width a board is worth keeping under, and it is **guidance, not a limit**.

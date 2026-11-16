@@ -6,7 +6,7 @@ import { boardOf, CARD_ITEM, type ReadMore } from "../stage/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "@decks/hub/layout";
 import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
-import { slug } from "../agents/slug.ts";
+import { cornerOf, GAP, placeBy, slug } from "@decks/deck-kit";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
 import { fitOn } from "./fit.ts";
 import { documentItemPath } from "../docs/item-path.ts";
@@ -56,8 +56,6 @@ function colourDefaults(node: Record<string, unknown>): void {
 /** A read's variables also short (`shortVariables`: `"#hex"`, `16`, `{ light, dark }`), as `canvas.variables` takes them, under `values`. */
 const withValues = (read: { variables?: unknown; themes?: unknown }) => (read.variables ? { values: shortVariables(read as Pick<PenDocument, "variables" | "themes">) } : {});
 
-/** How far clear of another item `beside` and `below` put one. */
-export const GAP = 160;
 
 type Corner = { x1: number; y1: number } | { x: number; y: number };
 /** What an item call acts on: a canvas by its folder name, or a frame file by its ref. */
@@ -83,21 +81,6 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
 		return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
 	}
 	return { ...node, ...(children ? { children } : {}) };
-}
-
-/** The corner a caller gave, `{ x1, y1 }` or `{ x, y }`, as two numbers. */
-function cornerOf(at: unknown): { x1: number; y1: number } | undefined {
-	if (at === undefined || at === null) return undefined;
-	const raw = at as { x1?: unknown; y1?: unknown; x?: unknown; y?: unknown };
-	const x = raw.x1 ?? raw.x;
-	const y = raw.y1 ?? raw.y;
-	if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error("at is a top-left corner on the canvas, as in at: { x1: 1160, y1: 0 }.");
-	return { x1: Math.round(x), y1: Math.round(y) };
-}
-
-/** The box `beside` or `below` an item's box: 160 px clear, tops (beside) or lefts (below) aligned. */
-export function placeBy(box: { x: number; y: number; w: number; h: number }, how: "beside" | "below"): { x1: number; y1: number } {
-	return how === "beside" ? { x1: Math.round(box.x + box.w + GAP), y1: Math.round(box.y) } : { x1: Math.round(box.x), y1: Math.round(box.y + box.h + GAP) };
 }
 
 export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {

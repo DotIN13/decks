@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { deleteFile, editFile, FileRefused, findFiles, grepFiles, listFiles, moveFile, readFile, resolveIn, writeFile } from "./deck-files.ts";
+import { deleteFile, editFile, findFiles, grepFiles, listFiles, moveFile, readFile, resolveIn, writeFile } from "./deck-files.ts";
+import { Refused } from "@decks/deck-kit";
 
 function deck() {
 	const root = mkdtempSync(join(tmpdir(), "decks-files-"));
@@ -24,11 +25,11 @@ test("file calls reach the deck and nothing else", () => {
 	writeFileSync(join(outside, "secret.txt"), "secret");
 	symlinkSync(outside, join(root, "assets", "out"));
 	for (const path of ["/etc/passwd", "../x", "a/../../x", ".decks/tokens.json", "canvases/.git/config", "assets/out/secret.txt", "a//b"]) {
-		assert.throws(() => resolveIn(root, path), FileRefused, path);
+		assert.throws(() => resolveIn(root, path), Refused, path);
 	}
-	assert.throws(() => writeFile(root, "assets/out/new.txt", "x"), FileRefused);
-	assert.throws(() => writeFile(root, "lib/d3.min.js", "x"), FileRefused, "lib is read only");
-	assert.throws(() => writeFile(root, "", "x"), FileRefused);
+	assert.throws(() => writeFile(root, "assets/out/new.txt", "x"), Refused);
+	assert.throws(() => writeFile(root, "lib/d3.min.js", "x"), Refused, "lib is read only");
+	assert.throws(() => writeFile(root, "", "x"), Refused);
 	assert.equal(existsSync(join(outside, "new.txt")), false);
 	rmSync(root, { recursive: true, force: true });
 	rmSync(outside, { recursive: true, force: true });

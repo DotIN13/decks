@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Page, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { withBoardSize } from "../deck/meta.ts";
+import { withCardSize } from "@decks/deck-kit";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 import { checkAvatar } from "./avatar.ts";
@@ -281,7 +281,7 @@ export class StageService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
-		return this.host.writeBoard(path, withBoardSize(path, html, size));
+		return this.host.writeBoard(path, withCardSize(html, size));
 	}
 
 	/**

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readBoardMeta, readMeta, withBoardSize } from "./meta.ts";
+import { cardHead, cardMeta, withCardSize } from "../src/cards.ts";
 
 test("a board's title, size and poster come off the head", () => {
-	const meta = readBoardMeta(`<!doctype html><html><head>
+	const meta = cardHead(`<!doctype html><html><head>
 		<title>  Auth refresh —
 		the plan </title>
 		<meta name="board" content='{"w":1600,"h":1000,"bg":"dots"}'>
@@ -17,12 +17,12 @@ test("a board's title, size and poster come off the head", () => {
 });
 
 test("a board that says nothing says nothing — the loader supplies defaults", () => {
-	const meta = readBoardMeta("<html><body></body></html>");
+	const meta = cardHead("<html><body></body></html>");
 	assert.deepEqual(meta, {});
 });
 
 test("broken board meta is ignored rather than fatal", () => {
-	const meta = readBoardMeta(`<meta name="board" content='{"w":1600,'><title>x</title>`);
+	const meta = cardHead(`<meta name="board" content='{"w":1600,'><title>x</title>`);
 	assert.equal(meta.title, "x");
 	assert.equal(meta.w, undefined);
 });
@@ -35,20 +35,20 @@ test("attribute order and quoting do not matter", () => {
 	 * attribute can carry that JSON, so a board written by hand, or by an editor that
 	 * normalises quotes, silently lost its size while the file looked correct.
 	 */
-	const encoded = readBoardMeta(`<meta content="{&quot;w&quot;:800}" name="board">`);
+	const encoded = cardHead(`<meta content="{&quot;w&quot;:800}" name="board">`);
 	assert.equal(encoded.w, 800);
-	const plain = readBoardMeta(`<meta content='{"w":800}' name="board">`);
+	const plain = cardHead(`<meta content='{"w":800}' name="board">`);
 	assert.equal(plain.w, 800);
 });
 
 test("a numeric character reference is decoded too", () => {
-	assert.equal(readBoardMeta(`<meta name="board" content="{&#34;w&#34;:120}">`).w, 120);
+	assert.equal(cardHead(`<meta name="board" content="{&#34;w&#34;:120}">`).w, 120);
 });
 
 test("a board that is still broken falls back rather than throwing", () => {
 	// The point of unescaping is not to accept anything: half a tag is still half a tag.
-	assert.equal(readBoardMeta(`<meta name="board" content="{&quot;w&quot;:}">`).w, undefined);
-	assert.equal(readBoardMeta(`<meta name="board" content="not json at all">`).w, undefined);
+	assert.equal(cardHead(`<meta name="board" content="{&quot;w&quot;:}">`).w, undefined);
+	assert.equal(cardHead(`<meta name="board" content="not json at all">`).w, undefined);
 });
 
 /*
@@ -58,40 +58,38 @@ test("a board that is still broken falls back rather than throwing", () => {
  */
 test("resizing a board rewrites the two numbers and nothing else", () => {
 	const html = `<!doctype html>\n<html><head><title>A</title>\n<meta name="board" content='{"w":800,"h":600,"bg":"dots"}' />\n</head><body class="board"><p>hi</p></body></html>`;
-	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 1200, h: 900 });
-	assert.deepEqual(readBoardMeta(out), { title: "A", w: 1200, h: 900, bg: "dots" });
+	const out = withCardSize(html, { w: 1200, h: 900 });
+	assert.deepEqual(cardHead(out), { title: "A", w: 1200, h: 900, bg: "dots" });
 	assert.ok(out.includes("<p>hi</p>"));
 	assert.equal(out.match(/name="board"/g)?.length, 1);
 });
 
 test("a missing dimension keeps the one the board already had", () => {
 	const html = `<html><head><meta name="board" content='{"w":800,"h":600}'></head><body></body></html>`;
-	assert.deepEqual(readBoardMeta(withBoardSize("canvases/t/cards/a/index.html", html, { h: 1500 })), { w: 800, h: 1500 });
+	assert.deepEqual(cardHead(withCardSize(html, { h: 1500 })), { w: 800, h: 1500 });
 });
 
 test("a board with no meta tag gets one, under its title", () => {
 	const html = `<!doctype html>\n<html><head><title>Hand written</title></head><body class="board"></body></html>`;
-	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 640, h: 480 });
-	assert.deepEqual(readBoardMeta(out), { title: "Hand written", w: 640, h: 480 });
+	const out = withCardSize(html, { w: 640, h: 480 });
+	assert.deepEqual(cardHead(out), { title: "Hand written", w: 640, h: 480 });
 	assert.ok(out.indexOf("name=\"card\"") > out.indexOf("</title>"), "and it goes after the title, not before it");
 });
 
 test("an entity-escaped tag survives being resized", () => {
 	const html = `<html><head><meta name="board" content="{&quot;w&quot;:800,&quot;h&quot;:600,&quot;theme&quot;:&quot;dark&quot;}"></head><body></body></html>`;
-	const out = withBoardSize("canvases/t/cards/a/index.html", html, { w: 900, h: 700 });
-	assert.equal(readBoardMeta(out).w, 900);
+	const out = withCardSize(html, { w: 900, h: 700 });
+	assert.equal(cardHead(out).w, 900);
 	assert.ok(out.includes('"theme":"dark"'), "and keeps the key this build does not use itself");
 });
 
 test("a size is a positive whole number of pixels", () => {
 	const html = `<html><head><meta name="board" content='{"w":800,"h":600}'></head><body></body></html>`;
-	assert.deepEqual(readBoardMeta(withBoardSize("canvases/t/cards/a/index.html", html, { w: 640.4, h: -12 })), { w: 640, h: 1 });
+	assert.deepEqual(cardHead(withCardSize(html, { w: 640.4, h: -12 })), { w: 640, h: 1 });
 });
 
 test("a leftover deck file is read like any other: its size from the tag, an aspect ignored", () => {
-	const meta = readMeta(
-		"boards/talk.slides.html",
-		`<!doctype html><html><head><title>The talk</title>
+	const meta = cardMeta(`<!doctype html><html><head><title>The talk</title>
 		<meta name="board" content='{"aspect":"4:3","w":1200}' />
 		</head><body class="reveal"><div class="slides"><section>One</section></div></body></html>`,
 	);
@@ -99,12 +97,12 @@ test("a leftover deck file is read like any other: its size from the tag, an asp
 });
 
 test("an HTML document with no tag keeps saying nothing about its size", () => {
-	const meta = readMeta("boards/report.html", "<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
+	const meta = cardMeta("<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
 	assert.equal(meta.w, undefined);
 	assert.equal(meta.title, "Report");
 });
 
 test("a card with no title is called by its first heading, and by nothing when it has neither", () => {
-	assert.equal(readMeta("canvases/t/cards/a/index.html", `<meta name="card" content='{"w":900}' /><div class="doc"><h1>Sales <em>are up</em></h1></div>`).title, "Sales are up");
-	assert.equal(readMeta("canvases/t/cards/a/index.html", `<div class="doc"><p>No heading</p></div>`).title, undefined);
+	assert.equal(cardMeta(`<meta name="card" content='{"w":900}' /><div class="doc"><h1>Sales <em>are up</em></h1></div>`).title, "Sales are up");
+	assert.equal(cardMeta(`<div class="doc"><p>No heading</p></div>`).title, undefined);
 });

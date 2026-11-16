@@ -1,4 +1,4 @@
-import { slug } from "./slug.ts";
+import { slug } from "@decks/deck-kit";
 
 /**
  * What a tag is allowed to be.

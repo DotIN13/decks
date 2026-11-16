@@ -4,7 +4,7 @@ import { isCardPath, pageName } from "@decks/hub/layout";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Page, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
-import { readMeta } from "./meta.ts";
+import { cardMeta } from "@decks/deck-kit";
 import { BOARD_W } from "../cards/size.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
@@ -377,7 +377,7 @@ export class Deck {
 	private describe(path: string): Page {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
-		const meta = readMeta(path, source);
+		const meta = cardMeta(source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
 		this.signatures.set(path, pageSignature(this.path, path));

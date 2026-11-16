@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { slug } from "../agents/slug.ts";
+import { slug } from "@decks/deck-kit";
 import type { DeckAgent } from "../agents/session.ts";
 import type { Deck } from "../deck/loader.ts";
 import { canvasFolder } from "@decks/hub/layout";

@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
+import { applyEdits, capped, globMatcher, isText, LIMIT, matchLines, MAX_READ, MAX_WRITE, pathParts, Refused, searchPattern, sliceLines, type TextEdit, type TextMatch, type TextSlice } from "@decks/deck-kit";
 
 /**
  * The deck's files, for a caller with no disk: list, find, read, write, edit, search, move, delete.
@@ -11,10 +12,10 @@ import { dirname, join, relative, sep } from "node:path";
  * `lib/` is the deck's copy of Decks's own libraries and is read only. Reading and searching take
  * text; a picture or a film is embedded by its address (`file.url`), not read.
  *
- * Pure of the server: every function takes the deck's root. The calls are `verbs/files.ts`.
+ * The rules (which paths, how a read is cut, how an edit lands, what a search answers) are
+ * `@decks/deck-kit`'s, the same wherever a deck is kept; here they meet the disk. Pure of the server:
+ * every function takes the deck's root. The calls are `verbs/files.ts`.
  */
-
-export class FileRefused extends Error {}
 
 export interface DeckFile {
 	path: string;
@@ -24,11 +25,7 @@ export interface DeckFile {
 	dir?: true;
 }
 
-/** The most a read answers, and the largest file a search opens or a write takes. */
-const MAX_READ = 1024 * 1024;
-const MAX_WRITE = 5 * 1024 * 1024;
-/** How many entries or matches one call answers unless it asks for fewer. */
-export const LIMIT = 200;
+export { LIMIT };
 /** Folders a walk never enters: dependencies and build output are not the deck's content. */
 const SKIPPED = new Set(["node_modules", "dist", "build"]);
 
@@ -37,26 +34,14 @@ const SKIPPED = new Set(["node_modules", "dist", "build"]);
  * also refuses `lib/` and the deck's own root.
  */
 export function resolveIn(root: string, asked: unknown, options: { write?: boolean } = {}): string {
-	if (typeof asked !== "string") throw new FileRefused('A file is named by its path from the deck\'s root, as in "canvases/plan/cards/q3/index.html".');
-	const clean = asked.trim().replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
-	if (clean.startsWith("/") || /^[a-zA-Z]:/.test(clean)) throw new FileRefused(`${asked} is an absolute path. File calls reach the deck only: name it from the deck's root.`);
-	const parts = clean === "" || clean === "." ? [] : clean.split("/");
-	for (const part of parts) {
-		if (part === "..") throw new FileRefused(`${asked} climbs out of the deck. File calls reach the deck only.`);
-		if (part === "" || part === ".") throw new FileRefused(`${asked} is not a path: it has an empty part.`);
-		if (part.startsWith(".")) throw new FileRefused(`${asked} is in a hidden folder (${part}), which file calls do not reach.`);
-	}
-	if (options.write) {
-		if (parts.length === 0) throw new FileRefused("That is the deck itself, not a file in it.");
-		if (parts[0] === "lib") throw new FileRefused("lib/ is Decks's own copy of its libraries and is not edited: put your file in a card's folder, a canvas's files/ or assets/.");
-	}
+	const parts = pathParts(asked, options);
 	const full = join(root, ...parts);
 	// A link may point anywhere: what exists of the path must still be inside the deck once links are followed.
 	let there = full;
 	while (!existsSync(there) && there !== root) there = dirname(there);
 	const real = realpathSync(there);
 	const realRoot = realpathSync(root);
-	if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new FileRefused(`${asked} leads outside the deck through a link. File calls reach the deck only.`);
+	if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new Refused(`${asked} leads outside the deck through a link. File calls reach the deck only.`);
 	return full;
 }
 
@@ -98,11 +83,9 @@ function* walk(root: string, dir: string, deep: boolean): Generator<DeckFile> {
 	}
 }
 
-const capped = (limit: unknown, most = LIMIT) => (typeof limit === "number" && limit > 0 ? Math.min(Math.floor(limit), 2000) : most);
-
 export function listFiles(root: string, path: unknown, options: { deep?: boolean; limit?: number } = {}): DeckFile[] {
 	const dir = resolveIn(root, path ?? "");
-	if (!existsSync(dir)) throw new FileRefused(`There is no folder ${path}.`);
+	if (!existsSync(dir)) throw new Refused(`There is no folder ${path}.`);
 	if (!statSync(dir).isDirectory()) return [entryOf(root, dir)];
 	const out: DeckFile[] = [];
 	const most = capped(options.limit, options.deep ? 1000 : 2000);
@@ -113,34 +96,11 @@ export function listFiles(root: string, path: unknown, options: { deep?: boolean
 	return out;
 }
 
-/** A glob as a pattern: `*` within a name, `**` across folders, `?` one character. */
-function globToRegex(glob: string): RegExp {
-	let out = "";
-	for (let index = 0; index < glob.length; index++) {
-		const char = glob[index]!;
-		if (char === "*") {
-			if (glob[index + 1] === "*") {
-				out += ".*";
-				index += glob[index + 2] === "/" ? 2 : 1;
-			} else out += "[^/]*";
-		} else if (char === "?") out += "[^/]";
-		else out += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-	}
-	return new RegExp(`^${out}$`);
-}
-
-/** Whether a path under `under` matches: a pattern with no slash is matched against the file's name, anywhere. */
-function matcher(glob: string, under: string): (path: string) => boolean {
-	const pattern = globToRegex(glob);
-	const byName = !glob.includes("/");
-	return (path) => pattern.test(byName ? path.slice(path.lastIndexOf("/") + 1) : under ? path.slice(under.length + 1) : path);
-}
-
 export function findFiles(root: string, glob: unknown, options: { path?: string; limit?: number } = {}): DeckFile[] {
-	if (typeof glob !== "string" || !glob.trim()) throw new FileRefused('A pattern to find, as in "*.md" or "canvases/*/cards/*/index.html".');
+	if (typeof glob !== "string" || !glob.trim()) throw new Refused('A pattern to find, as in "*.md" or "canvases/*/cards/*/index.html".');
 	const dir = resolveIn(root, options.path ?? "");
 	const under = pathOf(root, dir);
-	const matches = matcher(glob.trim(), under);
+	const matches = globMatcher(glob.trim(), under);
 	const out: DeckFile[] = [];
 	const most = capped(options.limit);
 	for (const entry of walk(root, dir, true)) {
@@ -153,45 +113,34 @@ export function findFiles(root: string, glob: unknown, options: { path?: string;
 
 /** A file's bytes as text, or a refusal for what is not text. */
 function textOf(root: string, full: string, asked: unknown): { text: string; stat: DeckFile } {
-	if (!existsSync(full)) throw new FileRefused(`There is no file ${asked}.`);
+	if (!existsSync(full)) throw new Refused(`There is no file ${asked}.`);
 	const stat = entryOf(root, full);
-	if (stat.dir) throw new FileRefused(`${asked} is a folder: decks file list reads it.`);
-	if (stat.size > MAX_READ) throw new FileRefused(`${asked} is ${Math.round(stat.size / 1024)} KB, more than a read takes (${MAX_READ / 1024} KB).`);
+	if (stat.dir) throw new Refused(`${asked} is a folder: decks file list reads it.`);
+	if (stat.size > MAX_READ) throw new Refused(`${asked} is ${Math.round(stat.size / 1024)} KB, more than a read takes (${MAX_READ / 1024} KB).`);
 	const bytes = readFileSync(full);
-	if (bytes.subarray(0, 8000).includes(0)) throw new FileRefused(`${asked} is not text. A picture, a film or a PDF is shown by its address: decks file url ${asked}.`);
+	if (!isText(bytes)) throw new Refused(`${asked} is not text. A picture, a film or a PDF is shown by its address: decks file url ${asked}.`);
 	return { text: bytes.toString("utf8"), stat };
 }
 
-export interface FileText extends DeckFile {
-	text: string;
-	/** The first line answered, from 1, and how many lines the file has. */
-	from: number;
-	lines: number;
-	/** True when lines after the ones answered were left out. */
-	more?: true;
-}
+export interface FileText extends DeckFile, TextSlice {}
 
 export function readFile(root: string, path: unknown, options: { from?: number; lines?: number } = {}): FileText {
 	const { text, stat } = textOf(root, resolveIn(root, path), path);
-	const all = text.split("\n");
-	const from = Math.max(1, Math.floor(options.from ?? 1));
-	const count = options.lines && options.lines > 0 ? Math.floor(options.lines) : all.length;
-	const part = from === 1 && count >= all.length ? text : all.slice(from - 1, from - 1 + count).join("\n");
-	return { ...stat, text: part, from, lines: all.length, ...(from - 1 + count < all.length ? { more: true as const } : {}) };
+	return { ...stat, ...sliceLines(text, options) };
 }
 
 /** Refuse a write over a file that changed since the caller read it (`rev` is the `at` a read answered). */
 function checkRev(root: string, full: string, asked: unknown, rev: unknown): void {
 	if (typeof rev !== "number") return;
 	const now = existsSync(full) ? entryOf(root, full).at : 0;
-	if (now !== rev) throw new FileRefused(`${asked} has changed since you read it (it is at ${now}, you had ${rev}). Read it again, then write.`);
+	if (now !== rev) throw new Refused(`${asked} has changed since you read it (it is at ${now}, you had ${rev}). Read it again, then write.`);
 }
 
 export function writeFile(root: string, path: unknown, text: unknown, options: { rev?: number } = {}): DeckFile {
-	if (typeof text !== "string") throw new FileRefused("The file's whole text, as a string.");
-	if (Buffer.byteLength(text) > MAX_WRITE) throw new FileRefused(`That is more than a write takes (${MAX_WRITE / 1024 / 1024} MB).`);
+	if (typeof text !== "string") throw new Refused("The file's whole text, as a string.");
+	if (Buffer.byteLength(text) > MAX_WRITE) throw new Refused(`That is more than a write takes (${MAX_WRITE / 1024 / 1024} MB).`);
 	const full = resolveIn(root, path, { write: true });
-	if (existsSync(full) && statSync(full).isDirectory()) throw new FileRefused(`${path} is a folder.`);
+	if (existsSync(full) && statSync(full).isDirectory()) throw new Refused(`${path} is a folder.`);
 	checkRev(root, full, path, options.rev);
 	mkdirSync(dirname(full), { recursive: true });
 	// In place, never a rename: the canvas watches the file itself.
@@ -199,28 +148,7 @@ export function writeFile(root: string, path: unknown, text: unknown, options: {
 	return entryOf(root, full);
 }
 
-export interface TextEdit {
-	find: string;
-	replace: string;
-	/** Replace every occurrence; without it `find` must occur exactly once. */
-	all?: boolean;
-}
-
-/** Apply every edit in order, or none: each `find` must be there, and once only unless `all`. */
-export function applyEdits(path: string, text: string, edits: readonly TextEdit[]): string {
-	if (!Array.isArray(edits) || edits.length === 0) throw new FileRefused("At least one edit: { find, replace }.");
-	let out = text;
-	edits.forEach((edit, index) => {
-		const label = edits.length > 1 ? `Edit ${index + 1}: ` : "";
-		if (typeof edit?.find !== "string" || typeof edit.replace !== "string" || !edit.find) throw new FileRefused(`${label}an edit is { find, replace }, both strings, find not empty.`);
-		const count = out.split(edit.find).length - 1;
-		if (count === 0) throw new FileRefused(`${label}${quote(edit.find)} is not in ${path}. Nothing was changed.`);
-		if (count > 1 && !edit.all) throw new FileRefused(`${label}${quote(edit.find)} is in ${path} ${count} times. Give more of the words around it, or set all. Nothing was changed.`);
-		out = edit.all ? out.split(edit.find).join(edit.replace) : out.replace(edit.find, () => edit.replace);
-	});
-	return out;
-}
-const quote = (words: string) => `"${words.length > 60 ? `${words.slice(0, 57)}...` : words}"`;
+export type { TextEdit };
 
 export function editFile(root: string, path: unknown, edits: readonly TextEdit[], options: { rev?: number } = {}): DeckFile {
 	const full = resolveIn(root, path, { write: true });
@@ -230,24 +158,14 @@ export function editFile(root: string, path: unknown, edits: readonly TextEdit[]
 	return entryOf(root, full);
 }
 
-export interface FileMatch {
-	path: string;
-	line: number;
-	text: string;
-}
+export type FileMatch = TextMatch;
 
 export function grepFiles(root: string, pattern: unknown, options: { path?: string; glob?: string; limit?: number; ignoreCase?: boolean } = {}): FileMatch[] {
-	if (typeof pattern !== "string" || !pattern) throw new FileRefused("A regular expression to search for.");
-	let regex: RegExp;
-	try {
-		regex = new RegExp(pattern, options.ignoreCase ? "i" : "");
-	} catch (error) {
-		throw new FileRefused(`${pattern} is not a regular expression: ${(error as Error).message}`);
-	}
+	const regex = searchPattern(pattern, options);
 	const dir = resolveIn(root, options.path ?? "");
-	if (!existsSync(dir)) throw new FileRefused(`There is no ${options.path}.`);
+	if (!existsSync(dir)) throw new Refused(`There is no ${options.path}.`);
 	const under = statSync(dir).isDirectory() ? pathOf(root, dir) : "";
-	const wanted = options.glob ? matcher(options.glob, under) : () => true;
+	const wanted = options.glob ? globMatcher(options.glob, under) : () => true;
 	const entries = statSync(dir).isDirectory() ? walk(root, dir, true) : [entryOf(root, dir)];
 	const out: FileMatch[] = [];
 	const most = capped(options.limit);
@@ -261,13 +179,8 @@ export function grepFiles(root: string, pattern: unknown, options: { path?: stri
 		} catch {
 			continue;
 		}
-		if (bytes.subarray(0, 8000).includes(0)) continue;
-		const lines = bytes.toString("utf8").split("\n");
-		for (let index = 0; index < lines.length; index++) {
-			if (!regex.test(lines[index]!)) continue;
-			out.push({ path: entry.path, line: index + 1, text: lines[index]!.length > 300 ? `${lines[index]!.slice(0, 300)}…` : lines[index]! });
-			if (out.length >= most) return out;
-		}
+		if (!isText(bytes)) continue;
+		if (matchLines(entry.path, bytes.toString("utf8"), regex, out, most)) return out;
 	}
 	return out;
 }
@@ -275,9 +188,9 @@ export function grepFiles(root: string, pattern: unknown, options: { path?: stri
 export function moveFile(root: string, path: unknown, to: unknown): DeckFile {
 	const from = resolveIn(root, path, { write: true });
 	const target = resolveIn(root, to, { write: true });
-	if (!existsSync(from)) throw new FileRefused(`There is no ${path}.`);
-	if (existsSync(target)) throw new FileRefused(`${to} is already there. Delete it first, or choose another name.`);
-	if (target.startsWith(from + sep)) throw new FileRefused(`${to} is inside ${path}.`);
+	if (!existsSync(from)) throw new Refused(`There is no ${path}.`);
+	if (existsSync(target)) throw new Refused(`${to} is already there. Delete it first, or choose another name.`);
+	if (target.startsWith(from + sep)) throw new Refused(`${to} is inside ${path}.`);
 	mkdirSync(dirname(target), { recursive: true });
 	renameSync(from, target);
 	return entryOf(root, target);
@@ -286,7 +199,7 @@ export function moveFile(root: string, path: unknown, to: unknown): DeckFile {
 /** Delete by moving to the deck's trash (`.decks/trash/files/<time>/<path>`), where it can be moved back by hand. */
 export function deleteFile(root: string, path: unknown, now: number = Date.now()): { deleted: string; trash: string } {
 	const full = resolveIn(root, path, { write: true });
-	if (!existsSync(full)) throw new FileRefused(`There is no ${path}.`);
+	if (!existsSync(full)) throw new Refused(`There is no ${path}.`);
 	const kept = join(".decks", "trash", "files", new Date(now).toISOString().replace(/[:.]/g, "-"), pathOf(root, full));
 	mkdirSync(dirname(join(root, kept)), { recursive: true });
 	renameSync(full, join(root, kept));

@@ -5,7 +5,7 @@ import type { Page, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "../deck/snapshots.ts";
 import { Authors, Seen } from "../deck/authors.ts";
 import type { Deck } from "../deck/loader.ts";
-import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
+import { onlySizeChanged, withCardSize } from "@decks/deck-kit";
 
 /**
  * What the shell has to do for the card service, and nothing else.
@@ -259,7 +259,7 @@ export class CardService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
-		return this.writeBoard(path, withBoardSize(path, html, size));
+		return this.writeBoard(path, withCardSize(html, size));
 	}
 
 	/** Why a board on a friend's canvas shared with you to view may not be changed or deleted, or undefined. */
@@ -292,7 +292,7 @@ export class CardService {
 		const board = this.deck.refresh(path);
 		if (!board) throw new Error(`No such board: ${path}`);
 		// Only the size in its tag: the surfaces showing it keep their document (`items/card-surface.tsx`, `sized`).
-		const sized = before !== undefined && onlySizeChanged(path, before, html);
+		const sized = before !== undefined && onlySizeChanged(before, html);
 		this.hooks.send({ type: "card.changed", path, rev: board.rev, card: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;
 	}

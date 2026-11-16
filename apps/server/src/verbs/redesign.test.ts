@@ -7,7 +7,8 @@ import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../http.ts";
-import { placeBy, toItem } from "./canvas.ts";
+import { placeBy } from "@decks/deck-kit";
+import { toItem } from "./canvas.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {
