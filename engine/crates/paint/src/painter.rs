@@ -22,36 +22,13 @@ use crate::mesh;
 use stage_text::atlas::{Atlas, COLOR_TEXTURE, MASK_TEXTURE};
 use stage_text::{Laid, Span, Text};
 
+mod ink;
 mod words;
 use words::*;
-pub use words::draw_laid;
+pub use ink::{LiveInk, paint_ink};
+pub use words::{IconPart, IconShape, draw_laid, icon_key};
 
 pub const NOTE_RADIUS: f32 = 12.0;
-
-/// An icon's shapes, as the app's reader (`icons.ts`, `parseIcon`) gives them.
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IconShape {
-	pub view_box: [f64; 4],
-	pub parts: Vec<IconPart>,
-}
-
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IconPart {
-	pub d: String,
-	pub fill: bool,
-	pub stroke: bool,
-	pub stroke_width: f32,
-	pub cap: String,
-	pub join: String,
-	pub even_odd: bool,
-}
-
-/// An icon's key: what the app fetches it by.
-pub fn icon_key(library: &str, name: &str, weight: f64) -> String {
-	format!("{library}|{name}|{}", weight.round())
-}
 
 /// What the painter is told besides the scene.
 pub struct Context<'a> {
@@ -94,9 +71,6 @@ pub struct Writer {
 	pub name: Option<String>,
 	pub color: [f32; 4],
 }
-
-/// A placeholder's colour when nobody is named: the app's accent (`--color-accent`, `#3b5cf6`).
-pub const PLACEHOLDER_ACCENT: [f32; 4] = [0.231, 0.361, 0.965, 1.0];
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
@@ -444,30 +418,6 @@ fn arrow_label(ctx: &Context, item: &Item, path: &kurbo::BezPath, transform: Aff
 	draw_laid(ctx, &laid, (x, y), &[Color::straight(ink, 1.0)], m, ops);
 }
 
-// Ink, painted fresh each frame by the page rather than into tiles.
-/// The stroke still under the pen: an SVG path in stage units, filled or stroked `size` wide.
-#[derive(Clone, Debug)]
-pub struct LiveInk {
-	pub d: String,
-	pub filled: bool,
-	pub color: [f32; 4],
-	pub size: f32,
-	pub opacity: f32,
-}
-
-/// Live strokes, drawn with `target` (stage units to target pixels).
-pub fn paint_ink(strokes: &[LiveInk], target: &Mat, ops: &mut Vec<Op>) {
-	let transform = to_affine(target);
-	let pixels = transform.scale_factor().max(1e-3);
-	for stroke in strokes {
-		let Ok(path) = kurbo::BezPath::from_svg(&stroke.d) else { continue };
-		let mesh = if stroke.filled { mesh::fill(&path, false, pixels) } else { mesh::stroke(&path, stroke.size, lyon_tessellation::LineCap::Round, lyon_tessellation::LineJoin::Round, None, pixels) };
-		if let Some((vertices, indices)) = mesh {
-			ops.push(Op::Mesh { vertices, indices, transform, paint: Paint::Solid(Color::straight(stroke.color, stroke.opacity)) });
-		}
-	}
-}
-
 // Fills, paints and shadows.
 fn to_affine(m: &Mat) -> Affine {
 	Affine(m.0.map(|v| v as f32))
@@ -788,6 +738,8 @@ fn halfway(path: &kurbo::BezPath) -> Option<kurbo::Point> {
 }
 
 // Marks round frames and cards: placeholders, outlines, papers.
+/// A placeholder's colour when nobody is named: the app's accent (`--color-accent`, `#3b5cf6`).
+pub const PLACEHOLDER_ACCENT: [f32; 4] = [0.231, 0.361, 0.965, 1.0];
 /// The outline's width and dashes, and the name tag's inset and padding, in stage units.
 const PLACEHOLDER_LINE: f64 = 2.0;
 

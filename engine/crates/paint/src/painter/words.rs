@@ -228,6 +228,31 @@ pub(crate) fn draw_card(ctx: &Context, id: &str, card_ops: &[stage_text::card::C
 	}
 }
 
+/// An icon's shapes, as the app's reader (`icons.ts`, `parseIcon`) gives them.
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IconShape {
+	pub view_box: [f64; 4],
+	pub parts: Vec<IconPart>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IconPart {
+	pub d: String,
+	pub fill: bool,
+	pub stroke: bool,
+	pub stroke_width: f32,
+	pub cap: String,
+	pub join: String,
+	pub even_odd: bool,
+}
+
+/// An icon's key: what the app fetches it by.
+pub fn icon_key(library: &str, name: &str, weight: f64) -> String {
+	format!("{library}|{name}|{}", weight.round())
+}
+
 /// An icon from a named library, fitted and centred in its box, in its first colour fill.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn icon(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, pixels: f32, ops: &mut Vec<Op>) {
