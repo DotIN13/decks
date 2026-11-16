@@ -84,6 +84,25 @@ test("indent names a body left at or above the line that opened its block, and n
 	assert.deepEqual(shallowLines(fine), [], "regex, string, template, comment, JSX and an apostrophe are read through");
 	assert.deepEqual(await breaks("indent", { "server/a/x.ts": "function f() {\nreturn 1;\n}\n" }), ["server/a/x.ts: line shallower than its block"]);
 });
+test("indent names a JSX child level with its parent, and reads nested views, words and generics through", async () => {
+	const { shallowJsx } = await import("./indent.mjs");
+	assert.deepEqual(shallowJsx(["return (", "\t<>", "\t<Show when={a}>", "\t\t<b />", "\t</Show>", "\t</>", ");"].join("\n")), [3], "a child level with its fragment (a closing tag is not measured)");
+	const fine = [
+		"const list = new Map<string, number>();",
+		"if (a < b) go();",
+		"return (",
+		"\t<div title={x > 1 ? \"big\" : \"small\"} icon={<Icon />}>",
+		"\t\t<span>Signed out</span>",
+		"\t\twords, then <b>bold</b>",
+		"\t\t{items.map((x) => (",
+		"\t\t\t<li>{x}</li>",
+		"\t\t))}",
+		"\t</div>",
+		");",
+	].join("\n");
+	assert.deepEqual(shallowJsx(fine), [], "nested children, words before a closing tag, a generic, a comparison, JSX in an attribute");
+	assert.deepEqual(await breaks("indent", { "ui/x.tsx": "export const X = () => (\n\t<div>\n\t<span />\n\t</div>\n);\n" }), ["ui/x.tsx: JSX child level with its parent"]);
+});
 test("imports names a folder importing against the table", () =>
 	plantedFails("imports", { "protocol/a.ts": 'import x from "node:fs";\n' }, { "protocol/a.ts": 'import x from "./b.ts";\n' }, "protocol may not import node:fs"));
 test("imports names server importing the harness", () =>
