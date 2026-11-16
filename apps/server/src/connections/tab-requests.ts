@@ -1,6 +1,5 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import type { App } from "../app.ts";
-import { settleStage } from "../stage/pending.ts";
 import type { View } from "./tab-socket.ts";
 import { runVerb } from "../calls/run.ts";
 import { renameCanvas, unpairStudioHere } from "../calls/person-table.ts";
@@ -158,7 +157,7 @@ function alias(message: ClientMessage): Alias | undefined {
 		case "chat.tool":
 			return { verb: "chat.tool", args: [message.agentId, message.itemId] };
 		case "stage.result":
-			return { direct: (app) => void settleStage(app.pendingStage, message.result) };
+			return { direct: (app) => void app.pageCalls.settle(message.result) };
 		case "extension.ui.answer":
 			return { verb: "agent.answer", args: [message.answer] };
 		case "claude.accounts":

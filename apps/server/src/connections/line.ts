@@ -9,7 +9,6 @@ import { isCanvasPass } from "../auth/passes.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
 import { cardRefusedFor, DOC_CALLS, onCanvas } from "../calls/canvas-frame.ts";
 import { runVerb } from "../calls/run.ts";
-import { settleStage } from "../stage/pending.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */
 export const HELLO_MS = 5_000;
@@ -181,7 +180,7 @@ export class Line {
 			}
 			case "view.answered": {
 				if (typeof message.id !== "string") return;
-				settleStage(this.app.pendingStage, { id: message.id, value: message.value, ...(typeof message.error === "string" ? { error: message.error } : {}) });
+				this.app.pageCalls.settle({ id: message.id, value: message.value, ...(typeof message.error === "string" ? { error: message.error } : {}) });
 				return;
 			}
 			default: {

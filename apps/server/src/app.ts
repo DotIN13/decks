@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { sttReady } from "./stt.ts";
 import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
@@ -6,7 +5,7 @@ import { closeOldShapes } from "./deck/old-shapes.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
-import type { Page, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
+import type { Page, ClientMessage, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
@@ -24,6 +23,7 @@ import { TokenStore } from "./auth/tokens.ts";
 import { studioLink } from "./studio/index.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
+import { PageCalls } from "./stage/page-calls.ts";
 import { ClaudeAccounts } from "./runtimes/claude/accounts.ts";
 import { AccountList } from "./runtimes/claude/account-list.ts";
 import { DECK_DIR, type Config } from "./config.ts";
@@ -152,12 +152,12 @@ export class App {
 	private resyncTimer: NodeJS.Timeout | undefined;
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
-	/** Stage calls waiting for the browser to carry them out. */
+	/** What an agent asked the pages to do to a canvas, waiting on their answers (`stage/page-calls.ts`). */
+	readonly pageCalls = new PageCalls({ send: (message) => this.send(message), screens: () => (this.hub?.connections ?? 0) + this.lines() });
 	/** Canvas frames following their canvas's stream now (`connections/routes/v1.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
 	/** How many lines are open (`connections/line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
 	lines: () => number = () => 0;
-	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
 	/** The subscriptions as the page is told of them: who each is, its five-hour window, who spends which (`runtimes/claude/account-list.ts`). */
@@ -254,8 +254,8 @@ export class App {
 				const board = this.deck.board(path);
 				return board && this.stage.shots ? this.stage.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
 			},
-			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
-			callAll: (call, timeoutMs) => this.callStageAll(call, timeoutMs),
+			call: (call, timeoutMs) => this.pageCalls.ask(call, timeoutMs),
+			callAll: (call, timeoutMs) => this.pageCalls.askAll(call, timeoutMs),
 			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
 			connected: () => (this.hub?.connections ?? 0) > 0 || this.lines() > 0 || this.canvasFrames > 0,
 			broadcast: (message) => this.send(message),
@@ -428,47 +428,6 @@ export class App {
 				bridge: this.bridge,
 			},
 		);
-	}
-
-	/**
-	 * Ask the browser to do something to the canvas, and wait for it.
-	 *
-	 * Broadcast rather than addressed: two tabs on one deck are looking at the same
-	 * stage, and both should move. The first answer wins, and a browser that never
-	 * answers times out into a result rather than leaving the agent's tool call
-	 * hanging on a tab that was closed mid-gesture.
-	 */
-	private callStage(call: Omit<StageCall, "id">, timeoutMs = 5000): Promise<unknown> {
-		const id = randomUUID();
-		return new Promise((resolve) => {
-			const timer = setTimeout(() => {
-				this.pendingStage.delete(id);
-				resolve({ skipped: "the canvas did not answer in time" });
-			}, timeoutMs);
-			this.pendingStage.set(id, { resolve, timer });
-			this.send({ type: "view.called", call: { ...call, id } });
-		});
-	}
-
-	/**
-	 * Ask every browser, and wait for each to answer or for the time to run out: for a call whose
-	 * answer is a count over all of them (`view.reload`). The answers that came are what it resolves with.
-	 */
-	private callStageAll(call: Omit<StageCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
-		const id = randomUUID();
-		// Every front end may answer: pages and canvas frames on the line as well as the old socket's. A line that
-		// answers nothing (a script's, or a page leaving the call to its frame) only makes the wait run to its end.
-		const expected = (this.hub?.connections ?? 0) + this.lines();
-		if (expected === 0) return Promise.resolve([]);
-		return new Promise((resolve) => {
-			const many = { answers: [] as unknown[], expected };
-			const timer = setTimeout(() => {
-				this.pendingStage.delete(id);
-				resolve(many.answers);
-			}, timeoutMs);
-			this.pendingStage.set(id, { resolve: (value) => resolve(value as unknown[]), timer, many });
-			this.send({ type: "view.called", call: { ...call, id } });
-		});
 	}
 
 	/**

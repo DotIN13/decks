@@ -4,7 +4,6 @@ import { bearerOf } from "../../auth/guard.ts";
 import { actsAsPerson } from "../../auth/principal.ts";
 import { cardRefusedFor, DOC_CALLS, onCanvas } from "../../calls/canvas-frame.ts";
 import { runVerb } from "../../calls/run.ts";
-import { settleStage } from "../../stage/pending.ts";
 import type { RouteDeps } from "./shared.ts";
 
 /**
@@ -94,7 +93,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 			res.status(400).json({ ok: false, error: "Send { id, value } or { id, error }." });
 			return;
 		}
-		const settled = settleStage(app.pendingStage, { id: result.id, value: result.value, ...(typeof result.error === "string" ? { error: result.error } : {}) });
+		const settled = app.pageCalls.settle({ id: result.id, value: result.value, ...(typeof result.error === "string" ? { error: result.error } : {}) });
 		res.json({ ok: true, settled });
 	});
 
