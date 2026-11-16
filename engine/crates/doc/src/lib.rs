@@ -280,6 +280,7 @@ impl Document {
 		out
 	}
 
+	// Changing the map: places for new items, and a batch of changes applied whole or not at all.
 	/// A key placing a new last child under `parent`.
 	pub fn pos_last(&self, parent: Option<Handle>) -> String {
 		let last = self.child_list(parent).last().and_then(|&h| self.node(h)).map(|n| n.pos.as_str());
@@ -299,7 +300,6 @@ impl Document {
 		}
 	}
 
-	// Applying a batch of changes, all of it or none.
 	/// Apply a batch: all of it or, at the first change that cannot apply, none of it.
 	pub fn apply(&mut self, changes: &[Change]) -> Result<Applied, DocError> {
 		self.apply_each(changes.len(), |_, i| Ok(changes[i].clone()))
