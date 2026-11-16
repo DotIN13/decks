@@ -1,0 +1,22 @@
+{
+	"canvas.restore": {
+		"owner": "Easel",
+		"why": "Declared for canvas history; no feature answers it yet."
+	},
+	"canvas.version": {
+		"owner": "Easel",
+		"why": "Declared for canvas history; no feature answers it yet."
+	},
+	"canvas.versions": {
+		"owner": "Easel",
+		"why": "Declared for canvas history; no feature answers it yet."
+	},
+	"google.read": {
+		"owner": "Folio, then Keel",
+		"why": "Handled, but main.ts does not yet give documents the Docs API; Folio is porting the client, Keel wires it."
+	},
+	"google.edit": {
+		"owner": "Folio, then Keel",
+		"why": "Handled, but main.ts does not yet give documents the Docs API; Folio is porting the client, Keel wires it."
+	}
+}

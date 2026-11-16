@@ -36,10 +36,15 @@ export function features(options: FeatureOptions = {}): Feature[] {
 	];
 }
 
+/** What a real start gives features(): the card runtime; the completeness test starts the same way. */
+export function startOptions(): FeatureOptions {
+	const lib = cardLib();
+	return lib ? { lib } : {};
+}
+
 async function main(): Promise<void> {
 	const args = argsOf(process.argv.slice(2));
-	const lib = cardLib();
-	const running = await startServer({ ...args, features: features(lib ? { lib } : {}) });
+	const running = await startServer({ ...args, features: features(startOptions()) });
 	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
 	const stop = () => {
 		setTimeout(() => process.exit(0), 3000).unref();
