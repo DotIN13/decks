@@ -1,3 +1,4 @@
+// Tests for what a press, a card's margin, a page's picture and a marquee pick.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";

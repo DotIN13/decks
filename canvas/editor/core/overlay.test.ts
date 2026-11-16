@@ -1,3 +1,4 @@
+// Tests for what the overlay draws: outlines, handles and their hit zones, hover, kin, the grip, distances.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.test-helper.ts";

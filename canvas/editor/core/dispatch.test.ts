@@ -1,3 +1,4 @@
+// Tests for what a press, a second tap and the hand start on the canvas.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { decideHover, decidePress, handPans, isBareSecondTap, isSecondTap, type HoverAction, type HoverFacts, type PressAction, type PressFacts } from "./dispatch.ts";

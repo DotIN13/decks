@@ -1,3 +1,4 @@
+// Tests for resizing by the handles, a page's handles, and the corner radius.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";

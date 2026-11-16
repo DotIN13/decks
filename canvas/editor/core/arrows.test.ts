@@ -1,3 +1,4 @@
+// Tests for editing an arrow: its ends joined and slid, its handles, its middle pulled, a new one drawn.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW } from "@decks/pen";

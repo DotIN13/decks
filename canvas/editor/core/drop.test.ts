@@ -1,3 +1,4 @@
+// Tests for where a drag drops what it carries: the frame, the slot among its children, the places near.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.test-helper.ts";

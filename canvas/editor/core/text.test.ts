@@ -1,3 +1,4 @@
+// Tests for the words typed over the drawing: their look, what opens, and what putting them away writes.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CARD, MARKDOWN, SHAPE, type PenDocument, type PenNode } from "@decks/pen";

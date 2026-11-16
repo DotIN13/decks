@@ -1,3 +1,4 @@
+// Tests for the gesture reducer: carries, snaps, copies, drops, the marquee, pages, handles, radius, a finger.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene, type FakeItem } from "./fake-scene.test-helper.ts";

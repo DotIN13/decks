@@ -1,3 +1,4 @@
+// Tests for what a moving selection snaps against, and the box it moves as.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.test-helper.ts";

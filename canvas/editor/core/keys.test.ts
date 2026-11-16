@@ -1,3 +1,4 @@
+// Tests for the drawing's keys in edit mode: undo, delete, Escape, duplicate, nudges, tool letters, Enter.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.test-helper.ts";

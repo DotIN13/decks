@@ -1,3 +1,4 @@
+// Tests for the pen ops an edit writes: items moved, copied, duplicated, deleted, and made with a tool.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ARROW, makeShape, MARKDOWN, shapeKind, type PenNode } from "@decks/pen";
