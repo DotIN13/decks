@@ -96,6 +96,17 @@ function decide(messages, tools) {
 		const out = results.map((r) => (typeof r.content === "string" ? r.content : JSON.stringify(r.content))).join("\n");
 		return done(list ? `Done. The boards on the canvas:\n${out.slice(-1500)}` : "Done.");
 	}
+	// The same in the new words: "With the new decks commands, put the cards A and B on your canvas, …" (decks item …).
+	m = /with the new decks commands, (put the cards?|take) (.+?) (on|off) your canvas(, then read your canvas)?\.?$/i.exec(text.trim());
+	if (m && names.has("bash")) {
+		const paths = m[2].match(/[\w./-]+\.html/g) ?? [];
+		const folder = (p) => /\/cards\/([^/]+)\/index\.html$/.exec(p)?.[1] ?? p;
+		const find = (p) => `decks item list | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const j=JSON.parse(s);const i=(Array.isArray(j)?j:j.items).find((x)=>x.card&&x.card.includes("/cards/${folder(p)}/"));console.log(i?i.id:"")})'`;
+		const cmds = m[3].toLowerCase() === "on" ? paths.map((p) => `decks item insert --item '{"type":"card","card":"${p}"}'`) : paths.map((p) => `decks item delete "$(${find(p)})"`);
+		if (m[4]) cmds.push("decks item list");
+		if (calls.length < cmds.length) return { tool_calls: [call("bash", { command: cmds[calls.length] })] };
+		return done("Done.");
+	}
 	// "With the decks command, put the cards A and B on your canvas, then read your canvas." / "…take B off your canvas."
 	m = /with the decks command, (put the cards?|take) (.+?) (on|off) your canvas(, then read your canvas)?\.?$/i.exec(text.trim());
 	if (m && names.has("bash")) {
