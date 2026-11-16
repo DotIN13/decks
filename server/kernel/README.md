@@ -20,8 +20,8 @@ no feature; only `server/main.ts` does. Keel owns it.
 
 1. Only `deck.ts`, `disk.ts` and `lockfile.ts` touch `node:fs`; everything else reads a deck through `Deck`.
 2. A path is a `DeckPath`, checked once by `toDeckPath`; a symlink that leads out is refused as `invalid`.
-3. The deck's calls stay inside the deck; a file outside it is edited on disk (DESIGN 10). Every write, remove and move is a revision in history, with who and when; a file is readable and
-   restorable at any revision. A remove goes to `.decks/trash/`. A change on the disk is `by: "disk"`, the server's own writes known by their bytes.
+3. The deck's calls stay inside the deck; a file outside it is edited on disk (DESIGN 10). Every
+   write, remove and move is a revision in history, with who and when, restorable at any revision. A remove goes to `.decks/trash/`. A change on the disk is `by: "disk"`, the server's own writes known by their bytes.
 4. A token or a pass (a token issued to a card or an app) becomes a `Caller` at the door. Nothing else
    says who is calling. Only hashes are kept. The person on this machine has id `person`.
 5. The router finds the call, checks the caller's kind, checks the arguments, runs the handler, and
@@ -38,10 +38,12 @@ no feature; only `server/main.ts` does. Keel owns it.
 10. `Kernel.machine()` is a user-only folder outside any deck; `Kernel.deckId()` is made once per deck.
 11. A running server keeps `<deck>/.decks/server.json`, mode 0600, with the person's token. A second
    server on the same deck, or the same port, fails with a sentence.
+12. A feature's `feature.ts` exports one named factory that makes a fresh `Feature` (options as its one
+   argument) and no default export: nothing is built when the file is imported, and only main calls it.
 
 ## Not here
 
-Serving the harness's page, upgrading old decks and old call names: later, in `upgrade/` and `compat/`.
+Serving the canvas page, upgrading old decks and old call names are features: `frame/`, `upgrade/`, `compat/`.
 CORS only for a sandboxed frame (Origin null) that sends its token; a page on another site gets none.
 
 ## Check
