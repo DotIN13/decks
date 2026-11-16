@@ -48,7 +48,21 @@
 		"server/canvas/",
 		"tools/checks/canvas/",
 		"canvas/drawing/",
-		"canvas/camera/"
+		"canvas/camera/",
+		"canvas/editor/core/gesture-carry.ts",
+		"canvas/editor/editor.tsx",
+		"canvas/render/engine.ts",
+		"canvas/render/engine-frame.ts",
+		"canvas/render/engine-doc.ts",
+		"canvas/input/canvas-input.ts",
+		"canvas/items/glide.ts",
+		"canvas/items/glide.test.ts",
+		"canvas/items/README.md",
+		"canvas/host/inside/events.ts",
+		"canvas/entries/camera.ts",
+		"canvas/types.ts",
+		"tools/checks/library/smooth-edits.mjs",
+		"tools/checks/page/per-agent.mjs"
 	],
 	"Folio": [
 		"server/cards/",
