@@ -147,10 +147,9 @@ export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] 
 		url: async (ctx, { card: name }) => {
 			const path = cardPath(name);
 			if (!(await stat(ctx.deck, path))) throw new Refused("not_found", `There is no card at ${path}.`, "card.list");
-			const callers = kernel()?.callers;
-			const pass = callers?.issue({ kind: "card", id: path, name: path, canvas: canvasOf(path) }, "card page");
-			// The page's pass ends after an hour, as the frame's does: it is never kept for good.
-			if (pass && callers?.forget) setTimeout(() => callers.forget!(pass), PAGE_PASS_MS).unref?.();
+			// The page's pass opens this card's canvas alone, makes no calls (a card in a tab makes none), and ends in an hour.
+			const canvas = canvasOf(path);
+			const pass = kernel()?.callers.issue({ kind: "card", id: path, name: path, canvas }, "card page", { canvas, calls: [], until: Date.now() + PAGE_PASS_MS });
 			return FILES + encodeURI(path) + (pass ? `?pass=${encodeURIComponent(pass)}` : "");
 		},
 	});

@@ -147,13 +147,13 @@ test("rule 14: a card's own :host rules apply to its element on its page", async
 });
 
 test("rule 14: card.url's pass ends after an hour", async (t) => {
-	t.mock.timers.enable({ apis: ["setTimeout"] });
+	t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
 	const s = await start();
 	const { path } = await s.value<{ path: string }>("card.create", { title: "Short" }, ann);
 	const url = await s.value<string>("card.url", { card: path });
 	const pass = decodeURIComponent(url.split("pass=")[1]!);
 	assert.equal(s.callers.resolve(pass)?.kind, "card");
-	t.mock.timers.tick(PAGE_PASS_MS);
+	t.mock.timers.tick(PAGE_PASS_MS + 1);
 	assert.equal(s.callers.resolve(pass), undefined);
 	await s.close();
 });
