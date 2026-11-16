@@ -1,5 +1,5 @@
 import { events, layout } from "../../protocol/index.ts";
-import { defineFeature, type Feature, type Kernel } from "../kernel/types.ts";
+import { defineFeature, type Feature, type FileChange, type Kernel } from "../kernel/types.ts";
 import { cardCalls, fileCalls } from "./calls.ts";
 import { cardKindWith } from "./prepare.ts";
 import { followSizes } from "./resize.ts";
@@ -24,6 +24,7 @@ export function cards(options: CardsOptions = {}): Feature {
 			const sizes = followSizes(given);
 			// A write to any file in a card's folder is news about the card.
 			const files = given.deck.watch((change) => {
+				if (change.kind === "written") void announceIfNew(given, change);
 				const card = layout.cardOf(change.path);
 				if (!card) return;
 				const removed = change.kind === "deleted" && change.path === card;
@@ -37,3 +38,9 @@ export function cards(options: CardsOptions = {}): Feature {
 	});
 }
 
+/** A written file the deck's history did not have one revision earlier is new: file.created. */
+async function announceIfNew(kernel: Kernel, change: FileChange): Promise<void> {
+	if (!kernel.deck.readAt) return;
+	const existed = await kernel.deck.readAt(change.path, change.rev - 1).then(() => true, () => false);
+	if (!existed) kernel.events.emit(events.fileCreated, { ids: [change.path], by: change.by, rev: change.rev });
+}

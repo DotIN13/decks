@@ -35,7 +35,11 @@ test("rule 2: a write carries its author, and answers the file as it now is", as
 	assert.equal(wrote.path, "docs/new.md");
 	assert.equal(wrote.by, "ann");
 	assert.equal(wrote.size, 5);
-	assert.deepEqual(s.heard.filter((e) => e.name === "file.created").map((e) => (e.payload as { ids: string[] }).ids), [["docs/new.md"]]);
+	await s.value("file.write", { path: "docs/new.md", text: "hello" }, ann);
+	await s.deck.write("docs/made-on-disk.md" as never, new TextEncoder().encode("x"), { kind: "person", id: "disk", name: "disk" });
+	await new Promise((r) => setTimeout(r, 10));
+	const created = s.heard.filter((e) => e.name === "file.created").map((e) => (e.payload as { ids: string[]; by: string }));
+	assert.deepEqual(created.map((p) => [p.ids[0], p.by]), [["docs/new.md", "ann"], ["docs/made-on-disk.md", "disk"]]);
 	const history = await s.deck.revisions!(wrote.path as never);
 	assert.equal(history.at(-1)?.by, "ann");
 	assert.equal((await s.value<{ text: string }>("file.read", { path: "docs/new.md" })).text, "hello");
