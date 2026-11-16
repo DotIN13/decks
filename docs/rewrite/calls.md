@@ -11,7 +11,7 @@ Every old name keeps answering for one release, from `server/compat/`; then its 
 *Who* is who may call it: person, agent, app, card, or anyone. Calls on chat, account and runtime are answered
 by the harness, for the person only; all others by the server.
 
-**Counts.** 144 calls (124 on the server, 20 in the harness) and 24 events, from 120 calls and 52 events today.
+**Counts.** 145 calls (125 on the server, 20 in the harness) and 24 events, from 120 calls and 52 events today.
 
 ## Calls, by noun
 
@@ -168,6 +168,7 @@ Who works on the deck: its name, avatar, home canvas, tags and inbox.
 | `agent.add` | person | alias of `agent.create` | person, agent | The same thing as agent.create. |
 | `agent.get` | agents | `agent.get` | anyone | Unchanged. |
 | new | | `agent.host` | person | New: a client says which kinds of agent it can start. |
+| new | | `agent.act` | agent | Added in 0.29.0 for Helm and Roster: an agent's own file tools say they start or finish an edit, for its cursor; today's server read it from the tool. |
 | `agent.inbox` | agents | `agent.inbox` | agent | Unchanged. |
 | `agent.list` | agents | `agent.list` | anyone | Unchanged. |
 | `agent.me` | agents | `agent.me` | person, agent | For the person (since 0.13.0), the agent whose conversation is on their screen. |

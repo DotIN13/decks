@@ -1,5 +1,5 @@
 import { defineCall } from "../call.ts";
-import { arr, bool, opt, str } from "../schema.ts";
+import { arr, bool, lit, obj, opt, str } from "../schema.ts";
 import { Agent, AgentChange, AgentKind, AgentMode, Deleted, Message, News } from "../shapes.ts";
 import { AGENT, ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
@@ -68,6 +68,16 @@ export const host = defineCall({
 	who: PERSON,
 	args: { kinds: arr(AgentKind), calls: opt(arr(str("A harness call this host answers, such as chat.list."))) },
 	answer: arr(AgentKind),
+	effect: "change",
+});
+
+// Showing your work: your cursor and glow while you edit cards.
+export const act = defineCall({
+	name: "agent.act",
+	summary: "Say you are starting or finishing an edit of these cards, for your cursor and glow; it records nothing (card.claim records the writer).",
+	who: AGENT,
+	args: { cards: arr(str("A card path, or any file of a card.")), phase: lit("start", "done"), what: opt(str("edit, write, ...")), ...onCanvas },
+	answer: obj({ ok: bool() }),
 	effect: "change",
 });
 
