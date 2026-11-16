@@ -64,8 +64,8 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	const frame = `f${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 	const base = api.replace(/\/+$/, "");
 	const headers = (more: Record<string, string> = {}) => ({ authorization: `Bearer ${token}`, ...more });
-	/** Who hears the canvas's messages (`follow`), and the revision they hold (`since`), said in every `hello`. */
-	const hearers = new Set<(message: Heard) => void>();
+	/** Who hears the canvas's messages (`follow`), and the revision they hold (`since`), said in every watch. */
+	const hearing = createHearing();
 	let sinceOf: (() => number) | undefined;
 	let opened: LineClient | undefined;
 	/** The line, opened on first use: its calls, the canvas's changes and the frame's own messages. */
@@ -77,12 +77,12 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 			// The drawing is the socket's now (`sock`): the line's copies of its changes are passed over.
 			hear: (message) => {
 				if ((message as { type?: string }).type === "canvas.changed") return;
-				for (const one of hearers) one(message as Heard);
+				hearing.tell(message as Heard);
 			},
 		}));
 
 	let socket: FrameSocket | undefined;
-	const sock = () => (socket ??= drawingSocket(new URL(base).origin, () => token, canvas, hearers));
+	const sock = () => (socket ??= drawingSocket(new URL(base).origin, () => token, canvas, hearing.tell, () => sinceOf?.()));
 
 	// The line and the socket are this canvas's: they stop when the frame moves to another canvas in place (`life.ts`).
 	life().addEventListener("abort", () => (opened?.stop(), socket?.stop()), { once: true });
@@ -93,12 +93,10 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 
 		follow(hear, since) {
 			sinceOf = since;
-			hearers.add(hear);
+			const stop = hearing.add(hear);
 			sock();
 			line();
-			return () => {
-				hearers.delete(hear);
-			};
+			return stop;
 		},
 
 		async call(verb, args, edit) {
@@ -136,19 +134,39 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	};
 }
 
-/** The socket on the protocol, for the drawing read and its changes (`item.changed`), told to the hearers. */
-function drawingSocket(origin: string, token: () => string, canvas: string, hearers: Set<(message: Heard) => void>): FrameSocket {
+/**
+ * Who hears the canvas's messages. What comes before anyone listens (the frame's editor is made between
+ * the drawing's read and its follow) is held and told to the first to listen, which passes over what
+ * the read already had by its revision.
+ */
+export function createHearing() {
+	const hearers = new Set<(message: Heard) => void>();
+	let held: Heard[] = [];
+	return {
+		tell(message: Heard): void {
+			if (!hearers.size) held.push(message);
+			else for (const one of hearers) one(message);
+		},
+		add(hear: (message: Heard) => void): () => void {
+			hearers.add(hear);
+			const waiting = held;
+			held = [];
+			for (const message of waiting) hear(message);
+			return () => void hearers.delete(hear);
+		},
+	};
+}
+
+/** The socket on the protocol, for the drawing read and its changes (`item.changed`); after a drop it watches from `since`. */
+function drawingSocket(origin: string, token: () => string, canvas: string, tell: (message: Heard) => void, since: () => number | undefined): FrameSocket {
 	return openSocket({
 		origin,
 		token,
 		canvas,
+		since,
 		hear: (name, payload) => {
 			const heard = drawingHeard(canvas, name, payload);
-			if (heard) for (const one of hearers) one(heard);
-		},
-		// Back after a drop: what was missed is not said, so the drawing is read again.
-		onState: (open, again) => {
-			if (open && again) for (const one of hearers) one({ type: "reconnected" });
+			if (heard) tell(heard);
 		},
 	});
 }
@@ -161,7 +179,8 @@ function drawingHeard(canvas: string, name: string, payload: Record<string, unkn
 	if (name !== "item.changed") return undefined;
 	const rev = payload.rev as number;
 	const pen = payload.pen as PenEdit[] | undefined;
-	if (!pen) return { type: "reconnected" };
+	// The server's log no longer reaches the revision held (`missed`), or the change came without its edits: read whole.
+	if (payload.missed === true || !pen) return { type: "reconnected" };
 	const made = payload.made as string[] | undefined;
 	const author = payload.author as ChangeAuthor | undefined;
 	return { type: "canvas.changed", canvas, rev, from: payload.base as number, edits: deckPathEdits(canvas, pen), base: "", ...(made ? { made } : {}), ...(author ? { author } : {}) };

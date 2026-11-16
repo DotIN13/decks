@@ -1,7 +1,8 @@
 import { PROTOCOL_VERSION, SOCKET_PATH, type ClientMessage, type ServerMessage } from "@decks/protocol";
 
 // The frame's socket to the server on the protocol (`protocol/wire.ts`): hello with the canvas pass, then
-// calls answered in their envelope and the watched canvas's events, coming back a little later after a drop.
+// calls answered in their envelope and the watched canvas's events, coming back after a drop to catch up
+// from the revision held, and taking a renewed pass on the open socket.
 
 /** A call's answer: the value and its notes, or a refusal. */
 export type Answered = { ok: true; value: unknown; notes: string[] } | { ok: false; error: { code: string; message: string; hint?: string }; notes: string[] };
@@ -13,6 +14,8 @@ interface SocketOptions {
 	token: () => string;
 	/** The canvas whose events this socket hears. */
 	canvas: string;
+	/** The revision held, when there is one: a watch after a drop replays what came after it. */
+	since?: () => number | undefined;
 	/** An event on the watched canvas. */
 	hear: (name: string, payload: Record<string, unknown>) => void;
 	/** The socket said hello (`again` after a drop), or closed. */
@@ -22,7 +25,7 @@ interface SocketOptions {
 export interface FrameSocket {
 	/** One call by its protocol name, answered once; a socket that drops first answers a refusal. */
 	call(name: string, args: Record<string, unknown>): Promise<Answered>;
-	/** A renewed pass: the socket says hello again on it. */
+	/** A renewed pass: said on the open socket, so nothing is closed or missed. */
 	renew(): void;
 	stop(): void;
 	open(): boolean;
@@ -37,13 +40,13 @@ export function openSocket(options: SocketOptions): FrameSocket {
 	url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 	let socket: WebSocket | undefined;
 	let ready = false;
+	/** The watch is said once per connection, after its first hello. */
+	let watching = false;
 	let everOpen = false;
 	let stopped = false;
 	let wait = 500;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let nextId = 0;
-	/** A renewed pass waiting for the calls on their way: the socket says hello again once they are answered. */
-	let renewing = false;
 	const queue: ClientMessage[] = [];
 	const pending = new Map<string, (answer: Answered) => void>();
 	const send = (message: ClientMessage) => {
@@ -62,7 +65,11 @@ export function openSocket(options: SocketOptions): FrameSocket {
 			if (message.type === "hello") {
 				ready = true;
 				wait = 500;
-				ws.send(JSON.stringify({ type: "watch", canvas: options.canvas } satisfies ClientMessage));
+				// The hello a renewed pass is answered with changes nothing else.
+				if (watching) return;
+				watching = true;
+				const since = options.since?.();
+				ws.send(JSON.stringify({ type: "watch", canvas: options.canvas, ...(since !== undefined && since >= 0 ? { since } : {}) } satisfies ClientMessage));
 				options.onState?.(true, everOpen);
 				everOpen = true;
 				while (queue.length) ws.send(JSON.stringify(queue.shift()));
@@ -70,15 +77,12 @@ export function openSocket(options: SocketOptions): FrameSocket {
 				const done = pending.get(message.id);
 				pending.delete(message.id);
 				done?.(message.envelope as Answered);
-				if (renewing && pending.size === 0) {
-					renewing = false;
-					ws.close(1000, "a renewed pass");
-				}
 			} else if (message.type === "event") options.hear(message.name, (message.payload ?? {}) as Record<string, unknown>);
 		};
 		ws.onclose = (event) => {
 			if (socket === ws) socket = undefined;
 			ready = false;
+			watching = false;
 			options.onState?.(false, everOpen);
 			for (const done of pending.values()) done({ ok: false, error: { code: "unavailable", message: `The socket to the server dropped${event.reason ? `: ${event.reason}` : ""}.` }, notes: [] });
 			pending.clear();
@@ -98,9 +102,8 @@ export function openSocket(options: SocketOptions): FrameSocket {
 			});
 		},
 		renew() {
-			// The server stops telling events once the old pass runs out: say hello again on the new one.
-			if (pending.size) renewing = true;
-			else socket?.close(1000, "a renewed pass");
+			// The server stops telling events once the old pass runs out; a socket not open says the new one in its hello.
+			if (socket && ready) socket.send(JSON.stringify({ type: "token", token: options.token() } satisfies ClientMessage));
 		},
 		stop() {
 			stopped = true;
