@@ -1,19 +1,12 @@
-import type { Infer, shapes } from "../../protocol/index.ts";
+import { idsOf, type Infer, type shapes } from "../../protocol/index.ts";
 import { readJson, writeJson } from "../kernel/store.ts";
-import type { CanvasDoc, Change, ItemOp, Store } from "../kernel/types.ts";
+import type { CanvasDoc, Change, Store } from "../kernel/types.ts";
 
 // How far each agent has read each canvas, kept under marks/<agent id>, and what changed
 // since: others' changes only. agent-mail.ts answers agent.news with these and the mail.
 
 export type NewsChange = Infer<typeof shapes.News>["changes"][number];
 const KEY = "marks/";
-
-/** The ids an op touches. */
-export function idsOf(op: ItemOp): string[] {
-	if (op.op === "insert") return op.item.id ? [op.item.id] : [];
-	if (op.op === "copy") return op.as ? [op.id, op.as] : [op.id];
-	return "id" in op && typeof op.id === "string" ? [op.id] : [];
-}
 
 /** Others' changes after a mark, each as one line of news. */
 export function changesSince(doc: CanvasDoc, canvas: string, mark: number, self: string): { changes: NewsChange[]; rev: number } {
