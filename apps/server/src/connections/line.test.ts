@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import WebSocket from "ws";
 import type { LineClientMessage, ServerMessage } from "@decks/protocol";
-import { App } from "./app.ts";
-import { realPathOf } from "./deck/roots.ts";
+import { App } from "../app.ts";
+import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "./http.ts";
 import { Line } from "./line.ts";
 

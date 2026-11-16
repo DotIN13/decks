@@ -2,7 +2,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
 import type { Op } from "@decks/pen";
 import { STT_MODELS, type ServerMessage } from "@decks/protocol";
-import { harnessVersion } from "../routes/shared.ts";
+import { harnessVersion } from "../connections/routes/shared.ts";
 import { sttReady } from "../stt.ts";
 import type { App } from "../app.ts";
 import { cleanParts } from "../agents/message-parts.ts";
@@ -12,7 +12,7 @@ import { putOn } from "../stage/canvas-ops.ts";
 import { penEditBy } from "../stage/pens.ts";
 import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import { unpairStudio } from "../studio/index.ts";
-import type { View } from "../ws.ts";
+import type { View } from "../connections/tab-socket.ts";
 import { personAgent } from "./person.ts";
 
 /**
@@ -448,7 +448,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 	};
 }
 
-/** `canvas.rename` and `studio.disconnect` are the table's; the person's old `stage.rename` and `studio.unpair` run through them (`wire/legacy.ts`). */
+/** `canvas.rename` and `studio.disconnect` are the table's; the person's old `stage.rename` and `studio.unpair` run through them (`connections/tab-requests.ts`). */
 export function renameCanvas(app: App, name: string, to: string): void {
 	const pens = app.stage.pens;
 	if (!pens) throw new Error("This server keeps no canvases.");

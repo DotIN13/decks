@@ -30,7 +30,7 @@ export interface LineClient {
 }
 
 /**
- * The frame's end of the line (`server/src/line.ts`): one WebSocket to `/api/v1/socket` that carries
+ * The frame's end of the line (`server/src/connections/line.ts`): one WebSocket to `/api/v1/socket` that carries
  * the frame's calls, the canvas's changes and the frame's own messages, in one envelope. It opens as
  * it is made, says `hello` with the token and what it watches, and comes back after a drop a little
  * later each time (0.5 s to 10 s); messages sent while it is down wait for it. Calls carry an `id` and

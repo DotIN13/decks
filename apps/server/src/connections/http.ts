@@ -3,19 +3,19 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
-import { appRequest } from "./apps/route.ts";
-import { forwardRequest } from "./ports.ts";
+import { appRequest } from "../apps/route.ts";
+import { forwardRequest } from "../ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
-import { NotFound, PathRefused } from "./deck/roots.ts";
-import { UploadRefused } from "./files/upload.ts";
+import { NotFound, PathRefused } from "../deck/roots.ts";
+import { UploadRefused } from "../files/upload.ts";
 import { verbRoutes } from "./routes/v1.ts";
-import type { App } from "./app.ts";
-import { guard } from "./auth/guard.ts";
-import { extraHosts, hostAllowed, hostRefusal } from "./auth/hosts.ts";
-import { doorRoutes, isTopNavigation, tabToken, withSession } from "./auth/issue.ts";
-import { actsAsPerson } from "./auth/principal.ts";
-import { Relay } from "./share/relay.ts";
+import type { App } from "../app.ts";
+import { guard } from "../auth/guard.ts";
+import { extraHosts, hostAllowed, hostRefusal } from "../auth/hosts.ts";
+import { doorRoutes, isTopNavigation, tabToken, withSession } from "../auth/issue.ts";
+import { actsAsPerson } from "../auth/principal.ts";
+import { Relay } from "../share/relay.ts";
 import { asyncRoute } from "./routes/shared.ts";
 import { register as registerAgents } from "./routes/agents.ts";
 import { register as registerApps } from "./routes/apps.ts";
@@ -124,7 +124,7 @@ export function createHttpApp(app: App): Express {
 
 	// The built UI, when there is one. In development Vite serves it instead and
 	// proxies here, so a missing dist is normal rather than an error.
-	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
+	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../../web/dist");
 	/**
 	 * The Decks page itself, with a fresh person token in it for a tab the person opened
 	 * (`auth/issue.ts`): a frame or a script's fetch of the same page gets it without. Never stored, so

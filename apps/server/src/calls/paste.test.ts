@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { createHttpApp } from "../http.ts";
+import { createHttpApp } from "../connections/http.ts";
 
 /**
  * Copy and paste within one harness (`paste.ts`): `canvas.clip` holds the items as the drawing has

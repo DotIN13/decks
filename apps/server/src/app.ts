@@ -14,7 +14,7 @@ import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
-import { legacy } from "./wire/legacy.ts";
+import { legacy } from "./connections/tab-requests.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
@@ -32,7 +32,7 @@ import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
 import { Cameras } from "./deck/cameras.ts";
-import { Hub, type View } from "./ws.ts";
+import { Hub, type View } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
@@ -122,7 +122,7 @@ export class App {
 	/**
 	 * The deck's import map, as the canvas frame is handed it (`/api/passes`): names to another site's addresses,
 	 * or to paths under `assets/`, which the frame reads from beside its canvas's cards, where the deck's `assets/`
-	 * is served (`routes/card-path.ts`) on the pass it already has. Read when asked: it is small, and may change.
+	 * is served (`connections/routes/card-path.ts`) on the pass it already has. Read when asked: it is small, and may change.
 	 */
 	deckImports(): Record<string, string> {
 		const file = join(this.deck.path, "assets", "importmap.json");
@@ -136,7 +136,7 @@ export class App {
 		// An app's picture (`apps/<name>`) is the canvas's to read when the app is placed on it.
 		const app = /^apps\/([^/]+)$/.exec(path)?.[1];
 		if (app && this.stage.pens) return canvasShowsApp(this.stage.pens, canvas, app);
-		// A document's file is the canvas's to picture when a document item naming it is placed there (`routes/pictures.ts`, `docPage`).
+		// A document's file is the canvas's to picture when a document item naming it is placed there (`connections/routes/pictures.ts`, `docPage`).
 		if (/\.(?:md|markdown)$/i.test(path) && this.stage.pens && canvasShowsDocument(this.stage.pens, canvas, path)) return true;
 		return boardOnCanvas(this, path, canvas);
 	}
@@ -160,9 +160,9 @@ export class App {
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** Stage calls waiting for the browser to carry them out. */
-	/** Canvas frames following their canvas's stream now (`routes/v1.ts`): each can answer an agent's view of its canvas. */
+	/** Canvas frames following their canvas's stream now (`connections/routes/v1.ts`): each can answer an agent's view of its canvas. */
 	canvasFrames = 0;
-	/** How many lines are open (`line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
+	/** How many lines are open (`connections/line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
 	lines: () => number = () => 0;
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
@@ -1017,7 +1017,7 @@ export class App {
 	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */
 	readonly appsAllowedOnce = new Set<string>();
 
-	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `routes/v1.ts`). */
+	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `connections/routes/v1.ts`). */
 	private readonly listeners = new Set<(message: ServerMessage) => void>();
 
 	/** Hear every broadcast, as it goes to the browsers; the answer stops it. */
@@ -1028,7 +1028,7 @@ export class App {
 
 	/**
 	 * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
-	 * the document service keys it: the only files a canvas frame may open (`routes/v1.ts`, `line.ts`).
+	 * the document service keys it: the only files a canvas frame may open (`connections/routes/v1.ts`, `connections/line.ts`).
 	 */
 	documentsOn(canvas: string): Map<string, string> {
 		const out = new Map<string, string>();

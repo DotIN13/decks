@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { createHttpApp } from "../http.ts";
+import { createHttpApp } from "../connections/http.ts";
 
 /**
  * The canvas pass (`passes.ts`): made for the person's own page, one canvas and their role on it, and

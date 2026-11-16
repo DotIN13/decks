@@ -1,6 +1,6 @@
 /**
  * An app placed on your own canvas runs inside the canvas frame, as a sandboxed iframe on the app pass in
- * its path (`server/src/routes/apps.ts`, `apps/route.ts`), and keeps what it saves in this browser through
+ * its path (`server/src/connections/routes/apps.ts`, `apps/route.ts`), and keeps what it saves in this browser through
  * `decks-canvas.js`: the page keeps it, and the app reads it back after a reload.
  *
  * - the app item's body is the app itself, at `/app/t/<pass>/<name>/`, not the bar and Open alone;

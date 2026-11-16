@@ -1,7 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import type { App } from "../app.ts";
 import { settleStage } from "../stage/pending.ts";
-import type { View } from "../ws.ts";
+import type { View } from "./tab-socket.ts";
 import { runVerb } from "../calls/run.ts";
 import { renameCanvas, unpairStudioHere } from "../calls/person-table.ts";
 

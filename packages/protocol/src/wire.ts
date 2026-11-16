@@ -95,7 +95,7 @@ export type ClientMessage =
 	/**
 	 * The first message on a tab's socket (`/ws`): the token, which used to ride in the address as
 	 * `decks_token` (still taken: the browser checks open it so). Nothing else is heard before it, and a socket that
-	 * does not say it in five seconds is closed. Taken by the hub itself (`server/src/ws.ts`), never dispatched.
+	 * does not say it in five seconds is closed. Taken by the hub itself (`server/src/connections/tab-socket.ts`), never dispatched.
 	 */
 	| { type: "hello"; token: string; /** Reads the events by their names (`names.ts`); without it the socket says the old names, as the Decks iOS app reads them. */ v?: 2 }
 	| { type: "deck.open"; path: string }

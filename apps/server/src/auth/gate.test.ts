@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { createHttpApp } from "../http.ts";
+import { createHttpApp } from "../connections/http.ts";
 
 /**
  * The gate, end to end over HTTP: every request carries a token, and who is calling is the token's

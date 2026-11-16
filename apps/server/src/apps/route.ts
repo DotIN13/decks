@@ -39,7 +39,7 @@ type TicketCheck = (pass: string | undefined, name: string) => boolean;
 type CarriedCheck = (pass: string, name: string) => boolean;
 
 /**
- * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`routes/apps.ts`, `open`). The frame is
+ * `/app/t/<pass>/<name>/…`: an app opened inside the canvas frame (`connections/routes/apps.ts`, `open`). The frame is
  * sandboxed and so is the app's iframe in it, with no origin of its own and no cookies, so the pass rides in
  * the path, and every relative address the app loads, fetches or opens a socket to carries it too.
  */

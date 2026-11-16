@@ -1,6 +1,6 @@
 import type { Router, Request, Response } from "express";
 import { asyncRoute, type RouteDeps } from "./shared.ts";
-import { runVerb } from "../calls/run.ts";
+import { runVerb } from "../../calls/run.ts";
 
 /** `/api/harness…`, aliases of the person's verbs, kept while Decks Studio's Settings page calls them. */
 export function register(api: Router, { app }: RouteDeps): void {

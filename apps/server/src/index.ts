@@ -8,10 +8,10 @@ import { appUpgrade } from "./apps/route.ts";
 import { forwardUpgrade } from "./ports.ts";
 import { App } from "./app.ts";
 import { loadConfig } from "./config.ts";
-import { createHttpApp } from "./http.ts";
+import { createHttpApp } from "./connections/http.ts";
 import { installDir } from "@decks/runtime";
-import { Hub } from "./ws.ts";
-import { Line } from "./line.ts";
+import { Hub } from "./connections/tab-socket.ts";
+import { Line } from "./connections/line.ts";
 import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
 
@@ -48,7 +48,7 @@ const hub = new Hub(
 	},
 );
 app.attach(hub);
-// The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`line.ts`).
+// The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`connections/line.ts`).
 const line = new Line(app);
 app.lines = () => line.connections;
 
@@ -77,7 +77,7 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
 			return true;
 		},
 	},
-	// Someone on Studio, or on another harness through it, is on a canvas kept here: every line watching it hears (`line.ts`).
+	// Someone on Studio, or on another harness through it, is on a canvas kept here: every line watching it hears (`connections/line.ts`).
 	presence: (name, event) => {
 		const { type: _type, canvas: _canvas, ...rest } = event;
 		line.present({ type: "presence.changed", canvas: name, ...rest });
@@ -117,7 +117,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 		/*
 		 * The socket runs the person's commands, so it is opened only with the person's token or a
 		 * paired site's: in `hello`, its first message, or (the older way, which the browser checks still use) in its
-		 * address (`decks_token`). A socket that says neither is closed (`ws.ts`).
+		 * address (`decks_token`). A socket that says neither is closed (`connections/tab-socket.ts`).
 		 */
 		hub.handleUpgrade(request, socket, head, socketPrincipal(app, request) !== undefined);
 	}

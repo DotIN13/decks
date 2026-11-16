@@ -1,11 +1,11 @@
 import { existsSync, statSync } from "node:fs";
 import type { Router } from "express";
 import { unstampCard } from "@decks/card-host";
-import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts";
-import { normalizeBoardPath } from "../deck/schema.ts";
-import { NotFound, PathRefused, resolveServed } from "../deck/roots.ts";
+import { LIB_FOREVER, libVersion, splitLibVersion } from "../../deck/lib-version.ts";
+import { normalizeBoardPath } from "../../deck/schema.ts";
+import { NotFound, PathRefused, resolveServed } from "../../deck/roots.ts";
 import { canvasOfPath, isCardPath, isSharedCanvas, servedAs } from "@decks/hub/layout";
-import { assetHeaders, boardHeaders } from "../files/serve.ts";
+import { assetHeaders, boardHeaders } from "../../files/serve.ts";
 import { assetAnswer } from "./assets.ts";
 import { cardModuleAnswer, cardPageAnswer } from "./cards.ts";
 import { asyncRoute, sharedHeaders, wildcard, type RouteDeps } from "./shared.ts";

@@ -1,15 +1,15 @@
 import { existsSync, statSync } from "node:fs";
-import { sttReady, transcribe } from "../stt.ts";
-import { LIB_FOREVER, libVersion, splitLibVersion } from "../deck/lib-version.ts";
+import { sttReady, transcribe } from "../../stt.ts";
+import { LIB_FOREVER, libVersion, splitLibVersion } from "../../deck/lib-version.ts";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
-import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } from "../deck/roots.ts";
+import { fileUrl, NotFound, resolveFileRequest, resolveInDeck, resolveServed } from "../../deck/roots.ts";
 import { canvasFolder, canvasNameOk, libName } from "@decks/hub/layout";
-import { browse } from "../files/browse.ts";
-import { filePreview, previewKind } from "../files/preview.ts";
-import { boardHeaders, quarantine } from "../files/serve.ts";
-import { storeAssetStream, UploadRefused, withMedia } from "../files/upload.ts";
-import { actsAsPerson } from "../auth/principal.ts";
+import { browse } from "../../files/browse.ts";
+import { filePreview, previewKind } from "../../files/preview.ts";
+import { boardHeaders, quarantine } from "../../files/serve.ts";
+import { storeAssetStream, UploadRefused, withMedia } from "../../files/upload.ts";
+import { actsAsPerson } from "../../auth/principal.ts";
 import { asyncRoute, wildcard, sendFile, type RouteDeps } from "./shared.ts";
 import express, { type Router } from "express";
 

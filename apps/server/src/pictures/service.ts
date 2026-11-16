@@ -756,7 +756,7 @@ export class PictureService {
 			} else if (opens(job.board)) {
 				/*
 				 * An app on a canvas (`apps/<name>`), pictured as it runs in the canvas frame: at its address
-				 * there, with the pass made for that canvas (`routes/pictures.ts`), so its pages, data and storage
+				 * there, with the pass made for that canvas (`connections/routes/pictures.ts`), so its pages, data and storage
 				 * stand-in are the ones the frame shows. Given a moment to fetch and draw what it shows first.
 				 */
 				await page.goto(`${this.host.origin()}${opens(job.board)}`, { waitUntil: "load", timeout: 20_000 });

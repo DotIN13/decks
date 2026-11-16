@@ -2,14 +2,14 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { LineClientMessage, Presence, PresenceBy, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { App } from "./app.ts";
-import type { View } from "./ws.ts";
-import { verifyOn } from "./auth/guard.ts";
-import { isCanvasPass } from "./auth/passes.ts";
-import { actsAsPerson, type Principal } from "./auth/principal.ts";
-import { cardRefusedFor, DOC_CALLS, onCanvas } from "./calls/canvas-frame.ts";
-import { runVerb } from "./calls/run.ts";
-import { settleStage } from "./stage/pending.ts";
+import type { App } from "../app.ts";
+import type { View } from "./tab-socket.ts";
+import { verifyOn } from "../auth/guard.ts";
+import { isCanvasPass } from "../auth/passes.ts";
+import { actsAsPerson, type Principal } from "../auth/principal.ts";
+import { cardRefusedFor, DOC_CALLS, onCanvas } from "../calls/canvas-frame.ts";
+import { runVerb } from "../calls/run.ts";
+import { settleStage } from "../stage/pending.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */
 export const HELLO_MS = 5_000;

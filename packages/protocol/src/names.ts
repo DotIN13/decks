@@ -62,7 +62,7 @@ export const EVENT_NAMES: Record<ServerMessage["type"], true> = {
 	"presence.changed": true,
 	"account.list": true,
 	"web.changed": true,
-	// The tab socket's per-agent copies of a canvas's change, kept for the Decks iOS app (`server/src/ws.ts`): the line and the stream say `canvas.changed`.
+	// The tab socket's per-agent copies of a canvas's change, kept for the Decks iOS app (`server/src/connections/tab-socket.ts`): the line and the stream say `canvas.changed`.
 	"stage.pen": true,
 	"stage.pen.delta": true,
 	"stage.pen.refused": true,

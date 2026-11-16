@@ -7,11 +7,11 @@ import { join } from "node:path";
 import { test } from "node:test";
 import WebSocket from "ws";
 import type { ServerMessage } from "@decks/protocol";
-import { App } from "./app.ts";
-import { verifyOn } from "./auth/guard.ts";
-import { realPathOf } from "./deck/roots.ts";
+import { App } from "../app.ts";
+import { verifyOn } from "../auth/guard.ts";
+import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "./http.ts";
-import { Hub } from "./ws.ts";
+import { Hub } from "./tab-socket.ts";
 
 /** A deck, its server with the tab's socket on /ws as index.ts wires it, and a way to open one. */
 async function open() {

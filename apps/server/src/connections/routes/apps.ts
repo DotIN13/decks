@@ -1,8 +1,8 @@
-import { SDK_FILE } from "../apps/service.ts";
-import { canvasShowsApp } from "../calls/app-caller.ts";
+import { SDK_FILE } from "../../apps/service.ts";
+import { canvasShowsApp } from "../../calls/app-caller.ts";
 import { type RouteDeps } from "./shared.ts";
 import { type Request, type Response, type Router } from "express";
-import { runVerb } from "../calls/run.ts";
+import { runVerb } from "../../calls/run.ts";
 
 /**
  * The deck's apps (`apps/service.ts`) and the SDK an app's page imports.
@@ -45,7 +45,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 	api.post("/apps/:name/seen", seen);
 
 	/**
-	 * The SDK, for an app's page: `import { decks } from "../../api/sdk/decks.mjs"`. It is one file
+	 * The SDK, for an app's page: `import { decks } from "../../../api/sdk/decks.mjs"`. It is one file
 	 * with no dependencies (`packages/sdk`), and a server app is told its path on disk instead.
 	 */
 	api.get("/sdk/decks.mjs", (_req, res) => {

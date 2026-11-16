@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { test } from "node:test";
 import type { ServerMessage } from "@decks/protocol";
-import { App } from "./app.ts";
-import { AgentStateStore } from "./agents/agent-state.ts";
-import { DeckAgent } from "./agents/session.ts";
-import { AgentStore } from "./agents/store.ts";
-import { Deck } from "./deck/loader.ts";
-import { realPathOf } from "./deck/roots.ts";
-import type { StageService } from "./stage/service.ts";
-import type { Hub, View } from "./ws.ts";
+import { App } from "../app.ts";
+import { AgentStateStore } from "../agents/agent-state.ts";
+import { DeckAgent } from "../agents/session.ts";
+import { AgentStore } from "../agents/store.ts";
+import { Deck } from "../deck/loader.ts";
+import { realPathOf } from "../deck/roots.ts";
+import type { StageService } from "../stage/service.ts";
+import type { Hub, View } from "./tab-socket.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {

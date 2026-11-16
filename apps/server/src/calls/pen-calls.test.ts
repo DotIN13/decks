@@ -6,7 +6,7 @@ import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { createHttpApp } from "../http.ts";
+import { createHttpApp } from "../connections/http.ts";
 
 /** Write a file, making its folder: a card is `cards/<name>/index.html`. */
 function put(file: string, data: string | Uint8Array): void {

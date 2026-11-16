@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { Request, Response, Router } from "express";
 import { createMcp, type McpSession } from "@decks/sdk/mcp";
 import VERBS from "@decks/sdk/verbs.json" with { type: "json" };
-import type { App } from "../app.ts";
-import { actsAsPerson, type Principal } from "../auth/principal.ts";
-import { runVerb } from "../calls/run.ts";
+import type { App } from "../../app.ts";
+import { actsAsPerson, type Principal } from "../../auth/principal.ts";
+import { runVerb } from "../../calls/run.ts";
 
 /**
  * Decks as an MCP server at a web address: `POST /api/mcp` (and `/mcp`), for a client that is not on

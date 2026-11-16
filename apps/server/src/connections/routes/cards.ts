@@ -2,12 +2,12 @@ import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Response } from "express";
 import type { Page } from "@decks/protocol";
-import { cardModules, cardPage, readDeckImports } from "../cards/cards.ts";
+import { cardModules, cardPage, readDeckImports } from "../../cards/cards.ts";
 import { canvasOfPath, isCardPath, isSharedCanvas } from "@decks/hub/layout";
-import { libVersion, versionLibRefs } from "../deck/lib-version.ts";
-import { NotFound, PathRefused, resolveServed } from "../deck/roots.ts";
-import { boardHeaders } from "../files/serve.ts";
-import type { App } from "../app.ts";
+import { libVersion, versionLibRefs } from "../../deck/lib-version.ts";
+import { NotFound, PathRefused, resolveServed } from "../../deck/roots.ts";
+import { boardHeaders } from "../../files/serve.ts";
+import type { App } from "../../app.ts";
 
 /**
  * A card's two answers under `/api/card/*path` (`card-path.ts`): one of its scripts, and its page.

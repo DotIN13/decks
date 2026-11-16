@@ -1,10 +1,10 @@
 import { PERSON_VERBS, signature, VERBS } from "@decks/api";
 import express, { type Request, type Response } from "express";
-import { bearerOf } from "../auth/guard.ts";
-import { actsAsPerson } from "../auth/principal.ts";
-import { cardRefusedFor, DOC_CALLS, onCanvas } from "../calls/canvas-frame.ts";
-import { runVerb } from "../calls/run.ts";
-import { settleStage } from "../stage/pending.ts";
+import { bearerOf } from "../../auth/guard.ts";
+import { actsAsPerson } from "../../auth/principal.ts";
+import { cardRefusedFor, DOC_CALLS, onCanvas } from "../../calls/canvas-frame.ts";
+import { runVerb } from "../../calls/run.ts";
+import { settleStage } from "../../stage/pending.ts";
 import type { RouteDeps } from "./shared.ts";
 
 /**

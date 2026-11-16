@@ -118,7 +118,7 @@ export function installHost(ctx: FrameContext): void {
 			},
 			/*
 			 * Inside the canvas, on a canvas that is yours alone: asked of the harness with this frame's canvas
-			 * pass, which answers the app's address with an app pass in its path (`server/src/routes/apps.ts`).
+			 * pass, which answers the app's address with an app pass in its path (`server/src/connections/routes/apps.ts`).
 			 * What the app saved in this browser goes after `#`, which never reaches the server.
 			 */
 			...(studio

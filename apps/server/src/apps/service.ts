@@ -18,7 +18,7 @@ export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../
  * the requests for its address, and stops it when nobody has looked at it for a while, starting it
  * again on the next request.
  *
- * Every app is reached at `/app/<name>/` on Decks' own address (`http.ts`), and shown on the canvas
+ * Every app is reached at `/app/<name>/` on Decks' own address (`connections/http.ts`), and shown on the canvas
  * by an app item (`{ type: "browser", metadata: { type: "decks.app", name } }`, which
  * `decks canvas insert '{"type":"app","app":"<name>"}'` places). The folder is
  * the agent's: it writes the files with its own tools. `app.json` says which rung it is on:

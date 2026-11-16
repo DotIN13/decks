@@ -421,7 +421,7 @@ export class Registry {
 	 * Take one browser's focus for the length of one of its frames.
 	 *
 	 * Silent, because nothing moved for anyone: each browser keeps its own conversation
-	 * (`ws.ts`'s `View`), and this only makes "the focused agent" mean *that browser's* while
+	 * (`connections/tab-socket.ts`'s `View`), and this only makes "the focused agent" mean *that browser's* while
 	 * its frame is handled. An id that is gone is ignored, and the last focus stands.
 	 */
 	look(id: string | undefined): void {

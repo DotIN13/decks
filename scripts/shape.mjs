@@ -37,7 +37,7 @@ const LAYERS = [
 	["start-up", ["index.ts", "app.ts", "main.ts"]],
 	// Upgrade scripts run at start-up and may use any layer; the running code must not reach into them.
 	["upgrades", ["migrations/"]],
-	["connections", ["connections/", "http.ts", "line.ts", "ws.ts", "routes/", "wire/"]],
+	["connections", ["connections/"]],
 	["calls", ["calls/"]],
 	["agents", ["agents/", "runtimes/"]],
 	["features", ["cards/", "docs/", "apps/", "pictures/", "files/", "share/", "studio/", "google/", "browser/"]],

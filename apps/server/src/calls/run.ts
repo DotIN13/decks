@@ -12,7 +12,7 @@ import type { StageCallResult } from "./tool.ts";
 
 /**
  * The one way a call is run, whoever makes it and however it arrives: `POST /api/v1/<verb>`
- * (`routes/v1.ts`), the line's `line.call` (`line.ts`), an MCP tool (`routes/mcp.ts`), the tab
+ * (`connections/routes/v1.ts`), the line's `line.call` (`connections/line.ts`), an MCP tool (`connections/routes/mcp.ts`), the tab
  * socket's old requests and the side routes kept as aliases.
  *
  * Who is calling is the request's token (`auth/guard.ts`), and nothing else. The person, in a Decks

@@ -16,7 +16,7 @@ import { decodedPath, HARNESS_ID, isAppPass, isCanvasPass, passCovers, splitPath
  * `/api/t/<pass>/card/…`. Nothing else says who is calling: not an `X-Decks-*` header, not reaching the
  * harness from this machine, not being a page on its own address.
  *
- * In front of the gate, in `http.ts`: the names the harness answers to (`hosts.ts`), which goes
+ * In front of the gate, in `connections/http.ts`: the names the harness answers to (`hosts.ts`), which goes
  * first, then a forwarded port's and an app's own requests, which are those servers' to answer.
  *
  * What is let in without one:
@@ -137,7 +137,7 @@ export function canvasMay(method: string, path: string, canvas: string, placed: 
 	// A card on its canvas written out for the harness's Chrome to draw (`/api/snapshot`, which checks the card is on it).
 	if (method === "POST" && path === "/api/snapshot") return true;
 	if (read && /^\/api\/apps\/[^/]+$/.test(path)) return true;
-	// An app placed on the canvas, opened in its frame: the route checks it is placed there (`routes/apps.ts`).
+	// An app placed on the canvas, opened in its frame: the route checks it is placed there (`connections/routes/apps.ts`).
 	if (method === "POST" && /^\/api\/apps\/[^/]+\/open$/.test(path)) return true;
 	if (path.startsWith("/c/")) return false;
 	if (read) {
@@ -225,7 +225,7 @@ export function guard(gate: Gate) {
 				return;
 			}
 			req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
-			// The token the pass was made with: what an app pass made from it is bound to (`routes/apps.ts`).
+			// The token the pass was made with: what an app pass made from it is bound to (`connections/routes/apps.ts`).
 			req.tokenId = pass.by;
 			next();
 			return;
@@ -272,7 +272,7 @@ export function guard(gate: Gate) {
 			if (pass && path !== undefined && passCovers(pass.canvas, path, (deckPath) => gate.placedOn?.(deckPath, pass.canvas) ?? false)) {
 				req.url = carried.rest;
 				req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
-				// The token behind the pass, as for one in the header: an app's picture opens the app on a pass bound to it (`routes/pictures.ts`).
+				// The token behind the pass, as for one in the header: an app's picture opens the app on a pass bound to it (`connections/routes/pictures.ts`).
 				req.tokenId = pass.by;
 				// The pass in the page's address is not sent on as the Referer of what it loads.
 				res.setHeader("Referrer-Policy", "no-referrer");

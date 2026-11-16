@@ -12,7 +12,7 @@ import type { Request, Response } from "express";
  * server `/c/<id>/` stands for, with that server's token, and every request under the prefix is
  * fetched from there and handed back.
  *
- * Only this server's own front end may register a connection (the cross-site guard in `http.ts`
+ * Only this server's own front end may register a connection (the cross-site guard in `connections/http.ts`
  * refuses anyone else before this is reached), and only registered ones are passed through, so it
  * is not a way for a page to make this server fetch an address of its choosing. Kept on disk beside
  * the pairing tokens, readable only by this user, so a restart does not leave an open page asking
