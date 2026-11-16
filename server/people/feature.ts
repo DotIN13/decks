@@ -15,5 +15,3 @@ export function peopleFeature(): Feature {
 		},
 	});
 }
-
-export default peopleFeature;
