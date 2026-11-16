@@ -35,21 +35,21 @@ A pen.dev drawing and the folder around it: canvases/<name>/, with its cards, fr
 |---|---|---|---|---|
 | `canvas.copyShared` | agents | `canvas.copy` | person, agent | Copies any canvas into a new one of yours, a friend's included. |
 | `canvas.create` | agents | `canvas.create` | person, agent | Unchanged. |
-| `canvas.export` | agents | `canvas.export` | person, agent, app | Answers the File it wrote. |
-| new | | `canvas.get` | anyone | Split from canvas.read: the canvas's title, file, revision and variables. |
+| `canvas.export` | agents | `canvas.export` | anyone | Answers the File it wrote. |
+| new | | `canvas.get` | person, agent, app | Split from canvas.read: the canvas's title, file, revision and variables. |
 | `here` | agents | `canvas.here` | anyone | A bare word becomes noun.verb. |
 | new | | `canvas.versions` | person, agent | Added in 0.18.0 for Loft: a drawing's revisions, newest first, as file.versions. |
 | new | | `canvas.version` | person, agent | Added in 0.18.0: the drawing's file as it was at a revision. |
 | new | | `canvas.restore` | person | Added in 0.18.0: write the drawing back as it was, as a new revision, as file.restore. |
-| new | | `canvas.drawing` | person, app, card | Added in 0.32.0 for Loom and Easel: the pen document as the file holds it, with rev and base, for the canvas frame leaving compat. Also in 0.32.0: item.batch, item.delete, item.paste and canvas.undo take an optional edit name, echoed in item.changed's made; item.changed may carry pen, the change as pen's own edits; protocol/pen-ops.ts turns a pen op into an item op and back. |
+| new | | `canvas.drawing` | person, app | Added in 0.32.0 for Loom and Easel: the pen document as the file holds it, with rev and base, for the canvas frame leaving compat. Also in 0.32.0: item.batch, item.delete, item.paste and canvas.undo take an optional edit name, echoed in item.changed's made; item.changed may carry pen, the change as pen's own edits; protocol/pen-ops.ts turns a pen op into an item op and back. |
 | new | | (socket) | person, app, card | Added in 0.33.0 for Loom, Keel and Easel: the socket takes { type: "token", token } after hello, a fresh token for the same caller (and, for a card pass, the same canvas), answered with a fresh hello (any other closes it, 4403); watch takes since, replaying item.changed (with pen and made) after that revision, or one item.changed with missed: true when the log no longer reaches it. |
 | new | | (compat) | card | Added in 0.34.0 for Loom, Warden and Helm: protocol/compat/old-calls.ts (@decks/protocol/compat) holds this table's old calls and how each becomes its new one, and cardCall, a card's call read as old or new by its arguments' shape. Old card shapes carry no date. In 0.34.0 too, as Mason decided: a card may call agent.queue (the person asked first, as for agent.send), view.goto (the person's screen, asked first while they use the canvas), agent.me and agent.inbox (from a card, "you" is the agent whose home is the card's canvas). |
 | changed | | (card) | card | 0.35.0, Mason's ruling on Reader's read of step 5: a card makes exactly the calls it could before, by their new names, but agent.create (refused on purpose). Back for cards: canvas.export, canvas.screenshot, canvas.update (the old rename), frame.save, card.create, frame.create. No longer for cards: canvas.drawing (the frame's, on its pass), canvas.get, file.open, file.read, file.close, file.versions, frame.get, frame.list. cardCall takes the shape the card called in; an old card's answer is its old one (view.move and view.focus carry both shapes' fields, view.reload the old). |
 | `canvas.list` | agents | `canvas.list` | person, agent, app | Unchanged. |
 | `canvas.remove` | person | `canvas.delete` | person | Renamed. |
-| `canvas.screenshot` | agents | `canvas.screenshot` | person, agent, app | The picture's size is a Size { w, h }. |
+| `canvas.screenshot` | agents | `canvas.screenshot` | anyone | The picture's size is a Size { w, h }. |
 | `canvas.step` | agents | `canvas.undo` | person, card | `redo: true` puts a step back. Answers the canvas, whose undo and redo say whether a step is left. |
-| `canvas.rename` | agents | `canvas.update` | person, agent | Rename was update by another word. |
+| `canvas.rename` | agents | `canvas.update` | person, agent, card | Rename was update by another word. |
 
 ### item
 
@@ -84,7 +84,7 @@ A piece of HTML drawn on a canvas, kept as a folder: cards/<name>/index.html and
 | Today | From | New | Who | What changes |
 |---|---|---|---|---|
 | `agent.claim` | agents | `card.claim` | agent | Claiming is about cards. Answers the cards. |
-| `card.create` | agents | `card.create` | person, agent, app | Title, size and canvas are one object. |
+| `card.create` | agents | `card.create` | anyone | Title, size and canvas are one object. |
 | `canvas.fit` | agents | `card.fit` | anyone | Answers the card's Placement; what the browser measured rides beside it as notes. |
 | `card.get` | agents | `card.get` | anyone | Answers where the card sits too (`placements`). |
 | `card.canvases` | agents | alias of `card.get` | anyone | card.get's `placements` say it. |
@@ -103,16 +103,16 @@ Any file in the deck, named by its path from the deck's root.
 | new | | `file.grep` | person, agent, app | New. |
 | new | | `file.list` | person, agent, app | New: the deck's files without a disk. |
 | new | | `file.move` | person, agent, app | New. |
-| new | | `file.read` | anyone | New; `sha` reads a document's past version. |
+| new | | `file.read` | person, agent, app | New; `sha` reads a document's past version. |
 | `card.delete` | person | `file.delete` | person, agent, app | A card is a folder: deleting it is deleting the folder. |
 | new | | `file.delete` | person, agent, app | New. |
 | `file.url` | agents | `file.url` | anyone | Its argument is called `path`. |
 | new | | `file.write` | person, agent, app | New: a file written through a call carries its author. |
-| new | | `file.open` | anyone | Added in 0.3.0 for Folio: a page joins a document. These rode the documents' socket messages. |
-| new | | `file.close` | anyone | Added in 0.3.0: the page leaves the document. |
+| new | | `file.open` | person, agent, app | Added in 0.3.0 for Folio: a page joins a document. These rode the documents' socket messages. |
+| new | | `file.close` | person, agent, app | Added in 0.3.0: the page leaves the document. |
 | new | | `file.splice` | person, agent, app | Added in 0.3.0: a page's typing lands as splices at a revision. |
 | new | | `file.review` | person, agent, app | Added in 0.3.0: accept or reject an edit waiting for review. |
-| new | | `file.versions` | anyone | Added in 0.3.0: a document's kept versions. |
+| new | | `file.versions` | person, agent, app | Added in 0.3.0: a document's kept versions. |
 | new | | `file.restore` | person, agent, app | Added in 0.3.0: put a document back as it was at a version. |
 | new | | `file.compile` | person, agent, app | Added in 0.28.0 for Quire: typeset a .tex document; today's line message doc.compile. |
 | new | | `file.repo` | person, agent | Added in 0.28.0: the document's git repository; today's doc.git status. |
@@ -125,10 +125,10 @@ A reusable pen.dev file in a canvas's frames/, placed on the canvas as a ref.
 
 | Today | From | New | Who | What changes |
 |---|---|---|---|---|
-| `frame.create` | agents | `frame.create` | person, agent, app | Answers the Frame. |
-| new | | `frame.get` | anyone | Added: one frame file and its item. |
-| new | | `frame.list` | anyone | Added: frames could be made, but not listed. |
-| `canvas.save` | agents | `frame.save` | person, agent, app | Answers the Frame. |
+| `frame.create` | agents | `frame.create` | anyone | Answers the Frame. |
+| new | | `frame.get` | person, agent, app | Added: one frame file and its item. |
+| new | | `frame.list` | person, agent, app | Added: frames could be made, but not listed. |
+| `canvas.save` | agents | `frame.save` | anyone | Answers the Frame. |
 
 ### app
 
@@ -173,11 +173,11 @@ Who works on the deck: its name, avatar, home canvas, tags and inbox.
 | `agent.get` | agents | `agent.get` | anyone | Unchanged. |
 | new | | `agent.host` | person | New: a client says which kinds of agent it can start. |
 | new | | `agent.act` | agent | Added in 0.29.0 for Helm and Roster: an agent's own file tools say they start or finish an edit, for its cursor; today's server read it from the tool. |
-| `agent.inbox` | agents | `agent.inbox` | agent | Unchanged. |
+| `agent.inbox` | agents | `agent.inbox` | agent, card | Unchanged. |
 | `agent.list` | agents | `agent.list` | anyone | Unchanged. |
-| `agent.me` | agents | `agent.me` | person, agent | For the person (since 0.13.0), the agent whose conversation is on their screen. |
+| `agent.me` | agents | `agent.me` | person, agent, card | For the person (since 0.13.0), the agent whose conversation is on their screen. |
 | new | | `agent.news` | agent | New: what changed on your canvas since you last asked, and your mail. |
-| `agent.queue` | agents | `agent.queue` | person, agent, app | Answers the Message, with its place in the queue. |
+| `agent.queue` | agents | `agent.queue` | anyone | Answers the Message, with its place in the queue. |
 | `agent.remove` | person | `agent.delete` | person | Renamed. |
 | `agent.send` | agents | `agent.send` | anyone | Answers the Message, with its state: delivered, queued or new. |
 | `agent.update` | agents | `agent.update` | person, agent | The change goes in `change`; the person may name another agent. |
@@ -193,7 +193,7 @@ What a screen shows of a canvas: its camera, its size, and where people point.
 | `view.focus` | agents | `view.focus` | anyone | Answers the View. |
 | `view.camera` | agents | `view.get` | anyone | Answers the View, its camera inside. |
 | `view.viewport` | agents | alias of `view.get` | anyone | view.get's `screen` is the screen's Size. |
-| `view.goto` | agents | `view.goto` | person, agent | Answers the View. |
+| `view.goto` | agents | `view.goto` | person, agent, card | Answers the View. |
 | `view.move` | agents | `view.move` | anyone | Answers the View. |
 | `view.remember` | person | alias of `view.move` | anyone | From the person's own page, view.move records where their screen is. |
 | `view.reload` | agents | `view.reload` | anyone | Answers how many reloaded, as a number. |
