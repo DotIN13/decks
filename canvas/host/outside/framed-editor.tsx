@@ -143,6 +143,8 @@ export interface FramedHandle {
 	setCamera(camera: Camera): void;
 	/** A card's file changed: it loads again. */
 	reloadCard(path: string): void;
+	/** Outline a block in a card, in the frame where the cards are drawn (a view's highlight). */
+	highlightBlock(path: string, id: string): void;
 	/** Always false: the page keeps the views, not the frame. */
 	readonly restored: boolean;
 	dispose(): void;
@@ -705,6 +707,7 @@ function handleOf(f: FramedRun): FramedHandle {
 			f.end()?.emit("camera", { camera });
 		},
 		reloadCard: (path) => f.end()?.emit("reload", { path }),
+		highlightBlock: (path, id) => f.end()?.emit("highlight", { path, id }),
 		paste: (data) => f.end()?.emit("paste", data),
 		restored: false,
 		dispose: () => {

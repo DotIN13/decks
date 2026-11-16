@@ -561,6 +561,12 @@ const registryPerRoot = (() => {
  * these whether any are (`wordsSelectedInCards`), so a copy of a card's words is the browser's.
  */
 const openRoots = new Set<ShadowRoot>();
+/** Each card's closed root, by the element holding it, for what must reach inside: a view's highlight. */
+const rootsByHost = new WeakMap<Element, ShadowRoot>();
+/** The closed root of the card drawn in `node` or an element inside it. */
+export function cardRootIn(node: Element): ShadowRoot | undefined {
+	return rootsByHost.get(node) ?? [...node.querySelectorAll("*")].map((el) => rootsByHost.get(el)).find((root) => root !== undefined);
+}
 
 /** Whether words are selected in a mounted card: by the selection's composed ranges where the browser has them, else by each root's own selection (Chromium's). */
 export function wordsSelectedInCards(): boolean {
@@ -592,6 +598,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
 	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
 	openRoots.add(root);
+	rootsByHost.set(host, root);
 	host.dataset.theme = source.theme;
 	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
 	const lib = new URL("../../lib/", source.url).href;
@@ -737,6 +744,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			}
 			root.replaceChildren();
 			openRoots.delete(root);
+			rootsByHost.delete(host);
 		},
 	};
 }

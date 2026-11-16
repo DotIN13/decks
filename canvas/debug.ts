@@ -54,6 +54,8 @@ export interface Probes {
 	rust?: unknown;
 	/** The engine's statistics, and what a drag carries as pictures. */
 	engine?: { stats(): Record<string, unknown>; readonly carried: { paths: Set<string> } & Record<string, unknown> } | undefined;
+	/** The block a view's highlight outlined last, in which card. */
+	highlighted?: { path: string; id: string } | undefined;
 	/** What glides now: each item's shift. */
 	glide?: (() => Array<[string, unknown]>) | undefined;
 	/** The world's transform as a CSS string, from the camera. */

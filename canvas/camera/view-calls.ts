@@ -1,18 +1,13 @@
 import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { cssEscape } from "@decks/ui";
+import { cardRootIn } from "../cards/card.ts";
+import { probes } from "../debug.ts";
 import { boxOf, fit } from "./camera.ts";
 
 /**
- * What the browser does when an agent asks something of the canvas.
- *
- * These are the operations only the browser can carry out — the camera, the
- * highlight, the pointer. Everything an agent can be told from the server (which
- * boards exist, what one says) never gets here.
- *
- * Highlighting reaches into the board's own document and sets `data-selected` on the
- * component, which `card.css` already styles. That is the same-origin decision
- * (DESIGN §4) doing real work: no message protocol, no cooperation from the board,
- * three lines.
+ * What the browser does when an agent asks something of the canvas: the camera, the highlight, the
+ * pointer. A highlight sets `data-selected` on a card's block, which `card.css` styles, through the
+ * card's closed root, in the document where the cards are drawn (the canvas frame).
  */
 
 export interface StageOpsHost {
@@ -46,6 +41,8 @@ export interface StageOpsHost {
 	rememberView(agentId: string, camera: Camera, selected?: string): void;
 	select(path: string | undefined): void;
 	reload(path: string): void;
+	/** Outline a block in a card where the cards are drawn; left out, the cards are in this document. */
+	highlight?(path: string, id: string): void;
 	/** Put the agent's cursor at a point of a card, or take it away (null). Answers false when no card on this canvas has that path. */
 	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): boolean;
 }
@@ -76,7 +73,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 
 		case "reload": {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
-			// Counted (`view.reload`): this page reloads the board only if its canvas shows it.
+			// Counted (`view.reload`): this page reloads the card only if its canvas shows it.
 			if (args.count === true) {
 				if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) return { pages: 0 };
 				if (!host.boards().some((board) => board.path === args.path)) return { pages: 0 };
@@ -125,8 +122,8 @@ function showCall(call: Call, host: Host, args: Record<string, unknown>): unknow
 	/*
 	 * Drawn items arrive as boxes the server measured off the stage's layout, because an
 	 * item's id means nothing to this file: the drawing is painted on a canvas, not
-	 * mounted, so there is no node to look up. They frame like a board and are not
-	 * selected — selection here means a *board*, and an item has its own on the stage.
+	 * mounted, so there is no node to look up. They frame like a card and are not
+	 * selected — selection here means a *card*, and an item has its own on the stage.
 	 */
 	const items = (Array.isArray(args.items) ? args.items : []).filter(
 		(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
@@ -143,7 +140,7 @@ function showCall(call: Call, host: Host, args: Record<string, unknown>): unknow
 	host.setCamera(wanted, { animate: args.animate === true });
 	if (boards[0]) host.select(boards[0].path);
 
-	if (typeof args.highlight === "string" && boards[0]) highlight(boards[0].path, args.highlight);
+	if (typeof args.highlight === "string" && boards[0]) (host.highlight ?? highlight)(boards[0].path, args.highlight);
 	return { shown };
 }
 
@@ -167,13 +164,15 @@ function cursorCall(host: Host, args: Record<string, unknown>): unknown {
 	return { cursor: at ? "shown" : "cleared" };
 }
 
+/** Outline one block inside a card for six seconds, and take the last one off first. */
 export function highlight(path: string, id: string): void {
 	clearLast?.run();
 	clearLast = undefined;
 
-	const frame = document.querySelector<HTMLIFrameElement>(`.card-node[data-path="${cssEscape(path)}"] iframe`);
-	const target = frame?.contentDocument?.querySelector<HTMLElement>(`[data-id="${cssEscape(id)}"]`);
+	const node = document.querySelector(`.card-node[data-path="${cssEscape(path)}"]`);
+	const target = node ? cardRootIn(node)?.querySelector<HTMLElement>(`[data-id="${cssEscape(id)}"]`) : undefined;
 	if (!target) return;
+	probes.highlighted = { path, id };
 
 	target.dataset.selected = "true";
 	const timer = setTimeout(() => {
@@ -188,7 +187,7 @@ export function highlight(path: string, id: string): void {
 	};
 }
 
-/** Outline one component inside a board, and take it off again on its own. */
+/** How to take the last highlight off, while it is on. */
 let clearLast: { run: () => void } | undefined;
 
 /**
@@ -197,7 +196,7 @@ let clearLast: { run: () => void } | undefined;
  * The canvas is per conversation — it draws the focused agent's in-play set and nothing else
  * — and the camera has to follow the same rule or it is the one part of the view an agent
  * you are not watching can reach into. It could, and did: an agent working in another corner
- * of the deck flew your camera to a board that was not drawn on your canvas at all, which is
+ * of the deck flew your camera to a card that was not drawn on your canvas at all, which is
  * an empty view arriving while you sit still.
  *
  * So the fit is *remembered against that agent* rather than applied, and `viewOnSwitch` hands
@@ -208,7 +207,7 @@ function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: s
 	/*
 	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
 	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
-	 * this is their conversation already; the board is on the stage where it was put.
+	 * this is their conversation already; the card is on the stage where it was put.
 	 */
 	if (call.agentId && call.agentId === host.focused() && host.handsOn?.()) {
 		host.offerView?.(call.agentId, camera, selected, what);

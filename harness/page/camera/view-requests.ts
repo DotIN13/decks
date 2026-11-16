@@ -35,6 +35,7 @@ async function answer(event: Requested, deps: Parameters<typeof answerViews>[0])
 		rememberView: deps.rememberView,
 		select: (path) => path && deps.editor()?.select([path]),
 		reload: (path) => deps.editor()?.reloadCard(path),
+		highlight: (path, id) => deps.editor()?.highlightBlock(path, id),
 		cursor: () => true,
 	});
 }

@@ -7,11 +7,12 @@
  * - `view.goto(canvas)` moves the conversation on screen to the canvas, as the canvas switcher
  *   does, and the screen with it: the same conversation stays on screen, whoever else is on it.
  * - `view.focus(card)` with no canvas goes to the canvas the card's path names, and frames it;
- *   `view.focus(item, { canvas })` goes to that canvas first.
+ *   `view.focus(item, { canvas })` goes to that canvas first; with `highlight` it outlines that
+ *   data-id block inside the card, reached through the card's closed root.
  * - None of them changed a canvas file. (Whether an agent's own call asks a person using the
  *   canvas, or moves quietly in the background, is `camera/view-calls.test.ts`.)
  */
-import { API, asPerson, open, resetStage, say, settle } from "../harness.mjs";
+import { API, asPerson, canvasFrame, open, resetStage, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await resetStage(page);
@@ -53,6 +54,13 @@ await settle(page, 6500);
 const focused = await call("view.focus", [card], agent);
 const back = (await call("here", [], agent)).value;
 say("view.focus a card with no canvas goes to the canvas its path names and frames it", focused.ok && !focused.value.deferred && back?.name === home.name, JSON.stringify({ focused, here: back?.name }));
+// The notes card's "body" block, outlined: the card is a closed root, so the frame's probe says what was found.
+await settle(page, 6500);
+const NOTES = read.value.items.find((item) => item.type === "card" && String(item.card).endsWith("/cards/notes/index.html"))?.card;
+const lit = await call("view.focus", [NOTES, { highlight: "body" }], agent);
+await settle(page, 600);
+const highlighted = await (await canvasFrame(page)).evaluate(() => globalThis.__decksProbes?.highlighted);
+say("view.focus with highlight outlines that block inside the card", lit.ok && highlighted?.id === "body" && highlighted?.path === NOTES, JSON.stringify({ lit: lit.ok, highlighted, NOTES }));
 await call("canvas.insert", [{ type: "note", id: "far-note", content: "over here" }, { canvas: other.name, at: { x1: 0, y1: 0 } }], agent);
 await settle(page, 6500);
 const elsewhere = await call("view.focus", ["far-note", { canvas: other.name }], agent);

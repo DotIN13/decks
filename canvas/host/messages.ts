@@ -84,6 +84,8 @@ export interface PageToFrame {
 	 */
 	token: { token: string; files?: { base: string; expires: number }; pictures?: string };
 	reload: { path: string };
+	/** A view's highlight: outline the block with this data-id in this card. */
+	highlight: { path: string; id: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
 	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number; /** Where the page's composer is on the frame's screen (null: not shown): a drag let go over it mentions what it carries. */ composer?: Rect | null };
 	tool: { tool?: PenTool; ink?: { on: boolean } };

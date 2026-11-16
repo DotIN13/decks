@@ -7,7 +7,7 @@ import { dismissMenus } from "@decks/ui";
 import type { Page, Camera, StageCall } from "@decks/protocol-old";
 import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
-import { runStageCall } from "../../camera/view-calls.ts";
+import { highlight, runStageCall } from "../../camera/view-calls.ts";
 import { cardShot } from "../../cards/card-surface.tsx";
 import { handsOn } from "../../camera/hands-on.ts";
 import { drawingFollower } from "./backend.ts";
@@ -257,6 +257,7 @@ function hearLine(ctx: FrameContext, handle: Handle, follower: Follower, message
 function hearPage(ctx: FrameContext, handle: Handle): void {
 	const { end, agent, setAgent, busy, setBusy } = ctx;
 	end.on("reload", (data) => handle.reloadCard(data.path));
+	end.on("highlight", (data) => highlight(data.path, data.id));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
 		if (data.insets) useInsets(data.insets);
