@@ -1,18 +1,16 @@
 import type { DocVersion, Splice } from "./model.ts";
 import { DocSync } from "./client.ts";
-import { spliceDiff } from "./merge.ts";
-import type { DocSync as Sync } from "./client.ts";
-import { docxBlocks, readParagraph } from "./blocks.ts";
 import { findMarks, marksOf, segments, shiftMarks, spliceBetween, type Mark } from "./marks.ts";
 import { LiveEditor, type BlockStyle, type FormatState, type InlineStyle } from "./live.ts";
 import { Reading } from "./reading.ts";
 import { GoogleView } from "./gview.ts";
 import type { DocsRequest } from "./google/types.ts";
 import { STYLE } from "./page/style.ts";
-import { base, clip, dir, el, keyName, svg, when } from "./page/parts.ts";
+import { base, clip, dir, el, keyName, svg } from "./page/parts.ts";
 import { PdfPane } from "./page/pdf.ts";
 import { Remotes } from "./page/remote.ts";
 import { buildPage } from "./page/dom.ts";
+import { closeVersion, drawHistory, openVersion, restoreTo } from "./page/history.ts";
 import type { DocPage, DocPageOptions, GComment } from "./page/types.ts";
 
 export type { DocPage, DocPageOptions } from "./page/types.ts";
@@ -20,7 +18,7 @@ export type { DocPage, DocPageOptions } from "./page/types.ts";
 /**
  * A document drawn as a page you type into, in plain DOM.
  *
- * Markdown and LaTeX are typed into as they read (`live.ts`): the file's own characters, styled,
+ * Markdown and LaTeX are typed into as they read (`live/editor.ts`): the file's own characters, styled,
  * with their syntax hidden until the caret reaches it, and a toolbar of the usual styles. A Word
  * file is drawn by docx-preview and a paragraph is typed into in place (`reading.ts`). Source shows
  * the file as it is, for anything the page does not draw.
@@ -39,7 +37,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	return new DocPageView(host, options).handle();
 }
 
-/** What a page is made for: the element it fills and the options it was given, before anything else is made. */
+/** The element a page fills and the options it was given, set by super() before any field of the view is. */
 class DocPageInput {
 	constructor(
 		readonly host: HTMLElement,
@@ -47,85 +45,23 @@ class DocPageInput {
 	) {}
 }
 
-/** One document page: its parts, the editors over its text, its state, and what each part does. */
-class DocPageView extends DocPageInput {
-	readonly ready = prepare(this.host);
+/**
+ * One document page: its parts, the editors over its text, its state, and what each part does. Its
+ * fields hold no work: start() does every step in the order the page was always built in.
+ */
+export class DocPageView extends DocPageInput {
+	// --- what the page holds ---
+
 	/** The elements the page is made of (page/dom.ts). */
-	readonly parts = buildPage(this.host, this.options);
-	marks: Mark[] = [];
-	composing = false;
-	view: "none" | "changes" | "history" | "comments" = "none";
+	parts!: ReturnType<typeof buildPage>;
+	readonly urls: Map<string, Promise<string | undefined>> = new Map<string, Promise<string | undefined>>();
+	readonly pictures: Map<string, Promise<string | undefined>> = new Map<string, Promise<string | undefined>>();
+	sync!: DocSync;
+	live!: LiveEditor;
+	reading!: Reading;
 
-	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
-	comments: GComment[] = [];
-	commentsError = "";
-	versions: DocVersion[] = [];
-
-	/** The kept version being looked at, instead of the page as it is now. */
-	viewing: { sha: string; at?: number; text: string; editor?: LiveEditor } | undefined;
-
-	/** The History row last pressed: one text kept twice has one id, so the row says which time is meant. */
-	picked: { sha: string; at: number } | undefined;
-	mode: "page" | "source" = "page";
-	readonly urls = new Map<string, Promise<string | undefined>>();
-	readonly pictures = new Map<string, Promise<string | undefined>>();
-	readonly near = (src: string) => (src.startsWith("/") ? src : `${dir(this.sync.path)}/${decodeURI(src)}`);
-	readonly sync = new DocSync({
-		path: this.options.path,
-		send: this.options.send,
-		onUpdate: (_sync, why, applied) => this.updated(why, applied),
-	});
-	readonly recent = () => this.sync.changes;
-	readonly live = new LiveEditor(this.sync, {
-		...(this.options.math ? { math: this.options.math } : {}),
-		asset: (src) => {
-			if (!this.options.file) return Promise.resolve(undefined);
-			const from = dir(this.sync.path);
-			const path = src.startsWith("/") ? src : `${from}/${decodeURI(src)}`;
-			let url = this.urls.get(path);
-			if (!url) {
-				url = this.options
-					.file(path)
-					.then((bytes) => URL.createObjectURL(new Blob([bytes])))
-					.catch(() => undefined);
-				this.urls.set(path, url);
-			}
-			return url;
-		},
-		pdfPicture: (src) => {
-			if (!this.options.file || !this.options.pdf) return Promise.resolve(undefined);
-			const path = this.near(src);
-			let url = this.pictures.get(path);
-			if (!url) {
-				const into = document.createElement("div");
-				url = this.options
-					.file(path)
-					.then((bytes) => this.options.pdf!(into, bytes, 1200))
-					.then(() => into.querySelector("img")?.src ?? into.querySelector("canvas")?.toDataURL("image/png"))
-					.catch(() => undefined);
-				this.pictures.set(path, url);
-			}
-			return url;
-		},
-		marks: () => this.marks,
-		changes: this.recent,
-		onState: (state) => this.pressed(state),
-	});
-	readonly reading = new Reading(this.sync, {
-		...(this.options.markdown ? { markdown: this.options.markdown } : {}),
-		...(this.options.math ? { math: this.options.math } : {}),
-		...(this.options.file ? { file: this.options.file } : {}),
-		marks: () => this.marks,
-	});
-
-	// A Google Doc, drawn from Google's own document as it lays it out (`gview.ts`); its styles go to Google once the typing before them has.
-	readonly gview = new GoogleView(this.sync, {
-		marks: () => this.marks,
-		style: (requests) => this.sendStyle(requests),
-		...(this.options.api ? { api: this.options.api } : {}),
-		selection: () => this.gpressed(),
-		command: (name) => (name === "link" ? this.askLink() : this.newComment()),
-	});
+	// A Google Doc, drawn from Google's own document as it lays it out (`google/view.ts`); its styles go to Google once the typing before them has.
+	gview!: GoogleView;
 
 	/**
 	 * Styles for Google, each with the text the page had when it was made, sent in order once the
@@ -136,103 +72,133 @@ class DocPageView extends DocPageInput {
 
 	/** A keystroke's style is held this long for the next keystroke to join, so a run of bold typing is one request to Google, not one a key. */
 	readonly HOLD_MS = 400;
-	pumping: ReturnType<typeof setTimeout> | undefined;
-	readonly isGoogle = () => !!this.sync.remote;
-	readonly isWord = () => this.sync.format === "docx";
-	readonly isTex = () => /\.(tex|sty|cls|ltx)$/i.test(this.sync.path);
-
-
-	readonly buttons = new Map<string, HTMLButtonElement>();
+	readonly buttons: Map<string, HTMLButtonElement> = new Map<string, HTMLButtonElement>();
 
 	// The paragraph style: a button naming it, and a menu drawing each style as it reads.
-	readonly styleBox = el("div", { class: "dp-style" });
-	readonly styleButton = el("button", { type: "button", class: "dp-btn", title: "Paragraph style", "aria-haspopup": "menu", "aria-expanded": "false" });
-	readonly styleMenu = el("div", { class: "dp-menu", role: "menu", hidden: "" });
-	styles: Array<[string, string]> = [];
-	styleNow = "p";
-	readonly styleLabel = () => {
-		this.styleButton.innerHTML = "";
-		this.styleButton.append(el("span", {}, this.styles.find(([v]) => v === this.styleNow)?.[1] ?? "Body"));
-		this.styleButton.insertAdjacentHTML("beforeend", svg("chevron"));
-	};
-	readonly closeMenu = () => {
-		this.styleMenu.hidden = true;
-		this.styleButton.setAttribute("aria-expanded", "false");
-	};
-
-
-	readonly FONTS = ["Arial", "Roboto", "Times New Roman", "Georgia", "Lato", "Merriweather", "Montserrat", "Open Sans", "Playfair Display", "Source Sans 3", "Courier New", "Verdana", "Comic Sans MS"];
+	styleBox!: HTMLDivElement;
+	styleButton!: HTMLButtonElement;
+	styleMenu!: HTMLDivElement;
+	readonly FONTS: string[] = ["Arial", "Roboto", "Times New Roman", "Georgia", "Lato", "Merriweather", "Montserrat", "Open Sans", "Playfair Display", "Source Sans 3", "Courier New", "Verdana", "Comic Sans MS"];
 	readonly gcontrols: { font?: HTMLSelectElement; size?: HTMLInputElement } = {};
-	readonly shiftCaret = (at: { start: number; end: number }, applied: readonly Splice[]) => {
-		const move = (p: number) => applied.reduce((q, s) => (q <= s.at ? q : q >= s.at + s.before.length ? q + s.text.length - s.before.length : s.at + s.text.length), p);
-		return { start: move(at.start), end: move(at.end) };
-	};
-	readonly whoOf = (by: string) => (by === "outside" ? "Another program" : by);
-	readonly initial = (by: string) => (by === "outside" ? "?" : by.trim().charAt(0).toUpperCase() || "?");
-	changesDrawn = "";
-	readonly changesKey = () => `${this.sync.readOnly}|${this.sync.changes.map((c) => c.id).join(",")}`;
-
-	/** A new comment on the selected words: the panel opens with a box for it at the top. */
-	drafting: string | undefined;
-
-
-	pillFor: string | undefined;
-	pillTimer: ReturnType<typeof setTimeout> | undefined;
-	readonly pdf = new PdfPane({ sync: this.sync, live: this.live, options: this.options, pdfBar: this.parts.pdfBar, pdfState: this.parts.pdfState, errButton: this.parts.errButton, errList: this.parts.errList, pdfBody: this.parts.pdfBody, pdfButton: this.parts.pdfButton, pdfPane: this.parts.pdfPane, divider: this.parts.divider, main: this.parts.main, panel: this.parts.panel, iconButton: this.parts.iconButton });
-	readonly remote = new Remotes({ sync: this.sync, options: this.options, gitBox: this.parts.gitBox, gitButton: this.parts.gitButton, gitMenu: this.parts.gitMenu, googleBox: this.parts.googleBox, googleButton: this.parts.googleButton, googleMenu: this.parts.googleMenu, pdf: this.pdf, drawComments: this.drawComments.bind(this), view: () => this.view });
-	readonly stop = this.options.listen((message) => {
-		this.sync.receive(message);
-		if (message.type === "doc.versions" && message.path === this.sync.path) {
-			this.versions = message.versions;
-			if (this.view === "history") this.drawHistory();
-		}
-		if (message.type === "doc.compiled" && message.path === this.sync.path) this.pdf.compiled(message);
-		if (message.type === "doc.repo" && message.path === this.sync.path) this.remote.repoAnswered(message);
-		if (message.type === "doc.gdoc" && message.path === this.sync.path) {
-			this.gview.load(message.document as never, message.text);
-			this.gview.setComments(this.comments);
-		}
-		if (message.type === "doc.gcomments" && message.path === this.sync.path) {
-			this.comments = message.comments as GComment[];
-			this.commentsError = message.error ?? "";
-			this.gview.setComments(this.comments);
-			this.drawCommentsButton();
-			if (this.view === "comments") this.drawComments();
-		}
-		if (message.type === "doc.remote" && message.path === this.sync.path) {
-			this.remote.status = message.status;
-			this.remote.drawGoogle();
-		}
-		if (message.type === "doc.version" && message.path === this.sync.path) {
-			if (message.text !== undefined) this.openVersion(message.sha, this.picked?.sha === message.sha ? this.picked.at : message.at, message.text);
-			else if (message.error) {
-				this.parts.status.dataset.state = "error";
-				this.parts.status.textContent = message.error;
-			}
-		}
-		// A restore or someone's edit while looking at a version: the History list grows.
-		if (message.type === "doc.changed" && this.view === "history" && !message.client && message.path === this.sync.path) this.sync.versions();
-		if (message.type === "doc.patched") this.refresh();
-	});
-
+	pdf!: PdfPane;
+	remote!: Remotes;
+	stop!: () => void;
 	/*
 	 * Asked again until answered: the board's script runs before the app has wired the frame, so
 	 * the first `doc.open` can go out before anyone is listening for it. Opening twice is harmless.
 	 */
-	readonly ticker = setInterval(() => {
-		if (!this.sync.ready && !this.sync.error) this.sync.open();
-		this.refresh();
-	}, 400);
+	ticker!: ReturnType<typeof setInterval>;
+
+	// --- its state ---
+	marks: Mark[] = [];
+	composing: boolean = false;
+	view: "none" | "changes" | "history" | "comments" = "none";
+
+	/** A Google Doc's open comments, from Drive, or why they cannot be shown. */
+	comments: GComment[] = [];
+	commentsError: string = "";
+	versions: DocVersion[] = [];
+
+	/** The kept version being looked at, instead of the page as it is now. */
+	viewing: { sha: string; at?: number; text: string; editor?: LiveEditor } | undefined;
+
+	/** The History row last pressed: one text kept twice has one id, so the row says which time is meant. */
+	picked: { sha: string; at: number } | undefined;
+	mode: "page" | "source" = "page";
+	pumping: ReturnType<typeof setTimeout> | undefined;
+	styles: Array<[string, string]> = [];
+	styleNow: string = "p";
+	changesDrawn: string = "";
+
+	/** A new comment on the selected words: the panel opens with a box for it at the top. */
+	drafting: string | undefined;
+	pillFor: string | undefined;
+	pillTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(host: HTMLElement, options: DocPageOptions) {
 		super(host, options);
+		this.start();
+	}
 
-	// the editors in the page
+	/** Every step of building the page, in its order: the host, the editors, the tools, the listeners, then the outside. */
+	start(): void {
+		if (!document.getElementById("dp-style")) document.head.append(el("style", { id: "dp-style" }, STYLE));
+		this.host.classList.add("dp");
+		this.host.replaceChildren();
+		this.placeEditors();
+		this.wireStyleMenu();
+		this.wireSource();
+		this.wireCommentClicks();
+		this.wireChangePill();
+		this.startOutside();
+	}
+
+	/** The page and its editors. */
+	placeEditors(): void {
+		this.parts = buildPage(this.host, this.options);
+		this.sync = new DocSync({
+			path: this.options.path,
+			send: this.options.send,
+			onUpdate: (_sync, why, applied) => this.updated(why, applied),
+		});
+		this.live = new LiveEditor(this.sync, {
+			...(this.options.math ? { math: this.options.math } : {}),
+			asset: (src) => {
+				if (!this.options.file) return Promise.resolve(undefined);
+				const from = dir(this.sync.path);
+				const path = src.startsWith("/") ? src : `${from}/${decodeURI(src)}`;
+				let url = this.urls.get(path);
+				if (!url) {
+					url = this.options
+						.file(path)
+						.then((bytes) => URL.createObjectURL(new Blob([bytes])))
+						.catch(() => undefined);
+					this.urls.set(path, url);
+				}
+				return url;
+			},
+			pdfPicture: (src) => {
+				if (!this.options.file || !this.options.pdf) return Promise.resolve(undefined);
+				const path = this.near(src);
+				let url = this.pictures.get(path);
+				if (!url) {
+					const into = document.createElement("div");
+					url = this.options
+						.file(path)
+						.then((bytes) => this.options.pdf!(into, bytes, 1200))
+						.then(() => into.querySelector("img")?.src ?? into.querySelector("canvas")?.toDataURL("image/png"))
+						.catch(() => undefined);
+					this.pictures.set(path, url);
+				}
+				return url;
+			},
+			marks: () => this.marks,
+			changes: this.recent.bind(this),
+			onState: (state) => this.pressed(state),
+		});
+		this.reading = new Reading(this.sync, {
+			...(this.options.markdown ? { markdown: this.options.markdown } : {}),
+			...(this.options.math ? { math: this.options.math } : {}),
+			...(this.options.file ? { file: this.options.file } : {}),
+			marks: () => this.marks,
+		});
+		this.gview = new GoogleView(this.sync, {
+			marks: () => this.marks,
+			style: (requests) => this.sendStyle(requests),
+			...(this.options.api ? { api: this.options.api } : {}),
+			selection: () => this.gpressed(),
+			command: (name) => (name === "link" ? this.askLink() : this.newComment()),
+		});
 		this.parts.scroll.append(this.live.root, this.reading.root, this.gview.root, this.parts.old);
 		this.reading.root.hidden = true;
 		this.gview.root.hidden = true;
+	}
 
-	// the styling tools
+	/** The styling tools. */
+	wireStyleMenu(): void {
+		this.styleBox = el("div", { class: "dp-style" });
+		this.styleButton = el("button", { type: "button", class: "dp-btn", title: "Paragraph style", "aria-haspopup": "menu", "aria-expanded": "false" });
+		this.styleMenu = el("div", { class: "dp-menu", role: "menu", hidden: "" });
 		this.styleBox.append(this.styleButton, this.styleMenu);
 		this.styleButton.addEventListener("mousedown", (event) => event.preventDefault());
 		this.styleButton.onclick = () => {
@@ -255,8 +221,10 @@ class DocPageView extends DocPageInput {
 		document.addEventListener("mousedown", (event) => {
 			if (!this.styleBox.contains(event.target as Node)) this.closeMenu();
 		});
+	}
 
-	// Source: the file's text as it is
+	/** Source: the file's text as it is. */
+	wireSource(): void {
 		this.parts.text.addEventListener("compositionstart", () => (this.composing = true));
 		this.parts.text.addEventListener("compositionend", () => {
 			this.composing = false;
@@ -265,8 +233,10 @@ class DocPageView extends DocPageInput {
 		this.parts.text.addEventListener("input", () => {
 			if (!this.composing) this.typed();
 		});
+	}
 
-	// a Google Doc's comments, kept by Drive
+	/** A Google Doc's comments, kept by Drive. */
+	wireCommentClicks(): void {
 		// A click on commented words opens the comment.
 		this.gview.page.addEventListener("click", (event) => {
 			const id = (event.target as HTMLElement).closest<HTMLElement>("[data-comment]")?.dataset.comment;
@@ -274,8 +244,10 @@ class DocPageView extends DocPageInput {
 			if (this.view !== "comments") this.show("comments");
 			this.parts.panel.querySelector(`[data-comment="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 		});
+	}
 
-	// one change, from its highlight
+	/** One change, from its highlight. */
+	wireChangePill(): void {
 		for (const surface of [this.live.root, this.gview.page]) {
 			surface.addEventListener("mouseover", (event) => {
 				const target = (event.target as HTMLElement).closest<HTMLElement>("[data-change]");
@@ -287,13 +259,65 @@ class DocPageView extends DocPageInput {
 		this.parts.pill.addEventListener("mouseenter", () => clearTimeout(this.pillTimer));
 		this.parts.pill.addEventListener("mouseleave", () => this.hidePill());
 		this.parts.scroll.addEventListener("scroll", () => this.hidePill(true));
+	}
 
-	// the PDF, for a LaTeX page, and where the file lives besides the deck (page/pdf.ts, page/remote.ts)
+	/** The PDF, for a LaTeX page, and where the file lives besides the deck (page/pdf.ts, page/remote.ts). */
+	startOutside(): void {
+		this.pdf = new PdfPane({ sync: this.sync, live: this.live, options: this.options, pdfBar: this.parts.pdfBar, pdfState: this.parts.pdfState, errButton: this.parts.errButton, errList: this.parts.errList, pdfBody: this.parts.pdfBody, pdfButton: this.parts.pdfButton, pdfPane: this.parts.pdfPane, divider: this.parts.divider, main: this.parts.main, panel: this.parts.panel, iconButton: this.parts.iconButton });
+		this.remote = new Remotes({ sync: this.sync, options: this.options, gitBox: this.parts.gitBox, gitButton: this.parts.gitButton, gitMenu: this.parts.gitMenu, googleBox: this.parts.googleBox, googleButton: this.parts.googleButton, googleMenu: this.parts.googleMenu, pdf: this.pdf, drawComments: this.drawComments.bind(this), view: () => this.view });
 		this.parts.sourceButton.onclick = () => this.setMode(this.mode === "source" ? "page" : "source");
 		this.parts.historyButton.onclick = () => this.show("history");
 		this.parts.commentsButton.onclick = () => this.show("comments");
 		this.parts.changesButton.onclick = () => this.show("changes");
+		this.stop = this.options.listen((message) => {
+			this.sync.receive(message);
+			if (message.type === "doc.versions" && message.path === this.sync.path) {
+				this.versions = message.versions;
+				if (this.view === "history") this.drawHistory();
+			}
+			if (message.type === "doc.compiled" && message.path === this.sync.path) this.pdf.compiled(message);
+			if (message.type === "doc.repo" && message.path === this.sync.path) this.remote.repoAnswered(message);
+			if (message.type === "doc.gdoc" && message.path === this.sync.path) {
+				this.gview.load(message.document as never, message.text);
+				this.gview.setComments(this.comments);
+			}
+			if (message.type === "doc.gcomments" && message.path === this.sync.path) {
+				this.comments = message.comments as GComment[];
+				this.commentsError = message.error ?? "";
+				this.gview.setComments(this.comments);
+				this.drawCommentsButton();
+				if (this.view === "comments") this.drawComments();
+			}
+			if (message.type === "doc.remote" && message.path === this.sync.path) {
+				this.remote.status = message.status;
+				this.remote.drawGoogle();
+			}
+			if (message.type === "doc.version" && message.path === this.sync.path) {
+				if (message.text !== undefined) this.openVersion(message.sha, this.picked?.sha === message.sha ? this.picked.at : message.at, message.text);
+				else if (message.error) {
+					this.parts.status.dataset.state = "error";
+					this.parts.status.textContent = message.error;
+				}
+			}
+			// A restore or someone's edit while looking at a version: the History list grows.
+			if (message.type === "doc.changed" && this.view === "history" && !message.client && message.path === this.sync.path) this.sync.versions();
+			if (message.type === "doc.patched") this.refresh();
+		});
+		this.ticker = setInterval(() => {
+			if (!this.sync.ready && !this.sync.error) this.sync.open();
+			this.refresh();
+		}, 400);
 		this.sync.open();
+	}
+
+	// --- sending styles to Google, and what kind of file this is ---
+
+	near(src: string) {
+		return (src.startsWith("/") ? src : `${dir(this.sync.path)}/${decodeURI(src)}`);
+	}
+
+	recent() {
+		return this.sync.changes;
 	}
 
 	sendStyle(requests: DocsRequest[]): void {
@@ -319,6 +343,31 @@ class DocPageView extends DocPageInput {
 			this.options.send({ type: "doc.gstyle", path: this.sync.path, client: this.sync.client, requests: next.requests, text: next.text });
 		}
 		if (this.styleQueue.length) this.pumping = setTimeout(this.pump.bind(this), 30);
+	}
+
+	isGoogle() {
+		return !!this.sync.remote;
+	}
+
+	isWord() {
+		return this.sync.format === "docx";
+	}
+
+	isTex() {
+		return /\.(tex|sty|cls|ltx)$/i.test(this.sync.path);
+	}
+
+	// --- the styling tools ---
+
+	styleLabel() {
+		this.styleButton.innerHTML = "";
+		this.styleButton.append(el("span", {}, this.styles.find(([v]) => v === this.styleNow)?.[1] ?? "Body"));
+		this.styleButton.insertAdjacentHTML("beforeend", svg("chevron"));
+	}
+
+	closeMenu() {
+		this.styleMenu.hidden = true;
+		this.styleButton.setAttribute("aria-expanded", "false");
 	}
 
 	buildTools(): void {
@@ -375,6 +424,8 @@ class DocPageView extends DocPageInput {
 		button("redo", `Redo (${keyName("Mod+Shift+Z")})`, () => this.live.redo());
 		sep();
 	}
+
+	// --- a Google Doc's own tools: what Google's toolbar has, sent to Google as Docs requests ---
 
 	buildGoogleTools(): void {
 		const bar = this.toolGroups();
@@ -542,6 +593,7 @@ class DocPageView extends DocPageInput {
 		else this.live.render();
 	}
 
+	// --- Source: the file's text as it is ---
 
 	texts(): Text[] {
 		const out: Text[] = [];
@@ -599,6 +651,11 @@ class DocPageView extends DocPageInput {
 		if (where) this.place(where);
 	}
 
+	shiftCaret(at: { start: number; end: number }, applied: readonly Splice[]) {
+		const move = (p: number) => applied.reduce((q, s) => (q <= s.at ? q : q >= s.at + s.before.length ? q + s.text.length - s.before.length : s.at + s.text.length), p);
+		return { start: move(at.start), end: move(at.end) };
+	}
+
 	typed(): void {
 		const now = this.parts.text.textContent ?? "";
 		const at = this.caret();
@@ -606,6 +663,7 @@ class DocPageView extends DocPageInput {
 		if (splice) this.sync.edit(splice);
 	}
 
+	// --- what changed ---
 
 	updated(why: "open" | "remote" | "local" | "outside" | "review", applied?: readonly Splice[]): void {
 		if (why === "open") {
@@ -652,6 +710,7 @@ class DocPageView extends DocPageInput {
 		this.refresh();
 	}
 
+	// --- the bar and the history ---
 
 	refresh(): void {
 		if (this.sync.error && !this.sync.ready) {
@@ -690,12 +749,24 @@ class DocPageView extends DocPageInput {
 		this.refresh();
 	}
 
+	whoOf(by: string) {
+		return (by === "outside" ? "Another program" : by);
+	}
+
 	header(title: string, ...extra: HTMLElement[]): HTMLElement {
 		const head = el("div", { class: "dp-head" });
 		const close = this.parts.iconButton("x", "Close", "dp-ib dp-sm");
 		close.onclick = () => this.show(this.view);
 		head.append(el("h3", {}, title), ...extra, close);
 		return head;
+	}
+
+	initial(by: string) {
+		return (by === "outside" ? "?" : by.trim().charAt(0).toUpperCase() || "?");
+	}
+
+	changesKey() {
+		return `${this.sync.readOnly}|${this.sync.changes.map((c) => c.id).join(",")}`;
 	}
 
 	drawChanges(): void {
@@ -738,6 +809,7 @@ class DocPageView extends DocPageInput {
 		}
 	}
 
+	// --- a Google Doc's comments, kept by Drive ---
 
 	drawCommentsButton(): void {
 		this.parts.commentsButton.hidden = !this.isGoogle();
@@ -837,6 +909,8 @@ class DocPageView extends DocPageInput {
 		for (const node of (this.isGoogle() ? this.gview.page : this.live.root).querySelectorAll<HTMLElement>(`[data-change="${change}"]`)) node.toggleAttribute("data-hot", on);
 	}
 
+	// --- one change, from its highlight ---
+
 	showPill(target: HTMLElement): void {
 		const id = target.dataset.change!;
 		const change = this.sync.changes.find((c) => c.id === id);
@@ -873,99 +947,22 @@ class DocPageView extends DocPageInput {
 		else this.pillTimer = setTimeout(go, 350);
 	}
 
+	// --- history: looking at a kept version (page/history.ts) ---
 
 	drawHistory(): void {
-		this.parts.panel.replaceChildren(this.header("History"));
-		if (this.versions.length === 0) this.parts.panel.append(el("p", { class: "dp-empty" }, "No versions yet."));
-		const today = new Date().toDateString();
-		for (const [i, version] of [...this.versions].reverse().entries()) {
-			const date = new Date(version.at);
-			const item = el("div", { class: i === 0 ? "dp-time t-latest" : "dp-time", "aria-current": String(this.viewing?.sha === version.sha && this.viewing.at === version.at), title: "Show this version" });
-			const label = el("span", { class: "t-when" }, date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }));
-			if (date.toDateString() !== today) label.append(el("small", {}, date.toLocaleDateString([], { month: "short", day: "numeric" })));
-			item.append(label);
-			if (!this.sync.readOnly) {
-				const restore = this.parts.iconButton("restore", "Restore this version", "dp-ib dp-sm");
-				restore.onclick = (event) => (event.stopPropagation(), this.restoreTo(version.sha));
-				item.append(restore);
-			}
-			item.onclick = () => {
-				if (this.viewing?.sha === version.sha && this.viewing.at === version.at) return this.closeVersion();
-				this.picked = { sha: version.sha, at: version.at };
-				this.sync.version(version.sha);
-			};
-			this.parts.panel.append(item);
-		}
+		drawHistory(this);
 	}
 
 	restoreTo(sha: string): void {
-		this.sync.restore(sha);
-		this.closeVersion();
+		restoreTo(this, sha);
 	}
 
 	openVersion(sha: string, at: number | undefined, source: string): void {
-		this.closeVersion(false);
-		this.viewing = { sha, ...(at ? { at } : {}), text: source };
-		const word = this.isWord();
-		this.live.root.hidden = true;
-		this.reading.root.hidden = true;
-		this.gview.root.hidden = true;
-		this.parts.text.hidden = true;
-		this.parts.tools.hidden = true;
-		if (this.isGoogle()) {
-			// A Doc's version reads as its words; its styles are Google's, in Google's own version history.
-			this.parts.old.replaceChildren(...GoogleView.plain(source).split("\n").map((line) => el("p", {}, line)));
-			this.parts.old.hidden = false;
-		} else if (word) {
-			// A Word version reads as its paragraphs' words.
-			this.parts.old.replaceChildren(...docxBlocks(source).filter((b) => b.kind === "text").map((b) => el("p", {}, readParagraph(source.slice(b.start, b.end)).text)));
-			this.parts.old.hidden = false;
-		} else {
-			// What differs from now is highlighted: the words Restore would bring back.
-			const diff = spliceDiff(this.sync.text, source);
-			const marks2: Mark[] = [];
-			// Splices in source order: each one's place holds in the version's text.
-			for (const s of diff) {
-				if (s.text) marks2.push({ change: "then", kind: "ins", start: s.at, end: s.at + s.text.length });
-				else marks2.push({ change: "then", kind: "del", at: s.at, text: s.before });
-			}
-			const stub = { text: source, readOnly: true, ready: true, path: this.sync.path, format: this.sync.format } as unknown as Sync;
-			const editor = new LiveEditor(stub, { ...(this.options.math ? { math: this.options.math } : {}), marks: () => marks2, changes: () => [] });
-			editor.root.dataset.preview = "";
-			editor.root.toggleAttribute("data-tex", this.isTex());
-			editor.reset();
-			this.viewing.editor = editor;
-			this.live.root.after(editor.root);
-		}
-		const restore = el("button", { type: "button", class: "dp-btn dp-sm dp-primary" }, "Restore");
-		const back = this.parts.iconButton("x", "Back to now", "dp-ib dp-sm");
-		restore.onclick = () => this.restoreTo(sha);
-		back.onclick = () => this.closeVersion();
-		const icon = el("span");
-		icon.innerHTML = svg("clock");
-		this.parts.banner.replaceChildren(icon.firstElementChild!, el("b", {}, at ? when(at) : "Earlier version"), el("span", { class: "dp-spacer" }), ...(this.sync.readOnly ? [] : [restore]), back);
-		this.parts.banner.hidden = false;
-		this.parts.scroll.scrollTop = 0;
-		if (this.view === "history") this.drawHistory();
+		openVersion(this, sha, at, source);
 	}
 
 	closeVersion(redraw = true): void {
-		if (!this.viewing) return;
-		this.viewing.editor?.destroy();
-		this.viewing.editor?.root.remove();
-		this.viewing = undefined;
-		this.parts.banner.hidden = true;
-		this.parts.old.hidden = true;
-		if (redraw) {
-			const word = this.isWord();
-			const google = this.isGoogle();
-			this.live.root.hidden = this.mode !== "page" || word || google;
-			this.reading.root.hidden = this.mode !== "page" || !word;
-			this.gview.root.hidden = this.mode !== "page" || !google;
-			this.parts.text.hidden = this.mode !== "source";
-			this.parts.tools.hidden = this.mode !== "page" || word || this.sync.readOnly || !this.sync.ready;
-			if (this.view === "history") this.drawHistory();
-		}
+		closeVersion(this, redraw);
 	}
 
 	/** What the caller holds: the sync, and a way to take the page down. */
@@ -983,12 +980,4 @@ class DocPageView extends DocPageInput {
 			},
 		};
 	}
-}
-
-/** The page's sheet in the head, once, and the host made the page's, empty: before anything is built into it. */
-function prepare(host: HTMLElement): true {
-	if (!document.getElementById("dp-style")) document.head.append(el("style", { id: "dp-style" }, STYLE));
-	host.classList.add("dp");
-	host.replaceChildren();
-	return true;
 }

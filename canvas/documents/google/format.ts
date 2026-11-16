@@ -1,9 +1,9 @@
 import type { DocsDimension, DocsParagraphStyle, DocsRequest, DocsTextStyle } from "./types.ts";
 import { isStruct, OBJECT_UNIT, STRUCT } from "./units.ts";
 import { pt, type TableStep } from "./text-units.ts";
-import { GoogleView } from "./view.ts";
+import type { GoogleView } from "./view.ts";
 
-/** What the toolbar does to a GoogleView's Doc: lists, styles, tables, links and comments, added to its prototype. */
+/** What the toolbar does to a GoogleView's Doc: lists, styles, tables, links and comments, which installFormat puts on its prototype. */
 
 declare module "./view.ts" {
 	interface GoogleView {
@@ -33,7 +33,7 @@ declare module "./view.ts" {
  * Requests that make `nls` one list at these depths: Docs reads a list item's depth from the
  * tabs it starts with, and takes them away, so a tab goes in for each level, last paragraph first.
  */
-GoogleView.prototype.bullets = function (this: GoogleView, nls: number[], levels: number[], numbered: boolean, listId?: string): DocsRequest[] {
+function bullets(this: GoogleView, nls: number[], levels: number[], numbered: boolean, listId?: string): DocsRequest[] {
 	const start = this.paragraphStart(nls[0]!);
 	const out: DocsRequest[] = [];
 	let tabs = 0;
@@ -47,13 +47,13 @@ GoogleView.prototype.bullets = function (this: GoogleView, nls: number[], levels
 	this.hints.set(create, { levels: [...levels], ...(listId ? { listId } : {}) });
 	out.push(create);
 	return out;
-};
+}
 
 /**
  * List items a level deeper or shallower: the list they are in is made again with each item's
  * new depth, so its numbering carries on. False when none of the selection is a list item.
  */
-GoogleView.prototype.nest = function (this: GoogleView, delta: number): boolean {
+function nest(this: GoogleView, delta: number): boolean {
 	const range = this.range();
 	if (!range) return false;
 	const chosen = this.paragraphsIn(range[0], range[1]).filter((nl) => this.units[nl]!.para?.bullet);
@@ -71,10 +71,10 @@ GoogleView.prototype.nest = function (this: GoogleView, delta: number): boolean 
 	if (levels.every((level, k) => level === (this.units[block[k]!]!.para!.bullet!.nestingLevel ?? 0))) return true;
 	this.run(this.bullets(block, levels, this.isNumbered(this.units[block[0]!]!.para!.bullet!), listId), range);
 	return true;
-};
+}
 
 /** The paragraphs' indent a step in or out (Docs' half inch), or a list's items a level. */
-GoogleView.prototype.indent = function (this: GoogleView, delta: number): void {
+function indent(this: GoogleView, delta: number): void {
 	const range = this.range();
 	if (!range) return;
 	if (this.nest(delta)) return;
@@ -85,34 +85,34 @@ GoogleView.prototype.indent = function (this: GoogleView, delta: number): void {
 		return { updateParagraphStyle: { range: { startIndex: start, endIndex: Math.max(start + 1, nl) }, paragraphStyle: { indentStart: by(ps.indentStart), indentFirstLine: by(ps.indentFirstLine) }, fields: "indentStart,indentFirstLine" } };
 	});
 	this.run(requests, range);
-};
+}
 
 /** The font a point bigger or smaller, as Ctrl+Shift+. and , do. */
-GoogleView.prototype.bump = function (this: GoogleView, delta: number): void {
+function bump(this: GoogleView, delta: number): void {
 	this.setText("fontSize", { magnitude: Math.max(1, Math.round(this.state().size) + delta), unit: "PT" });
-};
+}
 
 /** Superscript or subscript, or back to the line when it already is. */
-GoogleView.prototype.baseline = function (this: GoogleView, kind: "SUPERSCRIPT" | "SUBSCRIPT"): void {
+function baseline(this: GoogleView, kind: "SUPERSCRIPT" | "SUBSCRIPT"): void {
 	this.setText("baselineOffset", this.state().baseline === kind ? "NONE" : kind);
-};
+}
 
-GoogleView.prototype.isNumbered = function (this: GoogleView, bullet: { listId?: string; nestingLevel?: number }): boolean {
+function isNumbered(this: GoogleView, bullet: { listId?: string; nestingLevel?: number }): boolean {
 	const glyph = this.doc?.lists?.[bullet.listId ?? ""]?.listProperties?.nestingLevels?.[bullet.nestingLevel ?? 0]?.glyphType;
 	return !!glyph && glyph !== "GLYPH_TYPE_UNSPECIFIED" && glyph !== "NONE";
-};
+}
 
 /** A list for bullets made here, drawn until Google's own comes back. */
-GoogleView.prototype.localList = function (this: GoogleView, numbered: boolean): string {
+function localList(this: GoogleView, numbered: boolean): string {
 	const listId = numbered ? "local-numbered" : "local-bulleted";
 	if (this.doc && !this.doc.lists?.[listId]) {
 		this.doc.lists = { ...(this.doc.lists ?? {}), [listId]: { listProperties: { nestingLevels: Array.from({ length: 9 }, (_, k) => ({ glyphType: numbered ? "DECIMAL" : "GLYPH_TYPE_UNSPECIFIED", glyphFormat: numbered ? `%${k}.` : "", indentStart: { magnitude: 36 + 36 * k, unit: "PT" }, indentFirstLine: { magnitude: 18 + 36 * k, unit: "PT" } })) } } };
 	}
 	return listId;
-};
+}
 
 /** Set one text style on the selection (`undefined` clears it), here at once and in Google next. */
-GoogleView.prototype.setText = function (this: GoogleView, field: keyof DocsTextStyle, value: unknown): void {
+function setText(this: GoogleView, field: keyof DocsTextStyle, value: unknown): void {
 	const range = this.textRange();
 	if (!range) return;
 	if (range === "caret") {
@@ -127,10 +127,10 @@ GoogleView.prototype.setText = function (this: GoogleView, field: keyof DocsText
 	}
 	const textStyle = (value === undefined ? {} : { [field]: value }) as DocsTextStyle;
 	this.run([{ updateTextStyle: { range: { startIndex: range[0], endIndex: range[1] }, textStyle, fields: field } }], range);
-};
+}
 
 /** On for the whole selection unless all of it already has it, as Docs decides. */
-GoogleView.prototype.toggle = function (this: GoogleView, field: "bold" | "italic" | "underline" | "strikethrough"): void {
+function toggle(this: GoogleView, field: "bold" | "italic" | "underline" | "strikethrough"): void {
 	const range = this.range();
 	if (range && range[0] !== range[1]) {
 		let all = true;
@@ -144,19 +144,19 @@ GoogleView.prototype.toggle = function (this: GoogleView, field: "bold" | "itali
 	}
 	const key = field === "strikethrough" ? "strike" : field;
 	this.setText(field, !this.state()[key as "bold"]);
-};
+}
 
 /** Set a paragraph style on every paragraph the selection touches. */
-GoogleView.prototype.setParagraph = function (this: GoogleView, style: DocsParagraphStyle, fields: string): void {
+function setParagraph(this: GoogleView, style: DocsParagraphStyle, fields: string): void {
 	const range = this.range();
 	if (!range) return;
 	const from = this.paragraphStart(range[0]);
 	const to = this.paragraphEnd(range[1]);
 	this.run([{ updateParagraphStyle: { range: { startIndex: from, endIndex: Math.max(from + 1, to) }, paragraphStyle: style, fields } }], range);
-};
+}
 
 /** Bullets or numbers on the selection's paragraphs, or off when they already have that kind. */
-GoogleView.prototype.list = function (this: GoogleView, numbered: boolean): void {
+function list(this: GoogleView, numbered: boolean): void {
 	const range = this.range();
 	if (!range) return;
 	const from = this.paragraphStart(range[0]);
@@ -165,9 +165,9 @@ GoogleView.prototype.list = function (this: GoogleView, numbered: boolean): void
 	const off = numbered ? now.numbered : now.bullet;
 	const r = { startIndex: from, endIndex: Math.max(from + 1, to) };
 	this.run(off ? [{ deleteParagraphBullets: { range: r } }] : [{ deleteParagraphBullets: { range: r } }, { createParagraphBullets: { range: r, bulletPreset: numbered ? "NUMBERED_DECIMAL_ALPHA_ROMAN" : "BULLET_DISC_CIRCLE_SQUARE" } }], range);
-};
+}
 
-GoogleView.prototype.clearFormatting = function (this: GoogleView): void {
+function clearFormatting(this: GoogleView): void {
 	const range = this.textRange();
 	if (!range) return;
 	if (range === "caret") {
@@ -176,24 +176,24 @@ GoogleView.prototype.clearFormatting = function (this: GoogleView): void {
 		return;
 	}
 	this.run([{ updateTextStyle: { range: { startIndex: range[0], endIndex: range[1] }, textStyle: {}, fields: "bold,italic,underline,strikethrough,smallCaps,foregroundColor,backgroundColor,fontSize,weightedFontFamily,baselineOffset" } }], range);
-};
+}
 
 // -- tables ---------------------------------------------------------------------------------
 /** The table cell the caret is in: the table's index now, and the cell's row and column. */
-GoogleView.prototype.cellAt = function (this: GoogleView): { table: number; row: number; column: number } | undefined {
+function cellAt(this: GoogleView): { table: number; row: number; column: number } | undefined {
 	const range = this.range();
 	const unit = range ? this.units[range[0]] ?? this.units[range[0] - 1] : undefined;
 	const cell = unit?.cell;
 	if (!cell) return undefined;
 	const table = this.units.findIndex((u) => u.ch === STRUCT.table && u.tid === cell.t);
 	return table === -1 ? undefined : { table, row: cell.r, column: cell.c };
-};
+}
 
 /**
  * A table's shape changed: a row or column in or out, or a new table. Docs makes the structure, so
  * the page waits for the Doc to come back to draw it; these are not undone here.
  */
-GoogleView.prototype.table = function (this: GoogleView, action: "rowAbove" | "rowBelow" | "colLeft" | "colRight" | "deleteRow" | "deleteCol" | "insert"): void {
+function table(this: GoogleView, action: "rowAbove" | "rowBelow" | "colLeft" | "colRight" | "deleteRow" | "deleteCol" | "insert"): void {
 	let step: TableStep | undefined;
 	if (action === "insert") {
 		const range = this.range();
@@ -210,14 +210,14 @@ GoogleView.prototype.table = function (this: GoogleView, action: "rowAbove" | "r
 	}
 	const done = this.perform(step);
 	if (done) this.record({ table: done });
-};
+}
 
 /**
  * A table's shape changed, as Docs requests: a row or a column in or out, or a whole table. The
  * answer is the step that undoes it. A row or column taken out keeps its cells' words, so
  * putting it back fills them in once the Doc has made the new cells.
  */
-GoogleView.prototype.perform = function (this: GoogleView, step: TableStep): TableStep | undefined {
+function perform(this: GoogleView, step: TableStep): TableStep | undefined {
 	if (step.kind === "table") {
 		if (step.op === "insert") {
 			this.host.style([{ insertTable: { rows: 3, columns: 3, location: { index: step.at! } } }]);
@@ -247,10 +247,10 @@ GoogleView.prototype.perform = function (this: GoogleView, step: TableStep): Tab
 	const texts = grid.cells.filter((cell) => (row ? cell.r : cell.c) === step.index).map((cell) => cell.text);
 	this.host.style([row ? { deleteTableRow: { tableCellLocation: location(step.index) } } : { deleteTableColumn: { tableCellLocation: location(step.index) } }]);
 	return { kind: step.kind, op: "insert", table: step.table, index: step.index, texts };
-};
+}
 
 /** A table as it stands, by the index of its start: its rows, columns, cells and where it ends. */
-GoogleView.prototype.grid = function (this: GoogleView, start: number): { rows: number; columns: number; end: number; cells: Array<{ r: number; c: number; start: number; end: number; text: string }> } | undefined {
+function grid(this: GoogleView, start: number): { rows: number; columns: number; end: number; cells: Array<{ r: number; c: number; start: number; end: number; text: string }> } | undefined {
 	const head = this.units[start];
 	if (head?.ch !== STRUCT.table || head.tid === undefined) return undefined;
 	const cells: Array<{ r: number; c: number; start: number; end: number; text: string }> = [];
@@ -268,10 +268,10 @@ GoogleView.prototype.grid = function (this: GoogleView, start: number): { rows: 
 	}
 	for (const cell of cells) cell.text = cell.text.replace(/\n$/, "");
 	return { rows: new Set(cells.map((c) => c.r)).size, columns: new Set(cells.map((c) => c.c)).size, end, cells };
-};
+}
 
 /** After a Doc arrives: the row or column waiting for its words, given them as typing. */
-GoogleView.prototype.refill = function (this: GoogleView): void {
+function refill(this: GoogleView): void {
 	const step = this.fill;
 	if (!step?.texts) return;
 	const grid = this.grid(step.table);
@@ -285,10 +285,10 @@ GoogleView.prototype.refill = function (this: GoogleView): void {
 	} finally {
 		this.replaying = false;
 	}
-};
+}
 
 /** A link on the selection or the word; with neither, the address goes in as linked text, as Docs puts it. */
-GoogleView.prototype.link = function (this: GoogleView, url: string | undefined): void {
+function link(this: GoogleView, url: string | undefined): void {
 	const range = this.textRange();
 	if (range === "caret" && url) {
 		const at = this.range()![0];
@@ -300,7 +300,7 @@ GoogleView.prototype.link = function (this: GoogleView, url: string | undefined)
 		return;
 	}
 	this.setText("link", url ? { url } : undefined);
-};
+}
 
 // -- comments -------------------------------------------------------------------------------
 /**
@@ -308,7 +308,7 @@ GoogleView.prototype.link = function (this: GoogleView, url: string | undefined)
  * quoted words, not its place, so each is found in the text in order, the first not taken
  * by an earlier one; a comment whose words are gone shows in the list with no highlight.
  */
-GoogleView.prototype.setComments = function (this: GoogleView, comments: ReadonlyArray<{ id: string; quotedFileContent?: { value?: string } }>): void {
+function setComments(this: GoogleView, comments: ReadonlyArray<{ id: string; quotedFileContent?: { value?: string } }>): void {
 	this.commented.clear();
 	const text = this.units.map((u) => (u.ch === "\u000b" ? "\n" : u.ch)).join("");
 	const taken = new Set<number>();
@@ -322,4 +322,29 @@ GoogleView.prototype.setComments = function (this: GoogleView, comments: Readonl
 		for (let i = at; i < at + quote.length; i++) if (!this.commented.has(i)) this.commented.set(i, comment.id);
 	}
 	this.render();
-};
+}
+
+/** Put these methods on the class: called once, where GoogleView is defined, so the class never exists without them. */
+export function installFormat(cls: typeof GoogleView): void {
+	Object.assign(cls.prototype, {
+		bullets,
+		nest,
+		indent,
+		bump,
+		baseline,
+		isNumbered,
+		localList,
+		setText,
+		toggle,
+		setParagraph,
+		list,
+		clearFormatting,
+		cellAt,
+		table,
+		perform,
+		grid,
+		refill,
+		link,
+		setComments,
+	});
+}

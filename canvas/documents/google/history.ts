@@ -1,9 +1,9 @@
 import type { DocsParagraphStyle, DocsRequest, DocsTextStyle } from "./types.ts";
 import { isStruct } from "./units.ts";
 import { type Step, dedupeBullets } from "./text-units.ts";
-import { GoogleView } from "./view.ts";
+import type { GoogleView } from "./view.ts";
 
-/** A GoogleView's undo and redo: steps recorded, joined, applied here and inverted, added to its prototype. */
+/** A GoogleView's undo and redo: steps recorded, joined, applied here and inverted, which installHistory puts on its prototype. */
 
 declare module "./view.ts" {
 	interface GoogleView {
@@ -20,7 +20,7 @@ declare module "./view.ts" {
 }
 
 /** Steps made inside `work` become one undo step. */
-GoogleView.prototype.transact = function (this: GoogleView, work: () => void): void {
+function transact(this: GoogleView, work: () => void): void {
 	if (this.batch || this.replaying) return work();
 	const batch: Step[] = (this.batch = []);
 	try {
@@ -30,9 +30,9 @@ GoogleView.prototype.transact = function (this: GoogleView, work: () => void): v
 	}
 	if (batch.length === 1) this.record(batch[0]!);
 	else if (batch.length) this.record({ group: batch, ...(batch[0]!.typing === "ins" ? { typing: "ins" as const, time: batch[0]!.time } : {}) });
-};
+}
 
-GoogleView.prototype.record = function (this: GoogleView, step: Step): void {
+function record(this: GoogleView, step: Step): void {
 	if (this.replaying) return;
 	if (this.batch) return void this.batch.push(step);
 	this.redoStack = [];
@@ -40,10 +40,10 @@ GoogleView.prototype.record = function (this: GoogleView, step: Step): void {
 	if (step.typing && top?.typing === step.typing && (step.time ?? 0) - (top.time ?? 0) < 1500 && this.join(top, step)) return;
 	this.undoStack.push(step);
 	if (this.undoStack.length > 500) this.undoStack.shift();
-};
+}
 
 /** Typing joined to the step before it: Docs undoes a burst of typing, or of deleting, at once. */
-GoogleView.prototype.join = function (this: GoogleView, top: Step, step: Step): boolean {
+function join(this: GoogleView, top: Step, step: Step): boolean {
 	// Deleting styled text: the deletion and the styles that undo puts back, joined to the deleting before.
 	if (top.group?.length === 2 && step.group?.length === 2 && step.typing === "del" && top.group[1]!.splice && step.group[1]!.splice && top.group[0]!.inverse && step.group[0]!.inverse) {
 		const a = top.group[1]!.splice;
@@ -97,17 +97,17 @@ GoogleView.prototype.join = function (this: GoogleView, top: Step, step: Step): 
 	}
 	top.time = step.time;
 	return true;
-};
+}
 
-GoogleView.prototype.undo = function (this: GoogleView): void {
+function undo(this: GoogleView): void {
 	this.step(this.undoStack, this.redoStack);
-};
+}
 
-GoogleView.prototype.redo = function (this: GoogleView): void {
+function redo(this: GoogleView): void {
 	this.step(this.redoStack, this.undoStack);
-};
+}
 
-GoogleView.prototype.step = function (this: GoogleView, from: Step[], to: Step[]): void {
+function step(this: GoogleView, from: Step[], to: Step[]): void {
 	this.pending = undefined;
 	for (let step = from.pop(); step; step = from.pop()) {
 		const done = this.apply(step);
@@ -116,10 +116,10 @@ GoogleView.prototype.step = function (this: GoogleView, from: Step[], to: Step[]
 		to.push(done);
 		return;
 	}
-};
+}
 
 /** Do what a step says, and answer the step that takes it back. */
-GoogleView.prototype.apply = function (this: GoogleView, step: Step): Step | undefined {
+function apply(this: GoogleView, step: Step): Step | undefined {
 	if (step.group) {
 		const done: Step[] = [];
 		for (const part of [...step.group].reverse()) {
@@ -159,10 +159,10 @@ GoogleView.prototype.apply = function (this: GoogleView, step: Step): Step | und
 		return { requests: step.inverse, inverse: step.requests };
 	}
 	return undefined;
-};
+}
 
 /** Requests as Docs would apply them, to the units here: the styles a page draws with. */
-GoogleView.prototype.applyLocal = function (this: GoogleView, requests: readonly DocsRequest[]): void {
+function applyLocal(this: GoogleView, requests: readonly DocsRequest[]): void {
 	for (const request of requests) {
 		if ("updateTextStyle" in request) {
 			const { range, textStyle, fields } = request.updateTextStyle;
@@ -210,10 +210,10 @@ GoogleView.prototype.applyLocal = function (this: GoogleView, requests: readonly
 			}
 		}
 	}
-};
+}
 
 /** The requests that put back what `requests` would change, from the units as they are now. */
-GoogleView.prototype.inverseOf = function (this: GoogleView, requests: readonly DocsRequest[]): DocsRequest[] {
+function inverseOf(this: GoogleView, requests: readonly DocsRequest[]): DocsRequest[] {
 	const groups: DocsRequest[][] = [];
 	for (const request of requests) {
 		const out: DocsRequest[] = [];
@@ -269,4 +269,19 @@ GoogleView.prototype.inverseOf = function (this: GoogleView, requests: readonly 
 	}
 	// Undone in the opposite order, so a later request's undo does not fight an earlier one's.
 	return dedupeBullets(groups.reverse().flat());
-};
+}
+
+/** Put these methods on the class: called once, where GoogleView is defined, so the class never exists without them. */
+export function installHistory(cls: typeof GoogleView): void {
+	Object.assign(cls.prototype, {
+		transact,
+		record,
+		join,
+		undo,
+		redo,
+		step,
+		apply,
+		applyLocal,
+		inverseOf,
+	});
+}

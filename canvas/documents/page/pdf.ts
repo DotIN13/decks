@@ -34,25 +34,16 @@ export class PdfPane {
 	readonly openPdf!: HTMLButtonElement;
 
 	constructor(private readonly n: PdfNeeds) {
-	
+		// The bar over the PDF: its state, its errors, and typeset again, open and close.
 		const recompile = this.n.iconButton("refresh", "Typeset again", "dp-ib dp-sm");
 		this.openPdf = this.n.iconButton("external", "Open the PDF in a new tab", "dp-ib dp-sm");
 		const closePdf = this.n.iconButton("x", "Close the PDF", "dp-ib dp-sm");
 		this.n.pdfBar.append(this.n.pdfState, this.n.errButton, recompile, this.openPdf, closePdf);
 		this.openPdf.disabled = true;
-	
+
 		const savedWidth = Number(localStorage.getItem("dp-pdf-width") ?? 0);
 		if (savedWidth > 0) this.n.pdfPane.style.setProperty("--pdf-w", `${savedWidth}px`);
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+		// What each button does, and the divider dragged to size the pane.
 		this.n.pdfButton.onclick = () => this.showPdf(!this.pdfOpen);
 		closePdf.onclick = () => this.showPdf(false);
 		recompile.onclick = () => this.compileNow();

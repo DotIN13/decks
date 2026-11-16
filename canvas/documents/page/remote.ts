@@ -27,11 +27,7 @@ export class Remotes {
 	pasteSaid = "";
 
 	constructor(private readonly n: RemoteNeeds) {
-	
-	
-	
-	
-	
+		// Git: its menu opens on the button and closes on a press anywhere else.
 		const closeGit = () => {
 			this.n.gitMenu.hidden = true;
 			this.n.gitButton.setAttribute("aria-pressed", "false");
@@ -48,11 +44,7 @@ export class Remotes {
 		document.addEventListener("mousedown", (event) => {
 			if (!this.n.gitBox.contains(event.target as Node)) closeGit();
 		});
-	
-	
-	
-	
-	
+		// Google: the menu that links the file to a Doc, opened and closed the same way.
 		this.n.googleButton.onclick = () => {
 			const opening = this.n.googleMenu.hidden;
 			this.n.googleMenu.hidden = !opening;

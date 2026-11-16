@@ -1,9 +1,9 @@
 import type { DocsDimension, DocsParagraphStyle, DocsRequest, DocsTextStyle } from "./types.ts";
 import { isStruct, OBJECT_UNIT } from "./units.ts";
 import { type Unit, pt, sameStyle, smartQuote, runsOf, wordStart, wordEnd, lineStart, type Step } from "./text-units.ts";
-import { GoogleView } from "./view.ts";
+import type { GoogleView } from "./view.ts";
 
-/** How typing, keys and the clipboard change a GoogleView's Doc, added to its prototype. */
+/** How typing, keys and the clipboard change a GoogleView's Doc, which installTyping puts on its prototype. */
 
 declare module "./view.ts" {
 	interface GoogleView {
@@ -34,7 +34,7 @@ declare module "./view.ts" {
  * chosen for the next typing (`pending`), else the first replaced character's, else Docs' own
  * choice, the style of the text before it. The answer is where the text went, or undefined.
  */
-GoogleView.prototype.replace = function (this: GoogleView, from: number, to: number, text: string, typing = false): number | undefined {
+function replace(this: GoogleView, from: number, to: number, text: string, typing = false): number | undefined {
 	const current = this.sync.text;
 	if (from < 1 || to > current.length || to < from) return undefined;
 	const runs: Array<[number, number]> = [];
@@ -68,10 +68,10 @@ GoogleView.prototype.replace = function (this: GoogleView, from: number, to: num
 	});
 	this.select(at + text.length);
 	return at;
-};
+}
 
 /** One splice of the page's text, kept for undo. */
-GoogleView.prototype.edit = function (this: GoogleView, at: number, end: number, text: string, typing: boolean): void {
+function edit(this: GoogleView, at: number, end: number, text: string, typing: boolean): void {
 	const before = this.sync.text.slice(at, end);
 	if (!before && !text) return;
 	// Paragraphs joined: undo splits them again, and gives each back the style it had.
@@ -80,14 +80,14 @@ GoogleView.prototype.edit = function (this: GoogleView, at: number, end: number,
 	const kind = !typing ? undefined : text && !text.includes("\n") ? "ins" : !text && before.length <= 2 ? "del" : undefined;
 	const step: Step = { splice: { at, before: text, text: before }, ...(kind ? { typing: kind } : {}), time: Date.now() };
 	this.record(restore?.length ? { group: [{ requests: [], inverse: restore }, step], ...(kind ? { typing: kind } : {}), time: step.time } : step);
-};
+}
 
 /**
  * Requests that give the text `from..to` the style it has now, run by run: undoing a deletion
  * puts the words back as Docs does, bold where they were bold, not in the style beside them.
  * None when neither the text nor what it would take its style from has any style of its own.
  */
-GoogleView.prototype.textAsItIs = function (this: GoogleView, from: number, to: number): DocsRequest[] {
+function textAsItIs(this: GoogleView, from: number, to: number): DocsRequest[] {
 	const plain = (u: Unit | undefined) => !u?.ts || !Object.keys(u.ts).length;
 	const units = this.units.slice(from, to);
 	if (units.every((u) => plain(u) || u.ch === "\n" || isStruct(u.ch)) && plain(this.units[from - 1]) && plain(this.units[to])) return [];
@@ -104,14 +104,14 @@ GoogleView.prototype.textAsItIs = function (this: GoogleView, from: number, to: 
 		if (text && start === -1) start = i;
 	}
 	return out;
-};
+}
 
 /**
  * Requests that give every paragraph `from..to` touches the style it has now: its named style,
  * alignment, indents and spacing, and its bullet. Docs joins paragraphs into the first one's
  * style, so this is what undoing a join needs once the text is back.
  */
-GoogleView.prototype.paragraphsAsTheyAre = function (this: GoogleView, from: number, to: number): DocsRequest[] {
+function paragraphsAsTheyAre(this: GoogleView, from: number, to: number): DocsRequest[] {
 	const out: DocsRequest[] = [];
 	for (const nl of this.paragraphsIn(from, to + 1)) {
 		const para = this.units[nl]?.para;
@@ -126,10 +126,10 @@ GoogleView.prototype.paragraphsAsTheyAre = function (this: GoogleView, from: num
 		if (bullet) out.push(...this.bullets([nl], [bullet.nestingLevel ?? 0], this.isNumbered(bullet), bullet.listId));
 	}
 	return out;
-};
+}
 
 /** Text set to read in `want`, when Docs would give it another style, or always with `force`; true when a style was sent. */
-GoogleView.prototype.restyle = function (this: GoogleView, from: number, to: number, want: DocsTextStyle, force = false): boolean {
+function restyle(this: GoogleView, from: number, to: number, want: DocsTextStyle, force = false): boolean {
 	const fields = new Set(Object.keys(want));
 	let same = true;
 	for (let i = from; i < to; i++) {
@@ -141,9 +141,9 @@ GoogleView.prototype.restyle = function (this: GoogleView, from: number, to: num
 	if ((same && !force) || !fields.size) return false;
 	this.run([{ updateTextStyle: { range: { startIndex: from, endIndex: to }, textStyle: want, fields: [...fields].join(",") } }]);
 	return true;
-};
+}
 
-GoogleView.prototype.input = function (this: GoogleView, event: InputEvent): void {
+function input(this: GoogleView, event: InputEvent): void {
 	if (this.composing || event.inputType === "insertCompositionText") return;
 	event.preventDefault();
 	const range = this.range();
@@ -209,13 +209,13 @@ GoogleView.prototype.input = function (this: GoogleView, event: InputEvent): voi
 			this.toggle("underline");
 			return;
 	}
-};
+}
 
 /**
  * Enter, as Docs takes it: on an empty list item it leaves the list, or goes up a level; at the
  * end of a heading the new paragraph is Normal text; anywhere else both halves keep the style.
  */
-GoogleView.prototype.enter = function (this: GoogleView, from: number, to: number): void {
+function enter(this: GoogleView, from: number, to: number): void {
 	const nl = this.paragraphEnd(from);
 	const para = this.units[nl]?.para;
 	if (from === to && this.paragraphStart(from) === nl && para?.bullet) {
@@ -237,10 +237,10 @@ GoogleView.prototype.enter = function (this: GoogleView, from: number, to: numbe
 	// What is typed after a heading reads as Normal text, not in the heading's own run style.
 	if (heading) this.pending = { at: at + 1, ts: {} };
 	this.autolink(at);
-};
+}
 
 /** At a paragraph's start: its bullet off (Docs keeps where its text sat), or its indent back a step. */
-GoogleView.prototype.outdent = function (this: GoogleView, at: number): boolean {
+function outdent(this: GoogleView, at: number): boolean {
 	const nl = this.paragraphEnd(at);
 	const para = this.units[nl]?.para;
 	const range = { startIndex: at, endIndex: Math.max(at + 1, nl) };
@@ -253,10 +253,10 @@ GoogleView.prototype.outdent = function (this: GoogleView, at: number): boolean 
 	const step = (d: DocsDimension | undefined) => ({ magnitude: Math.max(0, pt(d) - 36), unit: "PT" });
 	this.run([{ updateParagraphStyle: { range, paragraphStyle: { indentStart: step(para?.ps.indentStart), indentFirstLine: step(para?.ps.indentFirstLine) }, fields: "indentStart,indentFirstLine" } }]);
 	return true;
-};
+}
 
 /** After a space: "* ", "- ", "1. ", "1) ", "A. " or "I. " at a paragraph's start becomes a list, as Docs detects one; a web address before it a link. */
-GoogleView.prototype.autoformat = function (this: GoogleView, space: number): void {
+function autoformat(this: GoogleView, space: number): void {
 	const text = this.sync.text;
 	const start = this.paragraphStart(space);
 	const head = text.slice(start, space);
@@ -271,10 +271,10 @@ GoogleView.prototype.autoformat = function (this: GoogleView, space: number): vo
 		return;
 	}
 	this.autolink(space);
-};
+}
 
 /** A web address or an email address just finished, before `end`: linked, as Docs detects one. */
-GoogleView.prototype.autolink = function (this: GoogleView, end: number): void {
+function autolink(this: GoogleView, end: number): void {
 	const text = this.sync.text;
 	let start = end;
 	while (start > 1 && !/[\s-￼]/.test(text[start - 1]!)) start--;
@@ -285,10 +285,10 @@ GoogleView.prototype.autolink = function (this: GoogleView, end: number): void {
 	const caret = this.range();
 	this.run([{ updateTextStyle: { range: { startIndex: start, endIndex: start + word.length }, textStyle: { link: { url } }, fields: "link" } }]);
 	if (caret) this.select(caret[0], caret[1]);
-};
+}
 
 /** Pasted: Docs keeps bold, italic, underline, strikethrough and links from what was copied. */
-GoogleView.prototype.paste = function (this: GoogleView, from: number, to: number, data: DataTransfer | null): void {
+function paste(this: GoogleView, from: number, to: number, data: DataTransfer | null): void {
 	const plain = (data?.getData("text/plain") ?? "").replace(/\r\n?/g, "\n");
 	const html = data?.getData("text/html");
 	const runs = html ? runsOf(html) : undefined;
@@ -310,10 +310,10 @@ GoogleView.prototype.paste = function (this: GoogleView, from: number, to: numbe
 		if (requests.length) this.run(requests);
 		this.select(at + text.length);
 	});
-};
+}
 
 /** Copied as Docs copies: the words as plain text, and as styled HTML without the page's own furniture. */
-GoogleView.prototype.copy = function (this: GoogleView, event: ClipboardEvent, cut: boolean): void {
+function copy(this: GoogleView, event: ClipboardEvent, cut: boolean): void {
 	const range = this.range(true);
 	const selection = document.getSelection();
 	if (!range || range[0] === range[1] || !selection?.rangeCount || !event.clipboardData) return;
@@ -339,9 +339,9 @@ GoogleView.prototype.copy = function (this: GoogleView, event: ClipboardEvent, c
 	event.clipboardData.setData("text/html", html);
 	event.clipboardData.setData("text/plain", this.quote());
 	if (cut && !this.sync.readOnly) this.replace(range[0], range[1], "");
-};
+}
 
-GoogleView.prototype.key = function (this: GoogleView, event: KeyboardEvent): void {
+function key(this: GoogleView, event: KeyboardEvent): void {
 	// The board's own keys (its editor, its undo) are not this page's: the Doc keeps them.
 	event.stopPropagation();
 	if (event.isComposing) return;
@@ -370,10 +370,10 @@ GoogleView.prototype.key = function (this: GoogleView, event: KeyboardEvent): vo
 		event.preventDefault();
 		this.pageBreak();
 	}
-};
+}
 
 /** Docs' keyboard shortcuts, by the key's place on the keyboard so a layout or Option does not change them. */
-GoogleView.prototype.shortcut = function (this: GoogleView, event: KeyboardEvent, mod: boolean): (() => void) | undefined {
+function shortcut(this: GoogleView, event: KeyboardEvent, mod: boolean): (() => void) | undefined {
 	const code = event.code;
 	if (!mod) return event.altKey && event.shiftKey && code === "Digit5" ? () => this.toggle("strikethrough") : undefined;
 	if (event.altKey) {
@@ -414,13 +414,13 @@ GoogleView.prototype.shortcut = function (this: GoogleView, event: KeyboardEvent
 			return this.host.command ? () => this.host.command!("link") : undefined;
 	}
 	return undefined;
-};
+}
 
 /**
  * Tab, as Docs takes it: in a table, the next cell (Shift, the one before), and past the last a
  * new row; at a list item's start, or across several, a level down (Shift, up); else a tab.
  */
-GoogleView.prototype.tab = function (this: GoogleView, back: boolean): void {
+function tab(this: GoogleView, back: boolean): void {
 	const range = this.range();
 	if (!range) return;
 	const nls = this.paragraphsIn(range[0], range[1]);
@@ -439,19 +439,19 @@ GoogleView.prototype.tab = function (this: GoogleView, back: boolean): void {
 		return;
 	}
 	if (!back) this.replace(range[0], range[1], "\t", true);
-};
+}
 
 /** A page break where the caret is: Docs makes it, with a new paragraph after. */
-GoogleView.prototype.pageBreak = function (this: GoogleView): void {
+function pageBreak(this: GoogleView): void {
 	const range = this.range();
 	if (!range) return;
 	let at = range[0];
 	if (range[0] !== range[1]) at = this.replace(range[0], range[1], "") ?? at;
 	const done = this.breakPage({ at, op: "insert" });
 	if (done) this.record({ pagebreak: done });
-};
+}
 
-GoogleView.prototype.breakPage = function (this: GoogleView, step: { at: number; op: "insert" | "delete" }): { at: number; op: "insert" | "delete" } | undefined {
+function breakPage(this: GoogleView, step: { at: number; op: "insert" | "delete" }): { at: number; op: "insert" | "delete" } | undefined {
 	if (step.op === "insert") {
 		if (this.cellAt()) return undefined;
 		this.host.style([{ insertPageBreak: { location: { index: step.at } } }]);
@@ -466,13 +466,13 @@ GoogleView.prototype.breakPage = function (this: GoogleView, step: { at: number;
 		this.replaying = false;
 	}
 	return { at: step.at, op: "insert" };
-};
+}
 
 /**
  * Docs requests made here: applied to the page at once, sent to Google, and kept for undo with
  * the requests that put back what they changed.
  */
-GoogleView.prototype.run = function (this: GoogleView, requests: DocsRequest[], select?: [number, number]): void {
+function run(this: GoogleView, requests: DocsRequest[], select?: [number, number]): void {
 	if (!requests.length) return;
 	const inverse = this.inverseOf(requests);
 	this.applyLocal(requests);
@@ -481,4 +481,28 @@ GoogleView.prototype.run = function (this: GoogleView, requests: DocsRequest[], 
 	this.record({ requests, inverse });
 	this.render();
 	if (select) this.select(select[0], select[1]);
-};
+}
+
+/** Put these methods on the class: called once, where GoogleView is defined, so the class never exists without them. */
+export function installTyping(cls: typeof GoogleView): void {
+	Object.assign(cls.prototype, {
+		replace,
+		edit,
+		textAsItIs,
+		paragraphsAsTheyAre,
+		restyle,
+		input,
+		enter,
+		outdent,
+		autoformat,
+		autolink,
+		paste,
+		copy,
+		key,
+		shortcut,
+		tab,
+		pageBreak,
+		breakPage,
+		run,
+	});
+}

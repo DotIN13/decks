@@ -6,6 +6,7 @@ import { spliceBetween, type Mark } from "../marks.ts";
 import { texMeta } from "../tex.ts";
 import type { FormatState, LiveHost, Range2, UndoEntry } from "../live.ts";
 import { Builder, h } from "./builder.ts";
+import { installInput } from "./input.ts";
 
 /** The LiveEditor: its state, how it draws the file, where the caret is, and its history. What keys and the toolbar do is in input.ts. */
 
@@ -207,12 +208,6 @@ export class LiveEditor {
 			offsets.push(total);
 			total += node.data.length;
 		}
-		const title = (id: string) => {
-			const change = changes.find((c) => c.id === id);
-			if (!change) return "Edited";
-			const who = change.by === "outside" ? "another program" : change.by;
-			return `Edited by ${who} at ${new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-		};
 		const local = marks.filter((m) => (m.kind === "ins" ? m.end > start && m.start < start + total : m.at >= start && m.at <= start + total));
 		if (local.length === 0) return;
 		const lineOf = (offset: number) => [...el.querySelectorAll<HTMLElement>(".lv-line")].find((line) => Number(line.dataset.s) <= offset && offset <= Number(line.dataset.e));
@@ -584,6 +579,9 @@ export class LiveEditor {
 		this.apply(moved, { start: end, end }, "type");
 	}
 }
+
+// What the class can do beyond drawing, defined beside it and put on it here, once.
+installInput(LiveEditor);
 
 function textNodes(root: Node): Text[] {
 	const out: Text[] = [];

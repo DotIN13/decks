@@ -5,6 +5,9 @@ import type { DocsColor, DocsDimension, DocsDocument, DocsParagraphStyle, DocsRe
 import { isStruct, OBJECT_UNIT, STRUCT } from "./units.ts";
 import type { Mark } from "../marks.ts";
 import { type Unit, PT, GAP, pt, DEFAULTS, cssColor, firstIndex, lastIndex, WORD, numeral, applyText, cellStyle, buildUnits, type Step, type TableStep, shiftStep } from "./text-units.ts";
+import { installTyping } from "./typing.ts";
+import { installHistory } from "./history.ts";
+import { installFormat } from "./format.ts";
 
 /**
  * A Google Doc drawn as Google lays it out, from the Doc itself: its page size and margins, its
@@ -732,3 +735,8 @@ export class GoogleView {
 		return text.replace(/[\uE000-\uE004]/g, "").replace(/\uFFFC/g, "▢").replace(/\u000b/g, "\n");
 	}
 }
+
+// What the class can do beyond drawing, defined beside it and put on it here, once.
+installTyping(GoogleView);
+installHistory(GoogleView);
+installFormat(GoogleView);

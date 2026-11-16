@@ -1,4 +1,3 @@
-import { blocks } from "../blocks.ts";
 import { readTabular, TEXT_ENVS, THEOREMS, withMacros, type TexMeta } from "../tex.ts";
 
 /** How a document's source is drawn as blocks: the Builder, and the small elements it makes. */

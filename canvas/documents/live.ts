@@ -64,6 +64,6 @@ export interface UndoEntry {
 	kind: string;
 }
 
-// The editor, its drawing of source text, and what keys and the toolbar do, each in live/.
+// The editor, its drawing of source text, and what keys and the toolbar do, each in live/: the
+// editor puts its input on itself, so importing it alone gives a whole editor.
 export { LiveEditor } from "./live/editor.ts";
-import "./live/input.ts";

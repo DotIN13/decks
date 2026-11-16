@@ -1,9 +1,9 @@
 import type { Splice } from "../model.ts";
 import type { BlockStyle, InlineStyle, Range2 } from "../live.ts";
 import { Builder, isWord } from "./builder.ts";
-import { LiveEditor } from "./editor.ts";
+import type { LiveEditor } from "./editor.ts";
 
-/** What keys, the clipboard, the mouse and the toolbar do to a LiveEditor's text, added to its prototype. */
+/** What keys, the clipboard, the mouse and the toolbar do to a LiveEditor's text, which installInput puts on its prototype. */
 
 declare module "./editor.ts" {
 	interface LiveEditor {
@@ -32,7 +32,7 @@ declare module "./editor.ts" {
 	}
 }
 
-LiveEditor.prototype.beforeInput = function (this: LiveEditor, event: InputEvent): void {
+function beforeInput(this: LiveEditor, event: InputEvent): void {
 	const type = event.inputType;
 	if (type === "insertCompositionText" || this.composing || event.isComposing) return;
 	event.preventDefault();
@@ -90,35 +90,35 @@ LiveEditor.prototype.beforeInput = function (this: LiveEditor, event: InputEvent
 		}
 		this.apply([{ at: range.start, before: text.slice(range.start, range.end), text: "" }], { start: range.start, end: range.start }, backward ? "delete" : "delete");
 	}
-};
+}
 
-LiveEditor.prototype.targetRange = function (this: LiveEditor, event: InputEvent): Range2 | undefined {
+function targetRange(this: LiveEditor, event: InputEvent): Range2 | undefined {
 	const range = event.getTargetRanges?.()[0];
 	if (!range) return undefined;
 	const a = this.offsetAt(range.startContainer, range.startOffset);
 	const b = this.offsetAt(range.endContainer, range.endOffset);
 	return { start: Math.min(a, b), end: Math.max(a, b) };
-};
+}
 
-LiveEditor.prototype.lineAround = function (this: LiveEditor, offset: number): { start: number; end: number; text: string } {
+function lineAround(this: LiveEditor, offset: number): { start: number; end: number; text: string } {
 	const text = this.sync.text;
 	const start = text.lastIndexOf("\n", offset - 1) + 1;
 	let end = text.indexOf("\n", offset);
 	if (end === -1) end = text.length;
 	return { start, end, text: text.slice(start, end) };
-};
+}
 
-LiveEditor.prototype.chunkKind = function (this: LiveEditor, offset: number): string {
+function chunkKind(this: LiveEditor, offset: number): string {
 	let kind = "flow";
 	for (const c of this.chunks()) {
 		if (Number(c.dataset.start) <= offset) kind = c.dataset.kind ?? "flow";
 		else break;
 	}
 	return kind;
-};
+}
 
 /** The block syntax a line starts with: a heading's `#`, a quote's `>`, a list's marker, `\item`. */
-LiveEditor.prototype.prefixOf = function (this: LiveEditor, line: string): { len: number; kind: string; match: RegExpExecArray } | undefined {
+function prefixOf(this: LiveEditor, line: string): { len: number; kind: string; match: RegExpExecArray } | undefined {
 	if (this.tex) {
 		const item = /^(\s*)\\item(\[[^\]]*\])?[ \t]*/.exec(line);
 		return item ? { len: item[0].length, kind: "ul", match: item } : undefined;
@@ -128,9 +128,9 @@ LiveEditor.prototype.prefixOf = function (this: LiveEditor, line: string): { len
 	if ((m = /^([ \t]*)([-*+]|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?/.exec(line))) return { len: m[0].length, kind: m[6] ? "task" : m[3] ? "ol" : "ul", match: m };
 	if ((m = /^( {0,3}>[ \t]?)+/.exec(line))) return { len: m[0].length, kind: "quote", match: m };
 	return undefined;
-};
+}
 
-LiveEditor.prototype.enter = function (this: LiveEditor, at: Range2): void {
+function enter(this: LiveEditor, at: Range2): void {
 	const line = this.lineAround(at.start);
 	const kind = this.chunkKind(at.start);
 	if (kind !== "flow") {
@@ -154,10 +154,10 @@ LiveEditor.prototype.enter = function (this: LiveEditor, at: Range2): void {
 	if (line.text.trim() === "") return this.replace(at, "\n");
 	// A new paragraph: a blank line between, which is what a paragraph is in markdown and LaTeX.
 	this.replace(at, "\n\n");
-};
+}
 
 /** Backspace just after a line's block syntax takes the syntax off, as Typora does. True when it did. */
-LiveEditor.prototype.backspaceAtLineStart = function (this: LiveEditor, offset: number): boolean {
+function backspaceAtLineStart(this: LiveEditor, offset: number): boolean {
 	const line = this.lineAround(offset);
 	const prefix = this.prefixOf(line.text);
 	if (prefix && offset === line.start + prefix.len && this.chunkKind(offset) === "flow") {
@@ -173,9 +173,9 @@ LiveEditor.prototype.backspaceAtLineStart = function (this: LiveEditor, offset: 
 		return true;
 	}
 	return false;
-};
+}
 
-LiveEditor.prototype.keydown = function (this: LiveEditor, event: KeyboardEvent): void {
+function keydown(this: LiveEditor, event: KeyboardEvent): void {
 	// The page owns the keyboard while it has the caret: the board around it must not take ⌘Z or Backspace too.
 	if (event.key !== "Escape") event.stopPropagation();
 	if (event.isComposing || this.composing) return;
@@ -230,13 +230,13 @@ LiveEditor.prototype.keydown = function (this: LiveEditor, event: KeyboardEvent)
 		if (!event.shiftKey) this.replace(at, this.chunkKind(at.start) === "code" ? "    " : "\t");
 	}
 	if (event.key === "Escape") this.root.blur();
-};
+}
 
 /**
  * Where the caret goes to step into a closed element whose source is hidden (a reference, inline
  * maths, a picture) from just before it (`forward`) or just after it; undefined when there is none.
  */
-LiveEditor.prototype.hiddenSourceAt = function (this: LiveEditor, offset: number, forward: boolean): number | undefined {
+function hiddenSourceAt(this: LiveEditor, offset: number, forward: boolean): number | undefined {
 	for (const el of this.root.querySelectorAll<HTMLElement>(".lv-i:not(.open)")) {
 		if (!el.querySelector(":scope > .lv-src") || el.closest("[data-widget]")) continue;
 		const chunk = el.closest<HTMLElement>(".lv-chunk");
@@ -247,26 +247,26 @@ LiveEditor.prototype.hiddenSourceAt = function (this: LiveEditor, offset: number
 		if (!forward && offset === e) return e - Math.max(1, Number(el.dataset.c ?? 1));
 	}
 	return undefined;
-};
+}
 
-LiveEditor.prototype.copy = function (this: LiveEditor, event: ClipboardEvent, cut: boolean): void {
+function copy(this: LiveEditor, event: ClipboardEvent, cut: boolean): void {
 	const at = this.selection();
 	if (!at || at.start === at.end) return;
 	event.preventDefault();
 	// The file's own characters, syntax and all, so pasting it elsewhere keeps its formatting.
 	event.clipboardData?.setData("text/plain", this.sync.text.slice(at.start, at.end));
 	if (cut && !this.sync.readOnly) this.apply([{ at: at.start, before: this.sync.text.slice(at.start, at.end), text: "" }], { start: at.start, end: at.start });
-};
+}
 
-LiveEditor.prototype.paste = function (this: LiveEditor, event: ClipboardEvent): void {
+function paste(this: LiveEditor, event: ClipboardEvent): void {
 	event.preventDefault();
 	if (this.sync.readOnly) return;
 	const at = this.selection();
 	const data = event.clipboardData?.getData("text/plain");
 	if (at && data) this.replace(at, data.replace(/\r\n?/g, "\n"));
-};
+}
 
-LiveEditor.prototype.drop = function (this: LiveEditor, event: DragEvent): void {
+function drop(this: LiveEditor, event: DragEvent): void {
 	event.preventDefault();
 	if (this.sync.readOnly) return;
 	const data = event.dataTransfer?.getData("text/plain");
@@ -274,9 +274,9 @@ LiveEditor.prototype.drop = function (this: LiveEditor, event: DragEvent): void 
 	if (!data || !pos || !this.root.contains(pos.startContainer)) return;
 	const at = this.offsetAt(pos.startContainer, pos.startOffset);
 	this.replace({ start: at, end: at }, data);
-};
+}
 
-LiveEditor.prototype.pressed = function (this: LiveEditor, event: MouseEvent): void {
+function pressed(this: LiveEditor, event: MouseEvent): void {
 	const target = event.target as HTMLElement;
 	const drawn = target.closest<HTMLElement>("[data-widget]");
 	if (!drawn || !this.root.contains(drawn)) return;
@@ -304,31 +304,31 @@ LiveEditor.prototype.pressed = function (this: LiveEditor, event: MouseEvent): v
 	this.root.focus({ preventScroll: true });
 	this.place({ start, end: start });
 	this.state();
-};
+}
 
-LiveEditor.prototype.clicked = function (this: LiveEditor, event: MouseEvent): void {
+function clicked(this: LiveEditor, event: MouseEvent): void {
 	const link = (event.target as HTMLElement).closest<HTMLElement>("[data-href]");
 	if (link && (event.metaKey || event.ctrlKey)) {
 		event.preventDefault();
 		window.open(link.dataset.href, "_blank", "noopener");
 	}
-};
+}
 
 // --- the styling tools -------------------------------------------------------------------
 
-LiveEditor.prototype.delimiters = function (this: LiveEditor, style: InlineStyle): [string, string] | undefined {
+function delimiters(this: LiveEditor, style: InlineStyle): [string, string] | undefined {
 	if (this.tex) {
 		const map: Partial<Record<InlineStyle, [string, string]>> = { bold: ["\\textbf{", "}"], italic: ["\\emph{", "}"], underline: ["\\underline{", "}"], code: ["\\texttt{", "}"], math: ["$", "$"], strike: ["\\sout{", "}"] };
 		return map[style];
 	}
 	const map: Record<InlineStyle, [string, string]> = { bold: ["**", "**"], italic: ["*", "*"], strike: ["~~", "~~"], underline: ["<u>", "</u>"], code: ["`", "`"], mark: ["==", "=="], math: ["$", "$"] };
 	return map[style];
-};
+}
 
 const CLASS: Record<InlineStyle, string> = { bold: "lv-b", italic: "lv-em", strike: "lv-s", underline: "lv-u", code: "lv-code", mark: "lv-mark", math: "lv-math" };
 
 /** The drawn element of a style around an offset, with its place in the text. */
-LiveEditor.prototype.around = function (this: LiveEditor, cls: string, at: Range2): { s: number; e: number; o: number; c: number } | undefined {
+function around(this: LiveEditor, cls: string, at: Range2): { s: number; e: number; o: number; c: number } | undefined {
 	const sel = getSelection();
 	const node = sel?.anchorNode;
 	const el = node ? (node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement)) : null;
@@ -340,10 +340,10 @@ LiveEditor.prototype.around = function (this: LiveEditor, cls: string, at: Range
 	const e = base + Number(found.dataset.e);
 	if (at.start < s || at.end > e) return undefined;
 	return { s, e, o: Number(found.dataset.o), c: Number(found.dataset.c) };
-};
+}
 
 /** Bold, italic and the rest: taken off when the caret is in it, put round the selection or the word otherwise. */
-LiveEditor.prototype.toggle = function (this: LiveEditor, style: InlineStyle): void {
+function toggle(this: LiveEditor, style: InlineStyle): void {
 	if (this.sync.readOnly) return;
 	const at = this.selection();
 	const delims = this.delimiters(style);
@@ -379,10 +379,10 @@ LiveEditor.prototype.toggle = function (this: LiveEditor, style: InlineStyle): v
 	if (start === end) return this.apply(splices, { start: start + open.length, end: start + open.length });
 	const caret = at.start === at.end ? at.start + open.length : start + open.length;
 	this.apply(splices, at.start === at.end ? { start: caret, end: caret } : { start: start + open.length, end: end + open.length });
-};
+}
 
 /** A link round the selection, with its address selected to type over; in a link, the link taken off. */
-LiveEditor.prototype.link = function (this: LiveEditor): void {
+function link(this: LiveEditor): void {
 	if (this.sync.readOnly) return;
 	const at = this.selection();
 	if (!at) return;
@@ -406,10 +406,10 @@ LiveEditor.prototype.link = function (this: LiveEditor): void {
 	const urlAt = at.start + label.length + 3;
 	if (!label) return this.apply([{ at: at.start, before: "", text: insert }], { start: at.start + 1, end: at.start + 1 });
 	this.apply([{ at: at.start, before: label, text: insert }], { start: urlAt, end: urlAt + url.length });
-};
+}
 
 /** Turn the lines of the selection into a heading, a list, a quote or a paragraph; pressed again, back to a paragraph. */
-LiveEditor.prototype.setBlock = function (this: LiveEditor, style: BlockStyle): void {
+function setBlock(this: LiveEditor, style: BlockStyle): void {
 	if (this.sync.readOnly) return;
 	const at = this.selection();
 	if (!at) return;
@@ -473,17 +473,17 @@ LiveEditor.prototype.setBlock = function (this: LiveEditor, style: BlockStyle): 
 	const firstPlan = plan[0];
 	const minStart = firstPlan ? firstPlan.start + (this.tex ? 0 : firstPlan.text.length) : at.start;
 	this.apply(splices, { start: Math.max(minStart, at.start + caretShift), end: Math.max(minStart, at.end + endShift) });
-};
+}
 
 /** Whether an offset of a LaTeX file sits inside an itemize, enumerate or description list. */
-LiveEditor.prototype.inTexList = function (this: LiveEditor, offset: number): boolean {
+function inTexList(this: LiveEditor, offset: number): boolean {
 	const before = this.sync.text.slice(0, offset).replace(/(^|[^\\])%.*$/gm, "$1");
 	const opened = (before.match(/\\begin\{(itemize|enumerate|description)\}/g) ?? []).length;
 	const closed = (before.match(/\\end\{(itemize|enumerate|description)\}/g) ?? []).length;
 	return opened > closed;
-};
+}
 
-LiveEditor.prototype.codeBlock = function (this: LiveEditor, at: Range2): void {
+function codeBlock(this: LiveEditor, at: Range2): void {
 	const text = this.sync.text;
 	if (this.tex) return;
 	const chunk = this.chunks().find((c) => Number(c.dataset.start) <= at.start && at.start < Number(c.dataset.end));
@@ -512,10 +512,10 @@ LiveEditor.prototype.codeBlock = function (this: LiveEditor, at: Range2): void {
 	];
 	const shift = lead.length + 4;
 	this.apply(splices, { start: at.start + shift, end: at.end + shift });
-};
+}
 
 /** Put something of its own on a new line after the caret's block: a rule, a table, a maths block. */
-LiveEditor.prototype.insertBlock = function (this: LiveEditor, kind: "hr" | "table" | "math"): void {
+function insertBlock(this: LiveEditor, kind: "hr" | "table" | "math"): void {
 	if (this.sync.readOnly) return;
 	const at = this.selection();
 	if (!at) return;
@@ -535,4 +535,32 @@ LiveEditor.prototype.insertBlock = function (this: LiveEditor, kind: "hr" | "tab
 	else if (kind === "table") caret += 2;
 	else caret = insertAt + insert.length;
 	this.apply([{ at: insertAt, before, text: insert }], { start: caret, end: kind === "table" ? caret + 6 : caret });
-};
+}
+
+/** Put these methods on the class: called once, where LiveEditor is defined, so the class never exists without them. */
+export function installInput(cls: typeof LiveEditor): void {
+	Object.assign(cls.prototype, {
+		beforeInput,
+		targetRange,
+		lineAround,
+		chunkKind,
+		prefixOf,
+		enter,
+		backspaceAtLineStart,
+		keydown,
+		hiddenSourceAt,
+		copy,
+		paste,
+		drop,
+		pressed,
+		clicked,
+		delimiters,
+		around,
+		toggle,
+		link,
+		setBlock,
+		inTexList,
+		codeBlock,
+		insertBlock,
+	});
+}
