@@ -1,5 +1,6 @@
-//! The calls JavaScript makes: `PageEngine` on the page, `WorkerEngine` in the render worker, and
-//! opening WebGPU or WebGL 2 on a canvas for either (`select.rs` picks which). Changes cross as JSON text; tiles as `ImageBitmap`s.
+//! The calls JavaScript makes: opening WebGPU or WebGL 2 on a canvas (`select.rs` picks which),
+//! `PageEngine` on the page, and `routeArrow` for the editor's arrow drafts. The render worker's
+//! engine, measuring words and the fixtures are in `bind/`. Changes cross as JSON text.
 
 use crate::engine::{Camera, Page, TILE_SIZE, Worker};
 use crate::select::{self, Api};
@@ -10,7 +11,11 @@ use stage_paint::tiles::Key;
 use stage_paint::{Backend, Target, TextureKind};
 use wasm_bindgen::prelude::*;
 
+mod fixtures;
+mod measure;
 mod worker;
+
+use measure::measure_words;
 
 #[wasm_bindgen(start)]
 fn start() {
@@ -91,6 +96,7 @@ pub struct PageEngine {
 
 #[wasm_bindgen]
 impl PageEngine {
+	// Opening the engine, what it is handed (fonts, readers, icons), and the document.
 	#[wasm_bindgen(constructor)]
 	pub fn new(text: &str, dark: bool, session: &str) -> Result<PageEngine, JsError> {
 		Ok(PageEngine { page: Page::new(text, dark, session).map_err(err)?, gpu: None, size: (0, 0), meshes: 0 })
@@ -766,77 +772,6 @@ pub fn wasm_module() -> JsValue {
 	wasm_bindgen::module()
 }
 
-/// Words measured as the page lays them out, for the server: the same text crate, fonts and
-/// markdown reader, so a box an agent reads back from an edit is the box the page draws.
-#[wasm_bindgen]
-pub struct TextMeasure {
-	text: stage_text::Text,
-}
-
-#[wasm_bindgen]
-impl TextMeasure {
-	#[wasm_bindgen(constructor)]
-	pub fn new() -> TextMeasure {
-		TextMeasure { text: stage_text::Text::new() }
-	}
-
-	#[wasm_bindgen(js_name = addFont)]
-	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
-		self.text.add_font(name, bytes, fallback);
-	}
-
-	#[wasm_bindgen(js_name = setMarkdownReader)]
-	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
-		self.text.set_reader(reader(read));
-	}
-
-	#[wasm_bindgen(js_name = setMath)]
-	pub fn set_math(&mut self, typeset: js_sys::Function) {
-		self.text.set_math(typesetter(typeset));
-	}
-
-	/// `[w, h]` of words in a style (`{ fontFamily, fontSize, fontWeight, fontStyle, letterSpacing,
-	/// lineHeight }`), wrapped at `max_width` when it is not negative. A card's markdown (`markdown`)
-	/// is laid out at that width, aligned by `align`, and its height is the card's.
-	pub fn measure(&self, text: &str, style: &str, max_width: f64, markdown: bool, align: &str) -> Vec<f64> {
-		measure_words(&self.text, text, style, max_width, markdown, align)
-	}
-}
-
-impl Default for TextMeasure {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
-/// `[w, h]` of words with a text system's fonts and readers: `TextMeasure`'s, or the page engine's own.
-fn measure_words(words: &stage_text::Text, text: &str, style: &str, max_width: f64, markdown: bool, align: &str) -> Vec<f64> {
-	let v: serde_json::Value = serde_json::from_str(style).unwrap_or_default();
-	let num = |k: &str| v.get(k).and_then(serde_json::Value::as_f64);
-	let style = stage_scene::layout::TextStyle {
-		family: v.get("fontFamily").and_then(serde_json::Value::as_str).unwrap_or("Inter").to_owned(),
-		size: num("fontSize").unwrap_or(16.0),
-		weight: num("fontWeight").unwrap_or(400.0),
-		italic: v.get("fontStyle").and_then(serde_json::Value::as_str) == Some("italic"),
-		letter_spacing: num("letterSpacing").unwrap_or(0.0),
-		line_height: num("lineHeight"),
-	};
-	let max = (max_width >= 0.0).then_some(max_width);
-	if markdown {
-		let width = max.unwrap_or(240.0).max(1.0) as f32;
-		let align = match align {
-			"center" => stage_text::Align::Center,
-			"right" => stage_text::Align::Right,
-			"justify" => stage_text::Align::Justify,
-			_ => stage_text::Align::Left,
-		};
-		return vec![width as f64, words.card(text, &style, width, align).height as f64];
-	}
-	let item = stage_scene::tree::Item { id: String::new(), props: Default::default(), parent: None, children: Vec::new(), handle: None };
-	let (w, h) = stage_scene::layout::Measure::measure(words, text, &style, max, &item);
-	vec![w, h]
-}
-
 /// One joined arrow routed by the engine's router (`stage_scene::arrows`), for the server's reroute:
 /// its `metadata`, the boxes of what its ends name (`{ name: [x, y, w, h] }`) and its stroke width.
 /// Returns the path's fields as JSON, `{ x, y, width, height, geometry }`, or `""` when an end is
@@ -852,50 +787,3 @@ pub fn route_arrow(metadata: &str, ends: &str, stroke: f64) -> String {
 	serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "geometry": s.geometry }).to_string()
 }
 
-/// The pictures every backend must draw alike (`stage_paint::fixtures`), for
-/// `apps/web/scripts/stage-backends.ts` to hold to the native goldens (`crates/gpu/goldens/`) under
-/// WebGPU and WebGL 2. Not used by the app.
-#[wasm_bindgen]
-pub struct Fixtures {
-	words: stage_text::Text,
-}
-
-#[wasm_bindgen]
-impl Fixtures {
-	#[wasm_bindgen(constructor)]
-	#[allow(clippy::new_without_default)]
-	pub fn new() -> Fixtures {
-		Fixtures { words: stage_text::Text::new() }
-	}
-
-	/// What there is to draw, as JSON: `{"fonts": [[family, file, fallback]], "names": [..],
-	/// "stages": [..]}` (fonts from `packages/stage/fonts/`, stages from `crates/gpu/fixtures/`).
-	pub fn list() -> String {
-		use stage_paint::fixtures::{FONTS, NAMES, STAGES};
-		serde_json::json!({ "fonts": FONTS, "names": NAMES, "stages": STAGES }).to_string()
-	}
-
-	/// One of the fonts `list` names, under its family.
-	#[wasm_bindgen(js_name = addFont)]
-	pub fn add_font(&mut self, family: &str, bytes: Vec<u8>, fallback: bool) {
-		self.words.add_font(family, bytes, fallback);
-	}
-
-	/// Draw fixture `name` (with `pen`, a `.pen` file's text: that stage, the way the worker tiles
-	/// it) and lay it on the handle's canvas pixel for pixel, over white. Size the canvas to the
-	/// picture first: its golden's size. Its `[width, height]`.
-	pub fn show(&self, handle: &mut GpuHandle, name: &str, pen: Option<String>) -> Result<Vec<u32>, JsError> {
-		use stage_paint::fixtures;
-		let gpu = &mut handle.gpu;
-		let size = match pen {
-			Some(pen) => fixtures::draw_stage(gpu, &pen, &self.words),
-			None => fixtures::draw(gpu, name, &self.words),
-		};
-		let (w, h) = size.ok_or_else(|| err(format!("no fixture {name:?} (or no fonts for it)")))?;
-		gpu.resize(w, h);
-		let mut list = stage_paint::DrawList::new(stage_paint::Color([1.0, 1.0, 1.0, 1.0]));
-		list.push(stage_paint::Op::Picture { texture: fixtures::OUT, x: 0.0, y: 0.0, w: w as f32, h: h as f32, uv: [0.0, 0.0, 1.0, 1.0], opacity: 1.0 });
-		gpu.draw(Target::Screen, &list);
-		Ok(vec![w, h])
-	}
-}
