@@ -25,10 +25,108 @@ import { giveDeckImports } from "../../cards/card.ts";
 export type FrameContext = Awaited<ReturnType<typeof openFrame>>;
 
 export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined) {
+	const keeper = keeperOf(start, end);
+	const { studio, backend } = keeper;
+	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Page[] } : await backend.drawing();
+	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
+	const own = (path: string): FramePage["trust"] => (path.startsWith("shared/") ? "friend" : "own");
+	const [pages, setPages] = createSignal<FramePage[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
+	const { setRevision, ...look } = lookOf(root, start);
+	const { items, drawn, ...editor } = editorRef(look.revision);
+	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`); said down the harness's line, or Studio's. */
+	const presence = installPresence({ camera: look.camera, send: (one) => (studio ? studio.presence(one) : backend.presence(one)), viewport: () => ({ width: innerWidth, height: innerHeight }) });
+	/** Marks over what agents draw, each for a moment in the agent's colour (`marks.ts`). */
+	const marks = installMarks();
+	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
+	const places = () => [...pages(), ...items()];
+	/** Where each card is, read off the drawing at each change (`createCardPlacer`). */
+	const placer = createCardPlacer({ drawn, pages: () => untrack(pages), setPages, own, ...(studio ? {} : { read: () => backend.drawing() }) });
+	const placeCards = placer.place;
+	const changed = () => {
+		setRevision((n) => n + 1);
+		queueMicrotask(placeCards);
+	};
+	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
+	if (start.look.insets) useInsets(start.look.insets);
+	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
+	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`items/news.ts`). */
+	const news = () => {
+		const out: Record<string, string> = {};
+		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && look.agents()[page.lastWrittenBy]?.color) || "var(--canvas-accent)";
+		return out;
+	};
+	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
+	const stored = storedOf(start, end);
+	const at = addressesOf(start, keeper);
 	/*
-	 * Who keeps this canvas: a harness, which answers the canvas's calls, its cards' and its agents'
-	 * views as well; or Decks Studio, which keeps the drawing and its files and nothing else.
+	 * A document item's editor, on this frame's line (`item-surfaces.tsx`): what it sends goes to the harness,
+	 * which answers only for files a document item on this canvas names, down this frame's own stream.
 	 */
+	const docListeners = new Set<(message: unknown) => void>();
+	const hearDoc = (message: unknown) => {
+		for (const listener of docListeners) listener(message);
+	};
+	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
+	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
+	return {
+		cardsReads: placer.reads,
+		...stored,
+		appWatchers,
+		root,
+		start,
+		end,
+		chrome,
+		...keeper,
+		first,
+		own,
+		pages,
+		setPages,
+		...look,
+		presence,
+		marks,
+		places,
+		changed,
+		canWrite,
+		news,
+		trust,
+		...at,
+		docListeners,
+		hearDoc,
+		...editor,
+	};
+}
+
+/** The editor, once it is made (`setMade`), and what is read off its drawing: the document and app items, a card's item, taking a card off. */
+function editorRef(revision: () => number) {
+	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
+	let made: Editor | undefined;
+	const items = () => {
+		revision();
+		const doc = made?.handle.drawn();
+		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
+	};
+	/** The editor's handle, once it is made: only ever read by what runs after. */
+	const handle = () => made!.handle;
+	/** A card's item on the drawing, by its path. */
+	function cardItem(path: string): { id: string; metadata?: { path?: string; scripts?: unknown; from?: unknown; [key: string]: unknown } } | undefined {
+		return ((made?.handle.drawn().children ?? []) as unknown as Array<{ id: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
+	}
+	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
+	function takeOff(path: string): boolean {
+		const child = ((handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
+		if (!child?.id) return false;
+		handle().edit([{ op: "delete", id: child.id }]);
+		return true;
+	}
+	const drawn = () => made?.handle.drawn();
+	return { items, drawn, setMade: (editor: Editor) => void (made = editor), handle, cardItem, takeOff };
+}
+
+/*
+ * Who keeps this canvas: a harness, which answers the canvas's calls, its cards' and its agents'
+ * views as well; or Decks Studio, which keeps the drawing and its files and nothing else.
+ */
+function keeperOf(start: Start, end: FrameEnd) {
 	const studio = start.backend.kind === "studio" ? createStudioLine(start.backend.api, start.canvas.name, start.backend.token) : undefined;
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
 	let currentToken = start.backend.token;
@@ -48,10 +146,11 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		if (data.files) filesBase = data.files.base;
 		if (data.pictures) picturesAt = data.pictures;
 	});
-	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Page[] } : await backend.drawing();
-	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
-	const own = (path: string): FramePage["trust"] => (path.startsWith("shared/") ? "friend" : "own");
-	const [pages, setPages] = createSignal<FramePage[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
+	return { studio, backend, backendToken, filesBase: () => filesBase, picturesAt: () => picturesAt };
+}
+
+/** The page's look and the frame's own state, as signals: camera, mode, scheme, comment, agent, offer, dock, width, cursor, agents, who is busy. */
+function lookOf(root: HTMLElement, start: Start) {
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
 	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
 	const [dark, setDark] = createSignal(start.look.dark);
@@ -79,102 +178,10 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	reflect();
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
-	/** Everyone else on this canvas: their pointers, selections and cameras, as the line says them (`presence.ts`); said down the harness's line, or Studio's. */
-	const presence = installPresence({ camera, send: (one) => (studio ? studio.presence(one) : backend.presence(one)), viewport: () => ({ width: innerWidth, height: innerHeight }) });
-	/** Marks over what agents draw, each for a moment in the agent's colour (`marks.ts`). */
-	const marks = installMarks();
-	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
-	let made: Editor | undefined;
-	const items = () => {
-		revision();
-		const doc = made?.handle.drawn();
-		return doc ? pagesOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
-	};
-	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
-	const places = () => [...pages(), ...items()];
-	/** Where each card is, read off the drawing at each change (`createCardPlacer`). */
-	const placer = createCardPlacer({ drawn: () => made?.handle.drawn(), pages: () => untrack(pages), setPages, own, ...(studio ? {} : { read: () => backend.drawing() }) });
-	const placeCards = placer.place;
-	const changed = () => {
-		setRevision((n) => n + 1);
-		queueMicrotask(placeCards);
-	};
-	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
-	if (start.look.insets) useInsets(start.look.insets);
-	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
 	/** Each agent's name and colour, from the page: what is new glows in its writer's colour. */
 	const [agents, setAgents] = createSignal<Record<string, { name: string; color: string }>>(start.look.agents ?? {});
-	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`items/news.ts`). */
-	const news = () => {
-		const out: Record<string, string> = {};
-		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--canvas-accent)";
-		return out;
-	};
 	const [busy, setBusy] = createSignal<{ writer?: { name?: string; color: string } }>(start.writer ? { writer: start.writer } : {});
-	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
-	const kept = new Map(Object.entries(start.stored));
-	/** What each app inside the canvas saved in this browser, by app name: the page keeps it (`app-store`), and an app's address carries it (`options.ts`). */
-	const appStored = new Map(Object.entries(start.appStored ?? {}));
-	/** The page keeps what this frame cannot: it has no storage of its own. */
-	const storage = {
-		getItem: (key: string) => kept.get(key) ?? null,
-		setItem: (key: string, value: string) => {
-			kept.set(key, value);
-			end.emit("store", { key, value });
-		},
-	};
-	/** A deck path's address, read on the canvas's ticket. */
-	const address = (path: string) => `${filesBase}${path.split("/").map(encodeURIComponent).join("/")}`;
-	/*
-	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
-	 * the canvas's own folder, where the deck's `assets/` and `docs/` are served beside it too
-	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
-	 */
-	const folder = `canvases/${start.canvas.name}/`;
-	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.
-	if (start.imports) giveDeckImports(start.imports, new URL(folder, start.files.base).href);
-	// On Studio the address is the canvas's own folder already.
-	const inFolder = (path: string) => (studio || path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
-	/*
-	 * A document item's editor, on this frame's line (`item-surfaces.tsx`): what it sends goes to the harness,
-	 * which answers only for files a document item on this canvas names, down this frame's own stream.
-	 */
-	const docListeners = new Set<(message: unknown) => void>();
-	const hearDoc = (message: unknown) => {
-		for (const listener of docListeners) listener(message);
-	};
-	/** The editor's handle, once it is made: only ever read by what runs after. */
-	const handle = () => made!.handle;
-	/** A card's item on the drawing, by its path. */
-	function cardItem(path: string): { id: string; metadata?: { path?: string; scripts?: unknown; from?: unknown; [key: string]: unknown } } | undefined {
-		return ((made?.handle.drawn().children ?? []) as unknown as Array<{ id: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
-	}
-	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
-	function takeOff(path: string): boolean {
-		const child = ((handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
-		if (!child?.id) return false;
-		handle().edit([{ op: "delete", id: child.id }]);
-		return true;
-	}
-	/** Who is watching each app's state (`apps.watch`): its windows on this canvas, told as the stream says (`app.state`). */
-	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
-		cardsReads: placer.reads,
-		appStored,
-		appWatchers,
-		root,
-		start,
-		end,
-		chrome,
-		studio,
-		backend,
-		backendToken,
-		filesBase: () => filesBase,
-		picturesAt: () => picturesAt,
-		first,
-		own,
-		pages,
-		setPages,
 		camera,
 		setCamera,
 		mode,
@@ -184,6 +191,7 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		comment,
 		setComment,
 		revision,
+		setRevision,
 		agent,
 		setAgent,
 		offer,
@@ -195,29 +203,45 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 		narrow,
 		reflect,
 		cursor,
-		presence,
-		marks,
 		setCursor,
-		places,
-		changed,
-		canWrite,
 		agents,
 		setAgents,
-		news,
 		busy,
 		setBusy,
-		trust,
-		storage,
-		address,
-		folder,
-		inFolder,
-		docListeners,
-		hearDoc,
-		setMade: (editor: Editor) => void (made = editor),
-		handle,
-		cardItem,
-		takeOff,
 	};
+}
+
+/** What the page keeps for the frame, which has no storage of its own: its values, and what each app inside it saved. */
+function storedOf(start: Start, end: FrameEnd) {
+	const kept = new Map(Object.entries(start.stored));
+	/** What each app inside the canvas saved in this browser, by app name: the page keeps it (`app-store`), and an app's address carries it (`options.ts`). */
+	const appStored = new Map(Object.entries(start.appStored ?? {}));
+	/** The page keeps what this frame cannot: it has no storage of its own. */
+	const storage = {
+		getItem: (key: string) => kept.get(key) ?? null,
+		setItem: (key: string, value: string) => {
+			kept.set(key, value);
+			end.emit("store", { key, value });
+		},
+	};
+	return { appStored, storage };
+}
+
+/** A deck path's address, read on the canvas's ticket, and where a path in the drawing is read. */
+function addressesOf(start: Start, keeper: ReturnType<typeof keeperOf>) {
+	const { studio } = keeper;
+	const address = (path: string) => `${keeper.filesBase()}${path.split("/").map(encodeURIComponent).join("/")}`;
+	/*
+	 * What a host answers for the canvas (`host.ts`), from the ticket: a deck file in the drawing is read in
+	 * the canvas's own folder, where the deck's `assets/` and `docs/` are served beside it too
+	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
+	 */
+	const folder = `canvases/${start.canvas.name}/`;
+	// The deck's import map, once for every card here (the harness's), before any card's script runs: its paths under assets/ read beside this canvas's cards, where the deck's assets/ is served.
+	if (start.imports) giveDeckImports(start.imports, new URL(folder, start.files.base).href);
+	// On Studio the address is the canvas's own folder already.
+	const inFolder = (path: string) => (studio || path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
+	return { address, folder, inFolder };
 }
 
 /** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
