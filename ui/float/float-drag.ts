@@ -1,4 +1,5 @@
-import { clamp, fling, saveStowed, settle as restingPlace, stowedAt, stowSide, stowY, toFraction, velocityFrom, verticalShare } from "./float-math.ts";
+import { clamp, fling, settle as restingPlace, toFraction, velocityFrom, verticalShare } from "./float-math.ts";
+import { saveStowed, stowedAt, stowSide, stowY } from "./stowed.ts";
 import { cancelSettle, clear, onIgnored, place, remember, sendHome, settle, tabWidth, type FloatState } from "./float-place.ts";
 
 /** Fewer pixels than this and a press was a click, not a drag; nothing is saved. */

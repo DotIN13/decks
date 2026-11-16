@@ -1,7 +1,5 @@
 import type { Velocity } from "../velocity.ts";
 import type { Saved } from "./saved.ts";
-export { type Saved, FLOATS_KEY, fromSaved, fromAnchor, loadFloats, saveFloat } from "./saved.ts";
-export { stowsRight, type Side, stowsLeft, stowSide, stowedAt, stowY, STOWED_KEY, type Stowed, loadStowed, saveStowed } from "./stowed.ts";
 
 /**
  * The geometry of a float: a small panel the person may drag around a surface.

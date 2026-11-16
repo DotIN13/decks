@@ -1,4 +1,5 @@
-import { clamp, saveStowed, verticalShare } from "./float-math.ts";
+import { clamp, verticalShare } from "./float-math.ts";
+import { saveStowed } from "./stowed.ts";
 import { DRAG_THRESHOLD, listen } from "./float-drag.ts";
 import { cancelSettle, clear, place, settle, type FloatState } from "./float-place.ts";
 

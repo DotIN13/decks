@@ -1,4 +1,6 @@
-import { avoid, clamp, clearUpward, fromSaved, glideMs, loadFloats, loadStowed, saveFloat, saveStowed, snapHome, stowedAt, toFraction, within, type Pin, type Point, type Sample, type Saved, type Side, type Size } from "./float-math.ts";
+import { avoid, clamp, clearUpward, glideMs, snapHome, toFraction, within, type Pin, type Point, type Sample, type Size } from "./float-math.ts";
+import { fromSaved, loadFloats, saveFloat, type Saved } from "./saved.ts";
+import { loadStowed, saveStowed, stowedAt, type Side } from "./stowed.ts";
 import type { FloatOptions } from "./float.ts";
 
 /** How far a tucked float's tab keeps from every other float: the throw bends up until it is this clear. */

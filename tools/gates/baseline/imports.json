@@ -18,8 +18,5 @@
 	"scripts/card-zoom.mjs: reaches past the entry of e2e": 1,
 	"scripts/gen-pen-schema.mjs: reaches past the entry of pen": 1,
 	"scripts/opencode2-live.mts: reaches past the entry of apps/server": 3,
-	"tools/checks/harness/programs.mjs: reaches past the entry of pen": 1,
-	"ui/float/float-math.ts: value import in a cycle": 2,
-	"ui/float/saved.ts: value import in a cycle": 1,
-	"ui/float/stowed.ts: value import in a cycle": 2
+	"tools/checks/harness/programs.mjs: reaches past the entry of pen": 1
 }

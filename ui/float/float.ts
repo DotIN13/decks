@@ -1,4 +1,6 @@
-import type { Box, Pin, Point, Saved, Side, Size } from "./float-math.ts";
+import type { Box, Pin, Point, Size } from "./float-math.ts";
+import type { Saved } from "./saved.ts";
+import type { Side } from "./stowed.ts";
 import { listen, onDoubleClick, onPointerDown, onWindowBlur, onWindowMove, onWindowUp } from "./float-drag.ts";
 import { cancelSettle, follow, placeAt, restore, sendHome, unstow, type FloatState } from "./float-place.ts";
 import { listenTab, onTabBlur, onTabDown, onTabWindowMove, onTabWindowUp } from "./float-tab.ts";

@@ -1,32 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-	FLOATS_KEY,
-	clamp,
-	fromAnchor,
-	fling,
-	fromSaved,
-	glideMs,
-	toFraction,
-	loadFloats,
-	saveFloat,
-	settle,
-	snapHome,
-	velocityFrom,
-	stowsRight,
-	stowsLeft,
-	stowSide,
-	avoid,
-	within,
-	stowY,
-	clearUpward,
-	stowedAt,
-	loadStowed,
-	saveStowed,
-	STOWED_KEY,
-	type Box,
-	type Saved,
-} from "./float-math.ts";
+import { clamp, fling, glideMs, toFraction, settle, snapHome, velocityFrom, avoid, within, clearUpward, type Box } from "./float-math.ts";
+import { FLOATS_KEY, fromAnchor, fromSaved, loadFloats, saveFloat, type Saved } from "./saved.ts";
+import { stowsRight, stowsLeft, stowSide, stowY, stowedAt, loadStowed, saveStowed, STOWED_KEY } from "./stowed.ts";
 
 const bounds: Box = { x: 100, y: 50, w: 800, h: 600 };
 const size = { w: 200, h: 100 };
