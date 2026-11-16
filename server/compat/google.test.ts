@@ -2,7 +2,7 @@
 // words and every few seconds, its link's state with the account, and nothing once it is closed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { DocLine } from "./docs.ts";
+import type { DocLine } from "./doc-line.ts";
 import { mirrorChanged, mirrorClosed, mirrorOpened } from "./google.ts";
 
 const path = "docs/google/plan.md";

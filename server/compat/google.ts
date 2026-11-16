@@ -1,6 +1,6 @@
 // Google Docs on today's line, for a mirror (docs/google/<name>.md) a page has open: the Doc as Google
 // has it (doc.gdoc), its comments (doc.gcomments, every 10 s as today) and its link's state (doc.remote).
-import { call, type DocLine } from "./docs.ts";
+import { call, type DocLine } from "./doc-line.ts";
 
 type Said = Record<string, unknown>;
 

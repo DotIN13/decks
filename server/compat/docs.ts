@@ -1,18 +1,9 @@
 // Documents on today's line: a document page's doc.* messages made into the file calls, and file.changed
 // told back as doc.changed to the line that has the document open (Folio's mapping, for the canvas page).
-import type { Caller } from "../../protocol/index.ts";
-import type { SocketDoor, Stop } from "../kernel/index.ts";
+import { call, type DocLine } from "./doc-line.ts";
 import { comment, mirrorChanged, mirrorClosed, mirrorOpened, style } from "./google.ts";
 
 type Said = Record<string, unknown>;
-
-/** What the documents need of a line: who it is, its subscriptions, the documents it has open, and its sender. */
-export type DocLine = {
-	state: { caller?: Caller; watched: Map<string, Stop>; docs?: Set<string>; clients?: Set<string> };
-	door: SocketDoor;
-	send: (message: Said) => void;
-	client: ReturnType<SocketDoor["client"]>;
-};
 
 /** One document message from the page, answered as today's server answered it. */
 export async function docHeard(L: DocLine, message: Said): Promise<void> {
@@ -122,10 +113,4 @@ export function docCompiled(payload: Record<string, unknown>, open: ReadonlySet<
 	if (!path || !open.has(path)) return undefined;
 	const { ok, pdf, errors, at, ms, error } = payload;
 	return { type: "doc.compiled", path, ok, ...(pdf !== undefined ? { pdf } : {}), errors: errors ?? [], at, ms, ...(error !== undefined ? { error } : {}) };
-}
-
-/** A file call as the line's caller: the value, or the refusal's words. */
-export async function call(L: DocLine, name: string, args: Record<string, unknown>): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
-	const envelope = await L.door.call(name, args, L.state.caller!, L.client);
-	return envelope.ok ? { ok: true, value: envelope.value } : { ok: false, error: envelope.error.message };
 }

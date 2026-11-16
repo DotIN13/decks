@@ -1,7 +1,9 @@
 // Rule 3: imports go one way (DESIGN.md section 3), through a folder's entry file only.
 // Today's packages count as the folder they move to. Inside server/, a feature imports the kernel only.
 // protocol/ imports nothing: no package and no node: module (its tests may use node:test).
+// And no two files import each other's values, directly or round a loop (cycles.mjs).
 import { dirname, posix } from "node:path";
+import { importCycles } from "./cycles.mjs";
 import { CODE, bump, isSource } from "./lib.mjs";
 
 export const MAY_IMPORT = {
@@ -23,17 +25,27 @@ const IMPORT = /^\s*(?:import|export)\s[^'"`;]*?from\s*["']([^"']+)["']|import\s
 
 export default {
 	name: "imports",
-	rule: "3. Imports go one way, through a folder's entry file only.",
+	rule: "3. Imports go one way, through a folder's entry file only, and never round a loop.",
 	scan(ctx) {
 		const pkgs = packages(ctx);
 		const counts = new Map();
-		for (const f of ctx.files.filter((f) => isSource(f) && CODE.test(f) && folderOf(unitOf(f)))) {
+		const code = ctx.files.filter((f) => isSource(f) && CODE.test(f) && folderOf(unitOf(f)));
+		for (const f of code) {
 			for (const m of ctx.read(f).matchAll(IMPORT)) {
 				const why = judge(ctx, pkgs, f, m[1] || m[2] || m[3] || m[4]);
 				if (why) bump(counts, `${f}: ${why}`);
 			}
 		}
-		return { counts, notes: ["Not checked: that harness reaches clients/ only through sdk and canvas/ only through its host entry."] };
+		const cycles = importCycles(code, ctx.read);
+		for (const [f, n] of cycles.counts) counts.set(`${f}: value import in a cycle`, n);
+		const largest = cycles.groups.slice(0, 3).map((g) => `${g.length} files from ${g[0]}`).join("; ");
+		return {
+			counts,
+			notes: [
+				"Not checked: that harness reaches clients/ only through sdk and canvas/ only through its host entry.",
+				`Import cycles: ${cycles.groups.length}, each file counted by its value imports inside its cycle (relative imports only; type-only and import() aside)${largest ? `. Largest: ${largest}` : ""}.`,
+			],
+		};
 	},
 };
 

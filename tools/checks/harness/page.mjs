@@ -2,7 +2,7 @@
 // conversation and the panel beside it (a turn asked and waited for, the agent list, a new agent).
 import { chromium, devices, webkit } from "playwright";
 import { WEB, card, socket } from "./programs.mjs";
-import { ready, rest } from "./waits.mjs";
+import { canvasFrame, ready, rest } from "./waits.mjs";
 
 // The page and its canvas frame: opened, focused, zoomed, fitted.
 
@@ -108,21 +108,6 @@ export async function open({ width = 1500, height = 950, scheme = "dark", cards 
 	 */
 	if (edit) await editMode(page);
 	return { browser, page, canvas, context, errors, asked, stopAnswering: () => clearInterval(watch) };
-}
-
-/**
- * The canvas frame (`iframe.canvas-frame`), once its stage is there: where the canvas, its tools, its
- * zoom bar and its popovers are. Made again when the conversation moves to another canvas, so a
- * check asks for it again after a switch rather than keeping the one it had.
- */
-export async function canvasFrame(page, { timeout = 30000 } = {}) {
-	const deadline = Date.now() + timeout;
-	for (;;) {
-		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
-		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) return frame;
-		if (Date.now() > deadline) throw new Error("the canvas frame never showed its stage");
-		await page.waitForTimeout(100);
-	}
 }
 
 /** Put the focus in the canvas frame, on its stage, so a key pressed next is the canvas's. */

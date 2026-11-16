@@ -113,6 +113,19 @@ test("imports names a reach past a folder's entry", () =>
 		{ "clients/sdk/a.ts": 'import x from "../../protocol/index.ts";\n', "protocol/index.ts": "" }, "reaches past the entry of protocol"));
 test("imports names a server feature importing another", () =>
 	plantedFails("imports", { "server/cards/a.ts": 'import x from "../canvas/doc.ts";\n' }, { "server/cards/a.ts": 'import x from "../kernel/deck.ts";\n' }, "feature cards may not import feature canvas"));
+test("imports names a value import cycle round three files, not one closed only by types", () =>
+	plantedFails("imports",
+		{ "canvas/a.ts": 'import { b } from "./b.ts";\n', "canvas/b.ts": 'import { c } from "./c";\n', "canvas/c.ts": 'import { a } from "./a.js";\n' },
+		{ "canvas/a.ts": 'import { b } from "./b.ts";\n', "canvas/b.ts": 'import { c } from "./c";\n', "canvas/c.ts": 'import type { A } from "./a.ts";\nimport { type B, type C } from "./a.ts";\nexport type { D } from "./a.ts";\nconst a = () => import("./a.ts");\n' },
+		"canvas/c.ts: value import in a cycle"));
+test("typeOnly tells a clause of types from one that brings a value", async () => {
+	const { typeOnly } = await import("./cycles.mjs");
+	assert.equal(typeOnly("import", "type { A }"), true);
+	assert.equal(typeOnly("import", "{ type A, type B }"), true);
+	assert.equal(typeOnly("import", "{ type A, b }"), false);
+	assert.equal(typeOnly("import", "X, { type A }"), false);
+	assert.equal(typeOnly("export", "*"), false);
+});
 test("calls names a call declared twice", () =>
 	plantedFails("calls", { "protocol/calls/a.ts": 'defineCall({ name: "item.move" })\n', "protocol/calls/b.ts": 'defineCall({ name: "item.move" })\n' },
 		{ "protocol/calls/a.ts": 'defineCall({ name: "item.move" })\n' }, "item.move again"));

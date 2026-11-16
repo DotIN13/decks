@@ -1,6 +1,20 @@
 // The checks' waits: for the canvas to settle, and for a file or the drawing to change. Never the clock.
 import { read } from "./programs.mjs";
-import { canvasFrame } from "./page.mjs";
+
+/**
+ * The canvas frame (`iframe.canvas-frame`), once its canvas is drawn in it: where the canvas, its tools, its
+ * zoom bar and its popovers are. Made again when the conversation moves to another canvas, so a
+ * check asks for it again after a switch rather than keeping the one it had.
+ */
+export async function canvasFrame(page, { timeout = 30000 } = {}) {
+	const deadline = Date.now() + timeout;
+	for (;;) {
+		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
+		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) return frame;
+		if (Date.now() > deadline) throw new Error("the canvas frame never drew its canvas");
+		await page.waitForTimeout(100);
+	}
+}
 
 /**
  * Wait until the canvas has drawn: the stage's sheet shown, or the Rust engine's first frame; then,
@@ -22,7 +36,7 @@ export async function ready(page, { timeout = 30000 } = {}) {
  *
  * A press at a coordinate is only about the thing under it. A camera that *arrives* rather than
  * jumping adds a way to be wrong about that: measure a box while the view is still gliding and the
- * press lands wherever the box has got to by then. `data-gliding` is the stage's own answer.
+ * press lands wherever the box has got to by then. `data-gliding` is the canvas's own answer.
  */
 export async function still(page, { timeout = 5000 } = {}) {
 	const canvas = await canvasFrame(page);
@@ -31,7 +45,7 @@ export async function still(page, { timeout = 5000 } = {}) {
 
 /**
  * Wait for the camera to come to rest after something that *may* move it — a Fit, a `1`, a click
- * on a stage card — instead of a fixed pause long enough for the longest glide.
+ * on a card — instead of a fixed pause long enough for the longest glide.
  *
  * Two steps, because the move may not have begun when this is called: up to `start` ms for it to
  * begin (and if it never does, nothing moved), then for it to end; then one frame for whatever

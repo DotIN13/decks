@@ -1,6 +1,6 @@
 // The canvas helpers: a card selected, flown to, its pill's buttons pressed, its edges found.
-import { canvasFrame, focusCanvas, onCanvasAt } from "./page.mjs";
-import { rest } from "./waits.mjs";
+import { focusCanvas, onCanvasAt } from "./page.mjs";
+import { canvasFrame, rest } from "./waits.mjs";
 
 export async function selectCard(page, path, { timeout = 4000 } = {}) {
 	const canvas = await canvasFrame(page);
