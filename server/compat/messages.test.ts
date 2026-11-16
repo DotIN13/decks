@@ -23,7 +23,7 @@ export function heard(): string[] {
 	return [...new Set([...read_, ...docs])].filter((t) => t !== "reconnected").sort();
 }
 
-const compat = ["line.ts", "events.ts", "docs.ts"].map((f) => read(`server/compat/${f}`)).join("\n");
+const compat = ["line.ts", "events.ts", "docs.ts", "google.ts"].map((f) => read(`server/compat/${f}`)).join("\n");
 const answered = (type: string) => compat.includes(`"${type}"`);
 const told = (type: string) => compat.includes(`type: "${type}"`);
 const gap = (type: string, way: "sent" | "heard") => GAPS.some((g) => g.type === type && g.way === way) || (way === "heard" && NOT_THIS_LINE.includes(type));

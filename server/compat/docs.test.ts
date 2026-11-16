@@ -47,8 +47,9 @@ test("a page opens a document, types into it, and another page on it hears the w
 	assert.deepEqual([changed.path, changed.client, changed.batch, changed.splices], [path, "page-a", "a1", [{ at: 5, before: "", text: ", world" }]]);
 	b.send({ type: "doc.versions", path });
 	assert.ok(Array.isArray((await b.next("doc.versions")).versions));
-	a.send({ type: "doc.gstyle", path, client: "page-a", requests: [] });
-	assert.match(String((await a.next("harness.notice")).text), /not on this server yet/);
+	a.send({ type: "doc.gcomment", path, client: "page-a", action: "create", content: "hm", quote: "Hello" });
+	const comments = await a.next("doc.gcomments");
+	assert.deepEqual([comments.comments, typeof comments.error], [[], "string"], "not a linked mirror: refused, answered empty with why");
 	for (const line of [a, b]) line.close();
 	await doors.close();
 	await server.close();

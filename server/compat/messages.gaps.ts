@@ -5,7 +5,6 @@
 export type Gap = { type: string; way: "sent" | "heard"; owner: string; why: string };
 
 export const GAPS: Gap[] = [
-	...["doc.remote", "doc.gdoc", "doc.gcomments"].map((type): Gap => ({ type, way: "heard", owner: "Folio", why: "Google Docs are not on the new server yet" })),
 ];
 
 /**

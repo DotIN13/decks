@@ -23,7 +23,7 @@ type Edit = { name: string; canvas?: string; at?: number; answered?: Promise<voi
  * edits: the frame's names for its edits not yet told back as made, each with its canvas and, once
  * answered, the revision the canvas had then (at), which has the edit. sent: this line's messages in order.
  */
-type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; docs?: Set<string>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
+type State = { caller?: Caller; token?: string; watched: Map<string, Stop>; docs?: Set<string>; clients?: Set<string>; edits: Edit[]; pointer?: Pointer; sent?: Promise<unknown> };
 
 /** What a line's helpers share: its state, the kernel's socket parts, the deck, its sender and its client. */
 type LineParts = { state: State; door: SocketDoor; deck: () => Deck; send: (m: Said) => void; client: ReturnType<SocketDoor["client"]>; url: () => string | undefined };

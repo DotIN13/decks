@@ -2,29 +2,27 @@
 // told back as doc.changed to the line that has the document open (Folio's mapping, for the canvas page).
 import type { Caller } from "../../protocol/index.ts";
 import type { SocketDoor, Stop } from "../kernel/index.ts";
+import { comment, mirrorChanged, mirrorClosed, mirrorOpened, style } from "./google.ts";
 
 type Said = Record<string, unknown>;
 
 /** What the documents need of a line: who it is, its subscriptions, the documents it has open, and its sender. */
 export type DocLine = {
-	state: { caller?: Caller; watched: Map<string, Stop>; docs?: Set<string> };
+	state: { caller?: Caller; watched: Map<string, Stop>; docs?: Set<string>; clients?: Set<string> };
 	door: SocketDoor;
 	send: (message: Said) => void;
 	client: ReturnType<SocketDoor["client"]>;
 };
-
-/** The messages the new server has no call for yet: Google Docs. */
-const NOT_YET = new Set(["doc.gstyle", "doc.gcomment"]);
 
 /** One document message from the page, answered as today's server answered it. */
 export async function docHeard(L: DocLine, message: Said): Promise<void> {
 	const type = String(message.type);
 	const path = String(message.path ?? "");
 	const client = typeof message.client === "string" ? message.client : undefined;
-	if (NOT_YET.has(type)) return L.send({ type: "harness.notice", level: "warn", text: `${type} is not on this server yet.` });
 	if (type === "doc.open") return open(L, path, client ?? "");
 	if (type === "doc.close") {
 		L.state.docs?.delete(path);
+		mirrorClosed(L, path);
 		return void (await call(L, "file.close", { path, client: client ?? "" }));
 	}
 	if (type === "doc.patch") return patch(L, message, path, client ?? "");
@@ -41,6 +39,8 @@ export async function docHeard(L: DocLine, message: Said): Promise<void> {
 	if (type === "doc.restore") return void (await call(L, "file.restore", { path, sha: message.sha }));
 	if (type === "doc.compile") return compile(L, path);
 	if (type === "doc.git") return git(L, path, String(message.action ?? "status"));
+	if (type === "doc.gstyle") return style(L, message, path);
+	if (type === "doc.gcomment") return comment(L, message, path);
 	L.send({ type: "harness.notice", level: "warn", text: `The line does not know ${type}.` });
 }
 
@@ -50,8 +50,11 @@ async function open(L: DocLine, path: string, client: string): Promise<void> {
 	if (!got.ok) return L.send({ type: "doc.state", path, asked: path, client, rev: 0, format: "text", text: "", changes: [], error: got.error });
 	const doc = got.value as { path: string; rev: number; format: string; text: string; changes: unknown[]; remote?: unknown };
 	(L.state.docs ??= new Set()).add(doc.path);
+	(L.state.clients ??= new Set()).add(client);
 	hearChanges(L);
 	L.send({ type: "doc.state", path: doc.path, asked: path, client, rev: doc.rev, format: doc.format, text: doc.text, changes: doc.changes, ...(doc.remote ? { remote: doc.remote } : {}) });
+	// A Google Doc's mirror: its Doc and comments follow, as today.
+	if (doc.remote) mirrorOpened(L, doc.path);
 }
 
 /** The page's typing as one batch: the revision it made and the splices refused, to this page. */
@@ -86,6 +89,7 @@ function hearChanges(L: DocLine): void {
 		const open = L.state.docs ?? new Set<string>();
 		const said = event.name === "file.compiled" ? docCompiled(event.payload, open) : docChanged(event.payload, open);
 		if (said) L.send(said);
+		if (event.name === "file.changed") mirrorChanged(L, event.payload);
 	});
 	L.state.watched.set("file.changed", stop);
 }
@@ -121,7 +125,7 @@ export function docCompiled(payload: Record<string, unknown>, open: ReadonlySet<
 }
 
 /** A file call as the line's caller: the value, or the refusal's words. */
-async function call(L: DocLine, name: string, args: Record<string, unknown>): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+export async function call(L: DocLine, name: string, args: Record<string, unknown>): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
 	const envelope = await L.door.call(name, args, L.state.caller!, L.client);
 	return envelope.ok ? { ok: true, value: envelope.value } : { ok: false, error: envelope.error.message };
 }
