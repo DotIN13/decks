@@ -1,15 +1,12 @@
 /**
- * Typing into a document on the canvas reaches its file: a sentence, Enter, a word made bold, undo
- * and redo, and plain text pasted, each read back from the file on disk.
- *
- * The document is the fixture's markdown, docs/notes.md, placed as a document item and opened by a
- * press. A Google Doc round needs a Docs API, which a fixture without the network cannot hold.
+ * Typing into a document on the canvas reaches its file: a sentence, Enter, bold, undo, redo and a
+ * paste, each read back from disk. The document is the fixture's docs/notes.md as a document item;
+ * a Google Doc round needs a Docs API, which a fixture without the network cannot hold.
  */
 import { readFileSync } from "node:fs";
-import { API, asPerson, CANVAS, canvasFrame, deckState, open, resetStage, rest, say, selectCard, settle } from "../harness.mjs";
+import { API, asPerson, CANVAS, canvasFrame, deckState, open, rest, say, selectCard, settle } from "../harness.mjs";
 
 const FILE = "docs/notes.md";
-await resetStage();
 const deck = await deckState();
 const onDisk = () => readFileSync(`${deck.path}/${FILE}`, "utf8");
 const original = onDisk();
