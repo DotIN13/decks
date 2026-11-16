@@ -3,7 +3,9 @@
  * do the person's edits and undo go on? The pass lives PASS_MS: DECKS_PASS_MS on a restarted server,
  * else its answer shortened on the way to the page. Run: node tools/checks/run.mjs <this file>.
  */
-import { API, asPerson, canvasFrame, focusCanvas, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { API, asPerson, CANVAS, canvasFrame, deckState, focusCanvas, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
 
 const PASS_MS = 8000;
 const CONTROL = process.env.DECKS_E2E_CONTROL;
@@ -168,17 +170,22 @@ const drop = async () => {
 	say("3a. …and the frame draws it back", !!(await until(async () => (await inFrame("rn-b"))?.x === from)), String((await inFrame("rn-b"))?.x));
 }
 
-// 3b. An agent changes the drawing after the person's nudge: ⌘Z is refused (server/canvas/log.ts), and the person is told why.
+// 3b. The drawing changed from outside after the person's nudge (canvas.pen written by another program): ⌘Z is
+// refused (server/canvas/log.ts, as anyone else's change), and the person is told why.
 {
 	await select("rn-b");
 	const from = onServer("rn-b")?.x;
 	await nudge();
 	await until(async () => onServer("rn-b")?.x === from + 10);
-	wire.link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "rn-c", fill: "#5cbf6a" }, box: at(-100, -150) }] });
-	say("3b. the agent's rectangle reaches the frame", !!(await until(async () => await inFrame("rn-c"), 10000)));
+	const file = join((await deckState()).path, "canvases", CANVAS, "canvas.pen");
+	const doc = JSON.parse(readFileSync(file, "utf8"));
+	const box = at(-100, -150);
+	doc.children.push({ type: "rectangle", id: "rn-c", fill: "#5cbf6a", x: box.x1, y: box.y1, width: box.x2 - box.x1, height: box.y2 - box.y1 });
+	writeFileSync(file, JSON.stringify(doc, null, "\t"));
+	say("3b. the rectangle written from outside reaches the frame", !!(await until(async () => await inFrame("rn-c"), 10000)));
 	await undo();
 	await settle(page, 1500);
-	say("3b. ⌘Z after an agent's edit leaves the nudge in place", onServer("rn-b")?.x === from + 10, `${from + 10} → ${onServer("rn-b")?.x}`);
+	say("3b. ⌘Z after a change from outside leaves the nudge in place", onServer("rn-b")?.x === from + 10, `${from + 10} → ${onServer("rn-b")?.x}`);
 	const told = await until(async () => {
 		const words = [await page.evaluate(() => document.body.innerText), await (await cv()).evaluate(() => document.body.innerText)].join(" ");
 		return /cannot be undone|changed the drawing since/i.test(words) && words.match(/[^.\n]*(cannot be undone|changed the drawing since)[^.\n]*/i)?.[0];
