@@ -4,7 +4,8 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./pages/index.tsx"
+		".": "./pages/index.tsx",
+		"./agent-ui": "./agent-ui/index.ts"
 	},
 	"scripts": {
 		"dev": "vite",
