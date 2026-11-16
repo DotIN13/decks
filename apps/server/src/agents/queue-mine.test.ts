@@ -24,7 +24,7 @@ function open() {
 		sent.push(text);
 		state("thinking");
 	};
-	const state = (to: "idle" | "thinking") => (agent as unknown as { translator: { setState: (s: string) => void } }).translator.setState(to);
+	const state = (to: "idle" | "thinking") => agent.conversation.translator.setState(to);
 	const emit = (agent as unknown as { emit: (m: ServerMessage) => void }).emit;
 	(agent as unknown as { emit: (m: ServerMessage) => void }).emit = (message) => {
 		if (message.type === "agent.queued") said.push(message);
@@ -58,7 +58,7 @@ test("Stop holds the queue until it is let go, and a row can be removed or sent 
 		agent.turns.queueMine("working on it");
 		agent.turns.queueMine("a");
 		agent.turns.queueMine("b");
-		await agent.abort();
+		await agent.conversation.abort();
 		state("idle");
 		assert.deepEqual(sent, ["working on it"], "stopped: nothing more goes");
 		assert.equal(said.at(-1)?.held, true);

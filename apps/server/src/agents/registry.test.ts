@@ -83,7 +83,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 
 	const agent = agentOn(deck);
 	agent.rename("Kestrel");
-	agent.translator.user("what is the plan");
+	agent.conversation.translator.user("what is the plan");
 	agent.seat.setInPlay(["canvases/t/cards/plan/index.html"]);
 	const id = agent.id;
 	agent.dispose();
@@ -104,7 +104,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 test("where a conversation put its boards comes back after a restart", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
-	agent.translator.user("put those two down here");
+	agent.conversation.translator.user("put those two down here");
 	agent.seat.setInPlay(["canvases/t/cards/plan/index.html", "canvases/t/cards/notes/index.html"]);
 	// Two boards, placed differently from any auto-layout — the whole point of a stage owning
 	// its arrangement is that these numbers are not derivable from the deck.
@@ -127,11 +127,11 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 	// Two chats, each with its own mind about where the plan goes.
 	const one = agentOn(deck);
 	one.rename("One");
-	one.translator.user("here");
+	one.conversation.translator.user("here");
 	one.seat.setPosition("canvases/t/cards/plan/index.html", 10, 20);
 	const two = agentOn(deck);
 	two.rename("Two");
-	two.translator.user("no, here");
+	two.conversation.translator.user("no, here");
 	two.seat.setPosition("canvases/t/cards/plan/index.html", 900, 400);
 	const [firstId, secondId] = [one.id, two.id];
 	one.dispose();
@@ -166,7 +166,7 @@ test("two conversations keep two arrangements of one deck, and the switch is wha
 test("a dormant row still reports what its runtime can do", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
-	agent.translator.user("hello");
+	agent.conversation.translator.user("hello");
 	const id = agent.id;
 	agent.dispose();
 
@@ -185,10 +185,10 @@ test("the transcript comes back, not only the row", () => {
 	const { deck, cleanup } = deckOn();
 
 	const agent = agentOn(deck);
-	agent.translator.user("what is the plan");
-	agent.translator.startAssistant();
-	agent.translator.delta("It is on the board.");
-	agent.translator.endAssistant();
+	agent.conversation.translator.user("what is the plan");
+	agent.conversation.translator.startAssistant();
+	agent.conversation.translator.delta("It is on the board.");
+	agent.conversation.translator.endAssistant();
 	const id = agent.id;
 	agent.dispose();
 
@@ -201,9 +201,9 @@ test("the transcript comes back, not only the row", () => {
 	 * for it, which is `chat.open`. That is the difference between a deck open that costs a
 	 * record per row and one that costs every conversation ever had.
 	 */
-	assert.deepEqual(restored.translator.history(), [], "nothing is read for a row nobody has opened");
+	assert.deepEqual(restored.conversation.translator.history(), [], "nothing is read for a row nobody has opened");
 
-	const history = (restored.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items;
+	const history = (restored.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items;
 	assert.deepEqual(
 		history.map((item) => item.kind),
 		["user", "assistant"],
@@ -219,12 +219,12 @@ test("a new message after a restore cannot land on a restored message's id", () 
 	// An assistant turn that says nothing is spliced out again, so the surviving ids have
 	// gaps in their numbering — which is what makes counting items the wrong way to resume
 	// the counter, and this is the case that catches it.
-	agent.translator.user("one");
-	agent.translator.startAssistant();
-	agent.translator.endAssistant();
-	agent.translator.user("two");
+	agent.conversation.translator.user("one");
+	agent.conversation.translator.startAssistant();
+	agent.conversation.translator.endAssistant();
+	agent.conversation.translator.user("two");
 	const id = agent.id;
-	const before = agent.translator.history().map((item) => item.id);
+	const before = agent.conversation.translator.history().map((item) => item.id);
 	agent.dispose();
 
 	const { registry } = registryOn(deck);
@@ -232,9 +232,9 @@ test("a new message after a restore cannot land on a restored message's id", () 
 	const restored = registry.get(id)!;
 	// The stored rows are read when somebody asks for the conversation, which a browser does
 	// with `chat.open` — and the new message has to land after them, not on their ids.
-	restored.historyMessage();
-	restored.translator.user("three");
-	const after = restored.translator.history().map((item) => item.id);
+	restored.conversation.historyMessage();
+	restored.conversation.translator.user("three");
+	const after = restored.conversation.translator.history().map((item) => item.id);
 
 	assert.equal(new Set(after).size, after.length, `ids collided: ${after.join(" ")}`);
 	assert.ok(
@@ -263,7 +263,7 @@ test("closing a chat keeps it closed across a restart", () => {
 	const { deck, cleanup } = deckOn();
 
 	const agent = agentOn(deck);
-	agent.translator.user("something");
+	agent.conversation.translator.user("something");
 	const id = agent.id;
 	agent.dispose();
 
@@ -283,11 +283,11 @@ test("the newest restored chat is the focused one", () => {
 	for (const [index, name] of ["Older", "Newer"].entries()) {
 		const agent = agentOn(deck);
 		agent.rename(name);
-		agent.translator.user(`hello from ${name}`);
+		agent.conversation.translator.user(`hello from ${name}`);
 		// The transcript's own timestamps are what the list is ordered by, and two agents
 		// created in the same millisecond would otherwise tie. `history()` is a shallow copy,
 		// so dating the message here dates the one the record will be written from.
-		const first = agent.translator.history()[0];
+		const first = agent.conversation.translator.history()[0];
 		if (first?.kind === "user") first.at = 1000 + index * 1000;
 		agent.dispose();
 	}
@@ -304,7 +304,7 @@ test("restored rows keep their colour, so a chat does not change identity", () =
 	const { deck, cleanup } = deckOn();
 
 	const agent = agentOn(deck, "#0f9ba8");
-	agent.translator.user("hello");
+	agent.conversation.translator.user("hello");
 	const id = agent.id;
 	agent.dispose();
 
@@ -320,8 +320,8 @@ test("every chat is kept, however many there are", () => {
 	for (let index = 0; index < 20; index += 1) {
 		const agent = agentOn(deck);
 		agent.rename(`Agent ${index}`);
-		agent.translator.user("hello");
-		const first = agent.translator.history()[0];
+		agent.conversation.translator.user("hello");
+		const first = agent.conversation.translator.history()[0];
 		if (first?.kind === "user") first.at = 1000 + index;
 		agent.dispose();
 	}
@@ -434,7 +434,7 @@ function twoRestored(deck: Deck): { registry: Registry; ada: string; kit: string
 	for (const name of ["Ada", "Kit"]) {
 		const agent = agentOn(deck);
 		agent.rename(name);
-		agent.translator.user("hello");
+		agent.conversation.translator.user("hello");
 		agent.dispose();
 	}
 	const { registry } = registryOn(deck);
@@ -502,7 +502,7 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
 	const { deck, cleanup } = deckOn();
 
 	const agent = agentOn(deck);
-	agent.translator.user("hello");
+	agent.conversation.translator.user("hello");
 	const id = agent.id;
 	agent.dispose();
 
@@ -536,15 +536,15 @@ class SpyChild extends DeckAgent {
 	readonly models: Array<[string, string, ThinkingLevel | undefined]> = [];
 	readonly modes: AgentMode[] = [];
 	readonly thinkings: ThinkingLevel[] = [];
-	override async start(): Promise<void> {}
-	override async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
-		this.models.push([provider, model, thinking]);
-	}
-	override async setMode(mode: AgentMode): Promise<void> {
-		this.modes.push(mode);
-	}
-	override async setThinking(level: ThinkingLevel): Promise<void> {
-		this.thinkings.push(level);
+	/** Its conversation takes no runtime: what it is asked to run on is written down instead. */
+	watch(): this {
+		Object.assign(this.conversation, {
+			start: async () => {},
+			setModel: async (provider: string, model: string, thinking?: ThinkingLevel) => void this.models.push([provider, model, thinking]),
+			setMode: async (mode: AgentMode) => void this.modes.push(mode),
+			setThinking: async (level: ThinkingLevel) => void this.thinkings.push(level),
+		});
+		return this;
 	}
 	override async run(text: string): Promise<{ report: string; boards: string[] }> {
 		return { report: "done", boards: [] };
@@ -582,7 +582,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					snapshots: new AgentStateStore(),
 					store: new AgentStore(deck),
 				},
-			);
+			).watch();
 			child = agent;
 			return agent;
 		}
@@ -615,7 +615,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 		},
 		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
-	parent.translator.user("delegate something");
+	parent.conversation.translator.user("delegate something");
 	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
 	return { registry, parentId: parent.id, child: () => child, created: () => createdWith, sent };
 }
@@ -747,7 +747,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					queue: (agentId) => this.get(agentId)?.turns.queue() ?? [],
 					// The real wiring under test: the receiver's `report` call becomes a
 					// notice in whoever is named — a transcript item, not a queued task.
-					report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
+					report: (agentId, text) => this.get(agentId)?.conversation.translator.notice("info", text),
 					brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
 					recordRevision: () => undefined,
 					boardPathOf: () => undefined,
@@ -806,7 +806,7 @@ test("a workspace survives a restart, because a dormant chat has no session to a
 	agent.rename("Rune");
 	// One thing said, so there is a record at all: an agent nobody has spoken to is not
 	// persisted (`session.persisted`), which is the same for its name and its tags.
-	agent.translator.user("where are we");
+	agent.conversation.translator.user("where are we");
 	// The slug is what is stored, not the sentence that produced it.
 	assert.equal(agent.setWorkspace("Political LLM"), "political-llm");
 	const id = agent.id;
@@ -829,7 +829,7 @@ test("a workspace survives a restart, because a dormant chat has no session to a
 test("an agent saying nothing keeps its workspace; the person clearing it takes it away", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
-	agent.translator.user("hello");
+	agent.conversation.translator.user("hello");
 	agent.setWorkspace("political-llm");
 
 	assert.equal(agent.setWorkspace(null), "political-llm", "the agent declining to say changes nothing");
@@ -848,8 +848,8 @@ test("the summaries carry the workspace, and `undefined` is a real answer", () =
 	const { deck, cleanup } = deckOn();
 	const one = agentOn(deck);
 	const two = agentOn(deck);
-	one.translator.user("one");
-	two.translator.user("two");
+	one.conversation.translator.user("one");
+	two.conversation.translator.user("two");
 	one.setWorkspace("political-llm");
 	two.setWorkspace(null);
 	// Disposed, so the debounced write is flushed rather than left on a timer.

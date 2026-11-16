@@ -1,132 +1,64 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Identity, MessagePart, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type StageTool } from "../calls/tool.ts";
 import { PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "./work.ts";
-import type { AgentBackend, AgentBackendContext } from "./backend.ts";
-import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import type { StageBridge } from "../stage/bridge.ts";
-import { Translator } from "./translator.ts";
 import type { Act } from "./acts.ts";
-import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
 import { canvasNameReminder } from "../stage/canvas-name.ts";
+import { Conversation } from "./conversation.ts";
 import { Inbox } from "./inbox.ts";
 import { cleanPlaces, Seat } from "./seat.ts";
 import { Turns } from "./turns.ts";
 
 /**
- * How much of the last thing said a row carries.
+ * One agent: who it is, and the four parts it is made of.
  *
- * The row draws one line of it, clipped, and the hover card three. It was the whole message:
- * 41 KB of a 76 KB chat list on a deck of thirty-four chats, sent again every time the list
- * is published — which is on every prompt. Two hundred and forty characters is longer than
- * anything either of those two places can show.
- */
-const PREVIEW_CHARS = 240;
-
-/**
- * One agent, and everything about it that is not Pi's.
+ * What is its own is here: its name, face, colour, tags and workspace, its record on disk, its row
+ * in the agents list, and the tool its calls run through. The rest is a part with one job each, and
+ * a caller asks the part:
  *
- * The transcript, the identity, the state, the dialog bridge. The backend is
- * created asynchronously — a Pi session has to load extensions, resolve models and
- * check credentials — so an agent exists and can be listed before it can be
- * prompted, and a prompt that arrives early waits for `ready` instead of failing.
- * That matters because the browser draws the composer immediately and a person
- * types faster than a model runtime starts.
+ * - `conversation`: what was said, and the runtime that says the agent's side of it (`conversation.ts`);
+ * - `seat`: its home canvas, the cards it holds, what it has seen of its canvases (`seat.ts`);
+ * - `turns`: what it is asked to do, and in what order (`turns.ts`);
+ * - `inbox`: what waits for it when it asks, and that an agent working outside Decks is here (`inbox.ts`).
+ *
+ * The parts do not know each other. Each is handed what it needs of the agent as plain functions,
+ * and the agent is where they meet: a message is said by the conversation with the seat's news put
+ * first (`prompt`), and a turn that ends tells the turns part that the agent has gone quiet.
  */
 export class DeckAgent {
 	/** Kept across restarts when the agent was restored: the avatar file is addressed by it. */
 	readonly id: string;
-	readonly translator: Translator;
-	readonly bridge: ExtensionUiBridge;
-	/** Where it sits: its home canvas, the cards it holds, and what it has seen of the canvases it works on (`seat.ts`). */
+	readonly conversation: Conversation;
 	readonly seat: Seat;
-	/** What it is asked to do, and in what order: your queue, work handed over, and the quiet before it starts (`turns.ts`). */
 	readonly turns: Turns;
-	/** What waits for it when it asks, and, for an agent that works outside Decks, that it is here (`inbox.ts`). */
 	readonly inbox: Inbox;
 
-	private backend: AgentBackend | undefined;
-	private starting: Promise<void> | undefined;
 	private tool: StageTool | undefined;
 	private personal: StageTool | undefined;
-	private failure: string | undefined;
-	private state: AgentState = "idle";
-	/**
-	 * Which Claude subscription this agent spends, by account id.
-	 *
-	 * Owned here because it is persisted here: it is on the record beside the model, so it
-	 * survives a restart with the conversation and a dormant row can still say what it will
-	 * spend. `claude/accounts.ts` owns the accounts and the per-agent symlinks; who is on
-	 * which is this.
-	 *
-	 * Resolved once, at start, and then recorded — so changing the default afterwards cannot
-	 * move an agent that already exists, which is the surprise the per-agent choice is for.
-	 */
-	private account: string | undefined;
 
-	/** The last model the runtime reported, kept for the record — and for a dormant chat, which has no runtime to ask. */
-	private lastModel: AgentModel | undefined;
-	/**
-	 * The last context and cost reading, for the same reason and with one difference.
-	 *
-	 * The model is *applied* from here when the runtime opens; this is only ever displayed.
-	 * It is the conversation's own reading — what this transcript costs to send — so it
-	 * survives a restart honestly, and it is replaced by the runtime's the moment a turn
-	 * ends. Without it a chat nobody had prompted since the deck opened drew no ring at all,
-	 * which is indistinguishable from a conversation that has cost nothing.
-	 */
-	private lastUsage: AgentUsage | undefined;
-	/** Shared with every other agent: the set of subscriptions this install can use. */
-	private readonly accounts: ClaudeAccountSwitcher | undefined;
-	private readonly accountsChanged: (() => void) | undefined;
-	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
-	private readonly commandsChanged: (() => void) | undefined;
-	/** Where an out-of-process runtime's canvas tool calls back to. */
-	private readonly stageBridge: StageBridge | undefined;
 	private identity: Identity;
-	/**
-	 * The model list, kept as well as sent.
-	 *
-	 * The first agent starts when the server does, so its `models` frame is
-	 * broadcast before any browser exists to hear it. Anything a late connection
-	 * needs has to be in the greeting, not only in the event that produced it.
-	 *
-	 * Seeded in the constructor from what this runtime last offered on this deck
-	 * (`AgentStore.rememberModels`), because a list that only exists once a session has been
-	 * started is a picker that cannot be used until you have already sent a turn. Replaced
-	 * by the runtime's own list as soon as there is one.
-	 */
-	private modelOptions: ModelOption[] = [];
 
-	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
+	/** The workspace it works in: its own fact, set by it or by you, kept on the record. */
 	private workspaceChosen: string | undefined;
 
-	/** Record the workspace and say so: `setWorkspace` writes through here. */
-	private declareWorkspace(workspace: string | undefined): void {
-		this.workspaceChosen = workspace;
-		this.identity = { ...this.identity, workspace };
-		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
-	}
 	/**
 	 * Things to tell the agent before its next turn.
 	 *
-	 * Pi could do this through `pi.sendMessage({ deliverAs: "nextTurn" })`, which is an
-	 * Extension API only Pi has. A queue here works for both runtimes and keeps the
-	 * behaviour the Pi version was chosen for: a board edit is not an interruption, so it
-	 * rides along with whatever the user says next rather than waking the agent up.
+	 * A change the person made to a card, or that the agent was moved to another canvas, is not an
+	 * interruption: it rides along with whatever is said next rather than waking the agent up. Kept
+	 * here and not left to a runtime, so every runtime behaves the same.
 	 */
 	private pending: string[] = [];
+
 	constructor(
 		private readonly deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
@@ -290,10 +222,10 @@ export class DeckAgent {
 				kind: options.kind,
 				emit: (message) => this.emit(message),
 				name: () => this.identity.name,
-				state: () => this.state,
+				state: () => this.conversation.state,
 				prompt: (text, parts) => this.prompt(text, parts),
 				run: (text) => this.run(text),
-				notice: (level, text) => this.translator.notice(level, text),
+				notice: (level, text) => this.conversation.translator.notice(level, text),
 				brief: (task, boards, person) => host.brief(task, boards, person),
 				report: (agentId, text) => host.report(agentId, text),
 				outside: () => (this.inbox.client === undefined ? undefined : { client: this.inbox.client }),
@@ -307,8 +239,8 @@ export class DeckAgent {
 				turns: this.turns,
 				name: () => this.identity.name,
 				canvasNotes: () => this.seat.canvasNotes(),
-				said: (text, parts) => this.translator.user(text, parts),
-				notice: (level, text) => this.translator.notice(level, text),
+				said: (text, parts) => this.conversation.translator.user(text, parts),
+				notice: (level, text) => this.conversation.translator.notice(level, text),
 				sayRow: () => this.sayRow(),
 				save: () => this.save(),
 				writeNow: () => {
@@ -320,39 +252,6 @@ export class DeckAgent {
 			joined ? { key: joined.key, client: joined.client, seen: options.restored?.outside?.seen } : undefined,
 		);
 		this.store = options.store;
-		this.restored = options.restored !== undefined;
-		/*
-		 * What the conversation was last on, before any runtime exists to ask.
-		 *
-		 * Two jobs, and for a long time it only did the first: it is what a dormant row
-		 * *says* it will use, and it is what the runtime is actually *opened on* when the
-		 * row is finally prompted (`start`). Without the second the display was a promise
-		 * the runtime broke — a chat left on `deepseek-v4-pro` came back saying so and
-		 * then answered from pi's configured default the moment you typed.
-		 */
-		this.lastModel = options.restored?.model ?? options.model ?? sessionModelOf(options.resumeRef);
-		this.lastUsage = options.restored?.usage;
-		// What this runtime offered the last time one ran on this deck. A list that is a
-		// session out of date is worth more than a picker that cannot be opened; choosing
-		// from it starts the runtime, which republishes it (`setModel`).
-		this.modelOptions = options.store.knownModels(options.kind);
-		/*
-		 * A record written before this existed names no account, and neither does a brand new
-		 * agent — both take the default, once. A record naming an account that has since been
-		 * forgotten also falls back, rather than pointing a link at a directory that is gone.
-		 *
-		 * Read from `options`, not from `this.accounts`, and that is not a style choice: it
-		 * used to be `this.accounts?.has(...)` twenty lines *above* `this.accounts = …`, so it
-		 * was always `undefined` and every agent resolved to no account at all. Which is
-		 * invisible from here — the field is optional and a missing one is a legal state — and
-		 * fatal one level down: the backend only puts `account` on its context when this is
-		 * set, so every session spawned on the machine-wide link and no per-agent switch could
-		 * reach a running session. A constructor that reads its own fields in the order they
-		 * happen to be written is a bug waiting for the next person to move a line.
-		 */
-		const named = options.restored?.account ?? options.account;
-		this.account = named && options.accounts?.has(named) ? named : options.accounts?.defaultId();
-		this.currentMode = options.restored?.mode ?? options.mode;
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
 		if (options.restored?.avatar) this.identity = { ...this.identity, avatar: options.restored.avatar };
@@ -382,75 +281,54 @@ export class DeckAgent {
 		// After construction, so nothing is announced for a chat the browsers have not been told of yet.
 		if (options.restored) setTimeout(() => this.seat.adoptStage(), 0);
 		this.parentId = options.parentId;
-		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
 		this.snapshots = options.snapshots;
-		this.accounts = options.accounts;
-		this.accountsChanged = options.accountsChanged;
-		this.commandsChanged = options.commandsChanged;
-		this.stageBridge = options.bridge;
-
-		/*
-		 * The translator's frames pass through here so the agent can keep the one
-		 * piece of state the chat list needs — what it is doing — without a second
-		 * path that could disagree with what the browser was told.
-		 */
-		this.translator = new Translator(
-			this.id,
-			(message) => {
-				if (message.type === "agent.state") {
-					if ((this.state === "idle") !== (message.state === "idle")) this.host.working?.(this.id, message.state !== "idle");
-					this.state = message.state;
-					// The queue's whole clock. Going idle starts the countdown; anything else
-					// stops it, which is how "quiet for ten seconds" stays true rather than
-					// becoming "ten seconds after the last time it happened to be idle".
-					if (message.state === "idle") this.turns.wentIdle();
+		this.conversation = new Conversation(
+			{
+				id: this.id,
+				kind: options.kind,
+				deck,
+				store: options.store,
+				port: host.port,
+				emit: (message) => this.emit(message),
+				save: () => this.save(),
+				writeNow: () => this.flush(),
+				record: () => this.record(),
+				sayRow: () => this.sayRow(),
+				stateChanged: (now, before) => {
+					if ((before === "idle") !== (now === "idle")) host.working?.(this.id, now !== "idle");
+					if (now === "idle") this.turns.wentIdle();
 					else this.turns.wentBusy();
-				}
-				// Rows leave trimmed: no arguments, and only a preview of a long output (`wire.ts`).
-				this.emit(message.type === "chat.item" ? { ...message, item: forBrowser(message.item) } : message);
-				/*
-				 * A turn that has just ended has left a new last line, so the row is said here
-				 * rather than wherever the turn was asked for. Work an agent gave itself ends
-				 * the same way work a person typed does, and this is the one place both pass
-				 * through.
-				 */
-				if (message.type === "agent.state" && message.state === "idle") this.sayRow();
+				},
+				acted: (event) => host.act?.(this.id, { kind: "tool", event }),
+				tool: () => this.stageTool(),
+				hooks: () => this.stageHooks(),
+				opened: (name) => {
+					if (name) this.identity = { ...this.identity, name };
+					// A resumed session had a canvas; without this it opens holding nothing, which reads as the cards having been lost.
+					this.apply(this.snapshots.latest(this.id));
+					this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+				},
+				restoreAt: (when) => this.apply(this.snapshots.at(this.id, when)),
+				stopped: () => this.turns.stopped(),
+				forgetNotes: () => {
+					this.pending = [];
+				},
+				...(host.runtimesChanged ? { runtimesChanged: () => host.runtimesChanged!() } : {}),
 			},
-			deck.path,
-			() => this.save(),
-			/*
-			 * Rows leaving the window go straight to disk, not through `save`.
-			 *
-			 * `save` is debounced and rewrites the whole tail; this is an append of exactly
-			 * what was dropped, and it has to happen at the moment of the drop because that
-			 * is the last moment those rows exist anywhere. Written before the debounce so a
-			 * kill in the next second cannot lose them.
-			 */
-			(dropped) => this.store.archive(this.id, dropped),
+			{
+				createdAt: this.createdAt,
+				resumeRef: options.resumeRef,
+				model: options.model,
+				mode: options.mode,
+				account: options.account,
+				accounts: options.accounts,
+				accountsChanged: options.accountsChanged,
+				commandsChanged: options.commandsChanged,
+				bridge: options.bridge,
+				restored: options.restored,
+			},
 		);
-		this.translator.onTool = (event) => this.host.act?.(this.id, { kind: "tool", event });
-
-		/*
-		 * A restored chat's transcript is **not** put back here. It is read the first time somebody asks for
-		 * the conversation (`transcript`), because reading it for every row is what made the
-		 * chat list cost the sum of every chat ever held; the row draws from the record alone,
-		 * and `storedLast` is the part of the transcript a row needs.
-		 */
-		if (options.restored) {
-			this.transcriptLoaded = false;
-			if (options.restored.lastLine) {
-				this.storedLast = { text: options.restored.lastLine, at: options.restored.lastAt ?? this.createdAt };
-			}
-		}
-
-		this.bridge = new ExtensionUiBridge({
-			prompt: (prompt) => this.emit({ type: "agent.prompt", agentId: this.id, prompt }),
-			closePrompt: (id) => this.emit({ type: "agent.promptClosed", agentId: this.id, id }),
-			notify: (text, level) => this.translator.notice(level, text),
-			status: () => {},
-			working: () => {},
-		});
 
 		/*
 		 * A fork opens a conversation that already happened, so it should open with the
@@ -469,33 +347,10 @@ export class DeckAgent {
 	/** Mutable only through `orphan`: a subagent outlives the parent it reported to. */
 	parentId: string | undefined;
 	readonly kind: AgentKind;
-	/**
-	 * Mutable, unlike the rest of this block: a rewind moves the session it points at, so
-	 * the stored ref is refreshed from the backend rather than fixed at creation.
-	 */
-	private resumeRef: string | undefined;
 	private readonly snapshots: AgentStateStore;
 	private readonly store: AgentStore;
-	/** Restored from disk and not yet started — a row you can read but nothing is running. */
-	private restored: boolean;
-	/**
-	 * Whether the stored transcript has been read into the window yet.
-	 *
-	 * True for anything that has never been to disk — a new agent's transcript is its own —
-	 * and false for a restored one until `transcript` runs. That is the whole of the lazy
-	 * load: one flag, read in one place.
-	 */
-	private transcriptLoaded = true;
-	/**
-	 * The last thing said, as the record has it, for a row whose transcript has not been read.
-	 *
-	 * Superseded by the window the moment the transcript loads — `chat()` asks the translator
-	 * first — so this only ever draws a preview for a chat nobody has opened.
-	 */
-	private storedLast: { text: string; at: number } | undefined;
 	private readonly createdAt: number;
 	private saving: ReturnType<typeof setTimeout> | undefined;
-	private currentMode: AgentMode | undefined;
 
 	/**
 	 * The parent this reported to is gone, so stop claiming it.
@@ -623,60 +478,6 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The conversation as a browser should open it — the newest rows of the window, trimmed
-	 * for the wire (`wire.ts`) — and whether there is more before them. Sent when a browser
-	 * asks (`chat.open`) and after a rewind; it is no longer part of the greeting.
-	 *
-	 * `more` is asked of the store rather than remembered, because eviction and this
-	 * question have no reason to be in touch — the log either has something in it or it
-	 * does not, and that is a `statSync` rather than a piece of state to keep true.
-	 */
-	historyMessage(): ServerMessage {
-		const window = this.transcript();
-		const shown = window.slice(-HISTORY_ITEMS);
-		return {
-			type: "chat.history",
-			agentId: this.id,
-			items: shown.map(forBrowser),
-			// More behind it when the window holds rows it did not send, or the archive has any.
-			more: window.length > shown.length || this.store.hasArchive(this.id),
-		};
-	}
-
-	private transcript(): ChatItem[] {
-		if (!this.transcriptLoaded) {
-			this.transcriptLoaded = true;
-			this.translator.load(this.store.readItems(this.id));
-		}
-		return this.translator.history();
-	}
-
-	/**
-	 * A page of conversation older than the row the browser holds, in reading order.
-	 *
-	 * The window first, then the archive. A history carries only the newest rows of the
-	 * window, so the rows just before what a browser holds are usually still here in memory.
-	 * The archive is only what is older than the window, and asked about a row it has never
-	 * seen it answers with its own last page — which, asked first, would skip every row between.
-	 */
-	earlier(before: string, limit: number): { items: ChatItem[]; more: boolean } {
-		const window = this.transcript();
-		const at = window.findIndex((item) => item.id === before);
-		if (at > 0) {
-			const start = Math.max(0, at - limit);
-			return { items: window.slice(start, at).map(forBrowser), more: start > 0 || this.store.hasArchive(this.id) };
-		}
-		const page = this.store.earlier(this.id, before, limit);
-		return { items: page.items.map(forBrowser), more: page.more };
-	}
-
-	/** A tool call's whole output, for a chip that was sent only a preview of it (`chat.tool`). */
-	toolResult(itemId: string): string | undefined {
-		const found = this.transcript().find((item) => item.id === itemId) ?? this.store.findArchived(this.id, itemId);
-		return found?.kind === "tool" ? found.result : undefined;
-	}
-
-	/**
 	 * Whether there is a row to write.
 	 *
 	 * A restored chat has one already; a new one is not written down until the user has spoken
@@ -687,37 +488,24 @@ export class DeckAgent {
 	 */
 	private persisted(): boolean {
 		// An outside agent is its record: there is no runtime session to find it by again.
-		return this.restored || this.inbox.outsideKey !== undefined || this.translator.userMessages().length > 0;
+		return this.conversation.wasRestored || this.inbox.outsideKey !== undefined || this.conversation.spoken;
 	}
 
 	/** Write the record now. */
 	private flush(): void {
 		if (!this.persisted()) return;
-		// Taken from the backend each time: a rewind moves the session, and a ref from
-		// start() would point at the branch that was abandoned.
-		this.resumeRef = this.backend?.sessionRef() ?? this.resumeRef;
+		// The rows first: asking for them is also what refreshes the session's reference on the record (`Conversation.toWrite`).
+		const rows = this.conversation.toWrite();
 		const record = this.record();
-		/*
-		 * An unread transcript is left exactly where it is.
-		 *
-		 * `record()` is the row, and it comes from the record itself when the transcript has not
-		 * been loaded (`storedLast`), so this write is complete without it. Reading the
-		 * conversation to rewrite it would undo the restore, and writing `history()` — which is
-		 * empty until something asks — would erase it.
-		 */
-		if (this.transcriptLoaded) this.store.write(record, this.translator.history());
+		if (rows) this.store.write(record, rows);
 		else this.store.writeRecord(record);
 	}
 
 	private record(): AgentRecord {
-		// The window's last line when it has one, and the record's when the transcript has
-		// never been read — a dormant row still shows a preview, and a flush on shutdown
-		// cannot make an old chat look like the newest one.
-		const last = this.translator.lastLine() ?? this.storedLast;
+		const said = this.conversation.record();
 		return {
 			id: this.id,
 			kind: this.kind,
-			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			color: this.identity.color,
@@ -725,17 +513,12 @@ export class DeckAgent {
 			...this.seat.record(),
 			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
 			createdAt: this.createdAt,
-			...(this.lastModel ? { model: this.lastModel } : {}),
-			...(this.currentMode ? { mode: this.currentMode } : {}),
-			...(this.usage ? { usage: this.usage } : {}),
-			...(this.account ? { account: this.account } : {}),
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
-			// The last thing actually said, not the time of this write — it is what the list
-			// is ordered by, and a flush on shutdown must not make an old chat look like the
-			// newest one. Kept on the record so the list never has to read a transcript.
-			...(last ? { lastLine: last.text } : {}),
-			lastAt: last?.at ?? this.createdAt,
+			// The session, what it runs on, and the last thing actually said: its time, not this write's, is what the list is
+			// ordered by, and a write on shutdown must not make an old chat look like the newest one.
+			...said,
+			lastAt: said.lastAt ?? this.createdAt,
 			...(this.inbox.outsideKey !== undefined ? { outside: this.inbox.record()! } : {}),
 		};
 	}
@@ -783,237 +566,37 @@ export class DeckAgent {
 		return this.personal;
 	}
 
-	/**
-	 * Start the backend, once, and remember the reason if it will not start.
-	 *
-	 * The only place that knows both runtimes exist. Which one an agent uses is fixed at
-	 * creation: a live session cannot change the process it is talking to, and pretending
-	 * otherwise would silently start a new conversation.
-	 */
-	start(): Promise<void> {
-		// Returned before anything is built, not just before the promise is replaced. The
-		// memo below is on `starting` alone, so every call used to construct a fresh stage
-		// tool and context and throw them away — which was invisible while `start()` was
-		// called once at creation, and is not now that a prompt is what starts an agent.
-		if (this.starting) return this.starting;
-
-		const tool = this.stageTool();
-
-		const context: AgentBackendContext = {
-			cwd: this.deck.path,
-			deck: this.deck,
-			translator: this.translator,
-			bridge: this.bridge,
-			notice: (level, text) => this.translator.notice(level, text),
-			turnEnded: () => {
-				if (!this.backend) return;
-				this.lastUsage = this.backend.usage() ?? this.lastUsage;
-				this.emit({
-					type: "agent.usage",
-					id: this.id,
-					usage: this.usage ?? { contextTokens: null, contextWindow: 0, cost: 0 },
-				});
-				// A finished turn is the point worth being durable at, rather than a second
-				// later: it is also the first moment the session ref exists to be stored.
-				this.flush();
-			},
-			tool,
-			stageAgent: this.stageHooks(),
-			// Where a runtime that is not in this process reaches the deck: the same
-			// loopback server the browser talks to.
-			port: this.host.port,
-			// Minted here rather than in the backend, because the token is the *agent's* and
-			// outlives any one runtime process: a rewind reopens the session and the tool on
-			// the other side must not be left holding a token nobody answers.
-			...(this.stageBridge ? { agentToken: this.stageBridge.issue(this.id) } : {}),
-			// …and the bridge itself, for the one runtime that shares a process and so names
-			// its calls by session id rather than by a token of its own (opencode).
-			...(this.stageBridge ? { stageBridge: this.stageBridge } : {}),
-			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
-			// Opened *on* the model and mode the conversation was last using, rather than
-			// asked what it happened to default to. Both runtimes take them at session
-			// creation, which is why this is a field here and not a `setModel` afterwards:
-			// a second call would write a model change into a session that never changed.
-			...(this.lastModel ? { model: this.lastModel } : {}),
-			...(this.currentMode ? { mode: this.currentMode } : {}),
-			/*
-			 * Something was taken out of the transcript, so the browser needs the whole list
-			 * again — the same message a rewind sends, and for the same reason.
-			 */
-			historyChanged: () => {
-				this.emit(this.historyMessage());
-				this.save();
-			},
-			// The install's Claude subscriptions, so a limit can say whether there is another.
-			...(this.accounts ? { accounts: this.accounts } : {}),
-			/*
-			 * And which of them *this* agent spends: what to spawn with, and whose usage
-			 * report the meter is asking for. Read-only, now that nothing switches by itself
-			 * — it used to carry a `set` the backend called when a limit moved it.
-			 */
-			...(this.accounts && this.account
-				? { account: { id: () => this.account ?? (this.accounts as ClaudeAccountSwitcher).defaultId() } }
-				: {}),
-			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
-			...(this.commandsChanged ? { commandsChanged: this.commandsChanged } : {}),
-			// `/cost` asked for the panel. The shell reads the figures; the backend only says
-			// that somebody wants them.
-			showUsage: () => void this.pushReport(),
-		};
-
-		const create: Promise<AgentBackend> = runtimeOf(this.kind).create(context);
-		this.starting ??= create
-			.then((backend) => {
-				this.backend = backend;
-				this.currentMode = backend.mode?.();
-				const name = backend.name();
-				if (name) this.identity = { ...this.identity, name };
-				// A resumed session had a canvas; without this it opens holding nothing,
-				// which reads as the boards having been lost.
-				this.apply(this.snapshots.latest(this.id));
-				this.lastModel = backend.model();
-				this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
-				this.emit({ type: "agent.model", id: this.id, model: backend.model() });
-				/*
-				 * And the row: a chat that was dormant is not any more, and what it asks before
-				 * acting is whatever the runtime that just opened says it is. Those two change
-				 * here and nowhere else, so this is where they are said.
-				 */
-				this.sayRow();
-				void this.publishModels();
-				// A restored chat now carries a live model; put it on the record so the
-				// next boot can greet it from the store instead of from the runtime.
-				this.save();
-			})
-			.catch((error: unknown) => {
-				/*
-				 * The usual cause is credentials — `pi auth`, or a Claude Code that is not
-				 * installed. So this is a notice in the agent's own column rather than a
-				 * thrown error that takes the deck down: the boards still work, and the
-				 * reason is where the person is looking.
-				 */
-				this.failure = error instanceof Error ? error.message : String(error);
-				this.translator.notice("error", `This agent could not start: ${this.failure}`);
-			});
-		return this.starting;
-	}
-
-	private async publishModels(): Promise<void> {
-		if (!this.backend) return;
-		try {
-			this.modelOptions = await this.backend.models();
-			// Remembered per runtime, so the *next* chat has a picker before it has a session,
-			// and published as the runtime's — one list for every chat on it, rather than the
-			// same catalogue once per conversation.
-			this.store.rememberModels(this.kind, this.modelOptions);
-			this.host.runtimesChanged?.();
-		} catch (error) {
-			this.translator.notice("warn", `Could not list models: ${(error as Error).message}`);
-		}
-	}
-
-	/**
-	 * The full usage reading — the panel's own request, and `/cost`'s.
-	 *
-	 * Throws rather than answering emptily: the panel has a refresh button and shows what
-	 * went wrong beside the figures it already has, so a failure that is reported is worth
-	 * more than one that leaves the button looking broken.
-	 */
-	async report(): Promise<UsageReport> {
-		await this.start();
-		const backend = this.backend;
-		if (!backend) throw new Error(this.failure ?? "This agent is not running.");
-		if (!backend.report) throw new Error("This runtime does not report usage.");
-		return backend.report();
-	}
-
-	/**
-	 * `/cost`: the same reading, pushed with the instruction to open the panel.
-	 *
-	 * Broadcast rather than replied to, because nobody clicked anything in a browser — the
-	 * request came from the composer as a prompt, and every tab looking at this agent should
-	 * get the panel the person just asked for.
-	 */
-	private async pushReport(): Promise<void> {
-		try {
-			this.emit({ type: "agent.report", id: this.id, report: await this.report(), show: true });
-		} catch (error) {
-			this.emit({ type: "agent.report", id: this.id, error: (error as Error).message, show: true });
-		}
-	}
-
 	/** `parts`: the message as written (`MessagePart`), kept with it in the conversation; the agent gets `text`. */
 	async prompt(text: string, parts?: MessagePart[]): Promise<void> {
-		// Before anything is appended: a restored chat's stored rows belong under the new
-		// message, not after it.
-		this.transcript();
+		// Before anything is appended: a restored chat's stored rows belong under the new message, not after it.
+		this.conversation.window();
 		// An outside agent has no runtime to prompt: the words wait in its inbox (`Inbox.leave`). A slash command means nothing to it.
 		if (this.inbox.outsideKey !== undefined) {
 			this.inbox.leave(text, parts);
 			return;
 		}
-		await this.start();
-		if (!this.backend) {
-			this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
-			return;
-		}
-		this.translator.user(text, parts);
-		this.translator.setState("thinking");
-		/*
-		 * Anything the user did to a board since the last turn rides along with this
-		 * message rather than arriving as its own interruption. Prefixed, not appended:
-		 * the agent should know the board moved *before* it reads what to do about it.
-		 */
-		const nudges = this.pending.splice(0);
-		const slash = text.trimStart().startsWith("/");
-		/*
-		 * What others changed on its canvases since its last message, before what it is asked now: every
-		 * way in comes through here, a message typed, queued, sent into a running turn or handed over.
-		 */
-		if (!slash) nudges.push(...this.seat.canvasNotes());
-		/*
-		 * And who it has not said it is, until it has (`agents/identity-reminder.ts`). Never on a
-		 * slash command, which every runtime reads as an exact line.
-		 */
-		const unsaid = slash ? undefined : identityReminder(this.identity);
-		if (unsaid) nudges.push(unsaid);
-		// The canvas's name, while it has none of its own or has outgrown it (`stage/canvas-name.ts`).
-		const unnamed = slash ? undefined : canvasNameReminder(this.stage.pens, this.seat.stageName());
-		if (unnamed) nudges.push(unnamed);
-		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
-		try {
-			await this.backend.prompt(sent);
-		} catch (error) {
-			this.translator.notice("error", (error as Error).message);
-			this.translator.setState("idle");
-		}
-		/*
-		 * The "thinking" above is a **prediction**: set before the runtime has been told
-		 * anything, so the row lights up when you press send rather than when the runtime's
-		 * first frame arrives. A turn takes the prediction back — Pi's `agent_end`, Claude's
-		 * `result`, opencode's idle frame — and a slash command is not a turn. Pi's `/compact`
-		 * summarises in place, `/help`, `/name` and `/session` answer out of state the shell
-		 * already has, and Claude's `/status` and Antigravity's `/models` are the same kind of
-		 * thing: none of them starts an agent run, so no terminal event follows and the
-		 * prediction stood **for ever**.
-		 *
-		 * What that cost: the chat list said "working" about an agent that was finished, so did
-		 * `decks.agent.list()` for every other agent that asked, and — the part that actually bites —
-		 * **the queue never drained**, because its clock starts on the return to idle. Work
-		 * another agent had handed over sat behind a `/compact` until somebody pressed stop.
-		 *
-		 * So the runtime is asked the one question it can answer: is anything running now? A
-		 * backend whose `prompt()` returns mid-turn — Claude's pushes the message and returns —
-		 * says yes and keeps the state. One that ran nothing says no, and the prediction goes
-		 * back. It is here rather than in each backend's command switch because there are four
-		 * of those and three of them would forget.
-		 */
-		if (!this.backend.isStreaming && this.state !== "idle") this.translator.setState("idle");
-		this.lastUsage = this.backend.usage() ?? this.lastUsage;
-		this.emit({ type: "agent.usage", id: this.id, usage: this.usage ?? { contextTokens: null, contextWindow: 0, cost: 0 } });
-		// The branch gained a point — the message just asked — so the transcript's user
-		// messages can be paired with it and get their rewind actions.
-		await this.backend.syncEntryIds();
+		await this.conversation.say(text, parts, (slash) => this.notesFor(slash));
+	}
+
+	/**
+	 * What the agent should know before it reads what to do, put first in its next message.
+	 *
+	 * Anything the person did to a card since the last turn rides along with the message rather than
+	 * arriving as its own interruption. Then, never on a slash command, which every runtime reads as
+	 * an exact line: what others changed on its canvases since its last message (every way in comes
+	 * through here: a message typed, queued, sent into a running turn or handed over), who it has not
+	 * said it is, until it has (`agents/identity-reminder.ts`), and its canvas's name, while it has
+	 * none of its own or has outgrown it (`stage/canvas-name.ts`).
+	 */
+	private notesFor(slash: boolean): string[] {
+		const notes = this.pending.splice(0);
+		if (slash) return notes;
+		notes.push(...this.seat.canvasNotes());
+		const unsaid = identityReminder(this.identity);
+		if (unsaid) notes.push(unsaid);
+		const unnamed = canvasNameReminder(this.stage.pens, this.seat.stageName());
+		if (unnamed) notes.push(unnamed);
+		return notes;
 	}
 
 	/**
@@ -1036,7 +619,7 @@ export class DeckAgent {
 		this.worked = new Set();
 		await this.prompt(text);
 		const boards = [...this.worked].filter((path) => this.deck.board(path));
-		return { report: this.translator.lastAssistantText(), boards };
+		return { report: this.conversation.translator.lastAssistantText(), boards };
 	}
 
 	/**
@@ -1054,259 +637,10 @@ export class DeckAgent {
 
 	// --- the time machine (§6.7) -----------------------------------------------------
 
-	timeline(): ReturnType<NonNullable<typeof this.backend>["timeline"]> {
-		return this.backend?.timeline() ?? [];
-	}
-
-	revisionsAt(entryId: string): Record<string, string> {
-		return this.backend?.revisionsAt(entryId) ?? {};
-	}
-
-	/**
-	 * Rewind, and put the transcript back to match.
-	 *
-	 * Pi rebuilds its own messages; the transcript in memory is ours, so it is
-	 * truncated to the same point. The text of the rewound message comes back so the
-	 * browser can put it in the composer — the user is usually about to say it
-	 * differently, which is why they rewound.
-	 */
-	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
-		if (!this.backend) return { cancelled: true };
-		// A rewind truncates what is here, so what is here has to be everything there is.
-		this.transcript();
-		/*
-		 * The runtime hands back what the model was sent, which carries Decks' reminders before the
-		 * person's words (`sent-as.ts`): that text is in no bubble, so it cut nothing and filled the
-		 * input bar with a reminder. The words the person typed, from the bubble paired to this
-		 * entry, are what go back in the bar and say where the transcript is cut.
-		 */
-		const shown = this.translator.userMessages().find((item) => item.entryId === entryId)?.text;
-		const runtime = await this.backend.rewindTo(entryId);
-		const result = runtime.cancelled || !shown ? runtime : { ...runtime, editorText: shown };
-		if (!result.cancelled) {
-			this.translator.truncateToUserMessage(result.editorText);
-			this.emit(this.historyMessage());
-			// The branch moved, so the pairing is stale for everything still shown.
-			await this.backend?.syncEntryIds();
-			/*
-			 * And the canvas moves with the conversation, which is the whole point of
-			 * rewinding: the boards, the context and the name it was going by at that
-			 * moment. Resolved by time, the same way `App.boardsAt` picks a revision.
-			 */
-			const when = this.timeline().find((point) => point.id === entryId)?.at;
-			if (when) this.apply(this.snapshots.at(this.id, when));
-		}
-		return result;
-	}
-
-	/**
-	 * Start afresh: a new conversation with the same agent. Its turn (if any) is stopped, its runtime
-	 * let go with the session it was on, and its log set aside on disk (`store.retire`); what makes it
-	 * this agent stays — name, face, colour, workspace, tags, home canvas, model and mode. The next
-	 * message starts a new session, as for an agent just made.
-	 */
-	async reset(): Promise<void> {
-		if (this.running) await this.abort().catch(() => undefined);
-		this.backend?.dispose();
-		this.backend = undefined;
-		this.starting = undefined;
-		this.stageBridge?.revoke(this.id);
-		this.resumeRef = undefined;
-		this.pending = [];
-		this.store.retire(this.id);
-		this.translator.clear();
-		this.transcriptLoaded = true;
-		this.storedLast = undefined;
-		this.lastUsage = undefined;
-		this.store.writeRecord(this.record());
-		this.emit(this.historyMessage());
-		this.sayRow();
-	}
-
-	async forkFrom(entryId: string): Promise<string | undefined> {
-		return this.backend?.forkFrom(entryId);
-	}
-
-	/** When a message was sent, so a fork can inherit the canvas as it was then. */
-	entryTime(entryId: string): number | undefined {
-		return this.timeline().find((point) => point.id === entryId)?.at;
-	}
-
-	async setMode(mode: AgentMode): Promise<void> {
-		/*
-		 * And the same for what it asks before acting. `start()` passes `mode` at session
-		 * creation, so a dormant chat opens on the mode that was chosen rather than dropping
-		 * the press: this used to return early on `!this.backend?.setMode`, which on a chat
-		 * with no runtime is every press.
-		 */
-		if (!this.backend) {
-			this.currentMode = mode;
-			this.save();
-			// `start()` reads the mode off the record and reports back what the runtime made
-			// of it, so there is nothing to re-read here.
-			await this.start();
-			return;
-		}
-		if (!this.backend.setMode) return;
-		await this.backend.setMode(mode);
-		this.currentMode = mode;
-	}
-
-	get running(): boolean {
-		return this.state !== "idle";
-	}
-
-	async abort(): Promise<void> {
-		// Stopping work is also a statement that now is not the moment for more of it: the
-		// countdown starts again from the return to idle below, and your queue waits for you.
-		this.turns.stopped();
-		await this.backend?.abort();
-		this.translator.setState("idle");
-	}
-
-	/**
-	 * Which subscription this agent spends, from the panel — and it lands on the next turn.
-	 *
-	 * Three writes, in this order, and the order is the whole of it. The **link** first,
-	 * because that is the switch: the CLI re-reads its credentials on every request, so a
-	 * repointed link is in force before this method returns and without the session being
-	 * touched. Then the **record**, so a restart does not undo it. Then the **transcript**,
-	 * because which subscription answered is part of what happened — the same reasoning as
-	 * `noteModel`, and for the same reader.
-	 *
-	 * Except on macOS, where the token is a keychain entry fixed when the process started:
-	 * there the link moves the files and not the login, so the backend is told and starts again.
-	 *
-	 * A no-op when it is already on that account: both callers can arrive at the value they
-	 * already had, and a line per non-change is a transcript that logs the furniture.
-	 */
-	useAccount(accountId: string): boolean {
-		if (!this.accounts || !this.accounts.has(accountId)) return false;
-		if (this.account === accountId) return true;
-		this.account = accountId;
-		this.accounts.pointAgentAt?.(this.id, accountId);
-		this.save();
-		const who = this.accounts.describe(accountId);
-		this.translator.notice("info", `Now spending ${who?.email ?? "another subscription"}.`);
-		this.emit({ type: "agent.account", id: this.id, account: accountId });
-		this.backend?.accountChanged?.();
-		return true;
-	}
-
-	/** Which subscription it is spending, for the row and for a delegated child. */
-	accountId(): string | undefined {
-		return this.account;
-	}
-
-	/**
-	 * Change the model, and say so in the conversation.
-	 *
-	 * The transcript is the record of what happened, and *which model said it* is part of
-	 * what happened — a long chat can span three of them, and the answer that surprised you
-	 * reads differently once you know it came from a different one. The picker in the dock
-	 * only ever shows the model in use *now*, so without this the switch leaves no trace at
-	 * all: the reply above it and the reply below it look like the same voice.
-	 *
-	 * A notice rather than a kind of its own, because it is the same shape as everything else
-	 * the deck says about itself — it lands at the point it happened, it is in the display
-	 * copy on disk (`agents/store.ts`), and it needs no new drawing.
-	 *
-	 * Said only when something actually changed. Both callers are a `<select>`, which fires
-	 * on every commit including one that lands on the value it already had, and a line per
-	 * non-change is a transcript that logs the furniture.
-	 */
-	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
-		/*
-		 * A chat nobody has prompted has no runtime to tell, so the choice is written down
-		 * and the runtime is **opened on it** — `start()` reads the model off the record and
-		 * passes it at session creation. Recorded before starting rather than after, which is
-		 * the whole point: starting first and then asking for a change opens the session on
-		 * the model that was being replaced, and on the one runtime where the model is a
-		 * launch flag (antigravity) that is a spawn and an immediate respawn.
-		 */
-		if (!this.backend) {
-			this.lastModel = { provider, model, thinking: thinking ?? this.lastModel?.thinking ?? "medium" };
-			this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
-			this.save();
-			await this.start();
-			this.reportModel();
-			return;
-		}
-		const before = this.backend?.model();
-		await this.backend?.setModel(provider, model, thinking);
-		this.lastModel = this.backend?.model();
-		this.noteModel(before, this.lastModel);
-		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
-		this.save();
-	}
-
-	/**
-	 * Say what the runtime landed on, once it exists.
-	 *
-	 * A separate method rather than three lines inline, and not only to avoid repeating them:
-	 * inside `if (!this.backend)` the compiler has narrowed the field away, so a re-read
-	 * after `await this.start()` — which is precisely the point of these branches — cannot be
-	 * written there at all. What was asked for and what a runtime accepts are different
-	 * things (a thinking level clamped to what the model offers, a model whose credentials
-	 * have gone), so the row is corrected from the runtime rather than left saying the wish.
-	 */
-	private reportModel(): void {
-		this.lastModel = this.backend?.model() ?? this.lastModel;
-		this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
-	}
-
-	/**
-	 * One line about a model change, or nothing.
-	 *
-	 * Reads the *reported* model on both sides rather than what was asked for: a runtime that
-	 * falls back — a model that has lost its credentials, a thinking level clamped to what the
-	 * model supports — should have the transcript say what it actually got.
-	 */
-	private noteModel(before: AgentModel | undefined, after: AgentModel | undefined): void {
-		if (!after) return;
-		const name = (model: AgentModel) => `${model.provider}/${model.model}`;
-		if (before && name(before) === name(after)) {
-			if (before.thinking === after.thinking) return;
-			this.translator.notice("info", `Thinking: ${before.thinking} → ${after.thinking}`);
-			return;
-		}
-		const arrow = before ? `${name(before)} → ${name(after)}` : name(after);
-		this.translator.notice("info", `Model: ${arrow}${after.thinking ? ` · thinking ${after.thinking}` : ""}`);
-	}
-
-	/**
-	 * How hard it thinks — the same rules as `setModel`, and it was the worse bug of the two.
-	 *
-	 * On a chat with no runtime this used to read `this.backend?.model()` and assign the
-	 * `undefined` it got, so pressing a level on a dormant chat *erased* the model the row was
-	 * showing and broadcast that erasure. Now the level is applied to the recorded model and
-	 * the runtime opens on it, exactly as a model change does.
-	 */
-	async setThinking(level: ThinkingLevel): Promise<void> {
-		if (!this.backend) {
-			if (this.lastModel) {
-				this.lastModel = { ...this.lastModel, thinking: level };
-				this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
-				this.save();
-			}
-			await this.start();
-			this.reportModel();
-			return;
-		}
-		const before = this.backend.model();
-		this.backend.setThinking(level);
-		// `?? this.lastModel`: a runtime that does not report a model must not be allowed to
-		// unset the one the row is showing — see the note above.
-		this.lastModel = this.backend.model() ?? this.lastModel;
-		this.noteModel(before, this.lastModel);
-		this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
-		this.save();
-	}
-
 	/** The agent naming itself, from `decks.agent.update({ name })`. */
 	rename(name: string): void {
 		this.identity = { ...this.identity, name };
-		this.backend?.setName(name);
+		this.conversation.setName(name);
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 		this.save();
 	}
@@ -1351,6 +685,13 @@ export class DeckAgent {
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 		this.save();
 		return tags;
+	}
+
+	/** Record the workspace and say so: `setWorkspace` and `clearWorkspace` write through here. */
+	private declareWorkspace(workspace: string | undefined): void {
+		this.workspaceChosen = workspace;
+		this.identity = { ...this.identity, workspace };
+		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 	}
 
 	/**
@@ -1413,20 +754,6 @@ export class DeckAgent {
 		return this.identity.name;
 	}
 
-	/** What it is on now, live if it is running and from the record if it is not. */
-	get model(): AgentModel | undefined {
-		return this.backend?.model() ?? this.lastModel;
-	}
-
-	/** What it has cost, on the same terms — and `undefined` means "not known", not "nothing". */
-	get usage(): AgentUsage | undefined {
-		return this.backend?.usage() ?? this.lastUsage;
-	}
-
-	get mode(): AgentMode | undefined {
-		return this.backend?.mode?.() ?? this.currentMode;
-	}
-
 	/**
 	 * One row in the chat list: everything a browser knows about this conversation.
 	 *
@@ -1448,52 +775,34 @@ export class DeckAgent {
 	}
 
 	chat(): AgentChat {
-		const model = this.backend?.model() ?? this.lastModel;
 		return {
 			id: this.id,
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			...(this.parentId ? { parentId: this.parentId } : {}),
-			state: this.state,
 			...this.rowFacts(),
 			unread: 0,
 			kind: this.kind,
-			...(this.backend ? { commands: this.backend.commands() } : {}),
 			identity: this.identity,
 			boards: [...this.seat.context],
 			inPlay: [...this.seat.inPlay],
-			...(model ? { model } : {}),
-			/*
-			 * What it will spend, and what it has spent. Both were once missing from the
-			 * greeting, and both are only ever *emitted* from a running backend — so on a chat
-			 * nobody had prompted since the deck opened, the model picker's Subscription
-			 * section had no row marked and the context ring was not drawn at all. Neither
-			 * needs a runtime to answer: the account is on the record and the reading is the
-			 * conversation's own.
-			 */
-			...(this.account ? { account: this.account } : {}),
-			...(this.usage ? { usage: this.usage } : {}),
+			// Its state, the runtime's commands, and what it runs on, will spend and has spent.
+			...this.conversation.chatFacts(),
 		};
 	}
 
 	/**
-	 * The four fields of a row that only the row carries, as they are now.
+	 * The fields of a row that only the row carries, as they are now.
 	 *
-	 * Written once and read twice: by `chat()` above, and by `sayRow()` below, which is how
-	 * they reach a browser between one chat list and the next. Two copies of this would be
-	 * two answers to "what did it last say", and the point of the message is that there is
-	 * one. `mode` is here rather than beside the model because nothing else announces it —
-	 * a runtime reports what it asks before acting when it starts, and that is a row change.
+	 * Written once and read twice: by `chat()` above, and by `sayRow()` below, which is how they
+	 * reach a browser between one chat list and the next. Two copies of this would be two answers to
+	 * "what did it last say", and the point of the message is that there is one.
 	 */
 	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant" | "outside"> {
-		const last = this.translator.lastLine() ?? this.storedLast;
-		return {
-			...(last ? { lastLine: last.text.slice(0, PREVIEW_CHARS), lastAt: last.at } : {}),
-			...(this.currentMode ? { mode: this.currentMode } : {}),
-			// Restored and untouched: readable, but nothing is running until it is prompted.
-			...(this.restored && !this.starting && this.inbox.outsideKey === undefined ? { dormant: true as const } : {}),
-			...(this.inbox.row() ? { outside: this.inbox.row()! } : {}),
-		};
+		const { dormant, ...said } = this.conversation.rowFacts();
+		const outside = this.inbox.row();
+		// An outside agent is never dormant: Decks has no runtime of its to start.
+		return { ...said, ...(dormant && !outside ? { dormant } : {}), ...(outside ? { outside } : {}) };
 	}
 
 	/**
@@ -1516,89 +825,20 @@ export class DeckAgent {
 	 * question is never redrawn waits forever.
 	 */
 	greet(reply: (message: ServerMessage) => void): void {
-		for (const prompt of this.bridge.outstanding()) reply({ type: "agent.prompt", agentId: this.id, prompt });
+		this.conversation.greet(reply);
 		this.turns.greet(reply);
-	}
-
-	answerDialog(...args: Parameters<ExtensionUiBridge["answer"]>): void {
-		this.bridge.answer(...args);
-	}
-
-	/** The questions this agent is waiting on an answer to, for a front end that reads them over HTTP (Studio). */
-	dialogs(): ReturnType<ExtensionUiBridge["outstanding"]> {
-		return this.bridge.outstanding();
-	}
-
-	/** The model this conversation is on, live if a runtime is up, else as last recorded. */
-	currentModel(): AgentModel | undefined {
-		return this.backend?.model() ?? this.lastModel;
 	}
 
 	dispose(): void {
 		// The canvas token stops working before the runtime has finished dying, so a tool
 		// call from a process that outlives its agent is refused rather than answered.
-		this.stageBridge?.revoke(this.id);
+		this.conversation.revoke();
 		this.turns.dispose();
 		// Before the backend goes: `flush` asks it for the session to resume, and a disposed
 		// one cannot answer. A pending debounce is cancelled because this write supersedes it.
 		if (this.saving) clearTimeout(this.saving);
 		this.saving = undefined;
 		this.flush();
-		this.bridge.dispose();
-		this.backend?.dispose();
-	}
-}
-
-/**
- * What a runtime can do, without an instance of it.
- *
- * A dormant chat has no backend to ask, but its row still has to say whether the mode
- * control belongs on it — and capabilities are a property of the runtime, not of a session,
- * which is why both backends declare them as a module constant. `session.ts` is already the
- * only file that knows both runtimes exist, so the mapping belongs here rather than in the
- * neutral interface.
- */
-/**
- * Which class answers for which runtime.
- *
- * A table rather than a chain of ternaries, because there are four of them now and a
- * fifth would have been a fourth place to forget. Every entry is the same shape — a
- * context in, a started backend out — which is the whole of what `AgentBackend` asks.
- */
-/**
- * The model a pi session was last on, read from its file.
- *
- * A chat restored from before the record carried a model has no way to say what it uses
- * except its own runtime — and starting a runtime just to ask is what dormancy exists to
- * avoid. Pi's session file records <code>model_change</code> and
- * <code>thinking_level_change</code> entries, so the last of each is the answer, read
- * without waking anything. Fail-safe by design: any parse problem means “unknown”, which
- * is the same answer a chat with no session file gives.
- */
-function sessionModelOf(path: string | undefined): AgentModel | undefined {
-	if (!path || !path.endsWith(".jsonl")) return undefined;
-	try {
-		const lines = readFileSync(path, "utf8").split("\n");
-		let provider: string | undefined;
-		let model: string | undefined;
-		let thinking: ThinkingLevel | undefined;
-		for (const line of lines) {
-			if (!line.trim()) continue;
-			let entry: { type?: string; provider?: string; modelId?: string; thinkingLevel?: ThinkingLevel };
-			try {
-				entry = JSON.parse(line) as typeof entry;
-			} catch {
-				continue;
-			}
-			if (entry.type === "model_change" && entry.provider && entry.modelId) {
-				provider = entry.provider;
-				model = entry.modelId;
-			} else if (entry.type === "thinking_level_change" && entry.thinkingLevel) {
-				thinking = entry.thinkingLevel;
-			}
-		}
-		return provider && model ? { provider, model, thinking: thinking ?? "medium" } : undefined;
-	} catch {
-		return undefined;
+		this.conversation.dispose();
 	}
 }

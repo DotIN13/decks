@@ -47,7 +47,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	agent.rename(name);
-	agent.translator.user("here");
+	agent.conversation.translator.user("here");
 	agent.seat.setPosition("canvases/t/cards/plan/index.html", place.x, place.y);
 	const id = agent.id;
 	agent.dispose();

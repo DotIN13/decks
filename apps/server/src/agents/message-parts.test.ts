@@ -63,7 +63,7 @@ test("a queued message keeps its parts until it is sent, and the queue row shows
 		(agent as unknown as { prompt: (t: string, p?: MessagePart[]) => Promise<void> }).prompt = async (t, p) => void prompted.push([t, p]);
 		agent.turns.queueMine(text, parts);
 		assert.deepEqual(prompted, [[text, parts]], "idle: sent at once, with its parts");
-		(agent as unknown as { translator: Translator }).translator.setState("thinking");
+		agent.conversation.translator.setState("thinking");
 		agent.turns.queueMine("again", parts);
 		assert.deepEqual(Object.keys(agent.turns.queuedMine().items[0]!), ["id", "text"]);
 		agent.turns.sendMineNow(agent.turns.queuedMine().items[0]!.id);

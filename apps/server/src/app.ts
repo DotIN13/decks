@@ -593,7 +593,7 @@ export class App {
 		 */
 		const spending: Record<string, string> = {};
 		for (const agent of this.agents.all()) {
-			const on = agent.accountId();
+			const on = agent.conversation.accountId();
 			if (on) spending[agent.id] = on;
 		}
 		const frame: ServerMessage = { type: "account.list", accounts, active, ...(Object.keys(spending).length > 0 ? { spending } : {}) };

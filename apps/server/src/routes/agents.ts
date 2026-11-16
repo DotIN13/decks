@@ -67,11 +67,11 @@ export function register(api: Router, { app }: RouteDeps): void {
 					return run(req, res, "agent.remove", [agentId], () => ({ id: agentId, removed: true }), 409);
 				case "model":
 					if (typeof given.provider !== "string" || typeof given.model !== "string") return void res.status(400).json({ error: "Say which provider and model." });
-					return run(req, res, "agent.set", [agentId, { model: { provider: given.provider, model: given.model, ...(typeof given.thinking === "string" ? { thinking: given.thinking } : {}) } }], () => ({ id: agentId, model: app.agents.get(agentId)?.model ?? null }));
+					return run(req, res, "agent.set", [agentId, { model: { provider: given.provider, model: given.model, ...(typeof given.thinking === "string" ? { thinking: given.thinking } : {}) } }], () => ({ id: agentId, model: app.agents.get(agentId)?.conversation.model ?? null }));
 				case "thinking":
-					return run(req, res, "agent.set", [agentId, { thinking: String(given.thinking ?? "") }], () => ({ id: agentId, model: app.agents.get(agentId)?.model ?? null }));
+					return run(req, res, "agent.set", [agentId, { thinking: String(given.thinking ?? "") }], () => ({ id: agentId, model: app.agents.get(agentId)?.conversation.model ?? null }));
 				case "mode":
-					return run(req, res, "agent.set", [agentId, { mode: String(given.mode ?? "") }], () => ({ id: agentId, mode: app.agents.get(agentId)?.mode ?? null }));
+					return run(req, res, "agent.set", [agentId, { mode: String(given.mode ?? "") }], () => ({ id: agentId, mode: app.agents.get(agentId)?.conversation.mode ?? null }));
 				case "account":
 					return run(req, res, "account.use", [String(given.id ?? ""), agentId], () => ({ id: agentId, account: String(given.id ?? "") }));
 				default:

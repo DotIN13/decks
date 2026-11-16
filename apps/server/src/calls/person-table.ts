@@ -138,17 +138,17 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				if (change.workspace === null) agent.clearWorkspace();
 				else agent.setWorkspace(change.workspace);
 			}
-			if (change.model) await agent.setModel(change.model.provider, change.model.model, change.model.thinking as never);
+			if (change.model) await agent.conversation.setModel(change.model.provider, change.model.model, change.model.thinking as never);
 			if (change.thinking !== undefined) {
 				try {
-					await agent.setThinking(change.thinking as never);
+					await agent.conversation.setThinking(change.thinking as never);
 				} catch (error) {
 					throw new Error(`Could not change the thinking level: ${(error as Error).message}`);
 				}
 			}
 			if (change.mode !== undefined) {
 				try {
-					await agent.setMode(change.mode as never);
+					await agent.conversation.setMode(change.mode as never);
 					agents().publish();
 				} catch (error) {
 					throw new Error(`Could not change mode: ${(error as Error).message}`);
@@ -163,12 +163,12 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				return;
 			}
 			void agent
-				.report()
+				.conversation.report()
 				.then((report) => call.tell({ type: "agent.report", id: agent.id, report }))
 				.catch((error: unknown) => call.tell({ type: "agent.report", id: agent.id, error: (error as Error).message }));
 		},
 		"agent.answer": async ([answer]) => {
-			for (const agent of agents().all()) agent.answerDialog(answer as never);
+			for (const agent of agents().all()) agent.conversation.answerDialog(answer as never);
 		},
 
 		"chat.send": async ([id, message]) => {
@@ -178,7 +178,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			agent.sayRow();
 		},
 		"chat.abort": async ([id]) => {
-			void agents().get(String(id))?.abort();
+			void agents().get(String(id))?.conversation.abort();
 		},
 		"chat.queue": async ([id, change]) => {
 			const agent = need(id);
@@ -191,7 +191,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 		"chat.open": async ([id], call) => {
 			const agent = need(id);
-			const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+			const history = agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 			call.tell(history);
 			return { items: history.items, more: history.more ?? false };
 		},
@@ -203,24 +203,24 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				call.tell({ type: "chat.earlier", agentId: String(id), before, items: [], more: false });
 				return;
 			}
-			const got = agent.earlier(before, Math.min(Math.max(asked.limit ?? 60, 1), 200));
+			const got = agent.conversation.earlier(before, Math.min(Math.max(asked.limit ?? 60, 1), 200));
 			call.tell({ type: "chat.earlier", agentId: agent.id, before, items: got.items, more: got.more });
 			return { items: got.items, more: got.more };
 		},
 		"chat.tool": async ([id, item], call) => {
 			const agent = agents().get(String(id));
-			const result = agent?.toolResult(String(item)) ?? "";
+			const result = agent?.conversation.toolResult(String(item)) ?? "";
 			call.tell({ type: "chat.tool", agentId: String(id), itemId: String(item), result });
 			return { result };
 		},
 		"chat.preview": async ([id, entry], call) => {
 			const agent = need(id);
 			const entryId = entry === null || entry === undefined ? null : String(entry);
-			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? app.boards.boardsAt(agent, entryId) : {} });
+			call.tell({ type: "chat.preview", agentId: agent.id, entryId, boards: entryId ? app.boards.boardsAt(agent.conversation, entryId) : {} });
 		},
 		"chat.rewind": async ([id, entry], call) => {
 			const agent = need(id);
-			const result = await agent.rewindTo(String(entry));
+			const result = await agent.conversation.rewindTo(String(entry));
 			agents().publish();
 			if (result.cancelled) {
 				notice(call, "info", "Rewind cancelled.");
@@ -233,16 +233,16 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 		"chat.fork": async ([id, entry], call) => {
 			const agent = need(id);
-			const resumeRef = await agent.forkFrom(String(entry));
+			const resumeRef = await agent.conversation.forkFrom(String(entry));
 			if (!resumeRef) throw new Error("There is nothing before that message to fork from.");
-			const at = agent.entryTime(String(entry));
+			const at = agent.conversation.entryTime(String(entry));
 			const child = agents().create({
 				name: `${agent.chat().name} (fork)`,
 				resumeRef,
 				kind: agent.kind,
 				...(at ? { forkedFrom: { agentId: agent.id, at } } : {}),
-				...(agent.model ? { model: agent.model } : {}),
-				...(agent.mode ? { mode: agent.mode } : {}),
+				...(agent.conversation.model ? { model: agent.conversation.model } : {}),
+				...(agent.conversation.mode ? { mode: agent.conversation.mode } : {}),
 			});
 			if (call.view) call.view.focused = child.id;
 			agents().focus(child.id);
@@ -250,7 +250,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 		"chat.restore": async ([id, entry], call) => {
 			const agent = need(id);
-			const wanted = app.boards.boardsAt(agent, String(entry));
+			const wanted = app.boards.boardsAt(agent.conversation, String(entry));
 			let restored = 0;
 			for (const [path, sha] of Object.entries(wanted)) {
 				try {
@@ -279,8 +279,8 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"account.use": async ([id, agentId]) => {
 			const agent = agents().all().find((one) => one.id === String(agentId));
 			if (!agent) throw new Error("That agent is not here any more.");
-			if (!agent.useAccount(String(id))) throw new Error("That account is not on the list any more.");
-			void agent.start();
+			if (!agent.conversation.useAccount(String(id))) throw new Error("That account is not on the list any more.");
+			void agent.conversation.start();
 			void app.warmAccount(String(id)).then(() => app.publishAccounts(undefined, { reread: true }));
 		},
 		"account.forget": async ([id]) => {
@@ -372,7 +372,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			}
 			if (problems.length) throw new Error(problems.map((one) => one.error).join(" "));
 		},
-		"agent.dialogs": async ([id]) => ({ dialogs: need(id).dialogs() }),
+		"agent.dialogs": async ([id]) => ({ dialogs: need(id).conversation.dialogs() }),
 		"agent.settings": async ([id, options]) => {
 			const agent = need(id);
 			if ((options as { limits?: unknown } | undefined)?.limits) void app.refreshLimits();
@@ -382,19 +382,19 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			return {
 				id: agent.id,
 				kind: agent.kind,
-				model: agent.model ?? null,
+				model: agent.conversation.model ?? null,
 				models: runtime?.models ?? [],
 				commands: agent.chat().commands ?? runtime?.commands ?? [],
-				mode: agent.mode ?? null,
-				usage: agent.usage ?? null,
+				mode: agent.conversation.mode ?? null,
+				usage: agent.conversation.usage ?? null,
 				modes: runtime?.capabilities.modes ?? [],
 				accounts: accounts.accounts ?? [],
-				account: agent.accountId() ?? accounts.active ?? null,
+				account: agent.conversation.accountId() ?? accounts.active ?? null,
 				queued: agent.turns.queuedMine(),
 			};
 		},
 		"agent.reset": async ([id]) => {
-			await need(id).reset();
+			await need(id).conversation.reset();
 			agents().publish();
 		},
 		"apps.seen": async ([name]) => {

@@ -23,7 +23,7 @@ interface Context {
 }
 
 function refuseIfBusy(context: Context, name: string, verb: string): void {
-	const busy = context.agents.find((agent) => agent.seat.stageName(false) === name && agent.running);
+	const busy = context.agents.find((agent) => agent.seat.stageName(false) === name && agent.conversation.running);
 	if (busy) throw new Error(`${busy.name} is working on "${name}" right now; ${verb} it when that turn ends.`);
 }
 
@@ -64,7 +64,7 @@ export function titleCanvas(context: Context, name: string, title: string): stri
 	if (!unchosen) return name;
 	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
 	const keepsBoards = existsSync(join(context.deck.path, canvasFolder(name), "cards"));
-	if (keepsBoards && context.agents.some((agent) => agent.seat.stageName(false) === name && agent.running)) return name;
+	if (keepsBoards && context.agents.some((agent) => agent.seat.stageName(false) === name && agent.conversation.running)) return name;
 	return moveCanvas(context, name, context.pens.freshName(clean));
 }
 

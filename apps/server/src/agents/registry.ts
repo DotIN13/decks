@@ -85,7 +85,7 @@ export class Registry {
 		due.forEach(({ id, since }, index) => {
 			const timer = setTimeout(() => {
 				const agent = this.get(id);
-				if (!agent || agent.running) return;
+				if (!agent || agent.conversation.running) return;
 				// Marked before the turn starts, so a stop during the start itself still counts as resumed.
 				this.working.set(id, true, Date.now());
 				void agent.prompt(resumeNote(since, now)).catch((error) => console.error(`[decks] could not start ${agent.chat().name} again: ${(error as Error).message}`));
@@ -259,7 +259,7 @@ export class Registry {
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
 				deliver: (fromId, target, spec) => this.deliver(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
-			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
+			report: (agentId, text) => this.get(agentId)?.conversation.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.turns.queue() ?? [],
 				brief: (task, boards, person) => brief(task, boards, this.deck, person),
 				recordRevision: (path) => this.host.recordRevision(path),
@@ -304,7 +304,7 @@ export class Registry {
 		 * continue. `prompt()` already opens with `await this.start()` and `start()` is
 		 * memoised, so the first thing said to a dormant agent starts it.
 		 */
-		if (!options.restored && agent.kind !== "outside") void agent.start();
+		if (!options.restored && agent.kind !== "outside") void agent.conversation.start();
 		this.publish();
 		return agent;
 	}
@@ -453,7 +453,7 @@ export class Registry {
 		const index = this.agents.findIndex((agent) => agent.id === id);
 		if (index === -1) return { removed: false, reason: "That agent is not here." };
 		const agent = this.agents[index]!;
-		if (agent.running) return { removed: false, reason: `${agent.chat().name} is still working. Stop it first.` };
+		if (agent.conversation.running) return { removed: false, reason: `${agent.chat().name} is still working. Stop it first.` };
 
 		this.agents.splice(index, 1);
 		agent.dispose();
@@ -538,32 +538,32 @@ export class Registry {
 		const workspace = spec.workspace ?? from.workspace;
 		// The creator's runtime unless another is named, so an inherited model is one it can open.
 		const kind = spec.kind ?? from.kind;
-		const inherited = !spec.model && kind === from.kind ? from.currentModel() : undefined;
+		const inherited = !spec.model && kind === from.kind ? from.conversation.currentModel() : undefined;
 		const made = this.create({
 			near: fromId,
 			name: spec.name,
 			kind,
 			...(inherited ? { model: inherited } : {}),
-			...(from.accountId() ? { account: from.accountId() as string } : {}),
+			...(from.conversation.accountId() ? { account: from.conversation.accountId() as string } : {}),
 			...(workspace ? { workspace } : {}),
 		});
 		if (spec.tags?.length) made.setTags(spec.tags);
 		if (spec.model?.includes("/")) {
 			const [provider, ...rest] = spec.model.split("/");
 			try {
-				await made.setModel(provider!, rest.join("/"), spec.thinking);
+				await made.conversation.setModel(provider!, rest.join("/"), spec.thinking);
 			} catch (error) {
-				from.translator.notice("warn", `${made.chat().name} stays on the default model: ${(error as Error).message}`);
+				from.conversation.translator.notice("warn", `${made.chat().name} stays on the default model: ${(error as Error).message}`);
 			}
 		} else if (spec.thinking) {
-			await made.setThinking(spec.thinking);
+			await made.conversation.setThinking(spec.thinking);
 		}
 		if (spec.mode) {
 			if (runtimeOf(made.chat().kind).capabilities.modes.includes(spec.mode)) {
-				await made.start();
-				await made.setMode(spec.mode);
+				await made.conversation.start();
+				await made.conversation.setMode(spec.mode);
 			} else {
-				from.translator.notice("warn", `${made.chat().name} stays in its default mode: ${made.chat().kind} cannot do "${spec.mode}".`);
+				from.conversation.translator.notice("warn", `${made.chat().name} stays in its default mode: ${made.chat().kind} cannot do "${spec.mode}".`);
 			}
 		}
 		/*
@@ -574,8 +574,8 @@ export class Registry {
 		if (spec.canvas) made.seat.openStage(spec.canvas, "itself");
 		else if (spec.newCanvas && this.stage.pens) made.seat.newStage("", { by: "itself" });
 		this.publish();
-		const model = made.model;
-		const mode = made.mode;
+		const model = made.conversation.model;
+		const mode = made.conversation.mode;
 		return {
 			agent: made.id,
 			name: made.chat().name,

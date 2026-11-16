@@ -81,7 +81,7 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 	// Trusted under `apps/<name>` as it always was, so an "Always allow" given before still holds.
 	const key = `apps/${name}`;
 	if (!app.appTrust.allows(key) && !app.appsAllowedOnce.has(key)) {
-		const answer = await conversationForApp(app, name).bridge.choose({
+		const answer = await conversationForApp(app, name).conversation.bridge.choose({
 			title: "Let this app use the stage?",
 			message: `The app ${name} wants to call stage verbs: write cards, move the canvas, message agents.`,
 			options: [
@@ -98,8 +98,8 @@ async function appCaller(app: CallsHost, name: string): Promise<Caller> {
 	return {
 		tool,
 		announce: (verb, answer) => {
-			if (answer.ok) conversation.translator.notice("info", `app ${name} called ${verb}`);
-			else conversation.translator.notice("error", `app ${name} called ${verb} and failed: ${answer.error}`);
+			if (answer.ok) conversation.conversation.translator.notice("info", `app ${name} called ${verb}`);
+			else conversation.conversation.translator.notice("error", `app ${name} called ${verb} and failed: ${answer.error}`);
 		},
 	};
 }

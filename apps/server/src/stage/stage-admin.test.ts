@@ -77,7 +77,7 @@ test("a delete takes the stage and the boards kept in its folder, and never the 
 test("neither is allowed while an agent on that stage is in the middle of a turn", () => {
 	const { context, done } = fixture();
 	try {
-		const busy = { name: "Ada", running: true, seat: { stageName: () => "deploy" } } as unknown as DeckAgent;
+		const busy = { name: "Ada", conversation: { running: true }, seat: { stageName: () => "deploy" } } as unknown as DeckAgent;
 		const withBusy = { ...context, agents: [busy] };
 		assert.throws(() => renameStage(withBusy, "deploy", "other"), /Ada is working on "deploy"/);
 		assert.throws(() => deleteStage(withBusy, "deploy"), /Ada is working on "deploy"/);

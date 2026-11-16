@@ -188,7 +188,7 @@ function agentOn(
 
 	test("a row's preview line is cut to what the list can draw", () => {
 		const { agent, sent, cleanup } = agentOn([]);
-		agent.translator.user("x".repeat(4_000));
+		agent.conversation.translator.user("x".repeat(4_000));
 		agent.sayRow();
 		const row = sent.filter((message): message is Extract<ServerMessage, { type: "agent.row" }> => message.type === "agent.row").at(-1);
 		assert.equal(row?.lastLine?.length, 240, "the row draws one clipped line, and the hover card three");
@@ -223,13 +223,13 @@ function agentOn(
 			},
 		});
 		let started = 0;
-		(agent as unknown as { start: () => Promise<void> }).start = async () => {
+		agent.conversation.start = async () => {
 			started += 1;
 		};
 
-		await agent.setThinking("high");
+		await agent.conversation.setThinking("high");
 
-		assert.deepEqual(agent.model, { provider: "openai", model: "gpt-5", thinking: "high" }, "the level lands on the recorded model");
+		assert.deepEqual(agent.conversation.model, { provider: "openai", model: "gpt-5", thinking: "high" }, "the level lands on the recorded model");
 		assert.equal(started, 1, "and the runtime is started, so the choice is in force rather than only written down");
 		const told = sent.filter((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
 		assert.equal(told.at(-1)?.model?.thinking, "high", "and the browser is told the model, not told it is gone");
@@ -241,16 +241,16 @@ function agentOn(
 			restored: { id: "restored-5", items: [], context: [], inPlay: [], createdAt: 1, model: { provider: "openai", model: "gpt-5", thinking: "low" } },
 		});
 		let started = 0;
-		(agent as unknown as { start: () => Promise<void> }).start = async () => {
+		agent.conversation.start = async () => {
 			started += 1;
 		};
 
-		await agent.setModel("anthropic", "claude-opus-5");
+		await agent.conversation.setModel("anthropic", "claude-opus-5");
 
 		// Recorded *before* starting, because `start()` reads the model off the record and
 		// passes it at session creation: starting first and changing afterwards opens the
 		// session on the model being replaced, and on antigravity that is a spawn and a respawn.
-		assert.deepEqual(agent.model, { provider: "anthropic", model: "claude-opus-5", thinking: "low" }, "the level it was on carries across");
+		assert.deepEqual(agent.conversation.model, { provider: "anthropic", model: "claude-opus-5", thinking: "low" }, "the level it was on carries across");
 		assert.equal(started, 1);
 		cleanup();
 	});
@@ -467,7 +467,7 @@ test("the queue drains once the agent has been quiet, one item at a time", async
 test("a busy agent is not interrupted, and the countdown restarts when it goes quiet", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, cleanup } = probeOn();
-	agent.translator.setState("thinking");
+	agent.conversation.translator.setState("thinking");
 	agent.turns.enqueue(item("waits its turn"));
 
 	await settle(60);
@@ -475,11 +475,11 @@ test("a busy agent is not interrupted, and the countdown restarts when it goes q
 
 	// `waiting` is a question the agent asked the user. It is not idle, and the timer must
 	// not fire under it either.
-	agent.translator.setState("waiting");
+	agent.conversation.translator.setState("waiting");
 	await settle(60);
 	assert.deepEqual(agent.ran, [], "nor while it is waiting on an answer");
 
-	agent.translator.setState("idle");
+	agent.conversation.translator.setState("idle");
 	await settle(60);
 	assert.deepEqual(agent.ran, ["waits its turn"]);
 	delete process.env.DECKS_QUEUE_IDLE_MS;
@@ -570,7 +570,7 @@ function switcherOf(ids: string[]) {
 test("a new agent opens on the install default, not on nothing", () => {
 	const { switcher } = switcherOf(["acct-one", "acct-two"]);
 	const { agent, cleanup } = agentOn([], { accounts: switcher });
-	assert.equal(agent.accountId(), "acct-one", "an agent with no account of its own spends the default");
+	assert.equal(agent.conversation.accountId(), "acct-one", "an agent with no account of its own spends the default");
 	cleanup();
 });
 
@@ -580,7 +580,7 @@ test("a restored agent opens on the account it was left on", () => {
 		accounts: switcher,
 		restored: { id: "r", items: [], context: [], inPlay: [], createdAt: 1, account: "acct-two" },
 	});
-	assert.equal(agent.accountId(), "acct-two", "which is the whole reason it is written down");
+	assert.equal(agent.conversation.accountId(), "acct-two", "which is the whole reason it is written down");
 	cleanup();
 });
 
@@ -590,7 +590,7 @@ test("a restored agent naming an account that is gone falls back rather than poi
 		accounts: switcher,
 		restored: { id: "r", items: [], context: [], inPlay: [], createdAt: 1, account: "forgotten" },
 	});
-	assert.equal(agent.accountId(), "acct-one");
+	assert.equal(agent.conversation.accountId(), "acct-one");
 	cleanup();
 });
 
@@ -598,12 +598,12 @@ test("switching moves the agent and points its link", () => {
 	const { switcher, links } = switcherOf(["acct-one", "acct-two"]);
 	const { agent, cleanup } = agentOn([], { accounts: switcher });
 
-	assert.equal(agent.useAccount("acct-two"), true);
-	assert.equal(agent.accountId(), "acct-two");
+	assert.equal(agent.conversation.useAccount("acct-two"), true);
+	assert.equal(agent.conversation.accountId(), "acct-two");
 	assert.equal(links[agent.id], "acct-two", "the link the running session reads through");
 
-	assert.equal(agent.useAccount("nope"), false, "an account that is not on the list is refused");
-	assert.equal(agent.accountId(), "acct-two", "and refusing changes nothing");
+	assert.equal(agent.conversation.useAccount("nope"), false, "an account that is not on the list is refused");
+	assert.equal(agent.conversation.accountId(), "acct-two", "and refusing changes nothing");
 	cleanup();
 });
 
@@ -631,7 +631,7 @@ test("a greeting carries no history, and one asked for is the newest rows, trimm
 			false,
 			"a history is asked for when a chat is shown, not greeted",
 		);
-		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		const history = agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 		assert.equal(history.items.length, HISTORY_ITEMS);
 		assert.equal(history.items[0]?.id, items[150 - HISTORY_ITEMS]?.id, "the newest rows, in reading order");
 		assert.equal(history.more, true, "the rows it did not send are still behind it");
@@ -649,16 +649,16 @@ test("scrolling back pages through the window before it reaches the archive", ()
 	const items = longChat(150);
 	const { agent, cleanup } = agentOn([], { restored: { id: "R", items, context: [], inPlay: [], createdAt: 1 } });
 	try {
-		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		const history = agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 		const oldest = history.items[0]?.id ?? "";
-		const page = agent.earlier(oldest, 30);
+		const page = agent.conversation.earlier(oldest, 30);
 		assert.deepEqual(
 			page.items.map((item) => item.id),
 			items.slice(150 - HISTORY_ITEMS - 30, 150 - HISTORY_ITEMS).map((item) => item.id),
 			"the thirty rows just before what the browser holds",
 		);
 		assert.equal(page.more, true);
-		const first = agent.earlier(items[20]?.id ?? "", 60);
+		const first = agent.conversation.earlier(items[20]?.id ?? "", 60);
 		assert.deepEqual(
 			first.items.map((item) => item.id),
 			items.slice(0, 20).map((item) => item.id),
@@ -675,9 +675,9 @@ test("a reset starts the conversation afresh and sets the old one aside, keeping
 	const { agent, store, cleanup } = agentOn([], { restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "message 29", lastAt: 29 } });
 	try {
 		const name = agent.chat().name;
-		assert.ok((agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items.length > 0);
-		await agent.reset();
-		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		assert.ok((agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items.length > 0);
+		await agent.conversation.reset();
+		const history = agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 		assert.equal(history.items.length, 0, "nothing is shown of the old conversation");
 		assert.equal(history.more, false, "and none of it is scrolled back to");
 		assert.deepEqual(store.readItems("R"), [], "the window on disk is empty");
@@ -692,9 +692,9 @@ test("a reset starts the conversation afresh and sets the old one aside, keeping
 test("a tool call's whole output is there to be asked for", () => {
 	const { agent, cleanup } = agentOn([], { restored: { id: "R", items: longChat(10), context: [], inPlay: [], createdAt: 1 } });
 	try {
-		assert.equal(agent.toolResult("t0"), "y".repeat(5000));
-		assert.equal(agent.toolResult("not-a-row"), undefined);
-		assert.equal(agent.toolResult("u1"), undefined, "a row that is not a tool call has no output");
+		assert.equal(agent.conversation.toolResult("t0"), "y".repeat(5000));
+		assert.equal(agent.conversation.toolResult("not-a-row"), undefined);
+		assert.equal(agent.conversation.toolResult("u1"), undefined, "a row that is not a tool call has no output");
 	} finally {
 		cleanup();
 	}
@@ -744,7 +744,7 @@ test("a restored row shows its last line before its transcript is read", () => {
 		assert.equal(agent.chat().lastAt, 5);
 
 		// Asking for the history is what reads `chat.json`, and the window then agrees with it.
-		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		const history = agent.conversation.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
 		assert.equal(history.items.at(-1)?.id, items.at(-1)?.id, "the stored rows are read back");
 		assert.equal(agent.chat().lastLine, "message 5", "and the preview is unchanged");
 	} finally {
