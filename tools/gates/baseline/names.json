@@ -162,7 +162,7 @@
 	"canvas/ink/ink-gestures.ts: stage": 22,
 	"canvas/ink/ink.ts: board": 2,
 	"canvas/ink/ink.ts: stage": 4,
-	"canvas/ink/InkLayer.tsx: stage": 7,
+	"canvas/ink/InkLayer.tsx: stage": 6,
 	"canvas/ink/live-ink.ts: stage": 5,
 	"canvas/ink/model.ts: stage": 8,
 	"canvas/ink/shaper.ts: board": 3,

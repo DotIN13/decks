@@ -191,31 +191,31 @@ function ItemSurface(p: { props: ItemSlotProps & ItemSlotExtras; awake: () => bo
 	const size = p.size;
 	return (
 		<>
-		<Show when={awake() && props.board.card}>
-			<CardSurface
-				page={props.page!}
-				path={props.board.path}
-				trusted={props.cardScripts !== false && !props.board.path.startsWith("shared/")}
-				rev={props.board.rev}
-				sized={props.board.sized}
-				reload={props.reload}
-				size={size}
-				selected={props.selected}
-				onSelect={() => props.view.select()}
-				onAddPress={(event, on) => props.view.press(event, on)}
-				onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}
-				onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
-				onShown={p.shown}
-				{...(props.onWords ? { onWords: props.onWords } : {})}
-			/>
-		</Show>
-		{/* A document or an app item: no file of its own, drawn here (`item-surfaces.tsx`). */}
-		<Show when={awake() && props.board.item === "document"}>
-			<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={p.shown} />
-		</Show>
-		<Show when={awake() && props.board.item === "app"}>
-			<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={p.shown} />
-		</Show>
+			<Show when={awake() && props.board.card}>
+				<CardSurface
+					page={props.page!}
+					path={props.board.path}
+					trusted={props.cardScripts !== false && !props.board.path.startsWith("shared/")}
+					rev={props.board.rev}
+					sized={props.board.sized}
+					reload={props.reload}
+					size={size}
+					selected={props.selected}
+					onSelect={() => props.view.select()}
+					onAddPress={(event, on) => props.view.press(event, on)}
+					onOpenPage={(path) => props.onOpenPage?.(path, props.board.path)}
+					onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
+					onShown={p.shown}
+					{...(props.onWords ? { onWords: props.onWords } : {})}
+				/>
+			</Show>
+			{/* A document or an app item: no file of its own, drawn here (`item-surfaces.tsx`). */}
+			<Show when={awake() && props.board.item === "document"}>
+				<DocumentSurface file={props.board.file ?? ""} selected={props.selected} onSelect={() => props.view.select()} ref={p.shown} />
+			</Show>
+			<Show when={awake() && props.board.item === "app"}>
+				<AppSurface app={props.board.app ?? ""} path={props.board.path} visible={props.visible} selected={COARSE ? !!props.active : props.selected} onSelect={() => props.view.select()} ref={p.shown} />
+			</Show>
 		</>
 	);
 }

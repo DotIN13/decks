@@ -1,6 +1,5 @@
 {
 	"canvas/cards/card-syntax.ts: line shallower than its block": 1,
 	"canvas/editor/dom/TextEditing.tsx: JSX child level with its parent": 2,
-	"canvas/editor/editor.tsx: line shallower than its block": 4,
-	"canvas/items/item-slot.tsx: JSX child level with its parent": 4
+	"canvas/editor/editor.tsx: line shallower than its block": 4
 }

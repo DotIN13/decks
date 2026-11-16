@@ -101,9 +101,6 @@ export function CanvasInk(props: InkProps) {
 
 
 
-/** Its old name, until its one importer (`view/CanvasView.tsx`) takes the new one. */
-export { CanvasInk as StageInk };
-
 /** The box round what the lasso holds, with the corners that resize it. */
 function HeldBox(props: { box: { x: number; y: number; w: number; h: number }; zoom: number; onCorner: (event: PointerEvent, corner: Corner) => void }) {
 	const box = () => props.box;
