@@ -1,3 +1,4 @@
+// Tests for what adding an item decides: what opens for typing, what a drawn arrow lights up, a panel pick.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { drawHints, insertPick, opensWords } from "./insert.ts";

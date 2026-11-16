@@ -1,3 +1,4 @@
+// Holds editor/core to its rule: no imports from the page, Solid or the engine.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";

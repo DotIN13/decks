@@ -1,7 +1,9 @@
+// The editor's one way in for the canvas view: its state, pointer, keys, typing and adding as one
+// object, and the pieces of it the view still uses itself.
 /**
  * The editor, as the stage (`canvas/view/CanvasView.tsx`) uses it: the one way in. `createStageEditor` puts
- * the state (`dom/controller.ts`), the pointer (`dom/pointer.ts`), the keys (`dom/keys.ts`), the
- * typing (`dom/TextEditing.tsx`) and the adding (`dom/InsertMenu.tsx`) together as one object; the
+ * the state (`dom/controller.ts`), the pointer (`input/pointer.ts`), the keys (`input/keys.ts`), the
+ * typing (`dom/TextEditing.tsx`) and the adding (`chrome/InsertMenu.tsx`) together as one object; the
  * rest is what the stage still does with the editor's pieces itself (the overlay's parts, the ops
  * the pill and the ink write), until those move in too.
  */

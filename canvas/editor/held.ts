@@ -1,3 +1,4 @@
+// A drag held by a button ends at the first sign, from any document it can cross, that the button is up.
 /**
  * The end of a drag that holds a button down: the first sign, from any of the documents it can
  * cross, that the button is up.

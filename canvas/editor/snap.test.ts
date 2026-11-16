@@ -1,3 +1,4 @@
+// Tests for snapping a moved box to its neighbours, and no snap when nothing is near.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { snapEdges, snapMove } from "./snap.ts";

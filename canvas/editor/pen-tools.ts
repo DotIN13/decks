@@ -1,11 +1,13 @@
+// The drawing tools' shared state: the tool in hand, the selection, and what the drawing bar, the
+// insert panel and the properties panel read and set.
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { PenTool } from "./core/model.ts";
 
 /**
- * What a press on the stage's drawing does, and what is selected in it (`canvas/pen/`).
+ * What a press on the stage's drawing does, and what is selected in it (`canvas/editor/`).
  *
  * Shared between the stage, which turns presses into pen operations, and the drawing bar
- * (`canvas/pen/PenBar.tsx`), which shows the tools and edits what is selected. `select` is the
+ * (`canvas/chrome/PenBar.tsx`), which shows the tools and edits what is selected. `select` is the
  * resting tool: a press picks an item up. Every other tool makes one item and hands back to
  * `select`, the way a design tool does, so a second press is never a second rectangle by surprise.
  */
@@ -49,7 +51,7 @@ export const keptSelection = (): readonly string[] => untrack(penSelection);
 const [penTyping, setPenTyping] = createSignal(false);
 
 /**
- * What the `shape` and `icon` tools make: the shape picked in the insert panel (`canvas/pen/Insert.tsx`,
+ * What the `shape` and `icon` tools make: the shape picked in the insert panel (`canvas/chrome/Insert.tsx`,
  * by its name in `@decks/pen`'s `SHAPES`) and the icon picked there, by library and name.
  */
 const [penShape, setPenShape] = createSignal("Rectangle");
@@ -57,14 +59,14 @@ const [penIcon, setPenIcon] = createSignal<{ library: string; name: string }>({ 
 
 /**
  * Where each selected item is on the stage, as the stage last drew it: the properties panel's
- * position and size (`canvas/pen/Properties.tsx`). Set by the stage, which has the layout.
+ * position and size (`canvas/chrome/Properties.tsx`). Set by the stage, which has the layout.
  */
 const [penBoxes, setPenBoxes] = createSignal<ReadonlyMap<string, { x: number; y: number; w: number; h: number }>>(new Map());
 /** On a touch screen the properties drawer opens only when asked, from the pill or the hold menu (`Properties.tsx`, `Callout.tsx`); elsewhere the panel shows with the selection. */
 const [propsOpen, setPropsOpen] = createSignal(false);
 
 /**
- * The insert panel (`canvas/pen/Insert.tsx`): open on its shapes or its icons. Opened from the tool
+ * The insert panel (`canvas/chrome/Insert.tsx`): open on its shapes or its icons. Opened from the tool
  * column it sits beside it and a pick arms the tool; opened from the canvas menu it carries the stage
  * point the menu was opened at, and a pick is put there at once.
  */

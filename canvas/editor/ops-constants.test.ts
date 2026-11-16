@@ -1,3 +1,4 @@
+// Holds the editor's made-frame corner equal to the look's note corner plus the frame's padding.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NOTE_RADIUS } from "../look/look.ts";

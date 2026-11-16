@@ -1,6 +1,6 @@
 /**
  * The seam answered from the TypeScript side of the engine. The only file in the editor that
- * knows `stage/engine.ts` exists.
+ * knows `render/engine.ts` exists.
  */
 import type { PenDocument } from "@decks/pen";
 import { docIndex } from "../drawing/doc-index.ts";

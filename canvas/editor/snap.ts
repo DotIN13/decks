@@ -1,3 +1,4 @@
+// Snapping a moving box to the edges, middles and gaps around it, and the guides that show it.
 /**
  * Snapping, the way a design tool does it: a box being moved lines its edges and its middle up
  * with the edges and middles of what is around it, and settles into the gap its neighbours
@@ -13,7 +14,6 @@ export interface Box {
 	w: number;
 	h: number;
 }
-
 /**
  * A line to draw: an alignment (`kind: "line"`) or one measured gap between two boxes (`"gap"`).
  * An alignment carries the points on it that line up (`points`), each marked with a ✕; a gap that
@@ -28,9 +28,46 @@ export interface Guide {
 	points?: { x: number; y: number }[];
 	label?: string;
 }
-
 /** The gap a board keeps from the next one, beside it or above or below it, for reading them in order. */
 export const READING_GAP = 160;
+/**
+ * Snap a moved box: the correction to add to the move, and the guides to draw where it lands.
+ * `reading` are boards the box keeps the reading gap from (a board being dragged: the other boards).
+ */
+export function snapMove(moving: Box, targets: readonly Box[], threshold: number, reading: readonly Box[] = []): { dx: number; dy: number; guides: Guide[] } {
+	const dx = bestShift(moving, targets, "x", threshold, reading) ?? 0;
+	const dy = bestShift(moving, targets, "y", threshold, reading) ?? 0;
+	const placed = { ...moving, x: moving.x + dx, y: moving.y + dy };
+	return { dx, dy, guides: [...guidesFor(placed, targets, "x"), ...guidesFor(placed, targets, "y"), ...readingGuides(placed, reading)] };
+}
+/**
+ * Snap the edges a resize is moving. `edges` names them — `x1` left, `x2` right, `y1` top,
+ * `y2` bottom — and each is pulled to the nearest line of a target on its own. Returns the box
+ * with the edges moved, and a guide for every edge that snapped.
+ */
+export function snapEdges(box: { x1: number; y1: number; x2: number; y2: number }, edges: ReadonlyArray<"x1" | "x2" | "y1" | "y2">, targets: readonly Box[], threshold: number) {
+	const out = { ...box };
+	const guides: Guide[] = [];
+	for (const edge of edges) {
+		const axis = edge[0] as "x" | "y";
+		let best: { value: number; target: Box } | undefined;
+		for (const target of targets) {
+			for (const t of lines(target, axis)) {
+				const d = Math.abs(t - out[edge]);
+				if (d <= threshold && (!best || d < Math.abs(best.value - out[edge]))) best = { value: t, target };
+			}
+		}
+		if (!best) continue;
+		out[edge] = best.value;
+		const other = cross(axis);
+		const lo = Math.min(other === "x" ? Math.min(out.x1, out.x2) : Math.min(out.y1, out.y2), start(best.target, other));
+		const hi = Math.max(other === "x" ? Math.max(out.x1, out.x2) : Math.max(out.y1, out.y2), end(best.target, other));
+		const edged = { x: Math.min(out.x1, out.x2), y: Math.min(out.y1, out.y2), w: Math.abs(out.x2 - out.x1), h: Math.abs(out.y2 - out.y1) };
+		const points = pointsOn(best.value, [edged, best.target], axis);
+		guides.push(axis === "x" ? { kind: "line", x1: best.value, y1: lo, x2: best.value, y2: hi, points } : { kind: "line", x1: lo, y1: best.value, x2: hi, y2: best.value, points });
+	}
+	return { box: out, guides };
+}
 
 const lines = (b: Box, axis: "x" | "y") => (axis === "x" ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h]);
 const start = (b: Box, axis: "x" | "y") => (axis === "x" ? b.x : b.y);
@@ -40,7 +77,6 @@ const cross = (axis: "x" | "y"): "x" | "y" => (axis === "x" ? "y" : "x");
 /** Whether two boxes share some of the other axis: side by side for `x`, one above the other for `y`. */
 const overlaps = (a: Box, b: Box, axis: "x" | "y") => start(a, cross(axis)) < end(b, cross(axis)) && start(b, cross(axis)) < end(a, cross(axis));
 const EPS = 0.5;
-
 /** The smallest correction along one axis that lines `moving` up with a target or an equal gap. */
 function bestShift(moving: Box, targets: readonly Box[], axis: "x" | "y", threshold: number, reading: readonly Box[] = []): number | undefined {
 	let best: number | undefined;
@@ -68,7 +104,6 @@ function bestShift(moving: Box, targets: readonly Box[], axis: "x" | "y", thresh
 	}
 	return best;
 }
-
 /** The guides that hold for a box already in place: every line it shares and every gap it repeats. */
 function guidesFor(moving: Box, targets: readonly Box[], axis: "x" | "y"): Guide[] {
 	const out: Guide[] = [];
@@ -104,7 +139,6 @@ function guidesFor(moving: Box, targets: readonly Box[], axis: "x" | "y"): Guide
 	}
 	return out;
 }
-
 /**
  * The points on an alignment at `at` that line up: each box's edges and middle along the line,
  * where the box has an edge or its middle on it. Each is marked with a ✕.
@@ -125,7 +159,6 @@ function pointsOn(at: number, boxes: readonly Box[], axis: "x" | "y"): { x: numb
 	}
 	return out;
 }
-
 /**
  * The reading gaps a board in place keeps: `READING_GAP` from another board beside it, above it or
  * below it, drawn across the gap with its size. Level with the middle of what the two share, or
@@ -146,44 +179,4 @@ function readingGuides(moving: Box, boards: readonly Box[]): Guide[] {
 		}
 	}
 	return out;
-}
-
-/**
- * Snap a moved box: the correction to add to the move, and the guides to draw where it lands.
- * `reading` are boards the box keeps the reading gap from (a board being dragged: the other boards).
- */
-export function snapMove(moving: Box, targets: readonly Box[], threshold: number, reading: readonly Box[] = []): { dx: number; dy: number; guides: Guide[] } {
-	const dx = bestShift(moving, targets, "x", threshold, reading) ?? 0;
-	const dy = bestShift(moving, targets, "y", threshold, reading) ?? 0;
-	const placed = { ...moving, x: moving.x + dx, y: moving.y + dy };
-	return { dx, dy, guides: [...guidesFor(placed, targets, "x"), ...guidesFor(placed, targets, "y"), ...readingGuides(placed, reading)] };
-}
-
-/**
- * Snap the edges a resize is moving. `edges` names them — `x1` left, `x2` right, `y1` top,
- * `y2` bottom — and each is pulled to the nearest line of a target on its own. Returns the box
- * with the edges moved, and a guide for every edge that snapped.
- */
-export function snapEdges(box: { x1: number; y1: number; x2: number; y2: number }, edges: ReadonlyArray<"x1" | "x2" | "y1" | "y2">, targets: readonly Box[], threshold: number) {
-	const out = { ...box };
-	const guides: Guide[] = [];
-	for (const edge of edges) {
-		const axis = edge[0] as "x" | "y";
-		let best: { value: number; target: Box } | undefined;
-		for (const target of targets) {
-			for (const t of lines(target, axis)) {
-				const d = Math.abs(t - out[edge]);
-				if (d <= threshold && (!best || d < Math.abs(best.value - out[edge]))) best = { value: t, target };
-			}
-		}
-		if (!best) continue;
-		out[edge] = best.value;
-		const other = cross(axis);
-		const lo = Math.min(other === "x" ? Math.min(out.x1, out.x2) : Math.min(out.y1, out.y2), start(best.target, other));
-		const hi = Math.max(other === "x" ? Math.max(out.x1, out.x2) : Math.max(out.y1, out.y2), end(best.target, other));
-		const edged = { x: Math.min(out.x1, out.x2), y: Math.min(out.y1, out.y2), w: Math.abs(out.x2 - out.x1), h: Math.abs(out.y2 - out.y1) };
-		const points = pointsOn(best.value, [edged, best.target], axis);
-		guides.push(axis === "x" ? { kind: "line", x1: best.value, y1: lo, x2: best.value, y2: hi, points } : { kind: "line", x1: lo, y1: best.value, x2: hi, y2: best.value, points });
-	}
-	return { box: out, guides };
 }

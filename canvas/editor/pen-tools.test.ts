@@ -1,3 +1,4 @@
+// Tests for the drawing tools' kept selection across mounts and a switch of connection.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { feedSelection, keptSelection, penSelection, setPenSelection } from "./pen-tools.ts";
