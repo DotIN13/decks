@@ -67,3 +67,11 @@ test("an old card's agent.send and agent.queue name the agent and spread the mes
 	assert.deepEqual(turn("agent.get", ["Mason"]), { name: "agent.get", args: { agent: "Mason" }, old: ["agent.get", "agents", "agent.get", ["name"]] });
 });
 
+test("a card may queue, read its agent and inbox, and send the person's screen to another canvas; not make an agent", () => {
+	assert.equal(ok(cardCall("agent.queue", ["Mason", { task: "go", boards: ["b.html"] }], "mine")).name, "agent.queue");
+	assert.equal(ok(cardCall("agent.me", [], "mine")).name, "agent.me");
+	assert.equal(ok(cardCall("agent.inbox", [], "mine")).name, "agent.inbox");
+	assert.equal(ok(cardCall("view.goto", ["other"], "mine")).name, "view.goto");
+	assert.ok("refusal" in cardCall("agent.create", ["x"], "mine"));
+});
+

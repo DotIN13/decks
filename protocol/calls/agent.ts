@@ -1,7 +1,7 @@
 import { defineCall } from "../call.ts";
 import { arr, bool, lit, obj, opt, str } from "../schema.ts";
 import { Agent, AgentChange, AgentKind, AgentMode, Deleted, Message, News } from "../shapes.ts";
-import { AGENT, ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
+import { AGENT, ANYONE, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 
 // Who works: their records, their mail, the clients that can start them.
 // The server keeps the records and starts no one.
@@ -9,7 +9,7 @@ import { AGENT, ANYONE, NOT_CARD, PEOPLE, PERSON, onCanvas } from "./parts.ts";
 const Name = str("An agent's name or id.");
 
 // Records: who works, and changing them.
-export const me = defineCall({ name: "agent.me", summary: "You: name, avatar, colour, workspace, tags and home canvas; for the person, the agent whose conversation is on their screen.", who: PEOPLE, args: {}, answer: Agent, effect: "read" });
+export const me = defineCall({ name: "agent.me", summary: "You: name, avatar, colour, workspace, tags and home canvas; for the person, the agent whose conversation is on their screen; for a card, the agent whose home is the card's canvas.", who: ["person", "agent", "card"], args: {}, answer: Agent, effect: "read" });
 
 export const list = defineCall({
 	name: "agent.list",
@@ -93,14 +93,14 @@ export const send = defineCall({
 
 export const queue = defineCall({
 	name: "agent.queue",
-	summary: "Put work in an agent's queue, taken up when its turn ends; reply brings its report back to you.",
-	who: NOT_CARD,
+	summary: "Put work in an agent's queue, taken up when its turn ends; reply brings its report back to you. From a card, the person is asked first, as for agent.send.",
+	who: ANYONE,
 	args: { agent: Name, task: str(), cards: opt(arr(str())), reply: opt(bool()) },
 	answer: Message,
 	effect: "change",
 });
 
-export const inbox = defineCall({ name: "agent.inbox", summary: "Hand-offs waiting for you from other agents.", who: AGENT, args: {}, answer: arr(Message), effect: "read" });
+export const inbox = defineCall({ name: "agent.inbox", summary: "Hand-offs waiting for you from other agents; for a card, for the agent whose home is the card's canvas.", who: ["agent", "card"], args: {}, answer: arr(Message), effect: "read" });
 
 export const news = defineCall({
 	name: "agent.news",

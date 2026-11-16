@@ -27,10 +27,12 @@ export function cardCall(name: string, raw: unknown, here?: string): { name: str
 	if ("refusal" in turned) return turned;
 	if (!mayCall(CALL_BY_NAME.get(turned.name), "card")) return { refusal: { code: "refused", message: `A card may not call ${turned.name}.` } };
 	const canvas = turned.args.canvas;
-	if (here !== undefined && canvas !== undefined && canvas !== here) return { refusal: { code: "refused", message: `A card acts on its own canvas, ${here}, not ${String(canvas)}.` } };
+	if (here !== undefined && canvas !== undefined && canvas !== here && !CANVAS_IS_THE_THING.has(turned.name)) return { refusal: { code: "refused", message: `A card acts on its own canvas, ${here}, not ${String(canvas)}.` } };
 	return { name: turned.name, args: turned.args, back: (value) => (fresh ? value : answerBack(name, value)) };
 }
 
+/** Calls whose canvas is where they go, not an option: a card may name another canvas there. */
+const CANVAS_IS_THE_THING = new Set(["view.goto"]);
 const mayCall = (call: AnyCall | undefined, who: Who) => !!call && (call.who as readonly string[]).includes(who);
 
 // The call in: an old name and its arguments, made into the new call.

@@ -46,8 +46,8 @@ export const focus = defineCall({
 
 export const goto = defineCall({
 	name: "view.goto",
-	summary: "Move your conversation to a canvas, as the canvas switcher does: it becomes your home.",
-	who: PEOPLE,
+	summary: "Move your conversation to a canvas, as the canvas switcher does: it becomes your home. From a card, the person's screen moves, asked first while they use the canvas.",
+	who: ["person", "agent", "card"],
 	args: { canvas: str() },
 	answer: View,
 	effect: "change",
