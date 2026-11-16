@@ -268,7 +268,7 @@ for (const raw of CASES) {
 	say(`${c.name}: the paper is the canvas's paper`, diff <= 3, `picture (${paper}) canvas (${canvasPaper})`);
 }
 
-// Dark: the stage's dark colour (`--stage` in index.css), not a colour of the picture page's own.
+// Dark: the canvas's dark ground (`--ground` in index.css), not a colour of the picture page's own.
 {
 	const dark = await shot({ of: TEXT, scheme: "dark" });
 	const found = dark.png ? await page.evaluate(inkOf, [dark.png.toString("base64"), { corner: { x1: 0, y1: 0, x2: 4, y2: 4 } }, INK]) : undefined;
