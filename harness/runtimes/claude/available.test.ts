@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { CLAUDE_BUNDLED_ENV, CLAUDE_PATH_ENV, claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 
 /**
@@ -11,6 +11,15 @@ import { CLAUDE_BUNDLED_ENV, CLAUDE_PATH_ENV, claudeAvailability, claudeBundledE
  * `PATH` is set explicitly in each case rather than trusted: whether the machine running
  * the tests happens to have Claude Code installed is not what is being tested.
  */
+/** Each folder a test makes, removed when the file's tests end. */
+const made: string[] = [];
+const tempDir = (prefix: string) => {
+	const dir = mkdtempSync(join(tmpdir(), prefix));
+	made.push(dir);
+	return dir;
+};
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
 function withEnv(env: Record<string, string | undefined>, body: () => void): void {
 	const before = { ...process.env };
 	Object.assign(process.env, env);
@@ -23,7 +32,7 @@ function withEnv(env: Record<string, string | undefined>, body: () => void): voi
 }
 
 test("an explicit override wins, if it exists", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-claude-"));
+	const dir = tempDir("decks-claude-");
 	const real = join(dir, "claude");
 	writeFileSync(real, "#!/bin/sh\n");
 
@@ -38,7 +47,7 @@ test("an explicit override wins, if it exists", () => {
 });
 
 test("PATH is searched when nothing is set", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-claude-path-"));
+	const dir = tempDir("decks-claude-path-");
 	writeFileSync(join(dir, "claude"), "#!/bin/sh\n");
 	withEnv({ PATH: dir, [CLAUDE_PATH_ENV]: undefined }, () => {
 		assert.equal(claudeExecutable(), join(dir, "claude"));

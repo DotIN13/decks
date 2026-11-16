@@ -20,7 +20,8 @@ test("opencode's tool folder holds gdocs_read and gdocs_edit, and OpenCode 2's p
 });
 
 test("a session's token is written for its agent alone, and a Google Docs call goes as that agent", async () => {
-	const dir = join(mkdtempSync(join(tmpdir(), "helm-")), "sessions");
+	const root = mkdtempSync(join(tmpdir(), "helm-"));
+	const dir = join(root, "sessions");
 	const fake = await fakeServer(4675, { "google.read": (args) => ({ doc: String(args.doc), text: "Hello" }) });
 	const was = { url: process.env.DECKS_URL, dir: process.env.DECKS_OPENCODE_SESSIONS };
 	try {
@@ -38,6 +39,6 @@ test("a session's token is written for its agent alone, and a Google Docs call g
 		process.env.DECKS_URL = was.url ?? "";
 		process.env.DECKS_OPENCODE_SESSIONS = was.dir ?? "";
 		await fake.close();
-		rmSync(dir, { recursive: true, force: true });
+		rmSync(root, { recursive: true, force: true });
 	}
 });

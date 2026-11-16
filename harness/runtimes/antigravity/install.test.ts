@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { mcpServerPath, parseModelsOutput, prepareAntigravityHome } from "./install.ts";
 
 /**
@@ -15,8 +15,13 @@ import { mcpServerPath, parseModelsOutput, prepareAntigravityHome } from "./inst
  * as symlinks, and the only real file is Decks' own `mcp_config.json`.
  */
 
+/** Each fake user folder, removed when the file's tests end. */
+const roots: string[] = [];
+after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
+
 function fakeUserGemini(): { real: string; home: string } {
 	const root = mkdtempSync(join(tmpdir(), "agy-install-"));
+	roots.push(root);
 	// The user's own `.gemini`, complete enough to be signed in.
 	mkdirSync(join(root, "user", ".gemini", "antigravity-cli"), { recursive: true });
 	mkdirSync(join(root, "user", ".gemini", "config", "projects"), { recursive: true });
