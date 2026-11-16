@@ -136,6 +136,10 @@ test("agentMatches is the whole rule, and an empty needle matches everything", (
 	assert.ok(!agentMatches(row, "iris"));
 });
 
+test("search finds a project by name", () => {
+	assert.deepEqual(ids(grouped("irb")), [["iris", "wren"]]);
+});
+
 test("filed by workspace: alphabetical, and `No workspace` last", () => {
 	// `irb-84069` before `political-llm` because that is the order of the names, and the focus is
 	// in `political-llm` — which is exactly the case the rule this replaced put first.
@@ -212,8 +216,4 @@ test("…and with nobody focused the same order, because the order never depende
 	});
 	// Zeta holds two and alpha one, and alpha is still first: the count is not part of this.
 	assert.deepEqual(swapped.map((section) => section.label), ["alpha", "irb-84069", "zeta", "No workspace"]);
-});
-
-test("search finds a project by name", () => {
-	assert.deepEqual(ids(grouped("irb")), [["iris", "wren"]]);
 });

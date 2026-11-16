@@ -80,24 +80,6 @@ interface AgentListInput {
 	query?: string;
 }
 
-/** Trimmed and folded once, so callers do not each do it differently. */
-const fold = (query?: string) => (query ?? "").trim().toLowerCase();
-
-/**
- * Does this agent match what was typed — by name, by either kind of tag, or by workspace?
- *
- * Both tag lists, because the point of typing `panel-css` is to find every agent on it, and
- * an agent you tagged yourself is one of them. The workspace too: `irb` finds every agent
- * filed under `irb-84069`.
- *
- * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a board: tags
- * and workspaces are slugs, so what somebody types is usually a word that is really in one.
- */
-export function agentMatches(row: Pick<AgentRow, "chat" | "tags" | "userTags" | "workspace">, needle: string): boolean {
-	if (!needle) return true;
-	return `${row.chat.name}\n${row.tags.join("\n")}\n${row.userTags.join("\n")}\n${row.workspace ?? ""}`.toLowerCase().includes(needle);
-}
-
 /**
  * The sections, one per workspace in use, with `No workspace` last — see `workspaceSections`.
  */
@@ -122,24 +104,23 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 	return workspaceSections(all);
 }
 
+/** Trimmed and folded once, so callers do not each do it differently. */
+const fold = (query?: string) => (query ?? "").trim().toLowerCase();
+
 /**
- * Newest message first, which is the row order inside every section.
+ * Does this agent match what was typed — by name, by either kind of tag, or by workspace?
  *
- * `lastAt` is the time of the last thing the agent said, not the time of the last write
- * (`protocol/chat.ts` says so on the field, and the server keeps it on the transcript for
- * exactly this reason). So a row moves to the top of its section when it says something, and
- * not when it opens a tool, changes state or has its tags edited — which is what the user
- * asked the list to be ordered by, and what stops the list re-sorting itself for reasons
- * nobody watching it can see.
+ * Both tag lists, because the point of typing `panel-css` is to find every agent on it, and
+ * an agent you tagged yourself is one of them. The workspace too: `irb` finds every agent
+ * filed under `irb-84069`.
  *
- * It is deliberately *not* urgency: an idle agent that spoke ten seconds ago leads a waiting
- * one that has said nothing for an hour, in a group whose heading already says somebody is
- * waiting. Two orderings would be two answers to one question.
- *
- * An agent that has never run sorts last rather than first: `lastAt` absent is not "now", and
- * a chat nobody has said anything to is not the newest thing that happened.
+ * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a board: tags
+ * and workspaces are slugs, so what somebody types is usually a word that is really in one.
  */
-const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.lastAt ?? 0);
+export function agentMatches(row: Pick<AgentRow, "chat" | "tags" | "userTags" | "workspace">, needle: string): boolean {
+	if (!needle) return true;
+	return `${row.chat.name}\n${row.tags.join("\n")}\n${row.userTags.join("\n")}\n${row.workspace ?? ""}`.toLowerCase().includes(needle);
+}
 
 /**
  * The list, cut by workspace.
@@ -175,6 +156,25 @@ function workspaceSections(rows: AgentRow[]): AgentSection[] {
 	const loose = groups.get("");
 	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
 }
+
+/**
+ * Newest message first, which is the row order inside every section.
+ *
+ * `lastAt` is the time of the last thing the agent said, not the time of the last write
+ * (`protocol/chat.ts` says so on the field, and the server keeps it on the transcript for
+ * exactly this reason). So a row moves to the top of its section when it says something, and
+ * not when it opens a tool, changes state or has its tags edited — which is what the user
+ * asked the list to be ordered by, and what stops the list re-sorting itself for reasons
+ * nobody watching it can see.
+ *
+ * It is deliberately *not* urgency: an idle agent that spoke ten seconds ago leads a waiting
+ * one that has said nothing for an hour, in a group whose heading already says somebody is
+ * waiting. Two orderings would be two answers to one question.
+ *
+ * An agent that has never run sorts last rather than first: `lastAt` absent is not "now", and
+ * a chat nobody has said anything to is not the newest thing that happened.
+ */
+const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.lastAt ?? 0);
 
 function section(kind: AgentSectionKind, id: string, label: string, rows: AgentRow[]): AgentSection {
 	const ranked = [...rows].sort(byRecency);

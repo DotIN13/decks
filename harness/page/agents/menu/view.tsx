@@ -30,6 +30,36 @@ export type MenuProps = {
 };
 type P = { props: MenuProps; m: ReturnType<typeof createMenu> };
 
+export function AgentMenu(props: MenuProps): JSX.Element {
+	const m = createMenu();
+	const listed = () => listAgents(props.chats, props.identities, props.unread, props.focused, m.find());
+	const describing = () => props.chats.find((chat) => chat.id === m.pointed());
+	return (
+		<Popover placement={props.placement ?? "bottom-start"} label={props.label ?? "Agents"} class="w-[280px]" onOpenChange={(open) => !open && m.setFind("")} trigger={(api) => ((m.timers.dismiss = () => api.open && api.toggle()), props.trigger(api))}>
+			<label class="field menu-find">
+				<Icon of={Search} size={13} class="shrink-0 text-faint" />
+				<input type="text" placeholder="Find an agent" aria-label="Find an agent" value={m.find()} onInput={(event) => m.setFind(event.currentTarget.value)} />
+			</label>
+			<Show when={m.find().trim() && findAgents(props.chats, props.identities, m.find()).length === 0}>
+				<p class="m-0 px-2 py-2 text-note text-faint">No agent matches that</p>
+			</Show>
+			<For each={runsOf(listed().shown, props.identities)}>
+				{(run) => (
+					<>
+						<Show when={run.label}>{(label) => <div class="group">{label()}</div>}</Show>
+						<For each={run.chats}>{(chat) => <Row props={props} m={m} chat={chat} />}</For>
+					</>
+				)}
+			</For>
+			<Show when={listed().more > 0}>
+				<More props={props} m={m} more={listed().more} />
+			</Show>
+			<Show when={props.onNew}>{(onNew) => <NewRow props={props} m={m} onNew={onNew()} />}</Show>
+			<Show when={describing()}>{(chat) => <AgentHoverCard chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} anchor={(m.over() ?? m.held())!.at} shown={m.over() !== undefined} beside />}</Show>
+		</Popover>
+	);
+}
+
 function Row(p: P & { chat: AgentChat }): JSX.Element {
 	const { props, m, chat } = p;
 	const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
@@ -89,35 +119,5 @@ function NewRow(p: P & { onNew: (kind: AgentKind) => void }): JSX.Element {
 				<AgentChoices onPick={(kind) => (p.m.timers.dismiss?.(), p.onNew(kind))} />
 			</Popover>
 		</>
-	);
-}
-
-export function AgentMenu(props: MenuProps): JSX.Element {
-	const m = createMenu();
-	const listed = () => listAgents(props.chats, props.identities, props.unread, props.focused, m.find());
-	const describing = () => props.chats.find((chat) => chat.id === m.pointed());
-	return (
-		<Popover placement={props.placement ?? "bottom-start"} label={props.label ?? "Agents"} class="w-[280px]" onOpenChange={(open) => !open && m.setFind("")} trigger={(api) => ((m.timers.dismiss = () => api.open && api.toggle()), props.trigger(api))}>
-			<label class="field menu-find">
-				<Icon of={Search} size={13} class="shrink-0 text-faint" />
-				<input type="text" placeholder="Find an agent" aria-label="Find an agent" value={m.find()} onInput={(event) => m.setFind(event.currentTarget.value)} />
-			</label>
-			<Show when={m.find().trim() && findAgents(props.chats, props.identities, m.find()).length === 0}>
-				<p class="m-0 px-2 py-2 text-note text-faint">No agent matches that</p>
-			</Show>
-			<For each={runsOf(listed().shown, props.identities)}>
-				{(run) => (
-					<>
-						<Show when={run.label}>{(label) => <div class="group">{label()}</div>}</Show>
-						<For each={run.chats}>{(chat) => <Row props={props} m={m} chat={chat} />}</For>
-					</>
-				)}
-			</For>
-			<Show when={listed().more > 0}>
-				<More props={props} m={m} more={listed().more} />
-			</Show>
-			<Show when={props.onNew}>{(onNew) => <NewRow props={props} m={m} onNew={onNew()} />}</Show>
-			<Show when={describing()}>{(chat) => <AgentHoverCard chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} anchor={(m.over() ?? m.held())!.at} shown={m.over() !== undefined} beside />}</Show>
-		</Popover>
 	);
 }

@@ -14,6 +14,7 @@ import type { AgentChat, AgentState, Identity } from "../state/types/index.ts";
  * what exists.** Neither is a subset of the other by accident.
  */
 
+// What a face's ring says
 /**
  * What an agent's ring says.
  *
@@ -38,6 +39,7 @@ export function agentStatus(state: AgentState, unread: number): AgentStatus {
 	return unread > 0 ? "done" : "idle";
 }
 
+// Who is in the corner and the dropdown, and in what order
 /**
  * The queue's order: asking, then finished, then busy, then quiet.
  *
@@ -109,6 +111,18 @@ export function agentList(chats: AgentChat[], unread: Record<string, number>, fo
 	return [...here, ...sortByUrgency(chats.filter((chat) => chat.id !== focusedId), unread)];
 }
 
+/*
+ * Ties by most recent. `Array.prototype.sort` has been stable since ES2019, so two agents
+ * with the same status and the same `lastAt` — two that have never run, usually — keep the
+ * order they arrived in rather than swapping about between renders.
+ */
+function sortByUrgency(chats: AgentChat[], unread: Record<string, number>): AgentChat[] {
+	return [...chats].sort((a, b) => {
+		const byRank = RANK[agentStatus(a.state, unread[a.id] ?? 0)] - RANK[agentStatus(b.state, unread[b.id] ?? 0)];
+		return byRank !== 0 ? byRank : (b.lastAt ?? 0) - (a.lastAt ?? 0);
+	});
+}
+
 /**
  * How the corner splits into faces and a number.
  *
@@ -132,18 +146,7 @@ export function dropdownFaces(ordered: AgentChat[], cap: number = DROPDOWN_CAP):
 	return { shown: ordered.slice(0, cap), more: Math.max(0, ordered.length - cap) };
 }
 
-/*
- * Ties by most recent. `Array.prototype.sort` has been stable since ES2019, so two agents
- * with the same status and the same `lastAt` — two that have never run, usually — keep the
- * order they arrived in rather than swapping about between renders.
- */
-function sortByUrgency(chats: AgentChat[], unread: Record<string, number>): AgentChat[] {
-	return [...chats].sort((a, b) => {
-		const byRank = RANK[agentStatus(a.state, unread[a.id] ?? 0)] - RANK[agentStatus(b.state, unread[b.id] ?? 0)];
-		return byRank !== 0 ? byRank : (b.lastAt ?? 0) - (a.lastAt ?? 0);
-	});
-}
-
+// The words beside a face: its state, how long ago, and its close button
 /**
  * The state in words, for the hover card and the dropdown's right-hand column.
  *
@@ -254,6 +257,7 @@ export function closeWords(state: AgentState, name: string): string | undefined 
 	return `Close ${name} — the transcript stays on disk. Delete does the same.`;
 }
 
+// The dropdown cut into runs of one workspace
 /**
  * The rows cut into workspace runs, for a menu that shows its headings.
  *

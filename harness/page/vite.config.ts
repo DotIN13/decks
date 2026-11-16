@@ -51,7 +51,6 @@ function sessionMeta(): Plugin {
 	};
 }
 
-const ROOT = fileURLToPath(new URL(".", import.meta.url));
 /** The alerts' cues at /sounds/, from alerts/sounds: served while Vite runs, and written into the build. */
 function sounds(): Plugin {
 	const folder = fileURLToPath(new URL("./alerts/sounds/", import.meta.url));
@@ -71,6 +70,7 @@ function sounds(): Plugin {
 	};
 }
 
+const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const target = () => server().url;
 /** A path that is a file of the page's own (app/, files/) is served here, not passed on. */
 const own = (url = "") => (existsSync(join(ROOT, decodeURIComponent(url.split("?")[0] ?? ""))) ? url : undefined);

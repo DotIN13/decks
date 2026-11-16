@@ -7,7 +7,7 @@ import { canHover } from "../lib/media.ts";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
 
 /**
- * The faces in the top-right corner — and only the ones doing something.
+ * The faces in the top-right corner, the most urgent first, with a hover card and a `+n` menu.
  *
  * `agentOrder` is the policy and `agent-order.ts` argues for it; this is the drawing. Two
  * things it is worth restating here, because they are what makes this more than decoration:

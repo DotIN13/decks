@@ -12,6 +12,9 @@ import {
 import { post as postBanner } from "./notify.ts";
 import { play as playCue, preload as preloadCues } from "./sound.ts";
 
+// The alerts a page raises when an agent finishes, asks or fails: a cue, a system
+// banner while the person is elsewhere, and a count for the tab.
+
 /** One thing worth interrupting somebody with. */
 export interface AlertBanner {
 	title: string;
@@ -19,34 +22,6 @@ export interface AlertBanner {
 	tag?: string;
 	/** The conversation it is about, so clicking the banner can switch to it. */
 	agent?: string;
-}
-
-/** Whether the person is in front of this tab: visibility for tabs and minimising, focus for windows. */
-function watchPresence(setPresence: (now: Presence) => void, looked: () => void): void {
-	const sync = () => {
-		const now = { visible: document.visibilityState === "visible", focused: document.hasFocus() };
-		setPresence(now);
-		if (inView(now)) looked();
-	};
-	sync();
-	window.addEventListener("focus", sync);
-	window.addEventListener("blur", sync);
-	document.addEventListener("visibilitychange", sync);
-	onCleanup(() => {
-		window.removeEventListener("focus", sync);
-		window.removeEventListener("blur", sync);
-		document.removeEventListener("visibilitychange", sync);
-	});
-}
-
-/** Fetch the configured cues on the first gesture, when the browser lets sound load. */
-function warmCues(cues: () => Parameters<typeof preloadCues>[0]): void {
-	const warm = () => preloadCues(cues());
-	const events = ["pointerdown", "keydown", "touchstart"] as const;
-	for (const name of events) window.addEventListener(name, warm, { once: true, passive: true });
-	onCleanup(() => {
-		for (const name of events) window.removeEventListener(name, warm);
-	});
 }
 
 /**
@@ -99,4 +74,32 @@ export function createAlerts(deps: {
 	};
 
 	return { prefs, setPrefs, raise };
+}
+
+/** Whether the person is in front of this tab: visibility for tabs and minimising, focus for windows. */
+function watchPresence(setPresence: (now: Presence) => void, looked: () => void): void {
+	const sync = () => {
+		const now = { visible: document.visibilityState === "visible", focused: document.hasFocus() };
+		setPresence(now);
+		if (inView(now)) looked();
+	};
+	sync();
+	window.addEventListener("focus", sync);
+	window.addEventListener("blur", sync);
+	document.addEventListener("visibilitychange", sync);
+	onCleanup(() => {
+		window.removeEventListener("focus", sync);
+		window.removeEventListener("blur", sync);
+		document.removeEventListener("visibilitychange", sync);
+	});
+}
+
+/** Fetch the configured cues on the first gesture, when the browser lets sound load. */
+function warmCues(cues: () => Parameters<typeof preloadCues>[0]): void {
+	const warm = () => preloadCues(cues());
+	const events = ["pointerdown", "keydown", "touchstart"] as const;
+	for (const name of events) window.addEventListener(name, warm, { once: true, passive: true });
+	onCleanup(() => {
+		for (const name of events) window.removeEventListener(name, warm);
+	});
 }

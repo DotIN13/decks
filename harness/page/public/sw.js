@@ -1,5 +1,5 @@
 /*
- * The Decks service worker: one front end, several backends (`src/connections/connection.ts`).
+ * The Decks service worker: one front end, several backends (`connections/connection.ts`).
  *
  * A board's page has to come from the app's own address, because the canvas reaches into it, and a
  * backend other than the server this page came from is not at that address. So everything for
@@ -80,15 +80,7 @@ self.addEventListener("fetch", (event) => {
 	);
 });
 
-function plain(status, text) {
-	return new Response(text, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
-}
-
-/** A response with this origin's own URL: a navigation answered with another URL's response would take that URL. */
-function own(response) {
-	return new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
-}
-
+// Which connection answers, and how
 async function route(id, rest, request) {
 	const entry = table?.get(id);
 	if (!entry) return plain(404, "This connection is not in this browser any more.");
@@ -97,11 +89,7 @@ async function route(id, rest, request) {
 	return plain(404, "Unknown connection.");
 }
 
-async function digestOf(text) {
-	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
-	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
+// A server connection: fetched from that server, with its token
 async function fromServer(entry, rest, request) {
 	const auth = request.headers.get("Authorization") ?? "";
 	const given = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
@@ -125,47 +113,12 @@ async function fromServer(entry, rest, request) {
 	}
 }
 
-async function manifestOf(id) {
-	if (manifests.has(id)) return manifests.get(id);
-	const cache = await caches.open(`decks-bundle-${id}`);
-	const response = await cache.match(`/c/${id}/manifest.json`);
-	const manifest = response ? await response.json() : undefined;
-	if (manifest) manifests.set(id, manifest);
-	return manifest;
+async function digestOf(text) {
+	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** `a/b/../c` → `a/c`; undefined for a path that climbs out of the deck. */
-function normalize(path) {
-	const out = [];
-	for (const part of path.split("/")) {
-		if (part === "" || part === ".") continue;
-		if (part === "..") {
-			if (out.length === 0) return undefined;
-			out.pop();
-		} else out.push(part);
-	}
-	return out.join("/");
-}
-
-function decoded(path) {
-	return path
-		.split("/")
-		.map((part) => {
-			try {
-				return decodeURIComponent(part);
-			} catch {
-				return part;
-			}
-		})
-		.join("/");
-}
-
-async function entryOf(id, name) {
-	const cache = await caches.open(`decks-bundle-${id}`);
-	const hit = await cache.match(`/c/${id}/${name}`);
-	return hit ? own(hit) : plain(404, `${name} is not in this canvas's file.`);
-}
-
+// A bundle connection: read from the files unpacked into Cache Storage
 async function fromBundle(id, rest) {
 	const url = new URL(rest, "http://bundle");
 	const manifest = await manifestOf(id);
@@ -205,4 +158,55 @@ async function fromBundle(id, rest) {
 		return Response.json({ doc: manifest.pen.doc, base: `/c/${id}/api/f/${manifest.pen.base}`, boards: manifest.boards.map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
 	}
 	return plain(404, "A canvas opened from a file can only be read.");
+}
+
+async function manifestOf(id) {
+	if (manifests.has(id)) return manifests.get(id);
+	const cache = await caches.open(`decks-bundle-${id}`);
+	const response = await cache.match(`/c/${id}/manifest.json`);
+	const manifest = response ? await response.json() : undefined;
+	if (manifest) manifests.set(id, manifest);
+	return manifest;
+}
+
+async function entryOf(id, name) {
+	const cache = await caches.open(`decks-bundle-${id}`);
+	const hit = await cache.match(`/c/${id}/${name}`);
+	return hit ? own(hit) : plain(404, `${name} is not in this canvas's file.`);
+}
+
+/** `a/b/../c` → `a/c`; undefined for a path that climbs out of the deck. */
+function normalize(path) {
+	const out = [];
+	for (const part of path.split("/")) {
+		if (part === "" || part === ".") continue;
+		if (part === "..") {
+			if (out.length === 0) return undefined;
+			out.pop();
+		} else out.push(part);
+	}
+	return out.join("/");
+}
+
+function decoded(path) {
+	return path
+		.split("/")
+		.map((part) => {
+			try {
+				return decodeURIComponent(part);
+			} catch {
+				return part;
+			}
+		})
+		.join("/");
+}
+
+// The responses this worker makes
+function plain(status, text) {
+	return new Response(text, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+
+/** A response with this origin's own URL: a navigation answered with another URL's response would take that URL. */
+function own(response) {
+	return new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
