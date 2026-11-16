@@ -377,6 +377,22 @@ export class GoogleView {
 		p.className = "gd-p";
 		p.dataset.s = String(indices[0]);
 		p.dataset.nl = String(indices[indices.length - 1]);
+		const { start, first } = this.styleParagraph(p, ps, nl);
+		applyText(p, base);
+		const bullet = nl.para?.bullet;
+		if (bullet) p.append(this.marker(bullet, base, counters, start, first));
+		this.drawRuns(p, indices, base, marks);
+		if (!p.querySelector("[data-s]")) {
+			// An empty paragraph still has a line to put the caret on.
+			const empty = document.createElement("br");
+			empty.dataset.empty = "";
+			p.append(empty);
+		}
+		return p;
+	}
+
+	/** A paragraph's own look: alignment, spacing, indents (its list's at its depth), shading, borders, direction. */
+	styleParagraph(p: HTMLElement, ps: DocsParagraphStyle, nl: Unit): { start: number; first: number } {
 		const s = p.style;
 		s.textAlign = { CENTER: "center", END: "right", JUSTIFIED: "justify" }[ps.alignment ?? ""] ?? "left";
 		s.marginTop = `${pt(ps.spaceAbove) * PT}px`;
@@ -402,10 +418,11 @@ export class GoogleView {
 			s.setProperty(`padding-${side.toLowerCase()}`, `${pt(border.padding) * PT + (side === "Left" ? start * PT : 0)}px`);
 		}
 		if (ps.direction === "RIGHT_TO_LEFT") p.dir = "rtl";
-		applyText(p, base);
-		const bullet = nl.para?.bullet;
-		if (bullet) p.append(this.marker(bullet, base, counters, start, first));
-		// Runs: one span per stretch of the same style, change and kind.
+		return { start, first };
+	}
+
+	/** The paragraph's text as runs: one span per stretch of the same style, change, suggestion and comment. */
+	drawRuns(p: HTMLElement, indices: number[], base: DocsTextStyle, marks: Map<number, string>): void {
 		let run: HTMLElement | undefined;
 		let runKey = "";
 		let words = "";
@@ -449,13 +466,6 @@ export class GoogleView {
 			words += unit.ch === "\u000b" ? "\n" : unit.ch;
 		}
 		flush();
-		if (!p.querySelector("[data-s]")) {
-			// An empty paragraph still has a line to put the caret on.
-			const empty = document.createElement("br");
-			empty.dataset.empty = "";
-			p.append(empty);
-		}
-		return p;
 	}
 
 	marker(bullet: NonNullable<NonNullable<Unit["para"]>["bullet"]>, base: DocsTextStyle, counters: Map<string, number[]>, start: number, first: number): HTMLElement {
