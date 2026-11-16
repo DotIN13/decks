@@ -106,24 +106,14 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 
 		frame,
 
-		async post(route, body) {
-			const data = (body ?? {}) as Record<string, unknown>;
-			if (route === "doc") line().send(data.message as never);
-			else if (route === "card-seen") line().send({ type: "card.seen", path: String(data.path) });
-			else if (route === "card-extent") line().send({ type: "card.extent", ...(data as { path: string; rev: number; w: number; h: number }) });
-			else return { ok: false, error: `The line has no ${route}.` };
-			return { ok: true };
-		},
+		post: async (route, body) => postOnLine(line(), route, body),
 
 		answer(id, value) {
 			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
 			void sock().call("view.answer", error ? { id, error } : { id, value });
 		},
 
-		presence(presence) {
-			// Said only down an open socket: where the pointer was while it was down is not news when it comes back.
-			if (socket?.open()) void socket.call("view.update", { canvas, ...presence });
-		},
+		presence: (presence) => sayPresence(socket, canvas, presence),
 
 		snapshot: (path, shot) => snapshotOf(`${base}/snapshot`, headers({ "content-type": "text/html" }), path, shot),
 
@@ -133,6 +123,25 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 			socket?.renew();
 		},
 	};
+}
+
+/** Where this frame is, said only down an open socket: where the pointer was while it was down is not news when it comes back. */
+function sayPresence(socket: FrameSocket | undefined, canvas: string, presence: Presence): void {
+	if (!socket?.open()) return;
+	void socket.call("view.update", { canvas, ...presence });
+	// A camera come to rest is also recorded as this screen's (people's rule 15), so view.get answers it.
+	const camera = presence.camera;
+	if (camera) void socket.call("view.move", { canvas, x: camera.x, y: camera.y, zoom: camera.zoom, device: "frame" });
+}
+
+/** What the frame still says down the line: a document's message, and a card seen or measured. */
+function postOnLine(line: LineClient, route: string, body: unknown): { ok: boolean; error?: string } {
+	const data = (body ?? {}) as Record<string, unknown>;
+	if (route === "doc") line.send(data.message as never);
+	else if (route === "card-seen") line.send({ type: "card.seen", path: String(data.path) });
+	else if (route === "card-extent") line.send({ type: "card.extent", ...(data as { path: string; rev: number; w: number; h: number }) });
+	else return { ok: false, error: `The line has no ${route}.` };
+	return { ok: true };
 }
 
 /** The socket's events the frame acts on itself, beside the drawing's `item.changed`. */

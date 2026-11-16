@@ -40,24 +40,7 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 	const [present, setPresent] = createSignal<Map<string, Present>>(new Map());
 	const k: Kept = { setPresent, linger: new Map(), tours: new Map() };
 	const { linger, tours } = k;
-	let last = 0;
-	let pointerOut = true;
-	const pointer = (event: PointerEvent) => {
-		const now = performance.now();
-		if (now - last < POINTER_MS) return;
-		last = now;
-		pointerOut = false;
-		options.send({ pointer: toWorld(options.camera(), options.viewport(), { x: event.clientX, y: event.clientY }) });
-	};
-	const leave = () => {
-		if (pointerOut) return;
-		pointerOut = true;
-		options.send({ pointer: null });
-	};
-	addEventListener("pointermove", pointer, { capture: true, passive: true, signal: life() });
-	addEventListener("pointerleave", leave, { capture: true, signal: life() });
-	addEventListener("blur", leave, { signal: life() });
-	document.addEventListener("mouseleave", leave, { signal: life() });
+	const ownPointer = sayPointer(options);
 	return {
 		present,
 		/** The selection changed: said as it is. */
@@ -98,12 +81,55 @@ export function installPresence(options: { camera: Accessor<Camera>; send: (pres
 			return true;
 		},
 		dispose() {
+			ownPointer.stop();
 			for (const tour of tours.values()) clearTimeout(tour.timer);
 			for (const timer of linger.values()) clearTimeout(timer);
-			removeEventListener("pointermove", pointer, true);
-			removeEventListener("pointerleave", leave, true);
-			removeEventListener("blur", leave);
-			document.removeEventListener("mouseleave", leave);
+		},
+	};
+}
+
+/**
+ * This frame's pointer, said at most every `POINTER_MS` while it moves, with the newest point said
+ * once the time has passed, so a pointer at rest is never a step short; gone when it leaves the window.
+ */
+function sayPointer(options: { camera: Accessor<Camera>; send: (presence: Presence) => void; viewport: () => { width: number; height: number } }) {
+	const lost = new AbortController();
+	let last = 0;
+	let pointerOut = true;
+	let unsaid: { x: number; y: number } | undefined;
+	let trailing: ReturnType<typeof setTimeout> | undefined;
+	const say = () => {
+		clearTimeout(trailing);
+		trailing = undefined;
+		if (!unsaid) return;
+		last = performance.now();
+		pointerOut = false;
+		options.send({ pointer: toWorld(options.camera(), options.viewport(), unsaid) });
+		unsaid = undefined;
+	};
+	const pointer = (event: PointerEvent) => {
+		unsaid = { x: event.clientX, y: event.clientY };
+		const since = performance.now() - last;
+		if (since >= POINTER_MS) return say();
+		trailing ??= setTimeout(say, POINTER_MS - since);
+	};
+	const leave = () => {
+		clearTimeout(trailing);
+		trailing = undefined;
+		unsaid = undefined;
+		if (pointerOut) return;
+		pointerOut = true;
+		options.send({ pointer: null });
+	};
+	const signal = AbortSignal.any([life(), lost.signal]);
+	addEventListener("pointermove", pointer, { capture: true, passive: true, signal });
+	addEventListener("pointerleave", leave, { capture: true, signal });
+	addEventListener("blur", leave, { signal });
+	document.addEventListener("mouseleave", leave, { signal });
+	return {
+		stop() {
+			clearTimeout(trailing);
+			lost.abort();
 		},
 	};
 }

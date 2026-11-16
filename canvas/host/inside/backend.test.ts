@@ -171,3 +171,13 @@ test("the frame's watch asks only for the events it hears, not every chat or fil
 	const { ws } = frameOn();
 	assert.deepEqual(ws.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 3 });
 });
+
+test("a camera come to rest is said as the frame's view and recorded with view.move, device frame", () => {
+	const { backend, ws } = frameOn();
+	backend.presence({ camera: { x: 10, y: 20, zoom: 2 } });
+	const calls = ws.sent.filter((m) => m.type === "call").map((m) => [m.name, m.args]);
+	assert.deepEqual(calls, [
+		["view.update", { canvas: "plan", camera: { x: 10, y: 20, zoom: 2 } }],
+		["view.move", { canvas: "plan", x: 10, y: 20, zoom: 2, device: "frame" }],
+	]);
+});
