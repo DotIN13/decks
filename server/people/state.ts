@@ -1,7 +1,7 @@
 import { Refused, events, type AnyEvent, type Caller, type Payload } from "../../protocol/index.ts";
 import { LOCAL_PERSON } from "../kernel/index.ts";
 import type { Context, Done, Kernel, Store, Tokens } from "../kernel/types.ts";
-import { actOf } from "./acts.ts";
+import { actOf, type Act } from "./acts.ts";
 import { Answers } from "./answers.ts";
 import { Presence } from "./presence.ts";
 import { Hosts } from "./hosts.ts";
@@ -82,9 +82,13 @@ export class People {
 		const done = { name: call.name, effect: call.effect, args, who: caller.kind, ok: envelope.ok, ...(envelope.ok ? { value: envelope.value } : {}) };
 		const act = actOf(done, caller.canvas);
 		const record = act ? this.roster.byIdOrUndefined(caller.id) : undefined;
-		if (!act || !record || !this.events) return;
-		const payload = { ...(act.canvas ? { canvas: act.canvas } : {}), ids: act.ids, by: record.id, rev: ++this.revs, phase: "done" as const, what: act.what, label: record.name, color: record.color };
-		this.events.emit(events.agentActed, payload);
+		if (act && record) this.tellAct(record, act, "done");
+	}
+
+	/** One act, in the agent's name and colour. */
+	tellAct(record: AgentRecord, act: Act, phase: "start" | "done"): void {
+		const payload = { ...(act.canvas ? { canvas: act.canvas } : {}), ids: act.ids, by: record.id, rev: ++this.revs, phase, what: act.what, label: record.name, color: record.color };
+		this.events?.emit(events.agentActed, payload);
 	}
 
 	/** A person's here: the home of the agent on their screen, else that screen's canvas, else the first. */

@@ -191,3 +191,16 @@ test("an agent's change on a card is told as agent.acted, in its name and colour
 	assert.deepEqual([acted[0]!.payload.ids, acted[0]!.payload.by, acted[0]!.payload.label, acted[0]!.payload.color, acted[0]!.payload.canvas], [[card], ann.id, "Ann", ann.color, "a"]);
 	await s.close();
 });
+
+test("agent.act tells a start and a finish on a card's file, and records nothing", async () => {
+	const { s } = await peopleServer();
+	const ann = await s.value<Agent>("agent.attach", { name: "Ann", canvas: "a" });
+	const as = s.callers.resolve(ann.token)!;
+	const file = "canvases/a/cards/x/chart.js";
+	assert.deepEqual(await s.value("agent.act", { cards: [file], phase: "start", what: "edit" }, as), { ok: true });
+	assert.deepEqual(await s.value("agent.act", { cards: ["assets/x.png"], phase: "done" }, as), { ok: false }, "no card, no act");
+	const acted = s.heard.filter((h) => h.name === "agent.acted");
+	assert.equal(acted.length, 1, "agent.act itself is not told again as a done act");
+	assert.deepEqual([acted[0]!.payload.phase, acted[0]!.payload.what, acted[0]!.payload.ids, acted[0]!.payload.canvas], ["start", "edit", ["canvases/a/cards/x/index.html"], "a"]);
+	await s.close();
+});

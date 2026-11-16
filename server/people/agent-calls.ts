@@ -4,12 +4,13 @@ import { deliver, takeNews } from "./agent-mail.ts";
 import type { AgentChange, AgentRecord } from "./records.ts";
 import type { Holder, People } from "./state.ts";
 import { followHome } from "./view-calls.ts";
+import { canvasOf, cardsOf } from "./acts.ts";
 
 // The agent calls: records, homes and hosts here, mail and news in agent-mail.ts.
 // One short handler each, then what the longer ones call, by cluster.
 
 /** The calls handled here, named, so a call added to the noun for another feature stays unhandled. */
-const AGENT_CALLS = (({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }: typeof calls.agent) => ({ me, list, get, create, update, remove, attach, host, send, queue, inbox, news }))(calls.agent);
+const AGENT_CALLS = (({ me, list, get, create, update, remove, attach, host, act, send, queue, inbox, news }: typeof calls.agent) => ({ me, list, get, create, update, remove, attach, host, act, send, queue, inbox, news }))(calls.agent);
 
 const NO_HOST = "No harness is running to start an agent: start the Decks harness on this machine, then try again.";
 
@@ -26,6 +27,7 @@ export function agentCalls(holder: Holder): Handled<Context>[] {
 		remove: (ctx, { agent }) => remove(p(), ctx, agent),
 		attach: (ctx, args) => attach(p(), ctx, args),
 		host: (ctx, { kinds, calls: answers }) => host(p(), ctx, kinds, answers ?? []),
+		act: (ctx, { cards, phase, what, canvas }) => act(p(), ctx, cards, phase, what, canvas),
 		send: (ctx, { agent, task, cards }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}) }, "send"),
 		queue: (ctx, { agent, task, cards, reply }) => deliver(p(), ctx, agent, { task, ...(cards ? { cards } : {}), ...(reply ? { reply } : {}) }, "queue"),
 		inbox: (ctx) => p().mail.inbox(p().self(ctx).id),
@@ -130,7 +132,7 @@ function safeSince(ctx: Context, canvas: string) {
 	}
 }
 
-// Hosts: the clients that start agents and answer the harness calls
+// Hosts: the clients that start agents and answer the harness calls; an agent's own acts
 /** A socket client offers kinds and harness calls; agents of its kinds with no host become its own,
  * each told to it as agent.requested with a fresh token and adopted: true. */
 async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], answers: string[]): Promise<NonNullable<AgentRecord["kind"]>[]> {
@@ -147,6 +149,15 @@ async function host(people: People, ctx: Context, kinds: AgentRecord["kind"][], 
 		people.tell(ctx, events.agentRequested, { ids: [taken.id], spec }, [client]);
 	}
 	return offered;
+}
+
+/** An agent says it starts or finishes an edit of some cards; nothing is recorded, only told. */
+function act(people: People, ctx: Context, paths: string[], phase: "start" | "done", what: string | undefined, canvas: string | undefined): { ok: boolean } {
+	const cards = cardsOf(paths);
+	if (!cards.length) return { ok: false };
+	const at = canvas ?? canvasOf(cards);
+	people.tellAct(people.self(ctx), { what: what ?? "edit", ids: cards, ...(at ? { canvas: at } : {}) }, phase);
+	return { ok: true };
 }
 
 function pick<T extends object, K extends keyof T>(from: T, keys: readonly K[]): Partial<Pick<T, K>> {

@@ -50,8 +50,8 @@ model, a login or a transcript.
 15. A canvas frame's line reports with `view.move` device `frame`: it can answer `view.screenshot`,
     and is never counted, moved or followed. `view.screenshot` tells every line on the canvas and
     takes the first `view.answer`, or is unavailable after 20 s.
-16. An agent's change that worked is told as `agent.acted` (the kernel's `after`), in its name and
-    colour: the cards it touched by path, a file's card included, and the items by id.
+16. An agent's change that worked, and its own `agent.act` (start or done), is told as `agent.acted`
+    in its name and colour: the cards by path (a file's card included), the items by id.
 
 ## Check
 ```

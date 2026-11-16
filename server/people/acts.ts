@@ -19,14 +19,15 @@ export function actOf(done: Done, here?: string): Act | undefined {
 	return { what: done.name.slice(done.name.indexOf(".") + 1), ...(canvas ? { canvas } : {}), ids: [...cards, ...items] };
 }
 
+/** The cards some paths name: a card's own path, or the card a file of it belongs to. */
+export function cardsOf(paths: readonly string[]): string[] {
+	return [...new Set(paths.map((path) => (layout.isCardPath(path) ? path : layout.cardOf(path))).filter((card): card is string => !!card))];
+}
+
 /** A card named by the call's arguments, or the card a file it wrote belongs to. */
 function cardsIn(args: Record<string, unknown>, cards: Set<string>): void {
-	for (const key of ["card", "path", "to", "from"]) {
-		const path = args[key];
-		if (typeof path !== "string") continue;
-		const card = layout.isCardPath(path) ? path : layout.cardOf(path);
-		if (card) cards.add(card);
-	}
+	const paths = ["card", "path", "to", "from"].map((key) => args[key]).filter((path): path is string => typeof path === "string");
+	for (const card of cardsOf(paths)) cards.add(card);
 }
 
 /** What the call answered: a card, an item, or a list of either. */
@@ -46,7 +47,8 @@ function idsIn(args: Record<string, unknown>, items: Set<string>): void {
 	if (Array.isArray(args.ops)) for (const op of args.ops as shapes.ItemOp[]) for (const id of idsOf(op)) items.add(id);
 }
 
-function canvasOf(cards: Set<string>): string | undefined {
+/** The canvas the first of some cards is on. */
+export function canvasOf(cards: Iterable<string>): string | undefined {
 	for (const card of cards) {
 		const at = layout.canvasOfPath(card);
 		if (at) return at.name;
