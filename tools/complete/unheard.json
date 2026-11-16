@@ -7,35 +7,35 @@
 		},
 		"chat.added": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"chat.changed": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"chat.asked": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"chat.answered": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"chat.drafted": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"account.changed": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"runtime.changed": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		},
 		"runtime.noticed": {
 			"owner": "Helm",
-			"provedBy": "The harness emits it and tells it on its socket (harness tests); the server's pass-through of a told event is server/kernel/doors/relay.test.ts."
+			"provedBy": "harness/sessions/checks/events.test.ts causes it with no model and hears it told through Decks-local on the person's event stream (318f7ac7)."
 		}
 	}
 }
