@@ -6,9 +6,9 @@ import { draftLabel, type DraftMention, type MentionKind } from "../draft/model.
 
 /** What a pill is about, as its tooltip and card tell it. The host knows; this file only draws. */
 export interface PillAbout {
-	/** The thing it is about: the card or card a comment is on, the card, the item, the file. */
+	/** The thing it is about: the card a comment is on, the card, the item, the file. */
 	name: string;
-	/** Which icon goes before the name: a card or card, a drawn item, a file. */
+	/** Which icon goes before the name: a card, a drawn item, a file. */
 	of: "card" | "shape" | "file";
 	quote?: string;
 	note?: string;
@@ -30,7 +30,7 @@ export interface PillHost {
 
 // The pill's element and its words.
 /*
- * Lucide's `message-square`, `layout-template`, `shapes` and `file`: a comment, a card or card, a thing
+ * Lucide's `message-square`, `layout-template`, `shapes` and `file`: a comment, a card, a thing
  * drawn on the canvas, a file. The wash behind each is its own colour too (`styles/ink.css`).
  */
 const svg = (body: string, size: number, slot: string) =>

@@ -6,7 +6,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { clientFor, host, type Host } from "@decks/sdk";
 import { draftComments, draftForAgent, type Draft } from "./draft/model.ts";
-import { messageParts, readParts } from "./pill/about.ts";
+import { messageParts, readParts } from "./pill/sent.ts";
 
 // Composer rule 5, through the real server: a message with a mention, a card and a comment
 // is sent as chat.send with its parts, and the host that answers chat.send gets it whole.

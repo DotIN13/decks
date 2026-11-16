@@ -3,7 +3,7 @@ import { panelOpen, setPanelOpen } from "../../state/index.ts";
 import { CHAT_FOLDED_KEY } from "./model.ts";
 
 // The conversation's place in the page's layout: the panel's lower half or the phone's sheet,
-// folded or open; and presenting, which hides the chrome for the canvas alone.
+// folded or open.
 
 /** The layout's own state. */
 export function createChatLayout() {
@@ -78,27 +78,3 @@ export const holdHistory = (ms = 320) => {
 	};
 	pin();
 };
-
-/** Present: the canvas alone, full screen. Escape, or leaving full screen, brings the chrome back. */
-export function createPresenting() {
-	const [presenting, setPresenting] = createSignal(false);
-	const present = () => {
-		setPresenting(true);
-		void document.documentElement.requestFullscreen?.().catch(() => {});
-	};
-	onMount(() => {
-		const keys = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && presenting()) setPresenting(false);
-		};
-		const left = () => {
-			if (!document.fullscreenElement) setPresenting(false);
-		};
-		window.addEventListener("keydown", keys);
-		document.addEventListener("fullscreenchange", left);
-		onCleanup(() => {
-			window.removeEventListener("keydown", keys);
-			document.removeEventListener("fullscreenchange", left);
-		});
-	});
-	return { presenting, present };
-}

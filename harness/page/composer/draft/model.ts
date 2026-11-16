@@ -23,7 +23,7 @@ export type DraftNode =
 			/** What the pill shows after its icon: the quoted words, the card's title, the item's name. */
 			label: string;
 			/**
-			 * What it is called, in full: the card or card a comment is on, a card's title, an item's
+			 * What it is called, in full: the card a comment is on, a card's title, an item's
 			 * name or its words, a file's name. The pill's card and the stored message name it by this;
 			 * the label is what fits in a sentence.
 			 */

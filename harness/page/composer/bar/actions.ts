@@ -28,6 +28,8 @@ export interface Bar {
 	ime: ReturnType<typeof createIme>;
 }
 
+type DraftState = ReturnType<typeof createDraft>;
+
 // The draft, kept per page, and words the deck hands over.
 /** What the field holds: a draft of words and pills, kept per page, and what each pill is about. */
 export function createDraft(props: ComposerProps, field: FieldRef) {
@@ -97,8 +99,6 @@ function takeHandedDrafts(props: ComposerProps, field: FieldRef, put: (draft: Dr
 		});
 	});
 }
-
-type DraftState = ReturnType<typeof createDraft>;
 
 // The slash and @ menus.
 /** The `/` menu: open on a bare command draft, its highlighted row reset as the list changes. */

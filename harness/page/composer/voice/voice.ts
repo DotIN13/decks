@@ -140,6 +140,8 @@ async function chooseServer(choice: Recogniser, browserHas: boolean): Promise<bo
 	return serverHas;
 }
 
+const [serverCan, setServerCan] = createSignal<Promise<boolean> | undefined>();
+
 /** Whether this server transcribes, asked once a page. */
 function serverTranscribes(): Promise<boolean> {
 	const known = serverCan();
@@ -149,13 +151,6 @@ function serverTranscribes(): Promise<boolean> {
 		.catch(() => false);
 	setServerCan(asking);
 	return asking;
-}
-
-const [serverCan, setServerCan] = createSignal<Promise<boolean> | undefined>();
-
-function browserRecogniser(): (new () => SpeechRecognitionLike) | undefined {
-	const w = globalThis as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
-	return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
 type SpeechRecognitionLike = {
@@ -169,6 +164,11 @@ type SpeechRecognitionLike = {
 	stop(): void;
 	abort(): void;
 };
+
+function browserRecogniser(): (new () => SpeechRecognitionLike) | undefined {
+	const w = globalThis as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+	return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
 
 /** Record the take, and send it whole to the server's recogniser when it stops. */
 function recordForServer(stream: MediaStream, release: () => void): Recording {

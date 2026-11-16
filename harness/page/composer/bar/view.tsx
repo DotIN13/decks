@@ -86,11 +86,11 @@ export interface ComposerProps {
 	onDraftTaken?: () => void;
 	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
 	onDropFiles?: (files: File[]) => void;
-	/** A card's or card's title by its path, for the name on a pill's card. */
+	/** A card's title by its path, for the name on a pill's card. */
 	titleOf?: TitleOf;
 	/** A drawn item's name by its id, for a comment on one. */
 	itemName?: ItemName;
-	/** Show what a pill is about: the card, card or item on the canvas, the file. */
+	/** Show what a pill is about: the card or drawn item on the canvas, the file. */
 	onShowPill?: (pill: DraftMention, comment?: WaitingComment) => void;
 	/**
 	 * Where a line will land, in a word: "to Sable", "note on risk-model".

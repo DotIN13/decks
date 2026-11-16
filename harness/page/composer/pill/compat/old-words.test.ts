@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DraftMention } from "../../draft/model.ts";
-import { readParts } from "../about.ts";
+import { readParts } from "../sent.ts";
 import { cardKind } from "./old-words.ts";
 
 // Old messages read back in the new words.
