@@ -228,7 +228,7 @@ function hearLine(ctx: FrameContext, handle: Handle, follower: Follower, message
 		 * change of its words clears it. The same revision said again (the file watcher's word after the
 		 * writer's) is no new change, so what the first message said of it stands.
 		 */
-		setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust, ...(message.sized || (page.sized && page.rev === record.rev) ? { sized: true as const } : {}) } : page)));
+		setPages(untrack(pages).map((page) => (page.path === record.path ? { ...page, ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust, ...(message.sized || (page.sized && page.rev === record.rev) ? { sized: true as const } : {}) } : page)));
 		return;
 	}
 	follower.hear(message);

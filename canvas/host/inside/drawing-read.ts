@@ -51,8 +51,18 @@ function deckPaths(canvas: string, nodes: PenDocument["children"] | undefined): 
 	}) as PenDocument["children"];
 }
 
-/** A card's news, as card.list says it. */
-type News = { path: string; by?: string; named?: number; changed?: number; seen?: number };
+/** A card's news, as card.list and card.get say it. */
+export type News = { path: string; by?: string; named?: number; changed?: number; seen?: number };
+
+/** A card's news as the frame's record keeps it: who wrote it last, when it was named, changed and read. */
+export function newsOf(one: News | undefined): Partial<Page> {
+	return {
+		...(one?.by ? { lastWrittenBy: one.by === "person" ? "you" : one.by } : {}),
+		...(one?.named !== undefined ? { namedAt: one.named } : {}),
+		...(one?.changed !== undefined ? { modifiedAt: one.changed } : {}),
+		...(one?.seen !== undefined ? { seenAt: one.seen } : {}),
+	};
+}
 
 /** The cards at the top of the drawing as the frame's records, with their news. */
 function pagesOf(doc: PenDocument, news: Map<string, News>): Page[] {
@@ -71,10 +81,7 @@ function pagesOf(doc: PenDocument, news: Map<string, News>): Page[] {
 				h: typeof node.height === "number" ? node.height : 700,
 				rev: 0,
 				inContext: [],
-				...(one?.by ? { lastWrittenBy: one.by === "person" ? "you" : one.by } : {}),
-				...(one?.named !== undefined ? { namedAt: one.named } : {}),
-				...(one?.changed !== undefined ? { modifiedAt: one.changed } : {}),
-				...(one?.seen !== undefined ? { seenAt: one.seen } : {}),
+				...newsOf(one),
 			} as Page;
 		});
 }

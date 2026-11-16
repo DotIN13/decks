@@ -3,7 +3,7 @@ import type { PenDocument, PenEdit } from "@decks/pen";
 import type { Page } from "@decks/protocol-old";
 import type { Presence, PresenceBy, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../cards/card-snapshot.ts";
-import { deckPathEdits, readDrawing } from "./drawing-read.ts";
+import { deckPathEdits, newsOf, readDrawing, type News } from "./drawing-read.ts";
 import { openLine, type LineClient } from "./line.ts";
 import { openSocket, type FrameSocket } from "./socket.ts";
 
@@ -42,7 +42,7 @@ export interface Backend {
 export type Heard =
 	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/canvas/store.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
-	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
+	| { type: "card.changed"; path: string; rev: number; card?: Partial<Page> & { path: string }; removed?: boolean; sized?: true }
 	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
 	| { type: `doc.${string}`; path?: string; [key: string]: unknown }
 	/** An event on the socket the frame acts on itself: a view call, someone's view, an agent's act, an app's state. */
@@ -106,7 +106,15 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 
 		frame,
 
-		post: async (route, body) => postOnLine(line(), route, body),
+		async post(route, body) {
+			if (route !== "card-seen") return postOnLine(line(), route, body);
+			// Read: recorded on the socket, and the card's news as the answer says it, its dot gone.
+			const path = String((body as { path?: unknown } | undefined)?.path ?? "");
+			const got = await sock().call("card.seen", { card: path });
+			if (!got.ok) return { ok: false, error: got.error.message };
+			hearing.tell({ type: "card.changed", path, rev: 0, card: { path, ...newsOf(got.value as News) } });
+			return { ok: true };
+		},
 
 		answer(id, value) {
 			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
@@ -134,11 +142,10 @@ function sayPresence(socket: FrameSocket | undefined, canvas: string, presence: 
 	if (camera) void socket.call("view.move", { canvas, x: camera.x, y: camera.y, zoom: camera.zoom, device: "frame" });
 }
 
-/** What the frame still says down the line: a document's message, and a card seen or measured. */
+/** What the frame still says down the line: a document's message, and a card measured. */
 function postOnLine(line: LineClient, route: string, body: unknown): { ok: boolean; error?: string } {
 	const data = (body ?? {}) as Record<string, unknown>;
 	if (route === "doc") line.send(data.message as never);
-	else if (route === "card-seen") line.send({ type: "card.seen", path: String(data.path) });
 	else if (route === "card-extent") line.send({ type: "card.extent", ...(data as { path: string; rev: number; w: number; h: number }) });
 	else return { ok: false, error: `The line has no ${route}.` };
 	return { ok: true };
@@ -146,10 +153,12 @@ function postOnLine(line: LineClient, route: string, body: unknown): { ok: boole
 
 /** The socket's events the frame acts on itself, beside the drawing's `item.changed`. */
 const SOCKET_EVENTS = new Set(["view.requested", "view.changed", "agent.acted", "app.changed"]);
+/** The events heard on the socket and told as the frame's own messages. */
+const TOLD_EVENTS = ["card.changed"];
 /** The events the frame hears on its socket; a name joins when the frame first acts on it. */
-const FRAME_EVENTS = ["item.changed", ...SOCKET_EVENTS];
+const FRAME_EVENTS = ["item.changed", ...TOLD_EVENTS, ...SOCKET_EVENTS];
 /** The line's messages the socket carries now: its copies are passed over. */
-const LINE_DONE = new Set(["canvas.changed", "view.called", "presence.changed", "agent.act", "app.changed"]);
+const LINE_DONE = new Set(["canvas.changed", "card.changed", "view.called", "presence.changed", "agent.act", "app.changed"]);
 
 /**
  * Who hears the canvas's messages. What comes before anyone listens (the frame's editor is made between
@@ -176,13 +185,14 @@ export function createHearing() {
 
 /** The socket on the protocol, for the drawing read and its changes (`item.changed`); after a drop it watches from `since`. */
 function drawingSocket(origin: string, token: () => string, canvas: string, tell: (message: Heard) => void, since: () => number | undefined): FrameSocket {
-	return openSocket({
+	const socket: FrameSocket = openSocket({
 		origin,
 		token,
 		canvas,
 		since,
 		events: FRAME_EVENTS,
 		hear: (name, payload) => {
+			if (name === "card.changed") return void cardHeard(socket, payload).then((message) => message && tell(message));
 			const heard = drawingHeard(canvas, name, payload);
 			const event = heard ?? (SOCKET_EVENTS.has(name) ? { type: "event" as const, name, payload } : undefined);
 			if (event) tell(event);
@@ -192,6 +202,19 @@ function drawingSocket(origin: string, token: () => string, canvas: string, tell
 			if (open && again && since() === undefined) tell({ type: "reconnected" });
 		},
 	});
+	return socket;
+}
+
+/** A card's file changed: told with its news (`card.get`), which marks it new for the person until they read it. */
+async function cardHeard(socket: FrameSocket, payload: Record<string, unknown>): Promise<Heard | undefined> {
+	const path = Array.isArray(payload.ids) ? payload.ids[0] : undefined;
+	if (typeof path !== "string") return undefined;
+	const rev = typeof payload.rev === "number" ? payload.rev : 0;
+	const sized = payload.sized ? { sized: true as const } : {};
+	if (payload.removed) return { type: "card.changed", path, rev, removed: true };
+	const got = await socket.call("card.get", { card: path });
+	const news = got.ok ? newsOf(got.value as News) : {};
+	return { type: "card.changed", path, rev, card: { path, rev, ...news }, ...sized };
 }
 
 /**

@@ -77,7 +77,7 @@ test("a reconnect watches from the revision held and catches up by the replay, n
 		assert.notEqual(again, ws);
 		again.open();
 		again.hello();
-		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 7 });
+		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "card.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 7 });
 		again.event("item.changed", change(8, 7));
 		assert.equal(heard.filter((m) => m.type === "reconnected").length, 0);
 		assert.deepEqual(heard.filter((m) => m.type === "canvas.changed").map((m) => (m as { rev: number }).rev), [8]);
@@ -108,7 +108,7 @@ test("neither a renewal nor a reconnect reads the drawing whole, which is what e
 		const again = FakeSocket.all.filter((one) => one.url.pathname === "/api/v1/socket").at(-1)!;
 		again.open();
 		again.hello();
-		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 4 });
+		assert.deepEqual(again.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "card.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 4 });
 		again.event("item.changed", change(5, 4));
 		assert.equal(follower.rev(), 5);
 	} finally {
@@ -169,7 +169,7 @@ test("a call in flight when the pass is renewed is answered, not refused", async
 
 test("the frame's watch asks only for the events it hears, not every chat or file event", () => {
 	const { ws } = frameOn();
-	assert.deepEqual(ws.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 3 });
+	assert.deepEqual(ws.sent.find((m) => m.type === "watch"), { type: "watch", canvas: "plan", events: ["item.changed", "card.changed", "view.requested", "view.changed", "agent.acted", "app.changed"], since: 3 });
 });
 
 test("a camera come to rest is said as the frame's view and recorded with view.move, device frame", () => {
@@ -180,4 +180,14 @@ test("a camera come to rest is said as the frame's view and recorded with view.m
 		["view.update", { canvas: "plan", camera: { x: 10, y: 20, zoom: 2 } }],
 		["view.move", { canvas: "plan", x: 10, y: 20, zoom: 2, device: "frame" }],
 	]);
+});
+
+test("a card's file changed on the socket is told with its news from card.get, so the frame marks it new", async () => {
+	const { heard, ws } = frameOn();
+	ws.event("card.changed", { canvas: "plan", ids: ["canvases/plan/cards/one/index.html"], by: "person", rev: 4 });
+	const asked = ws.sent.find((m) => m.type === "call" && m.name === "card.get")!;
+	assert.deepEqual(asked.args, { card: "canvases/plan/cards/one/index.html" });
+	ws.say({ type: "answer", id: asked.id, envelope: { ok: true, value: { path: "canvases/plan/cards/one/index.html", title: "One", by: "person", named: 10, changed: 20 }, notes: [] } });
+	await new Promise((done) => setTimeout(done, 0));
+	assert.deepEqual(heard.at(-1), { type: "card.changed", path: "canvases/plan/cards/one/index.html", rev: 4, card: { path: "canvases/plan/cards/one/index.html", rev: 4, lastWrittenBy: "you", namedAt: 10, modifiedAt: 20 } });
 });

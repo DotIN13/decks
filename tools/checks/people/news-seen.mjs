@@ -22,13 +22,13 @@ const person = await asPerson();
 const me = (await call("agent.me", [], person)).value;
 const agent = { ...person, "x-decks-agent": me.id };
 
-// The frame's `card.seen` messages, counted: it says them on its line (`host/inside/backend.ts`), not as a POST
-// any more. Read inside the frame, where its socket lives; Playwright's websocket events do not reach it.
+// The frame's `card.seen`, counted: a call on its protocol socket (`host/inside/backend.ts`), or a message on
+// an older line. Read inside the frame, where its socket lives; Playwright's websocket events do not reach it.
 await canvas.evaluate(() => {
 	window.__seenSent = [];
 	const send = WebSocket.prototype.send;
 	WebSocket.prototype.send = function (data) {
-		if (typeof data === "string" && /"type":"card\.seen"/.test(data)) window.__seenSent.push(data);
+		if (typeof data === "string" && /"type":"card\.seen"|"name":"card\.seen"/.test(data)) window.__seenSent.push(data);
 		return send.call(this, data);
 	};
 });
