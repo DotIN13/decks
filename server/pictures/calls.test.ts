@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { callers, testServer } from "../kernel/testing.ts";
 import { features } from "../main.ts";
@@ -43,7 +43,22 @@ function fakeBrowser(reading: Reading, views: Views = { controls: 0, opening: re
 	return { browser, seen };
 }
 
-const start = (browser: Browser, origin: string | null = "http://127.0.0.1:4664") => testServer({ features: [...features().filter((one) => one.name !== "pictures"), picturesFeature({ browser, origin: () => origin ?? undefined, native: false })], deck: DECK });
+/** What each test opened: closed after it whatever it did, so a failed assertion fails and does not hang. */
+const opened: (() => Promise<void>)[] = [];
+afterEach(async () => {
+	for (const close of opened.splice(0)) await close().catch(() => {});
+});
+const start = async (browser: Browser, origin: string | null = "http://127.0.0.1:4664") => {
+	const s = await testServer({ features: [...features().filter((one) => one.name !== "pictures"), picturesFeature({ browser, origin: () => origin ?? undefined, native: false })], deck: DECK });
+	const listen = s.listen.bind(s);
+	s.listen = async (port?: number) => {
+		const door = await listen(port);
+		opened.push(() => door.close());
+		return door;
+	};
+	opened.push(() => s.close());
+	return s;
+};
 const ann = callers.agent("ann", "work");
 
 test("rule 2: with no address known, the browser calls are unavailable", async () => {
@@ -332,14 +347,15 @@ test("rule 18: a pass writes a picture or a page only into its canvas's exports/
 	const s = await start(fake.browser);
 	await s.value("file.write", { path: "canvases/other/cards/x/index.html", text: "<title>X</title><p>x</p>" }, ann);
 	const served = await s.listen();
-	const pass = s.callers.issue({ kind: "person", id: "person~frame-8", name: "you" }, "canvas pass", { canvas: "work", calls: ["canvas.screenshot", "canvas.export"], until: Date.now() + 60_000 });
+	// Any scoped caller allowed these calls (the frame's own pass is refused them by the guard before they reach here).
+	const pass = s.callers.issue({ kind: "person", id: "scoped-tester", name: "you" }, "scoped", { canvas: "work", calls: ["canvas.screenshot", "canvas.export"], until: Date.now() + 60_000 });
 	const call = async (name: string, args: Record<string, unknown>) => (await (await fetch(`${served.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify(args) })).json()) as { ok: boolean; value?: { file?: string; path?: string }; error?: { code: string } };
 	for (const to of ["assets/importmap.json", "canvases/other/cards/x/index.html", "canvases/work/canvas.pen", "canvases/work/cards/sales/index.html", "apps/x/server.js", "canvases/work/files/../../other/x.png"]) {
 		const got = await call("canvas.screenshot", { canvas: "work", to });
 		assert.equal(got.ok, false, `screenshot to ${to}`);
 	}
 	const kept = await call("canvas.screenshot", { canvas: "work", to: "canvases/work/exports/one.png" });
-	assert.equal(kept.value?.file, "canvases/work/exports/one.png");
+	assert.equal(kept.value?.file, "canvases/work/exports/one.png", JSON.stringify(kept));
 	assert.equal((await call("canvas.screenshot", { canvas: "work", to: "canvases/work/exports/one.png" })).error?.code, "conflict", "never over a file");
 	assert.match((await call("canvas.screenshot", { canvas: "work" })).value?.file ?? "", /^canvases\/work\/files\/exports\//, "with no to, its own files/exports/");
 	assert.equal((await call("canvas.screenshot", { canvas: "work", of: "canvases/other/cards/x/index.html" })).ok, false, "of another canvas's card");
