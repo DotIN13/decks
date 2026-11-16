@@ -26,12 +26,9 @@
 		".github/",
 		"server/package.json",
 		"server/tsconfig.json",
-		"harness/package.json",
-		"harness/tsconfig.json",
 		"tools/package.json",
 		"tools/tsconfig.json",
 		"server/README.md",
-		"harness/README.md",
 		"server/frame/",
 		"server/compat/",
 		"server/upgrade/",
@@ -103,7 +100,10 @@
 		"harness/accounts/",
 		"harness/prompts/",
 		"canvas/cards/",
-		"canvas/editor/"
+		"canvas/editor/",
+		"harness/README.md",
+		"harness/package.json",
+		"harness/tsconfig.json"
 	],
 	"Pane": [
 		"harness/page/",
