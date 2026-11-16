@@ -103,25 +103,25 @@ export function Popover(props: PopoverProps) {
 				 * ancestor (the dock's `translateX(-50%)`) would place it in its own space instead.
 				 */}
 				<Portal mount={portalLayer()}>
-				<div
-					ref={card}
-					class={`popover ${props.class ?? ""}`}
-					data-sub={sub() ? "" : undefined}
-					data-placed={at() ? "" : undefined}
-					data-side={side()}
-					role="menu"
-					aria-label={props.label}
-					/* Hidden until placed, so it never flashes at 0,0 on the way to its corner. */
-					style={{
-						left: `${at()?.left ?? 0}px`,
-						top: `${at()?.top ?? 0}px`,
-						visibility: at() ? "visible" : "hidden",
-						"max-width": `calc(100vw - ${MARGIN * 2}px)`,
-						...(ceiling() !== undefined ? { "max-height": `${ceiling()}px` } : {}),
-					}}
-				>
-					{props.children}
-				</div>
+					<div
+						ref={card}
+						class={`popover ${props.class ?? ""}`}
+						data-sub={sub() ? "" : undefined}
+						data-placed={at() ? "" : undefined}
+						data-side={side()}
+						role="menu"
+						aria-label={props.label}
+						/* Hidden until placed, so it never flashes at 0,0 on the way to its corner. */
+						style={{
+							left: `${at()?.left ?? 0}px`,
+							top: `${at()?.top ?? 0}px`,
+							visibility: at() ? "visible" : "hidden",
+							"max-width": `calc(100vw - ${MARGIN * 2}px)`,
+							...(ceiling() !== undefined ? { "max-height": `${ceiling()}px` } : {}),
+						}}
+					>
+						{props.children}
+					</div>
 				</Portal>
 			</Show>
 		</>

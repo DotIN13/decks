@@ -205,36 +205,36 @@ function MarkDefs(props: { agent: AgentKind; busy?: boolean; ids: string }) {
 	const ids = props.ids;
 	return (
 		<>
-		{/*
-			Only a working mark needs either of these, and a still mark is drawn in every row of
-			a panel: two definitions per row that nothing references is a mask and a clip the
-			browser parses for nothing.
-		*/}
-		<Show when={props.busy && (opencodeMark(props.agent) || props.agent === "antigravity")}>
-			<defs>
-			{/* Where opencode's block is allowed to be: the opening it rises into. */}
-			<clipPath id={`${ids}-opening`}>
-				<rect x="192" y="160" width="128" height="192" />
-			</clipPath>
 			{/*
-				antigravity's reveal: a fat stroke along the arch's own centreline, drawn from the
-				left foot to the right foot, and used as a mask over the filled arch. `pathLength`
-				normalises the dash arithmetic to 100, so the keyframes do not carry a number that
-				would have to be remeasured if the curve were ever retraced.
+				Only a working mark needs either of these, and a still mark is drawn in every row of
+				a panel: two definitions per row that nothing references is a mask and a clip the
+				browser parses for nothing.
 			*/}
-			<mask id={`${ids}-arch`} maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
-				<path
-					class="ag-trace"
-					d={ARCH_CENTRELINE}
-					fill="none"
-					stroke="#fff"
-					stroke-width="96"
-					stroke-linecap="round"
-					pathLength="100"
-				/>
-			</mask>
-			</defs>
-		</Show>
+			<Show when={props.busy && (opencodeMark(props.agent) || props.agent === "antigravity")}>
+				<defs>
+					{/* Where opencode's block is allowed to be: the opening it rises into. */}
+					<clipPath id={`${ids}-opening`}>
+						<rect x="192" y="160" width="128" height="192" />
+					</clipPath>
+					{/*
+						antigravity's reveal: a fat stroke along the arch's own centreline, drawn from the
+						left foot to the right foot, and used as a mask over the filled arch. `pathLength`
+						normalises the dash arithmetic to 100, so the keyframes do not carry a number that
+						would have to be remeasured if the curve were ever retraced.
+					*/}
+					<mask id={`${ids}-arch`} maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
+						<path
+							class="ag-trace"
+							d={ARCH_CENTRELINE}
+							fill="none"
+							stroke="#fff"
+							stroke-width="96"
+							stroke-linecap="round"
+							pathLength="100"
+						/>
+					</mask>
+				</defs>
+			</Show>
 		</>
 	);
 }
