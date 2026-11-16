@@ -52,6 +52,15 @@ test("names passes the markup names by rule, only as markup", () =>
 test("names reads a check's name and path in checks.json as its file's", async () =>
 	assert.deepEqual(await breaks("names", { "tools/checks/library/stage-scroll.mjs": "// a check\n", "tools/checks/checks.json": '{ "checks": { "stage-scroll": { "path": "tools/checks/library/stage-scroll.mjs" } } }\n' }), []));
 test("names lets compat/ keep retired words", async () => assert.deepEqual(await breaks("names", { "server/compat/old.ts": "// board\n" }), []));
+test("strays names a doc comment off its item, an empty heading and a path no file has", async () => {
+	const story = "// A file.\n\n/** Adds. */\nexport function add() {}\n";
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": story }), []);
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file.\n\nexport const a = 1;\n\n/** Adds. */\n\nexport function add() {}\n" }), ["server/a/x.ts: doc above a blank line"]);
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file.\n\nexport const a = 1;\n\n/** Old. */\n/** Adds. */\nexport function add() {}\n" }), ["server/a/x.ts: doc above another doc"]);
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file.\n\nexport function add() {}\n\n// Readers\n\n// Writers\n\nexport function put() {}\n" }), ["server/a/x.ts: heading with nothing under it"]);
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file, as server/a/gone.ts said.\nexport function add() {}\n" }), ["server/a/x.ts: names a path no file has"]);
+	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file, as server/a/y.ts and canvases/plan/canvas.json say.\nexport function add() {}\n", "server/a/y.ts": "// Y.\nexport const y = 1;\n" }), []);
+});
 test("imports names a folder importing against the table", () =>
 	plantedFails("imports", { "protocol/a.ts": 'import x from "node:fs";\n' }, { "protocol/a.ts": 'import x from "./b.ts";\n' }, "protocol may not import node:fs"));
 test("imports names server importing the harness", () =>

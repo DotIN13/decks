@@ -11,6 +11,7 @@ The ten rules of `docs/rewrite/DESIGN.md` section 6, plus lanes and the map, as 
 - `lanes.mjs`: a commit touches only its author's paths in `docs/rewrite/lanes.json`.
 - `agents-md.mjs`: `AGENTS.md` is 150 lines at most and names only paths that exist.
 - `legacy.mjs`: calls the four gates in `scripts/` from before the rewrite.
+- `strays.mjs`: rule 1's story: a doc comment on its item, a heading with something under it, a named path that exists.
 - `baseline/`: each gate's exceptions today, as key and count. Only old code is in them.
 - `run.mjs` runs them all; `install-hooks.mjs` installs the commit hooks.
 
