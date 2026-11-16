@@ -4,9 +4,9 @@ Files you type into (.md, .tex, .docx, Google Docs), drawn as pages: keystrokes 
 
 ## Owns
 
-- `page.ts`: `mountDocPage`, a document as a page.
-- `live.ts`, `blocks.ts`, `marks.ts`, `reading.ts`, `render.ts`, `tex.ts`: the editor and how words are drawn.
-- `gview.ts`, `google/`: a Google Doc drawn as its own pages.
+- `page.ts`: `mountDocPage`, a document as a page; `page/`: its sheet, elements, PDF pane and remotes.
+- `live.ts` and `live/` (the editor, its builder, its input), `blocks.ts`, `marks.ts`, `reading.ts`, `render.ts`, `tex.ts`: the editor and how words are drawn.
+- `gview.ts`, `google/`: a Google Doc drawn as its own pages (view, typing, history, format).
 - `client.ts`, `merge.ts`, `model.ts`: the page's side of the document protocol.
 - `live-doc.ts`, `build-live-doc.mjs`: the one module a card's document box loads, built at install.
 

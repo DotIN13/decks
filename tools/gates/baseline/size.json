@@ -20,7 +20,6 @@
 	"canvas/documents/live/builder.ts: function texLine over 80 lines": 1,
 	"canvas/documents/page.ts: function buildGoogleTools over 80 lines": 1,
 	"canvas/documents/page.ts: function mountDocPage over 80 lines": 1,
-	"canvas/documents/page.ts: over 1000 lines": 1,
 	"canvas/documents/tex.ts: function texMeta over 80 lines": 1,
 	"canvas/editor/dom/controller.ts: function createEditor over 80 lines": 1,
 	"canvas/editor/dom/effects.ts: function createEffects over 80 lines": 1,
