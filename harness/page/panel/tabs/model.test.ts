@@ -4,7 +4,7 @@ import { cardsOf, drawnOf, itemLit, noAppsWords, noItemsWords } from "./model.ts
 
 // The Canvas tab lists cards apart from what is drawn; empty lists say why.
 
-const card = { id: "c", kind: "board", label: "Plan", board: "cards/plan/index.html" } as never;
+const card = { id: "c", kind: "board", label: "Plan", path: "cards/plan/index.html" } as never;
 const note = { id: "n", kind: "note", label: "Note" } as never;
 
 test("cards and drawn items are apart; a card is lit when it is the one open", () => {
