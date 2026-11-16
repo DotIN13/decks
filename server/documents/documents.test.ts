@@ -57,6 +57,8 @@ test("rule 6: a write from outside waits for review; reject takes it back, accep
 	const state = await s.value<State>("file.open", { path: "docs/plan.md", client: "p1" });
 	assert.equal(state.changes.length, 1);
 	assert.equal(state.changes[0]!.by, "ann");
+	const told = s.heard.filter((e) => e.name === "file.changed").map((e) => e.payload as { change?: string; record?: { id: string; by: string } }).find((p) => p.record);
+	assert.deepEqual([told?.record?.id, told?.record?.by, told?.change], [state.changes[0]!.id, "ann", state.changes[0]!.id]);
 	const after = await s.value<State>("file.review", { path: "docs/plan.md", change: state.changes[0]!.id, accept: false }, "person");
 	assert.equal(after.text, "# Plan\n\nShip it.\n");
 	assert.deepEqual(after.changes, []);

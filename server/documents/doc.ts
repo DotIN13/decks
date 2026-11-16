@@ -23,7 +23,7 @@ type Open = {
 	pause?: ReturnType<typeof setTimeout>;
 	typed?: number;
 };
-type Sent = { by: string; splices: Splice[]; base: number; client?: string; batch?: string; change?: string; settled?: boolean };
+type Sent = { by: string; splices: Splice[]; base: number; client?: string; batch?: string; change?: string; record?: DocChange; settled?: boolean };
 
 export class Documents {
 	private open = new Map<string, Open>();
@@ -208,7 +208,7 @@ export class Documents {
 		doc.rev = rev;
 		doc.changes.set(change.id, { change, rev });
 		await saveChanges(this.store, doc.path, doc.changes.values());
-		this.tell(doc, { by: change.by, splices, base, change: change.id });
+		this.tell(doc, { by: change.by, splices, base, change: change.id, record: change });
 	}
 
 	private tell(doc: Open, sent: Sent): void {
