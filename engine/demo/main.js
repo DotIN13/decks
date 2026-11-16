@@ -117,25 +117,6 @@ function toStage(e) {
 	return { x: camera.x + e.clientX / camera.zoom, y: camera.y + e.clientY / camera.zoom };
 }
 
-// Pictures by address, loaded once for both engines: relative to the stage's file.
-const asked = new Set();
-async function loadPictures(urls) {
-	for (const url of urls) {
-		if (asked.has(url)) continue;
-		asked.add(url);
-		try {
-			const blob = await (await fetch(new URL(url, new URL(stageUrl, location.href)))).blob();
-			const forPage = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
-			const forWorker = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
-			engine.putPicture(url, forPage);
-			worker.postMessage({ type: "picture", url, bitmap: forWorker }, [forWorker]);
-			dirty = true;
-		} catch (e) {
-			stats.errors.push(`picture ${url}: ${e}`);
-		}
-	}
-}
-
 // The pen (press P): the stroke under it is drawn by the page each frame, then kept as a path.
 let pen = false;
 let stroke;
@@ -231,6 +212,27 @@ addEventListener("keydown", (e) => {
 	}
 });
 addEventListener("resize", () => changed(false));
+
+// --- pictures --------------------------------------------------------------------------------
+
+// Pictures by address, loaded once for both engines: relative to the stage's file.
+const asked = new Set();
+async function loadPictures(urls) {
+	for (const url of urls) {
+		if (asked.has(url)) continue;
+		asked.add(url);
+		try {
+			const blob = await (await fetch(new URL(url, new URL(stageUrl, location.href)))).blob();
+			const forPage = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+			const forWorker = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+			engine.putPicture(url, forPage);
+			worker.postMessage({ type: "picture", url, bitmap: forWorker }, [forWorker]);
+			dirty = true;
+		} catch (e) {
+			stats.errors.push(`picture ${url}: ${e}`);
+		}
+	}
+}
 
 // --- start -----------------------------------------------------------------------------------
 
