@@ -12,12 +12,14 @@
 
 export interface CardComment {
 	id: string;
-	/** Deck-relative, as the agent knows it: `boards/plan.html`. */
-	board: string;
+	/** Deck-relative, as the agent knows it: a card's path, or the canvas's file for drawn items. */
+	path?: string;
+	/** The old name of `path`, read until the page writes `path`; then it goes. */
+	board?: string;
 	/** The `data-id` of the component the selection was in, when it was in one. */
 	component?: string;
 	/**
-	 * Drawn items on a canvas, by id, when the comment is on them rather than on a board: `board` is
+	 * Drawn items on a canvas, by id, when the comment is on them rather than on a card: `path` is
 	 * then the canvas's file (`canvases/<name>/canvas.pen`) and `quote` their words, so the agent finds
 	 * them with `decks.canvas.read()`.
 	 */
@@ -65,9 +67,9 @@ export function commentItem(comment: CardComment, n: number): string {
 	const said = comment.text.trim() ? `\n${comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n")}` : "";
 	if (comment.items?.length) {
 		const named = comment.items.map((id) => `"${id}"`).join(", ");
-		return `${n}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
+		return `${n}. on ${whereOf(comment)}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
 	}
-	const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
+	const where = comment.component ? `${whereOf(comment)}, in #${comment.component}` : whereOf(comment);
 	// No quote: a comment on the whole card, from its pill.
 	if (!comment.quote) return `${n}. ${where}, the whole card${said}`;
 	return `${n}. ${where}\n   > ${comment.quote}${said}`;
@@ -79,4 +81,9 @@ export function withComments(text: string, comments: CardComment[]): string {
 	const said = text.trim();
 	if (!block) return said;
 	return said ? `${block}\n\n${said}` : block;
+}
+
+/** Where a comment is: its `path`, or `board` as a comment saved before the rename has it. */
+function whereOf(comment: CardComment): string {
+	return comment.path ?? comment.board ?? "";
 }
