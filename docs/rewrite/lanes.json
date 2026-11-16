@@ -120,7 +120,8 @@
 	"Scribe": [
 		"harness/page/chat/",
 		"harness/page/composer/",
-		"canvas/chrome/"
+		"canvas/chrome/",
+		"canvas/view/selection.tsx"
 	],
 	"Anvil": [
 		"packages/stage/crates/apple/",
