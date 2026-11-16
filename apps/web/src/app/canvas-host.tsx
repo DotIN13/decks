@@ -14,7 +14,7 @@ import { exportPicture, frameComment, frameInk, frameRefer, pageComment } from "
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import type { StageComment } from "@decks/canvas";
 import type { createFileDrops } from "./files/drops.ts";
-import { rememberView } from "./socket-messages.ts";
+import { rememberView } from "./heard/view.ts";
 import { openLinkedPage } from "./links.ts";
 
 /** What the canvas host needs of the page around it. */
