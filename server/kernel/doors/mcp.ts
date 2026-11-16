@@ -1,12 +1,10 @@
-import { MCP_PATH as PATH, PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope, type Node } from "../../../protocol/index.ts";
-import type { Built } from "../kernel.ts";
-import { SERVER_VERSION } from "../own-calls.ts";
+import { PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope, type Node } from "../../../protocol/index.ts";
+import { SERVER_VERSION, type Built } from "../kernel.ts";
 
 // The MCP door, POST /mcp: JSON-RPC 2.0 over HTTP. Its tools are the calls
 // this caller may make here, named as the protocol names them, each with its
 // arguments as JSON Schema. A tool's result carries the envelope.
 
-export const MCP_PATH = PATH;
 
 const MCP_VERSION = "2025-06-18";
 

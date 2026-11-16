@@ -40,6 +40,16 @@ export class Router {
 		}
 	}
 
+	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
+		const turned = this.translator!(name, args);
+		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
+		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
+		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
+		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
+		const answer = await this.call(turned.name, turned.args, caller, client, true);
+		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
+	}
+
 	private find(name: string, caller: Caller, args: unknown, notes: string[]): { entry: Entry } | { error: Envelope<never> } | { relay: AnyCall } {
 		const call = this.declared.get(name);
 		if (!call) return { error: fail("not_found", `There is no call named ${name}.`, notes) };
@@ -50,16 +60,6 @@ export class Router {
 		if (entry) return { entry };
 		if (this.forward) return { relay: call };
 		return { error: fail("unavailable", `${name} is declared, but no feature on this server answers it yet.`, notes) };
-	}
-
-	private async translated(name: string, args: unknown, caller: Caller, client?: Client): Promise<Envelope<unknown>> {
-		const turned = this.translator!(name, args);
-		if (!turned && this.declared.has(name)) return this.call(name, args, caller, client, true);
-		if (!turned) return fail("not_found", `There is no call named ${name}.`, []);
-		if ("refusal" in turned) return fail(turned.refusal.code, turned.refusal.message, [], turned.refusal.hint);
-		if (!this.declared.has(turned.name)) return fail("not_found", `${name} was turned into ${turned.name}, which is not a call either.`, []);
-		const answer = await this.call(turned.name, turned.args, caller, client, true);
-		return answer.ok && turned.back ? { ...answer, value: turned.back(answer.value) } : answer;
 	}
 
 	private async relayed(call: AnyCall, args: unknown, caller: Caller, notes: string[]): Promise<Envelope<unknown>> {
@@ -104,6 +104,16 @@ export class Router {
 	}
 }
 
+/** Today's positional form, { args: [...] } and nothing else; no declared call takes it. */
+const oldForm = (args: unknown): boolean =>
+	typeof args === "object" && args !== null && Array.isArray((args as { args?: unknown }).args) && Object.keys(args).length === 1;
+
+export const fail = (code: Refused["code"], message: string, notes: string[], hint?: string): Envelope<never> => ({
+	ok: false,
+	error: { code, message, ...(hint ? { hint } : {}) },
+	notes,
+});
+
 // Building the tables of declared and handled calls, from the features.
 /** The protocol's calls, and those a feature declares itself (Studio's); a name declared twice stops the server. */
 export function declaredOf(features: Feature[]): ReadonlyMap<string, AnyCall> {
@@ -117,8 +127,8 @@ export function declaredOf(features: Feature[]): ReadonlyMap<string, AnyCall> {
 	return declared;
 }
 
-/** Every handled call by name; two handlers for one call stop the server. */
-export function routesOf(features: Feature[], declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME): Map<string, Entry> {
+/** Every handled call by name, with its handler and feature; two handlers for one call stop the server. */
+export function handledOf(features: Feature[], declared: ReadonlyMap<string, AnyCall> = CALL_BY_NAME): Map<string, Entry> {
 	const entries = new Map<string, Entry>();
 	for (const feature of features) {
 		for (const { call, run } of feature.calls) {
@@ -131,13 +141,3 @@ export function routesOf(features: Feature[], declared: ReadonlyMap<string, AnyC
 	}
 	return entries;
 }
-
-/** Today's positional form, { args: [...] } and nothing else; no declared call takes it. */
-const oldForm = (args: unknown): boolean =>
-	typeof args === "object" && args !== null && Array.isArray((args as { args?: unknown }).args) && Object.keys(args).length === 1;
-
-const fail = (code: Refused["code"], message: string, notes: string[], hint?: string): Envelope<never> => ({
-	ok: false,
-	error: { code, message, ...(hint ? { hint } : {}) },
-	notes,
-});

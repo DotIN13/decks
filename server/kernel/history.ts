@@ -91,6 +91,13 @@ export class HistoryDeck implements Deck {
 		};
 	}
 
+	private async hear(change: FileChange): Promise<void> {
+		const base = { path: change.path, rev: change.rev, by: change.by, at: change.at };
+		if (change.kind === "deleted") return this.record({ ...base, kind: "deleted" });
+		const bytes = await this.inner.read(change.path).catch(() => undefined);
+		if (bytes) await this.record({ ...base, kind: "written" }, bytes);
+	}
+
 	// Reading and restoring the past.
 	async revisions(path: DeckPath): Promise<Revision[]> {
 		return this.log.filter((one) => one.path === path).map(({ path: p, rev, by, at }) => ({ path: p, rev, by, at }));
@@ -161,12 +168,5 @@ export class HistoryDeck implements Deck {
 			const nested = await Promise.all(entries.map((e) => (e.kind === "file" ? [e.path] : this.filesUnder(e.path))));
 			return nested.flat();
 		}
-	}
-
-	private async hear(change: FileChange): Promise<void> {
-		const base = { path: change.path, rev: change.rev, by: change.by, at: change.at };
-		if (change.kind === "deleted") return this.record({ ...base, kind: "deleted" });
-		const bytes = await this.inner.read(change.path).catch(() => undefined);
-		if (bytes) await this.record({ ...base, kind: "written" }, bytes);
 	}
 }

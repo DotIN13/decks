@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { Caller, Envelope } from "../../protocol/index.ts";
+import { fail } from "./router.ts";
 import type { Answerer } from "./types.ts";
 
-// One door for the page: a declared call no feature handles goes to the
-// connected host the answerer names, as an ask on its socket, and its
-// reply comes back as is. No host, a host gone, or 30 s: unavailable.
+// Harness calls: a declared call no feature handles goes to the connected
+// host the answerer names, as an ask on its socket, and its reply comes back
+// as is. No host, a host gone, or 30 s: unavailable.
 
 type Pending = { client: string; done(envelope: Envelope<unknown>): void; timer: NodeJS.Timeout };
 const WAIT_MS = 30_000;
 
-const unavailable = (message: string, hint?: string): Envelope<never> => ({ ok: false, error: { code: "unavailable", message, ...(hint ? { hint } : {}) }, notes: [] });
 
 export class Relay {
 	private answerer: Answerer | undefined;
@@ -29,17 +29,17 @@ export class Relay {
 		this.sockets.set(client, send);
 		return () => {
 			this.sockets.delete(client);
-			for (const [id, one] of this.pending) if (one.client === client) this.finish(id, unavailable("The harness that was answering went away before it replied."));
+			for (const [id, one] of this.pending) if (one.client === client) this.finish(id, fail("unavailable", "The harness that was answering went away before it replied.", []));
 		};
 	}
 
 	forward(name: string, args: unknown, caller: Caller): Promise<Envelope<unknown>> {
 		const client = this.answerer?.(name, caller);
 		const send = client ? this.sockets.get(client) : undefined;
-		if (!client || !send) return Promise.resolve(unavailable(`No harness is connected to answer ${name}: start the Decks harness.`, "agent.host"));
+		if (!client || !send) return Promise.resolve(fail("unavailable", `No harness is connected to answer ${name}: start the Decks harness.`, [], "agent.host"));
 		const id = randomUUID();
 		return new Promise((done) => {
-			const timer = setTimeout(() => this.finish(id, unavailable(`The harness did not answer ${name} in ${Math.round(this.waitMs / 1000)} s.`)), this.waitMs);
+			const timer = setTimeout(() => this.finish(id, fail("unavailable", `The harness did not answer ${name} in ${Math.round(this.waitMs / 1000)} s.`, [])), this.waitMs);
 			this.pending.set(id, { client, done, timer });
 			send({ type: "ask", id, name, args, caller });
 		});

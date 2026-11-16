@@ -1,5 +1,6 @@
 import { calls, events, PROTOCOL_VERSION, Refused, type Caller } from "../../protocol/index.ts";
 import { LOCAL_PERSON, type Callers } from "./callers.ts";
+import { SERVER_VERSION } from "./kernel.ts";
 import { readJson, writeJson } from "./store.ts";
 import { defineFeature, handleAll, type Feature, type Store } from "./types.ts";
 
@@ -7,7 +8,6 @@ import { defineFeature, handleAll, type Feature, type Store } from "./types.ts";
 // clock where the person is, pairing other front ends and taking them back.
 // Only the person on this machine may make a pairing code.
 
-export const SERVER_VERSION = "0.1.0";
 
 /** The deck calls this feature answers, named, so a call added to the noun later is unhandled, not a start error. */
 const MINE = { get: calls.deck.get, update: calls.deck.update, now: calls.deck.now, pair: calls.deck.pair, revoke: calls.deck.revoke };

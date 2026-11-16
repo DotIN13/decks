@@ -6,13 +6,16 @@ import { EventBus } from "./events.ts";
 import { HistoryDeck } from "./history.ts";
 import { ownFeature } from "./own-calls.ts";
 import { Relay } from "./relay.ts";
-import { declaredOf, Router, routesOf, type MakeContext } from "./router.ts";
+import { declaredOf, Router, handledOf, type MakeContext } from "./router.ts";
 import { memoryVersion, readJson, writeJson, type Stores } from "./store.ts";
 import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Store, VersionFile } from "./types.ts";
 
 // Builds the kernel from a deck, a store per feature and the features: the
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
+
+/** This server's own version, said by deck.get, the HTTP door and MCP. */
+export const SERVER_VERSION = "0.1.0";
 
 export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string };
 
@@ -52,7 +55,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 	const call = (name: string, args: Record<string, unknown>, caller: Caller, client?: Context["client"]) => router.call(name, args, caller, client);
 	const makeContext: MakeContext = (feature, caller, notes, client) => contextFor({ feature, caller, notes, kernel, canvas, nameOf, call, ...(client ? { client } : {}) });
 	const declared = declaredOf(features);
-	const router: Router = new Router(routesOf(features, declared), makeContext, options.checkAnswers ?? false, (name, args, caller) => relay.forward(name, args, caller), declared);
+	const router: Router = new Router(handledOf(features, declared), makeContext, options.checkAnswers ?? false, (name, args, caller) => relay.forward(name, args, caller), declared);
 	const version = options.version ?? memoryVersion();
 	for (const one of features) await one.upgrade?.(history, version);
 	const stops: Stop[] = [];

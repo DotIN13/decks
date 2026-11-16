@@ -16,10 +16,10 @@ import { upgradeFeature } from "./upgrade/feature.ts";
 // Decks-local's entry: the only place a feature is named. features() is the
 // list a server runs, also for tests that need every feature at once.
 // Run: node --import tsx server/main.ts --deck <folder> [--port 4620] [--host 127.0.0.1]
-// upgrade comes first: upgrade hooks run in feature order, before any start.
 
 export type FeatureOptions = { lib?: CardsOptions["lib"]; google?: DocumentsOptions["google"]; clock?: () => number; appRun?: string };
 
+/** Every feature, in order; upgrade comes first, since upgrade hooks run in feature order before any start. */
 export function features(options: FeatureOptions = {}): Feature[] {
 	return [
 		upgradeFeature(),

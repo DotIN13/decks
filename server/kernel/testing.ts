@@ -1,18 +1,18 @@
 import { Refused, type Caller, type Envelope, type Who } from "../../protocol/index.ts";
-import type { Heard } from "./events.ts";
 import { LOCAL_PERSON } from "./callers.ts";
+import type { Heard } from "./events.ts";
 import { tempFolder } from "./disk.ts";
 import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { MemoryStore, memoryStores, memoryVersion } from "./store.ts";
-
-export { memoryVersion };
 import type { CanvasDoc, Client, Context, Deck, Feature, VersionFile } from "./types.ts";
 
 // For a feature's tests: the real kernel and router on an in-memory deck.
 // Make a call by name as any caller, read every event it emitted, read the
 // deck. Answers are checked against their declared shape here.
+
+export { memoryVersion };
 
 export type TestServer = Built & {
 	deck: Deck;
@@ -29,7 +29,7 @@ export type TestServer = Built & {
 };
 
 export const callers = {
-	person: { kind: "person", id: "person", name: "you" } as Caller,
+	person: LOCAL_PERSON,
 	agent: (id: string, canvas?: string): Caller => ({ kind: "agent", id, name: id, ...(canvas ? { canvas } : {}) }),
 	card: (path: string, canvas: string): Caller => ({ kind: "card", id: path, name: path, canvas }),
 	app: (name: string): Caller => ({ kind: "app", id: name, name }),

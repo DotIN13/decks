@@ -6,7 +6,10 @@ import { handlersFor, layout, Refused, type AnyCall, type AnyEvent, type Caller,
 // see, the deck, the kernel its start is handed, item kinds and HTTP routes.
 // These types only grow; each addition is announced to every owner.
 
-// The feature: the only way code enters the server.
+export type Bytes = Uint8Array;
+export type Stop = () => void;
+
+// The feature.
 
 /** The only way code enters the server. */
 export interface Feature {
@@ -30,7 +33,7 @@ export const defineFeature = (feature: Feature): Feature => feature;
 /** handle(call, fn) and handleAll(calls, fns), bound to the handler's context. */
 export const { handle, handleAll } = handlersFor<Context>();
 
-// A handler's context, and what it reaches: events, its store, a canvas.
+// A handler's context, and what it reaches: its client, events, its store.
 
 /** What a handler sees. It never sees a token, nor which server it runs on. */
 export interface Context {
@@ -72,6 +75,8 @@ export interface Store {
 	keys(prefix?: string): Promise<string[]>;
 }
 
+// A canvas, as a handler reaches it.
+
 /** A drawing changes only by ops; undo, sync and news all read since(). */
 export interface CanvasDoc {
 	read(query?: ItemQuery): Item[];
@@ -91,9 +96,6 @@ export interface CanvasSource {
 }
 
 // The deck: paths, revisions, every read and write.
-
-export type Bytes = Uint8Array;
-export type Stop = () => void;
 
 /** A path from the deck's root, checked once: no hidden part, nothing outside. */
 export type DeckPath = string & { readonly deckPath: unique symbol };

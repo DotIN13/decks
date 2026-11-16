@@ -1,7 +1,8 @@
 import type { Bytes, Store, VersionFile } from "./types.ts";
 
-// A feature's private state. MemoryStore keeps it in a Map, for tests; the
-// folder's store is in disk.ts. A key is any string; prefix filters keys().
+// A feature's private state kept in memory, for tests (the folder's is in
+// disk.ts), with readJson and writeJson for any store, and a version record
+// kept in memory. A key is any string; prefix filters keys().
 
 /** Every feature's store, made once per name. */
 export type Stores = (feature: string) => Store;
