@@ -46,7 +46,9 @@
 	],
 	"Easel": [
 		"server/canvas/",
-		"tools/checks/canvas/"
+		"tools/checks/canvas/",
+		"canvas/drawing/",
+		"canvas/camera/"
 	],
 	"Folio": [
 		"server/cards/",
@@ -77,8 +79,8 @@
 		"harness/runtimes/",
 		"harness/accounts/",
 		"harness/prompts/",
-		"canvas/cards/CardEditor.tsx",
-		"canvas/cards/editor/"
+		"canvas/cards/",
+		"canvas/editor/"
 	],
 	"Pane": [
 		"harness/page/",
@@ -94,7 +96,8 @@
 	],
 	"Scribe": [
 		"harness/page/chat/",
-		"harness/page/composer/"
+		"harness/page/composer/",
+		"canvas/chrome/"
 	],
 	"Anvil": [
 		"packages/stage/crates/apple/",
@@ -107,7 +110,8 @@
 		"engine/demo/",
 		"engine/build-web.sh",
 		"engine/fetch-fonts.mjs",
-		"canvas/render/"
+		"canvas/render/",
+		"canvas/view/"
 	],
 	"Loom": [
 		"docs/rewrite/loom/",
