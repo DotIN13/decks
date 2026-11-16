@@ -8,6 +8,9 @@ use serde_json::Value;
 use stage_web::engine::Preview;
 use std::collections::BTreeSet;
 
+/// The ids a gesture has lifted, in a steady order.
+pub type Lifted = BTreeSet<String>;
+
 impl Engine {
 	/// One step of a gesture: `[[id, { dx, dy, w?, h?, radius?, set? }], …]` (the web's
 	/// `setPreview`), or `null` to take the preview back. Returns the ids lifted so far.
@@ -75,6 +78,3 @@ fn preview_of(p: &Value) -> Preview {
 	}
 	Preview { dx: n("dx").unwrap_or(0.0), dy: n("dy").unwrap_or(0.0), set }
 }
-
-/// The ids a gesture has lifted, in a steady order.
-pub type Lifted = BTreeSet<String>;

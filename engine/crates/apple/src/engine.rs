@@ -41,11 +41,6 @@ impl Engine {
 		Ok(Engine { device, page, worker, page_gpu, worker_gpu, next_worker_texture: WORKER_TEXTURES, lifted: Default::default(), layer_size: None })
 	}
 
-	pub(crate) fn worker_texture(&mut self) -> u32 {
-		self.next_worker_texture += 1;
-		self.next_worker_texture
-	}
-
 	/// The whole drawing again, as the server sent it: the worker starts from it and paints every
 	/// tile again, and the page shows the tiles it has until each new one replaces it.
 	pub fn set_document(&mut self, pen: &str) -> Result<(), String> {
@@ -134,6 +129,11 @@ impl Engine {
 		for gone in std::mem::take(&mut self.page.pictures.dropped) {
 			self.page_gpu.forget(gone);
 		}
+	}
+
+	pub(crate) fn worker_texture(&mut self) -> u32 {
+		self.next_worker_texture += 1;
+		self.next_worker_texture
 	}
 
 	/// An icon's shapes (`parseIcon`'s JSON) under its key, `library|name|weight`.

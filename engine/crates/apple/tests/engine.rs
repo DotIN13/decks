@@ -71,25 +71,6 @@ fn a_picture_handed_in_fills_its_item() {
 	assert_eq!(engine.wanted()["pictures"], serde_json::json!([]));
 }
 
-/// What a frame costs on this Mac, for the report: the first (every tile painted) and the next
-/// ones (tiles kept, the frame composed and drawn). Read with `--nocapture`.
-#[test]
-fn frame_time_on_this_mac() {
-	let Some(mut engine) = engine_for("notes-and-text") else { return };
-	let v = View { x: -40.0, y: -100.0, zoom: 1.0, scale: 2.0, width: 1180.0, height: 820.0 };
-	let started = std::time::Instant::now();
-	engine.pixels(&v).unwrap();
-	let first = started.elapsed().as_secs_f64() * 1000.0;
-	let rounds = 120;
-	let started = std::time::Instant::now();
-	for i in 0..rounds {
-		engine.draw_and_wait(&View { x: v.x + i as f64 * 0.5, ..v });
-	}
-	let each = started.elapsed().as_secs_f64() * 1000.0 / rounds as f64;
-	eprintln!("frame time, notes-and-text at 2360×1640: first {first:.1} ms (tiles painted, read back); a panning frame {each:.2} ms (composed, drawn, waited for)");
-	assert!(each < 1000.0);
-}
-
 /// A drag as the web shows it: lifted, moved at each step by the page alone, nothing in undo; then
 /// taken back, saved once, and put down, after which the worker's tiles carry it again.
 #[test]
@@ -127,4 +108,23 @@ fn a_new_document_does_not_blank_the_canvas() {
 	assert!(!engine.page.tiles.is_empty(), "the page still holds its tiles");
 	let again = engine.pixels(&v).unwrap().0;
 	assert_eq!(at(&again, &v, 230.0, 230.0), [0x14, 0x80, 0x6f]);
+}
+
+/// What a frame costs on this Mac, for the report: the first (every tile painted) and the next
+/// ones (tiles kept, the frame composed and drawn). Read with `--nocapture`.
+#[test]
+fn frame_time_on_this_mac() {
+	let Some(mut engine) = engine_for("notes-and-text") else { return };
+	let v = View { x: -40.0, y: -100.0, zoom: 1.0, scale: 2.0, width: 1180.0, height: 820.0 };
+	let started = std::time::Instant::now();
+	engine.pixels(&v).unwrap();
+	let first = started.elapsed().as_secs_f64() * 1000.0;
+	let rounds = 120;
+	let started = std::time::Instant::now();
+	for i in 0..rounds {
+		engine.draw_and_wait(&View { x: v.x + i as f64 * 0.5, ..v });
+	}
+	let each = started.elapsed().as_secs_f64() * 1000.0 / rounds as f64;
+	eprintln!("frame time, notes-and-text at 2360×1640: first {first:.1} ms (tiles painted, read back); a panning frame {each:.2} ms (composed, drawn, waited for)");
+	assert!(each < 1000.0);
 }
