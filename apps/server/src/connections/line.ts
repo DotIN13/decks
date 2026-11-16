@@ -9,6 +9,7 @@ import { isCanvasPass } from "../auth/passes.ts";
 import { actsAsPerson, type Principal } from "../auth/principal.ts";
 import { cardRefusedFor, DOC_CALLS, onCanvas } from "../calls/canvas-frame.ts";
 import { runVerb } from "../calls/run.ts";
+import { greet } from "./greeting.ts";
 
 /** How long a new socket has to say `hello` before it is closed. */
 export const HELLO_MS = 5_000;
@@ -69,7 +70,7 @@ export class Line {
 	constructor(private readonly app: App) {
 		this.server = new WebSocketServer({ noServer: true, perMessageDeflate: { threshold: 1024, serverNoContextTakeover: true, clientNoContextTakeover: true } });
 		this.server.on("connection", (socket, request) => this.accept(socket, request as IncomingMessage));
-		app.listen((message) => this.hear(message));
+		app.pages.listen((message) => this.hear(message));
 	}
 
 	/** The `/api/v1/socket` upgrade, from the router in `index.ts`. */
@@ -100,7 +101,7 @@ export class Line {
 			if (!this.sockets.delete(socket)) return;
 			clearTimeout(state.hello);
 			clearInterval(state.recheck);
-			if (state.principal?.kind === "canvas") this.app.canvasFrames -= 1;
+			if (state.principal?.kind === "canvas") this.app.pages.canvasFrames -= 1;
 			// Gone from every canvas it was present on.
 			for (const canvas of state.present.keys()) this.said({ type: "presence.changed", canvas, by: this.by(state), gone: true }, socket);
 		};
@@ -137,7 +138,7 @@ export class Line {
 			state.principal = principal;
 			state.token = message.token;
 			state.all = message.all === true && actsAsPerson(principal);
-			if (principal.kind === "canvas") this.app.canvasFrames += 1;
+			if (principal.kind === "canvas") this.app.pages.canvasFrames += 1;
 			// Checked again while open, as the stream checks its pass before each message and each beat.
 			state.recheck = setInterval(() => {
 				if (!state.token || !this.verify(state, state.token)) socket.close(4401, "The token no longer opens the line.");
@@ -147,7 +148,7 @@ export class Line {
 			// A page: greeted as the tab's socket greeted it, with a screen of its own that `forView` renders for.
 			if (message.greet === true && actsAsPerson(principal)) {
 				state.view = {};
-				this.app.greet((said) => send(socket, said), state.view);
+				greet(this.app, (said) => send(socket, said), state.view);
 			}
 			for (const one of message.watch ?? []) this.watch(socket, state, one.canvas, one.since, one.whole);
 			return;
@@ -306,7 +307,7 @@ export class Line {
 			if (!wanted) continue;
 			if (socket.readyState !== socket.OPEN) continue;
 			// A page's line is told what its own screen should see (`forView`): the deck as its agent's canvas has it.
-			if (state.view) socket.send(JSON.stringify(this.app.forView(message, state.view)));
+			if (state.view) socket.send(JSON.stringify(this.app.pages.forView(message, state.view)));
 			else socket.send((text ??= JSON.stringify(message)));
 		}
 	}

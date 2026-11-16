@@ -9,6 +9,7 @@ import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "../connections/http.ts";
 import { revokeStudioTokens, STUDIO_TOKEN_MS, studioToken } from "../studio/index.ts";
+import { handleTabRequest } from "../connections/greeting.ts";
 
 const KEY = "dsk_abcdefghijklmnopqrstuvwxyz012345";
 const STUDIO = { origin: "https://studio.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
@@ -302,7 +303,7 @@ test("unpairing Studio in Settings deletes its key and takes back every token gi
 		const shown: unknown[] = [];
 		const before = app.pairingMessage() as { studio?: { url: string } };
 		assert.equal(before.studio?.url, "https://studio.test", "Settings shows the link");
-		app.handle({ type: "studio.unpair" }, (frame) => shown.push(frame));
+		handleTabRequest(app, { type: "studio.unpair" }, (frame) => shown.push(frame));
 		assert.ok(!linked(), "the key is gone");
 		for (const token of [first.body.token as string, ada.token, bob.token]) assert.equal(app.tokens.verify(token).ok, false);
 		assert.ok(app.tokens.verify(other).ok, "another Decks keeps its pairing");

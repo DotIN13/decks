@@ -4,7 +4,7 @@ import { closeOldShapes } from "./deck/old-shapes.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
-import type { Page, ClientMessage, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
+import type { Page, DeckState, RuntimeInfo, ServerMessage } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { CardService } from "./cards/service.ts";
@@ -12,7 +12,6 @@ import { AppTrust } from "./auth/app-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
-import { legacy } from "./connections/tab-requests.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { SMALL_WIDTHS, PictureService } from "./pictures/service.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
@@ -30,7 +29,8 @@ import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { followDeck } from "./cards/follow.ts";
 import { Cameras } from "./deck/cameras.ts";
-import { Hub, type View } from "./connections/tab-socket.ts";
+import { Broadcast } from "./connections/broadcast.ts";
+import type { Hub } from "./connections/tab-socket.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
@@ -135,18 +135,29 @@ export class App {
 	readonly thumbs: PictureService;
 	/** Stage pictures drawn without a browser (`stage/native-shots.ts`). */
 	readonly nativeShots: NativeShots;
-	private hub: Hub | undefined;
-	/** The browser whose frame is being handled right now, if any — see `handle`. */
-	viewing: View | undefined;
 	private unwatch: (() => void) | undefined;
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** What an agent asked the pages to do to a canvas, waiting on their answers (`stage/page-calls.ts`). */
-	readonly pageCalls = new PageCalls({ send: (message) => this.send(message), screens: () => (this.hub?.connections ?? 0) + this.lines() });
-	/** Canvas frames following their canvas's stream now (`connections/routes/v1.ts`): each can answer an agent's view of its canvas. */
-	canvasFrames = 0;
-	/** How many lines are open (`connections/line.ts`), set by `index.ts`: a page on the line counts as a connected browser. */
-	lines: () => number = () => 0;
+	/** What is said to the pages, and who is listening (`connections/broadcast.ts`). */
+	readonly pages: Broadcast<DeckAgent> = new Broadcast<DeckAgent>({
+		looking: () => this.agents.looking(),
+		agent: (id) => this.agents.get(id),
+		stateFor: (agent) => this.stageState(agent),
+		// Every change to a card is announced through the broadcast, whoever made it, which makes it the one place to keep the card's picture up with it (`pictures/service.ts`).
+		saying: (message) => {
+			if (message.type !== "card.changed") return;
+			if (message.removed) this.thumbs.forget(message.path);
+			else if (message.card) this.thumbs.changed(message.card);
+		},
+	});
+
+	/** Say something to every page. */
+	send(message: ServerMessage): void {
+		this.pages.send(message);
+	}
+
+	readonly pageCalls = new PageCalls({ send: (message) => this.send(message), screens: () => this.pages.screens });
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
 	/** The subscriptions as the page is told of them: who each is, its five-hour window, who spends which (`runtimes/claude/account-list.ts`). */
@@ -246,7 +257,7 @@ export class App {
 			call: (call, timeoutMs) => this.pageCalls.ask(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.pageCalls.askAll(call, timeoutMs),
 			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
-			connected: () => (this.hub?.connections ?? 0) > 0 || this.lines() > 0 || this.canvasFrames > 0,
+			connected: () => this.pages.connected,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.boards.wrote(path, who),
@@ -268,7 +279,7 @@ export class App {
 		this.apps.decksPort = config.port;
 		this.apps.passes = this.passes;
 		// A canvas frame showing the app hears its state change (`calls/canvas-frame.ts`, `onCanvas`), instead of asking every ten seconds.
-		this.apps.onChange = (name, state) => this.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
+		this.apps.onChange = (name, state) => this.pages.tellStreams({ type: "app.changed", name, ...(state.title ? { title: state.title } : {}), status: state.status });
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
@@ -460,7 +471,7 @@ export class App {
 	}
 
 	attach(hub: Hub): void {
-		this.hub = hub;
+		this.pages.hub = hub;
 		this.follow();
 		/*
 		 * The deck's own chat list first, then one agent only if it had none.
@@ -494,76 +505,6 @@ export class App {
 			gone: (path) => this.agents.boardRemoved(path),
 		});
 		this.accountList.startLimits();
-	}
-
-	/**
-	 * One frame, answered by the table in `wire/`.
-	 *
-	 * This method used to *be* the table — 38 cases and 500 lines in the middle of the
-	 * composition root, so every new frame landed in the same place as every unrelated
-	 * feature's. The cases moved to `wire/`, and what is left is the one line that says
-	 * where they went.
-	 */
-	handle(message: ClientMessage, reply: (message: ServerMessage) => void, view?: View): void {
-		if (!view) {
-			void legacy(this, message, reply);
-			return;
-		}
-		/*
-		 * Each browser has its own conversation, so a frame is handled as the browser that sent it.
-		 *
-		 * The registry keeps one "focused agent", which every frame about "the stage you are on" reads:
-		 * a board moved, a board placed, a prompt with no id. Setting it to this browser's before the
-		 * frame and reading it back after is what lets a phone and a laptop sit on two different
-		 * conversations — without it, opening a chat on one moved the other to it too.
-		 */
-		this.agents.look(view.focused);
-		this.viewing = view;
-		void legacy(this, message, reply, view).finally(() => {
-			this.viewing = undefined;
-			view.focused = this.agents.looking()?.id;
-		});
-	}
-
-	greet(reply: (message: ServerMessage) => void, view?: View): void {
-		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
-		if (view) view.focused = this.agents.looking()?.id;
-		// Who is answering, first: a front end that holds several connections draws its controls from it.
-		reply({ type: "harness.hello", backend: { name: this.deck.name, can: { agents: true, write: true, share: true } } });
-		reply({ type: "deck.changed", deck: this.stageState() });
-		/*
-		 * And what this install can run.
-		 *
-		 * A property of the machine rather than of the deck, which is why it is a frame of
-		 * its own: which runtimes exist, what to call them in a menu, and whether this
-		 * machine can start them. The browser needs the last one to grey a row out — before
-		 * this, the `+` menu offered all four everywhere, and the first prompt was where you
-		 * found out that the binary was not installed.
-		 */
-		reply({ type: "harness.runtimes", list: this.runtimes() });
-		for (const warning of this.deck.warnings) reply({ type: "harness.notice", level: "warn", text: warning });
-		// The whole truth on connect, so a reconnect is a refresh: the deck, the
-		// agents, and each one's transcript.
-		this.agents.greet(reply);
-		/*
-		 * And the subscriptions, which used to arrive only when Settings was opened.
-		 *
-		 * Every conversation's model picker draws a row per account, so a browser that has
-		 * not opened Settings had a picker with no Subscription section at all — the control
-		 * for switching account was invisible until you visited an unrelated panel. The list
-		 * is a property of the install, like the deck itself, so it belongs in the greeting.
-		 *
-		 * Late, deliberately: each row costs a `claude auth status`, so this resolves a
-		 * second or two after the rest and the browser fills the section in when it lands.
-		 */
-		void this.accountList.publish(reply);
-		// And the shared browser, with the code the extension pairs with: the status board
-		// shows it when nothing is connected yet, and the browser is where the user reads it.
-		// Which stages exist: the manager's list, and the name the pill shows beside the agent.
-		reply(this.stagesMessage());
-		reply({ type: "web.changed", status: this.web.status(), code: this.web.code() });
-		reply(this.settings.message());
-		reply(this.pairingMessage());
 	}
 
 	/** The code on show and every front end holding a token, for Settings. */
@@ -645,72 +586,12 @@ export class App {
 		return this.stageState().boards.find((one) => one.path === board.path) ?? board;
 	}
 
-	send(message: ServerMessage): void {
-		/*
-		 * Every change to a board is announced through here, whoever made it, which makes it
-		 * the one place to keep the board's picture up with it (`pictures/service.ts`).
-		 */
-		if (message.type === "card.changed") {
-			if (message.removed) this.thumbs.forget(message.path);
-			else if (message.card) this.thumbs.changed(message.card);
-		}
-		// A tab's socket reads a canvas's changes per agent (`stage.pen.delta`) for the Decks iOS app; `canvas.changed` is the line's and the stream's.
-		if (message.type !== "canvas.changed") this.hub?.each((view) => this.forView(message, view));
-		for (const listener of this.listeners) listener(message);
-	}
-
 	/** Apps the person let call verbs with "Allow once": remembered until the server restarts (`calls/caller.ts`). */
 	readonly appsAllowedOnce = new Set<string>();
-
-	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `connections/routes/v1.ts`). */
-	private readonly listeners = new Set<(message: ServerMessage) => void>();
-
-	/** Hear every broadcast, as it goes to the browsers; the answer stops it. */
-	/** Say something to the streams alone (`/api/v1/events`), not the sockets: a canvas frame's own answers. */
-	tellStreams(message: ServerMessage): void {
-		for (const listener of this.listeners) listener(message);
-	}
 
 	/** The files a canvas's document items name, as the document service keys them (`docs/on-canvas.ts`). */
 	documentsOn(canvas: string): Map<string, string> {
 		return documentsOnCanvas(this.pens, this.deck, canvas);
-	}
-
-	listen(listener: (message: ServerMessage) => void): () => void {
-		this.listeners.add(listener);
-		return () => this.listeners.delete(listener);
-	}
-
-	/**
-	 * A broadcast as one browser should see it.
-	 *
-	 * Three frames depend on which conversation is on screen: `agents` names it, and `deck.state` and
-	 * `card.changed` carry that stage's arrangement. They are built for the registry's focus, which is
-	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
-	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
-	 */
-	forView(message: ServerMessage, view: View): ServerMessage {
-		const shared = this.agents.looking();
-		if (view === this.viewing) return message;
-		const own = this.agents.get(view.focused);
-		if (!own) {
-			view.focused = shared?.id;
-			return message;
-		}
-		if (own === shared) return message;
-		switch (message.type) {
-			case "agent.list":
-				return { ...message, focused: own.id };
-			case "deck.changed":
-				return { ...message, deck: this.stageState(own) };
-			case "card.changed": {
-				if (!message.card) return message;
-				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
-				return placed ? { ...message, card: { ...message.card, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
-			}
-			default:
-				return message;
-		}
 	}
 
 	/**

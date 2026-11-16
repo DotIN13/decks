@@ -47,8 +47,8 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 		const still = () => pass === undefined || app.passes.openCanvas(pass)?.canvas === own;
 		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
 		res.write(": decks events\n\n");
-		if (own !== undefined) app.canvasFrames += 1;
-		const stop = app.listen((message) => {
+		if (own !== undefined) app.pages.canvasFrames += 1;
+		const stop = app.pages.listen((message) => {
 			if (!still()) {
 				res.end();
 				return;
@@ -71,7 +71,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 			if (closed) return;
 			closed = true;
 			clearInterval(beat);
-			if (own !== undefined) app.canvasFrames -= 1;
+			if (own !== undefined) app.pages.canvasFrames -= 1;
 			stop();
 		};
 		req.on("close", close);
@@ -133,7 +133,7 @@ export function verbRoutes(app: RouteDeps["app"]): express.Router {
 		}
 		// The file as the deck names it; an item that names it another way hears its answers under the name it used.
 		const given = message.path;
-		app.docs.handle({ ...message, path: key } as never, (answer) => app.tellStreams({ ...answer, ...((answer as { path?: unknown }).path === key ? { path: given } : {}), frameTo: frame } as never));
+		app.docs.handle({ ...message, path: key } as never, (answer) => app.pages.tellStreams({ ...answer, ...((answer as { path?: unknown }).path === key ? { path: given } : {}), frameTo: frame } as never));
 		res.json({ ok: true });
 	});
 

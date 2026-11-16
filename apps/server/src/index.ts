@@ -14,6 +14,7 @@ import { Hub } from "./connections/tab-socket.ts";
 import { Line } from "./connections/line.ts";
 import { revokeStudioTokens, startStudio, studioToken as studioGives } from "./studio/index.ts";
 import { DryRun } from "./migrations/index.ts";
+import { greet, handleTabRequest } from "./connections/greeting.ts";
 
 const config = loadConfig();
 
@@ -39,8 +40,8 @@ try {
 const httpServer = createServer(createHttpApp(app));
 const hub = new Hub(
 	httpServer,
-	(message, reply, view) => app.handle(message, reply, view),
-	(reply, view) => app.greet(reply, view),
+	(message, reply, view) => handleTabRequest(app, message, reply, view),
+	(reply, view) => greet(app, reply, view),
 	// A hello's token opens the socket as an address's did: the person's or a paired site's.
 	(token, headers) => {
 		const seen = verifyOn(app, token, headers);
@@ -50,7 +51,7 @@ const hub = new Hub(
 app.attach(hub);
 // The line: one socket for the canvas frame (and any token holder), its calls, its canvas's changes and its own messages (`connections/line.ts`).
 const line = new Line(app);
-app.lines = () => line.connections;
+app.pages.lines = () => line.connections;
 
 // Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
 // Its app list goes to Studio too, so Studio can list the apps beside the canvases.

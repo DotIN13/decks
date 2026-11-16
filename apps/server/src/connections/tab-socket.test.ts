@@ -12,6 +12,7 @@ import { verifyOn } from "../auth/guard.ts";
 import { realPathOf } from "../deck/roots.ts";
 import { createHttpApp } from "./http.ts";
 import { Hub } from "./tab-socket.ts";
+import { greet, handleTabRequest } from "./greeting.ts";
 
 /** A deck, its server with the tab's socket on /ws as index.ts wires it, and a way to open one. */
 async function open() {
@@ -21,8 +22,8 @@ async function open() {
 	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
 	const hub = new Hub(
 		createServer(),
-		(message, reply, view) => app.handle(message, reply, view),
-		(reply, view) => app.greet(reply, view),
+		(message, reply, view) => handleTabRequest(app, message, reply, view),
+		(reply, view) => greet(app, reply, view),
 		(token, headers) => {
 			const seen = verifyOn(app, token, headers);
 			return seen.ok && (seen.principal.kind === "person" || seen.principal.kind === "site");
