@@ -11,17 +11,17 @@ export const pen = (children: unknown[]) => `${JSON.stringify({ version: "2.14",
 export const DECK = {
 	"canvases/plan/canvas.pen": pen([NOTE("a", 0, 0), NOTE("b", 360, 0)]),
 	"canvases/plan/canvas.json": JSON.stringify({ title: "The plan" }),
-	"canvases/plan/stickers/s1/index.html": "<p>sticker</p>",
-	"canvases/plan/stickers/s2/index.html": "<p>second</p>",
+	"canvases/plan/cards/s1/index.html": "<p>sticker</p>",
+	"canvases/plan/cards/s2/index.html": "<p>second</p>",
 	"canvases/other/canvas.pen": pen([]),
 };
 
 export function stickerFeature(): Feature {
 	let deck: Kernel["deck"] | undefined;
 	const prepare = async (item: Item, at: { canvas: string; caller: Caller }): Promise<Item> => {
-		if (item.title === "sized") return { ...item, path: "canvases/plan/stickers/s2/index.html", box: { x1: 0, y1: 0, x2: 300, y2: 200 } };
+		if (item.title === "sized") return { ...item, path: "canvases/plan/cards/s2/index.html", box: { x1: 0, y1: 0, x2: 300, y2: 200 } };
 		if (item.path || !item.title) return item;
-		const path = `canvases/${at.canvas}/stickers/${item.title.replace(/ /g, "-")}/index.html`;
+		const path = `canvases/${at.canvas}/cards/${item.title.replace(/ /g, "-")}/index.html`;
 		await deck!.write(toDeckPath(path), new TextEncoder().encode(`<p>${item.title}</p>`), at.caller);
 		return { ...item, path };
 	};

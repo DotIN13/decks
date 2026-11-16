@@ -6,9 +6,8 @@ It answers `item.*` (13 calls), `canvas.*` (12 of 14: not `screenshot` or `expor
 ## Owns
 
 - `doc.ts`: `PenCanvas`, one drawing's `CanvasDoc`; `log.ts` its changes and undo; `arrows.ts` reroutes.
-- `ops.ts`, `place.ts`, `kinds.ts`: ops into pen's edits, places, which feature owns a node; `spans.ts`
-  keeps untouched items' bytes; `store.ts` every canvas, title, file and history; `clips.ts`.
-- `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`: the calls, and the feature.
+- `ops.ts`, `place.ts`, `kinds.ts`, `paths.ts`: ops, places, kinds, paths kept in the canvas; `spans.ts`
+  untouched bytes; `store.ts` canvases, titles, files, history; `clips.ts`; the calls, `feature.ts`.
 
 ## May import
 
@@ -40,10 +39,11 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
 9. A node whose `metadata.type` is `decks.<type>` belongs to the item kind with that type, which
     another feature registers; this folder never names those kinds. Before an insert or replace
     of such an item, its kind's `prepare` (if it has one) is awaited; a box it adds is a size only.
-    Every other node is drawn:
-    notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
+    Every other node is drawn: notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
     Anywhere an item's id is taken, a page's path is too: a card's as its folder or its
     index.html, an older page's as its file, with or without the canvas's folder before it.
+    Every path an item a call puts or changes names (a page's, a picture's url), read decoded and
+    normalised, stays in its canvas's own folder or the deck's assets/, docs/, apps/; else refused.
 10. After every change each joined arrow is routed again between its ends, in the same revision,
     so the file holds the path the page draws. Any other item you did not touch keeps its bytes.
 11. `item.clip` keeps a copy of items and the files their kinds name, for a day. `item.paste`

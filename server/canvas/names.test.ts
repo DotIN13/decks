@@ -9,8 +9,8 @@ import { leafFeature, DECK, stickerFeature } from "./test-deck.ts";
 // card's as its folder or its index.html, an older page's as its file.
 
 const ann = callers.agent("ann", "plan");
-const FULL = "canvases/plan/stickers/s1/index.html";
-const NAMES = [FULL, "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1"];
+const FULL = "canvases/plan/cards/s1/index.html";
+const NAMES = [FULL, "cards/s1/index.html", "canvases/plan/cards/s1", "cards/s1"];
 
 async function withPage() {
 	const s = await testServer({ features: [canvasFeature({ clock: () => 5 }), stickerFeature(), leafFeature()], deck: DECK });
@@ -44,18 +44,18 @@ for (const name of NAMES) {
 
 test("an older page is named by its file, with or without the canvas's folder", async () => {
 	const s = await testServer({ features: [canvasFeature(), leafFeature()], deck: DECK });
-	await s.value("item.insert", { item: { type: "leaf", id: "b1", file: "leaves/old.html" }, at: { x: 0, y: 600 } }, ann);
-	assert.equal((await s.value<Item>("item.get", { id: "leaves/old.html" }, ann)).id, "b1");
-	assert.equal((await s.value<Item>("item.get", { id: "canvases/plan/leaves/old.html" }, ann)).id, "b1");
+	await s.value("item.insert", { item: { type: "leaf", id: "b1", file: "files/old.html" }, at: { x: 0, y: 600 } }, ann);
+	assert.equal((await s.value<Item>("item.get", { id: "files/old.html" }, ann)).id, "b1");
+	assert.equal((await s.value<Item>("item.get", { id: "canvases/plan/files/old.html" }, ann)).id, "b1");
 	await s.close();
 });
 
 test("a page is named by its path, with or without the canvas's folder, or by its own folder", async () => {
 	const s = await testServer({ features: [canvasFeature(), stickerFeature()], deck: DECK });
-	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	for (const name of ["canvases/plan/stickers/s1/index.html", "stickers/s1/index.html", "canvases/plan/stickers/s1", "stickers/s1/"]) {
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	for (const name of ["canvases/plan/cards/s1/index.html", "cards/s1/index.html", "canvases/plan/cards/s1", "cards/s1/"]) {
 		assert.equal((await s.value<Item>("item.get", { id: name }, ann)).id, "st", name);
 	}
-	assert.deepEqual(await s.value("item.delete", { id: "canvases/plan/stickers/s1" }, ann), { deleted: "canvases/plan/stickers/s1" });
+	assert.deepEqual(await s.value("item.delete", { id: "canvases/plan/cards/s1" }, ann), { deleted: "canvases/plan/cards/s1" });
 	await s.close();
 });

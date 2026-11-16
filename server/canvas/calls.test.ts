@@ -146,6 +146,24 @@ test("a watcher catching up gets every item.changed after its revision, as told 
 	await s.close();
 });
 
+test("an item naming a path outside its canvas is refused, for every caller, however it is written", async () => {
+	const s = await start({ ...DECK, "canvases/other/cards/x/index.html": "<p>x</p>" });
+	const refused = async (args: Record<string, unknown>, name = "item.insert") => {
+		const answer = await s.call(name, args, ann);
+		return !answer.ok && answer.error.code === "refused" && /points only at its own folder/.test(answer.error.message);
+	};
+	assert.ok(await refused({ item: { type: "sticker", path: "canvases/other/cards/x/index.html" }, at: { x: 0, y: 900 } }), "another canvas's card");
+	assert.ok(await refused({ item: { type: "sticker", path: "assets/..%2fcanvases%2fother%2fcards%2fx%2findex.html" }, at: { x: 0, y: 900 } }), "a climb, encoded");
+	assert.ok(await refused({ item: { type: "rectangle", fill: { type: "image", url: "../other/files/a.png" } }, at: { x: 0, y: 900 } }), "a picture outside");
+	assert.ok(await refused({ ops: [{ op: "insert", item: { type: "note", id: "ok" } }, { op: "replace", id: "a", item: { type: "browser", url: "../../canvases/other/cards/x/index.html" } }] }, "item.batch"), "a replace in a batch");
+	assert.ok(await refused({ id: "a", set: { metadata: { path: "canvases/other/cards/x/index.html" } } }, "item.update"), "an update that sets one");
+	assert.equal((await s.value<Item[]>("item.list", {}, ann)).length, 2, "nothing changed");
+	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "files/a.png" } }, at: { x: 0, y: 900 } }, ann)).ok, true, "its own files");
+	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "assets/logo.png" } }, at: { x: 400, y: 900 } }, ann)).ok, true, "the deck's assets");
+	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } }, at: { x: 800, y: 900 } }, ann)).ok, true, "a web address");
+	await s.close();
+});
+
 async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
 	for (let i = 0; i < 50; i++) {
 		const v = await read();
@@ -178,18 +196,18 @@ test("a size with only a width leaves the height to the item", async () => {
 });
 
 test("an item given no place joins right of the newest page, in the nearest open slot", async () => {
-	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/stickers/s1/index.html": "x", "canvases/plan/stickers/s2/index.html": "y" });
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
+	const s = await start({ "canvases/plan/canvas.pen": `${JSON.stringify({ version: "2.14", children: [] })}\n`, "canvases/plan/cards/s1/index.html": "x", "canvases/plan/cards/s2/index.html": "y" });
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 0 } }, ann);
 	assert.deepEqual((await s.value<Item>("item.insert", { item: { type: "note", id: "n", width: 240, height: 120 } }, ann)).box!.x1, 460);
-	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s2/index.html", id: "s2" } }, ann);
+	const third = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s2/index.html", id: "s2" } }, ann);
 	assert.deepEqual([third.box!.x1, third.box!.y1], [460, 280]);
 	await s.close();
 });
 
 test("a page already on the canvas is not inserted again", async () => {
 	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	const again = await s.call("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" } }, ann);
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const again = await s.call("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" } }, ann);
 	assert.ok(!again.ok && again.error.code === "conflict" && /already on this canvas/.test(again.error.message));
 	assert.equal((await s.value<Item[]>("item.list", {}, ann)).filter((i) => i.type === "sticker").length, 1);
 	await s.close();
@@ -220,14 +238,14 @@ test("canvas.undo takes back the person's edit, and refuses naming who when an a
 test("before a kind's item is inserted, the kind may prepare it", async () => {
 	const s = await start();
 	const st = await s.value<Item>("item.insert", { item: { type: "sticker", title: "new one" }, at: { x: 0, y: 600 } }, ann);
-	assert.equal(st.path, "canvases/plan/stickers/new-one/index.html");
-	assert.equal(await text(s, "canvases/plan/stickers/new-one/index.html"), "<p>new one</p>");
+	assert.equal(st.path, "canvases/plan/cards/new-one/index.html");
+	assert.equal(await text(s, "canvases/plan/cards/new-one/index.html"), "<p>new one</p>");
 	await s.close();
 });
 
 test("a box a kind's prepare adds is a size: the item is still placed beside the newest page", async () => {
 	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
 	const made = await s.value<Item>("item.insert", { item: { type: "sticker", title: "sized" } }, ann);
 	assert.deepEqual(made.box, { x1: 460, y1: 600, x2: 760, y2: 800 });
 	await s.close();
@@ -235,8 +253,8 @@ test("a box a kind's prepare adds is a size: the item is still placed beside the
 
 test("an arrow whose end names a card by its deck path is routed to it", async () => {
 	const s = await start();
-	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
-	const arrow = await s.value<Item>("item.insert", { item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "canvases/plan/stickers/s1/index.html" } } }, ann);
+	await s.value("item.insert", { item: { type: "sticker", id: "st", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	const arrow = await s.value<Item>("item.insert", { item: { type: "path", id: "ar", metadata: { type: "decks.arrow", from: "a", to: "canvases/plan/cards/s1/index.html" } } }, ann);
 	assert.ok(arrow.box && arrow.box.y2 > 550, JSON.stringify(arrow.box));
 	await s.close();
 });
@@ -254,15 +272,15 @@ test("an item you did not touch is byte for byte the same in the file after an e
 
 test("a kind another feature registers owns its nodes; clip and paste carry its files and give new ids", async () => {
 	const s = await start();
-	const st = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/stickers/s1/index.html" }, at: { x: 0, y: 400 } }, ann);
+	const st = await s.value<Item>("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 400 } }, ann);
 	assert.equal(st.type, "sticker");
 	assert.match(await text(s, "canvases/plan/canvas.pen").then(() => s.deck.read(toDeckPath("canvases/plan/canvas.pen"))).then((b) => new TextDecoder().decode(b)), /decks\.sticker/);
 	await s.value("item.clip", { ids: [st.id!, "a"], id: "clip1" }, ann);
 	const pasted = await s.value<Item[]>("item.paste", { clip: { id: "clip1", canvas: "plan" }, canvas: "other", at: { x: 10, y: 10 } }, ann);
 	assert.equal(pasted.length, 2);
 	assert.ok(pasted.every((i) => i.id !== "a" && i.id !== st.id));
-	assert.equal(await text(s, "canvases/other/stickers/s1/index.html"), "<p>sticker</p>");
-	assert.equal(pasted.find((i) => i.type === "sticker")!.path, "canvases/other/stickers/s1/index.html");
+	assert.equal(await text(s, "canvases/other/cards/s1/index.html"), "<p>sticker</p>");
+	assert.equal(pasted.find((i) => i.type === "sticker")!.path, "canvases/other/cards/s1/index.html");
 	await s.close();
 });
 

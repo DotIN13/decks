@@ -1,10 +1,11 @@
-import { baseTheme, diff, parse, PenError, read as penRead, themeFrom, type PenDocument, type PenNode } from "@decks/pen";
+import { baseTheme, diff, parse, walk, PenError, read as penRead, themeFrom, type PenDocument, type PenNode } from "@decks/pen";
 import { idsOf, Refused, type Caller } from "../../protocol/index.ts";
 import type { CanvasDoc, Change, Item, ItemOp, ItemQuery } from "../kernel/types.ts";
 import type { Kinds } from "./kinds.ts";
 import { Log } from "./log.ts";
 import { routeArrows } from "./arrows.ts";
 import { findId as findIn, step } from "./ops.ts";
+import { strayPath } from "./paths.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
 
 // One drawing in memory: read, changed only by apply (all or none), and
@@ -72,6 +73,7 @@ export class PenCanvas implements CanvasDoc {
 				work = done.doc;
 				written.push(done.op);
 				if (done.id) ids.push(done.id);
+				if (done.id && (op.op !== "update" || op.set) && op.op !== "delete" && op.op !== "move") this.keepsInside(work, done.id);
 			} catch (error) {
 				throw failed(error, i, op);
 			}
@@ -93,6 +95,13 @@ export class PenCanvas implements CanvasDoc {
 		const text = writeLike(this.source, next as unknown as Record<string, unknown>);
 		this.source = sourceOf(text);
 		this.saved(text, change, [...new Set(ids)], by, { pen, ...(edit ? { made: [edit] } : {}) });
+	}
+
+	/** Refuse an item that names a path outside this canvas (README rule 9). */
+	private keepsInside(doc: PenDocument, id: string): void {
+		const node = [...walk(doc.children)].find((one) => one.id === id);
+		const stray = node ? strayPath([node], this.name, this.kinds) : undefined;
+		if (stray) throw new Refused("refused", `${id} names ${stray.path}, and ${stray.why}: a canvas points only at its own folder and the deck's assets/, docs/ and apps/.`, "item.paste");
 	}
 
 	// Its log: since, undo and redo, and edits from outside
