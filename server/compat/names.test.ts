@@ -24,7 +24,7 @@ test("every old call reaches a new call the server knows", async () => {
 			if (!envelope.ok && /There is no call named/.test(envelope.error.message)) missed.push(`${old} -> ${turned.name}`);
 		}
 		assert.deepEqual(missed, []);
-		assert.equal(OLD_CALLS.length, 117);
+		assert.equal(OLD_CALLS.length, 119, "canvas.file and apps.item answer since 0.36.0, no longer dropped");
 	} finally {
 		await server.close();
 	}
@@ -99,7 +99,7 @@ test("an old name posted to /api/v1 answers through the kernel's translator", as
 		const read = await post("canvas.read", { args: [{ canvas: "c" }] });
 		assert.equal(read.ok, true);
 		assert.equal(read.value?.items?.length, 1, "canvas.read answers { items } as it did");
-		assert.equal((await post("canvas.file", { args: [] })).ok, false);
+		assert.equal((await post("canvas.file", { args: [{ canvas: "c" }] })).ok, true, "canvas.file answers the drawing's file since 0.36.0");
 	} finally {
 		await doors.close();
 		await server.close();

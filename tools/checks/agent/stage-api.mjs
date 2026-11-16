@@ -26,7 +26,7 @@ const inPanel = () =>
 	page.evaluate(() => [...document.querySelectorAll('.panel-section[data-kind="canvas"] .v3-item[data-kind="board"] .v3-item-name')].map((n) => n.textContent.trim()).sort());
 
 /** Whether the decks command answers today's words yet (protocol/compat's table, Lexicon's): until then that round is expected to fail. */
-const OLD_WORDS_ANSWER = false;
+const OLD_WORDS_ANSWER = true;
 
 /** One round on a fresh agent, in one wording; a round expected to fail says what it saw without failing the check. */
 async function round(label, words, expected = true) {
