@@ -34,7 +34,8 @@ export function itemCalls(store: CanvasStore, clips: Clips) {
 		},
 		clip: (ctx, a) => clips.clip(ctx.canvasName(a.canvas), a.ids, a.id),
 		paste: async (ctx, a) => written(await clips.paste(a.clip.id, ctx.canvasName(a.canvas), a.at, ctx.caller)),
-		space: (ctx, a) => roomFor(at(ctx, a), a),		variables: (ctx, { set, themes, ...on }) => {
+		space: (ctx, a) => roomFor(at(ctx, a), a),
+		variables: (ctx, { set, themes, ...on }) => {
 			const name = ctx.canvasName(on.canvas);
 			at(ctx, on).apply([{ op: "variables", set, ...(themes !== undefined ? { themes } : {}) }], ctx.caller);
 			return written(store.describe(name));
