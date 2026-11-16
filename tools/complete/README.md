@@ -17,7 +17,7 @@ Anything: `@decks/protocol`, `@decks/server` and its kernel's testing entry, `@d
 1. A declared call is answered when a feature of the server handles it, or the harness offers it
    through `agent.host` and the server accepts the offer.
 2. A call a feature handles but that works only with an outside service (`google.read`, `google.edit`
-   need the Docs API) counts as answered only when main's start options give that service.
+   need the Google sign-in's store) counts as answered only when main's start options give it.
 3. A call answered by no one fails the check unless `unhandled.json` lists it, with its owner and why.
 4. A listed call that is answered now, or no longer declared, fails the check too: the list only shrinks.
 

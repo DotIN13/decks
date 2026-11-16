@@ -1,10 +1,34 @@
 {
-	"google.read": {
-		"owner": "Folio, then Keel",
-		"why": "Handled, but main.ts does not yet give documents the Docs API; Folio is porting the client, Keel wires it."
+	"file.compile": {
+		"owner": "Quire",
+		"why": "Declared for LaTeX documents and their git; server/documents/latex and git are being built."
 	},
-	"google.edit": {
-		"owner": "Folio, then Keel",
-		"why": "Handled, but main.ts does not yet give documents the Docs API; Folio is porting the client, Keel wires it."
+	"file.pull": {
+		"owner": "Quire",
+		"why": "Declared for LaTeX documents and their git; server/documents/latex and git are being built."
+	},
+	"file.push": {
+		"owner": "Quire",
+		"why": "Declared for LaTeX documents and their git; server/documents/latex and git are being built."
+	},
+	"file.repo": {
+		"owner": "Quire",
+		"why": "Declared for LaTeX documents and their git; server/documents/latex and git are being built."
+	},
+	"google.comment": {
+		"owner": "Folio",
+		"why": "Declared for Google Docs comments and styles; not handled yet."
+	},
+	"google.comments": {
+		"owner": "Folio",
+		"why": "Declared for Google Docs comments and styles; not handled yet."
+	},
+	"google.get": {
+		"owner": "Folio",
+		"why": "Declared for Google Docs comments and styles; not handled yet."
+	},
+	"google.style": {
+		"owner": "Folio",
+		"why": "Declared for Google Docs comments and styles; not handled yet."
 	}
 }

@@ -17,7 +17,7 @@ import { testServer } from "@decks/server/kernel/testing";
 type Listed = Record<string, { owner: string; why: string }>;
 const FIXTURE = new URL("../fixtures/deck", import.meta.url).pathname;
 /** Calls a feature handles but that work only with an outside service main.ts must give it. */
-const NEEDS = { "google.read": "docs", "google.edit": "docs" } as const;
+const NEEDS = { "google.read": "googleStore", "google.edit": "googleStore" } as const;
 
 /** The calls the harness answers, read from its own table; nothing it builds is used. */
 function harnessOffers(): string[] {
@@ -42,7 +42,7 @@ test("every declared call is answered by a feature or the harness, or listed wit
 	const root = await mkdtemp(join(tmpdir(), "complete-"));
 	await cp(FIXTURE, root, { recursive: true });
 	const deck = new FolderDeck(root);
-	const options = startOptions() as Record<string, unknown>;
+	const options = startOptions(root) as Record<string, unknown>;
 	const server = await testServer({ features: features(options), deck });
 	const doors = await server.listen(0);
 	try {

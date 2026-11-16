@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { appsFeature } from "./apps/feature.ts";
 import { canvasFeature } from "./canvas/feature.ts";
@@ -6,7 +7,7 @@ import { cards, type CardsOptions } from "./cards/feature.ts";
 import { compatFeature } from "./compat/feature.ts";
 import { documents, type DocumentsOptions } from "./documents/feature.ts";
 import { frameFeature } from "./frame/feature.ts";
-import { FolderDeck, startServer, type Feature } from "./kernel/index.ts";
+import { FolderDeck, FolderStore, startServer, type Feature } from "./kernel/index.ts";
 import { peopleFeature } from "./people/feature.ts";
 import { picturesFeature } from "./pictures/feature.ts";
 import { sharingFeature } from "./sharing/feature.ts";
@@ -17,7 +18,7 @@ import { upgradeFeature } from "./upgrade/feature.ts";
 // list a server runs, also for tests that need every feature at once.
 // Run: node --import tsx server/main.ts --deck <folder> [--port 4620] [--host 127.0.0.1]
 
-export type FeatureOptions = { lib?: CardsOptions["lib"]; google?: DocumentsOptions["google"]; clock?: () => number; appRun?: string };
+export type FeatureOptions = { lib?: CardsOptions["lib"]; google?: DocumentsOptions["google"]; googleStore?: DocumentsOptions["googleStore"]; clock?: () => number; appRun?: string };
 
 /** Every feature, in order; upgrade comes first, since upgrade hooks run in feature order before any start. */
 export function features(options: FeatureOptions = {}): Feature[] {
@@ -25,7 +26,7 @@ export function features(options: FeatureOptions = {}): Feature[] {
 		upgradeFeature(),
 		canvasFeature(options.clock ? { clock: options.clock } : {}),
 		cards(options.lib ? { lib: options.lib } : {}),
-		documents(options.google ? { google: options.google } : {}),
+		documents({ ...(options.google ? { google: options.google } : {}), ...(options.googleStore ? { googleStore: options.googleStore } : {}) }),
 		peopleFeature(),
 		sharingFeature(),
 		appsFeature({ ...(options.appRun ? { workdir: options.appRun } : {}), ...(options.clock ? { clock: options.clock } : {}) }),
@@ -36,15 +37,16 @@ export function features(options: FeatureOptions = {}): Feature[] {
 	];
 }
 
-/** What a real start gives features(): the card runtime; the completeness test starts the same way. */
-export function startOptions(): FeatureOptions {
+/** What a real start gives features(): the card runtime, and the Google sign-in kept beside the deck
+ *  (<data>/google for a deck at <data>/decks); the completeness test starts the same way. */
+export function startOptions(deck: string): FeatureOptions {
 	const lib = cardLib();
-	return lib ? { lib } : {};
+	return { ...(lib ? { lib } : {}), googleStore: new FolderStore(join(dirname(resolve(deck)), "google")) };
 }
 
 async function main(): Promise<void> {
 	const args = argsOf(process.argv.slice(2));
-	const running = await startServer({ ...args, features: features(startOptions()) });
+	const running = await startServer({ ...args, features: features(startOptions(args.deck)) });
 	console.log(`Decks-local serves ${args.deck} at ${running.url}`);
 	const stop = () => {
 		setTimeout(() => process.exit(0), 3000).unref();
