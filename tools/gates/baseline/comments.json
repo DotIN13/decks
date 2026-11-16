@@ -332,8 +332,6 @@
 	"harness/page/pages/index.tsx: comment over 5 lines": 1,
 	"harness/page/panel/AppRow.tsx: comment over 5 lines": 1,
 	"harness/page/panel/apps.ts: comment over 5 lines": 1,
-	"harness/page/panel/LeftPanel.tsx: comment over 5 lines": 14,
-	"harness/page/panel/LeftPanel.tsx: em dash": 34,
 	"harness/page/panel/lists/inspector.css: comment over 5 lines": 5,
 	"harness/page/panel/lists/inspector.css: em dash": 8,
 	"harness/page/panel/lists/panel.css: comment over 5 lines": 30,

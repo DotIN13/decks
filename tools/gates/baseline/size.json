@@ -37,7 +37,6 @@
 	"harness/page/frame/ToolColumn.tsx: function ToolColumn over 80 lines": 1,
 	"harness/page/markup/CommentPopup.tsx: function CommentPopup over 80 lines": 1,
 	"harness/page/panel/AppRow.tsx: function AppRow over 80 lines": 1,
-	"harness/page/panel/LeftPanel.tsx: function LeftPanel over 80 lines": 1,
 	"harness/page/perf/fps.tsx: function FpsMeter over 80 lines": 1,
 	"harness/page/shell/dock.ts: function (anonymous) over 80 lines": 1,
 	"harness/page/shell/dock.ts: function createDock over 80 lines": 1,

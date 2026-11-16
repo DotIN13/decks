@@ -361,8 +361,6 @@
 	"harness/page/panel/apps.ts: board": 3,
 	"harness/page/panel/apps.ts: stage": 2,
 	"harness/page/panel/DecksLineMark.tsx: board": 1,
-	"harness/page/panel/LeftPanel.tsx: board": 23,
-	"harness/page/panel/LeftPanel.tsx: stage": 3,
 	"harness/page/panel/lists/inspector.css: board": 1,
 	"harness/page/panel/lists/panel.css: board": 12,
 	"harness/page/panel/lists/v3.css: board": 1,

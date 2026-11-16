@@ -19,11 +19,9 @@ import { LeftPanel } from "../panel/LeftPanel.tsx";
 import { FpsMeter, showFps } from "../perf/fps.tsx";
 import { addAccount, forgetAccount, openSettings, readAccounts, repairTab, stopTab, useAccount } from "../settings/actions.ts";
 import { Settings, UsageModal } from "../settings/index.ts";
-import { camera } from "../state/camera.ts";
 import { stageOf, stages } from "../state/canvases.ts";
 import { removeComment, waitingComments } from "../state/comments.ts";
 import { clearDialog, dialog, runtimeFor, state } from "../state/deck.ts";
-import { editDrawing } from "../state/decks.ts";
 import { queuedFor } from "../state/queued.ts";
 import { selected } from "../state/selection.ts";
 import { draft, openUsage, ops, panelOpen, pagesStarted, picking, readUsage, setDraft, setOps, setPanelOpen, settings, setSettings, setUsagePanel, unread, usagePanel, usageReport } from "../state/ui.ts";
@@ -143,7 +141,6 @@ function Panel(props: P): JSX.Element {
 	return (
 		<LeftPanel
 			{...(page.panelAsk() ? { ask: page.panelAsk()! } : {})}
-			boards={state.pages}
 			{...(page.stagePen()?.doc ? { canvasDoc: page.stagePen()!.doc as never } : {})}
 			{...(here() ? { canvasTitle: here()!.title } : {})}
 			selectedItems={page.penSelected()}
@@ -156,12 +153,8 @@ function Panel(props: P): JSX.Element {
 			}}
 			desktop={!page.layout.phone()}
 			onSettings={openSettings}
-			pens={state.deck?.pens ?? []}
-			onPlacePen={(pen) => state.focused && void editDrawing(state.focused, [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(camera().x), y1: Math.round(camera().y) } }])}
 			listMayGrow={pagesStarted()}
 			current={selected()}
-			inPlay={page.stagePages().map((card) => card.path)}
-			kept={state.focused ? (state.contexts[state.focused] ?? []) : []}
 			focused={state.focused}
 			open={panelOpen()}
 			onOpenChange={setPanelOpen}
