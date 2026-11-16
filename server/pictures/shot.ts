@@ -1,20 +1,16 @@
 import { layout, Refused } from "../../protocol/index.ts";
 import type * as S from "./shapes.ts";
-import { toDeckPath, type Bytes, type Context } from "../kernel/index.ts";
-import { compose, factorFor, type Of } from "./compose.ts";
+import { toDeckPath, type Bytes, type Context, type Item } from "../kernel/index.ts";
+import { compose, factorFor, type Composed, type Of } from "./compose.ts";
 import { drawNatively } from "./native-shot.ts";
-import { cardPicture } from "./picture.ts";
-import { cardPath, keep, type Machine } from "./machine.ts";
+import { cardPath, cardPicture } from "./picture.ts";
+import type { Machine } from "./machine.ts";
 import type { Writer } from "./marks.ts";
 
 // canvas.screenshot (rules 7 to 9): a composed page of the drawing and its
 // cards, or one card's own page, pictured and written to the deck.
 
 export type ShotArgs = { of?: Of; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark"; live?: boolean; canvas?: string };
-
-const decoder = new TextDecoder();
-const extOf = (format: string) => (format === "jpeg" ? "jpg" : format);
-
 export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
 
 // Keeping the picture in the deck.
@@ -24,15 +20,23 @@ export async function screenshot(ctx: Context, m: Machine, args: ShotArgs, now =
 	const { canvas, card } = taken;
 	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
 	if (card && !taken.live) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
-	if (args.live === false) ctx.note("Every picture here is the browser's; the engine's native tool is not used yet.");
 	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
 }
+
+const extOf = (format: string) => (format === "jpeg" ? "jpg" : format);
 
 /** Where a picture is kept: to, else exports/screenshots/<canvas>-<time>.<ext>. */
 export function shotPath(canvas: string, format: string, to: string | undefined, now: number): string {
 	if (to) return toDeckPath(to);
 	const stamp = new Date(now).toISOString().replace(/[:.]/g, "-");
 	return toDeckPath(`exports/screenshots/${canvas.replace(/[^\w-]+/g, "-")}-${stamp}.${extOf(format)}`);
+}
+
+/** Writes bytes to a deck path as the caller, answering the path. */
+export async function keep(ctx: Context, path: string, bytes: Bytes): Promise<string> {
+	const at = toDeckPath(path);
+	await ctx.deck.write(at, bytes, ctx.caller);
+	return at;
 }
 
 // Taking it: a card as a screen has it, a card's own page, or the composed drawing.
@@ -43,7 +47,7 @@ export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Ta
 	const card = isCard(args.of) && args.format !== "pdf" ? cardPath(args.of) : undefined;
 	if (card) {
 		const seen = await seenCard(ctx, card, canvas);
-		const on = seen ? ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card) : undefined;
+		const on = seen ? placedOn(ctx, canvas, card) : undefined;
 		if (seen) return { bytes: seen.bytes, size: sizeOf(seen.bytes, on?.box), ...(on?.box ? { box: on.box } : {}), canvas, card: true, live: true, how: seen.how };
 	}
 	const taken = card ? await cardShot(ctx, m, card, canvas, args) : await canvasShot(ctx, m, canvas, args);
@@ -51,6 +55,11 @@ export async function take(ctx: Context, m: Machine, args: ShotArgs): Promise<Ta
 }
 
 const isCard = (of: Of): of is string => typeof of === "string" && /\/cards\//.test(of);
+
+/** The card's item on the canvas, when it is there. */
+function placedOn(ctx: Context, canvas: string, card: string): Item | undefined {
+	return ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card);
+}
 
 type Seen = { how: string; data: string; mime: string };
 
@@ -75,7 +84,7 @@ function sizeOf(bytes: Bytes, box: S.Box | undefined): S.Size {
 
 /** One card's own page at its width on the canvas, or 1000 when it is not there. */
 async function cardShot(ctx: Context, m: Machine, card: string, canvas: string, args: ShotArgs): Promise<Taken> {
-	const on = ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card);
+	const on = placedOn(ctx, canvas, card);
 	const width = on?.box ? Math.round(on.box.x2 - on.box.x1) : 1000;
 	const tall = on?.box ? Math.round(on.box.y2 - on.box.y1) : 800;
 	const factor = factorFor(width, tall, args.scale);
@@ -103,16 +112,10 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 	const writer = await writerOf(ctx, canvas);
 	const text = await drawingText(ctx, canvas);
 	const made = compose(text, canvas, args.of, { cardUrl, ...(writer ? { writer } : {}), ...(args.scale ? { scale: args.scale } : {}), ...(args.scheme ? { scheme: args.scheme } : {}) });
-	const native = !args.live && args.format !== "pdf" ? m.native?.() : undefined;
-	if (native) {
-		const scheme = args.scheme ?? "light";
-		const cardPictureOf = (card: string, px: number) => cardPicture(ctx, m, card, px, scheme, true);
-		const drawn = await drawNatively(ctx, native, { canvas, text, box: made.box, factor: made.factor, scheme, format: args.format === "jpeg" ? "jpeg" : "png", ...(writer ? { writer } : {}), cardPicture: cardPictureOf });
-		if ("bytes" in drawn) {
-			for (const pass of passes) pass.done();
-			return { bytes: drawn.bytes, size: { w: Math.round(made.w * made.factor), h: Math.round(made.h * made.factor) }, box: made.box, how: "native" };
-		}
-		ctx.note(`Drawn in the browser: ${drawn.why}.`);
+	const natively = await tryNatively(ctx, m, canvas, args, { text, made, writer });
+	if (natively) {
+		for (const pass of passes) pass.done();
+		return natively;
 	}
 	const tab = await m.browser.page({ width: made.w, height: made.h, scale: made.factor, scheme: args.scheme ?? "light" });
 	try {
@@ -126,6 +129,19 @@ export async function canvasShot(ctx: Context, m: Machine, canvas: string, args:
 	}
 }
 
+/** The composed box drawn by the engine's native tool; undefined, with a note, when the browser must. */
+async function tryNatively(ctx: Context, m: Machine, canvas: string, args: ShotArgs, drawing: { text: string; made: Composed; writer: Writer | undefined }): Promise<Taken | undefined> {
+	const native = !args.live && args.format !== "pdf" ? m.native?.() : undefined;
+	if (!native) return undefined;
+	const { text, made, writer } = drawing;
+	const scheme = args.scheme ?? "light";
+	const cardPictureOf = (card: string, px: number) => cardPicture(ctx, m, card, px, scheme, true);
+	const drawn = await drawNatively(ctx, native, { canvas, text, box: made.box, factor: made.factor, scheme, format: args.format === "jpeg" ? "jpeg" : "png", ...(writer ? { writer } : {}), cardPicture: cardPictureOf });
+	if ("bytes" in drawn) return { bytes: drawn.bytes, size: { w: Math.round(made.w * made.factor), h: Math.round(made.h * made.factor) }, box: made.box, how: "native" };
+	ctx.note(`Drawn in the browser: ${drawn.why}.`);
+	return undefined;
+}
+
 // Reading the drawing.
 /** The agent that last wrote the drawing, as its placeholder frames are marked; none for the person. */
 async function writerOf(ctx: Context, canvas: string): Promise<Writer | undefined> {
@@ -134,6 +150,8 @@ async function writerOf(ctx: Context, canvas: string): Promise<Writer | undefine
 	const agent = await ctx.call<{ name?: string; color?: string }>("agent.get", { agent: by }).catch(() => undefined);
 	return agent?.color ? { color: agent.color, ...(agent.name ? { name: agent.name } : {}) } : undefined;
 }
+
+const decoder = new TextDecoder();
 
 async function drawingText(ctx: Context, canvas: string): Promise<string> {
 	try {

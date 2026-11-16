@@ -1,7 +1,8 @@
 import { Refused } from "../../protocol/index.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Context, Store } from "../kernel/index.ts";
-import { pipeTo, send, withoutPass } from "./proxy.ts";
+import type { Duplex } from "node:stream";
+import type { Context, SocketDoor, Store } from "../kernel/index.ts";
+import { pipeTo, send, upgradeTo, withoutPass } from "./proxy.ts";
 
 // Forwarded ports: kept in the store, reached at /node/ and /rnode/. Rule 11.
 
@@ -64,4 +65,12 @@ export async function serveForward(ctx: Context, req: IncomingMessage, res: Serv
 	if (!target) return text(404, "A forwarded port's address is /node/<host>/<port>/ or /rnode/<host>/<port>/.");
 	if (!(await forwards(ctx.store)).some((one) => one.port === target.port)) return text(404, `Port ${target.port} is not forwarded; port.open forwards it.`);
 	return pipeTo(req, res, target.port, withoutPass(target.path, url.search), "");
+}
+
+/** A WebSocket to a forwarded port, its pass in the query; refused before it opens. */
+export function upgradeForward(req: IncomingMessage, socket: Duplex, head: Buffer, door: SocketDoor): void {
+	const url = new URL(req.url ?? "/", "http://decks.local");
+	const target = forwardTarget(url.pathname);
+	if (!target || !door.resolve(url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+	upgradeTo(req, socket, head, target.port, target.path, "");
 }

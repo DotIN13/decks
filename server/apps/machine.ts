@@ -7,12 +7,6 @@ import { dirname, join, resolve, sep } from "node:path";
 // Where an app builds and runs on this machine (its copy, or its folder outside the deck): its
 // files, its commands and its processes. The feature's only module on node:fs; it never writes the deck.
 
-const SECRET = /^(?:ANTHROPIC_|CLAUDE_|OPENAI_|GEMINI_|AWS_)|^(?:GOOGLE_API_KEY|GH_TOKEN|GITHUB_TOKEN|DECKS_STUDIO_KEY)$|_(?:TOKEN|SECRET|API_KEY|KEY|PASSWORD)$/i;
-const DECKS_OWN = /^DECKS_/;
-
-/** Whether an environment variable's name says it holds a secret an app is not given. */
-export const secretEnv = (name: string): boolean => SECRET.test(name) || DECKS_OWN.test(name);
-
 export type Output = (text: string) => void;
 
 export class Machine {
@@ -146,6 +140,13 @@ export class Machine {
 		});
 	}
 }
+
+// Its processes, and what they inherit
+const SECRET = /^(?:ANTHROPIC_|CLAUDE_|OPENAI_|GEMINI_|AWS_)|^(?:GOOGLE_API_KEY|GH_TOKEN|GITHUB_TOKEN|DECKS_STUDIO_KEY)$|_(?:TOKEN|SECRET|API_KEY|KEY|PASSWORD)$/i;
+const DECKS_OWN = /^DECKS_/;
+
+/** Whether an environment variable's name says it holds a secret an app is not given. */
+export const secretEnv = (name: string): boolean => SECRET.test(name) || DECKS_OWN.test(name);
 
 /** Stop a process and its whole group: TERM, then KILL after 3 s. */
 export function kill(child: ChildProcess): void {

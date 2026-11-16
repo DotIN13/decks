@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { layout, Refused, type Caller } from "../../protocol/index.ts";
-import { toDeckPath, type Bytes, type Context, type DeckPath, type Item, type Kernel } from "../kernel/index.ts";
+import { Refused, type Caller } from "../../protocol/index.ts";
+import type { Kernel } from "../kernel/index.ts";
 import type { Browser } from "./browser.ts";
 import { Native, nativeBinary } from "./native.ts";
 
 // What the pictures' calls need beyond ctx (rule 2): the browser, the server's
-// own address, a pass for a page and the native tool; then the card lookups they share.
+// own address, a pass for a page and the native tool.
 
 export interface Machine {
 	browser: Browser;
@@ -44,28 +44,4 @@ export function machine(browser: Browser, origin: () => string | undefined, kern
 			return { url: `${known()}/files/${card.split("/").map(encodeURIComponent).join("/")}?pass=${encodeURIComponent(token)}`, done: () => k.callers.revoke(who.id) };
 		},
 	};
-}
-
-/** A card named by its folder or its index.html, as its index.html. */
-export function cardPath(raw: string): DeckPath {
-	const trimmed = raw.replace(/\/+$/, "");
-	const index = /\/index\.html$/i.test(trimmed) ? trimmed : `${trimmed}/index.html`;
-	if (!layout.isCardPath(index)) throw new Refused("invalid", `${raw} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
-	return toDeckPath(index);
-}
-
-/** The card item for a path on a canvas, or a refusal that says how to put it there. */
-export function placedCard(ctx: Context, card: string, canvas: string): Item & { id: string; box: { x1: number; y1: number; x2: number; y2: number } } {
-	const found = ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card);
-	if (!found || typeof found.id !== "string" || !found.box) {
-		throw new Refused("invalid", `${card} is not on the canvas ${canvas}, so there is no width to fit it at.`, "item.insert");
-	}
-	return found as Item & { id: string; box: { x1: number; y1: number; x2: number; y2: number } };
-}
-
-/** Writes bytes to a deck path as the caller, answering the path. */
-export async function keep(ctx: Context, path: string, bytes: Bytes): Promise<string> {
-	const at = toDeckPath(path);
-	await ctx.deck.write(at, bytes, ctx.caller);
-	return at;
 }

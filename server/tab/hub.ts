@@ -184,12 +184,6 @@ export class TabHub {
 	}
 }
 
-export function labelOf(target: Target): string {
-	if (typeof target === "string") return target;
-	if ("ref" in target) return target.ref;
-	return target.nth === undefined ? target.name : `${target.name} (${target.nth})`;
-}
-
 function same(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
 	let diff = 0;

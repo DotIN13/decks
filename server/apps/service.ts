@@ -69,17 +69,6 @@ export class Apps {
 	}
 
 	// Building and running
-	/** Copy the source into the running copy, writing only what differs. Rule 2. */
-	async sync(name: string): Promise<number> {
-		let wrote = 0;
-		if (this.machine.isOutside(name)) return 0;
-		for (const file of await sourceFiles(this.deck, name)) {
-			const bytes = await this.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`));
-			if (await this.machine.put(name, file.path, bytes)) wrote += 1;
-		}
-		return wrote;
-	}
-
 	/** Install and build as the manifest says. A second call joins the first. */
 	build(name: string): Promise<boolean> {
 		return this.job(name, async () => this.runBuild(name, await this.manifest(name)));
@@ -129,21 +118,6 @@ export class Apps {
 		return false;
 	}
 
-	private async needsInstall(name: string): Promise<boolean> {
-		const bytes = await this.machine.read(name, "package.json");
-		if (!bytes) return false;
-		try {
-			const pkg = JSON.parse(new TextDecoder().decode(bytes)) as { dependencies?: object; devDependencies?: object };
-			return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).length > 0;
-		} catch {
-			return true;
-		}
-	}
-
-	private env(name: string, extra: Record<string, string> = {}): Record<string, string> {
-		return { BASE_PATH: `/app/${name}`, DECKS_APP: name, ...(this.options.env?.(name) ?? {}), ...extra };
-	}
-
 	private async runBuild(name: string, manifest: Manifest): Promise<boolean> {
 		const t0 = this.clock();
 		if (manifest.source && !(await this.machine.look(manifest.source.path)).exists) {
@@ -170,6 +144,32 @@ export class Apps {
 		this.set(name, { status, at: this.clock(), error: undefined });
 		out(`built in ${((this.clock() - t0) / 1000).toFixed(1)} s`);
 		return true;
+	}
+
+	/** Copy the source into the running copy, writing only what differs. Rule 2. */
+	async sync(name: string): Promise<number> {
+		let wrote = 0;
+		if (this.machine.isOutside(name)) return 0;
+		for (const file of await sourceFiles(this.deck, name)) {
+			const bytes = await this.deck.read(toDeckPath(`${folderOf(name)}/${file.path}`));
+			if (await this.machine.put(name, file.path, bytes)) wrote += 1;
+		}
+		return wrote;
+	}
+
+	private async needsInstall(name: string): Promise<boolean> {
+		const bytes = await this.machine.read(name, "package.json");
+		if (!bytes) return false;
+		try {
+			const pkg = JSON.parse(new TextDecoder().decode(bytes)) as { dependencies?: object; devDependencies?: object };
+			return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).length > 0;
+		} catch {
+			return true;
+		}
+	}
+
+	private env(name: string, extra: Record<string, string> = {}): Record<string, string> {
+		return { BASE_PATH: `/app/${name}`, DECKS_APP: name, ...(this.options.env?.(name) ?? {}), ...extra };
 	}
 
 	private async start(name: string, manifest: Manifest): Promise<boolean> {

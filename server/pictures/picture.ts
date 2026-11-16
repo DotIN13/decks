@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { layout, PICTURE_LADDER, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context, type DeckPath, type Route, type RouteAnswer } from "../kernel/index.ts";
 import { ASTC_TYPE, compress, encoder, LEVELS } from "./astc.ts";
-import { cardPath, type Machine } from "./machine.ts";
+import type { Machine } from "./machine.ts";
 
 // A card's picture for the canvas at /pictures/ (rule 11): its page at a rung of
 // the canvas's ladder, kept in the store, and compressed for the GPU when asked.
@@ -81,6 +81,14 @@ export function picturedPath(raw: string): DeckPath {
 	const trimmed = raw.replace(/\/+$/, "");
 	if (/\.html?$/i.test(trimmed) && !/\/index\.html$/i.test(trimmed)) return toDeckPath(trimmed);
 	return cardPath(trimmed);
+}
+
+/** A card named by its folder or its index.html, as its index.html. */
+export function cardPath(raw: string): DeckPath {
+	const trimmed = raw.replace(/\/+$/, "");
+	const index = /\/index\.html$/i.test(trimmed) ? trimmed : `${trimmed}/index.html`;
+	if (!layout.isCardPath(index)) throw new Refused("invalid", `${raw} is not a card: a card is canvases/<canvas>/cards/<name>/index.html.`, "card.list");
+	return toDeckPath(index);
 }
 
 /** The width a card asks for in its meta tag, else 1000. */

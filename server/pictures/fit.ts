@@ -1,6 +1,8 @@
+import { Refused } from "../../protocol/index.ts";
 import type { Context, Item } from "../kernel/index.ts";
 import type * as S from "./shapes.ts";
-import { cardPath, placedCard, type Machine } from "./machine.ts";
+import type { Machine } from "./machine.ts";
+import { cardPath } from "./picture.ts";
 import type { Extents } from "./extent.ts";
 import { noteOf, PRESS, READ, type Reading, type Views } from "./reading.ts";
 
@@ -58,3 +60,11 @@ export async function steady(read: () => Promise<Reading>, wait = (ms: number) =
 	return last;
 }
 
+/** The card item for a path on a canvas, or a refusal that says how to put it there. */
+export function placedCard(ctx: Context, card: string, canvas: string): Item & { id: string; box: { x1: number; y1: number; x2: number; y2: number } } {
+	const found = ctx.canvas(canvas).read().find((item) => item.type === "card" && item.card === card);
+	if (!found || typeof found.id !== "string" || !found.box) {
+		throw new Refused("invalid", `${card} is not on the canvas ${canvas}, so there is no width to fit it at.`, "item.insert");
+	}
+	return found as Item & { id: string; box: { x1: number; y1: number; x2: number; y2: number } };
+}

@@ -1,7 +1,7 @@
 import { calls, Refused, type Handled } from "../../protocol/index.ts";
 import { handleAll, toDeckPath, type Context } from "../kernel/types.ts";
 import { pngSize, type Target } from "./driver.ts";
-import { labelOf, type TabHub } from "./hub.ts";
+import type { TabHub } from "./hub.ts";
 
 // One short handler per tab call. Each action answers the tab as it now is.
 
@@ -79,4 +79,10 @@ export function tabCalls(hub: TabHub): Handled<Context>[] {
 function need(text: string | undefined, why: string): string {
 	if (!text?.trim()) throw new Refused("invalid", why, "tab.read");
 	return text.trim();
+}
+
+export function labelOf(target: Target): string {
+	if (typeof target === "string") return target;
+	if ("ref" in target) return target.ref;
+	return target.nth === undefined ? target.name : `${target.name} (${target.nth})`;
 }

@@ -12,13 +12,8 @@ import type { Writer } from "./marks.ts";
 // picture, and the fonts, pictures and icons it asks for. What it cannot be given makes the
 // call fall back to the browser, saying why.
 
-const FONT_CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
-const FONTS = process.env.DECKS_FONT_CACHE ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "decks", "fonts");
 const PAPER = { light: [245 / 255, 245 / 255, 245 / 255], dark: [30 / 255, 30 / 255, 30 / 255] };
 const ROUNDS = 6;
-/** What fontsource's latin subset draws; latin-ext adds the Latin letters beyond it. */
-const LATIN = /^[\u0000-ÿıŒœʻʼˆ˚˜̩̄̈ -⁯€™↑↓−∕﻿�]$/u;
-const LATIN_EXT = /^[Ā-ɏḀ-ỿ]$/u;
 
 export type NativeArgs = { canvas: string; text: string; box: Box; factor: number; scheme: "light" | "dark"; format: "png" | "jpeg"; writer?: Writer; cardPicture: (card: string, px: number) => Promise<Bytes> };
 
@@ -75,6 +70,11 @@ async function cardsIn(ctx: Context, args: NativeArgs, dir: string): Promise<{ x
 
 // The font files the words need.
 type FontFile = { key: string; family: string; urls: string[] };
+const FONT_CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
+const FONTS = process.env.DECKS_FONT_CACHE ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "decks", "fonts");
+/** What fontsource's latin subset draws; latin-ext adds the Latin letters beyond it. */
+const LATIN = /^[\u0000-ÿıŒœʻʼˆ˚˜̩̄̈ -⁯€™↑↓−∕﻿�]$/u;
+const LATIN_EXT = /^[Ā-ɏḀ-ỿ]$/u;
 
 const id = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
 

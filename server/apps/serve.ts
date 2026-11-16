@@ -1,8 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { toDeckPath, type Context, type RouteAnswer } from "../kernel/index.ts";
+import type { Duplex } from "node:stream";
+import { toDeckPath, type Context, type RouteAnswer, type SocketDoor } from "../kernel/index.ts";
 import { APP_NAME, folderOf, type Manifest } from "./manifest.ts";
 import { asksGuest, guestScript, guestSrc, withGuest } from "./guest.ts";
-import { pipeTo, send, withoutPass } from "./proxy.ts";
+import { pipeTo, send, upgradeTo, withoutPass } from "./proxy.ts";
 import type { Apps } from "./service.ts";
 
 // /app/<name>/<path>: a static app's files from the deck, a built app's from
@@ -41,6 +42,19 @@ export async function serveApp(ctx: Context, apps: Apps, req: IncomingMessage, r
 	if (!found.type.startsWith("text/html")) return send(res, found);
 	const page = typeof found.body === "string" ? found.body : new TextDecoder().decode(found.body);
 	send(res, { ...found, body: withGuest(page, guestSrc(at.inner)) });
+}
+
+/** A WebSocket to a server app, its pass in the path or the query; refused before it opens. */
+export function upgradeApp(apps: Apps, req: IncomingMessage, socket: Duplex, head: Buffer, door: SocketDoor): void {
+	const asked = new URL(req.url ?? "/", "http://decks.local");
+	const carried = passInPath(asked);
+	const url = carried ? new URL(`${carried.path}${asked.search}`, asked) : asked;
+	const at = parseAppPath(url.pathname);
+	if (!at || !door.resolve(carried?.token ?? url.searchParams.get("pass") ?? undefined)) return void socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+	void apps.manifest(at.name)
+		.then((manifest) => (manifest.kind === "server" ? serverTarget(apps, at.name, manifest, at.inner, url.search) : undefined))
+		.catch(() => undefined)
+		.then((target) => (target ? upgradeTo(req, socket, head, target.port, target.path, target.base) : socket.end("HTTP/1.1 404 Not Found\r\n\r\n")));
 }
 
 // The address
