@@ -32,8 +32,7 @@ HTML; `playwright` for the browser. No other feature.
    In a list a card's path names its item. A card's path alone is the card as a screen showing it
    has it now (view.screenshot), else its file; as a PDF, the card on its canvas.
 9. A screenshot goes to `to`, else `exports/screenshots/<canvas>-<time>.<ext>`; png, jpeg or pdf.
-10. `canvas.export` writes `@decks/pen`'s page of the items, to `to`, else `exports/<id>.html`.
-    A card in it is an iframe of its page, addressed from where the page is written.
+10. `canvas.export` writes pen's page of the items to `to`, else `exports/<id>.html`; a card an iframe.
 11. `GET /pictures/<path>?w=`: a JPEG of a card or other `.html` page at a rung of the canvas's
     ladder (192, 480, 800), never wider; kept by bytes, width and scheme; with `v`, cached a year;
     with `astc=1`, 4 x 4 ASTC blocks for the GPU. Only screenshots and exports draw cards wider.
@@ -52,7 +51,8 @@ HTML; `playwright` for the browser. No other feature.
     Latin, a font not fetched, a PDF, `live`, a lone card, maths, markdown cards or icons are the
     browser's; the notes say why.
 18. A canvas pass reaches only its canvas (reach.ts): a card or snapshot inside its folder, a shot
-    or tile of it, its cards' extents. Every other picture route refuses it.
+    or tile of it, its cards' extents. It writes a picture or page only into its canvas's exports/
+    or files/ (by default files/exports/), never over a file.
 
 ## Check
 

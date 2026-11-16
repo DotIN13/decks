@@ -44,5 +44,22 @@ function issuePass(kernel: Kernel, given: Given, name: string, canvas: string): 
 
 async function placed(ctx: Context, canvas: string, name: string): Promise<boolean> {
 	const items = await ctx.call<{ type: string; app?: string }[]>("item.list", { canvas, depth: 0 }).catch(() => []);
-	return items.some((item) => item.type === "app" && item.app === name);
+	return items.some((item) => item.type === "app" && item.app === name) && placedByWhole(ctx, canvas, name);
+}
+
+/** A pass's caller id: a frame's (asker~frame-n), an app's (name~canvas), a picture's, or a card's (its path). */
+const passId = (by: string) => by.includes("~") || by.includes("/") || by.startsWith("picture-");
+
+/** Whether the last change this server saw place the app on the canvas was a whole caller's (the person or an
+ *  agent), never a pass's. A placement from before the server's history counts as whole. */
+function placedByWhole(ctx: Context, canvas: string, name: string): boolean {
+	let by: string | undefined;
+	try {
+		for (const change of ctx.canvas(canvas).since(0)) {
+			for (const op of change.ops) if ((op.op === "insert" || op.op === "replace") && op.item.type === "app" && op.item.app === name) by = change.by;
+		}
+	} catch {
+		return true;
+	}
+	return by === undefined || !passId(by);
 }

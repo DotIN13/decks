@@ -2,6 +2,7 @@ import { parse, PenError, toHtml, type PenNode } from "@decks/pen";
 import type * as S from "./shapes.ts";
 import { layout, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type Context } from "../kernel/index.ts";
+import { writeTarget } from "./reach.ts";
 
 // canvas.export (rule 10): pen's page of the items, written to the deck, with
 // each card an iframe of its page addressed from where the page is written.
@@ -22,7 +23,7 @@ export async function exportItems(ctx: Context, args: ExportArgs): Promise<S.Fil
 	} catch {
 		throw new Refused("not_found", `There is no drawing at ${source}.`, args.frame ? "frame.list" : "canvas.list");
 	}
-	const page = toDeckPath(args.to ?? `exports/${(ids[0] ?? "page").replace(/[^\w-]+/g, "-")}.html`);
+	const page = await writeTarget(ctx, args.to, `exports/${(ids[0] ?? "page").replace(/[^\w-]+/g, "-")}.html`);
 	const html = pageOf(text, ids, { format: args.format ?? "html", canvas, page });
 	const rev = await ctx.deck.write(page, encoder.encode(html), ctx.caller);
 	return { path: page, size: encoder.encode(html).length, rev: rev.rev, by: rev.by, at: rev.at };

@@ -6,6 +6,7 @@ import { drawNatively } from "./native-shot.ts";
 import { cardPath, cardPicture } from "./picture.ts";
 import type { PictureTools } from "./tools.ts";
 import type { Writer } from "./marks.ts";
+import { reachOf, writeTarget } from "./reach.ts";
 
 // canvas.screenshot (rules 7 to 9): a composed page of the drawing and its
 // cards, or one card's own page, pictured and written to the deck.
@@ -16,9 +17,10 @@ export type Taken = { bytes: Bytes; size: S.Size; box?: S.Box; how?: string };
 // Keeping the picture in the deck.
 /** Take the picture, keep it in the deck, answer where and how big. */
 export async function screenshot(ctx: Context, m: PictureTools, args: ShotArgs, now = Date.now()): Promise<S.Screenshot> {
+	reachOf(ctx.scope, args.of);
 	const taken = await take(ctx, m, args);
 	const { canvas, card } = taken;
-	const file = await keep(ctx, shotPath(canvas, args.format ?? "png", args.to, now), taken.bytes);
+	const file = await keep(ctx, await writeTarget(ctx, args.to, shotPath(canvas, args.format ?? "png", undefined, now)), taken.bytes);
 	if (card && !taken.live) ctx.note("Only the card, from its file as the server loads it: the drawing round it is not in this picture, and nothing the person did on the page is.");
 	return { file, size: taken.size, ...(taken.box ? { box: taken.box } : {}), how: taken.how };
 }

@@ -326,3 +326,25 @@ test("rule 18: a canvas pass pictures only its own canvas and its cards", async 
 	await served.close();
 	await s.close();
 });
+
+test("rule 18: a pass writes a picture or a page only into its canvas's exports/ or files/, never over a file", async () => {
+	const fake = fakeBrowser({ h: 1, words: 1 });
+	const s = await start(fake.browser);
+	await s.value("file.write", { path: "canvases/other/cards/x/index.html", text: "<title>X</title><p>x</p>" }, ann);
+	const served = await s.listen();
+	const pass = s.callers.issue({ kind: "person", id: "person~frame-8", name: "you" }, "canvas pass", { canvas: "work", calls: ["canvas.screenshot", "canvas.export"], until: Date.now() + 60_000 });
+	const call = async (name: string, args: Record<string, unknown>) => (await (await fetch(`${served.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify(args) })).json()) as { ok: boolean; value?: { file?: string; path?: string }; error?: { code: string } };
+	for (const to of ["assets/importmap.json", "canvases/other/cards/x/index.html", "canvases/work/canvas.pen", "canvases/work/cards/sales/index.html", "apps/x/server.js", "canvases/work/files/../../other/x.png"]) {
+		const got = await call("canvas.screenshot", { canvas: "work", to });
+		assert.equal(got.ok, false, `screenshot to ${to}`);
+	}
+	const kept = await call("canvas.screenshot", { canvas: "work", to: "canvases/work/exports/one.png" });
+	assert.equal(kept.value?.file, "canvases/work/exports/one.png");
+	assert.equal((await call("canvas.screenshot", { canvas: "work", to: "canvases/work/exports/one.png" })).error?.code, "conflict", "never over a file");
+	assert.match((await call("canvas.screenshot", { canvas: "work" })).value?.file ?? "", /^canvases\/work\/files\/exports\//, "with no to, its own files/exports/");
+	assert.equal((await call("canvas.screenshot", { canvas: "work", of: "canvases/other/cards/x/index.html" })).ok, false, "of another canvas's card");
+	assert.equal((await call("canvas.export", { canvas: "work", of: "n1", to: "assets/importmap.json" })).ok, false, "export over the import map");
+	assert.equal((await call("canvas.export", { canvas: "work", of: "n1" })).value?.path, "canvases/work/files/exports/n1.html");
+	await served.close();
+	await s.close();
+});
