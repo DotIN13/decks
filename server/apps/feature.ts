@@ -28,8 +28,8 @@ export function appsFeature(options: AppsFeatureOptions = {}): Feature {
 		calls: [...appCalls(need, () => kernel!), ...portCalls(clock)],
 		items: [appKind],
 		routes: appRoutes(need, () => kernel!),
-		async upgrade(_deck, _version, parts) {
-			await upgradeApps(parts.old, parts.stores("apps"), (line) => console.log(`[upgrade] ${line}`));
+		async upgrade(deck, _version, parts) {
+			await upgradeApps(deck, parts.old, parts.stores("apps"), (line) => console.log(`[upgrade] ${line}`));
 		},
 		start(given) {
 			kernel = given;

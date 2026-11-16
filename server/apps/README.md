@@ -52,7 +52,7 @@ check.ts only. No other feature.
    home itself, a system folder or under a hidden one; a new app's folder must be missing or empty.
 16. A source folder not on this machine makes the app `missing`; app.clone with `to` takes it again.
 17. app.move copies the source to the folder and keeps only app.json in the deck, with source.
-18. Opening a deck from before keeps its `.decks/ports.json` and app logs; nothing is overwritten.
+18. Opening a deck from before keeps its `.decks/ports.json` and its apps' logs; none is overwritten.
 
 ## Check
 
