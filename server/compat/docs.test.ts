@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
-import { docChanged } from "./docs.ts";
+import { docChanged, docCompiled } from "./docs.ts";
 
 type Said = Record<string, unknown>;
 
@@ -47,7 +47,7 @@ test("a page opens a document, types into it, and another page on it hears the w
 	assert.deepEqual([changed.path, changed.client, changed.batch, changed.splices], [path, "page-a", "a1", [{ at: 5, before: "", text: ", world" }]]);
 	b.send({ type: "doc.versions", path });
 	assert.ok(Array.isArray((await b.next("doc.versions")).versions));
-	a.send({ type: "doc.compile", path, client: "page-a" });
+	a.send({ type: "doc.gstyle", path, client: "page-a", requests: [] });
 	assert.match(String((await a.next("harness.notice")).text), /not on this server yet/);
 	for (const line of [a, b]) line.close();
 	await doors.close();
@@ -76,4 +76,27 @@ test("file.changed is told only for an open document's words or review, with the
 	const record = { id: "c1", by: "agent", at: 1, from: "a", to: "b", splices: [] };
 	assert.deepEqual(docChanged({ ids: ["d.md"], part: "words", base: 1, rev: 2, splices: [{ at: 0, before: "", text: "x" }], by: "agent", record }, open), { type: "doc.changed", path: "d.md", base: 1, rev: 2, splices: [{ at: 0, before: "", text: "x" }], by: "agent", change: record });
 	assert.deepEqual(docChanged({ ids: ["d.md"], part: "review", base: 2, rev: 3, by: "person", change: "c1" }, open)?.settled, ["c1"]);
+});
+
+test("a typesetting is told to the pages on its document, its PDF and errors as today's doc.compiled", () => {
+	const open = new Set(["p.tex"]);
+	assert.equal(docCompiled({ ids: ["other.tex"], ok: true }, open), undefined);
+	assert.deepEqual(docCompiled({ ids: ["p.tex"], by: "a", rev: 3, ok: true, pdf: "p.pdf", errors: [], at: 9, ms: 120 }, open), { type: "doc.compiled", path: "p.tex", ok: true, pdf: "p.pdf", errors: [], at: 9, ms: 120 });
+});
+
+test("a git or compile the server refuses is answered to the page that asked", async () => {
+	const server = await testServer({ features: features(), deck: { "canvases/plan/canvas.pen": '{"version":"2.14","children":[]}', "canvases/plan/files/p.tex": "x" } });
+	const doors = await server.listen(0);
+	const line = openLine(doors.url);
+	line.send({ type: "line.hello", token: doors.token });
+	await line.next("line.hello");
+	line.send({ type: "doc.git", path: "canvases/plan/nowhere.tex", client: "page", action: "pull" });
+	const repo = await line.next("doc.repo");
+	assert.deepEqual([repo.action, repo.ok, typeof repo.message], ["pull", false, "string"]);
+	line.send({ type: "doc.compile", path: "canvases/plan/nowhere.tex", client: "page" });
+	const compiled = await line.next("doc.compiled");
+	assert.deepEqual([compiled.ok, compiled.errors, typeof compiled.error], [false, [], "string"]);
+	line.close();
+	await doors.close();
+	await server.close();
 });

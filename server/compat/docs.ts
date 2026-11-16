@@ -13,8 +13,8 @@ export type DocLine = {
 	client: ReturnType<SocketDoor["client"]>;
 };
 
-/** The messages the new server has no call for yet: LaTeX, git, Google Docs. */
-const NOT_YET = new Set(["doc.compile", "doc.git", "doc.gstyle", "doc.gcomment"]);
+/** The messages the new server has no call for yet: Google Docs. */
+const NOT_YET = new Set(["doc.gstyle", "doc.gcomment"]);
 
 /** One document message from the page, answered as today's server answered it. */
 export async function docHeard(L: DocLine, message: Said): Promise<void> {
@@ -39,6 +39,8 @@ export async function docHeard(L: DocLine, message: Said): Promise<void> {
 		return L.send(got.ok ? { type: "doc.version", path, sha: message.sha, text: (got.value as { text: string }).text } : { type: "doc.version", path, sha: message.sha, error: got.error });
 	}
 	if (type === "doc.restore") return void (await call(L, "file.restore", { path, sha: message.sha }));
+	if (type === "doc.compile") return compile(L, path);
+	if (type === "doc.git") return git(L, path, String(message.action ?? "status"));
 	L.send({ type: "harness.notice", level: "warn", text: `The line does not know ${type}.` });
 }
 
@@ -61,11 +63,28 @@ async function patch(L: DocLine, message: Said, path: string, client: string): P
 	L.send({ type: "doc.patched", path, batch: message.batch, rev: done.rev, refused: done.refused, ...(done.text !== undefined ? { text: done.text } : {}) });
 }
 
-/** file.changed for a document this line has open, told as today's doc.changed; once per line. */
+/** Typeset: the result comes as file.compiled to every page on the document; a refusal, to this page now. */
+async function compile(L: DocLine, path: string): Promise<void> {
+	const got = await call(L, "file.compile", { path });
+	if (!got.ok) L.send({ type: "doc.compiled", path, ok: false, errors: [], at: Date.now(), ms: 0, error: got.error });
+}
+
+/** The document's git: status, or a pull or push, answered as today's doc.repo. */
+async function git(L: DocLine, path: string, action: string): Promise<void> {
+	const name = action === "pull" ? "file.pull" : action === "push" ? "file.push" : "file.repo";
+	const got = await call(L, name, { path });
+	if (!got.ok) return L.send({ type: "doc.repo", path, action, ok: false, message: got.error });
+	if (name === "file.repo") return L.send({ type: "doc.repo", path, action, ok: true, ...(got.value ? { status: got.value } : {}) });
+	const synced = got.value as { ok: boolean; message: string; status?: unknown };
+	L.send({ type: "doc.repo", path, action, ok: synced.ok, message: synced.message, ...(synced.status ? { status: synced.status } : {}) });
+}
+
+/** file.changed and file.compiled for a document this line has open, told as today's doc.changed and doc.compiled; once per line. */
 function hearChanges(L: DocLine): void {
 	if (!L.state.caller || L.state.watched.has("file.changed")) return;
-	const stop = L.door.subscribe({ caller: L.state.caller, client: L.client.id, events: ["file.changed"] }, (event) => {
-		const said = docChanged(event.payload, L.state.docs ?? new Set());
+	const stop = L.door.subscribe({ caller: L.state.caller, client: L.client.id, events: ["file.changed", "file.compiled"] }, (event) => {
+		const open = L.state.docs ?? new Set<string>();
+		const said = event.name === "file.compiled" ? docCompiled(event.payload, open) : docChanged(event.payload, open);
 		if (said) L.send(said);
 	});
 	L.state.watched.set("file.changed", stop);
@@ -91,6 +110,14 @@ export function docChanged(payload: Record<string, unknown>, open: ReadonlySet<s
 		...(payload.record ? { change: payload.record } : {}),
 		...(payload.settled || !words ? (typeof payload.change === "string" ? { settled: [payload.change] } : {}) : {}),
 	};
+}
+
+/** Today's doc.compiled for a file.compiled of a document this line has open. */
+export function docCompiled(payload: Record<string, unknown>, open: ReadonlySet<string>): Said | undefined {
+	const path = Array.isArray(payload.ids) ? String(payload.ids[0]) : undefined;
+	if (!path || !open.has(path)) return undefined;
+	const { ok, pdf, errors, at, ms, error } = payload;
+	return { type: "doc.compiled", path, ok, ...(pdf !== undefined ? { pdf } : {}), errors: errors ?? [], at, ms, ...(error !== undefined ? { error } : {}) };
 }
 
 /** A file call as the line's caller: the value, or the refusal's words. */
