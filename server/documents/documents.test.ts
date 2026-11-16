@@ -101,7 +101,7 @@ test("rule 10: without Google, the google calls answer unavailable", async () =>
 
 test("a canvas pass hears a document's file events when its canvas shows that document, though the file is in docs/", async () => {
 	const drawing = { a: [{ type: "document", id: "d", path: "docs/notes.md" }], b: [] } as Record<string, Item[]>;
-	const canvases = defineFeature({ name: "canvases", calls: [], canvases: () => ({ doc: (name) => ({ read: () => drawing[name] ?? [], apply: () => ({ items: [], rev: 0 }), since: () => [] }) as never, name: (raw) => raw }) });
+	const canvases = defineFeature({ name: "canvases", calls: [], start: (kernel) => kernel.places((canvas, path) => (drawing[canvas] ?? []).some((item) => item.path === path)) });
 	const s = await testServer({ features: [canvases, documents()], deck: seed });
 	const pass = s.callers.resolve(s.callers.issue({ ...callers.person, id: "person~frame-1" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 }))!;
 	const other = s.callers.resolve(s.callers.issue({ ...callers.person, id: "person~frame-2" }, "canvas pass", { canvas: "b", until: Date.now() + 60_000 }))!;
