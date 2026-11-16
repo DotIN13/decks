@@ -58,7 +58,7 @@ export type Heard =
 
 /**
  * `api` is the harness's compat address as the frame reaches it (`http://host:4329/compat`); `files`, the
- * canvas folder's address on the pass, which the drawing's relative paths are read against.
+ * deck's address on the pass, whose canvas folder the drawing's relative paths are read in.
  */
 export function createBackend(api: string, canvas: string, firstToken: string, files: string): Backend {
 	let token = firstToken;
@@ -104,7 +104,8 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	life().addEventListener("abort", () => (opened?.stop(), socket?.stop()), { once: true });
 
 	return {
-		drawing: () => readDrawing(sock(), canvas, files),
+		// Its relative paths are read in the canvas's folder on the pass, as compat's drawing gave it.
+		drawing: () => readDrawing(sock(), canvas, `${files}canvases/${canvas}/`),
 
 		follow(hear, since) {
 			sinceOf = since;
