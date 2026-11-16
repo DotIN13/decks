@@ -41,21 +41,21 @@ createServer((req, res) => {
 		const base = { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: request.model ?? "fake-1" };
 		if (request.stream) {
 			void (async () => {
-			res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-			await sleep(THINK_MS);
-			sse(res, { ...base, choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] });
-			if (answer.tool_calls) {
-				answer.tool_calls.forEach((tc, i) => sse(res, { ...base, choices: [{ index: 0, delta: { tool_calls: [{ index: i, id: tc.id, type: "function", function: tc.function }] }, finish_reason: null }] }));
-				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
-			} else {
-				for (const word of answer.text.split(/(?<= )/)) {
-					sse(res, { ...base, choices: [{ index: 0, delta: { content: word }, finish_reason: null }] });
-					await sleep(WORD_MS);
+				res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+				await sleep(THINK_MS);
+				sse(res, { ...base, choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] });
+				if (answer.tool_calls) {
+					answer.tool_calls.forEach((tc, i) => sse(res, { ...base, choices: [{ index: 0, delta: { tool_calls: [{ index: i, id: tc.id, type: "function", function: tc.function }] }, finish_reason: null }] }));
+					sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
+				} else {
+					for (const word of answer.text.split(/(?<= )/)) {
+						sse(res, { ...base, choices: [{ index: 0, delta: { content: word }, finish_reason: null }] });
+						await sleep(WORD_MS);
+					}
+					sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
 				}
-				sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 } });
-			}
-			res.write("data: [DONE]\n\n");
-			res.end();
+				res.write("data: [DONE]\n\n");
+				res.end();
 			})();
 			return;
 		}

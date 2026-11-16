@@ -61,6 +61,24 @@ test("strays names a doc comment off its item, an empty heading and a path no fi
 	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file, as server/a/gone.ts said.\nexport function add() {}\n" }), ["server/a/x.ts: names a path no file has"]);
 	assert.deepEqual(await breaks("strays", { "server/a/x.ts": "// A file, as server/a/y.ts and canvases/plan/canvas.json say.\nexport function add() {}\n", "server/a/y.ts": "// Y.\nexport const y = 1;\n" }), []);
 });
+test("indent names a body left at or above the line that opened its block, and nothing else", async () => {
+	const { shallowLines } = await import("./indent.mjs");
+	assert.deepEqual(shallowLines("function f() {\nreturn 1;\n}\n"), [2], "a body at column 0");
+	assert.deepEqual(shallowLines("\tconst g = () => {\n\tgo();\n\t};\n"), [2], "a body level with its opener");
+	const fine = [
+		"export function f(x) {",
+		"\tconst re = /['{]/g;",
+		"\tconst s = \"{ not a block\";",
+		"\tconst t = `${x} and { too`;",
+		"\t/* { */",
+		"\treturn (",
+		"\t\t<a href={x}>it's </a>",
+		"\t);",
+		"}",
+	].join("\n");
+	assert.deepEqual(shallowLines(fine), [], "regex, string, template, comment, JSX and an apostrophe are read through");
+	assert.deepEqual(await breaks("indent", { "server/a/x.ts": "function f() {\nreturn 1;\n}\n" }), ["server/a/x.ts: line shallower than its block"]);
+});
 test("imports names a folder importing against the table", () =>
 	plantedFails("imports", { "protocol/a.ts": 'import x from "node:fs";\n' }, { "protocol/a.ts": 'import x from "./b.ts";\n' }, "protocol may not import node:fs"));
 test("imports names server importing the harness", () =>

@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { MOVED, ROOT, adoptBaseline, compare, context, readBaseline, writeBaseline } from "./lib.mjs";
 import { rekeyed, splitKeys, stagedRenames, stagedSplit, units } from "./rekey.mjs";
 
-export const GATES = ["size", "names", "imports", "calls", "readme", "comments", "commits", "parts", "state", "built", "lanes", "agents-md", "legacy", "strays"];
+export const GATES = ["size", "names", "imports", "calls", "readme", "comments", "commits", "parts", "state", "built", "lanes", "agents-md", "legacy", "strays", "indent"];
 
 export async function runGates({ root = ROOT, only, shrink = false, init = false, adopt, quiet = false } = {}) {
 	if (adopt && !MOVED.includes(adopt)) throw new Error(`--adopt takes a moved folder: ${MOVED.join(", ")}`);
