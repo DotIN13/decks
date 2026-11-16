@@ -1,7 +1,6 @@
-// The editor's page written back as the card's markdown, block by block, and the
-// selection helpers that find a block and put the caret after a node.
+// The editor's page written back as the card's markdown, block by block.
 import { EMOJI_OF, FACE_ALIAS, type Colour } from "../card-syntax.ts";
-import { ZW, h, sel } from "./model.ts";
+import { h } from "./model.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 // The page written back as markdown
@@ -178,19 +177,3 @@ export const wrapNode = (n: Node) => {
 	holder.append(n.cloneNode(true));
 	return holder;
 };
-
-// Finding a block and placing the caret
-export const topOf = (cx: EditorCtx, n: Node | null): HTMLElement | undefined => {
-	while (n && n.parentNode !== cx.ed) n = n.parentNode;
-	return n instanceof HTMLElement ? n : undefined;
-};
-
-export function placeAfter(node: Node) {
-	const z = document.createTextNode(ZW);
-	node.parentNode!.insertBefore(z, node.nextSibling);
-	const r = document.createRange();
-	r.setStart(z, 1);
-	r.collapse(true);
-	sel().removeAllRanges();
-	sel().addRange(r);
-}

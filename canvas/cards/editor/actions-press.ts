@@ -1,10 +1,14 @@
 // Presses, keys and drags: a piece dragged between lines or into a sentence, the keys
-// the editor answers itself, and the effect that wires the document's presses on mount.
+// the editor answers itself, and what wires the document's presses when the editor mounts.
 import { onCleanup, onMount } from "solid-js";
-import { type Style, ZW, caretInto, h, sel } from "./model.ts";
+import { ZW, h } from "./model.ts";
+import { caretInto, sel } from "./selection.ts";
+import type { Style } from "./tables.ts";
 
-import { SELECTION_PAUSE_MS } from "./view.tsx";
 import type { EditorCtx } from "./ctx.ts";
+
+/** How long a selection the keyboard grows must rest before the bar shows (`EditorCtx.selecting`). */
+const SELECTION_PAUSE_MS = 300;
 
 /** What the editor does once it is on the page: reads the card in, watches it, and wires the document's presses. */
 export function mountEditor(cx: EditorCtx): void {
@@ -152,11 +156,6 @@ function placeCaret(cx: EditorCtx): void {
 }
 
 // Dragging a piece
-export const local = (cx: EditorCtx, x: number, y: number) => {
-	const w = cx.wrap.getBoundingClientRect();
-	return { x: (x - w.left) / cx.props.zoom, y: (y - w.top) / cx.props.zoom };
-};
-
 export function onPointerDown(cx: EditorCtx, event: PointerEvent) {
 	// A press on a suggestion's buttons or a check keeps the caret where it is, a finger's too: a
 	// finger's press would otherwise take the focus away, and that saves the card and closes it.

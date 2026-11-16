@@ -1,5 +1,3 @@
-// Typing into an item's words on the canvas: opening a text, a label or a card,
-// the typed words drawn as they grow, and saving or taking them back.
 /**
  * Typing on the stage: a drawn item's words, a shape's, or a card's markdown, typed in an editor
  * laid over the item (`TextEditor`, the `.pen-text`), set exactly as the canvas sets them so the
@@ -24,7 +22,7 @@ import type { Pt, Rect } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
 import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
-import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
+import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
 import { openInTab, pictureAddress } from "../../host/host.ts";
 
@@ -67,20 +65,15 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		return now ? (host.scene.item(now.id)?.box ?? now.box) : undefined;
 	});
 	/*
-	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
-	 * server's answer has been drawn shows the old words for a moment, and then the new.
+	 * The canvas leaves the words out while they are typed over (`muteText`); the editor going gives
+	 * them back to it.
 	 */
-	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
 	const unmuteNow = () => {
-		if (unmute) clearTimeout(unmute.timer);
-		unmute = undefined;
 		host.engine.muteText(undefined);
 		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
 		ghost.markWhenDrawn();
 	};
-	const { commitPenText, cancel } = committing({ open, setOpen, host, look, typed, ghost, pictures, unmuteNow, clearUnmute: () => unmute && clearTimeout(unmute.timer) });
-	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
-	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
+	const { commitPenText, cancel } = committing({ open, setOpen, host, look, typed, ghost, pictures, unmuteNow });
 
 	return {
 		/** The words open for typing, if any. */
@@ -100,10 +93,8 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		commit: commitPenText,
 		cancel,
 		base: () => host.pen()?.base ?? "",
-		/** The engine laid the drawing out: words saved and drawn are the canvas's to draw again. */
-		drawn: () => {
-			if (unmute && wordsOf(host.scene.item(unmute.id)?.node) === unmute.value) unmuteNow();
-		},
+		/** The engine laid the drawing out: nothing waits on it now, the words given back as the editor goes. */
+		drawn: () => {},
 		/** The sheet put a frame on screen: the still copy goes once the words are in one. */
 		presented: ghost.presented,
 	};
@@ -205,15 +196,44 @@ function opening(editor: Editor, host: TextHost, look: Look) {
 	return { openShapeWords, openPenText, openFileOf, openCardAt };
 }
 
-/** The words being typed, drawn into a copy of the drawing once a frame, so what holds them grows as they are typed. */
+/** Pictures' own sizes, measured as they arrive, so a picture put in a card keeps its shape. */
+function pictureSizer(host: TextHost) {
+	const pictureSizes = new Map<string, { w: number; h: number } | null>();
+	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
+	const measurePictures = async (markdown: string) => {
+		const urls = pictureUrls(markdown).filter((url) => !pictureSizes.has(url));
+		await Promise.all(
+			urls.map(
+				(url) =>
+					new Promise<void>((done) => {
+						const image = new Image();
+						const finish = (size: { w: number; h: number } | null) => {
+							pictureSizes.set(url, size);
+							done();
+						};
+						image.onload = () => finish(image.naturalWidth ? { w: image.naturalWidth, h: image.naturalHeight } : null);
+						image.onerror = () => finish(null);
+						setTimeout(() => finish(null), 1500);
+						try {
+							image.src = pictureAddress(url, new URL(host.pen()?.base || "/", location.origin).href);
+						} catch {
+							finish(null);
+						}
+					}),
+			),
+		);
+	};
+	return { pictureSize, measurePictures };
+}
+
+/**
+ * The drawing laid out with the words being typed, so what holds them grows as they are typed:
+ * a card round its title, a note round its words. A copy of the document with the one item's
+ * words changed, drawn in place of the real one until the server answers with the real edit.
+ * Once a frame at most.
+ */
 function typedPreview(host: TextHost, look: Look, pictureSize: (url: string) => { w: number; h: number } | undefined) {
 	const { doc, cardInner } = look;
-	/**
-	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
-	 * a card round its title, a note round its words. A copy of the document with the one item's
-	 * words changed, drawn in place of the real one until the server answers with the real edit.
-	 * Once a frame at most.
-	 */
 	let typedFrame: number | undefined;
 	let typedValue: { id: string; value: string } | undefined;
 	const previewTyped = (id: string, value: string) => {
@@ -222,21 +242,19 @@ function typedPreview(host: TextHost, look: Look, pictureSize: (url: string) => 
 	};
 	/** The typed words drawn now, not at the next frame: what putting the editor away draws in its place. */
 	const showTyped = () => {
-		{
-			if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-			typedFrame = undefined;
-			const current = doc();
-			if (!current || !typedValue) return;
-			const copy = structuredClone(current);
-			const found = indexOf(copy).get(typedValue.id);
-			if (!found) return;
-			if (isCard(found.node)) {
-				// The card grows as its blocks are typed: stand-in ids, swapped for real ones when it is saved.
-				let n = 0;
-				found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
-			} else found.node.content = typedValue.value;
-			host.engine.showDoc(copy, host.pen()?.base ?? "");
-		}
+		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
+		typedFrame = undefined;
+		const current = doc();
+		if (!current || !typedValue) return;
+		const copy = structuredClone(current);
+		const found = indexOf(copy).get(typedValue.id);
+		if (!found) return;
+		if (isCard(found.node)) {
+			// The card grows as its blocks are typed: stand-in ids, swapped for real ones when it is saved.
+			let n = 0;
+			found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
+		} else found.node.content = typedValue.value;
+		host.engine.showDoc(copy, host.pen()?.base ?? "");
 	};
 	/** Back to the document as the server has it, for an edit taken back with Escape. */
 	const dropTyped = () => {
@@ -251,14 +269,13 @@ function typedPreview(host: TextHost, look: Look, pictureSize: (url: string) => 
 	return { previewTyped, showTyped, dropTyped, setTyped: (value: { id: string; value: string }) => void (typedValue = value) };
 }
 
-/** A still copy of the editor left where it was, until the canvas has a frame with the words in it. */
+/**
+ * A still copy of the editor, left where the editor was when the typing was put away, until the
+ * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
+ * the editor was taken away at once, and the canvas, which leaves the words out while they are
+ * the editor's, drew them only once the server's answer had been laid out.
+ */
 function stillCopy(host: TextHost) {
-	/*
-	 * A still copy of the editor, left where the editor was when the typing was put away, until the
-	 * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
-	 * the editor was taken away at once, and the canvas, which leaves the words out while they are
-	 * the editor's, drew them only once the server's answer had been laid out.
-	 */
 	let editorGhost: HTMLElement | undefined;
 	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`render/engine.ts`, `mark`). */
 	let ghostUntil: number | undefined;
@@ -316,7 +333,6 @@ type Committing = {
 	ghost: ReturnType<typeof stillCopy>;
 	pictures: ReturnType<typeof pictureSizer>;
 	unmuteNow: () => void;
-	clearUnmute: () => void;
 };
 
 /** Putting the typing away: the words saved as edits, or taken back with Escape. */
@@ -347,7 +363,6 @@ function committing(c: Committing) {
 				return dropTyped();
 		}
 		const session = now!;
-		c.clearUnmute();
 		/*
 		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
 		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It
@@ -390,36 +405,6 @@ function committing(c: Committing) {
 		if (ops.length) host.edit(ops);
 	};
 	return { commitPenText, cancel };
-}
-
-/** Pictures' own sizes, measured as they arrive, so a picture put in a card keeps its shape. */
-function pictureSizer(host: TextHost) {
-	const pictureSizes = new Map<string, { w: number; h: number } | null>();
-	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
-	const measurePictures = async (markdown: string) => {
-		const urls = pictureUrls(markdown).filter((url) => !pictureSizes.has(url));
-		await Promise.all(
-			urls.map(
-				(url) =>
-					new Promise<void>((done) => {
-						const image = new Image();
-						const finish = (size: { w: number; h: number } | null) => {
-							pictureSizes.set(url, size);
-							done();
-						};
-						image.onload = () => finish(image.naturalWidth ? { w: image.naturalWidth, h: image.naturalHeight } : null);
-						image.onerror = () => finish(null);
-						setTimeout(() => finish(null), 1500);
-						try {
-							image.src = pictureAddress(url, new URL(host.pen()?.base || "/", location.origin).href);
-						} catch {
-							finish(null);
-						}
-					}),
-			),
-		);
-	};
-	return { pictureSize, measurePictures };
 }
 
 /**

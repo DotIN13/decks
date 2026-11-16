@@ -1,5 +1,5 @@
-// What the card editor's page is made of: the pieces a card's markdown becomes,
-// the tables of styles and blocks, and cutting a styled run out of its block.
+// What the card editor's page is made of: the pieces a card's markdown becomes, and the
+// markdown read in as them, block by block.
 import { pageFont } from "../../look/look.ts";
 import { type Token, type Tokens } from "marked";
 import { CALLOUTS, cardMarked, sizedAlt, type WikiToken } from "../card-syntax.ts";
@@ -13,18 +13,6 @@ export const h = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<s
 	if (text !== undefined) el.textContent = text;
 	return el;
 };
-
-/** The page's selection: the caret, or the words selected. */
-export const sel = () => getSelection()!;
-
-/** The caret at the start of `el`, or all of it selected. */
-export function caretInto(el: Element, all: boolean) {
-	const r = document.createRange();
-	r.selectNodeContents(el);
-	if (!all) r.collapse(true);
-	sel().removeAllRanges();
-	sel().addRange(r);
-}
 
 /** An element taken out, its children left where it was. */
 export const unwrap = (n: Element) => n.replaceWith(...n.childNodes);
@@ -142,9 +130,8 @@ function quoteBlock(cx: EditorCtx, q: Tokens.Blockquote): HTMLElement | undefine
 	return el;
 }
 
-/** A table, typed into cell by cell. */
+/** A table, typed into cell by cell: Enter goes down a column, and past the last row adds one. */
 function tableBlock(cx: EditorCtx, tb: Tokens.Table): HTMLElement {
-	// Typed into cell by cell; Enter goes down a column, and past the last row adds one.
 	const el = h("table", { class: "pce-table", "data-align": tb.align.map((a) => a ?? "").join(",") });
 	const head = el.appendChild(h("thead")).appendChild(h("tr"));
 	for (const cell of tb.header) cx.inline(head.appendChild(h("th")), cell.tokens);
@@ -154,102 +141,4 @@ function tableBlock(cx: EditorCtx, tb: Tokens.Table): HTMLElement {
 		for (const cell of row) cx.inline(tr.appendChild(h("td")), cell.tokens);
 	}
 	return el;
-}
-
-// The tables of styles and blocks
-export const INLINE: Array<[RegExp, string]> = [
-	[/\*\*([^*​]+)\*\*$/, "strong"],
-	[/==([^=​]+)==$/, "mark"],
-	[/~~([^~​]+)~~$/, "s"],
-	[/`([^`​]+)`$/, "code"],
-	[/(?:^|[^*])\*([^*​]+)\*$/, "em"],
-	[/(?:^|[^_\w])_([^_​]+)_$/, "em"],
-];
-
-export const BLOCKS: Record<string, string> = { "# ": "h1", "## ": "h2", "### ": "h3", "> ": "blockquote", "- ": "ul", "* ": "ul", "1. ": "ol", "[] ": "check", "[ ] ": "check" };
-
-/*
- * A style over a selection, or taken off it: bold, italic, struck, code, a highlight, a colour.
- *
- * The browser cuts the selection into runs (`cut`): its highlight command splits a selection that
- * runs over several blocks, a heading and the paragraph under it, into one run per block, where
- * wrapping the range in one element put a heading inside a highlight. Each run is marked with a
- * colour no one would pick and then given the card's own element, so the browser's own bold, which
- * takes a heading for bold already and unbolds it, is never asked.
- */
-export const STYLES = {
-	bold: { selector: "strong, b", make: () => h("strong"), toggles: true },
-	italic: { selector: "em, i", make: () => h("em"), toggles: true },
-	strike: { selector: "s, strike, del", make: () => h("s"), toggles: true },
-	code: { selector: "code", make: () => h("code"), toggles: true },
-	hl: { selector: "mark", make: (v: string) => h("mark", v === "default" ? {} : { "data-c": v }), toggles: false },
-	fg: { selector: "span[data-fg]", make: (v: string) => h("span", { "data-fg": v }), toggles: false },
-	underline: { selector: "u", make: () => h("u"), toggles: true },
-	size: { selector: "span[data-size]", make: (v: string) => h("span", { "data-size": v }), toggles: false },
-	font: { selector: "span[data-font]", make: (v: string) => fontSpan(v), toggles: false },
-	link: { selector: "a[data-href]", make: (v: string) => h("a", { "data-href": v }), toggles: false },
-};
-
-export type Style = keyof typeof STYLES;
-export const CUT = "rgb(1, 2, 3)";
-export const BLOCK = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|TD|TH|PRE|UL|OL)$/;
-
-export const BLOCK_NAMES: Record<string, string> = { p: "Text", h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", quote: "Quote", code: "Code", ul: "Bullets", ol: "Numbers", check: "Checklist" };
-
-/** What the block the caret is in is, by the names the block menu uses. */
-export function blockKind(cx: EditorCtx): string {
-	const node = sel().anchorNode;
-	const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
-	const top = cx.topOf(el);
-	if (!top) return "p";
-	if (/^H[1-3]$/.test(top.tagName)) return top.tagName.toLowerCase();
-	if (top.tagName === "BLOCKQUOTE") return "quote";
-	if (top.tagName === "PRE") return "code";
-	if (top.tagName === "OL") return "ol";
-	if (top.tagName === "UL") return el?.closest("li")?.querySelector(":scope > .pce-check") ? "check" : "ul";
-	return "p";
-}
-
-// Cutting a styled run out of its block
-/** The selection as runs: plain spans, none of them across a block's edge. */
-export function cut(cx: EditorCtx): HTMLElement[] {
-	document.execCommand("styleWithCSS", false, "true");
-	document.execCommand("hiliteColor", false, CUT);
-	document.execCommand("styleWithCSS", false, "false");
-	return ([...cx.ed.querySelectorAll("*")] as HTMLElement[])
-		.filter((el) => el.style.backgroundColor === CUT)
-		.map((el) => {
-			el.style.removeProperty("background-color");
-			if (!el.getAttribute("style")) el.removeAttribute("style");
-			// The colour landed on a block, or on one of the card's own elements: the run is inside it.
-			if (el.tagName === "SPAN" && !el.attributes.length) return el;
-			const run = document.createElement("span");
-			run.append(...el.childNodes);
-			el.append(run);
-			return run;
-		})
-		.filter((run) => run.textContent);
-}
-
-/** Take `inner` out of `outer`, splitting `outer` round it: what was before and after it keeps `outer`. */
-export function splitAround(inner: Node, outer: HTMLElement) {
-	const before = document.createRange();
-	before.setStart(outer, 0);
-	before.setEndBefore(inner);
-	const after = document.createRange();
-	after.setStartAfter(inner);
-	after.setEnd(outer, outer.childNodes.length);
-	const head = before.extractContents();
-	const tail = after.extractContents();
-	if (head.textContent) {
-		const piece = outer.cloneNode(false) as HTMLElement;
-		piece.append(head);
-		outer.before(piece);
-	}
-	if (tail.textContent) {
-		const piece = outer.cloneNode(false) as HTMLElement;
-		piece.append(tail);
-		outer.after(piece);
-	}
-	unwrap(outer);
 }

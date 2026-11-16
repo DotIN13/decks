@@ -1,9 +1,3 @@
-// A card mounted in a closed shadow root of the canvas's page: its HTML cleaned when a
-// friend's, its parts drawn, its scripts handed the card, and what it may reach.
-import { deckFiles } from "@decks/protocol";
-import { readingOfCard } from "./card-reading.ts";
-import { freshAddress, passless } from "../host/host.ts";
-
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.
@@ -34,6 +28,10 @@ import { freshAddress, passless } from "../host/host.ts";
  * view and the time in the frame, the canvas's own calls by the harness, an agent's by the app's
  * page, which asks you before anything is sent to one, and nothing that reaches past the canvas.
  */
+import { deckFiles } from "@decks/protocol";
+import { readingOfCard } from "./card-reading.ts";
+import { freshAddress, passless } from "../host/host.ts";
+
 
 /** What a card's script is handed: its own root, and what the stage knows of it. */
 export interface CardContext {
@@ -96,7 +94,7 @@ export interface MountedCard {
 }
 
 /**
- * Put a card into `host`: its own closed root, card.css adopted, its HTML (cleaned first when it is
+ * Put a card into `host`: its own closed root, card.css first, its HTML (cleaned first when it is
  * a friend's), then each script it runs, called with the card. Answers at once; the scripts start as
  * they arrive.
  */
@@ -163,7 +161,12 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	};
 }
 
+/** A script the card runs: one of its own files (`src`), or its `n`th inline script, served beside the card. */
 type Script = { src?: string; n?: number };
+
+/** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
+const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
+const runs = (script: HTMLScriptElement) => RUNS.test(script.getAttribute("type") ?? "");
 
 /** The card's HTML parsed where nothing runs, its scripts taken out to run later, a friend's cleaned, in the body it shows in. */
 function cardBody(source: CardSource): { body: HTMLDivElement; scripts: Script[] } {
@@ -171,7 +174,7 @@ function cardBody(source: CardSource): { body: HTMLDivElement; scripts: Script[]
 	const template = document.createElement("template");
 	template.innerHTML = source.html;
 	const fragment = template.content;
-	const scripts: Array<{ src?: string; n?: number }> = [];
+	const scripts: Script[] = [];
 	let n = 0;
 	for (const script of [...fragment.querySelectorAll("script")]) {
 		if (!runs(script)) continue;
@@ -331,11 +334,6 @@ function watchHeight(body: HTMLElement): { onHeight(listener: (h: number) => voi
 }
 
 // Cleaning a friend's card: what runs, what may be reached
-/** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
-const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
-
-const runs = (script: HTMLScriptElement) => RUNS.test(script.getAttribute("type") ?? "");
-
 /** Elements a shared card may not hold: anything that runs, or opens a page of its own. */
 const DROPPED = new Set(["script", "iframe", "frame", "object", "embed", "applet", "base", "meta", "link", "portal", "noscript"]);
 
@@ -433,7 +431,7 @@ function cssInDeck(css: string, base: string): boolean {
 	return true;
 }
 
-// The card sheet every card adopts
+// The card sheet every card is given
 /*
  * card.css for a shadow root: the board tokens and parts, with `:root` and the page's `html` and
  * `body.board` turned into the card's own host and element, and the fonts declared once in the page

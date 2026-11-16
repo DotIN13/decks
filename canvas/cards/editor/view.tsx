@@ -24,14 +24,13 @@ import { ScribbleCatch } from "@decks/ui";
 import { pageFont } from "../../look/look.ts";
 import { FONT_GROUPS } from "../card-syntax.ts";
 
-import { sel } from "./model.ts";
+import { sel } from "./selection.ts";
 
 import type { EditorCtx } from "./ctx.ts";
 
 export const BLOCK_MENU: ReadonlyArray<[string, string]> = [["p", "Body text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"], ["quote", "Quote"], ["code", "Code block"]];
 export const SIZE_MENU: ReadonlyArray<[string, string]> = [["small", "Small"], ["normal", "Normal"], ["large", "Large"], ["huge", "Huge"]];
 export const SIX = ["yellow", "orange", "red", "green", "blue", "purple"] as const;
-export const SELECTION_PAUSE_MS = 300;
 
 // The markup
 /** The editor's markup: the words, the style bar with its menus, the drop marks. */
@@ -153,6 +152,11 @@ function BarMenus(): JSX.Element {
 }
 
 // Where the bar goes, and its menus
+/*
+ * The bar over the words selected, at the screen's size whatever the zoom, in two rows that scroll
+ * sideways on a narrow screen: above the words, or under them when a bar or the screen's top is in
+ * the way, never past an edge; gone while the camera moves, back with a fade (`placing`).
+ */
 export function placeBar(cx: EditorCtx) {
 	if (!cx.bar.isConnected || !cx.wanted || !sel().rangeCount) return;
 	const r = sel().getRangeAt(0).getBoundingClientRect();
@@ -225,6 +229,12 @@ export function toggleMenu(cx: EditorCtx, name: string, button: HTMLElement) {
 export const closeMenus = (cx: EditorCtx) => cx.bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
 
 // The marks that show where a dragged piece will land
+/** A point on the screen in the editor's own pixels, the zoom taken out. */
+export const local = (cx: EditorCtx, x: number, y: number) => {
+	const w = cx.wrap.getBoundingClientRect();
+	return { x: (x - w.left) / cx.props.zoom, y: (y - w.top) / cx.props.zoom };
+};
+
 export function hideMarks(cx: EditorCtx) {
 	cx.caret.style.display = cx.line.style.display = "none";
 }

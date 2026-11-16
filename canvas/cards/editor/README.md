@@ -7,9 +7,12 @@ and they are written back as its markdown.
 
 - `ctx.ts`: `EditorCtx`, the one state the parts share: the props, the elements, what the editor
   remembers between events, and each part's functions bound to it.
-- `model.ts`: the pieces a card's markdown becomes, reading it in block by block, the tables of
-  styles and blocks. `inline.ts`: a block's inline runs.
-- `markup.ts`: the page written back as markdown. `style.ts`: styling what is selected.
+- `model.ts`: the pieces a card's markdown becomes, and reading it in block by block.
+  `inline.ts`: a block's inline runs. `tables.ts`: what typing turns into a style or a block, and
+  each style the bar puts on.
+- `selection.ts`: the page's selection, the block the caret is in, placing the caret.
+- `markup.ts`: the page written back as markdown. `style.ts`: styling what is selected, the block
+  the caret is in, and the selection cut into runs.
 - `view.tsx`: the markup, the style bar and its menus, the drop marks.
 - `actions.ts`: typing, undo, pasting, clicks, committing. `actions-press.ts`: what mounting
   wires, dragging a piece, the keys.

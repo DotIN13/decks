@@ -1,28 +1,28 @@
 // The Decks canvas editor made inside a host's Solid tree: the drawing, the camera
 // and its views, the canvas view and its bars, and the handle the host calls.
-import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
+import { emptyDocument, parse, serialize, type PenDocument } from "@decks/pen";
 import type { Page, Camera } from "@decks/protocol-old";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { fitInto, frames } from "../camera/camera.ts";
 import { topBoxes } from "../drawing/boxes.ts";
 import { viewToPark } from "../camera/agent-view.ts";
-import { createAgentViews, type ViewStorage } from "../camera/agent-view-store.ts";
+import { createAgentViews } from "../camera/agent-view-store.ts";
 import { canvasBox } from "../camera/insets.ts";
 import type { StageEngine as Engine } from "../render/engine.ts";
 import { pagesAhead, pagesOf, createDrawing } from "../drawing/drawing.ts";
 import { stageMeasure } from "../render/measure.ts";
-import type { DocEdits, DrawingWriter } from "../render/types.ts";
+import type { DocEdits } from "../render/types.ts";
 import { InkBar } from "../chrome/InkBar.tsx";
 import { setCanvasScheme } from "../theme.ts";
 import { PenBar } from "../chrome/PenBar.tsx";
 import { ItemSlot } from "../items/item-slot.tsx";
-import { Stage, type InkRequest, type StageComment } from "../view/CanvasView.tsx";
-import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "../ink/ink.ts";
-import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./pen-tools.ts";
+import { Stage } from "../view/CanvasView.tsx";
+import { drawing as inkOn, setDrawing, setInkTool } from "../ink/ink.ts";
+import { penSelection, penTool, setPenSelection, setPenTool } from "./pen-tools.ts";
 
 export type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
-import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState, EditorState } from "../types.ts";
+import type { CanvasHandle, CanvasOptions, Editor, EditorOwnState } from "../types.ts";
 
 /** A camera that shows everything on the drawing, in a host this big. */
 export function fitAll(doc: PenDocument, view: { width: number; height: number }, look: "light" | "dark" = "light"): Camera {
@@ -31,7 +31,6 @@ export function fitAll(doc: PenDocument, view: { width: number; height: number }
 
 /** The empty picture: a board with no picture source is drawn as a blank sheet. */
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
-
 
 /**
  * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
@@ -164,7 +163,7 @@ function parkViews(
 		if (scope && views) views.keep(scope, undefined, viewToPark(untrack(camera), untrack(penSelection)[0]));
 	};
 	return options.views
-	? createRoot((done) => {
+		? createRoot((done) => {
 			const scope = options.views!.scope;
 			createEffect(
 				on(scope, (next, prev) => {
@@ -191,19 +190,18 @@ function parkViews(
 				done();
 			};
 		})
-	: undefined;
+		: undefined;
 }
 
 /** The card pill's Hide and Delete, and edits, for a canvas that can be edited; nothing for one that cannot. */
 function editingFor(options: Options, editable: boolean, d: { edit: ReturnType<typeof createDrawing>["edit"]; resizePage: ReturnType<typeof createDrawing>["resizePage"]; removePage: ReturnType<typeof createDrawing>["removePage"] }) {
 	const { edit, resizePage, removePage } = d;
-	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
 	/*
-	 * The board pill's Hide takes the board off this drawing (its file stays), and Delete, when the host
-	 * can delete files, takes it off and asks the host to delete the file too.
+	 * Hide takes the card off this drawing (its file stays); Delete, when the host can delete files,
+	 * also asks it to delete the file. Plain objects, fixed for the canvas's life.
 	 */
 	return editable
-	? {
+		? {
 			onPenEdit: edit,
 			onResize: resizePage,
 			onHide: (path: string) => (options.pages?.onHide ? options.pages.onHide(path) : removePage(path)),
@@ -215,20 +213,15 @@ function editingFor(options: Options, editable: boolean, d: { edit: ReturnType<t
 					}
 				: {}),
 		}
-	: {};
+		: {};
 }
 
 /** The cards on the canvas: the host's list, or the drawing's own, as one store whose objects stay from one drawing to the next. */
 function pagesFor(options: Options, drawing: ReturnType<typeof createDrawing>, doc: Accessor<PenDocument>): Page[] {
 	/*
-	 * Owned by whoever makes the editor (the canvas frame's render root), never by
-	 * an effect that runs again: made in Studio's effect once, the boards stopped following the
-	 * drawing, so a board moved once and then stayed where the stage last saw it.
-	 */
-	/*
-	 * The same object for a board from one drawing to the next, its fields changed in place, as the
-	 * Decks app's store keeps them: the stage keys each board's slot on its object, and a fresh list
-	 * on every edit rebuilt every slot and reloaded every board's page after any drag.
+	 * Made by whoever makes the editor, never in an effect that runs again (made in one, a card moved
+	 * once and then stayed); each card's object kept from one drawing to the next, changed in place,
+	 * since the view keys a card's slot on it and a fresh list reloaded every card after any drag.
 	 */
 	const [pages, setPages] = createStore<Page[]>([]);
 	/*
@@ -256,7 +249,6 @@ function pagesFor(options: Options, drawing: ReturnType<typeof createDrawing>, d
 	return pages;
 }
 
-
 type SurfaceParts = {
 	options: Options;
 	mode: Accessor<"edit" | "browse">;
@@ -282,48 +274,48 @@ type SurfaceParts = {
 function canvasSurface(s: SurfaceParts): JSX.Element {
 	const { options, mode, setModeSignal, ownGlide, pages, pen, editing, step, inking, camera, setCamera, selected, setSelected, movePage, reloads, editable } = s;
 	return (
-	<Stage
-		mode={mode()}
-		{...(options.pages?.onExtent ? { onExtent: options.pages.onExtent } : {})}
-		{...(options.pages?.onOpenLink ? { onOpenPage: options.pages.onOpenLink } : {})}
-		news={options.pages?.news?.() ?? {}}
-		{...(options.pages?.onRead ? { onRead: options.pages.onRead } : {})}
-		{...(options.onViewport ? { onViewport: options.onViewport } : {})}
-		{...(options.onRefer ? { onRefer: options.onRefer } : {})}
-		glide={ownGlide()}
-		opening={{ get camera() {
-			return s.opening();
-		} }}
-		{...(options.canvasName ? { stageName: options.canvasName() } : {})}
-		onTool={() => setPenTool("select")}
-		boards={pages}
-		pen={pen()}
-		{...editing}
-		{...(options.onExport ? { onExport: options.onExport } : {})}
-		onPenStep={step}
-		drawing={inking()}
-		onPencil={() => {
-			setModeSignal("browse");
-			setDrawing(true);
-		}}
-		camera={camera()}
-		setCamera={setCamera}
-		selected={selected()}
-		onSelect={(path) => {
-			setSelected(path);
-			options.onSelect?.(path);
-			/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
-			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
-		}}
-		onMove={movePage}
-		frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.pages?.page?.(slot.board.path)} {...(options.pages?.cardScripts && !options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.pages.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
-		shots={() => ({ picture: (board, scheme) => options.pages?.picture?.(board.path, scheme) ?? BLANK })}
-		{...(options.onComment ? { onComment: options.onComment } : {})}
-		{...(options.onInk ? { onInk: options.onInk } : {})}
-		inkAgent={options.inkAgent?.()}
-		{...(options.world ? { world: options.world } : {})}
-		onEngine={(made) => s.setEngine(made)}
-	/>
+		<Stage
+			mode={mode()}
+			{...(options.pages?.onExtent ? { onExtent: options.pages.onExtent } : {})}
+			{...(options.pages?.onOpenLink ? { onOpenPage: options.pages.onOpenLink } : {})}
+			news={options.pages?.news?.() ?? {}}
+			{...(options.pages?.onRead ? { onRead: options.pages.onRead } : {})}
+			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
+			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
+			glide={ownGlide()}
+			opening={{ get camera() {
+				return s.opening();
+			} }}
+			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
+			onTool={() => setPenTool("select")}
+			boards={pages}
+			pen={pen()}
+			{...editing}
+			{...(options.onExport ? { onExport: options.onExport } : {})}
+			onPenStep={step}
+			drawing={inking()}
+			onPencil={() => {
+				setModeSignal("browse");
+				setDrawing(true);
+			}}
+			camera={camera()}
+			setCamera={setCamera}
+			selected={selected()}
+			onSelect={(path) => {
+				setSelected(path);
+				options.onSelect?.(path);
+				/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
+				if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
+			}}
+			onMove={movePage}
+			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.pages?.page?.(slot.board.path)} {...(options.pages?.cardScripts && !options.pages.cardScripts(slot.board.path) ? { cardScripts: false, ...(options.pages.onScriptsOn && editable && !slot.board.path.startsWith("shared/") ? { onScriptsOn: () => options.pages!.onScriptsOn!(slot.board.path) } : {}) } : {})} />}
+			shots={() => ({ picture: (board, scheme) => options.pages?.picture?.(board.path, scheme) ?? BLANK })}
+			{...(options.onComment ? { onComment: options.onComment } : {})}
+			{...(options.onInk ? { onInk: options.onInk } : {})}
+			inkAgent={options.inkAgent?.()}
+			{...(options.world ? { world: options.world } : {})}
+			onEngine={(made) => s.setEngine(made)}
+		/>
 	);
 }
 
@@ -331,24 +323,23 @@ function canvasSurface(s: SurfaceParts): JSX.Element {
 function canvasRoot(r: { options: Options; mode: Accessor<"edit" | "browse">; editable: boolean; inking: Accessor<boolean>; doc: Accessor<PenDocument>; edit: ReturnType<typeof createDrawing>["edit"]; step: ReturnType<typeof createDrawing>["step"]; view: () => JSX.Element }): JSX.Element {
 	const { options, mode, editable, inking, doc, edit, step, view } = r;
 	return (
-	<div class="decks-canvas app" data-mode={mode()}>
-		<div class="work">
-			<div class="surface" data-surface="stage">
-				<div class="surface-layer" data-layer="stage">
-					{view()}
+		<div class="decks-canvas app" data-mode={mode()}>
+			<div class="work">
+				<div class="surface" data-surface="stage">
+					<div class="surface-layer" data-layer="stage">
+						{view()}
+					</div>
 				</div>
 			</div>
+			<Show when={editable && !inking()}>
+				<PenBar tools={options.toolbar !== false} doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
+			</Show>
+			<Show when={editable && inking()}>
+				<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
+			</Show>
 		</div>
-		<Show when={editable && !inking()}>
-			<PenBar tools={options.toolbar !== false} doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
-		</Show>
-		<Show when={editable && inking()}>
-			<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
-		</Show>
-	</div>
 	);
 }
-
 
 type HandleParts = {
 	options: Options;

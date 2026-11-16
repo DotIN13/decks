@@ -1,5 +1,8 @@
-// Styling what is selected: a style on or off, a block's kind, a table or a rule put in.
-import { STYLES, type Style, ZW, atom, caretInto, h, sel, splitAround, unwrap } from "./model.ts";
+// Styling what is selected: a style on or off, a block's kind, a table or a rule put in,
+// and the selection cut into runs that each sit in one block.
+import { ZW, atom, h, unwrap } from "./model.ts";
+import { caretInto, sel } from "./selection.ts";
+import { STYLES, type Style } from "./tables.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 export function style(cx: EditorCtx, event: MouseEvent) {
@@ -136,4 +139,65 @@ export function insertBlock(cx: EditorCtx, kind: "table" | "rule") {
 	if (after) after.after(made, next);
 	else cx.ed.append(made, next);
 	caretInto(kind === "table" ? made.querySelector("td")! : next, false);
+}
+
+// The block the caret is in, and the selection cut into runs
+/** The colour no one would pick that marks each run the browser cuts (`cut`). */
+const CUT = "rgb(1, 2, 3)";
+
+/** What the block the caret is in is, by the names the block menu uses. */
+export function blockKind(cx: EditorCtx): string {
+	const node = sel().anchorNode;
+	const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+	const top = cx.topOf(el);
+	if (!top) return "p";
+	if (/^H[1-3]$/.test(top.tagName)) return top.tagName.toLowerCase();
+	if (top.tagName === "BLOCKQUOTE") return "quote";
+	if (top.tagName === "PRE") return "code";
+	if (top.tagName === "OL") return "ol";
+	if (top.tagName === "UL") return el?.closest("li")?.querySelector(":scope > .pce-check") ? "check" : "ul";
+	return "p";
+}
+
+/** The selection as runs: plain spans, none of them across a block's edge. */
+export function cut(cx: EditorCtx): HTMLElement[] {
+	document.execCommand("styleWithCSS", false, "true");
+	document.execCommand("hiliteColor", false, CUT);
+	document.execCommand("styleWithCSS", false, "false");
+	return ([...cx.ed.querySelectorAll("*")] as HTMLElement[])
+		.filter((el) => el.style.backgroundColor === CUT)
+		.map((el) => {
+			el.style.removeProperty("background-color");
+			if (!el.getAttribute("style")) el.removeAttribute("style");
+			// The colour landed on a block, or on one of the card's own elements: the run is inside it.
+			if (el.tagName === "SPAN" && !el.attributes.length) return el;
+			const run = document.createElement("span");
+			run.append(...el.childNodes);
+			el.append(run);
+			return run;
+		})
+		.filter((run) => run.textContent);
+}
+
+/** Take `inner` out of `outer`, splitting `outer` round it: what was before and after it keeps `outer`. */
+export function splitAround(inner: Node, outer: HTMLElement) {
+	const before = document.createRange();
+	before.setStart(outer, 0);
+	before.setEndBefore(inner);
+	const after = document.createRange();
+	after.setStartAfter(inner);
+	after.setEnd(outer, outer.childNodes.length);
+	const head = before.extractContents();
+	const tail = after.extractContents();
+	if (head.textContent) {
+		const piece = outer.cloneNode(false) as HTMLElement;
+		piece.append(head);
+		outer.before(piece);
+	}
+	if (tail.textContent) {
+		const piece = outer.cloneNode(false) as HTMLElement;
+		piece.append(tail);
+		outer.after(piece);
+	}
+	unwrap(outer);
 }

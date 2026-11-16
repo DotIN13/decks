@@ -1,5 +1,3 @@
-// What the editor draws over the canvas: outlines, the selection's frame, handles,
-// anchors, guides, drop marks and arrows, each section a part of its own.
 /**
  * What the editor draws over the canvas (`core/overlay.ts`, `Overlay`), as elements in the world:
  * outlines, handles, hints, guides and drafts, in stage pixels, with every screen size divided by

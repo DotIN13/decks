@@ -1,11 +1,12 @@
 import { type JSX } from "solid-js";
 import { inline, list, piece, url } from "./editor/inline.ts";
-import { block, blockKind, build, cut } from "./editor/model.ts";
-import { serialise, topOf } from "./editor/markup.ts";
+import { block, build } from "./editor/model.ts";
+import { serialise } from "./editor/markup.ts";
+import { topOf } from "./editor/selection.ts";
 import { appendWords, changed, commit, onClick, onDblClick, onFocusOut, onInput, onPaste, travel } from "./editor/actions.ts";
-import { EditorView, closeMenus, hideMarks, lineSlot, placeBar, showBar, textSlot, toggleMenu } from "./editor/view.tsx";
-import { insertBlock, restyle, setBlock, style } from "./editor/style.ts";
-import { endDrag, local, mountEditor, onKeyDown, onPointerDown, onPointerMove } from "./editor/actions-press.ts";
+import { EditorView, closeMenus, hideMarks, lineSlot, local, placeBar, showBar, textSlot, toggleMenu } from "./editor/view.tsx";
+import { blockKind, cut, insertBlock, restyle, setBlock, style } from "./editor/style.ts";
+import { endDrag, mountEditor, onKeyDown, onPointerDown, onPointerMove } from "./editor/actions-press.ts";
 import { binder, type DrawnElement, type EditorCtx } from "./editor/ctx.ts";
 
 /**

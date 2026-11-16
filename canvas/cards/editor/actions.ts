@@ -3,8 +3,9 @@
 import { isScribbleCatch } from "@decks/ui";
 import { type Tokens } from "marked";
 import { cardMarked } from "../card-syntax.ts";
-import { BLOCKS, INLINE, ZW, caretInto, h, sel } from "./model.ts";
-import { placeAfter } from "./markup.ts";
+import { ZW, h } from "./model.ts";
+import { caretInto, placeAfter, sel } from "./selection.ts";
+import { BLOCKS, INLINE } from "./tables.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 // Typing

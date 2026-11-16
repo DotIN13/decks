@@ -8,7 +8,7 @@ import type { PreviewChange, SceneQuery } from "./scene.ts";
 import { SNAP_PX, snapTargets } from "./snapping.ts";
 import type { Effect, GestureContext, Input, PointerInput, Step } from "./gesture.ts";
 import { done, isFree, moveCarry, releaseCarry, settle } from "./gesture-carry.ts";
-import { HANDLE_TAP_MS, landed, PAGE_HOLD_MS, RADIUS_HOLD_MS, withSelection, ZERO } from "./gesture-ground.ts";
+import { HANDLE_TAP_MS, PAGE_HOLD_MS, RADIUS_HOLD_MS, withSelection } from "./gesture-ground.ts";
 
 /** A press that starts a gesture on something the overlay drew: a handle, the radius, an arrow's end or middle. */
 export function pressHandle(state: EditorState, input: Input & PointerInput, scene: SceneQuery, ctx: GestureContext): Step | undefined {

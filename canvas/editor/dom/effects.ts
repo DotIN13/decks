@@ -13,8 +13,7 @@ import type { Pt, Rect } from "../core/model.ts";
 /** The composer a drag is over: its element, or the host's word for one outside this document. */
 type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;
 
-/** A mention of something dropped on the composer. */
-/** `label` is what the pill shows; `name` what it is called in full, for its card and the sent message. */
+/** A mention of something dropped on the composer: `label` is what the pill shows, `name` what it is called in full, for its card and the sent message. */
 type ReferPill = { kind: "card" | "item"; id: string; label: string; name?: string };
 
 export type EffectHost = {
@@ -155,10 +154,10 @@ function referPills(host: EffectHost, ids: readonly string[], boards: readonly s
 	];
 }
 
-/*
+/**
  * The ghost of what a drag carries over a card: a picture of the items cut from the sheet as the
  * drag starts, laid beside the pointer with a shadow and a slight tilt, as the card's own pieces are
- * (`pen/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
+ * (`cards/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
  */
 function dragGhost(host: EffectHost) {
 	let ghost: { el?: HTMLCanvasElement; rect: { left: number; top: number; width: number; height: number } } | undefined;

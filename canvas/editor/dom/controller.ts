@@ -1,5 +1,3 @@
-// The editor on the page: its state in one signal, stepped by the gestures,
-// each part handed out as a memo, and what each step asks for done.
 /**
  * The editor on the page: its state (`core/model.ts`, `EditorState`) held in one signal, stepped
  * by `core/gesture.ts`, with what each step asks for done here — ops sent (`onPenEdit`), the
@@ -147,6 +145,45 @@ function editorCore(host: EditorHost) {
 	return { state, read, commit, update, dispatch, part, frames, afterFrame, effects, drawnAt };
 }
 
+/** Each part of the state handed out as its own memo, so a reader of one is not touched by a change to another. */
+function stateParts(core: Core) {
+	const { state, part } = core;
+	return {
+		state,
+		hoverItem: part((now) => now.hover.item),
+		hoverPage: part((now) => now.hover.board),
+		hoverPicture: part((now) => now.hover.picture),
+		hoverBlock: part((now) => now.hover.block),
+		overLink: part((now) => now.hover.link),
+		/** Alt is held over the stage: the distances from the selection to what is hovered. */
+		altHeld: part((now) => !!now.hover.alt),
+		gesture: part((now) => now.gesture),
+		drag: part((now) => now.drag),
+		resize: part((now) => now.resize),
+		radius: part((now) => now.radius),
+		marquee: part((now) => now.marquee),
+		guides: part((now) => now.guides),
+		dropInto: part((now) => now.drop.into),
+		dropSlot: part((now) => now.drop.slot),
+		dropNear: part((now) => now.drop.near),
+		joins: part((now) => now.joins),
+		sides: part((now) => now.sides),
+		draft: part((now) => now.draft),
+		endDraft: part((now) => now.endDraft),
+		route: part((now) => now.route),
+		/** The words open for typing (`dom/TextEditing.tsx`), and the item they are. */
+		text: part((now) => now.text),
+		typing: part((now) => now.text?.id),
+		items: part((now) => now.selection.items),
+		pagePicks: part((now) => now.selection.boards),
+		pageDrag: part((now) => now.pageDrag),
+		ownDrag: part((now) => now.ownDrag),
+		pageResize: part((now) => now.pageResize),
+		shownDrag: part(shownDrag),
+		shownResize: part((now) => now.shownResize),
+	};
+}
+
 /** The app's mode and tool kept in the state, and pages let go of, landed and carried as the pages change. */
 function followHost(core: Core, host: EditorHost, parts: ReturnType<typeof stateParts>): void {
 	const { update } = core;
@@ -187,45 +224,6 @@ function followHost(core: Core, host: EditorHost, parts: ReturnType<typeof state
 		// The boards' pictures are the engine's, and go with the drag there.
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
-}
-
-/** Each part of the state handed out as its own memo, so a reader of one is not touched by a change to another. */
-function stateParts(core: Core) {
-	const { state, part } = core;
-	return {
-		state,
-		hoverItem: part((now) => now.hover.item),
-		hoverPage: part((now) => now.hover.board),
-		hoverPicture: part((now) => now.hover.picture),
-		hoverBlock: part((now) => now.hover.block),
-		overLink: part((now) => now.hover.link),
-		/** Alt is held over the stage: the distances from the selection to what is hovered. */
-		altHeld: part((now) => !!now.hover.alt),
-		gesture: part((now) => now.gesture),
-		drag: part((now) => now.drag),
-		resize: part((now) => now.resize),
-		radius: part((now) => now.radius),
-		marquee: part((now) => now.marquee),
-		guides: part((now) => now.guides),
-		dropInto: part((now) => now.drop.into),
-		dropSlot: part((now) => now.drop.slot),
-		dropNear: part((now) => now.drop.near),
-		joins: part((now) => now.joins),
-		sides: part((now) => now.sides),
-		draft: part((now) => now.draft),
-		endDraft: part((now) => now.endDraft),
-		route: part((now) => now.route),
-		/** The words open for typing (`dom/TextEditing.tsx`), and the item they are. */
-		text: part((now) => now.text),
-		typing: part((now) => now.text?.id),
-		items: part((now) => now.selection.items),
-		pagePicks: part((now) => now.selection.boards),
-		pageDrag: part((now) => now.pageDrag),
-		ownDrag: part((now) => now.ownDrag),
-		pageResize: part((now) => now.pageResize),
-		shownDrag: part(shownDrag),
-		shownResize: part((now) => now.shownResize),
-	};
 }
 
 /** Pages carried and sized, and a drop's glide: what the canvas draws while a gesture is in hand. */

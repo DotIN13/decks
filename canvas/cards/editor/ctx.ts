@@ -4,6 +4,7 @@ import type { CardEditorProps } from "../CardEditor.tsx";
 import type * as inline from "./inline.ts";
 import type * as model from "./model.ts";
 import type * as markup from "./markup.ts";
+import type * as selection from "./selection.ts";
 import type * as actions from "./actions.ts";
 import type * as view from "./view.tsx";
 import type * as style from "./style.ts";
@@ -31,7 +32,12 @@ export interface EditorCtx {
 	/** What the card said after each change, for undo; what was undone, for redo. */
 	past: string[];
 	future: string[];
+	/** The bar is wanted: words are selected in the editor, and no piece is being dragged. */
 	wanted: boolean;
+	/**
+	 * A pointer is selecting words. The bar shows once a selection stops changing, not while it is
+	 * being made: a pointer's when it lifts, the keyboard's after a short pause (`SELECTION_PAUSE_MS`).
+	 */
 	selecting: boolean;
 	settleBar: ReturnType<typeof setTimeout> | undefined;
 	dragging: HTMLElement | undefined;
@@ -45,7 +51,7 @@ export interface EditorCtx {
 	block: Bound<typeof model.block>;
 	build: Bound<typeof model.build>;
 	serialise: Bound<typeof markup.serialise>;
-	topOf: Bound<typeof markup.topOf>;
+	topOf: Bound<typeof selection.topOf>;
 	onInput: Bound<typeof actions.onInput>;
 	changed: Bound<typeof actions.changed>;
 	travel: Bound<typeof actions.travel>;
@@ -55,14 +61,14 @@ export interface EditorCtx {
 	toggleMenu: Bound<typeof view.toggleMenu>;
 	closeMenus: Bound<typeof view.closeMenus>;
 	insertBlock: Bound<typeof style.insertBlock>;
-	cut: Bound<typeof model.cut>;
+	cut: Bound<typeof style.cut>;
 	restyle: Bound<typeof style.restyle>;
 	style: Bound<typeof style.style>;
-	blockKind: Bound<typeof model.blockKind>;
+	blockKind: Bound<typeof style.blockKind>;
 	setBlock: Bound<typeof style.setBlock>;
 	onClick: Bound<typeof actions.onClick>;
 	onDblClick: Bound<typeof actions.onDblClick>;
-	local: Bound<typeof actionsPress.local>;
+	local: Bound<typeof view.local>;
 	hideMarks: Bound<typeof view.hideMarks>;
 	lineSlot: Bound<typeof view.lineSlot>;
 	textSlot: Bound<typeof view.textSlot>;
