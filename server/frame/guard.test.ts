@@ -127,6 +127,12 @@ test("Reader's attack: an encoded climb, an agent call, and another canvas's pat
 		assert.equal((await insert({ type: "document", path: "canvases/a/../b/canvas.json" })).ok, false, "a climb");
 		assert.equal((await http("item.batch", { canvas: "a", ops: [{ op: "insert", item: { type: "card", card: "canvases/b/cards/secret/index.html" } }] })).ok, false, "in a batch");
 		assert.equal((await insert({ type: "card", card: "canvases/a/cards/note/index.html" })).ok, true, "its own card");
+		// (8) an app item: the page places apps, so a pass may not, alone or in a batch.
+		assert.equal((await insert({ type: "app", app: "other" })).ok, false, "an app item");
+		assert.equal((await http("item.batch", { canvas: "a", ops: [{ op: "insert", item: { type: "app", app: "other" } }] })).ok, false, "an app item in a batch");
+		// (7) export and screenshot write wherever their 'to' says: not on a pass.
+		assert.equal((await http("canvas.export", { canvas: "a", of: "x", to: "assets/importmap.json" })).ok, false, "canvas.export");
+		assert.equal((await http("canvas.screenshot", { canvas: "a", to: "assets/x.png" })).ok, false, "canvas.screenshot");
 	} finally {
 		await doors.close();
 		await s.close();

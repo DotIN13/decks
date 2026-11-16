@@ -24,6 +24,8 @@ export function passGuard(kernel: () => Kernel | undefined) {
 		const clip = args.clip as { canvas?: unknown } | undefined;
 		if (clip && typeof clip === "object" && clip.canvas !== undefined && clip.canvas !== canvas) throw refuse(name, `it pastes from ${String(clip.canvas)}, another canvas`);
 		for (const path of cardPaths(name, args)) if (!inCanvas(canvas, path)) throw refuse(name, `${path} is not a card of ${canvas}`);
+		// An app is placed by the page on the person's token: a pass placing one would get that app's pass (Reader, 8).
+		if (/^item\.(insert|replace|batch)$/.test(name) && itemKinds(args).includes("app")) throw refuse(name, "a pass places no app; the page does, on the person's token");
 		// Every path written into an item a pass inserts or changes: its own canvas or a shared root (Reader, 6).
 		if (name.startsWith("item.")) for (const path of itemPaths(args)) if (!itemPathOk(canvas, path)) throw refuse(name, `an item may not name ${String(path)}, outside ${canvas}'s folder and the deck's shared roots`);
 		// A document's words reach the frame through its document line, so file.read is only a kept version's.
@@ -59,6 +61,20 @@ function itemPaths(args: Args): unknown[] {
 		}
 	};
 	for (const key of ["item", "ops", "set"]) walk(args[key], 0);
+	return out;
+}
+
+/** The kinds of every item a call inserts or replaces, at any depth, in its item and its ops. */
+function itemKinds(args: Args): string[] {
+	const out: string[] = [];
+	const walk = (value: unknown, depth: number) => {
+		if (depth > 40 || value === null || typeof value !== "object") return;
+		if (Array.isArray(value)) return void value.forEach((one) => walk(one, depth + 1));
+		const type = (value as { type?: unknown }).type;
+		if (typeof type === "string") out.push(type);
+		for (const one of Object.values(value)) walk(one, depth + 1);
+	};
+	for (const key of ["item", "ops", "node"]) walk(args[key], 0);
 	return out;
 }
 

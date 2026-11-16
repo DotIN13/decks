@@ -8,6 +8,8 @@ export const appOpenRoutes = (url: () => string | undefined): Route[] =>
 	OLD.map((prefix) => ({
 		method: "POST" as const,
 		prefix,
+		// A canvas pass may ask to open an app; /app-pass/<name> then checks its canvas, the placement and the app.
+		scoped: (_scope, asked) => asked.method === "POST" && appToOpen(asked.path, prefix) !== undefined,
 		async serve(_ctx, req, res) {
 			const name = appToOpen(req.url ?? "", prefix);
 			const base = url();
