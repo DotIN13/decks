@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CALL_BY_NAME, callsFor } from "../calls/index.ts";
-import { answerBack, cardCall, DROPPED, isOld, keyed, OLD_CALLS, turn, withEdit } from "./old-calls.ts";
+import { answerBack, cardCall, DROPPED, isOld, keyed, OLD_CALLS, programCall, turn, withEdit } from "./old-calls.ts";
 
 // An old call becomes its new one; a card's call is old or new by its arguments' shape, and a card
 // reaches only what a card may, on its own canvas.
@@ -103,5 +103,17 @@ test("the shape the card called in decides, not its arguments, and an old card g
 	assert.deepEqual(reload.back(1), { reloaded: 1 });
 	const fresh = cardCall("view.reload", {}, "mine", "new") as { back: (v: unknown) => unknown };
 	assert.equal(fresh.back(1), 1);
+});
+
+test("a program's call: the new one when its schema takes it, today's else, and today's answer back", () => {
+	const fresh = programCall("canvas.delete", { canvas: "a" }) as { name: string };
+	assert.equal(fresh.name, "canvas.delete");
+	const old = programCall("canvas.delete", ["n1"]) as { name: string; args: unknown };
+	assert.deepEqual([old.name, old.args], ["item.delete", { id: "n1" }]);
+	const read = programCall("canvas.read", []) as { name: string; back: (v: unknown) => unknown };
+	assert.deepEqual([read.name, read.back([])], ["item.list", { items: [] }]);
+	assert.equal((programCall("canvas.file", []) as { back: (v: unknown) => unknown }).back({ file: "canvases/a/canvas.pen" }), "canvases/a/canvas.pen");
+	assert.deepEqual((programCall("apps.item", ["shelf"]) as { back: (v: unknown) => unknown }).back({}), { type: "app", app: "shelf" });
+	assert.equal(programCall("item.insert", { nope: 1 }), undefined);
 });
 

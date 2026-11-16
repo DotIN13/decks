@@ -31,6 +31,24 @@ export function cardCall(name: string, raw: unknown, here?: string, used?: "old"
 	return { name: turned.name, args: turned.args, back: (value) => (fresh ? value : answerBack(name, value, turned.args)) };
 }
 
+/** A call routed: the new call to make, and the answer made back as the caller expects it. */
+export type Routed = { name: string; args: Args; back: (value: unknown) => unknown };
+
+/**
+ * A program's call (the decks command, the SDK, an MCP tool) in today's words or the new: the new call
+ * when the name is one and its schema takes the arguments (one object, or a list of one); else, for an
+ * old name, its new call, the old answer made back; undefined for a new name the server should judge.
+ */
+export function programCall(name: string, raw: unknown): Routed | { refusal: Refusal } | undefined {
+	const call = CALL_BY_NAME.get(name);
+	const one = Array.isArray(raw) ? (raw.length <= 1 ? (raw[0] ?? {}) : undefined) : (raw ?? {});
+	if (call && isObject(one) && check(call.input, one).length === 0) return { name, args: one, back: (value) => value };
+	if (!isOld(name)) return undefined;
+	const turned = turn(name, raw);
+	if ("refusal" in turned) return turned;
+	return { name: turned.name, args: turned.args, back: (value) => answerBack(name, value, turned.args) };
+}
+
 /** Calls whose canvas is where they go, not an option: a card may name another canvas there. */
 const CANVAS_IS_THE_THING = new Set(["view.goto"]);
 const mayCall = (call: AnyCall | undefined, who: Who) => !!call && (call.who as readonly string[]).includes(who);
@@ -128,6 +146,9 @@ export function answerBack(old: string, value: unknown, args: Args = {}): unknow
 	if (old === "canvas.step" && isObject(value)) return { undo: Boolean(value.undo), redo: Boolean(value.redo) };
 	// view.reload answered { reloaded }; view.camera the Camera itself; view.viewport the screen's { width, height }.
 	if (old === "view.reload" && typeof value === "number") return { reloaded: value };
+	// canvas.file answered where the drawing is; apps.item the item that shows the app.
+	if (old === "canvas.file" && isObject(value)) return value.file;
+	if (old === "apps.item") return { type: "app", app: args.name };
 	// view.move answered the Camera and view.focus { canvas, target }: the View with those fields too.
 	if (old === "view.move" && isObject(value) && isObject(value.camera)) return { ...value, ...value.camera };
 	if (old === "view.focus" && isObject(value)) return { ...value, target: args.target };
@@ -173,6 +194,7 @@ export const OLD_CALLS: readonly OldCall[] = [
 	["canvas.create", "agents", "canvas.create", ["title"]],
 	["canvas.export", "agents", "canvas.export", ["of","..."]],
 	["here", "agents", "canvas.here", []],
+	["canvas.file", "agents", "canvas.get", ["..."]],
 	["canvas.list", "agents", "canvas.list", []],
 	["canvas.remove", "person", "canvas.delete", ["canvas"]],
 	["canvas.screenshot", "agents", "canvas.screenshot", ["..."]],
@@ -214,6 +236,7 @@ export const OLD_CALLS: readonly OldCall[] = [
 	["apps.status", "agents", "app.get", ["name"]],
 	["apps.repo", "agents", "app.get", ["name"]],
 	["apps.list", "agents", "app.list", []],
+	["apps.item", "agents", "app.get", ["name"]],
 	["apps.logs", "agents", "app.logs", ["name","..."]],
 	["apps.delete", "agents", "app.delete", ["name"]],
 	["apps.restart", "agents", "app.restart", ["name"]],
@@ -285,8 +308,6 @@ export const OLD_CALLS: readonly OldCall[] = [
 
 /** Old calls with no new name: each answers with why. */
 export const DROPPED: readonly (readonly [old: string, from: "agents" | "person", why: string])[] = [
-	["canvas.file", "agents", "canvas.get's `file` field says where the drawing is."],
-	["apps.item", "agents", "The item is { type: app, app: <name> }, written straight into item.insert."],
 	["deck.open", "person", "A server serves one deck, chosen when it starts; another deck is another server."],
 ];
 

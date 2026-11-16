@@ -44,6 +44,30 @@ function fillWords(input: Obj, args: Record<string, unknown>, rest: string[], st
 	return rest.slice(next);
 }
 
+/**
+ * Today's command line as the arguments object of today's call: plain words fill its old arguments in
+ * order (params, from protocol/compat), flags go to their own key or into the new call's object that
+ * takes them (--type card fills item). protocol/compat turns the object into the new call.
+ */
+export function oldArgsOf(params: readonly string[], call: AnyCall | undefined, words: string[], stdin: () => string): Record<string, unknown> {
+	const input = call?.input as Obj | undefined;
+	const { flags, rest } = split(words);
+	const all = flags.find(([key]) => key === "args");
+	if (all) return JSON.parse(all[1] === "-" ? stdin() : all[1]) as Record<string, unknown>;
+	const named = params.filter((param) => param !== "...");
+	if (rest.length > named.length) throw new Usage(`"${rest.slice(named.length).join(" ")}" is left over.`);
+	const args: Record<string, unknown> = {};
+	rest.forEach((word, i) => (args[named[i]!] = valueOf(word, undefined, stdin)));
+	for (const [key, raw] of flags) {
+		const keys = key.split(".");
+		const home = input && !params.includes(keys[0]!) ? (homed(input, keys) ?? keys) : keys;
+		let target = args;
+		for (const part of home.slice(0, -1)) target = (typeof target[part] === "object" && target[part] !== null ? target[part] : (target[part] = {})) as Record<string, unknown>;
+		target[home[home.length - 1]!] = valueOf(raw, input ? shapeAt(input, home) : undefined, stdin);
+	}
+	return args;
+}
+
 // The words and flags of a command line.
 function split(words: string[]): { flags: [string, string][]; rest: string[] } {
 	const flags: [string, string][] = [];

@@ -34,6 +34,9 @@ Runs in node 22 and later and in a browser.
    server to fan out.
 4. The token is the one given, else `DECKS_TOKEN`, else one `decks login` kept for that address in
    `~/.decks/tokens.json`, else the lock file's when it names the same server. It goes only in a header.
+6. Today's calls and shapes answer forever, untyped: `decks.canvas.insert(item, { beside })`, `decks.here()`,
+   and `call` by an old name, with today's answers (protocol/compat's `programCall`). A list of arguments
+   is today's shape; one object the new call's when its schema takes it.
 
 ## Check
 

@@ -1,11 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { CALLS, ENV, PROTOCOL_VERSION, type AnyCall, jsonSchemaOf, refusalFrom, toolText } from "../../protocol/index.ts";
+import { isOld } from "../../protocol/compat/old-calls.ts";
 import { connect, DecksError, type Client } from "../sdk/index.ts";
 
 // The MCP relay: JSON-RPC 2.0 over stdio. Each server call an agent may make
 // is a tool of the same name, whose input is the call's arguments; a call
 // goes to the server through the SDK. DECKS_TOOLS narrows the list to some
-// nouns or calls (item,card,view.focus).
+// nouns or calls (item,card,view.focus). A tool named in today's words is
+// still taken, unlisted, and answered as today's (protocol/compat).
 
 type Rpc = { jsonrpc?: string; id?: number | string; method?: string; params?: Record<string, unknown> };
 type Content = { type: "text"; text: string };
@@ -68,7 +70,7 @@ export function shownCalls(filter = process.env[ENV.tools] ?? ""): AnyCall[] {
 
 /** One tool call's content: the value and its notes, or the refusal with its code and hint. */
 export async function callTool(client: Client, name: string, input: unknown, filter?: string): Promise<{ content: Content[]; isError: boolean }> {
-	if (!shownCalls(filter).some((call) => call.name === name)) {
+	if (!shownCalls(filter).some((call) => call.name === name) && !isOld(name)) {
 		return { content: [{ type: "text", text: `There is no tool called ${name}. (not_found)` }], isError: true };
 	}
 	let shown: { text: string; isError: boolean };

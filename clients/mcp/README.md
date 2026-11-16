@@ -24,6 +24,7 @@ generators write.
    `Try <hint>.`
 5. The server and token are the SDK's: `DECKS_URL`, `DECKS_TOKEN`, a token `decks login` kept, or the
    deck's lock file. The first call connects.
+5. A tool named in today's words is taken, though not listed, and answered as today's (protocol/compat).
 
 ## Check
 

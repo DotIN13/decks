@@ -27,6 +27,9 @@ The `decks` command: `decks <noun> <verb>` for every call of the protocol, and `
    the command exits 1.
 4. Who is calling and where is the SDK's rule: `DECKS_URL`, `DECKS_TOKEN`, a token `decks login` kept,
    or the deck's lock file.
+4. Today's words answer forever (`decks canvas insert`, `decks here`), through protocol/compat, with
+   today's answers; a note on stderr gives the new words. A plain word after `canvas delete`, `copy` or
+   `update` is today's item; the canvas calls of those names take `--canvas`.
 
 ## Check
 

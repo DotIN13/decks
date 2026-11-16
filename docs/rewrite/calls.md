@@ -45,7 +45,9 @@ A pen.dev drawing and the folder around it: canvases/<name>/, with its cards, fr
 | new | | (socket) | person, app, card | Added in 0.33.0 for Loom, Keel and Easel: the socket takes { type: "token", token } after hello, a fresh token for the same caller (and, for a card pass, the same canvas), answered with a fresh hello (any other closes it, 4403); watch takes since, replaying item.changed (with pen and made) after that revision, or one item.changed with missed: true when the log no longer reaches it. |
 | new | | (compat) | card | Added in 0.34.0 for Loom, Warden and Helm: protocol/compat/old-calls.ts (@decks/protocol/compat) holds this table's old calls and how each becomes its new one, and cardCall, a card's call read as old or new by its arguments' shape. Old card shapes carry no date. In 0.34.0 too, as Mason decided: a card may call agent.queue (the person asked first, as for agent.send), view.goto (the person's screen, asked first while they use the canvas), agent.me and agent.inbox (from a card, "you" is the agent whose home is the card's canvas). |
 | changed | | (card) | card | 0.35.0, Mason's ruling on Reader's read of step 5: a card makes exactly the calls it could before, by their new names, but agent.create (refused on purpose). Back for cards: canvas.export, canvas.screenshot, canvas.update (the old rename), frame.save, card.create, frame.create. No longer for cards: canvas.drawing (the frame's, on its pass), canvas.get, file.open, file.read, file.close, file.versions, frame.get, frame.list. cardCall takes the shape the card called in; an old card's answer is its old one (view.move and view.focus carry both shapes' fields, view.reload the old). |
+| changed | | (programs) | anyone | 0.36.0, Mason: the decks command, the SDK and the MCP relay answer every word and shape of today's table, with today's answers, through protocol/compat's programCall; new words are taught, old ones never refused (the command notes the new words on stderr). canvas.file and apps.item, dropped before, are answered. |
 | `canvas.list` | agents | `canvas.list` | person, agent, app | Unchanged. |
+| `canvas.file` | agents | `canvas.get` | person, agent, app | Answered since 0.36.0 (it was dropped): today's answer, the drawing's file, from canvas.get's file. |
 | `canvas.remove` | person | `canvas.delete` | person | Renamed. |
 | `canvas.screenshot` | agents | `canvas.screenshot` | anyone | The picture's size is a Size { w, h }. |
 | `canvas.step` | agents | `canvas.undo` | person, card | `redo: true` puts a step back. Answers the canvas, whose undo and redo say whether a step is left. |
@@ -144,6 +146,7 @@ A folder in apps/ that the server serves, builds or runs, shown on a canvas as a
 | `apps.status` | agents | `app.get` | person, agent, app | Answers the App, its repository included. |
 | `apps.repo` | agents | alias of `app.get` | person, agent, app | app.get's `repo` says it. Every app is a repository from the start; older folders become one in upgrade/. |
 | `apps.list` | agents | `app.list` | person, agent, app | Renamed. |
+| `apps.item` | agents | `app.get` | person, agent, app | Answered since 0.36.0 (it was dropped): today's answer, { type: app, app: <name> }. |
 | `apps.logs` | agents | `app.logs` | person, agent | Renamed. |
 | `apps.delete` | agents | `app.delete` | person, agent | Answers { deleted }; the trash folder and the items taken off ride as notes. |
 | `apps.restart` | agents | `app.restart` | person, agent | Answers the App. |
@@ -298,8 +301,6 @@ A kind of agent the harness can run, and the harness's own settings.
 
 | Today | From | Why |
 |---|---|---|
-| `canvas.file` | agents | canvas.get's `file` field says where the drawing is. |
-| `apps.item` | agents | The item is { type: app, app: <name> }, written straight into item.insert. |
 | `deck.open` | person | A server serves one deck, chosen when it starts; another deck is another server. |
 
 ## Events
