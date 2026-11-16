@@ -6,7 +6,7 @@ import { emptyAgent, type AgentRecord } from "./agent.ts";
 /**
  * The server's view of the world, as one store.
  *
- * Layer 0, with `selection` and `socket`. It imports `agent` for the record type and
+ * Layer 0, with `selection`. It imports `agent` for the record type and
  * nothing else; every module above imports this one.
  *
  * **One store, not three.** Splitting it by reader was considered and measured against:

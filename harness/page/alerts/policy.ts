@@ -109,7 +109,7 @@ export function inView(presence: Presence): boolean {
 	return presence.visible && presence.focused;
 }
 
-/** Sound plays regardless of presence: the argument is in this file's header. */
+/** Sound plays regardless of presence: only the volume and each kind.s own setting decide. */
 export function shouldSound(kind: AlertKind, prefs: AlertPrefs): boolean {
 	return prefs.volume > 0 && prefs.sound[kind] !== SILENT;
 }

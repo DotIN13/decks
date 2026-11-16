@@ -65,7 +65,7 @@ export function AgentRow(props: {
 	 * Every workspace in use, for the popup's suggestions.
 	 *
 	 * The one thing that stops this feature's likeliest failure — a second spelling of a
-	 * project that already exists — so the names in use are offered as a `datalist` rather than
+	 * project that already exists — so the names in use are offered as a list to pick from rather than
 	 * left to memory. Read off the identities the panel already holds; no extra fetch.
 	 */
 	workspaces?: string[];
