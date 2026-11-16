@@ -50,7 +50,6 @@ export function docUnits(doc: DocsDocument): string {
 	return out.join("");
 }
 
-/** By UTF-16 unit, as Docs counts. */
 /**
  * The index of each table cell's last newline. A cell's text cannot lose it in Docs, and the text
  * alone does not say where a table's last cell ends: the paragraph after the table follows it with

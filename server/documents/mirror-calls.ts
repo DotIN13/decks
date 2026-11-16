@@ -1,7 +1,7 @@
 import { Refused } from "../../protocol/index.ts";
 import type { Context } from "../kernel/types.ts";
-import { guarded, syncOnce } from "./google.ts";
-import { credit, linkOf, type GoogleDocs } from "./links.ts";
+import { guarded } from "./google.ts";
+import { credit, linkOf, syncOnce, type GoogleDocs } from "./links.ts";
 import { fence } from "./path.ts";
 
 // The calls a Google Doc's page makes by its mirror's path: the Doc for drawing, styles, comments.

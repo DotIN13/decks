@@ -1,12 +1,15 @@
 import { Refused, type Caller } from "../../protocol/index.ts";
 import { toDeckPath, type Deck, type DeckPath, type Store } from "../kernel/types.ts";
-import { syncOnce, type DocsRemote, type Link } from "./google.ts";
+import type { DocsRemote } from "./google.ts";
+import { applyAll, diff, transformAll } from "./splice.ts";
 
 // Linked Google Docs: each a mirror file in docs/google/, kept in step with its
-// Doc while a page has the mirror open, every two seconds. Rule 11.
+// Doc while a page has the mirror open, every two seconds. Rules 11 and 13.
 
 export const TICK_MS = 2000;
 export type GoogleDoc = { id: string; title: string; url: string; modified?: number };
+/** A linked Doc: its id, and its mirror in the deck. */
+export type Link = { id: string; mirror: DeckPath };
 
 /** The Docs API, as the server's entry gives it: the mirror's index-aligned text, and markdown for agents. */
 export interface GoogleDocs extends DocsRemote {
@@ -84,9 +87,6 @@ export async function credit(store: Store, id: string, by: Caller, now = Date.no
 	await store.put(`credit/${id}`, encoder.encode(JSON.stringify({ caller: by, until: now + CREDIT_MS })));
 }
 
-// Rule 13: an agent reads a Doc as its text and edits it by one exact replacement. The edit goes
-// to Google; the next pull into its mirror is credited to that agent, so the page shows it as theirs.
-
 export const CREDIT_MS = 15_000;
 
 async function creditOf(store: Store, id: string, now: number): Promise<Caller> {
@@ -95,21 +95,40 @@ async function creditOf(store: Store, id: string, now: number): Promise<Caller> 
 	return credit && credit.until > now ? credit.caller : GOOGLE;
 }
 
-/** A Doc's words and title, by its address or id. */
-export async function readDoc(docs: GoogleDocs, url: string): Promise<{ doc: string; title?: string; text: string }> {
-	const id = docIdOf(url);
-	const doc = await docs.markdown(id);
-	return { doc: id, ...(doc.title ? { title: doc.title } : {}), text: doc.text };
+// The sync of one linked Doc with its mirror, three ways.
+
+/** Theirs merged into ours, both made from base. At one spot, theirs (already saved) goes first. */
+export function merge3(base: string, theirs: string, ours: string): string {
+	if (theirs === base || theirs === ours) return ours;
+	if (ours === base) return theirs;
+	const moved = transformAll(diff(base, theirs), diff(base, ours), true).a;
+	let text = ours;
+	for (const s of moved) text = applyAll(text, [s]) ?? text;
+	return text;
 }
 
-/** Replace one exact piece of a Doc's words, all of it or none; the Doc's words as they now are. */
-export async function editDoc(docs: GoogleDocs, store: Store, url: string, old: string, next: string, by: Caller, now = Date.now()): Promise<{ doc: string; text: string }> {
-	const id = docIdOf(url);
-	const doc = await docs.markdown(id);
-	const count = old ? doc.text.split(old).length - 1 : 0;
-	if (count !== 1) throw new Refused("invalid", count === 0 ? "Those exact words are not in the Doc: google.read shows its words as they are now." : `Those words are in the Doc ${count} times: give more of them, so they are found once.`, "google.read");
-	const at = doc.text.indexOf(old);
-	await docs.writeMarkdown(id, doc.text.slice(0, at) + next + doc.text.slice(at + old.length), doc.revision);
-	await credit(store, id, by, now);
-	return { doc: id, text: (await docs.markdown(id)).text };
+/**
+ * One round for a linked Doc. Pull: the Doc moved from base, so its words are
+ * merged into the mirror, written as "google" (the page shows it as a change).
+ * Push: the mirror moved from base, so its splices go to the Doc.
+ */
+export async function syncOnce(link: Link, remote: DocsRemote, deck: Deck, store: Store, google: Caller): Promise<"same" | "pulled" | "pushed" | "both"> {
+	const key = `google/${link.mirror}`;
+	const kept = await store.get(key);
+	const base = kept ? (JSON.parse(decoder.decode(kept)) as { text: string; revision: string }) : undefined;
+	const doc = await remote.read(link.id);
+	const mirror = await deck.read(link.mirror).then((b) => decoder.decode(b), () => "");
+	const from = base?.text ?? mirror;
+	let pulled = false;
+	let ours = mirror;
+	if (doc.text !== from) {
+		ours = merge3(from, doc.text, mirror);
+		if (ours !== mirror) await deck.write(link.mirror, encoder.encode(ours), google);
+		pulled = true;
+	}
+	let revision = doc.revision;
+	const pushing = diff(doc.text, ours);
+	if (pushing.length) revision = (await remote.write(link.id, pushing, doc.revision)).revision;
+	await store.put(key, encoder.encode(JSON.stringify({ text: ours, revision })));
+	return pulled && pushing.length ? "both" : pulled ? "pulled" : pushing.length ? "pushed" : "same";
 }

@@ -12,13 +12,6 @@ import { FILES } from "./page.ts";
 const { file, card } = calls;
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-async function answerOf(ctx: Context, path: ReturnType<typeof fence>): Promise<S.File> {
-	const entry = await stat(ctx.deck, path);
-	if (!entry) throw new Refused("not_found", `There is nothing at ${path}.`, "file.list");
-	const by = (await ctx.deck.revisions?.(path))?.at(-1)?.by;
-	return { ...fileOf(entry), ...(by ? { by } : {}) };
-}
-
 const FILE = { list: file.list, find: file.find, read: file.read, write: file.write, edit: file.edit, grep: file.grep, move: file.move, remove: file.remove, url: file.url };
 
 export const fileCalls: Handled<Context>[] = handleAll(FILE, {
@@ -61,6 +54,13 @@ export const fileCalls: Handled<Context>[] = handleAll(FILE, {
 	},
 	url: async (_ctx, { path }) => FILES + encodeURI(fence(path)),
 });
+
+async function answerOf(ctx: Context, path: ReturnType<typeof fence>): Promise<S.File> {
+	const entry = await stat(ctx.deck, path);
+	if (!entry) throw new Refused("not_found", `There is nothing at ${path}.`, "file.list");
+	const by = (await ctx.deck.revisions?.(path))?.at(-1)?.by;
+	return { ...fileOf(entry), ...(by ? { by } : {}) };
+}
 
 async function readPast(ctx: Context, path: ReturnType<typeof fence>, sha: string, from?: number, lines?: number): Promise<S.FileText> {
 	const rev = Number(sha);

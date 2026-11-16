@@ -10,7 +10,9 @@ and Google Docs.
 - Which deck revisions are versions, and the changes waiting for review (records.ts), in its store.
 - The document as an item kind (item.ts): `{ type: "document", path, box }` on a call, a `browser`
   node tagged `decks.document` in canvas.pen.
-- `google.status connect disconnect`, and a Google Doc's sync with its mirror (google.ts).
+- The google calls: the sign-in seam (google.ts), linked Docs and their mirrors' sync (links.ts),
+  agents' read and edit (google-tools.ts), a page's calls by mirror (mirror-calls.ts), and the
+  real client in google/ (client.ts, docs.ts, units, markdown, plan).
 
 ## May import
 

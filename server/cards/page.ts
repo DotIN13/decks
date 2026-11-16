@@ -23,32 +23,36 @@ const TYPES: Record<string, string> = {
 	pdf: "application/pdf", mp4: "video/mp4", mp3: "audio/mpeg", wav: "audio/wav", woff2: "font/woff2", wasm: "application/wasm",
 };
 
-const runs = (attrs: string) => RUNS.test(/\btype\s*=\s*["']?([^"'\s>]*)/i.exec(attrs)?.[1] ?? "");
+// --- the route: every file, a card's page, its modules ---
 
-/** The inline scripts a card runs, in order: the n-th is served at <card>.m<n>.js. */
-export function cardModules(source: string): string[] {
-	return [...source.matchAll(SCRIPT)].filter((m) => !/\bsrc\s*=/.test(m[1] ?? "") && runs(m[1] ?? "")).map((m) => m[2] ?? "");
-}
+export const routes: Route[] = [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query) }];
 
-/** The width a card asks for in its meta tag. */
-export function widthOf(source: string): number {
-	const content = /<meta\s+name=["'][\w-]+["']\s+content='(\{[^']*)'/i.exec(source)?.[1];
+/** GET /files/<path>: a file, a card's page, or one of its modules. */
+export async function answerFile(ctx: Context, rest: string, query: URLSearchParams): Promise<RouteAnswer> {
 	try {
-		const w = (JSON.parse(content ?? "{}") as { w?: unknown }).w;
-		return typeof w === "number" && w > 0 ? w : 1000;
-	} catch {
-		return 1000;
+		const asked = decodeURIComponent(rest.startsWith(FILES) ? rest.slice(FILES.length) : rest.replace(/^\/+/, ""));
+		const pass = query.get("pass") ? `?pass=${encodeURIComponent(query.get("pass")!)}` : "";
+		const module = /^(.+\/index\.html)\.m(\d+)\.js$/i.exec(asked);
+		if (module && layout.isCardPath(module[1]!)) {
+			if (layout.isSharedCanvas(layout.canvasOfPath(module[1]!)?.name ?? "")) return refusal(403, "A card shared with you runs no scripts.");
+			const source = cardModules(decoder.decode(await ctx.deck.read(fence(module[1]))))[Number(module[2])];
+			return source === undefined ? refusal(404, "The card has no such script.") : { type: "text/javascript", body: source, headers: { "cache-control": "no-cache" } };
+		}
+		const path = fence(asked);
+		if ((await stat(ctx.deck, path))?.kind !== "file") return refusal(404, `There is no file at ${path}.`);
+		if (layout.isCardPath(path) && query.get("raw") === null) {
+			return { type: "text/html", body: cardPage({ path, source: decoder.decode(await ctx.deck.read(path)), pass, deckImports: await deckImports(ctx) }) };
+		}
+		return { type: TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream", body: await ctx.deck.read(path) };
+	} catch (error) {
+		if (error instanceof Refused) return refusal(error.code === "not_found" ? 404 : error.code === "refused" ? 403 : 400, error.message);
+		throw error;
 	}
 }
 
-const STYLE = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
+const refusal = (status: number, message: string): RouteAnswer => ({ status, type: "text/plain", body: message });
 
-/** A card's own :host rules, made to apply to its element on a page of its own as they do on the canvas. */
-export function hostRules(html: string): string {
-	return html.replace(STYLE, (_all, open: string, css: string, close: string) => open + css.replace(/:host\(([^()]*)\)/g, "#decks-card$1").replace(/:host\b/g, "#decks-card") + close);
-}
-
-const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// --- a card as a page of its own ---
 
 /** A card as a page of its own: the piece under card.css, its modules called with a card. */
 export function cardPage(input: { path: string; source: string; pass: string; deckImports: Record<string, string> }): string {
@@ -110,29 +114,31 @@ async function deckImports(ctx: Context): Promise<Record<string, string>> {
 	}
 }
 
-const refusal = (status: number, message: string): RouteAnswer => ({ status, type: "text/plain", body: message });
+// --- what the page reads from a card ---
 
-/** GET /files/<path>: a file, a card's page, or one of its modules. */
-export async function answerFile(ctx: Context, rest: string, query: URLSearchParams): Promise<RouteAnswer> {
+const runs = (attrs: string) => RUNS.test(/\btype\s*=\s*["']?([^"'\s>]*)/i.exec(attrs)?.[1] ?? "");
+
+/** The inline scripts a card runs, in order: the n-th is served at <card>.m<n>.js. */
+export function cardModules(source: string): string[] {
+	return [...source.matchAll(SCRIPT)].filter((m) => !/\bsrc\s*=/.test(m[1] ?? "") && runs(m[1] ?? "")).map((m) => m[2] ?? "");
+}
+
+/** The width a card asks for in its meta tag. */
+export function widthOf(source: string): number {
+	const content = /<meta\s+name=["'][\w-]+["']\s+content='(\{[^']*)'/i.exec(source)?.[1];
 	try {
-		const asked = decodeURIComponent(rest.startsWith(FILES) ? rest.slice(FILES.length) : rest.replace(/^\/+/, ""));
-		const pass = query.get("pass") ? `?pass=${encodeURIComponent(query.get("pass")!)}` : "";
-		const module = /^(.+\/index\.html)\.m(\d+)\.js$/i.exec(asked);
-		if (module && layout.isCardPath(module[1]!)) {
-			if (layout.isSharedCanvas(layout.canvasOfPath(module[1]!)?.name ?? "")) return refusal(403, "A card shared with you runs no scripts.");
-			const source = cardModules(decoder.decode(await ctx.deck.read(fence(module[1]))))[Number(module[2])];
-			return source === undefined ? refusal(404, "The card has no such script.") : { type: "text/javascript", body: source, headers: { "cache-control": "no-cache" } };
-		}
-		const path = fence(asked);
-		if ((await stat(ctx.deck, path))?.kind !== "file") return refusal(404, `There is no file at ${path}.`);
-		if (layout.isCardPath(path) && query.get("raw") === null) {
-			return { type: "text/html", body: cardPage({ path, source: decoder.decode(await ctx.deck.read(path)), pass, deckImports: await deckImports(ctx) }) };
-		}
-		return { type: TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream", body: await ctx.deck.read(path) };
-	} catch (error) {
-		if (error instanceof Refused) return refusal(error.code === "not_found" ? 404 : error.code === "refused" ? 403 : 400, error.message);
-		throw error;
+		const w = (JSON.parse(content ?? "{}") as { w?: unknown }).w;
+		return typeof w === "number" && w > 0 ? w : 1000;
+	} catch {
+		return 1000;
 	}
 }
 
-export const routes: Route[] = [{ method: "GET", prefix: FILES, answer: (ctx, path, query) => answerFile(ctx, path, query) }];
+const STYLE = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
+
+/** A card's own :host rules, made to apply to its element on a page of its own as they do on the canvas. */
+export function hostRules(html: string): string {
+	return html.replace(STYLE, (_all, open: string, css: string, close: string) => open + css.replace(/:host\(([^()]*)\)/g, "#decks-card$1").replace(/:host\b/g, "#decks-card") + close);
+}
+
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

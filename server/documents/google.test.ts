@@ -5,7 +5,8 @@ import { callers, testServer } from "../kernel/testing.ts";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { MemoryStore } from "../kernel/store.ts";
 import { documents } from "./feature.ts";
-import { merge3, syncOnce, type DocsRemote } from "./google.ts";
+import type { DocsRemote } from "./google.ts";
+import { merge3, syncOnce } from "./links.ts";
 import { applyAll } from "./splice.ts";
 
 // Google Docs: a mirror kept in step with its Doc, and the sign-in seam.
