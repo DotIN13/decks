@@ -45,7 +45,7 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
    from the canvas's folder. Read and written back, a node keeps every field it had.
 13. A card's files are its whole folder: they travel with it on copy, paste and share.
 14. A card's page (`/files/<card>`) is the card in a page of its own; its n-th module is
-   `/files/<card>.m<n>.js`. A card on a friend's canvas runs no scripts: its modules are refused.
+   `/files/<card>.m<n>.js`, on `card.url`'s pass, an hour long. A friend's canvas's card runs no scripts.
 15. The card runtime in `lib/` is brought up to this build's on start: a file is written only when
    its bytes differ, and one this build no longer ships is removed.
 16. A card item given as html is written into a new folder of the canvas before it is placed.

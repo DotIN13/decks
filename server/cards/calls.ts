@@ -7,6 +7,9 @@ import { fence, fenceDir } from "./fence.ts";
 import { applyEdits, checkRev, fileOf, globToRegex, LIMIT, matchesGlob, readText, slice, stat, walk, writeText } from "./files.ts";
 import { FILES } from "./page.ts";
 
+/** How long the pass in card.url's address opens the card's page (README rule 14). */
+export const PAGE_PASS_MS = 3_600_000;
+
 // One short handler per call. The file calls, then the card calls.
 
 const { file, card } = calls;
@@ -144,7 +147,10 @@ export function cardCalls(kernel: () => Kernel | undefined): Handled<Context>[] 
 		url: async (ctx, { card: name }) => {
 			const path = cardPath(name);
 			if (!(await stat(ctx.deck, path))) throw new Refused("not_found", `There is no card at ${path}.`, "card.list");
-			const pass = kernel()?.callers.issue({ kind: "card", id: path, name: path, canvas: canvasOf(path) }, "card page");
+			const callers = kernel()?.callers;
+			const pass = callers?.issue({ kind: "card", id: path, name: path, canvas: canvasOf(path) }, "card page");
+			// The page's pass ends after an hour, as the frame's does: it is never kept for good.
+			if (pass && callers?.forget) setTimeout(() => callers.forget!(pass), PAGE_PASS_MS).unref?.();
 			return FILES + encodeURI(path) + (pass ? `?pass=${encodeURIComponent(pass)}` : "");
 		},
 	});

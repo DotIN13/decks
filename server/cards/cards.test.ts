@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { callers, testContext, testServer } from "../kernel/testing.ts";
 import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { slug, titleOf } from "./cards.ts";
+import { PAGE_PASS_MS } from "./calls.ts";
 import { cards } from "./feature.ts";
 import { cardKind } from "./item.ts";
 import { syncLib } from "./lib.ts";
@@ -143,4 +144,16 @@ test("rule 14: a card's own :host rules apply to its element on its page", async
 	const { hostRules } = await import("./page.ts");
 	assert.equal(hostRules("<style>:host { background: #000 } :host([data-theme=dark]) p { color: red }</style><p>x</p>"), "<style>#decks-card { background: #000 } #decks-card[data-theme=dark] p { color: red }</style><p>x</p>");
 	assert.equal(hostRules("<p>:host stays in words</p>"), "<p>:host stays in words</p>");
+});
+
+test("rule 14: card.url's pass ends after an hour", async (t) => {
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const s = await start();
+	const { path } = await s.value<{ path: string }>("card.create", { title: "Short" }, ann);
+	const url = await s.value<string>("card.url", { card: path });
+	const pass = decodeURIComponent(url.split("pass=")[1]!);
+	assert.equal(s.kernel.callers.resolve(pass)?.kind, "card");
+	t.mock.timers.tick(PAGE_PASS_MS);
+	assert.equal(s.kernel.callers.resolve(pass), undefined);
+	await s.close();
 });
