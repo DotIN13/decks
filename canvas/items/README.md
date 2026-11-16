@@ -7,6 +7,7 @@ What sits on the canvas besides the drawing, and when each wakes: apps, document
 - `awake.ts`: which items are awake.
 - `item-slot.tsx`, `item-surfaces.tsx`: an item's place and its surface.
 - `MediaPlayer.tsx`, `missing.ts`, `natural-size.ts`, `news.ts`, `file-drop.ts`, `file-kinds.ts`.
+- `glide.ts`: items gliding to where an edit or a drop put them.
 
 ## May import
 

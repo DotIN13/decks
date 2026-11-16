@@ -1,7 +1,7 @@
 import { knobs } from "../debug.ts";
 import type { Camera } from "@decks/protocol-old";
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { touchedCanvas } from "../camera/touched.ts";
+import { touchedCanvas } from "../camera/hands-on.ts";
 import { boxOf, pan, pinchCamera, zoomAbout, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
@@ -199,7 +199,7 @@ function listenPresses(c: InputCtx, element: HTMLDivElement): void {
 
 /** A hand on the canvas holds an agent's show; a pinch elsewhere does nothing; the camera follows the scroll; the scroll keys are the canvas's. */
 function listenCanvas(c: InputCtx, element: HTMLDivElement): void {
-	// A hand on the canvas holds the view against an agent's show (`camera/touched.ts`).
+	// A hand on the canvas holds the view against an agent's show (`camera/hands-on.ts`).
 	for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.addEventListener(kind, touchedCanvas, { capture: true, passive: true });
 	onCleanup(() => {
 		for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.removeEventListener(kind, touchedCanvas, { capture: true });

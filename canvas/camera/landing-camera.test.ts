@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { landingCamera, sameOwner } from "./land.ts";
+import { landingCamera, sameOwner } from "./landing-camera.ts";
 
 // Where the camera lands on arriving at a view's key: a saved view, else the middle of all.
 

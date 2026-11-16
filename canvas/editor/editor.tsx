@@ -5,7 +5,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { fitInto, frames } from "../camera/camera.ts";
 import { topBoxes } from "../drawing/boxes.ts";
 import { viewToPark } from "../camera/agent-view.ts";
-import { createAgentViews, type ViewStorage } from "../camera/agent-views.ts";
+import { createAgentViews, type ViewStorage } from "../camera/agent-view-store.ts";
 import { canvasBox } from "../camera/insets.ts";
 import type { StageEngine } from "../render/engine.ts";
 import { pagesAhead, pagesOf, createDrawing } from "../drawing/drawing.ts";

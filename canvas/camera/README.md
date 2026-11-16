@@ -5,10 +5,10 @@ Where the canvas looks: the camera, glides, insets, landing on a canvas, agents'
 ## Owns
 
 - `camera.ts`, `controller.ts`, `coords.ts`: the camera and who moves it.
-- `glide.ts`, `spring.ts`, `land.ts`, `landing.ts`: motion and arriving.
-- `agent-view.ts`, `agent-views.ts`: each agent's own view.
+- `spring.ts`, `landing-camera.ts` (where the camera lands), `landing.ts`: motion and arriving.
+- `agent-view.ts` (what a view remembers), `agent-view-store.ts` (where views are kept).
 - `view-calls.ts`: the view calls a screen answers (`view.focus`, `view.goto`, ...).
-- `insets.ts`, `scroll-area.ts`, `touch.ts`, `touched.ts`, `zoom-keys.ts`.
+- `insets.ts`, `scroll-area.ts`, `touch.ts`, `hands-on.ts` (when a hand last touched the canvas), `zoom-keys.ts`.
 
 ## May import
 

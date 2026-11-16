@@ -240,7 +240,7 @@ const beforeEmpty = await look();
 await goTo("Cass", []);
 const empty = await look();
 /*
- * Since d530ba5a the camera has an owner (`camera/land.ts`): an empty canvas with no view kept for
+ * Since d530ba5a the camera has an owner (`camera/landing-camera.ts`): an empty canvas with no view kept for
  * it lands on the canvas's origin at 100%, never on the camera of the agent being left, which used
  * to be saved a moment later as this one's own.
  */

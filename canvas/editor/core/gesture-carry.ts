@@ -1,7 +1,7 @@
 import { isCard, type Op } from "@decks/pen";
 import { snapMove, type Guide } from "../snap.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
-import { landingBoxes } from "../../camera/glide.ts";
+import { landingBoxes } from "../../items/glide.ts";
 import type { PageBox, EditorState, Mods, Offset, Pt, Rect } from "./model.ts";
 import { pageMoves, copyOps, moveOps, type PageMove } from "./ops.ts";
 import type { SceneQuery } from "./scene.ts";

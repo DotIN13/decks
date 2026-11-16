@@ -9,7 +9,7 @@ import { setDrawing } from "../../ink/ink.ts";
 import { useInsets } from "../../camera/insets.ts";
 import { runStageCall } from "../../camera/view-calls.ts";
 import { cardShot } from "../../cards/card-surface.tsx";
-import { handsOn } from "../../camera/touched.ts";
+import { handsOn } from "../../camera/hands-on.ts";
 import { drawingFollower } from "./backend.ts";
 import { installClipboard, sayer } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";

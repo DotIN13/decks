@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createAgentViews, type ViewStorage } from "./agent-views.ts";
+import { createAgentViews, type ViewStorage } from "./agent-view-store.ts";
 
 /**
  * Where you were looking, kept on the device.

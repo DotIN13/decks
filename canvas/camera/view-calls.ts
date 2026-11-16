@@ -33,7 +33,7 @@ export interface StageOpsHost {
 	 * (the page's shell), because a click *is* about the journey to what was clicked.
 	 */
 	setCamera(camera: Camera, options?: { animate?: boolean }): void;
-	/** The person has used the canvas in the last few seconds (`camera/touched.ts`): the view is theirs. */
+	/** The person has used the canvas in the last few seconds (`camera/hands-on.ts`): the view is theirs. */
 	handsOn?(): boolean;
 	/** Offer the held view instead: a notice whose button moves there (`state/notices.ts`, `offer`). */
 	offerView?(agentId: string, camera: Camera, selected: string | undefined, what: "card" | "view"): void;

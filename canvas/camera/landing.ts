@@ -1,8 +1,8 @@
 import type { Camera } from "@decks/protocol-old";
 import { viewToPark } from "./agent-view.ts";
-import type { AgentViews } from "./agent-views.ts";
+import type { AgentViews } from "./agent-view-store.ts";
 import { frames as showsAny, type Viewport } from "./camera.ts";
-import { landingCamera, sameOwner, type CameraOwner } from "./land.ts";
+import { landingCamera, sameOwner, type CameraOwner } from "./landing-camera.ts";
 import type { Box } from "../drawing/boxes.ts";
 
 /**

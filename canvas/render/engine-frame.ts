@@ -4,7 +4,7 @@
  */
 import { EMPTY, SHEET_MARGIN, type StageEngine as Engine, webKit } from "./engine.ts";
 import { knobs, probes } from "../debug.ts";
-import { glideShifts, glideStep, type Shift, shiftsFrom } from "../camera/glide.ts";
+import { glideShifts, glideStep, type Shift, shiftsFrom } from "../items/glide.ts";
 import { type Frame, isArrow, type PenDocument } from "@decks/pen";
 import type { PenPreview, TileFromWorker } from "./types.ts";
 import { cardReader } from "./reader.ts";
@@ -217,7 +217,7 @@ export function glidesWanted(): boolean {
 
 /**
  * The drawing that answers a drop is laid out: everything that moved glides from where it was let
- * go to where it is now (`camera/glide.ts`). Shown before this drawing's first frame, so nothing is
+ * go to where it is now (`items/glide.ts`). Shown before this drawing's first frame, so nothing is
  * drawn where it lands before it has glided there. False when nothing moved.
  */
 export function startGlide(e: Engine): boolean {

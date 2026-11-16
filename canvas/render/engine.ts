@@ -20,7 +20,7 @@ import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../editor/snap.ts";
 import { BoxIndex, type Rect } from "./spatial.ts";
 import { type Words } from "./measure.ts";
-import { type Shift } from "../camera/glide.ts";
+import { type Shift } from "../items/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { type Detected, type StageModule } from "./backends/detect.ts";
 import { ENGINE, knownGpuClass, PICTURES } from "./device.ts";

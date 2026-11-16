@@ -5,7 +5,7 @@
 import { pictureKey, type RootCard, type RootLaid, SHEET_MARGIN, type StageEngine as Engine } from "./engine.ts";
 import { diff, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { CardGeometry, DocEdits, SceneCard } from "./types.ts";
-import type { Shift } from "../camera/glide.ts";
+import type { Shift } from "../items/glide.ts";
 import { drawnNodes } from "../drawing/doc-index.ts";
 import { boundsOf } from "../drawing/bounds.ts";
 import { fontFiles } from "../look/font-files.ts";
