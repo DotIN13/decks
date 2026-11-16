@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { StageSnapshot } from "../calls/tool.ts";
+import type { StageSnapshot } from "./work.ts";
 import { AgentStateStore } from "./agent-state.ts";
 
 const snapshot = (context: string[], name = "Agent"): StageSnapshot => ({

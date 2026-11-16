@@ -450,7 +450,7 @@ test("work can be sent to an agent by name, and lands in its queue", () => {
 	const result = registry.send(ada, "Kit", { task: "Remeasure the panel", boards: ["canvases/t/cards/plan/index.html", "canvases/t/cards/gone/index.html"] });
 	assert.deepEqual(result, { queued: true, position: 1 });
 
-	const waiting = registry.get(kit)?.queue() ?? [];
+	const waiting = registry.get(kit)?.turns.queue() ?? [];
 	assert.equal(waiting.length, 1);
 	assert.equal(waiting[0]?.fromName, "Ada", "and it says who sent it");
 	assert.deepEqual(waiting[0]?.boards, ["canvases/t/cards/plan/index.html"], "boards that do not exist are dropped");
@@ -711,7 +711,7 @@ test("send carries reply into the queued item, and not without it", () => {
 
 	registry.send(ada, kit, { task: "one", reply: true });
 	registry.send(ada, kit, { task: "two" });
-	const waiting = registry.get(kit)?.queue() ?? [];
+	const waiting = registry.get(kit)?.turns.queue() ?? [];
 	assert.equal(waiting.length, 2);
 	assert.equal(waiting[0]?.reply, true);
 	assert.equal(waiting[1]?.reply, undefined, "plain sends stay plain");
@@ -744,7 +744,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					camera: () => ({ x: 0, y: 0, zoom: 1 }),
 					agents: () => [],
 							send: (fromId, target, spec) => this.send(fromId, target, spec),
-					queue: (agentId) => this.get(agentId)?.queue() ?? [],
+					queue: (agentId) => this.get(agentId)?.turns.queue() ?? [],
 					// The real wiring under test: the receiver's `report` call becomes a
 					// notice in whoever is named — a transcript item, not a queued task.
 					report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
@@ -783,7 +783,7 @@ test("a reply is delivered as a notice in the sender's transcript — and never 
 	await settle(80);
 
 	assert.deepEqual(receiver.ran, ["Remeasure the panel numbers [canvases/t/cards/plan/index.html]"], "the receiver did the work");
-	assert.equal(receiver.queued, 0, "and its queue drained");
+	assert.equal(receiver.turns.queued, 0, "and its queue drained");
 	const notices = sent.filter(
 		(message): message is Extract<ServerMessage, { type: "chat.item" }> => message.type === "chat.item" && message.item.kind === "notice",
 	);
@@ -795,7 +795,7 @@ test("a reply is delivered as a notice in the sender's transcript — and never 
 	);
 	// The no-loop rule: nothing was queued to the sender, so nothing can ever wake them to
 	// answer the report — the reply is read when they next look, not turned into a turn.
-	assert.equal(sender.queued, 0, "no task landed in the sender's queue");
+	assert.equal(sender.turns.queued, 0, "no task landed in the sender's queue");
 	assert.deepEqual(sender.ran, [], "and no turn of the sender ever ran");
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();

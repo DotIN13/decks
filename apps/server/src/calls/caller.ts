@@ -39,9 +39,9 @@ export async function callerOf(app: CallsHost, req: Pick<Request, "headers"> & {
 			const agent = app.agents.get(principal.id);
 			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
 			// An agent that works outside Decks is here while it calls, and what it changes is said in its conversation.
-			agent.touch();
-			return { tool: agent.stageTool(), ...(agent.outsideKey ? { announce: (name: string, answer: StageCallResult) => {
-						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.noteAct(actLine(name, answer));
+			agent.inbox.touch();
+			return { tool: agent.stageTool(), ...(agent.inbox.outsideKey ? { announce: (name: string, answer: StageCallResult) => {
+						if (answer.ok && VERB_BY_NAME.get(name)?.effect === "change" && name !== "agent.news") agent.inbox.noteAct(actLine(name, answer));
 					},
 				}
 				: {}) };

@@ -36,10 +36,10 @@ function open() {
 test("with nothing running a queued message is simply sent; while working it waits, one per turn", () => {
 	const { agent, sent, said, state, cleanup } = open();
 	try {
-		agent.queueMine("first");
+		agent.turns.queueMine("first");
 		assert.deepEqual(sent, ["first"], "idle: sent at once");
-		agent.queueMine("second");
-		agent.queueMine("third");
+		agent.turns.queueMine("second");
+		agent.turns.queueMine("third");
 		assert.deepEqual(sent, ["first"], "working: held");
 		assert.deepEqual(said.at(-1)?.items.map((one) => one.text), ["second", "third"]);
 		state("idle");
@@ -55,21 +55,21 @@ test("with nothing running a queued message is simply sent; while working it wai
 test("Stop holds the queue until it is let go, and a row can be removed or sent now", async () => {
 	const { agent, sent, said, state, cleanup } = open();
 	try {
-		agent.queueMine("working on it");
-		agent.queueMine("a");
-		agent.queueMine("b");
+		agent.turns.queueMine("working on it");
+		agent.turns.queueMine("a");
+		agent.turns.queueMine("b");
 		await agent.abort();
 		state("idle");
 		assert.deepEqual(sent, ["working on it"], "stopped: nothing more goes");
 		assert.equal(said.at(-1)?.held, true);
 		const [, b] = said.at(-1)!.items;
-		agent.unqueueMine(b!.id);
+		agent.turns.unqueueMine(b!.id);
 		assert.deepEqual(said.at(-1)?.items.map((one) => one.text), ["a"]);
-		agent.queueMine("c");
-		agent.sendMineNow(said.at(-1)!.items.find((one) => one.text === "c")!.id);
+		agent.turns.queueMine("c");
+		agent.turns.sendMineNow(said.at(-1)!.items.find((one) => one.text === "c")!.id);
 		assert.deepEqual(sent, ["working on it", "c"], "send now goes whatever is held");
 		state("idle");
-		agent.releaseMine();
+		agent.turns.releaseMine();
 		assert.deepEqual(sent, ["working on it", "c", "a"], "let go: the rest goes");
 	} finally {
 		cleanup();

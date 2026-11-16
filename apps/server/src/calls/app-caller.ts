@@ -85,7 +85,7 @@ export function appTool(host: Pick<CallsHost, "agents" | "cameras" | "boards" | 
 		positions: () => conversation.seat.positions(),
 		setPosition: (path, x, y) => conversation.seat.setPosition(path, x, y),
 		camera: () => host.cameras.answer(conversation.id, conversation.seat.stageName?.()),
-		queue: () => conversation.queue(),
+		queue: () => conversation.turns.queue(),
 		agents: () => host.agents.summaries(),
 		// The sender is the conversation: a reply has to find somebody to land in, and an app has no inbox.
 		send: (target, spec) => host.agents.send(conversation.id, target, spec),

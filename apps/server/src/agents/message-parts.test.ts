@@ -61,12 +61,12 @@ test("a queued message keeps its parts until it is sent, and the queue row shows
 		const agent = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
 		const prompted: Array<[string, MessagePart[] | undefined]> = [];
 		(agent as unknown as { prompt: (t: string, p?: MessagePart[]) => Promise<void> }).prompt = async (t, p) => void prompted.push([t, p]);
-		agent.queueMine(text, parts);
+		agent.turns.queueMine(text, parts);
 		assert.deepEqual(prompted, [[text, parts]], "idle: sent at once, with its parts");
 		(agent as unknown as { translator: Translator }).translator.setState("thinking");
-		agent.queueMine("again", parts);
-		assert.deepEqual(Object.keys(agent.queuedMine().items[0]!), ["id", "text"]);
-		agent.sendMineNow(agent.queuedMine().items[0]!.id);
+		agent.turns.queueMine("again", parts);
+		assert.deepEqual(Object.keys(agent.turns.queuedMine().items[0]!), ["id", "text"]);
+		agent.turns.sendMineNow(agent.turns.queuedMine().items[0]!.id);
 		assert.deepEqual(prompted[1], ["again", parts]);
 	} finally {
 		app.dispose();

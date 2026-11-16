@@ -8,7 +8,7 @@ import type { StageService } from "../stage/service.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
-import { PERSON, type CreateSpec, type SendSpec } from "../calls/tool.ts";
+import { PERSON, type CreateSpec, type SendSpec } from "./work.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
@@ -137,7 +137,7 @@ export class Registry {
 				// The workspace, or `undefined` for an agent in none — see `agents/workspaces.ts` for
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
-				queued: agent.queued,
+				queued: agent.turns.queued,
 				// The stage it has open, so `decks.canvas.list()` can say who is on each (`stage/pens.ts`).
 				stage: agent.seat.stageName(),
 				// The picture it drew, `/api/avatar/<id>?rev=…`, for another front end's agent rows (Studio).
@@ -159,7 +159,7 @@ export class Registry {
 		const key = spec.key.trim().slice(0, 200);
 		if (!key) throw new Error('An outside agent joins with a key of its own, the same each time it comes back: { key: "claude-code:/Users/you/project" }.');
 		const client = spec.client?.replace(/\s+/g, " ").trim().slice(0, 60) || "an MCP client";
-		let agent = this.agents.find((one) => one.outsideKey === key);
+		let agent = this.agents.find((one) => one.inbox.outsideKey === key);
 		const made = !agent;
 		if (!agent) {
 			const focused = this.focusedId;
@@ -169,9 +169,9 @@ export class Registry {
 			// A session joining in a terminal does not change which conversation is up.
 			if (focused) this.focusedId = focused;
 			this.publish();
-			agent.keep();
+			agent.inbox.keep();
 		}
-		agent.touch(client);
+		agent.inbox.touch(client);
 		return { agent, made, token: this.host.bridge?.issue(agent.id) };
 	}
 
@@ -260,7 +260,7 @@ export class Registry {
 				deliver: (fromId, target, spec) => this.deliver(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
-				queue: (agentId) => this.get(agentId)?.queue() ?? [],
+				queue: (agentId) => this.get(agentId)?.turns.queue() ?? [],
 				brief: (task, boards, person) => brief(task, boards, this.deck, person),
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
@@ -595,7 +595,7 @@ export class Registry {
 		const from = this.sender(fromId);
 		const to = this.resolve(target);
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		const answer = to.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
+		const answer = to.turns.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
 		this.publish();
 		return answer;
 	}
@@ -620,7 +620,7 @@ export class Registry {
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		const position = to.enqueue({
+		const position = to.turns.enqueue({
 			...from,
 			task: spec.task.trim(),
 			boards: handed,

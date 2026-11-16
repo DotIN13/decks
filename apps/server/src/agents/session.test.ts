@@ -428,10 +428,10 @@ const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 test("queued work is announced when it arrives, not when it runs", () => {
 	const { agent, sent, cleanup } = probeOn();
-	const position = agent.enqueue(item("Remeasure the panel numbers"));
+	const position = agent.turns.enqueue(item("Remeasure the panel numbers"));
 
 	assert.equal(position, 1, "and the sender is told where it landed");
-	assert.equal(agent.queued, 1);
+	assert.equal(agent.turns.queued, 1);
 	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
 	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice", "a notice in the receiver's transcript");
 	assert.match(notice.item.text, /Ada queued work for you: Remeasure the panel numbers/);
@@ -440,18 +440,18 @@ test("queued work is announced when it arrives, not when it runs", () => {
 
 test("a queue is capped, and the item over the cap is refused rather than dropped", () => {
 	const { agent, cleanup } = probeOn();
-	for (let n = 0; n < 8; n++) agent.enqueue(item(`task ${n}`));
-	assert.equal(agent.queued, 8);
-	assert.throws(() => agent.enqueue(item("one too many")), /already has 8 items waiting/);
-	assert.equal(agent.queued, 8, "and nothing was queued");
+	for (let n = 0; n < 8; n++) agent.turns.enqueue(item(`task ${n}`));
+	assert.equal(agent.turns.queued, 8);
+	assert.throws(() => agent.turns.enqueue(item("one too many")), /already has 8 items waiting/);
+	assert.equal(agent.turns.queued, 8, "and nothing was queued");
 	cleanup();
 });
 
 test("the queue drains once the agent has been quiet, one item at a time", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, cleanup } = probeOn();
-	agent.enqueue(item("first", ["canvases/t/cards/plan/index.html"]));
-	agent.enqueue(item("second"));
+	agent.turns.enqueue(item("first", ["canvases/t/cards/plan/index.html"]));
+	agent.turns.enqueue(item("second"));
 
 	// Two quiet spells of 10 ms each: waited for rather than timed, since a loaded machine (the whole
 	// suite at once) can take longer than any fixed sleep to fire both.
@@ -459,7 +459,7 @@ test("the queue drains once the agent has been quiet, one item at a time", async
 	// The brief is composed when the item runs, so the board source is the one that exists
 	// then — here the stub just names what it was handed.
 	assert.deepEqual(agent.ran, ["first [canvases/t/cards/plan/index.html]", "second"]);
-	assert.equal(agent.queued, 0);
+	assert.equal(agent.turns.queued, 0);
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });
@@ -468,7 +468,7 @@ test("a busy agent is not interrupted, and the countdown restarts when it goes q
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, cleanup } = probeOn();
 	agent.translator.setState("thinking");
-	agent.enqueue(item("waits its turn"));
+	agent.turns.enqueue(item("waits its turn"));
 
 	await settle(60);
 	assert.deepEqual(agent.ran, [], "nothing ran while the agent was working");
@@ -494,11 +494,11 @@ test("an item is popped before it runs, so a failure cannot loop", async () => {
 		calls++;
 		throw new Error("the model fell over");
 	};
-	agent.enqueue(item("doomed"));
+	agent.turns.enqueue(item("doomed"));
 
 	await settle(80);
 	assert.equal(calls, 1, "tried once");
-	assert.equal(agent.queued, 0, "and not put back");
+	assert.equal(agent.turns.queued, 0, "and not put back");
 	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
 	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice");
 	assert.match(notice.item.text, /Queued work from Ada failed: the model fell over/);
@@ -509,7 +509,7 @@ test("an item is popped before it runs, so a failure cannot loop", async () => {
 test("a reply asked for goes back to the sender as a notice — never as another queued task", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, reportCalls, sentTos, cleanup } = probeOn();
-	agent.enqueue(item("Remeasure the panel numbers", ["canvases/t/cards/plan/index.html"], true));
+	agent.turns.enqueue(item("Remeasure the panel numbers", ["canvases/t/cards/plan/index.html"], true));
 
 	await settle(80);
 	// The report reached the sender, named with who finished what…
@@ -518,7 +518,7 @@ test("a reply asked for goes back to the sender as a notice — never as another
 	// would queue a task — that is the loop: an item in a queue runs a turn, and the sender
 	// would be woken to answer its own report.
 	assert.deepEqual(sentTos, [], "nothing was queued back to the sender");
-	assert.equal(agent.queued, 0, "and the receiver's own queue drained normally");
+	assert.equal(agent.turns.queued, 0, "and the receiver's own queue drained normally");
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });
@@ -526,7 +526,7 @@ test("a reply asked for goes back to the sender as a notice — never as another
 test("a report nobody asked for is not delivered — a reply you did not ask for is an interruption", async () => {
 	process.env.DECKS_QUEUE_IDLE_MS = "10";
 	const { agent, reportCalls, cleanup } = probeOn();
-	agent.enqueue(item("Remeasure the panel numbers"));
+	agent.turns.enqueue(item("Remeasure the panel numbers"));
 
 	await settle(80);
 	assert.deepEqual(reportCalls, [], "no reply and no delivery: the sender had nothing more to do with the answer");

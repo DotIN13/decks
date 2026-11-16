@@ -183,10 +183,10 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"chat.queue": async ([id, change]) => {
 			const agent = need(id);
 			const asked = (change ?? {}) as { action?: string; text?: string; parts?: unknown[]; item?: string };
-			if (asked.action === "add" && typeof asked.text === "string") agent.queueMine(asked.text, cleanParts(asked.parts as never));
-			else if (asked.action === "remove" && typeof asked.item === "string") agent.unqueueMine(asked.item);
-			else if (asked.action === "send" && typeof asked.item === "string") agent.sendMineNow(asked.item);
-			else if (asked.action === "release") agent.releaseMine();
+			if (asked.action === "add" && typeof asked.text === "string") agent.turns.queueMine(asked.text, cleanParts(asked.parts as never));
+			else if (asked.action === "remove" && typeof asked.item === "string") agent.turns.unqueueMine(asked.item);
+			else if (asked.action === "send" && typeof asked.item === "string") agent.turns.sendMineNow(asked.item);
+			else if (asked.action === "release") agent.turns.releaseMine();
 			agent.sayRow();
 		},
 		"chat.open": async ([id], call) => {
@@ -390,7 +390,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 				modes: runtime?.capabilities.modes ?? [],
 				accounts: accounts.accounts ?? [],
 				account: agent.accountId() ?? accounts.active ?? null,
-				queued: agent.queuedMine(),
+				queued: agent.turns.queuedMine(),
 			};
 		},
 		"agent.reset": async ([id]) => {

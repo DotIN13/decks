@@ -60,7 +60,7 @@ export function register(api: Router, { app }: RouteDeps): void {
 				case "rename":
 					return run(req, res, "agent.set", [agentId, { name: String(given.name ?? "") }], () => ({ id: agentId, name: app.agents.get(agentId)?.chat().name }), 409);
 				case "queue":
-					return run(req, res, "chat.queue", [agentId, given], () => ({ id: agentId, ...app.agents.get(agentId)?.queuedMine() }));
+					return run(req, res, "chat.queue", [agentId, given], () => ({ id: agentId, ...app.agents.get(agentId)?.turns.queuedMine() }));
 				case "stop":
 					return run(req, res, "chat.abort", [agentId], () => ({ id: agentId, stopped: true }));
 				case "remove":
