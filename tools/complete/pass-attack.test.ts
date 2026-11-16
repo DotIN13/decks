@@ -69,6 +69,7 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 			["canvas.screenshot", { to: "canvases/b/cards/secret/index.html" }],
 			["canvas.screenshot", { to: "apps/x/server.js" }],
 			["item.insert", { item: { type: "app", app: "other" } }],
+			["item.insert", { item: { type: "ref", ref: "canvases/b/frames/x.pen" } }],
 			["item.batch", { ops: [{ op: "insert", item: { type: "app", app: "other" } }] }],
 		];
 		for (const [name, args] of calls) {
