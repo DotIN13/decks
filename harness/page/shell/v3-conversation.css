@@ -1,0 +1,469 @@
+/* The conversation in the v3 harness: under the list, with its status pill and the composer and its queue. */
+@layer components {
+	/* ---- the conversation, under the list -------------------------------------------------- */
+
+	.v3-chat {
+		display: flex;
+		min-height: 0;
+		flex: 1 1 0;
+		flex-direction: column;
+		border-top: 1px solid var(--v3-line);
+	}
+	.v3-chat[data-folded="true"] {
+		flex: none;
+		margin-top: auto;
+	}
+	.v3-chat-head {
+		display: flex;
+		height: 44px;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px 0 16px;
+	}
+	.v3-chat-title {
+		display: flex;
+		min-width: 0;
+		align-items: baseline;
+		gap: 8px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+	}
+	.v3-chat-name {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.v3-chat-state {
+		overflow: hidden;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.v3-chat-body {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+	}
+	.v3-chat[data-folded="true"] .v3-chat-body {
+		display: none;
+	}
+
+	/* The conversation itself (`@decks/agent-ui`'s `Stream`), laid flat in the panel. */
+	.v3-chat .stream,
+	.v3-chat .stream[data-shown] {
+		position: static;
+		inset: auto;
+		width: auto;
+		height: auto;
+		max-width: none;
+		min-width: 0;
+		min-height: 0;
+		flex: 1;
+		--gutter: 16px;
+		justify-content: flex-start;
+		overflow: hidden;
+		opacity: 1;
+		pointer-events: auto;
+		translate: none;
+		visibility: visible;
+		resize: none;
+		background: none;
+		box-shadow: none;
+		border: 0;
+		border-radius: 0;
+	}
+	.v3-chat .stream[data-shown] .stream-head {
+		display: none;
+	}
+	/*
+	 * A turn scrolled out of sight is not laid out: a long conversation in the panel was relaid line by
+	 * line at every step of a resize of the panel, and at every change to its width. Each keeps the size
+	 * it last had, so the scroll height and the bottom it is held at do not move.
+	 */
+	/*
+	 * Only while the side panel is being resized: skipped all the time, a turn coming into view was laid
+	 * out mid-scroll, at a guessed height until then, and scrolling stuttered. Each turn keeps the size it
+	 * was last drawn at all along (`contain-intrinsic-size: auto`), so skipped for a resize it holds its
+	 * place exactly.
+	 */
+	.v3-chat .stream[data-shown] .stream-roll > * {
+		contain-intrinsic-size: auto 96px;
+	}
+	:root[data-panel-resizing] .v3-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
+		content-visibility: auto;
+	}
+	.v3-chat .stream[data-shown] .stream-roll {
+		flex: 1 1 auto;
+		--roll-gap: 14px;
+		gap: var(--roll-gap);
+		padding: 6px 16px 16px;
+	}
+	.v3-chat .stream[data-shown] .stream-card {
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		box-shadow: none;
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	.v3-chat .stream[data-shown] .stream-mine {
+		--mine: var(--v3-bg3);
+		--mine-fg: var(--v3-fg);
+	}
+	.v3-chat .stream[data-shown] .stream-bubble {
+		max-width: 88%;
+		padding: 8px 12px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-bg3);
+		box-shadow: none;
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	/*
+	 * Rewind and Fork sit under your message as two quiet text buttons, in place of a menu. They
+	 * come up when the pointer is on the message (always, on a touchscreen), so a history of
+	 * questions does not read as a column of controls.
+	 */
+	.v3-chat .stream[data-shown] .stream-acts {
+		gap: 2px;
+		/* Tucked up against the bubble: the message's 6px gap, less 4. */
+		margin-top: -4px;
+	}
+	.v3-chat .stream[data-shown] .stream-act {
+		height: 22px;
+		gap: 4px;
+		padding: 0 7px 0 6px;
+		border-radius: 6px;
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease),
+			opacity 160ms var(--v3-ease);
+	}
+	.v3-chat .stream[data-shown] .stream-act:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		transition-duration: 120ms;
+	}
+	.v3-chat .stream[data-shown] .stream-act:active {
+		background: var(--v3-bg3);
+	}
+	@media (hover: hover) {
+		.v3-chat .stream[data-shown] .stream-mine:not(:hover, :focus-within) .stream-act {
+			opacity: 0;
+		}
+	}
+	.v3-chat .stream[data-shown] .stream-working {
+		padding: 0;
+		border: 0;
+		background: none;
+		box-shadow: none;
+		color: var(--v3-fg2);
+		font-size: 12px;
+	}
+
+	/* The phone's sheet: the same head and turns, over the canvas, out of the composer. */
+	.v3-chat[data-sheet="true"] {
+		position: absolute;
+		z-index: 25;
+		right: 8px;
+		/* Its foot ends well inside the composer's, so the composer hides it, corners and shadow and all. */
+		bottom: calc(32px + env(safe-area-inset-bottom) + var(--keyboard));
+		left: 8px;
+		top: calc(76px + env(safe-area-inset-top));
+		border: 0;
+		border-radius: 26px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		overflow: hidden;
+	}
+	/*
+	 * The composer stands over the sheet's foot, so the history scrolls on past it: the newest turn
+	 * can always be brought up clear of the composer (`--dock-h`, the composer's measured height).
+	 */
+	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-roll {
+		padding-bottom: calc(var(--dock-h, 120px) - 4px);
+	}
+	/* The way back to the latest messages, above the composer rather than under it. */
+	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-jump {
+		bottom: calc(var(--dock-h, 120px) - 12px);
+	}
+	/* The handle: the bar, in a band tall enough for a thumb, dragged down to put the sheet away. */
+	.v3-sheet-handle {
+		position: relative;
+		width: 36px;
+		height: 4px;
+		flex: none;
+		margin: 8px auto 0;
+		border-radius: 2px;
+		background: var(--v3-fg3);
+		opacity: 0.55;
+		touch-action: none;
+	}
+	.v3-sheet-handle::before {
+		content: "";
+		position: absolute;
+		inset: -8px -120px -10px;
+	}
+	.v3-chat[data-sheet="true"] .v3-chat-head {
+		touch-action: none;
+	}
+	.v3-chat[data-sheet="true"][data-dragged="true"] {
+		transition: none;
+	}
+	.v3-chat[data-sheet="true"][data-settling="true"] {
+		transition: transform 260ms var(--v3-spring);
+	}
+	.app[data-phone="true"]:has(.v3-chat[data-sheet="true"]) .dock {
+		z-index: 26;
+	}
+
+	/* ---- the status pill over the composer -------------------------------------------------- */
+
+	.v3-status.float {
+		display: flex;
+		max-width: 100%;
+		height: 34px;
+		align-items: center;
+		align-self: flex-start;
+		gap: 8px;
+		padding: 0 16px 0 12px;
+		border: 0;
+		border-radius: 999px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+	}
+	.v3-status-sign {
+		color: var(--v3-spark);
+		font-size: 15px;
+		animation: v3-spark 2.4s linear infinite;
+	}
+	.v3-status[data-waiting="true"] .v3-status-sign {
+		color: var(--color-warn, #e5a000);
+		animation: none;
+	}
+	@keyframes v3-spark {
+		to {
+			rotate: 360deg;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-status-sign {
+			animation: none;
+		}
+	}
+
+	/* ---- the composer and its queue -------------------------------------------------------- */
+
+	.dock {
+		width: min(620px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
+	}
+	.dock .composer-box {
+		padding: 8px 8px 6px;
+		border: 0;
+		border-radius: 18px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	/*
+	 * Where a drag of the composer can start: a band from 10px above its edge to 16px below it, so
+	 * the grip is easy to catch without the bar looking any taller. The text starts 10px down, so a
+	 * press on the first few pixels of its top line takes the bar, not the words. Not over a queued
+	 * message above it, which is pressed for itself.
+	 */
+	.dock .composer-box::before {
+		content: "";
+		position: absolute;
+		z-index: 2;
+		top: -10px;
+		left: 12px;
+		right: 12px;
+		height: 26px;
+	}
+	.dock:has(.composer-queue) .composer-box::before {
+		top: 0;
+		height: 16px;
+	}
+	.dock .dock-grip {
+		top: 4px;
+		width: 36px;
+		height: 4px;
+		margin: 0 0 0 -18px;
+		border-radius: 2px;
+		background: var(--v3-fg3);
+		opacity: 0.55;
+	}
+	.dock .dockfield {
+		min-height: 43px;
+		padding: 2px 4px 4px;
+		font-size: 14px;
+	}
+	.dock .dockfield::placeholder,
+	.dock [data-placeholder]::before {
+		color: var(--v3-fg3);
+	}
+	.dock .dock-row {
+		margin-top: 0;
+		gap: 4px;
+	}
+	.dock .dock-row .icon-button {
+		width: 32px;
+		height: 32px;
+		border-radius: 8px;
+		color: var(--v3-fg2);
+	}
+	.dock .dock-row .chip-button {
+		height: 32px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		font-size: 14px;
+	}
+	.dock .dock-row .chip-button:hover,
+	.dock .dock-row .chip-button[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-row .chip-button > svg:first-child:not(:only-child) {
+		display: none;
+	}
+	.dock .send-button {
+		width: 32px;
+		height: 32px;
+		border-radius: 16px;
+		background: var(--v3-accent);
+		color: #ffffff;
+	}
+	.dock .send-button[disabled] {
+		background: var(--v3-bg3);
+		color: var(--v3-fg3);
+	}
+	.dock .send-button[data-stop="true"] {
+		background: var(--v3-danger);
+		color: #ffffff;
+	}
+	.dock .dock-to[data-compact="true"] {
+		margin: 0;
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-chip {
+		height: 32px;
+		gap: 8px;
+		padding: 0 10px 0 8px;
+		border: 0;
+		border-radius: 12px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font-size: 14px;
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-chip:hover,
+	.dock .dock-to[data-compact="true"] .dock-to-chip[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-name {
+		max-width: 140px;
+		font-size: 14px;
+		font-weight: 400;
+	}
+
+	.dock .composer-queue {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.dock .composer-queue-head {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px 0 4px;
+		color: var(--v3-fg);
+	}
+	.composer-queue-fold.v3-icon {
+		width: 22px;
+		height: 22px;
+		color: var(--v3-fg2);
+	}
+	.composer-queue-title {
+		flex: none;
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+	.composer-queue-note {
+		min-width: 0;
+		color: var(--v3-fg3);
+		font-size: 12px;
+	}
+	.dock .composer-queue-release {
+		flex: none;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-accent);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.dock .composer-queue-row {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 10px;
+		padding: 0 4px 0 10px;
+		border-radius: 8px;
+	}
+	.dock .composer-queue-head + .composer-queue-row,
+	.dock .composer-queue-row:hover {
+		background: var(--v3-bg2);
+	}
+	.dock .composer-queue-n {
+		width: auto;
+		height: auto;
+		min-width: 0;
+		border-radius: 0;
+		background: none;
+		color: var(--v3-fg3);
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+	}
+	.dock .composer-queue-text {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		color: var(--v3-fg);
+		font-size: 13px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dock .composer-queue-row .icon-button {
+		width: 26px;
+		height: 26px;
+		color: var(--v3-fg2);
+		opacity: 0;
+	}
+	.dock .composer-queue-head + .composer-queue-row .icon-button,
+	.dock .composer-queue-row:hover .icon-button,
+	.dock .composer-queue-row:focus-within .icon-button {
+		opacity: 1;
+	}
+
+}

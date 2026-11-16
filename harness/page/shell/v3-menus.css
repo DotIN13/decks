@@ -1,0 +1,170 @@
+
+/* ---- menus, as the redesign draws them ("Menus and dialogs redesign" on the Decks Studio canvas) ----
+   White, a hairline and a soft shadow, 10px corners, 30px rows, labels in sentence case, and the
+   current choice a grey wash with no tick. Every `.popover` in the app takes it. */
+@layer components {
+	body .popover {
+		padding: 6px;
+		border: 1px solid var(--v3-line);
+		border-radius: 10px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	[data-color-scheme="dark"] body .popover {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .popover [data-row]:hover,
+	body .popover [data-row]:focus-visible {
+		background: var(--v3-bg2);
+	}
+	body .popover [data-row][data-current="true"],
+	body .popover .row-act:has(> [data-row][data-current="true"]) {
+		background: var(--v3-row-on);
+	}
+	body .popover [data-row][data-flat="true"] {
+		min-height: 30px;
+		gap: 9px;
+		border-radius: 6px;
+	}
+	body .popover [data-row] > .row-icon {
+		color: var(--v3-fg2);
+	}
+	/* On a one-line row the icon sits on the words' middle: the 1px nudge is for two-line rows only. */
+	body .popover [data-row][data-flat="true"] > .row-icon,
+	body .popover [data-row]:not(:has(> .row-note)) > .row-icon {
+		align-self: center;
+		padding-top: 0;
+	}
+	body .popover [data-row]:not(:has(> .row-note)) {
+		align-items: center;
+	}
+	body .popover [data-row] > svg:first-child {
+		align-self: center;
+	}
+	body .popover [data-row][data-flat="true"] > .row-label {
+		min-width: 0;
+		line-height: 18px;
+		white-space: nowrap;
+	}
+	/* A menu never scrolls sideways: a long word truncates in its row instead. */
+	body .popover {
+		overflow-x: hidden;
+	}
+	body .popover [data-row][data-current="true"] > .row-icon {
+		color: var(--v3-row-on-icon);
+	}
+	/* A section's label in a menu: sentence case, quiet, a line inside the list's rhythm. */
+	.menu-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+	}
+	body .popover .group {
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+	body .popover .rule {
+		height: 1px;
+		margin: 5px 2px;
+		background: var(--v3-line);
+	}
+	/* The find field at a menu's top: the panel search's field, a step smaller, not focused on open. */
+	.menu-find {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		margin: 2px 2px 4px;
+		padding: 0 8px 0 9px;
+		border-radius: 6px;
+	}
+	.menu-find input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 12.5px;
+		outline: none;
+	}
+	/* The thinking scale as drawn: a grey track and a raised white thumb on the level, not a blue fill. */
+	body .popover .segmented[data-scale="true"] {
+		padding: 2px;
+		gap: 1px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+		box-shadow: none;
+	}
+	body .popover .segmented[data-scale="true"] > button {
+		height: 24px;
+		border-radius: 5px;
+		font-size: 11.5px;
+	}
+	body .popover .segmented[data-scale="true"] > button:hover {
+		background: transparent;
+		color: var(--v3-fg);
+	}
+	body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: var(--v3-panel);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+		color: var(--v3-fg);
+		font-weight: 500;
+	}
+	[data-color-scheme="dark"] body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: #4a4a4a;
+	}
+	/* The deck switcher's own deck: a card at the top, the others listed under it. */
+	body .popover .row-act[data-here="true"] {
+		margin-bottom: 2px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+	}
+	body .popover .row-act[data-here="true"] .row-label {
+		font-weight: 600;
+	}
+	/* A row that removes something: red, its hover a red wash. */
+	body .popover [data-row].menu-danger:not([disabled]) {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]) > .row-icon {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]):hover {
+		background: color-mix(in srgb, var(--v3-danger, #dc2626) 10%, transparent);
+	}
+	/* A runtime's mark in a small tile, as the New agent menu draws it. */
+	.menu-tile {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		place-items: center;
+		border-radius: 5px;
+		background: var(--v3-bg3);
+	}
+	[disabled] > .menu-tile {
+		background: var(--v3-bg2);
+	}
+	.menu-note {
+		margin-left: auto;
+		padding-left: 10px;
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		white-space: nowrap;
+	}
+}

@@ -1,0 +1,199 @@
+/* The v3 harness's properties panel, Present, and the page on a phone. */
+@layer components {
+	/* ---- the properties panel -------------------------------------------------------------- */
+
+	.props-panel.panel-float {
+		top: 68px;
+		right: 12px;
+		width: 272px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.props-panel .props-head {
+		padding: 10px 10px 10px 14px;
+		border-bottom-color: var(--v3-line);
+	}
+	.props-panel .props-title {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.props-panel .props-sec {
+		border-top-color: var(--v3-line);
+	}
+	.props-panel .field {
+		height: 28px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+	}
+
+	/* ---- present: the canvas alone ---------------------------------------------------------- */
+
+	.app[data-presenting="true"] :is(.v3-chat[data-sheet="true"], .notices) {
+		display: none !important;
+	}
+
+	/* ---- a phone ------------------------------------------------------------------------------ */
+
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		top: calc(8px + env(safe-area-inset-top));
+		right: 8px;
+		left: 8px;
+		width: auto;
+		height: 52px;
+		padding: 0 8px 0 6px;
+		border-radius: 20px;
+	}
+	.app[data-phone="true"] .v3-topbar [data-phone-hide] {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-chip {
+		height: 36px;
+		border-radius: 12px;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-name {
+		max-width: 96px;
+		font-size: 15px;
+	}
+	/* The canvas's name gets the room the bar has, and the deck switcher, which the panel's head holds, gives it up. */
+	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
+		max-width: none;
+		font-size: 15px;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-deck {
+		display: none;
+	}
+	/* The phone's `⋯`: the top-right menu, standing at the right end of the one bar. */
+	.v3-phone-more {
+		position: absolute;
+		z-index: 21;
+		top: calc(8px + env(safe-area-inset-top) + 10px);
+		right: 16px;
+	}
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		padding-right: 48px;
+	}
+	.app[data-phone="true"] .dock {
+		right: 8px;
+		left: 8px;
+		width: auto;
+		transform: none;
+	}
+	.app[data-phone="true"] .props-panel.panel-float,
+	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+		top: auto;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		width: auto;
+		/* The bottom 42% of the screen, as the iPhone properties screen has it: what is selected stays in sight above. */
+		max-height: 42%;
+		border-radius: 26px 26px 0 0;
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+	/*
+	 * In the canvas frame the page's composer is drawn over the frame's foot (`--frame-dock`, how far up it
+	 * reaches): the sheet stands on it, its top where the page's has it, so what is selected stays in sight.
+	 */
+	.decks-canvas[data-phone="true"] .props-panel.panel-float {
+		bottom: var(--frame-dock, 0px);
+		max-height: calc(42% - var(--frame-dock, 0px));
+		border-radius: 26px;
+	}
+	/* Opened as the drawer from the pill (`data-sheet`): the page's composer slides out of its way, so it sits on the foot of the screen, as an iOS sheet does. */
+	.decks-canvas[data-phone="true"] .props-panel.panel-float[data-sheet] {
+		bottom: 0;
+		max-height: 56%;
+		border-radius: 26px 26px 0 0;
+	}
+	/* About three quarters of a phone's width, so a good strip of the canvas stays in sight beside it. */
+	.app[data-phone="true"] .panel-shell.v3-panel {
+		width: min(74vw, 288px) !important;
+		padding-top: env(safe-area-inset-top);
+	}
+
+	/* A touch screen: bigger targets in the bars, as the iPad screens draw them. */
+	@media (pointer: coarse) {
+		.v3-bar.float.pill {
+			height: 52px;
+			border-radius: 20px;
+		}
+		.v3-icon {
+			width: 36px;
+			height: 36px;
+		}
+		.v3-agent-chip,
+		.v3-canvas-chip {
+			height: 36px;
+		}
+		.pen-tools.v3-tools:not([data-row="true"]) {
+			top: 76px;
+			width: 54px;
+			border-radius: 20px;
+		}
+		.v3-tools:not([data-row="true"]) .v3-tool {
+			width: 44px;
+			height: 44px;
+			border-radius: 10px;
+		}
+		.v3-tray-wrap {
+			top: 76px;
+			left: calc(var(--inset-left, 0px) + 74px);
+		}
+		.props-panel.panel-float {
+			top: 76px;
+		}
+	}
+}
+
+@layer components {
+	.dock .dock-row .chip-sub {
+		color: var(--v3-fg2);
+		font-size: 13px;
+	}
+	/* A phone's composer row: the agent, attach, the model and the mic, as the iPhone screens have it. */
+	.app[data-phone="true"] .dock [data-mode-chip],
+	.app[data-phone="true"] .dock .dock-row .chip-sub {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-deck .switcher-name {
+		display: none;
+	}
+	/* The row lives in the canvas frame, whose root carries the phone mark (`host/inside/boot.ts`), not the app's. */
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] {
+		gap: 0;
+		padding: 0 4px;
+	}
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] .v3-tool {
+		width: 38px;
+		height: 40px;
+	}
+	:is(.app, .decks-canvas)[data-phone="true"] .v3-tools[data-row="true"] .v3-rule {
+		margin: 0 1px;
+	}
+}
+
+@layer components {
+	/* On a phone the open panel pushes the canvas aside, and the bars over it go with it. */
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 8px);
+		width: calc(100vw - 16px);
+		/* The desktop's cap, 32 px in from the edges for the top-right pill, held the bar to 358 px on a 390 px phone, 8 px short of the ⋯ standing at its right end. */
+		max-width: none;
+		transition: left 200ms ease;
+	}
+	.app[data-phone="true"] .v3-phone-more {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 100vw - 52px);
+		transition: left 200ms ease;
+	}
+	.app[data-phone="true"] .dock {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 8px);
+		width: calc(100vw - 16px);
+		transition: left 200ms ease;
+	}
+}

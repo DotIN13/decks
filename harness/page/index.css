@@ -33,6 +33,8 @@
  * is why the prose in this file could be rewritten and the hash did not move.
  */
 @import "./styles/kit/chrome.css";
+@import "./shell/controls.css";
+@import "./shell/picker.css";
 @import "./agents/face/style.css";
 @import "./panel/lists/panel.css";
 @import "./agents/menu/forms.css";
@@ -67,6 +69,14 @@
 @import "./shell/tokens.css";
 /* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
 @import "./shell/v3.css";
+@import "./panel/lists/v3.css";
+@import "./shell/v3-conversation.css";
+@import "./shell/pen-tray.css";
+@import "./shell/v3-phone.css";
+@import "./shell/v3-motion.css";
+@import "./shell/v3-steps.css";
+@import "./panel/tabs/v3.css";
+@import "./shell/v3-menus.css";
 @import "./shell/confirm.css";
 @import "./canvases/manager/drawn.css";
 @import "./shell/v3-after.css";

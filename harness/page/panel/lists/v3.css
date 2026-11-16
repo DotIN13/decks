@@ -1,0 +1,310 @@
+/* The side panel in the v3 harness: docked at the left, agents first, the conversation under them. */
+@layer components {
+	/* ---- the side panel -------------------------------------------------------------------- */
+
+	/*
+	 * The insets, fixed for everything in the panel: nothing in it reads them, and they are written on
+	 * the root (`camera/insets.ts`), so every change (each step of a resize of this panel) restyled the
+	 * whole conversation and every agent row with them. Held here, a change stops at the panel's edge.
+	 */
+	.panel-shell.v3-panel {
+		--inset-left: 0px;
+		--inset-right: 0px;
+		--inset-top: 0px;
+		--inset-bottom: 0px;
+		--band-left: 0px;
+		--band-right: 0px;
+		border: 0;
+		border-right: 1px solid var(--v3-line);
+		border-radius: 0;
+		background: var(--v3-panel);
+		box-shadow: none;
+		padding: 0;
+	}
+	.v3-panel-head {
+		display: flex;
+		height: 52px;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px 0 16px;
+	}
+	.v3-panel-head .panel-mark {
+		min-width: 0;
+		padding: 0;
+	}
+	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the boards inside. */
+	.v3-panel .switcher,
+	.v3-deck .switcher {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		border: 0;
+		background: transparent;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.v3-panel .switcher-name,
+	.v3-deck .switcher-name {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.v3-nav {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 2px;
+		padding: 0 10px 8px;
+	}
+	.v3-nav-tab {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+	}
+	.v3-nav-tab:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-nav-tab[data-on="true"] {
+		background: var(--v3-tab-on);
+		color: var(--v3-tab-on-fg);
+		font-weight: 500;
+	}
+	.v3-nav-tab[data-on="true"] > svg {
+		color: var(--v3-tab-on-icon);
+	}
+	.v3-search-wrap {
+		display: flex;
+		flex: none;
+		padding: 0 12px 8px;
+	}
+	.v3-search {
+		display: flex;
+		height: 32px;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 8px;
+		padding: 0 6px 0 10px;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg3);
+	}
+	.v3-search input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 12px;
+		outline: none;
+	}
+	.v3-search input::placeholder {
+		color: var(--v3-fg3);
+	}
+	.v3-kbd {
+		display: flex;
+		height: 18px;
+		align-items: center;
+		padding: 0 5px;
+		border: 1px solid var(--v3-line2);
+		border-radius: 4px;
+		color: var(--v3-fg3);
+		font-family: inherit;
+		font-size: 11px;
+		letter-spacing: 0.5px;
+	}
+	.v3-search-clear {
+		width: 20px;
+		height: 20px;
+	}
+
+	.v3-panel .panel-list {
+		min-height: 0;
+		flex: 1 1 auto;
+		padding: 0 8px 10px;
+	}
+	.v3-panel:has(.v3-chat:not([data-folded="true"])) .panel-list {
+		flex: 0 1 auto;
+		max-height: 52%;
+	}
+	.v3-panel .panel-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		margin: 0 0 4px;
+	}
+	.v3-folder-head {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 4px 0 6px;
+		border-radius: 8px;
+	}
+	.v3-folder-toggle {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+	.v3-folder-chev {
+		flex: none;
+		color: var(--v3-fg3);
+	}
+	.v3-folder-icon {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+	.v3-folder-name {
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+	.v3-folder-head .note {
+		color: var(--v3-fg2);
+		font-size: 11px;
+	}
+	.v3-folder-head .new-agent.v3-folder-add {
+		width: 22px;
+		height: 22px;
+		color: var(--v3-fg2);
+		opacity: 1;
+	}
+	.v3-panel .panel-section[data-drop="true"] .v3-folder-head {
+		background: var(--v3-accent-soft);
+	}
+
+	/* An agent's row: its face and ring, its name and kind, what it is doing, then its tags. */
+	.v3-panel .agent-list .agent-row {
+		border-radius: 10px;
+	}
+	.v3-panel .agent-list .agent-row > button[data-row] {
+		min-height: 0;
+		gap: 10px;
+		padding: 6px 10px 6px 28px;
+		border-radius: 10px;
+	}
+	.v3-panel .agent-list .agent-row:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-panel .agent-list .agent-row[data-current="true"],
+	.v3-panel .agent-list .agent-row[data-current="true"]:hover {
+		background: var(--v3-row-on);
+	}
+	.v3-panel .agent-list .row-label {
+		color: var(--v3-fg);
+		font-size: 13px;
+		font-weight: 400;
+	}
+	.v3-panel .agent-list .agent-row[data-current="true"] .row-label {
+		font-weight: 500;
+	}
+	.v3-panel .agent-list .kind {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-panel .agent-list .ago {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-panel .agent-list .ago[data-busy="true"] {
+		color: var(--v3-fg2);
+	}
+	.v3-panel .agent-list .tag {
+		height: 16px;
+		padding: 0 5px;
+		border-radius: 5px;
+		background: var(--v3-bg3);
+		color: var(--v3-fg2);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		line-height: 16px;
+	}
+	.v3-panel .agent-list .agent-said {
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+	}
+	.v3-new-agent.new-agent {
+		display: flex;
+		width: auto;
+		height: 32px;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 6px;
+		margin-top: 2px;
+		padding: 0 10px 0 6px;
+		border-radius: 8px;
+		color: var(--v3-fg2);
+		font-size: 12.5px;
+	}
+	.v3-new-agent.new-agent:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+
+	/* The panel's list headings, in v3's type. */
+	.v3-panel .panel-meta {
+		height: 28px;
+		color: var(--v3-fg);
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+
+	/* The apps list. */
+	.v3-app-row {
+		display: flex;
+		width: 100%;
+		height: 36px;
+		align-items: center;
+		gap: 10px;
+		padding: 0 10px 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+		text-align: left;
+	}
+	.v3-app-row:hover,
+	.v3-app-row:focus-visible {
+		background: var(--v3-bg2);
+		outline: none;
+	}
+	.v3-app-name {
+		min-width: 0;
+		flex: 1;
+	}
+	.v3-app-state {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-app-state[data-status="running"] {
+		color: var(--color-ok, #14ae5c);
+	}
+	.v3-app-state[data-status="broken"] {
+		color: var(--v3-danger);
+	}
+
+}
