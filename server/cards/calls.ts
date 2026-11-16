@@ -32,7 +32,10 @@ export const fileCalls: Handled<Context>[] = handleAll(FILE, {
 	write: async (ctx, { path, text, rev }) => {
 		const at = fence(path);
 		await checkRev(ctx.deck, at, rev);
-		return writeText(ctx.deck, at, text, ctx.caller);
+		const existed = await stat(ctx.deck, at);
+		const wrote = await writeText(ctx.deck, at, text, ctx.caller);
+		if (!existed) ctx.events.emit(events.fileCreated, { ids: [at], by: ctx.caller.id, rev: wrote.rev ?? 0 });
+		return wrote;
 	},
 	edit: async (ctx, { path, edits, rev }) => {
 		const at = fence(path);

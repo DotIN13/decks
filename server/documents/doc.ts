@@ -1,5 +1,6 @@
 import { events, Refused, type Caller } from "../../protocol/index.ts";
 import type { Deck, DeckPath, Events, Store } from "../kernel/types.ts";
+import { remoteOf } from "./links.ts";
 import { loadChanges, saveChanges, skip, type DocChange, type Waiting } from "./records.ts";
 import { applyAll, diff, invert, land, type Splice } from "./splice.ts";
 
@@ -12,7 +13,7 @@ const LOG = 200;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export type DocState = { path: string; rev: number; format: "text"; text: string; changes: DocChange[] };
+export type DocState = { path: string; rev: number; format: "text"; text: string; changes: DocChange[]; remote?: { url: string; title?: string } };
 type Open = {
 	path: DeckPath;
 	text: string;
@@ -65,7 +66,8 @@ export class Documents {
 			const doc = this.open.get(path) ?? (await this.load(path));
 			await this.absorb(doc);
 			doc.clients.add(client);
-			return stateOf(doc);
+			const remote = await remoteOf(this.store, path);
+			return { ...stateOf(doc), ...(remote ? { remote } : {}) };
 		});
 	}
 

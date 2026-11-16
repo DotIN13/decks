@@ -113,8 +113,9 @@ test("google.list and google.link: the mirror is made once, and syncs while a pa
 	assert.equal(made.path, "docs/google/field-notes-1abcde.md");
 	assert.equal(made.by, "google");
 	assert.equal((await s.value<{ path: string }>("google.link", { url }, "person")).path, made.path);
-	const opened = await s.value<{ rev: number; text: string }>("file.open", { path: made.path, client: "p" }, "person");
+	const opened = await s.value<{ rev: number; text: string; remote?: { url: string; title?: string } }>("file.open", { path: made.path, client: "p" }, "person");
 	assert.equal(opened.text, "From Google\n");
+	assert.deepEqual(opened.remote, { url, title: "Field notes" });
 	await s.value("file.splice", { path: made.path, client: "p", rev: opened.rev, batch: "1", splices: [{ at: 11, before: "", text: ", typed" }] }, "person");
 	remote.text = "From Google Docs\n";
 	remote.revision++;

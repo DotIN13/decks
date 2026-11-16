@@ -35,6 +35,7 @@ test("rule 2: a write carries its author, and answers the file as it now is", as
 	assert.equal(wrote.path, "docs/new.md");
 	assert.equal(wrote.by, "ann");
 	assert.equal(wrote.size, 5);
+	assert.deepEqual(s.heard.filter((e) => e.name === "file.created").map((e) => (e.payload as { ids: string[] }).ids), [["docs/new.md"]]);
 	const history = await s.deck.revisions!(wrote.path as never);
 	assert.equal(history.at(-1)?.by, "ann");
 	assert.equal((await s.value<{ text: string }>("file.read", { path: "docs/new.md" })).text, "hello");

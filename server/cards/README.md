@@ -22,7 +22,7 @@ Cards, and every file in the deck. The file calls are why the protocol is comple
 1. A path starts at the deck's root. A path outside the deck, or with a hidden part (`.decks`,
    `.git`), is refused as `refused`, with a sentence naming the part.
 2. Every read and write goes through `ctx.deck`. A write carries its caller, so history names its
-   author; the answer is the file as it now is, with its revision and author.
+   author; the answer is the file as it now is. A write that makes a file says `file.created`.
 3. A file's revision is the last one the deck's history recorded for it; a file history has never
    seen is at 0. `file.read` answers it, and `file.write` and `file.edit` with `rev` check against
    the same number: if the file has moved past it, `conflict`.

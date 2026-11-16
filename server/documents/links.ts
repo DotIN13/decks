@@ -9,7 +9,7 @@ import { applyAll, diff, transformAll } from "./splice.ts";
 export const TICK_MS = 2000;
 export type GoogleDoc = { id: string; title: string; url: string; modified?: number };
 /** A linked Doc: its id, and its mirror in the deck. */
-export type Link = { id: string; mirror: DeckPath };
+export type Link = { id: string; mirror: DeckPath; title?: string };
 
 /** The Docs API, as the server's entry gives it: the mirror's index-aligned text, and markdown for agents. */
 export interface GoogleDocs extends DocsRemote {
@@ -51,14 +51,24 @@ export async function link(docs: GoogleDocs, deck: Deck, store: Store, url: stri
 	const doc = await docs.read(id);
 	await deck.write(mirror, encoder.encode(doc.text), GOOGLE);
 	await store.put(`google/${mirror}`, encoder.encode(JSON.stringify({ text: doc.text, revision: doc.revision })));
-	await store.put(`links/${mirror}`, encoder.encode(id));
+	await store.put(`links/${mirror}`, encoder.encode(JSON.stringify({ id, title: await docs.title(id) })));
 	return { id, mirror };
 }
 
 export async function links(store: Store): Promise<Link[]> {
 	const out: Link[] = [];
-	for (const key of await store.keys("links/")) out.push({ id: decoder.decode((await store.get(key))!), mirror: key.slice("links/".length) as DeckPath });
+	for (const key of await store.keys("links/")) {
+		const kept = decoder.decode((await store.get(key))!);
+		const { id, title } = kept.startsWith("{") ? (JSON.parse(kept) as { id: string; title?: string }) : { id: kept, title: undefined };
+		out.push({ id, mirror: key.slice("links/".length) as DeckPath, ...(title ? { title } : {}) });
+	}
 	return out;
+}
+
+/** What stands behind a mirror, for its page: the Doc's address and title. */
+export async function remoteOf(store: Store, mirror: string): Promise<{ url: string; title?: string } | undefined> {
+	const found = (await links(store)).find((one) => one.mirror === mirror);
+	return found ? { url: `https://docs.google.com/document/d/${found.id}/edit`, ...(found.title ? { title: found.title } : {}) } : undefined;
 }
 
 /** One round over the linked mirrors a page has open; a failed round waits for the next. */
