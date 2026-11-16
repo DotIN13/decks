@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { expand, layout, type PenDocument } from "@decks/pen";
 import { boundsOf } from "./bounds.ts";
 
+// What an item covers: its geometry for a path, its children for a group, else its box.
+
 test("a path is bounded by what it draws, not by its viewBox's box", () => {
 	const doc: PenDocument = {
 		version: "2.14",

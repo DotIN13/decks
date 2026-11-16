@@ -63,14 +63,6 @@ export function canvasBox(view: { width: number; height: number }) {
 	};
 }
 
-/**
- * Start watching. Called once, from `App`.
- *
- * A `MutationObserver` as well as the resize one, because the chrome comes and goes: the
- * inspector is mounted on selection and the panel is unmounted when folded, and an observer
- * that only watched the elements present at startup would keep measuring a panel that has
- * since left the document.
- */
 /** The inset variables as last published, and where they go while a panel is being resized. */
 let published: Record<string, string> = {};
 let narrowTo: (() => readonly HTMLElement[]) | undefined;
@@ -254,6 +246,14 @@ function soon(w: Watch, withSync: boolean): void {
  */
 const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
 
+/**
+ * Start watching. Called once, from `App`.
+ *
+ * A `MutationObserver` as well as the resize one, because the chrome comes and goes: the
+ * inspector is mounted on selection and the panel is unmounted when folded, and an observer
+ * that only watched the elements present at startup would keep measuring a panel that has
+ * since left the document.
+ */
 export function watchInsets(root: HTMLElement = document.body): void {
 	const w: Watch = { root, sizes: new ResizeObserver(() => soon(w, false)), tracked: new Set(), band: { left: 0, right: 0 }, frame: 0, resync: false };
 	const resized = () => soon(w, false);

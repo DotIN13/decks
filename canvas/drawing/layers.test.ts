@@ -3,6 +3,8 @@ import { test } from "node:test";
 import type { PenDocument } from "@decks/pen";
 import { canvasItems } from "./layers.ts";
 
+// The layers list: one row per top-level item, the arrows as one row, filtered by words.
+
 const doc = {
 	version: "2.6",
 	children: [

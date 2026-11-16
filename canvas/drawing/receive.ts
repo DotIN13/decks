@@ -3,6 +3,8 @@ import { untrack } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
 import { forgetHistory, onTop, show, showOver, type DrawingRun } from "./edits.ts";
 
+// The host's drawing arriving: what it holds of the person's edits stops being shown over it.
+
 /** The host's drawing came: what it has of the person's edits is no longer shown on top of it. */
 export function receive(d: DrawingRun, next: PenDocument, edits: DocEdits | undefined, madeHere: readonly string[] | undefined, at: string | undefined): void {
 	const before = untrack(d.given);

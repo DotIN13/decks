@@ -237,6 +237,16 @@ export function fitInto(
 export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: board.h });
 
 /**
+ * What an arrival looks at: a few boards at once, not one board's words.
+ *
+ * Below `LIVE_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
+ * scale and not a working one — you land seeing what the stage holds and zoom into the board you
+ * came for. A landing that could be typed into straight away would have to be a landing on one
+ * board, and the manager's whole job is the other question.
+ */
+export const STAGE_ZOOM = 0.3;
+
+/**
  * Where to stand when you arrive on a stage you have not been on: the middle of its work.
  *
  * **Not `fit`.** Fitting everything a stage holds is right for two or three boards and wrong the
@@ -254,16 +264,6 @@ export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: 
  * zoom that depends on the stage would make every arrival a different scale, so the gesture would
  * never settle into a habit.
  */
-/**
- * What an arrival looks at: a few boards at once, not one board's words.
- *
- * Below `LIVE_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
- * scale and not a working one — you land seeing what the stage holds and zoom into the board you
- * came for. A landing that could be typed into straight away would have to be a landing on one
- * board, and the manager's whole job is the other question.
- */
-export const STAGE_ZOOM = 0.3;
-
 export function middleOf(
 	boxes: Array<{ x: number; y: number; w: number; h: number }>,
 	region: { x: number; y: number; width: number; height: number },

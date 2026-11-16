@@ -4,6 +4,8 @@ import { drop, edit, forgetHistory, show, step, type DrawingRun } from "./edits.
 import { isPage, pagePath } from "./pages.ts";
 import { receive } from "./receive.ts";
 
+// The Drawing object a canvas holds: each of its methods, over the state edits.ts keeps.
+
 /** The object `createDrawing` answers (its `Drawing`), over the state it holds. */
 export function drawingApi(d: DrawingRun) {
 	const host = d.host;

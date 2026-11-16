@@ -1,5 +1,7 @@
 import { baseTheme, placements, type PenDocument } from "@decks/pen";
 
+// Boxes of a drawing's top-level items and of its pages, in canvas units, for placing and picking.
+
 /** A box on the canvas, in canvas units. */
 export interface Box {
 	x: number;
@@ -20,8 +22,6 @@ interface PlacedItem {
 }
 
 type TopNode = { id?: string; type?: string; x?: unknown; y?: unknown; width?: unknown; height?: unknown; rotation?: unknown };
-
-const sized = (n: TopNode) => typeof n.x === "number" && typeof n.y === "number" && typeof n.width === "number" && n.width > 0 && typeof n.height === "number" && n.height > 0 && !n.rotation;
 
 /**
  * Each top-level item's box, by id. A top-level item with a number for its place and size sits in
@@ -51,6 +51,8 @@ export function topBoxMap(doc: PenDocument, look: "light" | "dark" = "light", op
 	return out;
 }
 
+const sized = (n: TopNode) => typeof n.x === "number" && typeof n.y === "number" && typeof n.width === "number" && n.width > 0 && typeof n.height === "number" && n.height > 0 && !n.rotation;
+
 /**
  * The drawing's top-level items, each with the box it is drawn in (`topBoxMap`).
  * One reading of the boxes for everything that frames, fits or lists what is on a canvas.
@@ -75,11 +77,11 @@ export function placedItems(doc: PenDocument, look: "light" | "dark" = "light"):
 /** The boxes of a drawing's top-level items: what a fit frames. */
 export const topBoxes = (doc: PenDocument, look: "light" | "dark" = "light"): Box[] => placedItems(doc, look).map((item) => item.box);
 
-const isPageNode = (node: { metadata?: { path?: unknown; type?: unknown } }) => typeof node.metadata?.path === "string" && (node.metadata.type === "decks.card" || node.metadata.type === "decks.board");
-
 /**
  * The cards and boards a drawing places, by the file each names. Only they are read, so the notes
  * and frames sized by their content are not laid out for a question about where the cards are.
  */
 export const pageItems = (doc: PenDocument, look: "light" | "dark" = "light"): PlacedItem[] =>
 	placedItems({ ...doc, children: ((doc.children ?? []) as unknown as Array<{ metadata?: { path?: unknown; type?: unknown } }>).filter(isPageNode) as PenDocument["children"] }, look);
+
+const isPageNode = (node: { metadata?: { path?: unknown; type?: unknown } }) => typeof node.metadata?.path === "string" && (node.metadata.type === "decks.card" || node.metadata.type === "decks.board");

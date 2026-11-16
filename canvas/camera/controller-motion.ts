@@ -105,7 +105,7 @@ export function glideTo(c: CameraRun, to: Camera, ms: number): void {
 	 * a frame-by-frame assertion, which is happy to see *some* intermediate value, and obvious in
 	 * a chart of the curve the samples were supposed to be on.
 	 */
-	// iOS's spring, no bounce: away at once, settling into place (`app/spring.ts`).
+	// iOS's spring, no bounce: away at once, settling into place (`spring.ts`).
 	const curve = springCurve(ms);
 	const step = () => {
 		if (mine !== c.glideToken) return;

@@ -39,6 +39,14 @@ export function quoteOf(selected: string): string {
 	return flat.length > QUOTE_LIMIT ? `${flat.slice(0, QUOTE_LIMIT - 1).trimEnd()}…` : flat;
 }
 
+/** A message with the waiting comments in front of it; either half may be empty. */
+export function withComments(text: string, comments: CardComment[]): string {
+	const block = commentBlock(comments);
+	const said = text.trim();
+	if (!block) return said;
+	return said ? `${block}\n\n${said}` : block;
+}
+
 /**
  * The comments as the agent reads them.
  *
@@ -71,12 +79,4 @@ export function commentItem(comment: CardComment, n: number): string {
 	// No quote: a comment on the whole card, from its pill.
 	if (!comment.quote) return `${n}. ${where}, the whole card${said}`;
 	return `${n}. ${where}\n   > ${comment.quote}${said}`;
-}
-
-/** A message with the waiting comments in front of it; either half may be empty. */
-export function withComments(text: string, comments: CardComment[]): string {
-	const block = commentBlock(comments);
-	const said = text.trim();
-	if (!block) return said;
-	return said ? `${block}\n\n${said}` : block;
 }

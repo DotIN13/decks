@@ -9,7 +9,7 @@ export interface CameraHost {
 	place(camera: Camera): void;
 	/** The browser has scrolled the world to this camera already: tell the drawing, and nothing else. */
 	follow(camera: Camera): void;
-	/** The camera moved: a press in hand runs its last step again (`editor/dom/pointer.ts`, `follow`). */
+	/** The camera moved: a press in hand runs its last step again (`canvas/input/pointer.ts`, `follow`). */
 	moved(): void;
 	/** The host's camera signal, set once a frame. */
 	publish(camera: Camera): void;

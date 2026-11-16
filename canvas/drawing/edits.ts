@@ -1,7 +1,9 @@
 import { apply, baseTheme, diff, withDecksColors, type MeasureText, type PenDocument, type PenEdit } from "@decks/pen";
 import { untrack, type Accessor, type Setter } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
-import { together } from "./pages.ts";
+
+// The person's edits: applied at once, sent to the host, shown over its drawing until it has
+// them, and undone and redone.
 
 /**
  * How long the person's edit is shown ahead of the host's drawing that has it, at most: a host that
@@ -68,24 +70,58 @@ export interface DrawingRun {
 	named: number;
 }
 
+// The person's edit: applied at once, sent, held on top until the host has it
+/** Pen operations, as the person's edit: applied, kept for undo, reported. False when refused or a no-op. */
+export function edit(d: DrawingRun, given: unknown[]): boolean {
+	if (d.readOnly || given.length === 0) return false;
+	// What the tools make is coloured by the drawing's own light/dark variables: defined here when it lacks them.
+	const ops = withDecksColors(untrack(d.doc), given);
+	const prev = untrack(d.doc);
+	if (d.host) {
+		let next: PenDocument | undefined;
+		try {
+			next = applied(d, prev, ops);
+		} catch {
+			// Not one this page can make: the host's to answer, as it always was.
+			next = undefined;
+		}
+		if (!next) {
+			d.host.send(ops);
+			return true;
+		}
+		const id = nameOne(d, {});
+		d.pending.push({ id, ops });
+		d.setWaiting(d.pending.length);
+		// Shown at once, even when nothing changed: the stage waits for the drawing that answers its gesture.
+		show(d, next, { from: prev, edits: diff(prev, next) });
+		flush(d);
+		return true;
+	}
+	let next: PenDocument;
+	try {
+		next = applied(d, prev, ops);
+	} catch (error) {
+		console.warn("[canvas] an edit was refused:", error instanceof Error ? error.message : error);
+		return false;
+	}
+	if (!commit(d, prev, next)) {
+		// Nothing changed (an item dropped back where it was), but the stage waits for a drawing that
+		// answers its gesture, as a server sends one whatever the edit did: a fresh copy is that answer.
+		show(d, { ...prev }, { from: prev, edits: [] });
+		return false;
+	}
+	d.undoStack.push(prev);
+	if (d.undoStack.length > d.depth) d.undoStack.shift();
+	d.redoStack.length = 0;
+	return true;
+}
+
 /**
  * `ops` applied to `prev` as the server applies them; throws when refused. The arrows an edit
  * touches are routed by the stage engine as it lays the edit out (`reroute_after`), as the server
  * routes them, so the page lays nothing out for them here.
  */
 export const applied = (d: DrawingRun, prev: PenDocument, ops: unknown[]) => apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, d.look()), ...(d.measure ? { measure: d.measure } : {}) }).doc;
-
-export function show(d: DrawingRun, next: PenDocument, edits?: DocEdits, own = true): void {
-	d.made = edits ? { ...edits, to: next } : undefined;
-	d.ownDoc = own ? next : undefined;
-	d.setDoc(next);
-}
-
-/** Show `next` in place of what is shown, with what changed between them for the stage. */
-export function showOver(d: DrawingRun, next: PenDocument): void {
-	const now = untrack(d.doc);
-	show(d, next, { from: now, edits: next === now ? [] : diff(now, next) });
-}
 
 /** Show `next` and tell the host what changed. */
 function commit(d: DrawingRun, prev: PenDocument, next: PenDocument): boolean {
@@ -102,48 +138,6 @@ export function nameOne(d: DrawingRun, what: { step?: "undo" | "redo"; change?: 
 	if (d.sent.size > 400) d.sent.delete(d.sent.keys().next().value!);
 	return id;
 }
-
-export function forgetHistory(d: DrawingRun): void {
-	d.history.undo = [];
-	d.history.redo = [];
-}
-
-/** The host's drawing with the edits still on their way on top; an edit that no longer applies is the host's to decide, and goes. */
-export function onTop(d: DrawingRun, base: PenDocument): PenDocument {
-	let next = base;
-	const kept: Pending[] = [];
-	for (const one of d.pending) {
-		if (one.to) {
-			// A step is shown over the host's drawing it was taken from, and over no other.
-			if (one.base === base && kept.length === 0) {
-				next = one.to;
-				kept.push(one);
-			} else clearTimeout(one.timer);
-			continue;
-		}
-		try {
-			next = apply(next, one.ops as Parameters<typeof apply>[1], { theme: baseTheme(next, d.look()), ...(d.measure ? { measure: d.measure } : {}) }).doc;
-			kept.push(one);
-		} catch {
-			clearTimeout(one.timer);
-		}
-	}
-	d.pending = kept;
-	d.setWaiting(kept.length);
-	return next;
-}
-
-/** An edit on its way is no longer shown: made by now, refused, or given up on. */
-export function drop(d: DrawingRun, id: string): void {
-	const gone = d.pending.filter((one) => one.id === id || one.as === id);
-	if (!gone.length) return;
-	for (const one of gone) clearTimeout(one.timer);
-	d.pending = d.pending.filter((one) => !gone.includes(one));
-	d.setWaiting(d.pending.length);
-	showOver(d, onTop(d, untrack(d.given)));
-}
-
-const wait = (d: DrawingRun, id: string, ms: number) => setTimeout(() => drop(d, id), ms);
 
 /** The edits waiting to go, sent as one call, when nothing is on its way; then any steps asked for after them. */
 function flush(d: DrawingRun): void {
@@ -194,51 +188,86 @@ function flush(d: DrawingRun): void {
 	);
 }
 
-/** Pen operations, as the person's edit: applied, kept for undo, reported. False when refused or a no-op. */
-export function edit(d: DrawingRun, given: unknown[]): boolean {
-	if (d.readOnly || given.length === 0) return false;
-	// What the tools make is coloured by the drawing's own light/dark variables: defined here when it lacks them.
-	const ops = withDecksColors(untrack(d.doc), given);
-	const prev = untrack(d.doc);
-	if (d.host) {
-		let next: PenDocument | undefined;
-		try {
-			next = applied(d, prev, ops);
-		} catch {
-			// Not one this page can make: the host's to answer, as it always was.
-			next = undefined;
+/**
+ * Edits made one after another, as one list of ops: run after run of plain updates (what the arrow keys,
+ * a colour or a board's move write) folded into one update an item, each field as the last set it, and
+ * anything else kept as it was, in order.
+ */
+export function together(edits: readonly (readonly unknown[])[]): unknown[] {
+	const ops = edits.flat();
+	const out: unknown[] = [];
+	/** The updates since the last op that was not one, by item. */
+	let run = new Map<string, { op: "update"; id: string; set: Record<string, unknown> }>();
+	for (const op of ops) {
+		const update = op as { op?: unknown; id?: unknown; set?: unknown };
+		const plain = update.op === "update" && typeof update.id === "string" && update.set && typeof update.set === "object" && Object.keys(update).length === 3;
+		if (!plain) {
+			run = new Map();
+			out.push(op);
+			continue;
 		}
-		if (!next) {
-			d.host.send(ops);
-			return true;
+		const held = run.get(update.id as string);
+		if (held) Object.assign(held.set, update.set);
+		else {
+			const one = { op: "update" as const, id: update.id as string, set: { ...(update.set as Record<string, unknown>) } };
+			run.set(one.id, one);
+			out.push(one);
 		}
-		const id = nameOne(d, {});
-		d.pending.push({ id, ops });
-		d.setWaiting(d.pending.length);
-		// Shown at once, even when nothing changed: the stage waits for the drawing that answers its gesture.
-		show(d, next, { from: prev, edits: diff(prev, next) });
-		flush(d);
-		return true;
 	}
-	let next: PenDocument;
-	try {
-		next = applied(d, prev, ops);
-	} catch (error) {
-		console.warn("[canvas] an edit was refused:", error instanceof Error ? error.message : error);
-		return false;
-	}
-	if (!commit(d, prev, next)) {
-		// Nothing changed (an item dropped back where it was), but the stage waits for a drawing that
-		// answers its gesture, as a server sends one whatever the edit did: a fresh copy is that answer.
-		show(d, { ...prev }, { from: prev, edits: [] });
-		return false;
-	}
-	d.undoStack.push(prev);
-	if (d.undoStack.length > d.depth) d.undoStack.shift();
-	d.redoStack.length = 0;
-	return true;
+	return out;
 }
 
+const wait = (d: DrawingRun, id: string, ms: number) => setTimeout(() => drop(d, id), ms);
+
+/** An edit on its way is no longer shown: made by now, refused, or given up on. */
+export function drop(d: DrawingRun, id: string): void {
+	const gone = d.pending.filter((one) => one.id === id || one.as === id);
+	if (!gone.length) return;
+	for (const one of gone) clearTimeout(one.timer);
+	d.pending = d.pending.filter((one) => !gone.includes(one));
+	d.setWaiting(d.pending.length);
+	showOver(d, onTop(d, untrack(d.given)));
+}
+
+// What is shown: the host's drawing with the person's edits on top
+export function show(d: DrawingRun, next: PenDocument, edits?: DocEdits, own = true): void {
+	d.made = edits ? { ...edits, to: next } : undefined;
+	d.ownDoc = own ? next : undefined;
+	d.setDoc(next);
+}
+
+/** Show `next` in place of what is shown, with what changed between them for the stage. */
+export function showOver(d: DrawingRun, next: PenDocument): void {
+	const now = untrack(d.doc);
+	show(d, next, { from: now, edits: next === now ? [] : diff(now, next) });
+}
+
+/** The host's drawing with the edits still on their way on top; an edit that no longer applies is the host's to decide, and goes. */
+export function onTop(d: DrawingRun, base: PenDocument): PenDocument {
+	let next = base;
+	const kept: Pending[] = [];
+	for (const one of d.pending) {
+		if (one.to) {
+			// A step is shown over the host's drawing it was taken from, and over no other.
+			if (one.base === base && kept.length === 0) {
+				next = one.to;
+				kept.push(one);
+			} else clearTimeout(one.timer);
+			continue;
+		}
+		try {
+			next = apply(next, one.ops as Parameters<typeof apply>[1], { theme: baseTheme(next, d.look()), ...(d.measure ? { measure: d.measure } : {}) }).doc;
+			kept.push(one);
+		} catch {
+			clearTimeout(one.timer);
+		}
+	}
+	d.pending = kept;
+	d.setWaiting(kept.length);
+	return next;
+}
+
+// Undo and redo
 export function step(d: DrawingRun, direction: "undo" | "redo"): void {
 	const host = d.host;
 	if (host) {
@@ -269,4 +298,9 @@ export function step(d: DrawingRun, direction: "undo" | "redo"): void {
 	const now = untrack(d.doc);
 	to.push(now);
 	commit(d, now, target);
+}
+
+export function forgetHistory(d: DrawingRun): void {
+	d.history.undo = [];
+	d.history.redo = [];
 }

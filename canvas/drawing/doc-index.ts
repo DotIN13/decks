@@ -1,5 +1,7 @@
 import { expand, indexOf, walk, type PenDocument, type PenNode } from "@decks/pen";
 
+// Lookups on one drawing, by id: where each item sits, and its drawn copy.
+
 type Located = ReturnType<typeof indexOf> extends Map<string, infer L> ? L : never;
 
 /**

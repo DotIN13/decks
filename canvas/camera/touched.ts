@@ -3,7 +3,7 @@
  * a board's page.
  *
  * An agent's `decks.view.focus` and `decks.view.move` move the view of the conversation on screen
- * (`canvas/view-calls.ts`), which is right when you are waiting for it and wrong when you are in the
+ * (`view-calls.ts`), which is right when you are waiting for it and wrong when you are in the
  * middle of reading or moving something: an agent showing a board every few seconds pulled the
  * view out from under the person working on it. So the view is the person's while they are using
  * it, and an agent's move waits for a pause of `HANDS_OFF_MS`.

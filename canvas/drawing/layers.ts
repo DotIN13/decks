@@ -9,11 +9,6 @@ import { topBoxMap } from "./boxes.ts";
 export type ItemKind = "board" | "note" | "text" | "shape" | "frame" | "ink" | "other";
 export type CanvasItem = { id: string; kind: ItemKind; label: string; /** A card's path, or `item:<id>` for a document or an app. */ path?: string; /** The old name of `path`, until the page reads `path`. */ board?: string; box: { x: number; y: number; w: number; h: number } };
 
-const clip = (text: unknown, fallback: string) => {
-	const line = String(text ?? "").split("\n").find((one) => one.trim()) ?? "";
-	return line.trim().slice(0, 60) || fallback;
-};
-
 /**
  * `boxes: false` lists without laying anything out: an item sized by its content comes with its place
  * and no size, which is enough to list it; ask again with boxes for the one picked, to fly to it.
@@ -51,3 +46,8 @@ export function canvasItems(doc: PenDocument | undefined, query = "", options?: 
 	}
 	return { items, arrows: q ? [] : arrows };
 }
+
+const clip = (text: unknown, fallback: string) => {
+	const line = String(text ?? "").split("\n").find((one) => one.trim()) ?? "";
+	return line.trim().slice(0, 60) || fallback;
+};

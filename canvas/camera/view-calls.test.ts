@@ -110,7 +110,7 @@ test("a call with no agent behind it still works, because the id is newer than t
  * anything that reads the camera a frame after calling it should see what it asked for. The two
  * gestures that glide do it in the page's shell, where a person's hands are — this is only about the
  * flag travelling from the call to the host, which is the half a check can see without a model
- * driving it. What the browser does with the flag is `e2e/checks/glide.mjs`.
+ * driving it. What the browser does with the flag is `tools/checks/library/glide.mjs`.
  */
 test("an op that asked to arrive says so, and one that did not does not", () => {
 	const plain = host("A");
