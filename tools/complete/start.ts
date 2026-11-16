@@ -31,6 +31,8 @@ export async function start(fixture = "deck", prepare?: (root: string) => Promis
 		await server.close();
 		deck.close();
 		await rm(folder, { recursive: true, force: true });
+		// The native screenshot's parent folder outlives its shots (Depot's to remove); this run's temp folder is the check's own.
+		await rm(join(tmpdir(), "decks-native-shots"), { recursive: true, force: true });
 	};
 	return { server, url: doors.url, token: doors.token, root, options, stop };
 }
