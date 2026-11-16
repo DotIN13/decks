@@ -1,6 +1,5 @@
 {
 	"canvas/cards/card-syntax.ts: line shallower than its block": 1,
-	"canvas/chrome/Callout.tsx: line shallower than its block": 2,
 	"canvas/documents/page.ts: line shallower than its block": 6,
 	"canvas/editor/editor.tsx: line shallower than its block": 4,
 	"canvas/input/canvas-input.ts: line shallower than its block": 4,

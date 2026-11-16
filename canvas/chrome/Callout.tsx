@@ -253,9 +253,9 @@ function PillActions(props: { card?: Page | undefined; ink: boolean; onOpen: () 
 			</button>
 			<Show when={props.card && !props.card.live ? props.card : undefined}>
 				{(card) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={card().item === "app" && card().app ? "#" : canvasHost().fileUrl(card().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (card().item === "app" && card().app) canvasHost().apps?.open(card().app!); else openInTab(canvasHost().fileUrl(card().path)); }}>
-					<Icon of={ExternalLink} size={16} />
-				</a>
+					<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={card().item === "app" && card().app ? "#" : canvasHost().fileUrl(card().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (card().item === "app" && card().app) canvasHost().apps?.open(card().app!); else openInTab(canvasHost().fileUrl(card().path)); }}>
+						<Icon of={ExternalLink} size={16} />
+					</a>
 				)}
 			</Show>
 			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
