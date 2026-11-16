@@ -47,7 +47,7 @@ and Google Docs.
 14. With a googleStore (today's `<data>/google/`: client.json, token.json), the sign-in and the
    Docs API are real: Docs and Drive over HTTPS, the mirror as Google's indices, agents' markdown.
 
-Typesetting, git, Google styles and comments are not built in wave 1: the router answers them `unavailable`.
+Typesetting (file.compile) and git (file.repo, pull, push) are in latex/ and git/, each with its rules.
 
 ## Check
 
