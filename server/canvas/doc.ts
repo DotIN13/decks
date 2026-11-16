@@ -5,7 +5,7 @@ import type { Kinds } from "./kinds.ts";
 import { Log } from "./log.ts";
 import { routeArrows } from "./arrows.ts";
 import { findId as findIn, step } from "./ops.ts";
-import { placedKeys, strayPath, strayVariable } from "./paths.ts";
+import { deckReadings, keyOf, placedKeys, strayPath, strayVariable } from "./paths.ts";
 import { sourceOf, writeLike, type Source } from "./spans.ts";
 
 // One drawing in memory: read, changed only by apply (all or none), and
@@ -20,6 +20,7 @@ export class PenCanvas implements CanvasDoc {
 	private doc: PenDocument;
 	private source: Source | undefined;
 	private log = new Log();
+	private placedAt: { rev: number; keys: Set<string> } | undefined;
 	rev = 0;
 
 	constructor(readonly name: string, text: string, private kinds: Kinds, private saved: Saved, private clock: () => number = Date.now) {
@@ -65,7 +66,7 @@ export class PenCanvas implements CanvasDoc {
 	apply(ops: ItemOp[], by: Caller, edit?: string, scoped = false): { items: Item[]; rev: number } {
 		if (!Array.isArray(ops) || !ops.length) throw new Refused("invalid", "Give at least one op.", "item.batch");
 		let work = this.doc;
-		const placed = scoped ? placedKeys(this.doc, this.name, this.kinds) : undefined;
+		const placed = scoped ? this.placedKeys() : undefined;
 		const written: ItemOp[] = [];
 		const ids: string[] = [];
 		ops.forEach((op, i) => {
@@ -104,6 +105,20 @@ export class PenCanvas implements CanvasDoc {
 		const nodes = [...walk(doc.children)].filter((one) => touched.has(one.id));
 		const stray = strayPath(nodes, this.name, this.kinds, placed) ?? strayVariable(doc, this.name, placed);
 		if (stray) throw new Refused("refused", `This edit names ${stray.path}, and ${stray.why}: a canvas pass reaches its canvas's folder and what its canvas already places; a new place is put by the person. Nothing changed.`, "item.insert");
+	}
+
+	/** Every place the drawing names, in one spelling; kept until the next revision. */
+	private placedKeys(): ReadonlySet<string> {
+		if (this.placedAt?.rev !== this.rev) this.placedAt = { rev: this.rev, keys: placedKeys(this.doc, this.name, this.kinds) };
+		return this.placedAt.keys;
+	}
+
+	/** Whether the drawing places an item at this path, or the path lies inside a placed card's folder. */
+	places(path: string): boolean {
+		const asked = [keyOf(path, this.name).key, ...deckReadings(path, this.name).slice(0, 1)];
+		const keys = this.placedKeys();
+		if (asked.some((one) => keys.has(one))) return true;
+		return [...keys].some((one) => one.endsWith("/index.html") && asked.some((key) => key.startsWith(one.slice(0, -"index.html".length))));
 	}
 
 	// Its log: since, undo and redo, and edits from outside

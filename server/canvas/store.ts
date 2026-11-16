@@ -43,6 +43,7 @@ export class CanvasStore {
 
 	/** Read every canvas and frame, and listen for writes from outside. */
 	async load(): Promise<Stop> {
+		this.kernel.places((canvas, path) => this.places(canvas, path));
 		for (const name of await this.names()) await this.open(name);
 		this.stop = this.deck.watch((change) => void this.heard(change.path, change.kind, change.by));
 		return () => this.stop?.();
@@ -94,6 +95,15 @@ export class CanvasStore {
 			...(pen.variables ? { variables: shortVariables(pen) } : {}), undo: steps.undo, redo: steps.redo,
 			...(shared ? { shared: { owner: shared.owner, role: "edit" as const } } : {}),
 		};
+	}
+
+	/** Kernel.places: whether a canvas places an item at a deck path; false for an unknown canvas. */
+	places(canvas: string, path: string): boolean {
+		try {
+			return this.doc(this.name(canvas)).places(path);
+		} catch {
+			return false;
+		}
 	}
 
 	/** canvas.drawing: the document as the file holds it, its revision, and where its paths are read from. */

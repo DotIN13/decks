@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { walk, type PenDocument, type PenNode } from "@decks/pen";
 import { layout } from "../../protocol/index.ts";
 import type { Kinds } from "./kinds.ts";
@@ -11,9 +12,33 @@ const PATH_FIELDS = new Set(["card", "path", "file", "url"]);
 /** Every place a drawing names, each in one spelling (`keyOf`): what the canvas already places. */
 export function placedKeys(doc: PenDocument, canvas: string, kinds: Kinds): Set<string> {
 	const keys = new Set<string>();
-	for (const node of walk(doc.children)) for (const path of pathsIn(node, canvas, kinds)) keys.add(keyOf(path, canvas).key);
-	for (const path of namedIn(doc.variables ?? {})) keys.add(keyOf(path, canvas).key);
+	const add = (path: string) => {
+		keys.add(keyOf(path, canvas).key);
+		for (const deck of deckReadings(path, canvas)) keys.add(deck);
+	};
+	for (const node of walk(doc.children)) pathsIn(node, canvas, kinds).forEach(add);
+	namedIn(doc.variables ?? {}).forEach(add);
 	return keys;
+}
+
+/**
+ * The deck paths a reference written without a known prefix may mean: itself from the deck's root (a
+ * document at papers/paper.md, an old page at the deck's boards/), and itself from the canvas's folder
+ * when it climbs out of it (../../papers/paper.md). Only paths inside the deck, with no hidden part.
+ */
+export function deckReadings(raw: string, canvas: string): string[] {
+	let path: string;
+	try {
+		path = decodeURIComponent(raw);
+	} catch {
+		return [];
+	}
+	if (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(path)) return [];
+	const out: string[] = [];
+	for (const one of [posix.normalize(path), posix.normalize(`${layout.canvasFolder(canvas)}/${path}`)]) {
+		if (!one.startsWith("..") && layout.deckPathOk(one) && !out.includes(one)) out.push(one.replace(/\/+$/, ""));
+	}
+	return out;
 }
 
 /** The first path these nodes name that a pass may not, and why; undefined when all may be named. */

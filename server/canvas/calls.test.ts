@@ -197,6 +197,24 @@ test("a whole caller places what today's Decks let it: another canvas's card, a 
 	await s.close();
 });
 
+test("the kernel asks the canvas what it places: a path its drawing names, or inside a placed card's folder", async () => {
+	const s = await start();
+	await s.value("item.insert", { item: { type: "sticker", path: "canvases/plan/cards/s1/index.html" }, at: { x: 0, y: 600 } }, ann);
+	await s.value("item.insert", { item: { type: "browser", id: "app1", url: "/app/review/" }, at: { x: 600, y: 600 } }, ann);
+	assert.equal(s.kernel.placed("plan", "canvases/plan/cards/s1/index.html"), true);
+	assert.equal(s.kernel.placed("The plan", "canvases/plan/cards/s1/card.css"), true, "inside a placed card's folder");
+	assert.equal(s.kernel.placed("plan", "/app/review/"), true);
+	assert.equal(s.kernel.placed("plan", "canvases/other/cards/x/index.html"), false);
+	assert.equal(s.kernel.placed("nowhere", "canvases/plan/cards/s1/index.html"), false);
+	// Names at the deck's root, as the person's deck holds them: a document there, an old page at the root.
+	await s.value("item.insert", { item: { type: "browser", id: "doc1", url: "../../papers/paper.md", metadata: { type: "decks.document", path: "papers/paper.md" } }, at: { x: 0, y: 1200 } }, ann);
+	await s.value("item.insert", { item: { type: "browser", id: "old1", url: "pages/apps/review.html", metadata: { type: "decks.app", name: "review" } }, at: { x: 600, y: 1200 } }, ann);
+	assert.equal(s.kernel.placed("plan", "papers/paper.md"), true, "a document at the deck's root");
+	assert.equal(s.kernel.placed("plan", "pages/apps/review.html"), true, "an old page at the deck's root");
+	assert.equal(s.kernel.placed("plan", "papers/other.md"), false);
+	await s.close();
+});
+
 async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
 	for (let i = 0; i < 50; i++) {
 		const v = await read();
