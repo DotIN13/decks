@@ -1,4 +1,4 @@
-//! A card's markdown set in the app's own hand, as the canvas's own sheet (`packages/canvas/styles/canvas.css`) sets it: the app's greys,
+//! A card's markdown set in the app's own hand, as the canvas's own sheet (`canvas/styles/canvas-cards.css`) sets it: the app's greys,
 //! hairlines and accent, light or dark; headings in semibold with no rule under them; a quote behind
 //! a hairline bar; code on the app's tint in its monospace face; tables across the whole card with a
 //! line under the header and between rows; sizes in units of the card's font size, paragraphs at a
@@ -38,83 +38,8 @@ pub struct Card {
 	pub scrollers: Vec<(f32, f32, f32, f32, f32)>,
 }
 
-struct Palette {
-	fg: &'static str,
-	muted: &'static str,
-	faint: &'static str,
-	line: &'static str,
-	strong: &'static str,
-	subtle: &'static str,
-	code: &'static str,
-	accent: &'static str,
-	r#box: &'static str,
-}
-
-const LIGHT: Palette = Palette { fg: "#161616", muted: "#5c5c5c", faint: "#808080", line: "#0000001a", strong: "#00000033", subtle: "#f2f2f2", code: "#0000000f", accent: "#3b5cf6", r#box: "#ffffff" };
-const DARK: Palette = Palette { fg: "#fafafa", muted: "#aeaeae", faint: "#808080", line: "#ffffff1f", strong: "#ffffff3d", subtle: "#2e2e2e", code: "#ffffff14", accent: "#6f8bff", r#box: "#242424" };
-
-/// The paper a card is drawn on, light and dark.
-pub const PAPER: [&str; 2] = ["#ffffff", "#242424"];
-
-fn ink(name: &str, dark: bool) -> Option<&'static str> {
-	Some(match (name, dark) {
-		("red", false) => "#d92e3c",
-		("red", true) => "#f06a74",
-		("orange", false) => "#c2410c",
-		("orange", true) => "#fb923c",
-		("yellow", false) => "#a16207",
-		("yellow", true) => "#facc15",
-		("green", false) => "#15803d",
-		("green", true) => "#4ade80",
-		("blue", false) => "#2563eb",
-		("blue", true) => "#60a5fa",
-		("purple", false) => "#7c3aed",
-		("purple", true) => "#c084fc",
-		_ => return None,
-	})
-}
-
-fn mark(name: &str, dark: bool) -> &'static str {
-	match (name, dark) {
-		("red", false) => "#f8717159",
-		("red", true) => "#f871714d",
-		("orange", false) => "#fb923c59",
-		("orange", true) => "#fb923c4d",
-		("green", false) => "#4ade8059",
-		("green", true) => "#4ade804d",
-		("blue", false) => "#38bdf859",
-		("blue", true) => "#38bdf84d",
-		("purple", false) => "#c084fc59",
-		("purple", true) => "#c084fc4d",
-		(_, false) => "#facc1573",
-		(_, true) => "#facc1547",
-	}
-}
-
-fn alert(name: &str, dark: bool) -> &'static str {
-	match (name, dark) {
-		("cyan", false) => "#0e8a9e",
-		("cyan", true) => "#3cc3d6",
-		("green", false) => "#2a9d52",
-		("green", true) => "#4cc97a",
-		("orange", false) => "#c26a12",
-		("orange", true) => "#f0a050",
-		("red", false) => "#d92e3c",
-		("red", true) => "#f06a74",
-		("purple", false) => "#7c4ddb",
-		("purple", true) => "#a88bf0",
-		("gray", false) => "#6b6b6b",
-		("gray", true) => "#a0a0a0",
-		(_, false) => "#3b5cf6",
-		(_, true) => "#6f8bff",
-	}
-}
-
-fn hex(s: &str) -> Rgba {
-	parse_color(s).unwrap_or([0.0, 0.0, 0.0, 1.0])
-}
-
 const HEADING_SIZE: [f32; 6] = [1.6, 1.3, 1.12, 1.0, 0.9, 0.85];
+
 pub const MONO: &str = "JetBrains Mono";
 const SERIF: &str = "Source Serif 4";
 
@@ -132,6 +57,16 @@ struct Opts {
 	align: Option<Align>,
 	size: Option<f32>,
 	weight: Option<f32>,
+}
+
+// Setting a card: each block in turn, stacked down the card.
+/// Lay out a card's blocks `width` wide in `style`, light or dark.
+pub fn layout(text: &Text, blocks: &[Block], style: &TextStyle, width: f32, align: Align, dark: bool, image: &dyn Fn(&str) -> Option<(f32, f32)>) -> Card {
+	let p = if dark { &DARK } else { &LIGHT };
+	let mut s = Setter { text, style, dark, p, align, image, ops: Vec::new(), links: Vec::new(), scrollers: Vec::new(), scroller: None };
+	let f = Frame { size: style.size as f32, colour: hex(p.fg), weight: style.weight as f32, depth: 0 };
+	let height = s.stack(blocks, 0.0, 0.0, width, f, style.size as f32);
+	Card { height, ops: s.ops, links: s.links, scrollers: s.scrollers }
 }
 
 struct Setter<'a> {
@@ -499,7 +434,6 @@ impl Setter<'_> {
 		y
 	}
 }
-
 fn roman(mut n: u32) -> String {
 	let mut out = String::new();
 	for (v, l) in [(10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")] {
@@ -510,7 +444,6 @@ fn roman(mut n: u32) -> String {
 	}
 	out
 }
-
 fn marker(ordered: bool, n: u32, depth: usize) -> String {
 	if !ordered {
 		return ["•", "◦", "▪"][depth.min(2)].into();
@@ -522,13 +455,82 @@ fn marker(ordered: bool, n: u32, depth: usize) -> String {
 	}
 }
 
-/// Lay out a card's blocks `width` wide in `style`, light or dark.
-pub fn layout(text: &Text, blocks: &[Block], style: &TextStyle, width: f32, align: Align, dark: bool, image: &dyn Fn(&str) -> Option<(f32, f32)>) -> Card {
-	let p = if dark { &DARK } else { &LIGHT };
-	let mut s = Setter { text, style, dark, p, align, image, ops: Vec::new(), links: Vec::new(), scrollers: Vec::new(), scroller: None };
-	let f = Frame { size: style.size as f32, colour: hex(p.fg), weight: style.weight as f32, depth: 0 };
-	let height = s.stack(blocks, 0.0, 0.0, width, f, style.size as f32);
-	Card { height, ops: s.ops, links: s.links, scrollers: s.scrollers }
+// Colours: the app's palette, light or dark, and colours named in the text.
+struct Palette {
+	fg: &'static str,
+	muted: &'static str,
+	faint: &'static str,
+	line: &'static str,
+	strong: &'static str,
+	subtle: &'static str,
+	code: &'static str,
+	accent: &'static str,
+	r#box: &'static str,
+}
+
+const LIGHT: Palette = Palette { fg: "#161616", muted: "#5c5c5c", faint: "#808080", line: "#0000001a", strong: "#00000033", subtle: "#f2f2f2", code: "#0000000f", accent: "#3b5cf6", r#box: "#ffffff" };
+
+const DARK: Palette = Palette { fg: "#fafafa", muted: "#aeaeae", faint: "#808080", line: "#ffffff1f", strong: "#ffffff3d", subtle: "#2e2e2e", code: "#ffffff14", accent: "#6f8bff", r#box: "#242424" };
+
+/// The paper a card is drawn on, light and dark.
+pub const PAPER: [&str; 2] = ["#ffffff", "#242424"];
+
+fn ink(name: &str, dark: bool) -> Option<&'static str> {
+	Some(match (name, dark) {
+		("red", false) => "#d92e3c",
+		("red", true) => "#f06a74",
+		("orange", false) => "#c2410c",
+		("orange", true) => "#fb923c",
+		("yellow", false) => "#a16207",
+		("yellow", true) => "#facc15",
+		("green", false) => "#15803d",
+		("green", true) => "#4ade80",
+		("blue", false) => "#2563eb",
+		("blue", true) => "#60a5fa",
+		("purple", false) => "#7c3aed",
+		("purple", true) => "#c084fc",
+		_ => return None,
+	})
+}
+
+fn mark(name: &str, dark: bool) -> &'static str {
+	match (name, dark) {
+		("red", false) => "#f8717159",
+		("red", true) => "#f871714d",
+		("orange", false) => "#fb923c59",
+		("orange", true) => "#fb923c4d",
+		("green", false) => "#4ade8059",
+		("green", true) => "#4ade804d",
+		("blue", false) => "#38bdf859",
+		("blue", true) => "#38bdf84d",
+		("purple", false) => "#c084fc59",
+		("purple", true) => "#c084fc4d",
+		(_, false) => "#facc1573",
+		(_, true) => "#facc1547",
+	}
+}
+
+fn alert(name: &str, dark: bool) -> &'static str {
+	match (name, dark) {
+		("cyan", false) => "#0e8a9e",
+		("cyan", true) => "#3cc3d6",
+		("green", false) => "#2a9d52",
+		("green", true) => "#4cc97a",
+		("orange", false) => "#c26a12",
+		("orange", true) => "#f0a050",
+		("red", false) => "#d92e3c",
+		("red", true) => "#f06a74",
+		("purple", false) => "#7c4ddb",
+		("purple", true) => "#a88bf0",
+		("gray", false) => "#6b6b6b",
+		("gray", true) => "#a0a0a0",
+		(_, false) => "#3b5cf6",
+		(_, true) => "#6f8bff",
+	}
+}
+
+fn hex(s: &str) -> Rgba {
+	parse_color(s).unwrap_or([0.0, 0.0, 0.0, 1.0])
 }
 
 /// The accent and the check box's colours, for the painter.

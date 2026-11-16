@@ -67,6 +67,43 @@ pub struct Request {
 	pub writer: Option<stage_paint::painter::Writer>,
 }
 
+/// A request from its JSON (`{ doc, dark, box: [x1, y1, x2, y2], scale, width, height, paper, cards }`).
+pub fn request_of(v: &Value) -> Result<Request, String> {
+	let n = |k: &str| v.get(k).and_then(Value::as_f64).ok_or_else(|| format!("{k} is missing"));
+	let b: Vec<f64> = v.get("box").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
+	if b.len() != 4 || b[2] <= b[0] || b[3] <= b[1] {
+		return Err("box is [x1, y1, x2, y2]".into());
+	}
+	let paper: Vec<f32> = v.get("paper").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).map(|c| c as f32).collect()).unwrap_or_default();
+	let cards = v
+		.get("cards")
+		.and_then(Value::as_array)
+		.map(|list| {
+			list.iter()
+				.map(|b| {
+					let n = |k: &str| b.get(k).and_then(Value::as_f64).unwrap_or(0.0);
+					Card { rect: Rect { x: n("x"), y: n("y"), w: n("w"), h: n("h") }, picture: b.get("picture").and_then(Value::as_str).map(str::to_owned) }
+				})
+				.collect()
+		})
+		.unwrap_or_default();
+	Ok(Request {
+		doc: v.get("doc").and_then(Value::as_str).ok_or("doc is missing")?.to_owned(),
+		dark: v.get("dark").and_then(Value::as_bool).unwrap_or(false),
+		area: Rect { x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] },
+		scale: n("scale")?,
+		width: n("width")? as u32,
+		height: n("height")? as u32,
+		paper: if paper.len() >= 3 { [paper[0], paper[1], paper[2]] } else { [0.945, 0.945, 0.953] },
+		cards,
+		writer: v.get("writer").and_then(|w| {
+			let color = w.get("color").and_then(Value::as_str).and_then(stage_scene::values::parse_color)?;
+			let name = w.get("name").and_then(Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
+			Some(stage_paint::painter::Writer { name, color })
+		}),
+	})
+}
+
 /// What a request could not be drawn without, for the caller to hand over.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Needs {
@@ -140,6 +177,7 @@ pub struct Shooter {
 const CARD_PICTURES: usize = 48;
 
 impl Shooter {
+	// Opening, and what the caller hands over.
 	/// On this machine's own graphics card; `None` when it has none to give.
 	pub fn open() -> Option<Shooter> {
 		let gpu = pollster::block_on(stage_gpu::headless())?;
@@ -249,6 +287,7 @@ impl Shooter {
 		Ok(made)
 	}
 
+	// Laying the stage out, and what it still needs.
 	/// The document laid out with every font, card and picture size handed over so far.
 	fn lay_out(&mut self, request: &Request) -> Result<(), String> {
 		use std::hash::{Hash, Hasher};
@@ -364,6 +403,7 @@ impl Shooter {
 		Ok(needs)
 	}
 
+	// Taking the picture.
 	/// Draw the picture, or say what it needs first: image fills and icons it met that were not handed over.
 	pub fn shoot(&mut self, request: &Request) -> Result<Result<Picture, Needs>, String> {
 		let started = std::time::Instant::now();
@@ -535,43 +575,6 @@ pub fn encode(picture: &Picture, format: &str, quality: u8) -> Result<Vec<u8>, S
 		image::ImageEncoder::write_image(encoder, &picture.rgba, picture.width, picture.height, image::ExtendedColorType::Rgba8).map_err(|e| e.to_string())?;
 	}
 	Ok(out)
-}
-
-/// A request from its JSON (`{ doc, dark, box: [x1, y1, x2, y2], scale, width, height, paper, cards }`).
-pub fn request_of(v: &Value) -> Result<Request, String> {
-	let n = |k: &str| v.get(k).and_then(Value::as_f64).ok_or_else(|| format!("{k} is missing"));
-	let b: Vec<f64> = v.get("box").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
-	if b.len() != 4 || b[2] <= b[0] || b[3] <= b[1] {
-		return Err("box is [x1, y1, x2, y2]".into());
-	}
-	let paper: Vec<f32> = v.get("paper").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).map(|c| c as f32).collect()).unwrap_or_default();
-	let cards = v
-		.get("cards")
-		.and_then(Value::as_array)
-		.map(|list| {
-			list.iter()
-				.map(|b| {
-					let n = |k: &str| b.get(k).and_then(Value::as_f64).unwrap_or(0.0);
-					Card { rect: Rect { x: n("x"), y: n("y"), w: n("w"), h: n("h") }, picture: b.get("picture").and_then(Value::as_str).map(str::to_owned) }
-				})
-				.collect()
-		})
-		.unwrap_or_default();
-	Ok(Request {
-		doc: v.get("doc").and_then(Value::as_str).ok_or("doc is missing")?.to_owned(),
-		dark: v.get("dark").and_then(Value::as_bool).unwrap_or(false),
-		area: Rect { x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] },
-		scale: n("scale")?,
-		width: n("width")? as u32,
-		height: n("height")? as u32,
-		paper: if paper.len() >= 3 { [paper[0], paper[1], paper[2]] } else { [0.945, 0.945, 0.953] },
-		cards,
-		writer: v.get("writer").and_then(|w| {
-			let color = w.get("color").and_then(Value::as_str).and_then(stage_scene::values::parse_color)?;
-			let name = w.get("name").and_then(Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
-			Some(stage_paint::painter::Writer { name, color })
-		}),
-	})
 }
 
 #[cfg(test)]

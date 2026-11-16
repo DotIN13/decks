@@ -1,3 +1,6 @@
+//! Words, tested: measured and wrapped, glyphs put into the atlas once, cards laid out again only
+//! for a picture they show, and line spacing as a multiple of the text's own size.
+
 use super::*;
 use stage_scene::layout::TextStyle;
 

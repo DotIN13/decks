@@ -422,10 +422,10 @@ impl Measure for Text {
 	}
 }
 
-#[cfg(test)]
-mod tests;
-
 /// Whether an item's words are a card's markdown (`decks.markdown`), a note's or one block's.
 pub fn is_markdown(item: &Item) -> bool {
 	item.get("metadata").and_then(|m| m.get("type")).and_then(|t| t.as_str()) == Some("decks.markdown")
 }
+
+#[cfg(test)]
+mod tests;
