@@ -1,6 +1,7 @@
 // Files dropped on the page, with no store and no DOM: which a canvas shows
 // as itself (a picture, words, a player), which open as documents, how far
 // a deck path is from a canvas's folder, and a size in words.
+import { layout } from "@decks/protocol";
 
 export const RASTER = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico"]);
 const WORDS = new Set(["md", "markdown", "mdx", "txt", "text"]);
@@ -16,16 +17,10 @@ export const isWords = (file: Named) => file.size <= CARD_BYTES && (WORDS.has(ex
 export const isPlayable = (file: Named) => PLAYABLE.has(extensionOf(file)) || file.type.startsWith("video/") || file.type.startsWith("audio/");
 export const showsAsItself = (file: Named) => isRaster(file) || isWords(file) || isPlayable(file);
 
-/** A canvas's folder: a friend's under shared/canvases/<owner>/, yours under canvases/. */
-export function folderOf(name: string): string {
-	const friend = /^shared\/([^/]+)\/([^/]+)$/.exec(name);
-	return friend ? `shared/canvases/${friend[1]}/${friend[2]}` : `canvases/${name}`;
-}
-
 /** A deck path as the canvas's page reaches it: inside its folder plainly, else up and back down. */
 export function fromCanvas(asset: string, canvas: string | undefined): string {
 	if (!canvas) return `../../${asset}`;
-	const folder = folderOf(canvas);
+	const folder = layout.canvasFolder(canvas);
 	if (asset.startsWith(`${folder}/`)) return asset.slice(folder.length + 1);
 	return `${"../".repeat(folder.split("/").length)}${asset}`;
 }
@@ -47,10 +42,3 @@ export function browsed(path: string, files: ReadonlyArray<{ path: string; size?
 
 /** A deck file's address through the server's files door. */
 export const fileAddress = (path: string): string => `/files/${path.split("/").map(encodeURIComponent).join("/")}`;
-
-/** The canvas a deck path is in: canvases/<name>/…, or a friend's shared/canvases/<owner>/<name>/…. */
-export function canvasInPath(path: string | undefined): string | undefined {
-	const friend = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path ?? "");
-	if (friend) return `shared/${friend[1]}/${friend[2]}`;
-	return /^canvases\/([^/]+)\//.exec(path ?? "")?.[1];
-}

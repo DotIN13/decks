@@ -61,7 +61,7 @@ export function createPills({ stagePen, editorHandle, setPenSelected, playAndFra
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
 		// Read with this tab's token, as every file is (`lib/authed.tsx`).
 		if (node.kind === "file") return void openAuthed(fileAddress(node.id)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
-		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
+		const target = comment ? (comment.items?.[0] ?? comment.path ?? "") : node.id;
 		const name = stageOf(state.focused)?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(
 			(one) => one.id === target || (!!one.board && (one.board === target || target.endsWith(`/${one.board}`) || (!!name && `canvases/${name}/${one.board}` === target))),

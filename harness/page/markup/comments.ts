@@ -12,6 +12,7 @@
 
 export { commentBlock, commentItem, QUOTE_LIMIT, quoteOf, withComments, type CardComment } from "@decks/canvas/comments";
 import type { CardComment } from "@decks/canvas/comments";
+import { commentFromOld } from "../state/compat/comment.ts";
 
 // --- kept between reloads ------------------------------------------------------------
 
@@ -41,10 +42,10 @@ type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function isComment(value: unknown): value is CardComment {
 	if (!value || typeof value !== "object") return false;
-	const { id, board, quote, text, at, component } = value as Record<string, unknown>;
+	const { id, path, quote, text, at, component } = value as Record<string, unknown>;
 	return (
 		typeof id === "string" &&
-		typeof board === "string" &&
+		typeof path === "string" &&
 		typeof quote === "string" &&
 		typeof text === "string" &&
 		typeof at === "number" &&
@@ -59,7 +60,7 @@ export function loadComments(store: Store | undefined): Record<string, CardComme
 		if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
 		const out: Record<string, CardComment[]> = {};
 		for (const [agent, list] of Object.entries(raw)) {
-			const kept = Array.isArray(list) ? list.filter(isComment) : [];
+			const kept = Array.isArray(list) ? list.map(commentFromOld).filter(isComment) : [];
 			if (kept.length > 0) out[agent] = kept;
 		}
 		return out;

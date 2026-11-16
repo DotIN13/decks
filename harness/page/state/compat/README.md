@@ -9,6 +9,7 @@ with the server's compat after stop 3.
 - `apply.ts`: `applyOld`, the old agent and chat messages applied to the page's state.
 - `line.ts`: today's line at /compat/v1/socket, opened only in compat mode (`DECKS_PAGE_COMPAT=1`), for
   the two calls today's checks read from the page's own frames: agent.set and view.remember.
+- `comment.ts`: `commentFromOld`, a waiting comment saved with `board` read as one with `path`.
 
 ## May import
 

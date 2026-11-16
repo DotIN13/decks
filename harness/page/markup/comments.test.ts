@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { commentBlock, COMMENTS_KEY, loadComments, popupPlace, QUOTE_LIMIT, quoteOf, saveComments, withComments, type CardComment } from "./comments.ts";
 
-const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", board: "boards/plan.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
+const comment = (extra: Partial<CardComment> = {}): CardComment => ({ id: "c1", path: "canvases/plan/cards/plan/index.html", component: "goal", quote: "Keep it short.", text: "Two sentences, please.", at: 1, ...extra });
 
 test("a quotation is one line, and not the whole page", () => {
 	assert.equal(quoteOf("  Keep\n\tit   short. "), "Keep it short.");
@@ -15,22 +15,22 @@ test("the agent reads where, the words, and the comment, and the list says what 
 	assert.equal(commentBlock([]), "");
 	assert.equal(
 		commentBlock([comment()]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. canvases/plan/cards/plan/index.html, in #goal\n   > Keep it short.\n   Two sentences, please.",
 	);
 	const two = commentBlock([comment(), comment({ id: "c2", component: undefined, text: "Why?\nSay more." })]);
 	assert.match(two, /^2 comments on cards\./);
-	assert.match(two, /2\. boards\/plan\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
+	assert.match(two, /2\. canvases\/plan\/cards\/plan\/index\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
 });
 
 test("a comment on the whole board has no quote, and says so", () => {
 	assert.equal(
 		commentBlock([comment({ quote: "", component: undefined })]),
-		"A comment on a card. The quoted words are what I selected:\n\n1. boards/plan.html, the whole card\n   Two sentences, please.",
+		"A comment on a card. The quoted words are what I selected:\n\n1. canvases/plan/cards/plan/index.html, the whole card\n   Two sentences, please.",
 	);
 });
 
 test("a comment on drawn items names the canvas file, the items by id, and their words", () => {
-	const note: CardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
+	const note: CardComment = { id: "c1", path: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
 	const block = commentBlock([note]);
 	assert.match(block, /^A comment on items drawn on a canvas:/);
 	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);
@@ -44,7 +44,7 @@ test("waiting comments go in front of the next message, and either half may be m
 
 test("waiting comments are kept per agent and canvas, and ones kept under the agent alone move to its canvas once", async () => {
 	const { adoptComments, commentsKey } = await import("./comments.ts");
-	const note = { id: "c1", board: "boards/a.html", quote: "q", text: "t", at: 1 };
+	const note = { id: "c1", path: "canvases/plan/cards/a/index.html", quote: "q", text: "t", at: 1 };
 	assert.equal(commentsKey("a1", "x"), "a1@x");
 	assert.equal(commentsKey("a1", undefined), "a1");
 	const moved = adoptComments({ a1: [note], "a1@x": [] }, "a1", "x");
@@ -66,6 +66,12 @@ test("comments survive a reload per agent, and a broken store is an empty one", 
 	held.set(COMMENTS_KEY, JSON.stringify({ a1: [{ id: 1 }, comment()] }));
 	assert.deepEqual(loadComments(store), { a1: [comment()] });
 	assert.deepEqual(loadComments(undefined), {});
+});
+
+test("a comment saved with board, before the field was named path, is read with path", () => {
+	const { path, ...rest } = comment();
+	const store = { getItem: () => JSON.stringify({ a1: [{ ...rest, board: path }] }), setItem: () => {}, removeItem: () => {} };
+	assert.deepEqual(loadComments(store), { a1: [comment()] });
 });
 
 test("the popup sits under the selection, above it when there is no room, and never off the window", () => {

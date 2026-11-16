@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { browsed, canvasInPath, folderOf, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
+import { browsed, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, sizeLabel } from "./model.ts";
 
 // A dropped file shows on the canvas as itself when it is a picture, short words or a player.
 
@@ -16,7 +16,7 @@ test("pictures, short words and players show as themselves; an SVG and long word
 });
 
 test("a deck path is reached from the canvas's folder", () => {
-	assert.equal(folderOf("shared/ada/notes"), "shared/canvases/ada/notes");
+	assert.equal(fromCanvas("shared/canvases/ada/notes/files/a.png", "shared/ada/notes"), "files/a.png");
 	assert.equal(fromCanvas("canvases/plan/files/a.png", "plan"), "files/a.png");
 	assert.equal(fromCanvas("assets/a.png", "plan"), "../../assets/a.png");
 	assert.equal(fromCanvas("assets/a.png", undefined), "../../assets/a.png");
@@ -33,10 +33,4 @@ test("a folder lists its entries by name, and the folder above it", () => {
 	assert.equal(at.parent, "assets");
 	assert.deepEqual(at.entries.map((one) => `${one.name}:${one.kind}`), ["a.mp4:file", "old:dir"]);
 	assert.equal(browsed("", []).parent, null);
-});
-
-test("a deck path names its canvas, a friend's as shared/<owner>/<name>", () => {
-	assert.equal(canvasInPath("canvases/plan/cards/a/index.html"), "plan");
-	assert.equal(canvasInPath("shared/canvases/ada/notes/cards/x/index.html"), "shared/ada/notes");
-	assert.equal(canvasInPath("note-1"), undefined);
 });
