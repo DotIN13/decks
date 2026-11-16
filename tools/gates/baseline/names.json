@@ -171,7 +171,7 @@
 	"canvas/host/inside/marks.ts: stage": 1,
 	"canvas/host/messages.ts: board": 2,
 	"canvas/host/outside/framed-editor.tsx: board": 2,
-	"canvas/host/outside/framed-editor.tsx: stage": 4,
+	"canvas/host/outside/framed-editor.tsx: stage": 3,
 	"canvas/index.ts: stage": 1,
 	"canvas/ink/ink.ts: board": 2,
 	"canvas/ink/ink.ts: stage": 6,
