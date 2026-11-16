@@ -362,9 +362,9 @@ export function createFileDrops() {
 		});
 
 		/*
-		 * Every file dropped on the canvas reaches here — on empty canvas, and over a card too: a
-		 * card's page hands its drop back to be replayed on its frame (`embed-guest.js`), since nothing
-		 * is dropped into a card. The input bar takes its own. The files land where they were dropped.
+		 * Every file dropped on the canvas reaches here. Over a card, the canvas frame takes the drop,
+		 * finds the card and the slot between its blocks under the point, and hands the files on
+		 * (`upload`, with `card`), so they land in that card. The input bar takes its own.
 		 */
 		onMount(() => {
 			dropPreview = deps.preview;
