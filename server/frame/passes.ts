@@ -17,7 +17,7 @@ export class Passes {
 	private readonly held = new Map<string, Held>();
 	private count = 0;
 
-	constructor(private readonly tokens: PassTokens, private readonly clock: () => number = Date.now) {}
+	constructor(private readonly tokens: PassTokens, private readonly clock: () => number = Date.now, private readonly life: number = PASS_MS) {}
 
 	/**
 	 * A pass for the asker on one canvas. `renewing`, a pass still held for the same asker and canvas,
@@ -26,9 +26,9 @@ export class Passes {
 	issue(canvas: string, asker: Caller, renewing?: string): { pass: string; expires: number } {
 		const id = this.renewedId(canvas, asker, renewing) ?? this.freshId(asker);
 		const pass = this.tokens.issue({ kind: asker.kind, id, name: asker.name, canvas }, `canvas pass for ${canvas}`);
-		const expires = this.clock() + PASS_MS;
+		const expires = this.clock() + this.life;
 		this.held.set(pass, { canvas, id, expires });
-		setTimeout(() => this.end(pass), PASS_MS).unref?.();
+		setTimeout(() => this.end(pass), this.life).unref?.();
 		return { pass, expires };
 	}
 

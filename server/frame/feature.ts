@@ -4,8 +4,11 @@ import { Passes, type PassTokens } from "./passes.ts";
 import { passFilesRoute, passRoute } from "./routes.ts";
 import { DIST, staticRoutes } from "./static.ts";
 
-/** page: false leaves the canvas page to the host (Studio serves its own); the passes stay. */
-export type FrameOptions = { dist?: string; clock?: () => number; page?: boolean };
+/**
+ * page: false leaves the canvas page to the host (Studio serves its own); the passes stay. passMs is
+ * how long a pass lives: an hour, or DECKS_PASS_MS, which a browser check shortens to see renewals.
+ */
+export type FrameOptions = { dist?: string; clock?: () => number; page?: boolean; passMs?: number };
 
 export function frameFeature(options: FrameOptions = {}): Feature {
 	let kernel: Kernel | undefined;
@@ -17,7 +20,7 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 		issue: (who, label) => started().callers.issue(who, label),
 		forget: (token) => started().callers.forget!(token),
 	};
-	const passes = new Passes(tokens, options.clock);
+	const passes = new Passes(tokens, options.clock, options.passMs ?? (Number(process.env.DECKS_PASS_MS) || undefined));
 	return defineFeature({
 		name: "frame",
 		calls: [],

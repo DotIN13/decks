@@ -2,18 +2,23 @@
 // Runs today's browser checks, unchanged, against the new programs: node tools/checks/run.mjs <check> ...
 // Per check: Decks-local on a fresh fixture copy, the harness, and the page, each on ports of its own.
 // It takes the heavy lock itself, a slot per check run (call it directly). Only server: --only-server.
-// CHECKS_LOG_DIR=<dir> keeps each check's whole log there; CHECKS_VERBOSE=1 prints a failure's tail.
+// CHECKS_LOG_DIR keeps each check's log, CHECKS_VERBOSE=1 a failure's tail; CHECKS_PROGRAMS=<checkout>
+// runs the programs from another checkout, the checks from this one (and a check may restart one: controlServer).
 import { spawn, spawnSync } from "node:child_process";
 import { freeGb, withSlot } from "../heavy.mjs";
 import { portsFree } from "./ports.mjs";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 
-const FIXTURE = join(ROOT, "tools/fixtures/deck");
+/** Where the programs come from: this checkout, or the one CHECKS_PROGRAMS names. */
+const PROGRAM_ROOT = process.env.CHECKS_PROGRAMS ? resolve(process.env.CHECKS_PROGRAMS) : ROOT;
+
+const FIXTURE = join(PROGRAM_ROOT, "tools/fixtures/deck");
 
 const BASE = Number(process.env.CHECKS_PORT ?? 4610);
 
@@ -47,8 +52,8 @@ export const PROGRAMS = {
 	// CHECKS_PAGE=dev runs vite's dev server instead, directly, not through npm.
 	page: ({ deck, web, dist }) =>
 		process.env.CHECKS_PAGE === "dev" || !dist
-			? { cmd: join(ROOT, "node_modules/.bin/vite"), args: [], cwd: join(ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web), DECKS_PAGE_COMPAT: "1" } }
-			: { cmd: process.execPath, args: [join(ROOT, "tools/checks/page-server.mjs"), "--dist", dist, "--deck", deck, "--port", String(web), "--compat"] },
+			? { cmd: join(PROGRAM_ROOT, "node_modules/.bin/vite"), args: [], cwd: join(PROGRAM_ROOT, "harness/page"), env: { DECKS_DECK: deck, DECKS_PAGE_PORT: String(web), DECKS_PAGE_COMPAT: "1" } }
+			: { cmd: process.execPath, args: [join(PROGRAM_ROOT, "tools/checks/page-server.mjs"), "--dist", dist, "--deck", deck, "--port", String(web), "--compat"] },
 };
 
 /** Ports by lock slot (0 alone, 1 and 2 the check slots), so two checks at once never share one. */
@@ -60,21 +65,43 @@ export const portsFor = (i) => ({ server: BASE + 3 * i, harness: BASE + 3 * i + 
 export async function runCheck(file, i, { onlyServer = false } = {}) {
 	const log = [];
 	try {
-		return await runPrograms(async ({ ports, started }) => {
+		return await runPrograms(async ({ ports, started, restart }) => {
 			const web = onlyServer ? ports.server : ports.web;
+			const control = await controlServer(ports.harness, restart);
 			// The page proxies the server's routes and carries the person's token in its HTML, as today's page did.
-			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}` };
-			const check = launch("check", { cmd: process.execPath, args: [checkPath(file)], env }, log);
+			const env = { DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: `http://127.0.0.1:${web}`, DECKS_E2E_WEB: `http://127.0.0.1:${web}`, DECKS_E2E_CONTROL: `http://127.0.0.1:${ports.harness}` };
+			const check = launch("check", { cmd: process.execPath, args: [checkPath(file)], env, cwd: ROOT }, log);
 			started.push(check);
 			const code = await new Promise((done) => {
 				const timer = setTimeout(() => (stop(check), done("timeout")), CHECK_MS);
 				check.on("exit", (c) => (clearTimeout(timer), done(c)));
-			});
+			}).finally(() => control.close());
 			return { file, ok: code === 0, why: code === 0 ? "" : firstFailure(log, code), log };
 		}, { i, onlyServer, log, dist: onDev(file) ? null : RUN.dist });
 	} catch (error) {
 		return { file, ok: false, why: error.message, log };
 	}
+}
+
+/**
+ * The check's way to restart a program, on the harness's port (the harness listens on none):
+ * POST /restart { program, env } stops that program and starts it again with those variables added,
+ * answering once it is ready again; env {} starts it as the runner did.
+ */
+function controlServer(port, restart) {
+	const server = createServer(async (req, res) => {
+		let body = "";
+		for await (const chunk of req) body += chunk;
+		try {
+			const { program, env = {} } = JSON.parse(body || "{}");
+			if (req.method !== "POST" || req.url !== "/restart" || !PROGRAMS[program]) throw new Error("POST /restart { program, env }");
+			await restart(program, env);
+			res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true }));
+		} catch (error) {
+			res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: error.message }));
+		}
+	});
+	return new Promise((done, fail) => server.once("error", fail).listen(port, "127.0.0.1", () => done(server)));
 }
 
 /** The first line of a check's output that says it failed, else the exit. */
@@ -95,22 +122,42 @@ export async function runPrograms(work, { i = 0, onlyServer = false, log = [], d
 	cpSync(FIXTURE, deck, { recursive: true });
 	mkdirSync(home);
 	const started = [];
+	const running = new Map();
+	const ready = (name) => (name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server));
+	const start = async (name, extra = {}) => {
+		const spec = PROGRAMS[name]({ ...ports, deck, home, dist });
+		const child = launch(name, { ...spec, env: { ...spec.env, ...extra } }, log);
+		started.push(child);
+		running.set(name, child);
+		await until(ready(name), child, name);
+	};
+	/**
+	 * A program stopped and started again, with variables of its own. After the server, the harness is
+	 * given 15 s to find it again; one that does not is restarted too, and the log says so.
+	 */
+	const restart = async (name, extra) => {
+		const was = running.get(name);
+		if (was) await stopAndWait(was);
+		await portsFree(name === "server" ? [ports.server] : name === "page" ? [ports.web] : []);
+		await start(name, extra);
+		if (name !== "server" || !running.has("harness")) return;
+		const back = await until(ready("harness"), running.get("harness"), "harness", 15_000).then(() => true, () => false);
+		if (back) return;
+		log.push("[runner] the harness did not find the restarted server in 15 s; restarting it too\n");
+		await restart("harness", {});
+	};
 	try {
-		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) {
-			const child = launch(name, PROGRAMS[name]({ ...ports, deck, home, dist }), log);
-			started.push(child);
-			const ready = name === "harness" ? () => harnessReady(ports, deck) : name === "page" ? () => pageReady(ports) : () => listening(ports.server);
-			await until(ready, child, name);
-		}
-		return await work({ ports, deck, started, log });
+		for (const name of onlyServer ? ["server"] : ["server", "harness", "page"]) await start(name);
+		return await work({ ports, deck, started, log, restart });
 	} finally {
 		await Promise.all(started.reverse().map(stopAndWait));
 		rmSync(scratch, { recursive: true, force: true });
 	}
 }
 
-/** Where a check is: its path in checks.json. */
+/** Where a check is: its path in checks.json, or the path it was named by (tools/checks/<feature>/<name>.mjs). */
 export function checkPath(file) {
+	if (file.includes("/")) return resolve(ROOT, file);
 	return join(ROOT, traitsOf(file).path ?? `e2e/checks/${file}`);
 }
 
@@ -148,14 +195,14 @@ const listening = (port) => new Promise((done) => {
 	socket.once("error", () => done(false));
 });
 
-async function until(ready, child, name) {
-	const end = Date.now() + WAIT_MS;
+async function until(ready, child, name, ms = WAIT_MS) {
+	const end = Date.now() + ms;
 	while (Date.now() < end) {
 		if (child.exitCode !== null) throw new Error(`${name} exited (${child.exitCode}) before it was ready`);
 		if (await ready()) return;
 		await new Promise((r) => setTimeout(r, 250));
 	}
-	throw new Error(`${name} was not ready in ${WAIT_MS / 1000} s`);
+	throw new Error(`${name} was not ready in ${ms / 1000} s`);
 }
 
 // The programs as child processes: started with a clean environment, stopped as a group.
@@ -172,7 +219,7 @@ for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 	});
 }
 
-function launch(name, { cmd, args, env = {}, cwd = ROOT }, log) {
+function launch(name, { cmd, args, env = {}, cwd = PROGRAM_ROOT }, log) {
 	const child = spawn(cmd, args, { cwd, detached: true, env: { ...CLEAN, ...env }, stdio: ["ignore", "pipe", "pipe"] });
 	LIVE.add(child);
 	child.once("exit", () => LIVE.delete(child));
@@ -205,7 +252,7 @@ export function buildPage() {
 	const dist = join(mkdtempSync(join(tmpdir(), "decks-page-")), "dist");
 	// Development mode, unminified: the code today's checks were written against (vite's dev server).
 	// Minified, a timed check (ink-long-stroke) measured two ways too close to tell apart, 7 runs in 10.
-	const built = spawnSync(join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+	const built = spawnSync(join(PROGRAM_ROOT, "node_modules/.bin/vite"), ["build", "--mode", "development", "--minify", "false", "--outDir", dist, "--emptyOutDir", "--logLevel", "warn"], { cwd: join(PROGRAM_ROOT, "harness/page"), env: CLEAN, stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
 	if (built.status !== 0) throw new Error(`the page did not build: ${built.stderr.slice(-400)}`);
 	return dist;
 }
@@ -245,7 +292,9 @@ async function main(argv) {
 		if (process.env.CHECKS_LOG_DIR) {
 			seen.set(file, (seen.get(file) ?? 0) + 1);
 			const n = seen.get(file);
-			writeFileSync(join(process.env.CHECKS_LOG_DIR, n === 1 ? `${file}.log` : `${file}.${n}.log`), result.log?.join("") ?? "");
+			const name = file.split("/").pop();
+			mkdirSync(process.env.CHECKS_LOG_DIR, { recursive: true });
+			writeFileSync(join(process.env.CHECKS_LOG_DIR, n === 1 ? `${name}.log` : `${name}.${n}.log`), result.log?.join("") ?? "");
 		}
 	}
 	if (model) stop(model);
