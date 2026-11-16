@@ -46,6 +46,8 @@ export function whyOutside(raw: string, canvas: string): string | undefined {
 	} catch {
 		return "it cannot be read";
 	}
+	// An app's page is served at /app/<name>/: the deck's apps/<name>, which every canvas may show.
+	if (/^\/app\/[A-Za-z0-9][\w.-]*(?:\/|$)/.test(path) && !path.split("/").includes("..")) return undefined;
 	if (/^(?:canvases|shared)\//.test(path) || /^(?:assets|docs|apps)\//.test(path)) {
 		if (!layout.deckPathOk(path) || path.split("/").includes("..")) return "it climbs, or names a hidden folder";
 		const at = layout.canvasOfPath(path);

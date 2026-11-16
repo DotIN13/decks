@@ -161,6 +161,9 @@ test("an item naming a path outside its canvas is refused, for every caller, how
 	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "files/a.png" } }, at: { x: 0, y: 900 } }, ann)).ok, true, "its own files");
 	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "assets/logo.png" } }, at: { x: 400, y: 900 } }, ann)).ok, true, "the deck's assets");
 	assert.equal((await s.call("item.insert", { item: { type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } }, at: { x: 800, y: 900 } }, ann)).ok, true, "a web address");
+	assert.equal((await s.call("item.insert", { item: { type: "browser", url: "/app/notes/" }, at: { x: 1200, y: 900 } }, ann)).ok, true, "an app's page");
+	assert.ok(await refused({ item: { type: "browser", url: "/files/canvases/other/cards/x/index.html" }, at: { x: 0, y: 1300 } }), "another route");
+	assert.ok(await refused({ item: { type: "browser", url: "/app/../files/canvases/other/x" }, at: { x: 0, y: 1300 } }), "an app path that climbs");
 	await s.close();
 });
 
