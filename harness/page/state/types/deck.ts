@@ -31,11 +31,11 @@ export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string
 ];
 
 /**
- * A card on a canvas, or an old board a canvas still holds (a friend's, drawn as its picture): its file, its
+ * A card on a canvas, or an old page a canvas still holds (a friend's, drawn as its picture): its file, its
  * place and size, and what the canvas marks on it.
  */
 export interface Page {
-	/** Deck-relative, forward slashes on every platform: "boards/plan.html". */
+	/** Deck-relative, forward slashes on every platform: "canvases/plan/cards/plan/index.html". */
 	path: string;
 	title: string;
 	/**
@@ -69,7 +69,7 @@ export interface Page {
 	 */
 	fills?: true;
 	/**
-	 * A card: a piece of HTML in a canvas's `cards/`, drawn in a shadow root of the stage's own page
+	 * A card: a piece of HTML in a canvas's `cards/`, drawn in a shadow root of the canvas's own page
 	 * instead of a frame (`card.ts`). Every other rule of a card holds for it.
 	 */
 	card?: true;
@@ -88,7 +88,7 @@ export interface Page {
 	/** An app item's app, by name. */
 	app?: string;
 	/**
-	 * Its item's own corners, from its `cornerRadius`, top-left clockwise in stage units; absent, the
+	 * Its item's own corners, from its `cornerRadius`, top-left clockwise in canvas units; absent, the
 	 * canvas's 12 px. Read off the drawing (`drawing/drawing.ts`, `pagesOf`), as its place is.
 	 */
 	corners?: [number, number, number, number];
@@ -133,7 +133,7 @@ export interface Page {
 	modifiedAt?: number;
 	/**
 	 * When a writer last *named* this card: an agent fitting, showing or reporting it through the
-	 * stage tool, or the person's own edit in the canvas.
+	 * canvas tool, or the person's own edit in the canvas.
 	 *
 	 * The "changed" mark is about the act, not the file. `modifiedAt` moves for any write at all,
 	 * which cannot tell an agent's work from the person's own drag, and `decks.canvas.insert` and `decks.agent.claim` write no
@@ -151,7 +151,7 @@ export interface Page {
 	seenAt?: number;
 }
 
-/** A `.pen` file kept with the cards: in `boards/` or `frames/`, placed on a canvas by a ref to its path. */
+/** A `.pen` file kept in the deck beside the cards (`frames/`), placed on a canvas by a ref to its path. */
 export interface DeckPen {
 	/** Deck-relative, with `.pen`: `frames/ui/button.pen`. */
 	path: string;
@@ -166,8 +166,8 @@ export interface DeckState {
 	/** Absolute path of the open deck. */
 	path: string;
 	name: string;
-	boards: Page[];
+	cards: Page[];
 	roots: Root[];
-	/** The `.pen` files in `boards/` and `frames/`, sorted by path. */
+	/** The deck's `.pen` files, sorted by path. */
 	pens?: DeckPen[];
 }

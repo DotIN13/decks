@@ -1,5 +1,5 @@
 /*
- * The page's side of the frame probe (`probe.ts`, which runs in the canvas frame, where the stage is):
+ * The page's side of the frame probe (`probe.ts`, which runs in the canvas frame, where the canvas is drawn):
  * with `?probe` on the page, `__probeEval(expression)` runs an expression in the canvas frame and
  * resolves to its value, awaited, so an inspector or WebDriver on the page (`scripts/ipad-profile.mjs`)
  * reaches the frame's `__pilot`, `__decksSheet` and clock. Nothing runs without the parameter.

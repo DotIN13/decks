@@ -15,7 +15,7 @@ import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
 import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
-import { editDrawing, stageOnScreen } from "../state/decks.ts";
+import { editDrawing, canvasOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/canvases.ts";
 import { authedSrc } from "../lib/authed.tsx";
 import { DOCUMENTS, fileAddress, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
@@ -37,7 +37,7 @@ export function createFileDrops() {
 	const created = new Map<string, (path: string) => void>();
 
 	/**
-	 * Ask the server for a document item and hear back which path it got on the stage.
+	 * Ask the server for a document item and hear back which path it got on the canvas.
 	 *
 	 * The server mints the item's id, so a caller that wants to *do* something with the item it
 	 * 	 * asked for — select it, fly to it — has to wait to be told what it is called. `ask` is handed the
@@ -92,13 +92,13 @@ export function createFileDrops() {
 	};
 
 	/**
-	 * Files dropped on empty canvas, all of them on the stage itself where they landed: pictures, text,
-	 * films and sounds as items of their own (`ontoStage`), anything else — a PDF, an SVG, a web page
+	 * Files dropped on empty canvas, all of them on the canvas itself where they landed: pictures, text,
+	 * films and sounds as items of their own (`ontoCanvas`), anything else — a PDF, an SVG, a web page
 	 * — as a file card (`asFileCards`).
 	 */
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }, over?: { card: string; index: number; inner: number }) => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage || refusedOn(stageOnScreen())) return;
+		const area = document.querySelector(".stage, iframe.canvas-frame");
+		if (!area || refusedOn(canvasOnScreen())) return;
 		// Asked first, before anything is made for them: a big file said no to leaves no card behind.
 		const files: File[] = [];
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
@@ -108,15 +108,15 @@ export function createFileDrops() {
 		if (card) return intoCard(files, card);
 		const direct = files.filter(showsAsItself);
 		const rest = files.filter((file) => !showsAsItself(file));
-		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
-		if (direct.length > 0) await ontoStage(direct, middle);
+		const middle = toWorld(camera(), { width: area.clientWidth, height: area.clientHeight }, at);
+		if (direct.length > 0) await ontoCanvas(direct, middle);
 		if (rest.length > 0) await asFileCards(rest, { x: middle.x, y: middle.y + (direct.length ? 260 : 0) });
 	};
 
 	/**
-	 * Files the stage has no item of its own for — a PDF, an SVG, a web page, a spreadsheet — copied
+	 * Files the canvas has no item of its own for — a PDF, an SVG, a web page, a spreadsheet — copied
 	 * into the deck and put on the canvas as file cards (`fileCard`): a picture of each where the
-	 * server can draw one, its name and kind under it. In a row centred on `middle`, a stage point.
+	 * server can draw one, its name and kind under it. In a row centred on `middle`, a canvas point.
 	 */
 	const asFileCards = async (files: File[], middle: { x: number; y: number }) => {
 		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
@@ -124,7 +124,7 @@ export function createFileDrops() {
 		const failures: string[] = [];
 		for (const file of files) {
 			try {
-				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen())).path);
+				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), canvasOnScreen())).path);
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
@@ -148,14 +148,14 @@ export function createFileDrops() {
 		if (agentId && live.length) {
 			const files = [];
 			for (const path of live) files.push({ path, preview: await previewOf(path) });
-			void editDrawing(agentId, liveFileOps(files, middle, fresh, fromStage));
+			void editDrawing(agentId, liveFileOps(files, middle, fresh, fromHere));
 		}
 		const paths = all.filter((one) => !LIVE.test(one));
 		if (!agentId || paths.length === 0) return;
 		const files = [];
-		// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
-		for (const path of paths) files.push({ path: fromStage(path), preview: await previewOf(path) });
-		void editDrawing(agentId, fileCardOps(files, middle, fresh, fromStage));
+		// Its path from the canvas's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
+		for (const path of paths) files.push({ path: fromHere(path), preview: await previewOf(path) });
+		void editDrawing(agentId, fileCardOps(files, middle, fresh, fromHere));
 	};
 
 	/**
@@ -178,9 +178,9 @@ export function createFileDrops() {
 					continue;
 				}
 				const natural = isRaster(file) ? await naturalSize(file) : undefined;
-				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
-				if (isRaster(file)) ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: cardPicture(file.name, fromStage(asset.path), into.inner, natural) });
-				else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromStage(asset.path), none) });
+				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), canvasOnScreen());
+				if (isRaster(file)) ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: cardPicture(file.name, fromHere(asset.path), into.inner, natural) });
+				else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromHere(asset.path), none) });
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
@@ -190,12 +190,12 @@ export function createFileDrops() {
 	};
 
 	/**
-	 * Pictures and text files, put on the stage itself: a picture is a rectangle filled with it, at
+	 * Pictures and text files, put on the canvas itself: a picture is a rectangle filled with it, at
 	 * its own proportions, and a text file is a markdown card holding its words. Copied into the
-	 * deck first like every other file, so the stage file refers to `assets/`, never to the desktop.
-	 * Laid in a row centred on `middle`, a stage point.
+	 * deck first like every other file, so the canvas file refers to `assets/`, never to the desktop.
+	 * Laid in a row centred on `middle`, a canvas point.
 	 */
-	const ontoStage = async (files: File[], middle: { x: number; y: number }) => {
+	const ontoCanvas = async (files: File[], middle: { x: number; y: number }) => {
 		const agentId = state.focused;
 		if (!agentId) return;
 		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
@@ -209,10 +209,10 @@ export function createFileDrops() {
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
-				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
+				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), canvasOnScreen());
 				// Only a file named as a film or a sound: ffmpeg reads a still picture as a one-frame film.
-				if (asset.media && isPlayable(file)) items.push(mediaItem(file.name, asset.path, asset.media, fromStage, natural));
-				else items.push(pictureItem(file.name, fromStage(asset.path), natural));
+				if (asset.media && isPlayable(file)) items.push(mediaItem(file.name, asset.path, asset.media, fromHere, natural));
+				else items.push(pictureItem(file.name, fromHere(asset.path), natural));
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
@@ -233,10 +233,10 @@ export function createFileDrops() {
 	 * screenshot pasted into a sentence you are writing is not put on the canvas.
 	 */
 	const paste = (files: File[]) => {
-		if (files.length === 0 || refusedOn(stageOnScreen())) return;
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return;
-		void onEmptyCanvas(files, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 });
+		if (files.length === 0 || refusedOn(canvasOnScreen())) return;
+		const area = document.querySelector(".stage, iframe.canvas-frame");
+		if (!area) return;
+		void onEmptyCanvas(files, { x: area.clientWidth / 2, y: area.clientHeight / 2 });
 	};
 
 	/**
@@ -249,8 +249,8 @@ export function createFileDrops() {
 	 * the newest thing on the canvas rather than on whatever is in the middle of the screen.
 	 */
 	const fileAt = async (at: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return undefined;
+		const area = document.querySelector(".stage, iframe.canvas-frame");
+		if (!area) return undefined;
 		const picked = await new Promise<string | undefined>((resolve) =>
 			setPicking({
 				resolve: (path) => {
@@ -262,13 +262,13 @@ export function createFileDrops() {
 			}),
 		);
 		if (!picked) return undefined;
-		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		const middle = toWorld(camera(), { width: area.clientWidth, height: area.clientHeight }, at);
 		const extension = (picked.split("/").pop()?.split(".").pop() ?? "").toLowerCase();
 		const google = picked.startsWith("google:") ? picked.slice(7) : undefined;
 		if (google || DOCUMENTS.has(extension)) {
 			const size = { w: 1000, h: 1100 };
 			// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the item.
-			return call<{ path?: string; id?: string }>("item.insert", { item: { type: "document", path: google ? `google:${google}` : picked }, ...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}), ...(stageOnScreen() ? { canvas: stageOnScreen() } : {}) }).then((answer) => {
+			return call<{ path?: string; id?: string }>("item.insert", { item: { type: "document", path: google ? `google:${google}` : picked }, ...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}), ...(canvasOnScreen() ? { canvas: canvasOnScreen() } : {}) }).then((answer) => {
 				if (!answer.ok) {
 					warnIfFailed(answer);
 					return undefined;
@@ -277,7 +277,7 @@ export function createFileDrops() {
 			});
 		}
 		const agentId = state.focused;
-		// In the deck, the stage file refers to it where it is, with nothing copied: the server says where that is, and what a film or a sound is.
+		// In the deck, the canvas file refers to it where it is, with nothing copied: the server says where that is, and what a film or a sound is.
 		const where = (await (await fetch(api(`/where?path=${encodeURIComponent(picked)}`))).json().catch(() => ({ inDeck: false }))) as { inDeck: boolean; path?: string; media?: { kind: "video" | "audio"; poster?: string; peaks?: number[]; seconds?: number; w?: number; h?: number } };
 		const inDeck = where.inDeck && !!where.path;
 		const deckPath = where.path ?? picked;
@@ -295,13 +295,13 @@ export function createFileDrops() {
 					() => resolve({ width: 480, height: 360 }),
 				);
 			});
-			place(pictureItem(name, fromStage(deckPath), natural));
+			place(pictureItem(name, fromHere(deckPath), natural));
 			return undefined;
 		}
 		if (inDeck && PLAYABLE.has(extension)) {
 			const facts = where.media;
 			if (facts) {
-				place(mediaItem(name, deckPath, facts, fromStage));
+				place(mediaItem(name, deckPath, facts, fromHere));
 				return undefined;
 			}
 		}
@@ -404,7 +404,7 @@ async function openDroppedBundle(file: File): Promise<void> {
 	}
 }
 
-const fromStage = (asset: string) => fromCanvas(asset, stageOnScreen());
+const fromHere = (asset: string) => fromCanvas(asset, canvasOnScreen());
 
 const refusedOn = (canvas: string | undefined): boolean => {
 	const row = viewOnly(canvas);

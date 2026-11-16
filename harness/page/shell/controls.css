@@ -193,7 +193,7 @@
 	 * they must name a runtime identically, which is the whole reason this is one class.
 	 *
 	 * A word rather than a badge on the avatar, which was the option it beat: agents draw
-	 * their own faces (`stage.me.setAvatar`), so a badge would be a third mark on a 22px
+	 * their own faces (through the SDK), so a badge would be a third mark on a 22px
 	 * circle that already carries a status ring and an unread dot, sitting on top of artwork
 	 * nobody controls. A word cannot collide with any of that, and it is readable aloud.
 	 */

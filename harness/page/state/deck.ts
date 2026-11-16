@@ -22,7 +22,7 @@ export interface Notice {
 function createDeck() {
 	return createStore<{
 		deck?: DeckState;
-		/** The deck's cards (and the old boards a canvas still holds), from `deck.state` and each `card.changed`. */
+		/** The deck's cards (and the old pages a canvas still holds), from `deck.state` and each `card.changed`. */
 		pages: Page[];
 		notices: Notice[];
 		/** One entry per agent, so switching chats (M5) is a lookup and not a fetch. */

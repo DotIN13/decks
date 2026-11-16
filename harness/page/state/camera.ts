@@ -13,8 +13,8 @@ export const GLIDE_MS = 500;
 /**
  * The glide the app has been asked for, or nothing.
  *
- * A **request**, not a schedule: `Stage` owns the pixels and the clock, so this carries a token
- * that tells one request from another plus the duration, and the stage does the rest. Two moves
+ * A **request**, not a schedule: the canvas owns the pixels and the clock, so this carries a token
+ * that tells one request from another plus the duration, and the canvas does the rest. Two moves
  * in a row give two tokens and the second wins — the loop interpolates from wherever the camera
  * *is*, so nothing travels backwards.
  */

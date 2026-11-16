@@ -106,7 +106,7 @@
 	 * `min-height: auto` and refuses to shrink below its content, so a deck of seventy-eight
 	 * would grow the panel off the bottom of the screen instead of scrolling — `overflow-y`
 	 * never engages on a box that is never smaller than what is inside it. It was two bugs
-	 * in one in `AllBoards`, where the rows past the second were clipped and unreachable.
+	 * in one in the old list of every card, where the rows past the second were clipped and unreachable.
 	 *
 	 * 2px of padding so a focus ring and the current tile's 1px halo are not clipped:
 	 * setting `overflow-y` makes `overflow-x` compute to `auto` too, so anything painted

@@ -1,13 +1,13 @@
-import type { StageCall } from "../state/types/index.ts";
+import type { CanvasCall } from "../state/types/index.ts";
 
 // A view.requested event as today's call (show, camera, goto, reload, cursor)
 // in today's argument names, which the canvas library's runner reads. Pure.
 
 export type Requested = { call?: string; args?: Record<string, unknown>; by?: string; canvas?: string };
-const OPS: Record<string, StageCall["op"]> = { "view.focus": "show", "view.move": "camera", "view.goto": "goto", "view.reload": "reload", "view.cursor": "cursor" };
+const OPS: Record<string, CanvasCall["op"]> = { "view.focus": "show", "view.move": "camera", "view.goto": "goto", "view.reload": "reload", "view.cursor": "cursor" };
 
 /** A view.requested event as today's call: its op, and its arguments in today's names. */
-export function todaysCall(event: Requested, boxOf: (id: string) => { x: number; y: number; w: number; h: number } | undefined, cardBox: (path: string) => { x: number; y: number; w: number; h: number } | undefined = () => undefined): StageCall | undefined {
+export function todaysCall(event: Requested, boxOf: (id: string) => { x: number; y: number; w: number; h: number } | undefined, cardBox: (path: string) => { x: number; y: number; w: number; h: number } | undefined = () => undefined): CanvasCall | undefined {
 	const op = event.call ? OPS[event.call] : undefined;
 	if (!op) return undefined;
 	const args = event.args ?? {};

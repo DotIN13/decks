@@ -21,7 +21,7 @@
 	--color-bg: var(--bg);
 	--color-bg-deep: var(--bg-deep);
 	--color-panel: var(--panel);
-	--color-stage: var(--stage);
+	--color-ground: var(--ground);
 	--color-fg: var(--fg);
 	--color-muted: var(--muted);
 	--color-faint: var(--faint);
@@ -220,7 +220,7 @@
 	 */
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
 	/* A step below white, so the white floats (`--layer`) and the white cards read as things on it. */
-	--stage: #f1f1f3;
+	--ground: #f1f1f3;
 	/*
 	 * The type scale: ten sizes with names, because thirteen sizes without them is what the
 	 * app had.
@@ -265,8 +265,8 @@
 	 * own order, and a panel's resize handle (1) is above its own panel and nothing else — both
 	 * are specific to one element, so both stay literals next to the thing they order.
 	 */
-	--z-board-edit: 2; /* a field opened on a card: the source editor, a rename */
-	--z-over-board: 5; /* just over the cards: the focus view's exit, an agent landing */
+	--z-card-edit: 2; /* a field opened on a card: the source editor, a rename */
+	--z-over-card: 5; /* just over the cards: the focus view's exit, an agent landing */
 	--z-conversation: 9; /* the conversation column */
 	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
 	--z-backdrop: 20; /* a dialog's backdrop */
@@ -292,7 +292,7 @@
 	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
-	--stage: #101010;
+	--ground: #101010;
 	color-scheme: dark;
 }
 
@@ -346,7 +346,7 @@
 		--canvas-panel: var(--panel);
 		--canvas-bg: var(--bg);
 		--canvas-bg-deep: var(--bg-deep);
-		--canvas-stage: var(--stage);
+		--canvas-stage: var(--ground);
 		--canvas-shadow: var(--shadow);
 		--canvas-radius: var(--radius-panel);
 		--canvas-radius-thumb: var(--radius-thumb);

@@ -22,7 +22,7 @@ test("the agent reads where, the words, and the comment, and the list says what 
 	assert.match(two, /2\. canvases\/plan\/cards\/plan\/index\.html\n   > Keep it short\.\n   Why\?\n   Say more\.$/);
 });
 
-test("a comment on the whole board has no quote, and says so", () => {
+test("a comment on the whole card has no quote, and says so", () => {
 	assert.equal(
 		commentBlock([comment({ quote: "", component: undefined })]),
 		"A comment on a card. The quoted words are what I selected:\n\n1. canvases/plan/cards/plan/index.html, the whole card\n   Two sentences, please.",
@@ -39,7 +39,7 @@ test("a comment on drawn items names the canvas file, the items by id, and their
 test("waiting comments go in front of the next message, and either half may be missing", () => {
 	assert.equal(withComments("  hello ", []), "hello");
 	assert.equal(withComments("", [comment()]), commentBlock([comment()]));
-	assert.equal(withComments("Then fit the board.", [comment()]), `${commentBlock([comment()])}\n\nThen fit the board.`);
+	assert.equal(withComments("Then fit the card.", [comment()]), `${commentBlock([comment()])}\n\nThen fit the card.`);
 });
 
 test("waiting comments are kept per agent and canvas, and ones kept under the agent alone move to its canvas once", async () => {
@@ -66,12 +66,6 @@ test("comments survive a reload per agent, and a broken store is an empty one", 
 	held.set(COMMENTS_KEY, JSON.stringify({ a1: [{ id: 1 }, comment()] }));
 	assert.deepEqual(loadComments(store), { a1: [comment()] });
 	assert.deepEqual(loadComments(undefined), {});
-});
-
-test("a comment saved with board, before the field was named path, is read with path", () => {
-	const { path, ...rest } = comment();
-	const store = { getItem: () => JSON.stringify({ a1: [{ ...rest, board: path }] }), setItem: () => {}, removeItem: () => {} };
-	assert.deepEqual(loadComments(store), { a1: [comment()] });
 });
 
 test("the popup sits under the selection, above it when there is no room, and never off the window", () => {

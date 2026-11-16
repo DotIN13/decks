@@ -5,9 +5,9 @@
  *
  * **The canvas keeps its own look.** The v3 colours are set on `body`, so the chrome and every
  * menu portalled into the body take them; `.stage` sets the old ones back for everything drawn on
- * the canvas (the selection, the pills, the handles, the cursors), and the stage engine reads its
+ * the canvas (the selection, the pills, the handles, the cursors), and the canvas engine reads its
  * accent off the root element, which this sheet leaves alone. Only the ground under the cards,
- * `--stage`, is the design's.
+ * `--ground`, is the design's.
  *
  * Last in `index.css`, and in the components layer, so a rule here wins a tie with the sheets it
  * restyles and still loses to a utility.
@@ -43,7 +43,7 @@ body {
 
 	/* The app's own tokens, as v3 has them, for the chrome. */
 	--bg: var(--v3-bg);
-	--stage: var(--v3-bg);
+	--ground: var(--v3-bg);
 	--panel: var(--v3-panel);
 	--fg: var(--v3-fg);
 	--muted: var(--v3-fg2);

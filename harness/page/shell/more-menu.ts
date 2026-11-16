@@ -13,13 +13,13 @@ import { setOps, setSettings } from "../state/ui.ts";
  * Highlighting is the pointer's menu now, Fit the zoom bar's, and the context reading the composer's
  * (a phone's ⋯ adds it back, `TopRight.tsx`).
  */
-export const moreItems = (stagePages: () => Page[]) => [
+export const moreItems = (canvasPages: () => Page[]) => [
 	{
 		label: "Clear the canvas",
 		icon: Eraser,
-		disabled: stagePages().length === 0,
+		disabled: canvasPages().length === 0,
 		onPick: () => {
-			const paths = stagePages().map((board) => board.path);
+			const paths = canvasPages().map((page) => page.path);
 			if (paths.length) void act("item.batch", { ops: paths.map((path) => ({ op: "delete", id: path })) });
 		},
 	},

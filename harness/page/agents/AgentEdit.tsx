@@ -96,7 +96,7 @@ export function AgentEdit(props: {
 		 * components deep in a panel, and putting its open/closed state in `App` so that
 		 * handler could name it would be lifting state for the sake of a keystroke. Capturing
 		 * is the alternative: while this is open it takes Escape *first*, closes, and stops
-		 * the event — so the stage behind it neither goes Home nor drops its selection.
+		 * the event — so the canvas behind it neither goes Home nor drops its selection.
 		 *
 		 * While the workspace list is open, Escape is the list's: it closes itself, and a
 		 * second press closes the window.

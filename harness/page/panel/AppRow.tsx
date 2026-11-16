@@ -15,7 +15,7 @@ import { Icon, Popover } from "@decks/ui";
 // The Apps tab's pieces: one app's row, with its menu to show, start, stop or
 // delete it, and the small panel that shows an app's recent output.
 
-export type PanelApp = { name: string; title: string; status: string; board: string };
+export type PanelApp = { name: string; title: string; status: string };
 
 /** What the ⋯ menu and a double-click ask of an app (the page's shell carries them out). */
 export type AppAction = "show" | "run-show" | "start" | "stop" | "restart" | "delete";

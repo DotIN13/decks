@@ -137,7 +137,7 @@ export function apiBase(): string {
 	return !one || one.kind === "here" ? "/api" : `/c/${one.id}/api`;
 }
 
-/** A backend URL: `api("/board/x.html")`. A path the server handed over (`/api/f/...`) is accepted too. */
+/** A backend URL: `api("/card/plan/index.html")`. A path the server handed over (`/api/f/...`) is accepted too. */
 export function api(path: string): string {
 	const rest = path.startsWith("/api/") ? path.slice(4) : path.startsWith("/") ? path : `/${path}`;
 	return `${apiBase()}${rest}`;

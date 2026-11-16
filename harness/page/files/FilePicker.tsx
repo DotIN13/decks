@@ -38,9 +38,9 @@ interface BrowseResult {
 
 /** What the picker is for, said in its title and under it. */
 const PURPOSES = {
-	canvas: { title: "Add a file", sub: "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a board." },
+	canvas: { title: "Add a file", sub: "Documents open as pages you and your agents type into; pictures, films and sounds go on the canvas; anything else gets a card." },
 	attach: { title: "Attach a file", sub: "It goes into your message, for the agent to read." },
-	embed: { title: "Choose a file", sub: "It is shown on the board, where it is." },
+	embed: { title: "Choose a file", sub: "It is shown on the card, where it is." },
 } as const;
 
 /**

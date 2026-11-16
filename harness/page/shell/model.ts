@@ -17,8 +17,8 @@ export function pagesInPlay(pages: readonly Page[], inPlay: readonly string[]): 
 }
 
 /** The drawing on screen as the editor and the panel read it, with who wrote it last. */
-export function penOnScreen<D, E>(pen: { doc: D; base: string; stage: string; by?: string; made?: string[]; edits?: E } | undefined, nameOf: (id: string) => { name: string; color: string } | undefined) {
+export function penOnScreen<D, E>(pen: { doc: D; base: string; canvas: string; by?: string; made?: string[]; edits?: E } | undefined, nameOf: (id: string) => { name: string; color: string } | undefined) {
 	if (!pen) return undefined;
 	const writer = pen.by ? nameOf(pen.by) : undefined;
-	return { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) };
+	return { doc: pen.doc, base: pen.base, scope: pen.canvas, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) };
 }

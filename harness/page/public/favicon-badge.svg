@@ -3,7 +3,7 @@
 		The same mark with an unread dot, swapped in by `lib/favicon.ts` when an alert
 		arrives at a tab you are not looking at.
 
-		The dot is punched out of the boards with a mask rather than drawn on top of them:
+		The dot is punched out of the cards with a mask rather than drawn on top of them:
 		the favicon has no background of its own, so a ring of "page colour" around the dot
 		would be a ring of whatever the tab strip happens to be. A hole is the only separator
 		that is right on every browser theme.

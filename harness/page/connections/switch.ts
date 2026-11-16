@@ -2,7 +2,7 @@ import { render } from "solid-js/web";
 import type { JSX } from "solid-js";
 import { resetDeck } from "../state/deck.ts";
 import { resetPens } from "../state/pens.ts";
-import { resetStages } from "../state/canvases.ts";
+import { resetCanvases } from "../state/canvases.ts";
 import { resetToolResults } from "../chat/index.ts";
 import { scratch } from "../state/agent.ts";
 import { setMode, setSelected } from "../state/selection.ts";
@@ -42,7 +42,7 @@ function forget(): void {
 	stop();
 	resetDeck();
 	resetPens();
-	resetStages();
+	resetCanvases();
 	resetToolResults();
 	scratch.clear();
 	setBackend(undefined);

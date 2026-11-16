@@ -1,16 +1,16 @@
 /* ---- the canvas manager, as drawn: a plain head, find and order in one row, one blue button ---- */
 @layer components {
-	body .stage-box {
+	body .canvases-box {
 		width: min(94vw, 900px);
 		border-radius: 14px;
 		background: var(--v3-panel);
 	}
-	body .stage-head {
+	body .canvases-head {
 		gap: 12px;
 		padding: 16px 20px 14px;
 		border-bottom: 0;
 	}
-	body .stage-title {
+	body .canvases-title {
 		font-size: 15px;
 		font-weight: 600;
 		letter-spacing: 0;
@@ -23,12 +23,12 @@
 		font-size: 13px;
 		font-weight: 500;
 	}
-	.stage-tools {
+	.canvases-tools {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 	}
-	body .stage-search {
+	body .canvases-search {
 		height: 30px;
 		flex: 1;
 		gap: 7px;
@@ -37,40 +37,40 @@
 		border-radius: 6px;
 		background: var(--v3-bg2);
 	}
-	body .stage-search:focus-within {
+	body .canvases-search:focus-within {
 		background: var(--v3-panel);
 		box-shadow:
 			inset 0 0 0 1px var(--v3-accent),
 			0 0 0 3px color-mix(in srgb, var(--v3-accent) 18%, transparent);
 	}
-	body .stage-search > input {
+	body .canvases-search > input {
 		font-size: 12.5px;
 	}
-	body .stage-sort {
+	body .canvases-sort {
 		padding: 2px;
 		gap: 1px;
 		border-radius: 7px;
 		background: var(--v3-bg2);
 		box-shadow: none;
 	}
-	body .stage-sort > button {
+	body .canvases-sort > button {
 		height: 26px;
 		padding: 0 10px;
 		border-radius: 5px;
 		font-size: 12px;
 	}
-	body .stage-sort > button:hover {
+	body .canvases-sort > button:hover {
 		background: transparent;
 	}
-	body .stage-sort > button[data-on="true"] {
+	body .canvases-sort > button[data-on="true"] {
 		background: var(--v3-panel);
 		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 		font-weight: 500;
 	}
-	[data-color-scheme="dark"] body .stage-sort > button[data-on="true"] {
+	[data-color-scheme="dark"] body .canvases-sort > button[data-on="true"] {
 		background: #4a4a4a;
 	}
-	body .stage-card[data-here] .stage-open {
+	body .stage-card[data-here] .canvases-open {
 		border-color: var(--v3-accent);
 		box-shadow: 0 0 0 1px var(--v3-accent);
 	}

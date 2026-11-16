@@ -20,7 +20,7 @@ test("the pages in play are copies of the store's, in the store's order", () => 
 });
 
 test("the pen on screen names its last writer when it is known", () => {
-	const pen = { doc: {}, base: "/b", stage: "plan", by: "a" };
+	const pen = { doc: {}, base: "/b", canvas: "plan", by: "a" };
 	assert.deepEqual(penOnScreen(pen, () => ({ name: "Ada", color: "#f00" }))?.writer, { name: "Ada", color: "#f00" });
 	assert.equal(penOnScreen(undefined, () => undefined), undefined);
 });

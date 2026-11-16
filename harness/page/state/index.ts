@@ -5,6 +5,6 @@ export { notice, offer } from "./notices.ts";
 export { waitingComments, removeComment, type WaitingComment } from "./comments.ts";
 export { queuedFor } from "./queued.ts";
 export { ensureHistory, loadEarlier } from "./history.ts";
-export { stages, stageOf } from "./canvases.ts";
+export { canvases, canvasOf } from "./canvases.ts";
 export { mode, selected, setMode } from "./selection.ts";
 export * from "./ui.ts";

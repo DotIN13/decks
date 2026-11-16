@@ -1,5 +1,5 @@
 import type { shapes } from "@decks/protocol";
-import type { AgentChat, AgentKind, AgentModel, AgentState, ClaudeAccount, Identity, Page, RuntimeInfo, StageRow, ThinkingLevel } from "./types/index.ts";
+import type { AgentChat, AgentKind, AgentModel, AgentState, ClaudeAccount, Identity, Page, RuntimeInfo, CanvasRow, ThinkingLevel } from "./types/index.ts";
 
 // What the server and the harness answer, as the rows the page draws. Pure:
 // no store, no DOM. A field the protocol does not carry gets the value the
@@ -51,8 +51,8 @@ export function identityOf(agent: Agent): Identity {
 	};
 }
 
-/** One row of the agent list. `boards` are the cards placed on its home canvas. */
-export function chatOf(agent: Agent, extra: AgentExtra = {}, boards: string[] = []): AgentChat {
+/** One row of the agent list. `cards` are the cards placed on its home canvas. */
+export function chatOf(agent: Agent, extra: AgentExtra = {}, cards: string[] = []): AgentChat {
 	const model = modelOf(agent, extra);
 	return {
 		id: agent.id,
@@ -63,8 +63,8 @@ export function chatOf(agent: Agent, extra: AgentExtra = {}, boards: string[] = 
 		kind: KINDS.includes(agent.kind as AgentKind) ? (agent.kind as AgentKind) : "claude",
 		...(agent.mode ? { mode: agent.mode } : {}),
 		identity: identityOf(agent),
-		cards: boards,
-		inPlay: boards,
+		cards,
+		inPlay: cards,
 		...(model ? { model } : {}),
 		...(extra.usage ? { usage: extra.usage } : {}),
 		...(extra.account ? { account: extra.account } : {}),
@@ -75,13 +75,13 @@ export function chatOf(agent: Agent, extra: AgentExtra = {}, boards: string[] = 
 	};
 }
 
-/** One row of the canvas manager: the agents whose home it is, and its cards counted (`boards`). */
-export function stageRowOf(canvas: Canvas, agents: readonly Agent[]): StageRow {
+/** One row of the canvas manager: the agents whose home it is, and its cards counted. */
+export function canvasRowOf(canvas: Canvas, agents: readonly Agent[]): CanvasRow {
 	const here = agents.filter((agent) => agent.canvas === canvas.name || canvas.open.includes(agent.id));
 	return {
 		name: canvas.name,
 		title: canvas.title,
-		boards: canvas.cards,
+		cards: canvas.cards,
 		rev: canvas.rev ?? 0,
 		agents: here.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color ?? "#888888" })),
 		words: canvas.title,

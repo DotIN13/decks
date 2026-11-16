@@ -1,18 +1,18 @@
-import type { StageRow } from "../../state/types/index.ts";
+import type { CanvasRow } from "../../state/types/index.ts";
 
 // The canvas manager's rules, with no store and no DOM: the order of the
 // wall, a card's line of facts, and how long ago it changed.
 
 export const FADE_MS = 120;
 
-export type Row = { stage: StageRow; hit: boolean };
+export type Row = { canvas: CanvasRow; hit: boolean };
 
 /** The canvases a search leaves, in order: by name, or the one you are on first, then the latest changed. */
 export function orderRows(rows: readonly Row[], sort: "recent" | "az", here: string | undefined): Row[] {
 	const list = rows.filter((one) => one.hit);
-	if (sort === "az") return list.sort((a, b) => a.stage.title.localeCompare(b.stage.title));
-	const at = (one: StageRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
-	return list.sort((a, b) => at(b.stage) - at(a.stage) || a.stage.title.localeCompare(b.stage.title));
+	if (sort === "az") return list.sort((a, b) => a.canvas.title.localeCompare(b.canvas.title));
+	const at = (one: CanvasRow) => (one.name === here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
+	return list.sort((a, b) => at(b.canvas) - at(a.canvas) || a.canvas.title.localeCompare(b.canvas.title));
 }
 
 /** How long ago, in a few words; a date after a week. */
@@ -30,8 +30,8 @@ export function since(at: number | undefined, now = Date.now()): string | undefi
 }
 
 /** Who shared it, how many cards, and when it changed, joined by dots. */
-export function cardMeta(canvas: StageRow, now = Date.now()): string {
+export function cardMeta(canvas: CanvasRow, now = Date.now()): string {
 	const sharedBy = canvas.shared ? `Shared by ${canvas.shared.owner}${canvas.shared.role === "view" ? ", to view" : ""}` : undefined;
-	const cards = canvas.boards === 0 ? "Empty" : `${canvas.boards} card${canvas.boards === 1 ? "" : "s"}`;
+	const cards = canvas.cards === 0 ? "Empty" : `${canvas.cards} card${canvas.cards === 1 ? "" : "s"}`;
 	return [sharedBy, cards, since(canvas.changedAt, now)].filter(Boolean).join(" · ");
 }

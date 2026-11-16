@@ -1,7 +1,7 @@
 import { call } from "./line.ts";
 import { notice } from "./notices.ts";
 import { rewatch } from "./pens.ts";
-import { stageOf } from "./canvases.ts";
+import { canvasOf } from "./canvases.ts";
 
 // The person's calls that change the deck, with a refusal said as a notice.
 // The canvas on screen and the agent being talked to are named by the shell.
@@ -9,12 +9,12 @@ import { stageOf } from "./canvases.ts";
 /** Who the page acts for: the canvas on screen and the conversation open. Set once, by the shell. */
 const person = { canvas: (() => undefined) as () => string | undefined, agent: (() => undefined) as () => string | undefined };
 
-export function setPersonStage(canvas: () => string | undefined, agent: () => string | undefined): void {
+export function setPersonCanvas(canvas: () => string | undefined, agent: () => string | undefined): void {
 	person.canvas = canvas;
 	person.agent = agent;
 }
 
-export function stageOnScreen(): string | undefined {
+export function canvasOnScreen(): string | undefined {
 	return person.canvas();
 }
 
@@ -36,7 +36,7 @@ export function setDrawingEditor(editor: typeof frame.editor): void {
 /** Change the drawing of an agent's canvas: through the frame's editor when it shows it, else by item.batch. */
 export async function editDrawing(agentId: string, ops: unknown[]): Promise<void> {
 	if (frame.editor && frame.editor.agentId() === agentId) return frame.editor.edit(ops);
-	const canvas = stageOf(agentId)?.name;
+	const canvas = canvasOf(agentId)?.name;
 	const done = await act("item.batch", { ops: (ops as PenOp[]).map(itemOp), ...(canvas ? { canvas } : {}) });
 	if (done === undefined) rewatch(canvas);
 }

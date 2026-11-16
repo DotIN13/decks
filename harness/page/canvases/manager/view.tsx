@@ -10,7 +10,7 @@ import { Icon } from "@decks/ui";
 import { AgentFace } from "../../agents/face/view.tsx";
 import { api } from "../../connections/connection.ts";
 import { AuthedImg } from "../../lib/authed.tsx";
-import type { StageRow } from "../../state/types/index.ts";
+import type { CanvasRow } from "../../state/types/index.ts";
 import { createCardEdit, createManager, type ManagerProps } from "./actions.ts";
 import { cardMeta, type Row } from "./model.ts";
 
@@ -24,18 +24,18 @@ export function CanvasManager(props: ManagerProps): JSX.Element {
 	return (
 		<Show when={m.mounted()}>
 			<div class="stage-manager" role="dialog" aria-label="Canvases" data-open={m.shown() ? "true" : undefined} onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}>
-				<div class="stage-box">
-					<div class="stage-head">
-						<div class="stage-title-row">
-							<h2 class="stage-title">Canvases</h2>
+				<div class="canvases-box">
+					<div class="canvases-head">
+						<div class="canvases-title-row">
+							<h2 class="canvases-title">Canvases</h2>
 							<NewCanvas m={m} props={props} />
 						</div>
 						<Tools m={m} props={props} />
 					</div>
-					<div class="stage-wall">
+					<div class="canvases-wall">
 						<For each={m.ordered()}>{(row) => <CanvasCard row={row} here={props.here} searching={m.searching()} scheme={props.scheme} onOpen={m.open} onRename={props.onRename} onDelete={props.onDelete} {...(props.onCopy ? { onCopy: props.onCopy } : {})} />}</For>
 						<Show when={m.searching() && m.found() === 0}>
-							<p class="stage-none">No canvas matches “{m.query().trim()}”.</p>
+							<p class="canvases-none">No canvas matches “{m.query().trim()}”.</p>
 						</Show>
 					</div>
 				</div>
@@ -74,7 +74,7 @@ function NewCanvas(p: M): JSX.Element {
 					}}
 				/>
 				<button type="submit" class="stage-new">Create</button>
-				<button type="button" class="stage-icon" aria-label="Cancel" onClick={() => m.setNaming(false)}>
+				<button type="button" class="canvases-icon" aria-label="Cancel" onClick={() => m.setNaming(false)}>
 					<Icon of={X} size={14} />
 				</button>
 			</form>
@@ -92,18 +92,18 @@ function Tools(p: M): JSX.Element {
 			return;
 		}
 		const first = event.key === "Enter" ? m.ordered()[0] : undefined;
-		if (first) m.open(first.stage.name);
+		if (first) m.open(first.canvas.name);
 	};
 	return (
-		<div class="stage-tools">
-			<label class="stage-search">
+		<div class="canvases-tools">
+			<label class="canvases-search">
 				<Icon of={Search} class="flex-none text-faint" size={15} />
 				<input ref={(element) => (m.fields.search = element)} type="text" spellcheck={false} placeholder="Find a canvas" title="Matches a canvas's name, the words on its cards and notes, and who is on it" value={m.query()} onInput={(event) => m.setQuery(event.currentTarget.value)} onKeyDown={key} />
 				<Show when={m.searching() && m.found() > 0}>
-					<kbd class="stage-kbd">↵</kbd>
+					<kbd class="canvases-kbd">↵</kbd>
 				</Show>
 			</label>
-			<div class="segmented stage-sort" role="radiogroup" aria-label="Order">
+			<div class="segmented canvases-sort" role="radiogroup" aria-label="Order">
 				<button type="button" role="radio" aria-checked={m.sort() === "recent"} data-on={m.sort() === "recent"} onClick={() => m.setSort("recent")}>
 					Recent
 				</button>
@@ -116,10 +116,10 @@ function Tools(p: M): JSX.Element {
 }
 
 type CardProps = { row: Row; here: string | undefined; searching: boolean; scheme: "light" | "dark"; onOpen: (name: string) => void; onRename: (name: string, to: string) => void; onDelete: (name: string) => void; onCopy?: (name: string) => void };
-type C = { props: CardProps; e: ReturnType<typeof createCardEdit>; canvas: () => StageRow };
+type C = { props: CardProps; e: ReturnType<typeof createCardEdit>; canvas: () => CanvasRow };
 
 function CanvasCard(props: CardProps): JSX.Element {
-	const canvas = () => props.row.stage;
+	const canvas = () => props.row.canvas;
 	const e = createCardEdit({ canvas, onRename: props.onRename });
 	const here = () => canvas().name === props.here;
 	const meta = () => cardMeta(canvas());
@@ -136,13 +136,13 @@ function Picture(p: C): JSX.Element {
 	const [broken, setBroken] = createSignal(false);
 	const canvas = p.canvas;
 	return (
-		<button type="button" class="stage-open" aria-label={`Open ${canvas().title}`}>
+		<button type="button" class="canvases-open" aria-label={`Open ${canvas().title}`}>
 			<Show
-				when={canvas().boards > 0 && !broken()}
+				when={canvas().cards > 0 && !broken()}
 				fallback={
 					<span class="stage-empty">
 						<Icon of={LayoutDashboard} size={22} />
-						<span>{canvas().boards > 0 ? "No picture yet" : "Empty canvas"}</span>
+						<span>{canvas().cards > 0 ? "No picture yet" : "Empty canvas"}</span>
 					</span>
 				}
 			>
@@ -159,31 +159,31 @@ function Acts(p: C): JSX.Element {
 	const { e, canvas } = p;
 	const title = () => canvas().title;
 	return (
-		<span class="stage-acts" data-confirming={e.confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>
+		<span class="canvases-acts" data-confirming={e.confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>
 			<Show
 				when={e.confirming()}
 				fallback={
 					<>
 						<Show when={canvas().shared && p.props.onCopy}>
-							<button type="button" class="stage-icon" title="Make a copy" aria-label={`Make a copy of ${title()}`} onClick={() => p.props.onCopy?.(canvas().name)}>
+							<button type="button" class="canvases-icon" title="Make a copy" aria-label={`Make a copy of ${title()}`} onClick={() => p.props.onCopy?.(canvas().name)}>
 								<Icon of={Copy} size={13} />
 							</button>
 						</Show>
 						<Show when={canvas().shared?.role !== "view"}>
-							<button type="button" class="stage-icon" title="Rename" aria-label={`Rename ${title()}`} onClick={e.start}>
+							<button type="button" class="canvases-icon" title="Rename" aria-label={`Rename ${title()}`} onClick={e.start}>
 								<Icon of={Pencil} size={13} />
 							</button>
 						</Show>
-						<button type="button" class="stage-icon" title="Delete" aria-label={`Delete ${title()}`} onClick={() => e.setConfirming(true)}>
+						<button type="button" class="canvases-icon" title="Delete" aria-label={`Delete ${title()}`} onClick={() => e.setConfirming(true)}>
 							<Icon of={Trash} size={13} />
 						</button>
 					</>
 				}
 			>
-				<button type="button" class="stage-icon" aria-label="Keep it" onClick={() => e.setConfirming(false)}>
+				<button type="button" class="canvases-icon" aria-label="Keep it" onClick={() => e.setConfirming(false)}>
 					<Icon of={X} size={13} />
 				</button>
-				<button type="button" class="stage-confirm" title="Deletes the canvas, its drawing and the cards kept in its own folder." onClick={() => (e.setConfirming(false), p.props.onDelete(canvas().name))}>
+				<button type="button" class="canvases-confirm" title="Deletes the canvas, its drawing and the cards kept in its own folder." onClick={() => (e.setConfirming(false), p.props.onDelete(canvas().name))}>
 					Delete canvas
 				</button>
 			</Show>
@@ -202,16 +202,16 @@ function Foot(p: C): JSX.Element {
 		queueMicrotask(() => (element.focus(), element.select()));
 	};
 	return (
-		<span class="stage-foot">
-			<span class="stage-name-row">
+		<span class="canvases-foot">
+			<span class="canvases-name-row">
 				<Show when={e.editing()} fallback={<span class="row-label">{canvas().title}</span>}>
-					<input ref={focus} class="stage-rename" value={canvas().title} spellcheck={false} aria-label={`New name for ${canvas().title}`} onClick={(event) => event.stopPropagation()} onKeyDown={key} onBlur={e.commit} />
+					<input ref={focus} class="canvases-rename" value={canvas().title} spellcheck={false} aria-label={`New name for ${canvas().title}`} onClick={(event) => event.stopPropagation()} onKeyDown={key} onBlur={e.commit} />
 				</Show>
-				<span class="stage-faces">
+				<span class="canvases-faces">
 					<For each={canvas().agents}>{(agent) => <AgentFace chat={{ id: agent.id, name: agent.name, kind: "claude", state: "idle" } as never} identity={{ name: agent.name, color: agent.color }} size={18} ring={0} />}</For>
 				</span>
 			</span>
-			<span class="stage-meta">{cardMeta(canvas())}</span>
+			<span class="canvases-meta">{cardMeta(canvas())}</span>
 		</span>
 	);
 }

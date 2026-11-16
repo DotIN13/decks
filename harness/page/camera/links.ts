@@ -3,7 +3,7 @@ import { createEffect, createSignal } from "solid-js";
 import { boxOf, canvasBox, fitInto } from "@decks/canvas/camera";
 import { moveCamera } from "../state/camera.ts";
 import { setState, state } from "../state/deck.ts";
-import { act, stageOnScreen } from "../state/decks.ts";
+import { act, canvasOnScreen } from "../state/decks.ts";
 import { notice } from "../state/notices.ts";
 import { setSelected } from "../state/selection.ts";
 import { call, warnIfFailed } from "../state/line.ts";
@@ -23,17 +23,17 @@ import { call, warnIfFailed } from "../state/line.ts";
  * out how the card you are now looking at relates to the one you were. a fit stays
  * instant, because a keyboard shortcut is a hand and a chat switch is a change of context.
  */
-export const flyToPages = (boards: Page[], options?: { animate?: boolean }) => {
-	if (boards.length === 0) return;
-	const stage = document.querySelector(".stage, iframe.canvas-frame");
-	if (!stage) return;
-	const view = { width: stage.clientWidth, height: stage.clientHeight };
-	moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
+export const flyToPages = (cards: Page[], options?: { animate?: boolean }) => {
+	if (cards.length === 0) return;
+	const area = document.querySelector(".stage, iframe.canvas-frame");
+	if (!area) return;
+	const view = { width: area.clientWidth, height: area.clientHeight };
+	moveCamera(fitInto(cards.map(boxOf), view, canvasBox(view)), options);
 };
 
-export const flyTo = (board: Page) => {
-	setSelected(board.path);
-	flyToPages([board], { animate: true });
+export const flyTo = (card: Page) => {
+	setSelected(card.path);
+	flyToPages([card], { animate: true });
 };
 
 /**
@@ -66,10 +66,10 @@ export function createFraming(onCanvasNow: () => Page[]) {
 			return;
 		}
 		if (!onCanvasNow().some((one) => one.path === wanted.path)) return;
-		const board = state.pages.find((one) => one.path === wanted.path);
-		if (!board) return;
+		const card = state.pages.find((one) => one.path === wanted.path);
+		if (!card) return;
 		setFraming(undefined);
-		flyTo(board);
+		flyTo(card);
 	});
 	return { frameWhenPlaced, playAndFrame };
 }
@@ -95,24 +95,23 @@ export function createFraming(onCanvasNow: () => Page[]) {
  */
 export const openLinkedPage = (path: string, from: string): boolean => {
 	if (!state.pages.some((one) => one.path === path)) {
-		notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
+		notice("warn", `No card at ${path} — the link points at something this deck does not have.`);
 		return false;
 	}
 	/*
-	 * A link names the library file (`../../../boards/x.html` from a canvas's copy), and the canvas
-	 * shows its own copy of it (`canvases/<canvas>/boards/x.html`): the copy is what moves, is
+	 * A link names the library file (`../../../cards/x/index.html` from a canvas's copy), and the canvas
+	 * shows its own copy of it (`canvases/<canvas>/cards/x/index.html`): the copy is what moves, is
 	 * selected and is flown to, once the canvas has one.
 	 */
-	const rest = path.replace(/^boards\//, "");
 	const playing = () => (state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
-	const onCanvas = () => playing().find((one) => one === path || (one.startsWith("canvases/") && one.split("/").slice(2).join("/") === `boards/${rest}`));
+	const onCanvas = () => playing().find((one) => one === path || (one.startsWith("canvases/") && one.split("/").slice(2).join("/") === path));
 	const opening = !onCanvas();
 	const land = (at: string) => {
-		const board = state.pages.find((one) => one.path === at);
+		const card = state.pages.find((one) => one.path === at);
 		const source = state.pages.find((one) => one.path === from);
 		if (opening && source) move(at, source.x + source.w + 32, source.y);
 		setSelected(at);
-		const placed = state.pages.find((one) => one.path === at) ?? board;
+		const placed = state.pages.find((one) => one.path === at) ?? card;
 		if (placed) flyToPages([placed], { animate: true });
 	};
 	const there = onCanvas();
@@ -136,13 +135,13 @@ const move = (path: string, x: number, y: number) => {
 	// Optimistic, and in place: the card is already where it was dropped, and the
 	// server's answer confirms it. Replacing the object here would re-create the
 	// row and reload the document that is sitting in it.
-	const index = state.pages.findIndex((board) => board.path === path);
+	const index = state.pages.findIndex((one) => one.path === path);
 	if (index >= 0) setState("pages", index, { x, y });
 	void act("item.move", { id: path, at: { x, y }, ...onScreen() });
 };
 
 /** The canvas on screen, as a call's option. */
 const onScreen = () => {
-	const canvas = stageOnScreen();
+	const canvas = canvasOnScreen();
 	return canvas ? { canvas } : {};
 };

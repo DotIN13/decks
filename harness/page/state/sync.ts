@@ -2,14 +2,14 @@ import { reconcile } from "solid-js/store";
 import { setTimeZone } from "@decks/ui";
 import { finished, startedAsking } from "../alerts/index.ts";
 import { scratch } from "./agent.ts";
-import { setStages } from "./canvases.ts";
+import { setCanvases } from "./canvases.ts";
 import { ensureAgent, nameOf, setState, state } from "./deck.ts";
 import { call, on } from "./line.ts";
 import { firstFocus } from "./focus.ts";
 import { reread } from "./history.ts";
 import { notice } from "./notices.ts";
 import { setQueued } from "./queued.ts";
-import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, stageRowOf, type AgentExtra } from "./rows.ts";
+import { accountsOf, cardsOn, chatOf, pageOf, runtimeOf, canvasRowOf, type AgentExtra } from "./rows.ts";
 import type { AgentChat, AgentState, ClaudeAccount } from "./types/index.ts";
 import { accountChanged, releasePages } from "./ui.ts";
 import { hearChat } from "./sync-chat.ts";
@@ -29,7 +29,7 @@ export interface SyncHooks {
 
 type Agent = Parameters<typeof chatOf>[0];
 type Card = Parameters<typeof pageOf>[0];
-type Canvas = Parameters<typeof stageRowOf>[0];
+type Canvas = Parameters<typeof canvasRowOf>[0];
 
 /** The latest answers the rows are made from; not drawn, so not reactive. */
 const held = { agents: [] as Agent[], cards: [] as Card[], canvases: [] as Canvas[], extras: {} as Record<string, AgentExtra>, told: [] as AgentChat[], soon: undefined as ReturnType<typeof setTimeout> | undefined, focused: undefined as string | undefined };
@@ -179,7 +179,7 @@ function drawAgents(hooks: SyncHooks): void {
 		setState("agents", chat.id, "spending", chat.account);
 		heardState(chat.id, chat.state, hooks);
 	}
-	setStages(held.canvases.map((canvas) => stageRowOf(canvas, held.agents)));
+	setCanvases(held.canvases.map((canvas) => canvasRowOf(canvas, held.agents)));
 	if (!state.focused && chats[0]) setState("focused", firstFocus(chats.map((chat) => chat.id), held.focused));
 	if (!state.focused) releasePages();
 }

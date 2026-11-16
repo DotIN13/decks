@@ -14,7 +14,7 @@ import { Icon, onDismiss } from "@decks/ui";
  * lasso, five colours and three widths (`@decks/canvas`, `ink/ink.ts`). Pressing the instrument
  * already in hand, or `⋯`, opens its widths under the tray.
  *
- * Its keys are the ones the old ink bar had, on the window and before the stage: ⌘Z and ⇧⌘Z mean
+ * Its keys are the ones the old ink bar had, on the window and before the canvas: ⌘Z and ⇧⌘Z mean
  * the drawing while the pen is out, Delete takes what the lasso holds, Escape lets the lasso go and
  * then puts the pen away.
  */

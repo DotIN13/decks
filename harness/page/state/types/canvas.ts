@@ -20,12 +20,12 @@ export interface Camera {
 }
 
 /**
- * The server asking the browser to do something to the stage, and awaiting it.
+ * The server asking the browser to do something to the canvas, and awaiting it.
  *
  * Reads that the server can answer itself never become one of these; this is only
  * for what only the browser knows or only the browser can do.
  */
-export interface StageCall {
+export interface CanvasCall {
 	id: string;
 	/**
 	 * Which agent asked.
@@ -40,17 +40,15 @@ export interface StageCall {
 	args: unknown;
 }
 
-export type StageResult = { id: string; value?: unknown; error?: string };
-
 /**
  * What an agent is doing to a card, for the cursor and the editing marks the canvas draws.
  *
- * `edit` is a write or edit tool naming the card's file; the rest are stage verbs. Said by
+ * `edit` is a write or edit tool naming the card's file; the rest are canvas verbs. Said by
  * the server from what it already sees, so an agent never has to point at its own work.
  */
 export type ActKind = "edit" | "new" | "resize" | "move" | "show" | "hide" | "draw";
 
-/** A box on a stage, both corners, in stage coordinates: what a `draw` act outlines. */
+/** A box on a canvas, both corners, in canvas coordinates: what a `draw` act outlines. */
 export interface ActBox {
 	x1: number;
 	y1: number;

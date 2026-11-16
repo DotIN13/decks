@@ -108,7 +108,7 @@
 	margin: 0 2px;
 	background: var(--line-strong);
 }
-	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
+	/* Ink's own actions, first and in words (`PageCallout`'s `ink`): what an agent can make of a sketch. */
 	.stage-fixed > .card-callout > .callout-word {
 	display: flex;
 	flex: none;

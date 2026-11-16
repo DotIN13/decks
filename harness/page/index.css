@@ -25,12 +25,8 @@
  * could: a rule that changes sheets still changes its place, and the gate's report on each of
  * those commits is what says so.
  *
- * **The order is hashed, so it is a fact rather than a convention.** `npm run css:order`
- * flattens these sheets in the order below and hashes every rule with its at-rule chain
- * and its declarations, against the baseline in `styles/cascade-order.json`. Move a rule past
- * another and the check fails naming both; move a rule into another sheet and it passes as
- * long as the flattened order is the same. Comments and whitespace are not part of it, which
- * is why the prose in this file could be rewritten and the hash did not move.
+ * The order is the order of the imports below, and nothing checks it but this file: move an
+ * import and every rule in that sheet moves with it in the cascade.
  */
 @import "./styles/kit/chrome.css";
 @import "./shell/controls.css";
@@ -137,7 +133,7 @@ body {
 	-webkit-font-smoothing: antialiased;
 	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
 	   chrome — where a double-tap means nothing and the delay is felt on every button.
-	   The stage sets `none` for itself (`input/canvas-input.ts`). */
+	   The canvas sets `none` for itself (`input/canvas-input.ts`). */
 	touch-action: manipulation;
 }
 
@@ -151,7 +147,7 @@ body {
  *
  * **Registered, and not inherited, and that is load-bearing.** An ordinary custom property
  * inherits, and a changed inherited property makes the browser recompute the style of every
- * element beneath it: written once on the stage it cost 21ms of style recalculation per step
+ * element beneath it: written once on the canvas it cost 21ms of style recalculation per step
  * of a pinch, more than the pinch cost before (measured, 17 cards, 4× CPU throttle). Written
  * on the box that uses it, and declared non-inherited, a change touches that box alone.
  */

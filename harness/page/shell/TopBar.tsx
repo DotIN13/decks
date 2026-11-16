@@ -29,9 +29,9 @@ export function TopBar(props: {
 	onNew: (kind: AgentKind) => void;
 	onClose: (id: string) => void;
 	onMoreAgents?: () => void;
-	stage?: string;
-	onStages?: () => void;
-	stagesOpen?: boolean;
+	canvas?: string;
+	onCanvases?: () => void;
+	canvasesOpen?: boolean;
 	onNewCanvas?: () => void;
 	viewOnly?: string;
 	onCopy?: () => void;
@@ -103,7 +103,7 @@ export function TopBar(props: {
 					</button>
 				)}
 			/>
-			<Show when={props.onStages}>
+			<Show when={props.onCanvases}>
 				<span class="v3-sep" aria-hidden="true" data-phone-hide />
 				<Show when={props.phone}>
 					<span class="flex-1" />
@@ -114,15 +114,15 @@ export function TopBar(props: {
 							type="button"
 							class="v3-canvas-chip"
 							ref={popover?.ref}
-							data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
+							data-open={(popover ? popover.open : props.canvasesOpen) ? "true" : undefined}
 							aria-haspopup={popover ? "menu" : "dialog"}
-							aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
+							aria-expanded={popover ? popover.open : (props.canvasesOpen ?? false)}
 							data-tip="Canvases"
-							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
-							onClick={() => (popover ? popover.toggle() : props.onStages?.())}
+							aria-label={props.canvas ? `Canvases, currently ${props.canvas}` : "Canvases, this chat is on none"}
+							onClick={() => (popover ? popover.toggle() : props.onCanvases?.())}
 						>
 							<Icon of={Layers} size={16} />
-							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
+							<span class="v3-canvas-name">{props.canvas ?? "No canvas"}</span>
 							<Icon of={ChevronDown} size={13} class="v3-chev" />
 						</button>
 					);

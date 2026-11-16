@@ -17,7 +17,7 @@ import { commentFromOld } from "../state/compat/comment.ts";
 // --- kept between reloads ------------------------------------------------------------
 
 /**
- * Whose waiting comments these are: an agent on a canvas, the stage they were made on. A comment is
+ * Whose waiting comments these are: an agent on a canvas, the canvas they were made on. A comment is
  * about a card on that canvas, so it waits there and not on the next canvas the agent is moved to.
  */
 export function commentsKey(agentId: string, canvas: string | undefined): string {

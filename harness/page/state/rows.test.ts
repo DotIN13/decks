@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountsOf, cardsOn, chatOf, identityOf, modelOf, pageOf, stageRowOf, stateOf } from "./rows.ts";
+import { accountsOf, cardsOn, chatOf, identityOf, modelOf, pageOf, canvasRowOf, stateOf } from "./rows.ts";
 
 // The rows the page draws, from what the server and the harness answer.
 
@@ -24,7 +24,7 @@ test("a model in words splits into provider and model; the harness's whole model
 	assert.equal(modelOf({ id: "x", name: "X", tags: [] }), undefined);
 });
 
-test("a row has its boards in play, the harness's lines and usage, and starts with nothing unread", () => {
+test("a row has its cards in play, the harness's lines and usage, and starts with nothing unread", () => {
 	const row = chatOf(ada, { lastLine: "done", dormant: true }, ["canvases/plan/cards/a/index.html"]);
 	assert.equal(row.state, "tool");
 	assert.equal(row.unread, 0);
@@ -34,9 +34,9 @@ test("a row has its boards in play, the harness's lines and usage, and starts wi
 });
 
 test("a canvas row lists the agents whose home it is", () => {
-	const row = stageRowOf({ name: "plan", title: "Plan", open: [], cards: 3, rev: 7 }, [ada, { id: "b", name: "Bo", tags: [], canvas: "other" }]);
+	const row = canvasRowOf({ name: "plan", title: "Plan", open: [], cards: 3, rev: 7 }, [ada, { id: "b", name: "Bo", tags: [], canvas: "other" }]);
 	assert.deepEqual(row.agents, [{ id: "a1", name: "Ada", color: "#f00" }]);
-	assert.equal(row.boards, 3);
+	assert.equal(row.cards, 3);
 });
 
 test("a card's page takes its box on its canvas; cardsOn lists a canvas's cards", () => {

@@ -10,9 +10,9 @@ import type { canvasItems } from "@decks/canvas/tools";
 type Node = Record<string, unknown> & { id?: string; type: string; children?: Node[] };
 /** The drawing, as the canvas library reads one. */
 export type PenDoc = NonNullable<Parameters<typeof canvasItems>[0]>;
-type StagePen = { stage: string; rev: number; doc: PenDoc; base: string; by?: string; made?: string[]; edits?: { from: PenDoc; edits: readonly unknown[] } };
+type CanvasPen = { canvas: string; rev: number; doc: PenDoc; base: string; by?: string; made?: string[]; edits?: { from: PenDoc; edits: readonly unknown[] } };
 
-const [pens, setPens] = createSignal<Record<string, StagePen>>({});
+const [pens, setPens] = createSignal<Record<string, CanvasPen>>({});
 export { pens };
 
 /** Which canvas is watched, and a read waiting to run. Not drawn. */
@@ -43,7 +43,7 @@ async function read(canvas: string): Promise<void> {
 	const [items, about] = await Promise.all([call<Node[]>("item.list", { canvas }), call<{ rev?: number }>("canvas.get", { canvas })]);
 	if (!items.ok || watching.canvas !== canvas) return;
 	const doc = { version: "2.6", children: items.value.map(nodeOf) } as unknown as PenDoc;
-	setPens({ ...pens(), [canvas]: { stage: canvas, rev: about.ok ? (about.value.rev ?? 0) : 0, doc, base: `/api/t/` } });
+	setPens({ ...pens(), [canvas]: { canvas, rev: about.ok ? (about.value.rev ?? 0) : 0, doc, base: `/api/t/` } });
 }
 
 /** An item as a pen.dev node: its box as x, y, width and height, inside and out; a card's title as its name. */

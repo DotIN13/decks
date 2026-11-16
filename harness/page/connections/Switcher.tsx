@@ -8,7 +8,7 @@ import { createSignal, For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DecksMark, Icon, Popover } from "@decks/ui";
 import { state } from "../state/deck.ts";
-import { stageOf } from "../state/canvases.ts";
+import { canvasOf } from "../state/canvases.ts";
 import { backend, can } from "./backend.ts";
 import { forget, openBundle } from "./bundle.ts";
 import { active, api, connections, nameOf, newId, rename, saveConnections, switchTo, type Connection } from "./connection.ts";
@@ -61,7 +61,7 @@ export function Switcher(props: { label?: string } = {}) {
 		const own = one?.kind === "here" ? ownName() : one?.label;
 		rename(id, draftName().trim() === own ? "" : draftName());
 	};
-	const stage = () => stageOf(state.focused);
+	const onCanvas = () => canvasOf(state.focused);
 
 	const opened = (open: boolean) => {
 		if (!open) {
@@ -317,7 +317,7 @@ export function Switcher(props: { label?: string } = {}) {
 						<Icon of={FileUp} size={13} class="flex-none text-muted" />
 						<span class="row-label flex-1">Open a canvas file…</span>
 					</button>
-					<Show when={can("share") && stage()}>
+					<Show when={can("share") && onCanvas()}>
 						{(one) => (
 							<a role="menuitem" data-row data-flat="true" href={api(`/bundle/${encodeURIComponent(one().name)}`)} download="" data-download-bundle>
 								<Icon of={Download} size={13} class="flex-none text-muted" />

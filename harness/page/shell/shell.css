@@ -1,5 +1,5 @@
 /*
- * The shell: the stage, two floats over it, a stationary sidebar beside it, and the
+ * The shell: the canvas, two floats over it, a stationary sidebar beside it, and the
  * segments the two toolbars grow.
  *
  * Only new selectors live here, so the import order against `index.css` cannot change
@@ -7,7 +7,7 @@
  */
 /*
  * The colour a float is painted. In light it is white — the toolbars, the composer, the
- * conversation, the sidebar, every panel and menu — over a ground one step deeper (`--stage`,
+ * conversation, the sidebar, every panel and menu — over a ground one step deeper (`--ground`,
  * `index.css`), so a float reads as a thing on the canvas. White on the old near-white ground
  * read as holes rather than things, which is why the ground moved and not the floats. In dark it
  * is one rung above the ground.
@@ -24,7 +24,7 @@
 }
 
 @layer components {
-	/* ---- the surface: the stage, with the floats over it ------------------------- */
+	/* ---- the surface: the canvas, with the floats over it ------------------------ */
 	.surface {
 		position: absolute;
 		inset: 0;
@@ -393,7 +393,7 @@
  * The canvas and everything floating over it, filling the window.
  *
  * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
- * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
+ * — the canvas, all the floats, the dock — so as a block in normal flow it measured *zero*
  * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
  * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
  * off the top of the window with the canvas invisible behind it.

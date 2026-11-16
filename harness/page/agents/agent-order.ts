@@ -10,7 +10,7 @@ import type { AgentChat, AgentState, Identity } from "../state/types/index.ts";
  * is here, and `agent-order.test.ts` is the only place either is asserted.
  *
  * The division of labour the whole feature rests on, from
- * `boards/the-agent-stack-comes-back`: **the corner is what is happening, the dropdown is
+ * the design card `the-agent-stack-comes-back`: **the corner is what is happening, the dropdown is
  * what exists.** Neither is a subset of the other by accident.
  */
 
@@ -100,7 +100,7 @@ export function agentOrder(chats: AgentChat[], unread: Record<string, number>, f
  * The dropdown's order: everyone, including the idle, with the current agent pinned first.
  *
  * The pin is the one place the drawing and the table on
- * `boards/the-agent-stack-comes-back` disagree, and the drawing wins: it puts Ada — focused
+ * the design card `the-agent-stack-comes-back` disagree, and the drawing wins: it puts Ada — focused
  * and merely *working* — above a reviewer that is *waiting*. That is right, because the row
  * is describing the window you are already in, and it costs nothing: the corner excludes
  * the focused agent entirely, so the *relative* order of everything below the pin is

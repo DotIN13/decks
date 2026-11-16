@@ -1,13 +1,13 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { searchStages } from "../../state/canvases.ts";
-import type { StageRow } from "../../state/types/index.ts";
+import { searchCanvases } from "../../state/canvases.ts";
+import type { CanvasRow } from "../../state/types/index.ts";
 import { FADE_MS, orderRows } from "./model.ts";
 
 // The canvas manager's behaviour: it fades in and out, closes on Escape, marks
 // the body while shown, searches and sorts, and names a new canvas in place.
 
 export type ManagerProps = {
-	stages: StageRow[];
+	canvases: CanvasRow[];
 	here: string | undefined;
 	open: boolean;
 	onClose: () => void;
@@ -29,7 +29,7 @@ export function createManager(props: ManagerProps) {
 		setNaming(false);
 	});
 	closeOnEscape(props);
-	const rows = createMemo(() => searchStages(props.stages, query()));
+	const rows = createMemo(() => searchCanvases(props.canvases, query()));
 	const found = createMemo(() => rows().filter((one) => one.hit).length);
 	const ordered = createMemo(() => orderRows(rows(), sort(), props.here));
 	const open = (name: string) => {
@@ -76,14 +76,14 @@ function fade(open: () => boolean) {
 	});
 	createEffect(() => {
 		if (!shown()) return;
-		document.body.dataset.stageManager = "";
-		onCleanup(() => delete document.body.dataset.stageManager);
+		document.body.dataset.canvasManager = "";
+		onCleanup(() => delete document.body.dataset.canvasManager);
 	});
 	return { mounted, shown };
 }
 
 /** A card's rename and delete: a rename ends once, so the blur that follows Enter renames nothing. */
-export function createCardEdit(props: { canvas: () => StageRow; onRename: (name: string, to: string) => void }) {
+export function createCardEdit(props: { canvas: () => CanvasRow; onRename: (name: string, to: string) => void }) {
 	const [editing, setEditing] = createSignal(false);
 	const [confirming, setConfirming] = createSignal(false);
 	const edit = { input: undefined as HTMLInputElement | undefined, settled: true };

@@ -8,7 +8,7 @@ import { Dialog } from "../agents/index.ts";
 import { CanvasHost, type CanvasHostInputs } from "../canvases/host.tsx";
 import { moreItems } from "./more-menu.ts";
 import { destination, destinationLabel } from "../composer/index.ts";
-import { copyShared, deleteCanvas, moveConversation, newCanvas, openCanvas, renameCanvas, setStagesOpen, stagesOpen } from "../canvases/actions.ts";
+import { copyShared, deleteCanvas, moveConversation, newCanvas, openCanvas, renameCanvas, setCanvasesOpen, canvasesOpen } from "../canvases/actions.ts";
 import { CanvasManager } from "../canvases/manager/view.tsx";
 import { CanvasOps } from "../canvases/CanvasOps.tsx";
 import { CanvasSwitcher } from "../canvases/CanvasSwitcher.tsx";
@@ -19,7 +19,7 @@ import { LeftPanel } from "../panel/LeftPanel.tsx";
 import { FpsMeter, showFps } from "../perf/fps.tsx";
 import { addAccount, forgetAccount, openSettings, readAccounts, repairTab, stopTab, useAccount } from "../settings/actions.ts";
 import { Settings, UsageModal } from "../settings/index.ts";
-import { stageOf, stages } from "../state/canvases.ts";
+import { canvasOf, canvases } from "../state/canvases.ts";
 import { removeComment, waitingComments } from "../state/comments.ts";
 import { clearDialog, dialog, runtimeFor, state } from "../state/deck.ts";
 import { queuedFor } from "../state/queued.ts";
@@ -64,7 +64,7 @@ export function Shell(): JSX.Element {
 
 /** The inputs the canvas host takes from the wiring. */
 const hostOf = (page: PageWiring): CanvasHostInputs => ({
-	stagePen: page.stagePen as never,
+	canvasPen: page.canvasPen as never,
 	personMoved: page.landing.personMoved,
 	setPenSelected: page.setPenSelected,
 	setEditorHandle: page.setEditorHandle,
@@ -80,7 +80,7 @@ const hostOf = (page: PageWiring): CanvasHostInputs => ({
 function Top(props: P): JSX.Element {
 	const page = props.page;
 	const phone = () => page.layout.phone();
-	const here = () => stageOf(state.focused);
+	const here = () => canvasOf(state.focused);
 	return (
 		<>
 			<TopBar
@@ -97,14 +97,14 @@ function Top(props: P): JSX.Element {
 				onMoreAgents={page.openAgentsPanel}
 				phone={phone()}
 				onNewCanvas={() => newCanvas()}
-				{...(here() ? { stage: here()!.title } : {})}
-				{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
-				{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: Trigger) => canvasMenu(trigger) } : {})}
-				{...(page.viewOnlyStage() ? { viewOnly: page.viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(page.viewOnlyStage()!.name) } : {})}
+				{...(here() ? { canvas: here()!.title } : {})}
+				{...(canvases().length > 0 ? { onCanvases: () => void setCanvasesOpen((was) => !was), canvasesOpen: canvasesOpen() } : {})}
+				{...(!phone() && canvases().length > 0 ? { canvasMenu: (trigger: Trigger) => canvasMenu(trigger) } : {})}
+				{...(page.viewOnlyCanvas() ? { viewOnly: page.viewOnlyCanvas()!.shared!.owner, onCopy: () => copyShared(page.viewOnlyCanvas()!.name) } : {})}
 			/>
-			<CanvasManager stages={stages()} onRename={renameCanvas} onDelete={deleteCanvas} onCopy={copyShared} here={here()?.name} open={stagesOpen()} onClose={() => void setStagesOpen(false)} onPick={openCanvas} onNew={(title) => newCanvas(title)} scheme={scheme()} />
-			<Show when={!phone()} fallback={<span class="v3-phone-more"><TopRight menuOnly here={[]} identities={state.identities} unread={unread} focused={state.focused} onFocus={focusAgent} onPresent={page.presenting.present} usage={usageOf()} onContext={() => openUsage(state.focused)} more={moreItems(page.stagePages)} /></span>}>
-				<TopRight here={page.hereAgents()} identities={state.identities} unread={unread} focused={state.focused} onFocus={focusAgent} onPresent={page.presenting.present} usage={usageOf()} onContext={() => openUsage(state.focused)} more={moreItems(page.stagePages)} />
+			<CanvasManager canvases={canvases()} onRename={renameCanvas} onDelete={deleteCanvas} onCopy={copyShared} here={here()?.name} open={canvasesOpen()} onClose={() => void setCanvasesOpen(false)} onPick={openCanvas} onNew={(title) => newCanvas(title)} scheme={scheme()} />
+			<Show when={!phone()} fallback={<span class="v3-phone-more"><TopRight menuOnly here={[]} identities={state.identities} unread={unread} focused={state.focused} onFocus={focusAgent} onPresent={page.presenting.present} usage={usageOf()} onContext={() => openUsage(state.focused)} more={moreItems(page.canvasPages)} /></span>}>
+				<TopRight here={page.hereAgents()} identities={state.identities} unread={unread} focused={state.focused} onFocus={focusAgent} onPresent={page.presenting.present} usage={usageOf()} onContext={() => openUsage(state.focused)} more={moreItems(page.canvasPages)} />
 				<Show when={showFps()}>
 					<FpsMeter />
 				</Show>
@@ -137,16 +137,16 @@ function Overlays(props: P): JSX.Element {
 
 function Panel(props: P): JSX.Element {
 	const page = props.page;
-	const here = () => stageOf(state.focused);
+	const here = () => canvasOf(state.focused);
 	return (
 		<LeftPanel
 			{...(page.panelAsk() ? { ask: page.panelAsk()! } : {})}
-			{...(page.stagePen()?.doc ? { canvasDoc: page.stagePen()!.doc as never } : {})}
+			{...(page.canvasPen()?.doc ? { canvasDoc: page.canvasPen()!.doc as never } : {})}
 			{...(here() ? { canvasTitle: here()!.title } : {})}
 			selectedItems={page.penSelected()}
 			onPickItem={page.pills.pickItem}
-			onCanvases={() => void setStagesOpen((was) => !was)}
-			{...(stages().length > 0 ? { canvasMenu: (trigger: Trigger) => canvasMenu(trigger) } : {})}
+			onCanvases={() => void setCanvasesOpen((was) => !was)}
+			{...(canvases().length > 0 ? { canvasMenu: (trigger: Trigger) => canvasMenu(trigger) } : {})}
 			onPickArrows={(ids) => {
 				page.editorHandle()?.select(ids);
 				page.setPenSelected(ids);
@@ -244,7 +244,7 @@ function DockedComposer(props: P): JSX.Element {
 	const chat = () => page.focusedChat();
 	const runtime = () => runtimeFor(chat()?.kind);
 	const dest = () => destination(page.bar.barText(), page.bar.barContext());
-	const canvas = () => stageOf(state.focused)?.name;
+	const canvas = () => canvasOf(state.focused)?.name;
 	return (
 		<Composer
 			draft={draft()}
@@ -292,7 +292,7 @@ function DockedComposer(props: P): JSX.Element {
 
 // Read by several pieces above: the canvas switcher, and the focused agent's usage.
 const canvasMenu = (trigger: Trigger, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
-	<CanvasSwitcher stages={stages()} here={stageOf(state.focused)?.name} scheme={scheme()} placement={placement} onPick={openCanvas} onNew={() => newCanvas()} onAll={() => void setStagesOpen(true)} trigger={trigger} />
+	<CanvasSwitcher canvases={canvases()} here={canvasOf(state.focused)?.name} scheme={scheme()} placement={placement} onPick={openCanvas} onNew={() => newCanvas()} onAll={() => void setCanvasesOpen(true)} trigger={trigger} />
 );
 
 const usageOf = () => (state.focused ? state.agents[state.focused]?.usage : undefined);

@@ -25,10 +25,10 @@ import { createFileDrops } from "../files/index.ts";
 import { scheme } from "../lib/theme.ts";
 import type { PanelTab } from "../panel/LeftPanel.tsx";
 import { scratch } from "../state/agent.ts";
-import { stageOf, viewOnly } from "../state/canvases.ts";
+import { canvasOf, viewOnly } from "../state/canvases.ts";
 import { adoptFormerComments } from "../state/comments.ts";
 import { preview, state } from "../state/deck.ts";
-import { setPersonStage } from "../state/decks.ts";
+import { setPersonCanvas } from "../state/decks.ts";
 import { ensureHistory } from "../state/history.ts";
 import { call, setFailureSink, start } from "../state/line.ts";
 import { notice } from "../state/notices.ts";
@@ -52,7 +52,7 @@ export function createPage() {
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
 	const { prefs, setPrefs, raise } = createAlerts({ focusAgent });
 	const views = keepViews();
-	const viewOnlyStage = browseWhenReadOnly();
+	const viewOnlyCanvas = browseWhenReadOnly();
 	const layout = createChatLayout();
 	const conversation = focusedConversation(layout.chatShown);
 	const onScreen = canvasOnScreen();
@@ -61,21 +61,21 @@ export function createPage() {
 	mountLine(raise, () => setDeckSeen((n) => n + 1), (request, path) => files.hearCreated(request, path));
 	const [editorHandle, setEditorHandle] = createSignal<FramedHandle>();
 	const [penSelected, setPenSelected] = createSignal<string[]>([]);
-	const { frameWhenPlaced, playAndFrame } = createFraming(onScreen.stagePages);
-	const pills = createPills({ canvasPen: onScreen.stagePen, editorHandle, setPenSelected, playAndFrame });
+	const { frameWhenPlaced, playAndFrame } = createFraming(onScreen.canvasPages);
+	const pills = createPills({ canvasPen: onScreen.canvasPen, editorHandle, setPenSelected, playAndFrame });
 	const bar = createBar({ titleOf: (path) => pills.titleOf(path), itemName: (id) => pills.itemName(id) });
 	setCommentSender((ids) => bar.sendFromBar("", ids));
 	const floats = createFloats();
 	const dock = createDock({ phone: layout.phone, phoneChat: layout.phoneChat, setPhoneChat: (open, from) => layout.setPhoneChat(open, from), viewWidth: layout.viewWidth }, floats);
 	const [underSheet, setUnderSheet] = createSignal(false);
 	const panels = panelAsks();
-	const landing = createCameraLanding({ views, stagePen: onScreen.stagePen, stagePages: onScreen.stagePages, deckSeen });
-	const apps = createAppsPanel(onScreen.stagePages, frameWhenPlaced);
+	const landing = createCameraLanding({ views, canvasPen: onScreen.canvasPen, canvasPages: onScreen.canvasPages, deckSeen });
+	const apps = createAppsPanel(onScreen.canvasPages, frameWhenPlaced);
 	const [findAt, setFindAt] = createSignal(0);
 	wireBrowser({ files, editorHandle, park: landing.park, find: setFindAt });
-	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => stageOf(id)?.name, state.focused));
-	onMount(() => onCleanup(answerViews({ editor: editorHandle, took: () => landing.stop(), boxOf: (id) => canvasItems(onScreen.stagePen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
-	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyStage, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
+	const hereAgents = createMemo(() => agentsHere(state.chats, (id) => canvasOf(id)?.name, state.focused));
+	onMount(() => onCleanup(answerViews({ editor: editorHandle, took: () => landing.stop(), boxOf: (id) => canvasItems(onScreen.canvasPen()?.doc).items.find((one) => one.id === id)?.box, moveConversation, rememberView })));
+	return { atTurn, setAtTurn, prefs, setPrefs, views, viewOnlyCanvas, layout, ...conversation, ...onScreen, files, editorHandle, setEditorHandle, penSelected, setPenSelected, frameWhenPlaced, playAndFrame, pills, bar, dock, underSheet, setUnderSheet, ...panels, landing, apps, findAt, hereAgents, presenting: createPresenting(), pickFile };
 }
 
 export type PageWiring = ReturnType<typeof createPage>;
@@ -85,7 +85,7 @@ function keepViews() {
 	const views = createMemo(() => agentViews(state.deck?.path ?? ""));
 	createEffect(() => {
 		const agent = state.focused;
-		const canvas = stageOf(agent)?.name;
+		const canvas = canvasOf(agent)?.name;
 		if (agent && canvas) untrack(() => adoptFormerComments(agent, canvas));
 	});
 	createEffect(() => {
@@ -97,13 +97,13 @@ function keepViews() {
 
 /** A shared canvas you may only view, and a page that cannot write, browse and do not ink. */
 function browseWhenReadOnly() {
-	const viewOnlyStage = () => viewOnly(stageOf(state.focused)?.name);
+	const viewOnlyCanvas = () => viewOnly(canvasOf(state.focused)?.name);
 	createEffect(() => {
-		if (can("write") && !viewOnlyStage()) return;
+		if (can("write") && !viewOnlyCanvas()) return;
 		if (mode() !== "browse") setMode("browse");
 		if (drawing()) setDrawing(false);
 	});
-	return viewOnlyStage;
+	return viewOnlyCanvas;
 }
 
 /** The conversation on screen: its row, its transcript, whether it is busy. */
@@ -119,8 +119,8 @@ function focusedConversation(chatShown: () => boolean) {
 
 /** The drawing and the cards on the conversation's canvas. */
 function canvasOnScreen() {
-	const stagePen = createMemo(() => {
-		const name = stageOf(state.focused)?.name;
+	const canvasPen = createMemo(() => {
+		const name = canvasOf(state.focused)?.name;
 		return penOnScreen(name ? pens()[name] : undefined, (id) => state.identities[id]);
 	});
 	const [shownPages, setShownPages] = createStore<Page[]>([]);
@@ -128,7 +128,7 @@ function canvasOnScreen() {
 		const list = pagesInPlay(state.pages, state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		setShownPages(reconcile(list, { key: "path", merge: true }));
 	});
-	return { stagePen, stagePages: (): Page[] => shownPages };
+	return { canvasPen, canvasPages: (): Page[] => shownPages };
 }
 
 /** Open the line, read everything when it comes up, and hear the events after. */
@@ -152,7 +152,7 @@ function mountLine(raise: ReturnType<typeof createAlerts>["raise"], landed: () =
 			void call<ChatItem>("chat.get", { agent: agentId, item: itemId }).then((answer) => answer.ok && receiveToolResult(itemId, (answer.value as { result?: string }).result ?? ""));
 			return true;
 		});
-		createEffect(() => watchCanvas(stageOf(state.focused)?.name));
+		createEffect(() => watchCanvas(canvasOf(state.focused)?.name));
 		onCleanup(stop);
 	});
 }
@@ -181,7 +181,7 @@ function wireBrowser(inputs: { files: ReturnType<typeof createFileDrops>; editor
 	installViewport();
 	markPenPresses();
 	installKeys({ openPanel: () => setPanelOpen(true), find: inputs.find });
-	setPersonStage(() => stageOf(state.focused)?.name, () => state.focused);
+	setPersonCanvas(() => canvasOf(state.focused)?.name, () => state.focused);
 	reportCameraOnArrival();
 	onMount(() => {
 		watchInsets();

@@ -32,14 +32,14 @@ export interface BackendInfo {
 	can: { agents: boolean; write: boolean; share: boolean };
 }
 
-export interface StageRow {
-	/** The folder: the stage's id, which agents open it by and never changes. */
+export interface CanvasRow {
+	/** The folder: the canvas's id, which agents open it by and never changes. */
 	name: string;
 	/** What it is called, which the person can change freely (`canvas.json` beside the drawing). */
 	title: string;
 	/** When its drawing last changed, in ms since the epoch: the manager's order and its "2 h ago". */
 	changedAt?: number;
-	boards: number;
+	cards: number;
 	rev: number;
 	agents: Array<{ id: string; name: string; color: string }>;
 	/** The words its cards and notes carry, for the manager's search field. */

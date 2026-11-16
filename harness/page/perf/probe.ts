@@ -4,7 +4,7 @@
  * second as one JSON line; and the gestures themselves, as `__pilot` for an inspector to call
  * (`scripts/ipad-profile.mjs`). Nothing runs without the parameter.
  *
- * It runs in the canvas frame, where the stage is: the app's page passes `?probe` and its companions on
+ * It runs in the canvas frame, where the canvas is drawn: the app's page passes `?probe` and its companions on
  * to the frame's address (`@decks/canvas`, `host/outside/framed-editor.tsx`), and keeps only a relay
  * (`probe-relay.ts`) through which an inspector of the page runs an expression here.
  */
@@ -95,8 +95,8 @@ if (target) {
 	let last = performance.now();
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.e-]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(String(probes()?.cameraTransform?.() ?? ""));
-		const stage = document.querySelector<HTMLElement>(".stage");
-		return { zoom: m ? Number(m[3]) : 0, x: stage?.scrollLeft ?? 0, y: stage?.scrollTop ?? 0 };
+		const area = document.querySelector<HTMLElement>(".stage");
+		return { zoom: m ? Number(m[3]) : 0, x: area?.scrollLeft ?? 0, y: area?.scrollTop ?? 0 };
 	};
 	const tick = (t: number) => {
 		const cam = camera();
@@ -118,8 +118,8 @@ if (target) {
 	const describe = (node: EventTarget | null) => {
 		const el = node instanceof Element ? node : null;
 		if (!el) return String(node?.constructor?.name ?? "?");
-		const board = el.closest(".card-node");
-		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${board ? " in board" : ""}${el.isConnected ? "" : " DETACHED"}`;
+		const card = el.closest(".card-node");
+		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${card ? " in card" : ""}${el.isConnected ? "" : " DETACHED"}`;
 	};
 	const seen = new WeakMap<Event, number>();
 	window.addEventListener("wheel", (event) => {
@@ -145,7 +145,7 @@ if (target) {
 	window.addEventListener("pointercancel", (event) => inputs.push({ t: Math.round(performance.now()), kind: `pointercancel ${event.pointerType}` }), { passive: true, capture: true });
 	window.addEventListener("message", (event) => {
 		const m = event.data as { t?: string; phase?: string } | null;
-		if (m?.t === "decks:touch" && m.phase !== "move") inputs.push({ t: Math.round(performance.now()), kind: `board finger ${m.phase}` });
+		if (m?.t === "decks:touch" && m.phase !== "move") inputs.push({ t: Math.round(performance.now()), kind: `card finger ${m.phase}` });
 	});
 	window.addEventListener("gesturechange", note("gesturechange"), { passive: true, capture: true });
 	/** Sent only to an address; `probe=1` keeps the gestures for an inspector and sends nothing. */
@@ -166,18 +166,18 @@ if (target) {
 	/*
 	 * `&autopilot=1`: the gestures, run by the page itself, for a device whose automation cannot lift a
 	 * finger (Safari's WebDriver never ends a touch on this canvas). Pans are smooth scrolls of the
-	 * stage, which the browser animates as it does a finger's; pinches are Safari's gesture events,
-	 * handed to the stage's own pinch handlers.
+	 * canvas, which the browser animates as it does a finger's; pinches are Safari's gesture events,
+	 * handed to the canvas's own pinch handlers.
 	 */
 	{
 		const frame = () => new Promise<number>((done) => requestAnimationFrame(done));
 		const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
-		const stage = () => document.querySelector<HTMLElement>(".stage")!;
+		const area = () => document.querySelector<HTMLElement>(".stage")!;
 		const mark = (name: string, ms?: number) => marks.push({ t: Math.round(performance.now()), mark: name, ...(ms !== undefined ? { ms: Math.round(ms) } : {}) });
 		const gesture = (type: string, scale: number) => {
 			const event = new Event(type, { bubbles: true, cancelable: true });
 			Object.assign(event, { scale, clientX: innerWidth / 2, clientY: innerHeight / 2 });
-			stage().dispatchEvent(event);
+			area().dispatchEvent(event);
 		};
 		const pinch = async (to: number, ms: number) => {
 			const start = performance.now();
@@ -193,10 +193,10 @@ if (target) {
 		};
 		const pan = async (dx: number, dy: number) => {
 			const start = performance.now();
-			stage().scrollBy({ left: dx, top: dy, behavior: "smooth" });
+			area().scrollBy({ left: dx, top: dy, behavior: "smooth" });
 			await new Promise<void>((done) => {
-				const off = () => { stage().removeEventListener("scrollend", off); done(); };
-				stage().addEventListener("scrollend", off);
+				const off = () => { area().removeEventListener("scrollend", off); done(); };
+				area().addEventListener("scrollend", off);
 				setTimeout(off, 3000);
 			});
 			return performance.now() - start;

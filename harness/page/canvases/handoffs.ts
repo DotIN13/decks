@@ -7,7 +7,7 @@ import { addComment, cleanFrameComment, cleanFrameInk, cleanFramePills } from ".
 import { state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
 import { call } from "../state/line.ts";
-import { stageOf } from "../state/canvases.ts";
+import { canvasOf } from "../state/canvases.ts";
 import { setDraft } from "../state/ui.ts";
 import { inkAsked } from "./ink-prompts.ts";
 import { layout } from "@decks/protocol";
@@ -23,7 +23,7 @@ import { layout } from "@decks/protocol";
 export const frameComment = (handed: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
 	const agentId = state.focused;
 	if (!agentId) return;
-	const canvas = stageOf(state.focused)?.name;
+	const canvas = canvasOf(state.focused)?.name;
 	const comment = cleanFrameComment(handed);
 	const note = { id: `c${Date.now().toString(36)}`, path: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 	if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });
@@ -47,7 +47,7 @@ export const setCommentSender = (send: (ids: string[]) => void) => {
 export const pageComment = (target: { path: string; title?: string; quote: string; component?: string; items?: string[] }, text: string, send: boolean) => {
 	const agentId = state.focused;
 	if (!agentId) return;
-	const canvas = stageOf(agentId)?.name;
+	const canvas = canvasOf(agentId)?.name;
 	const comment = cleanFrameComment({ path: target.path, title: target.title ?? "", quote: target.quote, text, ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) });
 	const note = { id: `c${Date.now().toString(36)}`, path: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 	addComment(agentId, canvas, note);
@@ -74,7 +74,7 @@ export const frameRefer = (pills: Parameters<typeof cleanFramePills>[0]) =>
 /** A picture of these drawn items to download, taken by the server. */
 export const exportPicture = (ids: string[], format: "png" | "pdf" = "png") => {
 	// The canvas on screen, else the one the first card's path names: an export needs no agent.
-	const canvas = stageOf(state.focused)?.name ?? layout.canvasOfPath(ids[0] ?? "")?.name;
+	const canvas = canvasOf(state.focused)?.name ?? layout.canvasOfPath(ids[0] ?? "")?.name;
 	if (!canvas) return void notice("warn", "The picture could not be taken: no canvas is on screen.");
 	// Taken on the server by canvas.screenshot, as decks canvas screenshot takes it, which can take a moment; fetched with this tab's token (a plain link carries none, and was refused), then saved.
 	notice("info", "Taking the picture…");

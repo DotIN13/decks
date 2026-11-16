@@ -125,7 +125,7 @@ async function fromBundle(id, rest) {
 	if (!manifest) return plain(404, "This canvas's files are gone from this browser. Open the .decks file again.");
 	const path = url.pathname;
 	const after = (prefix) => normalize(decoded(path.slice(prefix.length)));
-	if (path === "/api/hello") return Response.json({ decks: true, name: manifest.stage.title, bundle: true });
+	if (path === "/api/hello") return Response.json({ decks: true, name: manifest.canvas.title, bundle: true });
 	if (path.startsWith("/api/card/")) {
 		const file = after("/api/card/");
 		if (!file) return plain(404, "Outside the canvas.");
@@ -152,10 +152,10 @@ async function fromBundle(id, rest) {
 		const pictures = (file && manifest.pictures[file]) || {};
 		const scheme = url.searchParams.get("scheme") === "dark" ? "dark" : "light";
 		const picture = pictures[scheme] ?? pictures.light ?? pictures.dark;
-		return picture ? entryOf(id, picture) : plain(404, "No picture of this board came with the canvas.");
+		return picture ? entryOf(id, picture) : plain(404, "No picture of this card came with the canvas.");
 	}
 	if (path.startsWith("/api/stage-pen/")) {
-		return Response.json({ doc: manifest.pen.doc, base: `/c/${id}/api/f/${manifest.pen.base}`, boards: manifest.boards.map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
+		return Response.json({ doc: manifest.pen.doc, base: `/c/${id}/api/f/${manifest.pen.base}`, cards: manifest.cards.map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
 	}
 	return plain(404, "A canvas opened from a file can only be read.");
 }
