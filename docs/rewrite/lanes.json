@@ -63,7 +63,10 @@
 		"canvas/types.ts",
 		"tools/checks/library/smooth-edits.mjs",
 		"tools/checks/page/per-agent.mjs",
-		"canvas/editor/core/imports.test.ts"
+		"canvas/editor/core/imports.test.ts",
+		"canvas/cards/card.ts",
+		"canvas/debug.ts",
+		"tools/checks/people/view-calls.mjs"
 	],
 	"Folio": [
 		"server/cards/",
