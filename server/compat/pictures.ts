@@ -30,6 +30,9 @@ function forward(OLD: string, NOW: string, url: () => string | undefined, method
 	return {
 		method,
 		prefix: OLD,
+		// A pass reaches here what it reaches at the target: the forward passes its token on, and server/pictures
+		// answers with its own scope (the pass's canvas, a path inside it); the forward adds no reach of its own.
+		scoped: (_scope, asked) => asked.method === method,
 		async serve(_ctx, req, res) {
 			const base = url();
 			if (!base) return void res.writeHead(503, { "content-type": "text/plain" }).end("The server is not listening yet.");

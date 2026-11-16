@@ -20,12 +20,15 @@ export function drawingRoute(deck: () => Deck): Route {
 	return {
 		method: "GET",
 		prefix: DRAWING_PATH,
+		// A pass reads only its own canvas's drawing.
+		scoped: (scope, asked) => !!scope.canvas && decodeURIComponent(asked.path.slice(DRAWING_PATH.length).split("?")[0] ?? "") === scope.canvas,
 		async serve(ctx, req, res) {
 			const canvas = decodeURIComponent((req.url ?? "").split("?")[0]!.slice(DRAWING_PATH.length));
 			const bound = /(^|~)frame-/.test(ctx.caller.id) ? ctx.caller.canvas : undefined;
 			const pass = bearer(req.headers.authorization);
 			const base = bound && pass ? `/api/t/${pass}/card/canvases/${canvas}/` : `/files/canvases/${canvas}/`;
-			const got = bound && bound !== canvas ? undefined : await ctx.call<{ rev?: number }>("canvas.get", { canvas }).catch(() => undefined);
+			// canvas.drawing, which a pass may call, says the canvas is there and its revision.
+			const got = bound && bound !== canvas ? undefined : await ctx.call<{ rev?: number }>("canvas.drawing", { canvas }).catch(() => undefined);
 			const read = got ? await readDrawing(deck(), canvas, base) : undefined;
 			if (!read) return void res.writeHead(404, { "content-type": "text/plain" }).end(`There is no canvas called ${canvas}.`);
 			const body = JSON.stringify({ doc: read.doc, base, rev: got?.rev ?? 0, cards: pagesOf(canvas, read.doc, true, await newsOf((n, a) => ctx.call(n, a))) });
