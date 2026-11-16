@@ -116,8 +116,10 @@ const SAMPLER = () => {
 			};
 			requestAnimationFrame(tick);
 		},
-		armCommit() {
+		/** Arm on the next committing event, or on the next event of `type` only (a double-click commits on dblclick, not its first click). */
+		armCommit(type) {
 			ew.commitAt = Infinity;
+			ew.armedFor = type;
 			ew.armed = true;
 		},
 		stop() {
@@ -125,12 +127,13 @@ const SAMPLER = () => {
 			return { frames: ew.frames, commitAt: ew.commitAt };
 		},
 	};
-	for (const type of ["pointerup", "keydown", "click"])
+	for (const type of ["pointerup", "keydown", "click", "dblclick"])
 		addEventListener(
 			type,
 			(event) => {
 				// A chord's modifier goes down first: the key that commits is the one after it.
 				if (!ew.armed || ["Shift", "Control", "Meta", "Alt"].includes(event.key)) return;
+				if (ew.armedFor ? event.type !== ew.armedFor : event.type === "dblclick") return;
 				ew.armed = false;
 				ew.commitAt = performance.now();
 			},
@@ -159,7 +162,7 @@ async function op(page, engine, name, { probe, setup, prepare, commit, cleanup, 
 		await (await cv()).evaluate((probe) => globalThis.__ew.start(probe), probe);
 		lag.ms = LAG;
 		await line.set(LAG);
-		await commit(async () => (await cv()).evaluate(() => globalThis.__ew.armCommit()));
+		await commit(async (type) => (await cv()).evaluate((type) => globalThis.__ew.armCommit(type), type));
 		await page.waitForTimeout(WINDOW);
 		lag.ms = 0;
 		await line.set(0);
@@ -538,8 +541,9 @@ async function run(engine, { all }) {
 		probe: { count: true },
 		setup: () => remember(),
 		prepare: () => page.mouse.move(700, 450),
+		// Its first click makes nothing: the edit is the dblclick, so the frames are judged from there.
 		commit: async (arm) => {
-			await arm();
+			await arm("dblclick");
 			await page.mouse.click(700, 450, { clickCount: 2 });
 		},
 		cleanup: async () => {
