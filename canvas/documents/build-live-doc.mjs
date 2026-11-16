@@ -1,6 +1,6 @@
 /**
- * Bundle the document page into `canvas/cards/runtime/lib/live-doc.js`, the one module a `[data-live="doc"]`
- * board loads (`runtime/live-doc.ts`). Committed output, like the other bundles in `lib/`.
+ * Bundle the document page (`live-doc.ts` beside this) into live-doc.js in `canvas/cards/runtime/lib/`,
+ * the one module a `[data-live="doc"]` card loads. Committed output, like the other bundles in `lib/`.
  *
  *     npm run build:live-doc
  */

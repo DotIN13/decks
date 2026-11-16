@@ -11,7 +11,7 @@ import { type Unit, PT, GAP, pt, DEFAULTS, cssColor, firstIndex, lastIndex, WORD
  * named styles, every run's font, size, weight, colour and highlight, every paragraph's alignment,
  * spacing and indents, its lists with their own glyphs and numbering, its tables, pictures and rules.
  *
- * The page edits the Doc's index-aligned text (`gdoc/units.ts`), one character per index, so a
+ * The page edits the Doc's index-aligned text (`units.ts`), one character per index, so a
  * keystroke is a splice of that text at exactly the Doc's index and goes out through the same sync
  * as any document; the server turns it into an insertion or a deletion in Google. Styles do not
  * travel as text: a button sends Docs requests for the selection's indices (`style`), applied here

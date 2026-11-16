@@ -93,6 +93,13 @@ const TEX_STYLE: Record<string, [keyof HTMLElementTagNameMap, string]> = {
 };
 const TEX_REF = /^(cite[a-z]*|ref|eqref|autoref|cref|Cref|label|pageref)$/;
 const TEX_HEADING: Record<string, number> = { part: 1, chapter: 1, title: 1, section: 1, subsection: 2, subsubsection: 3, paragraph: 4, subparagraph: 5 };
+/** Text drawn into its element up to an index; a reader calls it before drawing what it found. */
+type Flush = (to: number) => void;
+/** One line of a block: its text, where it starts in the file, and whether a newline ends it. */
+type Line = { text: string; s: number; nl: boolean };
+/** What a reader found at an index: drawn up to end, a run to skip, or nothing (plain text). */
+type Step = { end: number } | { skip: number } | undefined;
+
 const MATH_ENV = /^\s*(\\begin\{(equation|align|gather|multline|eqnarray|displaymath|math)\*?\}|\\\[|\$\$)/;
 
 /** Builds one block's elements from its source. */
@@ -134,153 +141,152 @@ export class Builder {
 		const flush = (to: number) => {
 			if (to > plain) into.append(text.slice(plain, to));
 		};
-		const done = (next: number) => {
-			i = next;
-			plain = next;
-		};
 		while (i < text.length) {
-			const c = text[i]!;
-			const rest = text.slice(i);
-			if (c === "\\" && i + 1 < text.length && PUNCT.test(text[i + 1]!)) {
-				flush(i);
-				into.append(mk("\\"), text[i + 1]!);
-				done(i + 2);
-				continue;
-			}
-			if (c === "`") {
-				let n = 1;
-				while (text[i + n] === "`") n++;
-				const ticks = "`".repeat(n);
-				let close = text.indexOf(ticks, i + n);
-				while (close !== -1 && text[close + n] === "`") close = text.indexOf(ticks, close + n + 1);
-				if (close > i + n - 1 && close !== -1) {
-					flush(i);
-					const node = inl("code", "lv-code", at + i, at + close + n, n, n);
-					node.append(mk(ticks), text.slice(i + n, close), mk(ticks));
-					into.append(node);
-					done(close + n);
-					continue;
-				}
-				i += n;
-				continue;
-			}
-			if (c === "!" && text[i + 1] === "[") {
-				const link = linkAt(text, i + 1);
-				if (link) {
-					flush(i);
-					const node = inl("span", "lv-img", at + i, at + link.end, 2, link.end - link.label[1]);
-					const src = h("span", "lv-src", text.slice(i, link.end));
-					const shown = widget("span", "lv-imgw", "img");
-					const img = h("img");
-					img.alt = text.slice(link.label[0], link.label[1]);
-					shown.append(img);
-					node.append(src, shown);
-					this.widgets.push({ kind: "img", el: img, source: text.slice(link.url[0], link.url[1]).trim().split(/\s+/)[0]!.replace(/^<|>$/g, "") });
-					into.append(node);
-					done(link.end);
-					continue;
-				}
-			}
-			if (c === "[" && text[i + 1] === "^") {
-				const close = text.indexOf("]", i);
-				if (close !== -1) {
-					flush(i);
-					into.append(h("sup", "lv-fn", text.slice(i, close + 1)));
-					done(close + 1);
-					continue;
-				}
-			}
-			if (c === "[") {
-				const link = linkAt(text, i);
-				if (link) {
-					flush(i);
-					const node = inl("a", "lv-a", at + i, at + link.end, 1, link.end - link.label[1]);
-					node.dataset.href = text.slice(link.url[0], link.url[1]).trim().split(/\s+/)[0]!.replace(/^<|>$/g, "");
-					node.append(mk("["));
-					this.inlineMd(text.slice(link.label[0], link.label[1]), at + link.label[0], node);
-					node.append(mk(text.slice(link.label[1], link.end)));
-					into.append(node);
-					done(link.end);
-					continue;
-				}
-			}
-			if (c === "$" && text[i + 1] !== "$" && !isSpace(text[i + 1])) {
-				let close = text.indexOf("$", i + 1);
-				while (close !== -1 && (text[close - 1] === "\\" || isSpace(text[close - 1]))) close = text.indexOf("$", close + 1);
-				if (close !== -1 && !/\d/.test(text[close + 1] ?? "")) {
-					flush(i);
-					this.math(text.slice(i, close + 1), at + i, at + close + 1, 1, into);
-					done(close + 1);
-					continue;
-				}
-			}
-			if (c === "$" && text[i + 1] === "$") {
-				const close = text.indexOf("$$", i + 2);
-				if (close > i + 2) {
-					flush(i);
-					this.math(text.slice(i, close + 2), at + i, at + close + 2, 2, into);
-					done(close + 2);
-					continue;
-				}
-			}
-			if (c === "<") {
-				const auto = /^<((?:https?|mailto):[^\s<>]+)>/.exec(rest);
-				if (auto) {
-					flush(i);
-					const node = inl("a", "lv-a", at + i, at + i + auto[0].length, 1, 1);
-					node.dataset.href = auto[1]!;
-					node.append(mk("<"), auto[1]!, mk(">"));
-					into.append(node);
-					done(i + auto[0].length);
-					continue;
-				}
-				const pair = /^<(u|sub|sup|kbd|mark)>/.exec(rest);
-				const close = pair ? text.indexOf(`</${pair[1]}>`, i + pair[0].length) : -1;
-				if (pair && close !== -1) {
-					flush(i);
-					const tag = pair[1] === "u" ? "u" : (pair[1] as "sub" | "sup" | "kbd" | "mark");
-					const end = close + pair[1]!.length + 3;
-					const node = inl(tag, `lv-${pair[1]}`, at + i, at + end, pair[0].length, pair[1]!.length + 3);
-					node.append(mk(pair[0]));
-					this.inlineMd(text.slice(i + pair[0].length, close), at + i + pair[0].length, node);
-					node.append(mk(`</${pair[1]}>`));
-					into.append(node);
-					done(end);
-					continue;
-				}
-				const tag = /^<\/?[a-zA-Z][^<>]*>|^<!--[\s\S]*?-->/.exec(rest);
-				if (tag) {
-					flush(i);
-					into.append(h("span", "lv-tag", tag[0]));
-					done(i + tag[0].length);
-					continue;
-				}
-			}
-			if ((c === "h" || c === "w") && (i === 0 || !isWord(text[i - 1]))) {
-				const url = /^(?:https?:\/\/|www\.)[^\s<>]*[^\s<>.,;:!?'")\]]/.exec(rest);
-				if (url) {
-					flush(i);
-					const node = h("a", "lv-a lv-bare", url[0]);
-					node.dataset.href = url[0].startsWith("www.") ? `https://${url[0]}` : url[0];
-					into.append(node);
-					done(i + url[0].length);
-					continue;
-				}
-			}
-			if (c === "*" || c === "_" || c === "~" || c === "=") {
-				let n = 1;
-				while (text[i + n] === c) n++;
-				const used = this.emphasis(text, at, i, c, n, into, flush);
-				if (used) {
-					done(used);
-					continue;
-				}
-				i += n;
-				continue;
-			}
-			i++;
+			const step = this.mdStep(text, at, i, into, flush);
+			if (step === undefined) i++;
+			else if ("skip" in step) i += step.skip;
+			else i = plain = step.end;
 		}
 		flush(text.length);
+	}
+
+	/** What the markdown at i is: drawn up to end, a run to skip, or plain text (undefined). */
+	private mdStep(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		const c = text[i]!;
+		if (c === "\\" && i + 1 < text.length && PUNCT.test(text[i + 1]!)) {
+			flush(i);
+			into.append(mk("\\"), text[i + 1]!);
+			return { end: i + 2 };
+		}
+		if (c === "`") return this.mdCode(text, at, i, into, flush);
+		const found =
+			(c === "!" && text[i + 1] === "[" ? this.mdImage(text, at, i, into, flush) : undefined) ??
+			(c === "[" && text[i + 1] === "^" ? this.mdNote(text, i, into, flush) : undefined) ??
+			(c === "[" ? this.mdLink(text, at, i, into, flush) : undefined) ??
+			(c === "$" ? this.mdMath(text, at, i, into, flush) : undefined) ??
+			(c === "<" ? this.mdAngle(text, at, i, into, flush) : undefined) ??
+			((c === "h" || c === "w") && (i === 0 || !isWord(text[i - 1])) ? this.mdBare(text, i, into, flush) : undefined);
+		if (found) return found;
+		if (c === "*" || c === "_" || c === "~" || c === "=") {
+			let n = 1;
+			while (text[i + n] === c) n++;
+			const used = this.emphasis(text, at, i, c, n, into, flush);
+			return used ? { end: used } : { skip: n };
+		}
+		return undefined;
+	}
+
+	/** Code between runs of backticks; an unmatched run is skipped whole. */
+	private mdCode(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		let n = 1;
+		while (text[i + n] === "`") n++;
+		const ticks = "`".repeat(n);
+		let close = text.indexOf(ticks, i + n);
+		while (close !== -1 && text[close + n] === "`") close = text.indexOf(ticks, close + n + 1);
+		if (!(close > i + n - 1 && close !== -1)) return { skip: n };
+		flush(i);
+		const node = inl("code", "lv-code", at + i, at + close + n, n, n);
+		node.append(mk(ticks), text.slice(i + n, close), mk(ticks));
+		into.append(node);
+		return { end: close + n };
+	}
+
+	private mdImage(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		const link = linkAt(text, i + 1);
+		if (!link) return undefined;
+		flush(i);
+		const node = inl("span", "lv-img", at + i, at + link.end, 2, link.end - link.label[1]);
+		const src = h("span", "lv-src", text.slice(i, link.end));
+		const shown = widget("span", "lv-imgw", "img");
+		const img = h("img");
+		img.alt = text.slice(link.label[0], link.label[1]);
+		shown.append(img);
+		node.append(src, shown);
+		this.widgets.push({ kind: "img", el: img, source: text.slice(link.url[0], link.url[1]).trim().split(/\s+/)[0]!.replace(/^<|>$/g, "") });
+		into.append(node);
+		return { end: link.end };
+	}
+
+	private mdNote(text: string, i: number, into: HTMLElement, flush: Flush): Step {
+		const close = text.indexOf("]", i);
+		if (close === -1) return undefined;
+		flush(i);
+		into.append(h("sup", "lv-fn", text.slice(i, close + 1)));
+		return { end: close + 1 };
+	}
+
+	private mdLink(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		const link = linkAt(text, i);
+		if (!link) return undefined;
+		flush(i);
+		const node = inl("a", "lv-a", at + i, at + link.end, 1, link.end - link.label[1]);
+		node.dataset.href = text.slice(link.url[0], link.url[1]).trim().split(/\s+/)[0]!.replace(/^<|>$/g, "");
+		node.append(mk("["));
+		this.inlineMd(text.slice(link.label[0], link.label[1]), at + link.label[0], node);
+		node.append(mk(text.slice(link.label[1], link.end)));
+		into.append(node);
+		return { end: link.end };
+	}
+
+	/** $maths$ (not before a digit, not around a space) or $$maths$$. */
+	private mdMath(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		if (text[i + 1] !== "$" && !isSpace(text[i + 1])) {
+			let close = text.indexOf("$", i + 1);
+			while (close !== -1 && (text[close - 1] === "\\" || isSpace(text[close - 1]))) close = text.indexOf("$", close + 1);
+			if (close === -1 || /\d/.test(text[close + 1] ?? "")) return undefined;
+			flush(i);
+			this.math(text.slice(i, close + 1), at + i, at + close + 1, 1, into);
+			return { end: close + 1 };
+		}
+		if (text[i + 1] !== "$") return undefined;
+		const close = text.indexOf("$$", i + 2);
+		if (!(close > i + 2)) return undefined;
+		flush(i);
+		this.math(text.slice(i, close + 2), at + i, at + close + 2, 2, into);
+		return { end: close + 2 };
+	}
+
+	/** An autolink, an HTML pair (u, sub, sup, kbd, mark), or any other tag or comment. */
+	private mdAngle(text: string, at: number, i: number, into: HTMLElement, flush: Flush): Step {
+		const rest = text.slice(i);
+		const auto = /^<((?:https?|mailto):[^\s<>]+)>/.exec(rest);
+		if (auto) {
+			flush(i);
+			const node = inl("a", "lv-a", at + i, at + i + auto[0].length, 1, 1);
+			node.dataset.href = auto[1]!;
+			node.append(mk("<"), auto[1]!, mk(">"));
+			into.append(node);
+			return { end: i + auto[0].length };
+		}
+		const pair = /^<(u|sub|sup|kbd|mark)>/.exec(rest);
+		const close = pair ? text.indexOf(`</${pair[1]}>`, i + pair[0].length) : -1;
+		if (pair && close !== -1) {
+			flush(i);
+			const tag = pair[1] === "u" ? "u" : (pair[1] as "sub" | "sup" | "kbd" | "mark");
+			const end = close + pair[1]!.length + 3;
+			const node = inl(tag, `lv-${pair[1]}`, at + i, at + end, pair[0].length, pair[1]!.length + 3);
+			node.append(mk(pair[0]));
+			this.inlineMd(text.slice(i + pair[0].length, close), at + i + pair[0].length, node);
+			node.append(mk(`</${pair[1]}>`));
+			into.append(node);
+			return { end };
+		}
+		const tag = /^<\/?[a-zA-Z][^<>]*>|^<!--[\s\S]*?-->/.exec(rest);
+		if (!tag) return undefined;
+		flush(i);
+		into.append(h("span", "lv-tag", tag[0]));
+		return { end: i + tag[0].length };
+	}
+
+	/** A bare http(s):// or www. address. */
+	private mdBare(text: string, i: number, into: HTMLElement, flush: Flush): Step {
+		const url = /^(?:https?:\/\/|www\.)[^\s<>]*[^\s<>.,;:!?'")\]]/.exec(text.slice(i));
+		if (!url) return undefined;
+		flush(i);
+		const node = h("a", "lv-a lv-bare", url[0]);
+		node.dataset.href = url[0].startsWith("www.") ? `https://${url[0]}` : url[0];
+		into.append(node);
+		return { end: i + url[0].length };
 	}
 
 	/** `*`, `_`, `~~` or `==` at `i`, a run of `n`: the index after it when it opened and closed something. */
@@ -333,132 +339,139 @@ export class Builder {
 		const flush = (to: number) => {
 			if (to > plain) into.append(text.slice(plain, to));
 		};
-		const done = (next: number) => {
-			i = next;
-			plain = next;
-		};
 		while (i < text.length) {
-			const c = text[i]!;
-			if (c === "%") {
-				flush(i);
-				into.append(h("span", "lv-comment", text.slice(i)));
-				done(text.length);
-				continue;
-			}
-			if (c === "\\") {
-				const name = /^\\([a-zA-Z]+)\*?/.exec(text.slice(i));
-				if (name) {
-					const cmd = name[1]!;
-					const after = i + name[0].length;
-					const style = TEX_STYLE[cmd];
-					if (style && text[after] === "{") {
-						const close = closeBrace(text, after);
-						if (close !== -1) {
-							flush(i);
-							const node = inl(style[0], style[1], at + i, at + close + 1, after + 1 - i, 1);
-							node.append(mk(text.slice(i, after + 1)));
-							this.inlineTex(text.slice(after + 1, close), at + after + 1, node);
-							node.append(mk("}"));
-							into.append(node);
-							done(close + 1);
-							continue;
-						}
-					}
-					if ((cmd === "href" || cmd === "url") && text[after] === "{") {
-						const close = closeBrace(text, after);
-						const second = cmd === "href" && text[close + 1] === "{" ? closeBrace(text, close + 1) : -1;
-						if (close !== -1 && (cmd === "url" || second !== -1)) {
-							flush(i);
-							const end = cmd === "url" ? close + 1 : second + 1;
-							const open = cmd === "url" ? after + 1 - i : close + 2 - i;
-							const node = inl("a", "lv-a", at + i, at + end, open, 1);
-							node.dataset.href = text.slice(after + 1, close);
-							node.append(mk(text.slice(i, i + open)));
-							this.inlineTex(text.slice(i + open, end - 1), at + i + open, node);
-							node.append(mk("}"));
-							into.append(node);
-							done(end);
-							continue;
-						}
-					}
-					if (TEX_REF.test(cmd) && /^(\[[^\]]*\])*\{/.test(text.slice(after))) {
-						const brace = text.indexOf("{", after);
-						const close = closeBrace(text, brace);
-						if (close !== -1) {
-							flush(i);
-							const raw = text.slice(i, close + 1);
-							if (cmd === "label") {
-								// A label prints nothing: it shows only while the caret is on its line.
-								into.append(h("span", "lv-mk lv-label", raw));
-							} else {
-								// Open and close are the command's own syntax, so a press on the number puts the caret at the key.
-								const node = inl("span", cmd.startsWith("cite") ? "lv-ref lv-cite" : "lv-ref", at + i, at + close + 1, brace + 1 - i, 1);
-								const shown = widget("span", "lv-refw", "open");
-								const keys = text.slice(brace + 1, close).split(",").map((k) => k.trim()).filter(Boolean);
-								shown.textContent = this.refText(cmd, keys);
-								shown.title = keys.join(", ");
-								if (shown.textContent.includes("?")) shown.classList.add("lv-unresolved");
-								node.append(h("span", "lv-src", raw), shown);
-								into.append(node);
-							}
-							done(close + 1);
-							continue;
-						}
-					}
-					flush(i);
-					into.append(h("span", "lv-cmd", name[0]));
-					done(after);
-					continue;
-				}
-				if (text[i + 1] === "(") {
-					const close = text.indexOf("\\)", i + 2);
-					if (close !== -1) {
-						flush(i);
-						this.math(text.slice(i, close + 2), at + i, at + close + 2, 2, into);
-						done(close + 2);
-						continue;
-					}
-				}
-				if (text[i + 1] === "\\") {
-					flush(i);
-					into.append(h("span", "lv-cmd", "\\\\"));
-					done(i + 2);
-					continue;
-				}
-				if (i + 1 < text.length) {
-					flush(i);
-					into.append(mk("\\"), text[i + 1]!);
-					done(i + 2);
-					continue;
-				}
-			}
-			if (c === "$") {
-				const two = text[i + 1] === "$";
-				const close = two ? text.indexOf("$$", i + 2) : text.indexOf("$", i + 1);
-				if (close !== -1 && close > i + (two ? 2 : 1)) {
-					flush(i);
-					const end = close + (two ? 2 : 1);
-					this.math(text.slice(i, end), at + i, at + end, two ? 2 : 1, into);
-					done(end);
-					continue;
-				}
-			}
-			if (c === "{" || c === "}") {
-				flush(i);
-				into.append(h("span", "lv-brace", c));
-				done(i + 1);
-				continue;
-			}
-			if (c === "~") {
-				// A tie is a space that does not break: drawn as a space, the tilde itself shown only on the open line.
-				flush(i);
-				into.append(h("span", "lv-tilde", "~"));
-				done(i + 1);
-				continue;
-			}
-			i++;
+			const end = this.texStep(text, at, i, into, flush);
+			if (end === undefined) i++;
+			else i = plain = end;
 		}
 		flush(text.length);
+	}
+
+	/** What the LaTeX at i is: drawn up to the index answered, or plain text (undefined). */
+	private texStep(text: string, at: number, i: number, into: HTMLElement, flush: Flush): number | undefined {
+		const c = text[i]!;
+		if (c === "%") {
+			flush(i);
+			into.append(h("span", "lv-comment", text.slice(i)));
+			return text.length;
+		}
+		if (c === "\\") {
+			const drawn = this.texBackslash(text, at, i, into, flush);
+			if (drawn !== undefined) return drawn;
+		}
+		if (c === "$") {
+			const two = text[i + 1] === "$";
+			const close = two ? text.indexOf("$$", i + 2) : text.indexOf("$", i + 1);
+			if (close !== -1 && close > i + (two ? 2 : 1)) {
+				flush(i);
+				const end = close + (two ? 2 : 1);
+				this.math(text.slice(i, end), at + i, at + end, two ? 2 : 1, into);
+				return end;
+			}
+		}
+		if (c === "{" || c === "}") {
+			flush(i);
+			into.append(h("span", "lv-brace", c));
+			return i + 1;
+		}
+		if (c === "~") {
+			// A tie is a space that does not break: drawn as a space, the tilde itself shown only on the open line.
+			flush(i);
+			into.append(h("span", "lv-tilde", "~"));
+			return i + 1;
+		}
+		return undefined;
+	}
+
+	/** A backslash: a named command, \( maths \), a line break, or an escaped character. */
+	private texBackslash(text: string, at: number, i: number, into: HTMLElement, flush: Flush): number | undefined {
+		const name = /^\\([a-zA-Z]+)\*?/.exec(text.slice(i));
+		if (name) return this.texCommand(text, at, i, name, into, flush);
+		if (text[i + 1] === "(") {
+			const close = text.indexOf("\\)", i + 2);
+			if (close !== -1) {
+				flush(i);
+				this.math(text.slice(i, close + 2), at + i, at + close + 2, 2, into);
+				return close + 2;
+			}
+		}
+		if (text[i + 1] === "\\") {
+			flush(i);
+			into.append(h("span", "lv-cmd", "\\\\"));
+			return i + 2;
+		}
+		if (i + 1 < text.length) {
+			flush(i);
+			into.append(mk("\\"), text[i + 1]!);
+			return i + 2;
+		}
+		return undefined;
+	}
+
+	/** A named command: styled text, a link, a reference or label, or any other command as itself. */
+	private texCommand(text: string, at: number, i: number, name: RegExpExecArray, into: HTMLElement, flush: Flush): number {
+		const cmd = name[1]!;
+		const after = i + name[0].length;
+		const drawn = this.texStyled(text, at, i, cmd, after, into, flush) ?? this.texLink(text, at, i, cmd, after, into, flush) ?? this.texRef(text, at, i, cmd, after, into, flush);
+		if (drawn !== undefined) return drawn;
+		flush(i);
+		into.append(h("span", "lv-cmd", name[0]));
+		return after;
+	}
+
+	private texStyled(text: string, at: number, i: number, cmd: string, after: number, into: HTMLElement, flush: Flush): number | undefined {
+		const style = TEX_STYLE[cmd];
+		if (!style || text[after] !== "{") return undefined;
+		const close = closeBrace(text, after);
+		if (close === -1) return undefined;
+		flush(i);
+		const node = inl(style[0], style[1], at + i, at + close + 1, after + 1 - i, 1);
+		node.append(mk(text.slice(i, after + 1)));
+		this.inlineTex(text.slice(after + 1, close), at + after + 1, node);
+		node.append(mk("}"));
+		into.append(node);
+		return close + 1;
+	}
+
+	private texLink(text: string, at: number, i: number, cmd: string, after: number, into: HTMLElement, flush: Flush): number | undefined {
+		if ((cmd !== "href" && cmd !== "url") || text[after] !== "{") return undefined;
+		const close = closeBrace(text, after);
+		const second = cmd === "href" && text[close + 1] === "{" ? closeBrace(text, close + 1) : -1;
+		if (!(close !== -1 && (cmd === "url" || second !== -1))) return undefined;
+		flush(i);
+		const end = cmd === "url" ? close + 1 : second + 1;
+		const open = cmd === "url" ? after + 1 - i : close + 2 - i;
+		const node = inl("a", "lv-a", at + i, at + end, open, 1);
+		node.dataset.href = text.slice(after + 1, close);
+		node.append(mk(text.slice(i, i + open)));
+		this.inlineTex(text.slice(i + open, end - 1), at + i + open, node);
+		node.append(mk("}"));
+		into.append(node);
+		return end;
+	}
+
+	private texRef(text: string, at: number, i: number, cmd: string, after: number, into: HTMLElement, flush: Flush): number | undefined {
+		if (!TEX_REF.test(cmd) || !/^(\[[^\]]*\])*\{/.test(text.slice(after))) return undefined;
+		const brace = text.indexOf("{", after);
+		const close = closeBrace(text, brace);
+		if (close === -1) return undefined;
+		flush(i);
+		const raw = text.slice(i, close + 1);
+		if (cmd === "label") {
+			// A label prints nothing: it shows only while the caret is on its line.
+			into.append(h("span", "lv-mk lv-label", raw));
+		} else {
+			// Open and close are the command's own syntax, so a press on the number puts the caret at the key.
+			const node = inl("span", cmd.startsWith("cite") ? "lv-ref lv-cite" : "lv-ref", at + i, at + close + 1, brace + 1 - i, 1);
+			const shown = widget("span", "lv-refw", "open");
+			const keys = text.slice(brace + 1, close).split(",").map((k) => k.trim()).filter(Boolean);
+			shown.textContent = this.refText(cmd, keys);
+			shown.title = keys.join(", ");
+			if (shown.textContent.includes("?")) shown.classList.add("lv-unresolved");
+			node.append(h("span", "lv-src", raw), shown);
+			into.append(node);
+		}
+		return close + 1;
 	}
 
 	/** What `\ref`, `\eqref`, `\cite` and their kin print, from what the whole file numbers. */
@@ -557,8 +570,41 @@ export class Builder {
 	}
 
 	private texLine(text: string, s: number, node: HTMLElement, prefix: (len: number) => void, body: (len: number) => void): void {
-		let m: RegExpExecArray | null;
-		if ((m = /^(\s*)\\([a-zA-Z]+)\*?(\[[^\]]*\])?\{/.exec(text)) && TEX_HEADING[m[2]!] !== undefined) {
+		if (this.texHeading(text, s, node) || this.texItem(text, s, node, prefix, body)) return;
+		const env = /^\s*\\(begin|end)\{(itemize|enumerate|description)\}/.exec(text);
+		if (env?.[1] === "begin") this.lists.push({ ordered: env[2] === "enumerate", n: 0 });
+		else if (env) this.lists.pop();
+		// A list's own \begin and \end lines say nothing the bullets do not: hidden until the caret is on them.
+		if (env && /^\s*\\(begin|end)\{[a-z]+\}\s*(%.*)?$/.test(text)) {
+			node.classList.add("lv-tagline");
+			node.dataset.block = "env";
+			node.append(mk(text));
+			return;
+		}
+		if (/^\s*\\maketitle\s*(%.*)?$/.test(text)) {
+			node.classList.add("lv-tagline", "lv-maketitle");
+			node.dataset.block = "env";
+			node.append(mk(text), this.titleBlock());
+			return;
+		}
+		if (this.texTextEnv(text, s, node)) return;
+		if (/^\s*\\(begin|end)\{[^}]*\}(\[[^\]]*\]|\{[^}]*\})*\s*(%.*)?$/.test(text) || /^\s*\\(maketitle|tableofcontents|newpage|clearpage|bibliography|bibliographystyle|centering|noindent)\b/.test(text)) {
+			node.classList.add("lv-env");
+			node.dataset.block = "env";
+			node.append(text);
+			return;
+		}
+		node.classList.add("lv-p");
+		node.dataset.block = "p";
+		const inside = this.envs.at(-1);
+		if (inside) node.classList.add("lv-in", `lv-in-${THEOREMS[inside] ? "theorem" : inside}`);
+		this.inline(text, s, node);
+	}
+
+	/** A sectioning command's line: a heading of its level. */
+	private texHeading(text: string, s: number, node: HTMLElement): boolean {
+		const m = /^(\s*)\\([a-zA-Z]+)\*?(\[[^\]]*\])?\{/.exec(text);
+		if (m && TEX_HEADING[m[2]!] !== undefined) {
 			const open = m[0].length - 1;
 			const close = closeBrace(text, open);
 			if (close !== -1) {
@@ -569,10 +615,16 @@ export class Builder {
 				this.inline(text.slice(open + 1, close), s + open + 1, node);
 				node.append(mk("}"));
 				this.inline(text.slice(close + 1), s + close + 1, node);
-				return;
+				return true;
 			}
 		}
-		if ((m = /^(\s*)\\item(\[[^\]]*\])?[ \t]*/.exec(text))) {
+		return false;
+	}
+
+	/** An \\item: a bullet, or a number LaTeX gives. */
+	private texItem(text: string, s: number, node: HTMLElement, prefix: (len: number) => void, body: (len: number) => void): boolean {
+		const m = /^(\s*)\\item(\[[^\]]*\])?[ \t]*/.exec(text);
+		if (m) {
 			const list = this.lists.at(-1);
 			node.classList.add("lv-li");
 			node.style.setProperty("--indent", String(Math.max(0, this.lists.length - 1)));
@@ -590,24 +642,13 @@ export class Builder {
 				prefix(m[0].length);
 			}
 			this.inline(text.slice(m[0].length), s + m[0].length, node);
-			return;
+			return true;
 		}
-		const env = /^\s*\\(begin|end)\{(itemize|enumerate|description)\}/.exec(text);
-		if (env?.[1] === "begin") this.lists.push({ ordered: env[2] === "enumerate", n: 0 });
-		else if (env) this.lists.pop();
-		// A list's own \begin and \end lines say nothing the bullets do not: hidden until the caret is on them.
-		if (env && /^\s*\\(begin|end)\{[a-z]+\}\s*(%.*)?$/.test(text)) {
-			node.classList.add("lv-tagline");
-			node.dataset.block = "env";
-			node.append(mk(text));
-			return;
-		}
-		if (/^\s*\\maketitle\s*(%.*)?$/.test(text)) {
-			node.classList.add("lv-tagline", "lv-maketitle");
-			node.dataset.block = "env";
-			node.append(mk(text), this.titleBlock());
-			return;
-		}
+		return false;
+	}
+
+	/** A text environment's \\begin or \\end line (a theorem, a proof): its heading, or the proof's end. */
+	private texTextEnv(text: string, s: number, node: HTMLElement): boolean {
 		const textEnv = /^\s*\\(begin|end)\{([a-zA-Z]+)(\*?)\}(\[[^\]]*\])?\s*(\\label\{[^}]*\})?\s*(%.*)?$/.exec(text);
 		if (textEnv && TEXT_ENVS.has(textEnv[2]!)) {
 			const [, side, name, star, note] = textEnv;
@@ -630,19 +671,9 @@ export class Builder {
 					node.append(qed);
 				}
 			}
-			return;
+			return true;
 		}
-		if (/^\s*\\(begin|end)\{[^}]*\}(\[[^\]]*\]|\{[^}]*\})*\s*(%.*)?$/.test(text) || /^\s*\\(maketitle|tableofcontents|newpage|clearpage|bibliography|bibliographystyle|centering|noindent)\b/.test(text)) {
-			node.classList.add("lv-env");
-			node.dataset.block = "env";
-			node.append(text);
-			return;
-		}
-		node.classList.add("lv-p");
-		node.dataset.block = "p";
-		const inside = this.envs.at(-1);
-		if (inside) node.classList.add("lv-in", `lv-in-${THEOREMS[inside] ? "theorem" : inside}`);
-		this.inline(text, s, node);
+		return false;
 	}
 
 	/** The title block `\maketitle` sets, from the preamble's \title, \author and \date. */
@@ -704,80 +735,37 @@ export class Builder {
 		const body = lines.slice(0, content);
 		const tail = lines.slice(content);
 		const head = body[0]?.text ?? "";
-		const raw = (cls: string, list: typeof lines) => {
-			const box = h("div", cls);
-			for (const line of list) {
-				const row = h("div", "lv-line lv-raw");
-				row.dataset.s = String(line.s);
-				row.dataset.e = String(line.s + line.text.length);
-				row.dataset.p = "0";
-				if (this.tex) this.inline(line.text, line.s, row);
-				else row.append(line.text);
-				if (line.nl) row.append("\n");
-				box.append(row);
-			}
-			return box;
-		};
 		const fence = /^ {0,3}(```+|~~~+)\s*([\w+#.-]*)/.exec(head);
 		if (kind === "preamble" || (!this.tex && first && /^---\s*$/.test(head) && body.length > 1)) {
 			node.dataset.kind = "front";
-			node.append(raw("lv-src lv-frontbox", body));
+			node.append(this.raw("lv-src lv-frontbox", body));
 			const chip = widget("div", "lv-chip", "open");
 			chip.textContent = kind === "preamble" ? `Preamble, ${body.length} lines` : "Front matter";
 			node.append(chip);
 		} else if (!this.tex && fence) {
 			node.dataset.kind = "code";
-			const box = h("div", "lv-codebox");
-			for (const [index, line] of body.entries()) {
-				const row = h("div", "lv-line lv-codeline");
-				row.dataset.s = String(line.s);
-				row.dataset.e = String(line.s + line.text.length);
-				row.dataset.p = "0";
-				const isFence = index === 0 || (index === body.length - 1 && line.text.trim().startsWith(fence[1]!.slice(0, 3)));
-				if (isFence) row.classList.add("lv-fence");
-				row.append(isFence ? mk(line.text) : line.text);
-				if (line.nl) row.append("\n");
-				box.append(row);
-			}
-			if (fence[2]) {
-				const lang = widget("span", "lv-lang", "open");
-				lang.textContent = fence[2];
-				box.append(lang);
-			}
-			node.append(box);
+			node.append(this.codeBox(body, fence));
 		} else if (MATH_ENV.test(head) && (this.tex || head.trim() === "$$")) {
 			node.dataset.kind = "math";
-			const box = h("div", "lv-mathbox");
-			box.append(raw("lv-src", body));
-			const shown = widget("div", "lv-mathw lv-display", "open");
-			const tex = body.map((l) => l.text).join("\n");
-			box.append(shown);
-			// KaTeX draws \label and \nonumber as errors; they say nothing about how the maths looks.
-			let drawn = tex.replace(/\\label\{[^}]*\}/g, "").replace(/\\(nonumber|notag)\b/g, "");
-			// KaTeX numbers each drawing from (1): an equation gets the number it has in the whole file instead.
-			const single = /^\s*\\begin\{equation\}([\s\S]*)\\end\{equation\}\s*$/.exec(drawn);
-			const num = this.meta?.numbers.get(this.base + (body[0]?.s ?? 0) + (/^\s*/.exec(head)![0].length));
-			if (single) drawn = `$$${single[1]}${num ? `\\tag{${num}}` : ""}$$`;
-			this.widgets.push({ kind: "math", el: shown, source: withMacros(drawn.trim().startsWith("$$") || drawn.trim().startsWith("\\[") ? drawn : `$$${drawn}$$`, this.meta?.macros ?? ""), shows: tex });
-			node.append(box);
+			node.append(this.mathBox(body, head));
 		} else if (this.tex && /^\s*\\begin\{(figure|table|tabular)\*?\}/.test(head)) {
 			// A figure or a table is drawn beside its source, which shows while the caret is in it.
 			node.dataset.kind = "float";
 			const box = h("div", "lv-floatbox");
-			box.append(raw("lv-src", body), this.float(body.map((l) => l.text).join("\n"), this.base + (body[0]?.s ?? 0) + (/^\s*/.exec(head)![0].length)));
+			box.append(this.raw("lv-src", body), this.float(body.map((l) => l.text).join("\n"), this.base + (body[0]?.s ?? 0) + (/^\s*/.exec(head)![0].length)));
 			node.append(box);
 		} else if (!this.tex && body.length >= 2 && head.includes("|") && /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/.test(body[1]!.text)) {
 			node.dataset.kind = "table";
 			const box = h("div", "lv-tablebox");
-			box.append(raw("lv-src", body));
+			box.append(this.raw("lv-src", body));
 			box.append(this.table(body.map((l) => l.text)));
 			node.append(box);
 		} else if (!this.tex && /^ {0,3}<([a-zA-Z][\w-]*|!--)/.test(head)) {
 			node.dataset.kind = "html";
-			node.append(raw("lv-htmlbox", body));
+			node.append(this.raw("lv-htmlbox", body));
 		} else if (this.tex && /^\s*\\begin\{(verbatim|lstlisting|minted|tikzpicture|algorithm)/.test(head)) {
 			node.dataset.kind = "env";
-			node.append(raw("lv-envbox", body));
+			node.append(this.raw("lv-envbox", body));
 		} else {
 			node.dataset.kind = "flow";
 			let inList = false;
@@ -797,6 +785,61 @@ export class Builder {
 			node.append(row);
 		}
 		return node;
+	}
+
+	/** Lines shown as they are written, each a row of its own. */
+	private raw(cls: string, list: Line[]): HTMLElement {
+		const box = h("div", cls);
+		for (const line of list) {
+			const row = h("div", "lv-line lv-raw");
+			row.dataset.s = String(line.s);
+			row.dataset.e = String(line.s + line.text.length);
+			row.dataset.p = "0";
+			if (this.tex) this.inline(line.text, line.s, row);
+			else row.append(line.text);
+			if (line.nl) row.append("\n");
+			box.append(row);
+		}
+		return box;
+	}
+
+	/** A fenced code block: its fences shown as syntax, its language beside it. */
+	private codeBox(body: Line[], fence: RegExpExecArray): HTMLElement {
+		const box = h("div", "lv-codebox");
+		for (const [index, line] of body.entries()) {
+			const row = h("div", "lv-line lv-codeline");
+			row.dataset.s = String(line.s);
+			row.dataset.e = String(line.s + line.text.length);
+			row.dataset.p = "0";
+			const isFence = index === 0 || (index === body.length - 1 && line.text.trim().startsWith(fence[1]!.slice(0, 3)));
+			if (isFence) row.classList.add("lv-fence");
+			row.append(isFence ? mk(line.text) : line.text);
+			if (line.nl) row.append("\n");
+			box.append(row);
+		}
+		if (fence[2]) {
+			const lang = widget("span", "lv-lang", "open");
+			lang.textContent = fence[2];
+			box.append(lang);
+		}
+		return box;
+	}
+
+	/** Display maths: its source, and KaTeX's drawing with the number it has in the whole file. */
+	private mathBox(body: Line[], head: string): HTMLElement {
+		const box = h("div", "lv-mathbox");
+		box.append(this.raw("lv-src", body));
+		const shown = widget("div", "lv-mathw lv-display", "open");
+		const tex = body.map((l) => l.text).join("\n");
+		box.append(shown);
+		// KaTeX draws \label and \nonumber as errors; they say nothing about how the maths looks.
+		let drawn = tex.replace(/\\label\{[^}]*\}/g, "").replace(/\\(nonumber|notag)\b/g, "");
+		// KaTeX numbers each drawing from (1): an equation gets the number it has in the whole file instead.
+		const single = /^\s*\\begin\{equation\}([\s\S]*)\\end\{equation\}\s*$/.exec(drawn);
+		const num = this.meta?.numbers.get(this.base + (body[0]?.s ?? 0) + (/^\s*/.exec(head)![0].length));
+		if (single) drawn = `$$${single[1]}${num ? `\\tag{${num}}` : ""}$$`;
+		this.widgets.push({ kind: "math", el: shown, source: withMacros(drawn.trim().startsWith("$$") || drawn.trim().startsWith("\\[") ? drawn : `$$${drawn}$$`, this.meta?.macros ?? ""), shows: tex });
+		return box;
 	}
 
 	/** A LaTeX figure or table as it reads: its pictures, its tabulars, and its numbered caption. */

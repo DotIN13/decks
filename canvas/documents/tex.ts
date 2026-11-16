@@ -76,92 +76,106 @@ function arg(text: string, name: string): string | undefined {
 
 export function texMeta(source: string): TexMeta {
 	const text = blankComments(source);
-	const labels: TexMeta["labels"] = new Map();
-	const cites: TexMeta["cites"] = new Map();
-	const numbers: TexMeta["numbers"] = new Map();
-	const author = arg(text, "author");
-	const meta: TexMeta = { labels, cites, numbers, macros: readMacros(text), sig: "" };
+	const meta: TexMeta = { labels: new Map(), cites: new Map(), numbers: new Map(), macros: readMacros(text), sig: "" };
 	const title = arg(text, "title");
 	if (title !== undefined) meta.title = title;
+	const author = arg(text, "author");
 	if (author !== undefined) meta.author = author;
 	const date = arg(text, "date");
 	if (date !== undefined) meta.date = date;
+	const bib = numberAll(text, meta);
+	// A bibliography written in the file numbers citations by its own order.
+	if (bib.size) {
+		const ordered = new Map<string, number>();
+		for (const key of meta.cites.keys()) ordered.set(key, bib.get(key) ?? 0);
+		meta.cites = ordered;
+	}
+	meta.sig = JSON.stringify([meta.title, meta.author, meta.date, [...meta.labels], [...meta.cites], [...meta.numbers.values()], meta.macros]);
+	return meta;
+}
 
-	const sec = [0, 0, 0, 0];
-	const counts: Record<string, number> = {};
-	let eq = 0;
+/** Where numbering stands while the file is read: sections, counters, equations, open environments. */
+type Numbering = {
+	sec: number[];
+	counts: Record<string, number>;
+	eq: number;
 	/** What a `\label` met now would name. */
-	let current: { num: string; kind: LabelKind } = { num: "", kind: "other" };
-	const stack: Array<{ env: string; restore: typeof current; multi: boolean }> = [];
-	const levels: Record<string, number> = { chapter: 0, section: 1, subsection: 2, subsubsection: 3 };
-	const token = /\\(chapter|section|subsection|subsubsection)(\*?)\s*(\[[^\]]*\])?\{|\\begin\{([a-zA-Z*]+)\}|\\end\{([a-zA-Z*]+)\}|\\label\{([^}]*)\}|\\\\(?!\\)|\\item\b|\\(?:no)?(?:cite[a-z]*|nocite)\*?(?:\[[^\]]*\])*\{([^}]*)\}|\\bibitem(?:\[[^\]]*\])?\{([^}]*)\}|\\nonumber|\\notag/g;
+	current: { num: string; kind: LabelKind };
+	stack: Array<{ env: string; restore: Numbering["current"]; multi: boolean }>;
+};
+
+const LEVELS: Record<string, number> = { chapter: 0, section: 1, subsection: 2, subsubsection: 3 };
+const NUMBERED = ["figure", "table", "equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"];
+const TOKEN = /\\(chapter|section|subsection|subsubsection)(\*?)\s*(\[[^\]]*\])?\{|\\begin\{([a-zA-Z*]+)\}|\\end\{([a-zA-Z*]+)\}|\\label\{([^}]*)\}|\\\\(?!\\)|\\item\b|\\(?:no)?(?:cite[a-z]*|nocite)\*?(?:\[[^\]]*\])*\{([^}]*)\}|\\bibitem(?:\[[^\]]*\])?\{([^}]*)\}|\\nonumber|\\notag/g;
+
+/** Labels, citations and numbered environments, in reading order; answers the bibliography's own order. */
+function numberAll(text: string, meta: TexMeta): Map<string, number> {
+	const n: Numbering = { sec: [0, 0, 0, 0], counts: {}, eq: 0, current: { num: "", kind: "other" }, stack: [] };
+	const token = new RegExp(TOKEN.source, "g");
 	let bibitems = 0;
 	const bib = new Map<string, number>();
 	for (let m = token.exec(text); m; m = token.exec(text)) {
 		const [whole, heading, star, , begin, end, label, citeKeys, bibKey] = m;
 		if (heading) {
 			if (star) continue;
-			const level = levels[heading]!;
-			sec[level]!++;
-			for (let k = level + 1; k < sec.length; k++) sec[k] = 0;
-			const first = sec[0] ? 0 : 1;
-			current = { num: sec.slice(first, level + 1).join("."), kind: "section" };
+			const level = LEVELS[heading]!;
+			n.sec[level]!++;
+			for (let k = level + 1; k < n.sec.length; k++) n.sec[k] = 0;
+			const first = n.sec[0] ? 0 : 1;
+			n.current = { num: n.sec.slice(first, level + 1).join("."), kind: "section" };
 		} else if (begin) {
-			const restore = current;
-			const name = begin.replace(/\*$/, "");
-			const starred = begin.endsWith("*");
-			let multi = false;
-			if (["equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"].includes(name) && !starred) {
-				eq++;
-				current = { num: String(eq), kind: "equation" };
-				numbers.set(m.index, String(eq));
-				multi = name !== "equation" && name !== "multline";
-			} else if (name === "figure" || name === "table") {
-				counts[name] = (counts[name] ?? 0) + 1;
-				current = { num: String(counts[name]), kind: name };
-				numbers.set(m.index, String(counts[name]));
-			} else if (THEOREMS[name]) {
-				counts[name] = (counts[name] ?? 0) + 1;
-				current = { num: String(counts[name]), kind: "theorem" };
-				if (!starred) numbers.set(m.index, String(counts[name]));
-			} else if (name === "enumerate") {
-				counts.enumi = 0;
-			}
-			stack.push({ env: begin, restore, multi });
+			opened(n, begin, m.index, meta.numbers);
 		} else if (end) {
-			const top = stack.pop();
-			if (top && !["figure", "table", "equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"].includes(top.env.replace(/\*$/, "")) && !THEOREMS[top.env.replace(/\*$/, "")]) continue;
-			if (top) current = top.restore;
+			const top = n.stack.pop();
+			if (top && !NUMBERED.includes(top.env.replace(/\*$/, "")) && !THEOREMS[top.env.replace(/\*$/, "")]) continue;
+			if (top) n.current = top.restore;
 		} else if (label !== undefined) {
-			labels.set(label.trim(), { ...current });
+			meta.labels.set(label.trim(), { ...n.current });
 		} else if (whole === "\\\\") {
 			// A new row of a numbered alignment is a new equation.
-			const top = stack.at(-1);
-			if (top?.multi) {
-				eq++;
-				current = { num: String(eq), kind: "equation" };
+			if (n.stack.at(-1)?.multi) {
+				n.eq++;
+				n.current = { num: String(n.eq), kind: "equation" };
 			}
 		} else if (whole.startsWith("\\nonumber") || whole.startsWith("\\notag")) {
-			if (stack.at(-1)?.multi) eq--;
+			if (n.stack.at(-1)?.multi) n.eq--;
 		} else if (whole === "\\item") {
-			if (stack.at(-1)?.env === "enumerate") {
-				counts.enumi = (counts.enumi ?? 0) + 1;
-				current = { num: String(counts.enumi), kind: "item" };
+			if (n.stack.at(-1)?.env === "enumerate") {
+				n.counts.enumi = (n.counts.enumi ?? 0) + 1;
+				n.current = { num: String(n.counts.enumi), kind: "item" };
 			}
 		} else if (citeKeys !== undefined) {
-			for (const key of citeKeys.split(",").map((k) => k.trim()).filter(Boolean)) if (!cites.has(key)) cites.set(key, cites.size + 1);
+			for (const key of citeKeys.split(",").map((k) => k.trim()).filter(Boolean)) if (!meta.cites.has(key)) meta.cites.set(key, meta.cites.size + 1);
 		} else if (bibKey !== undefined) {
 			bib.set(bibKey.trim(), ++bibitems);
 		}
 	}
-	// A bibliography written in the file numbers citations by its own order.
-	if (bib.size) {
-		const ordered = new Map<string, number>();
-		for (const key of cites.keys()) ordered.set(key, bib.get(key) ?? 0);
-		meta.cites = ordered;
+	return bib;
+}
+
+/** An environment begun: an equation, a figure or table, a theorem, a numbered list. */
+function opened(n: Numbering, begin: string, at: number, numbers: TexMeta["numbers"]): void {
+	const restore = n.current;
+	const name = begin.replace(/\*$/, "");
+	const starred = begin.endsWith("*");
+	let multi = false;
+	if (["equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"].includes(name) && !starred) {
+		n.eq++;
+		n.current = { num: String(n.eq), kind: "equation" };
+		numbers.set(at, String(n.eq));
+		multi = name !== "equation" && name !== "multline";
+	} else if (name === "figure" || name === "table") {
+		n.counts[name] = (n.counts[name] ?? 0) + 1;
+		n.current = { num: String(n.counts[name]), kind: name };
+		numbers.set(at, String(n.counts[name]));
+	} else if (THEOREMS[name]) {
+		n.counts[name] = (n.counts[name] ?? 0) + 1;
+		n.current = { num: String(n.counts[name]), kind: "theorem" };
+		if (!starred) numbers.set(at, String(n.counts[name]));
+	} else if (name === "enumerate") {
+		n.counts.enumi = 0;
 	}
-	meta.sig = JSON.stringify([meta.title, meta.author, meta.date, [...labels], [...meta.cites], [...numbers.values()], meta.macros]);
-	return meta;
+	n.stack.push({ env: begin, restore, multi });
 }
 
 export interface TabularCell {

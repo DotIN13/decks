@@ -10,7 +10,7 @@ import type { DocsDocument, DocsRequest, DocsStructuralElement } from "./types.t
  * That makes the page's ordinary edit machinery work on a Doc unchanged: a splice of this text is
  * an insertion or deletion at exactly that index (`unitRequests`), Google's edits arrive as splices
  * of it, and versions and review keep it like any file. Styles are not in it: the page draws them
- * from the Doc itself (`page/gview.ts`), which this text lines up with index for index.
+ * from the Doc itself (`gview.ts`), which this text lines up with index for index.
  */
 
 export const STRUCT = { section: "\uE000", table: "\uE001", row: "\uE002", cell: "\uE003", other: "\uE004" } as const;

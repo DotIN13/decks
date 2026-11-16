@@ -193,8 +193,7 @@ export type DocClientMessage =
 	 * and merges the remote's; `push` does that and sends the commits. Answered by `doc.repo`.
 	 */
 	| { type: "doc.git"; path: string; client: string; action: "status" | "pull" | "push" }
-	/** Styles for a Google Doc, as Docs requests at the page's indices, sent once the typing before them is in. */
-	/** Docs requests for a Google Doc, made when the page read `text`: the server brings the Doc to that text first, so typing after them lands after them. */
+	/** Styles for a Google Doc, as Docs requests at the page's indices, made when the page read `text`: the server brings the Doc to that text first, so typing after them lands after them. */
 	| { type: "doc.gstyle"; path: string; client: string; requests: unknown[]; text?: string }
 	/** A comment on a Google Doc: a new one on the quoted words, a reply, or resolving one. */
 	| { type: "doc.gcomment"; path: string; client: string; action: "create" | "reply" | "resolve"; comment?: string; content?: string; quote?: string };
@@ -234,7 +233,7 @@ export type DocServerMessage =
 	| { type: "doc.repo"; path: string; action: "status" | "pull" | "push"; ok: boolean; status?: GitStatus; message?: string }
 	/**
 	 * To the pages on a Google Doc's mirror: the Doc as Google returned it, for drawing, and the
-	 * index-aligned text it reads as (`gdoc/units.ts`), so a page whose text is ahead can lay its
+	 * index-aligned text it reads as (`google/units.ts`), so a page whose text is ahead can lay its
 	 * own typing over it.
 	 */
 	| { type: "doc.gdoc"; path: string; document: unknown; text: string }
