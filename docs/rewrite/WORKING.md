@@ -157,3 +157,12 @@ The gates pass after every commit: "do not edit the baselines" was wrong for a s
 
 Never amend or rebase a commit that is already on `rewrite`: others have based work on it within seconds.
 Fix forward with a new commit.
+
+## The main checkout holds only what has landed
+
+Added on 2026-11-15: a browser check starts the server from the files in the main checkout, so an edit
+left there without a commit is in every check, whatever the hold says. Nobody edits in the main
+checkout. Every agent has a checkout of its own (`../decks-dev-checkouts/<agent>`, made by
+`zsh docs/rewrite/new-checkout.sh <agent>`), works only there, and lands only with
+`REWRITE_AGENT=<you> node tools/gates/land.mjs`. Mason alone commits in the main checkout, and only
+under `docs/rewrite/`.
