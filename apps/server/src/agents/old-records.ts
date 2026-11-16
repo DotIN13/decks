@@ -1,12 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentRecord } from "../agents/store.ts";
+import type { AgentRecord } from "./store.ts";
 
 /**
- * 2026-09-22: shared canvases (`.decks/canvases/<name>.json`) are gone, and each chat keeps its own.
+ * Two shapes an agent's record was kept in before deck version 0.1.0, read as each chat is restored,
+ * and only in a deck old enough to hold them (`deck/old-shapes.ts`).
  *
- * Runs on read (`agents/registry.ts`, as each chat is restored), once per record: the record is
- * written back without `fromCanvas`, so it never comes here again.
+ * **2026-09-22: shared canvases (`.decks/canvases/<name>.json`) are gone, and each chat keeps its own**
+ * (`fromSharedCanvas`, from `agents/registry.ts`), once per record: the record is written back
+ * without `fromCanvas`, so it never comes here again.
  *
  * For a while boards lived on canvases (`.decks/canvases/<name>.json`) that several agents
  * shared, and a chat's record named its canvas instead of carrying its own boards. Each agent
@@ -62,4 +64,19 @@ export function fromSharedCanvas(record: AgentRecord, deckPath: string, exists: 
 	const next: AgentRecord = { ...rest, context, inPlay: boards, ...(Object.keys(places).length > 0 ? { positions: places } : {}) };
 	write(next);
 	return next;
+}
+
+/**
+ * 2026-10-16: which boards are on a canvas is the canvas file's alone (`stage/canvas-ops.ts`).
+ *
+ * Before, each agent's record kept its own list (`inPlay` in `.decks/agents/<id>/meta.json`). A
+ * restored record still carrying one has it written into its canvas file, once, and only when that
+ * file holds no boards yet: a canvas file with boards in it is the truth, and another agent's list
+ * must not be laid over it. The record stops saving the list on its next write (`agents/session.ts`).
+ *
+ * As each agent is restored (`DeckAgent.adoptStage`). Returns the boards to put on the canvas, or nothing.
+ */
+export function recordedBoardsToAdopt(onCanvas: number, recorded: readonly string[] | undefined): string[] {
+	if (onCanvas > 0 || !recorded?.length) return [];
+	return [...recorded];
 }

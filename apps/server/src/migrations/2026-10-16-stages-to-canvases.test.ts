@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { realPathOf } from "../deck/roots.ts";
-import { migrateStages, movedPath } from "./2026-10-16-stages-to-canvases.ts";
+import { movedPath } from "../stage/canvas-files.ts";
+import { migrateStages } from "./2026-10-16-stages-to-canvases.ts";
 
 /*
  * Canvases are the deck's: `canvases/<subject>/canvas.pen`. A deck from before keeps them in

@@ -13,7 +13,7 @@
  * shipping TypeScript (tests, the browser checks, scripts, generated and vendored code left out).
  *
  * **The server's layers**, bottom to top: the deck and auth; the canvas; the features; the agents and
- * their runtimes; the calls; the connections; start-up (`LAYERS`). A file imports from its own layer
+ * their runtimes; the calls; the connections; the upgrade scripts; start-up (`LAYERS`). A file imports from its own layer
  * or below. Every import that points up today is listed in the baseline, and the list may only
  * shrink: a new one fails, naming the two files. The old folder names and the new ones are both in
  * the table, so the gate holds while folders move.
@@ -35,12 +35,14 @@ const LIMITS = { fileLines: 1000, functionLines: 150, classMethods: 30 };
 /** The server's layers, lowest first: a path under `apps/server/src/` belongs to the first entry it starts with. */
 const LAYERS = [
 	["start-up", ["index.ts", "app.ts", "main.ts"]],
+	// Upgrade scripts run at start-up and may use any layer; the running code must not reach into them.
+	["upgrades", ["migrations/"]],
 	["connections", ["connections/", "http.ts", "line.ts", "ws.ts", "routes/", "wire/"]],
 	["calls", ["calls/", "verbs/", "stage/tool.ts", "stage/caller-"]],
 	["agents", ["agents/", "runtimes/"]],
 	["features", ["cards/", "docs/", "apps/", "pictures/", "files/", "share/", "studio/", "google/", "browser/"]],
 	["canvas", ["canvas/", "stage/"]],
-	["base", ["deck/", "auth/", "migrations/", "lib/", ""]],
+	["base", ["deck/", "auth/", "lib/", ""]],
 ];
 const layerOf = (path) => {
 	const rest = path.slice(SERVER.length);

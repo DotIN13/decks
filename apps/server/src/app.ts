@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sttReady } from "./stt.ts";
 import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
+import { closeOldShapes } from "./deck/old-shapes.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
@@ -1164,6 +1165,8 @@ export class App {
 	}
 
 	dispose(): void {
+		// A run that read a deck's old shapes has restored and written back every record by now (`deck/old-shapes.ts`).
+		closeOldShapes(this.deck.path);
 		this.unwatch?.();
 		this.unwatch = undefined;
 		clearInterval(this.resyncTimer);

@@ -3,9 +3,8 @@ import type { Author, ChangeRecord } from "../agents/canvas-news.ts";
 import type { ChangeAuthor } from "@decks/protocol";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { rustRouter } from "./arrows.ts";
-import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
+import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "./canvas-files.ts";
 import { runAtOpen } from "../migrations/index.ts";
-import { movedPath } from "../migrations/2026-10-16-stages-to-canvases.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
 import { apply, ARROW, baseTheme, withDecksColors, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, themeFrom, walk, type Frame, type Op, type OpResult, type PenDocument, type PenEdit, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
 
@@ -741,7 +740,7 @@ export class StagePens {
 	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string; canvas?: string } {
 		const asked = typeof path === "string" ? path.trim() : "";
 		if (!asked) throw new PenError("A .pen file needs a path relative to the deck, such as \"frames/agent-card\" or \"canvases/research-notes/canvas.pen\", or an absolute one.");
-		// A path written before canvases moved out of stages/ still finds its canvas (`migrations/2026-10-16-stages-to-canvases.ts`).
+		// A path written before canvases moved out of stages/ still finds its canvas (`canvas-files.ts`).
 		const relativeAsked = movedPath(asked.replace(/^\.?\/+/, ""), new Map());
 		let file = isAbsolute(asked) ? resolvePath(asked) : resolvePath(this.deckPath, relativeAsked);
 		if (!/\.[^/\\.]+$/.test(file)) file += ".pen";

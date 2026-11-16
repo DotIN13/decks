@@ -1,4 +1,4 @@
-import { oldBoardPlaces } from "../migrations/2026-09-16-deck-json-places.ts";
+import { oldBoardPlaces } from "./old-shapes.ts";
 import type { Root } from "@decks/protocol";
 
 /**
@@ -48,7 +48,8 @@ interface ParsedDeckFile {
  */
 const KNOWN = new Set(["version", "name", "boards", "sizes", "roots"]);
 
-export function parseDeckFile(text: string): ParsedDeckFile {
+/** `oldPlaces`: whether the deck is old enough to hold a `boards` map of places (`old-shapes.ts`); read unless said not. */
+export function parseDeckFile(text: string, options: { oldPlaces?: boolean } = {}): ParsedDeckFile {
 	const warnings: string[] = [];
 	let raw: unknown;
 	try {
@@ -70,8 +71,8 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 		warnings.push(`deck.json version ${String(source.version)} is newer than this build understands.`);
 	}
 
-	// And the places an older `boards` map held, a seed rather than state (`migrations/2026-09-16-deck-json-places.ts`).
-	const arrangement = oldBoardPlaces(source.boards, normalizeBoardPath, warnings);
+	// And the places an older `boards` map held, a seed rather than state: in a deck old enough to hold one (`old-shapes.ts`).
+	const arrangement = options.oldPlaces === false ? {} : oldBoardPlaces(source.boards, normalizeBoardPath, warnings);
 
 	if (source.roots !== undefined) {
 		if (Array.isArray(source.roots)) file.roots = source.roots as DeckFile["roots"];

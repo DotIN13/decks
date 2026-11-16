@@ -9,6 +9,7 @@ import { fillsOf, isBoardFile, liveKindOf, shellFor } from "./kinds.ts";
 import { BOARD_W } from "../cards/size.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
+import { readsOldShapes } from "./old-shapes.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
 
 /**
@@ -44,6 +45,11 @@ export class Deck {
 	 * seeds nothing, which is the end state the migration is for.
 	 */
 	private seeds: Record<string, { x: number; y: number }> = {};
+	/**
+	 * Whether this deck may still hold shapes from before version 0.1.0 (`old-shapes.ts`): asked once, when
+	 * the deck is opened, and what the readers of those shapes go by (the seeds above, `agents/old-records.ts`).
+	 */
+	readonly readsOldShapes: boolean;
 	private boardsByPath = new Map<string, Page>();
 	/**
 	 * `mtime:size` per board file, so `resync` can skip what has not moved.
@@ -75,6 +81,7 @@ export class Deck {
 	readonly warnings: string[] = [];
 
 	private constructor(readonly path: string) {
+		this.readsOldShapes = readsOldShapes(path);
 		this.resolved = resolveRoots(path, []);
 		try {
 			const saved = JSON.parse(readFileSync(join(path, ".decks", "heights.json"), "utf8")) as Record<string, { rev: number; h: number }>;
@@ -249,7 +256,7 @@ export class Deck {
 
 		const deckFile = join(this.path, "deck.json");
 		if (existsSync(deckFile)) {
-			const parsed = parseDeckFile(readFileSync(deckFile, "utf8"));
+			const parsed = parseDeckFile(readFileSync(deckFile, "utf8"), { oldPlaces: this.readsOldShapes });
 			this.file = parsed.file;
 			this.seeds = parsed.arrangement;
 			this.warnings.push(...parsed.warnings);

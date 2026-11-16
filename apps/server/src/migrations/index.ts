@@ -7,6 +7,7 @@ import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-
 import { countsOf, migrated as boardLeftoversMigrated, migrateBoardLeftovers } from "./2026-10-30-board-leftovers.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { openOldShapes } from "../deck/old-shapes.ts";
 import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecord, writeVersion, type Semver } from "./version.ts";
 
 /**
@@ -17,14 +18,15 @@ import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSem
  *
  * - **at open**: run by `runAtOpen` before the deck, its canvases or its agents are read, and only when
  *   the old shape is on disk, so running one again does nothing.
- * - **on read**: called from the reader of one record, as that record is read, and written back in the
- *   new shape so it is not read the old way again.
+ * - **read where met**: three shapes from before 0.1.0 were never moved: their readers sit in the code
+ *   that reads the record, write the new shape back, and run only in a deck old enough to hold them,
+ *   which `runAtOpen` marks (`deck/old-shapes.ts`, `agents/old-records.ts`).
  *
  * | file                                       | runs    | called from                     |
  * | ------------------------------------------ | ------- | ------------------------------- |
- * | 2026-09-16-deck-json-places.ts             | on read | `deck/schema.ts`                |
- * | 2026-09-22-shared-canvases-to-agents.ts    | on read | `agents/registry.ts`            |
- * | 2026-10-16-board-lists-into-canvas-files.ts| on read | `agents/session.ts` (adoptStage) |
+ * | 2026-09-16, places in deck.json            | read where met | `deck/old-shapes.ts`, from `deck/schema.ts` |
+ * | 2026-09-22, shared canvases to agents      | read where met | `agents/old-records.ts`, from `agents/registry.ts` |
+ * | 2026-10-16, board lists into canvas files  | read where met | `agents/old-records.ts`, from `agents/session.ts` (adoptStage) |
  * | 2026-10-16-stages-to-canvases.ts           | at open | `runAtOpen`, below              |
  * | 2026-10-20-standalone-canvases.ts          | at open | `runAtOpen`, below; once, after a backup, and recorded in `.decks/migrations.json` |
  * | 2026-10-21-isolation-removed.ts            | at open | `runAtOpen`, below; once, after a backup of what it changes, and recorded there too |
@@ -156,6 +158,9 @@ export const MIGRATIONS: readonly Migration[] = [
 /** The version a deck is at once every migration has run, and the one a new deck starts at. */
 export const LATEST: Semver = MIGRATIONS.at(-1)!.version;
 
+/** Below this version a deck may hold the shapes that are read where they are met (`deck/old-shapes.ts`). */
+const OLD_SHAPES_BELOW: Semver = "0.1.0";
+
 /**
  * The version the record says, if it says one: a semantic version as written, or a plain number from
  * the build that counted migrations 1, 2, 3 (the version of that many migrations in).
@@ -189,6 +194,8 @@ export function runAtOpen(deck: string, options: Options = {}): string[] {
 	const written = recordedVersion(record.version);
 	const from = written ?? derivedVersion(record, MIGRATIONS, deck);
 	const pending = MIGRATIONS.filter((one) => compareSemver(one.version, from) > 0);
+	// A deck from before 0.1.0 may also hold the three shapes that are read where they are met: marked, so their readers run (`deck/old-shapes.ts`).
+	if (!dryRun && compareSemver(from, OLD_SHAPES_BELOW) < 0) openOldShapes(deck);
 	if (dryRun) {
 		const lines: string[] = [];
 		for (const one of pending) if (!one.migrated?.(deck)) one.dryRun(deck, (line) => lines.push(line));

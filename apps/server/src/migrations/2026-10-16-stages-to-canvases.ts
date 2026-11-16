@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { slug } from "../agents/slug.ts";
-import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "../stage/canvas-files.ts";
+import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, movedPath } from "../stage/canvas-files.ts";
 
 /**
  * 2026-10-16: `stages/<name>/stage.pen` and `stage.json` become `canvases/<name>/canvas.pen` and
@@ -13,15 +13,6 @@ import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "../stage/canvas-files.ts";
 const OLD_DIR = "stages";
 const OLD_FILE = "stage.pen";
 const OLD_META = "stage.json";
-
-/** A deck-relative path written before the move, pointed at where it is now: `stages/<n>/…` → `canvases/<m>/…`. */
-export function movedPath(path: string, renamed: ReadonlyMap<string, string>): string {
-	const match = /^stages\/([^/]+)(\/.*)?$/.exec(path);
-	if (!match) return path;
-	const name = renamed.get(match[1]!) ?? match[1]!;
-	const rest = (match[2] ?? "").replace(/^\/stage\.pen$/, `/${CANVAS_FILE}`).replace(/^\/stage\.json$/, `/${CANVAS_META}`);
-	return `${CANVAS_DIR}/${name}${rest}`;
-}
 
 /**
  * Move a deck's `stages/` to `canvases/`, once. A canvas with a title gets a folder named from it;

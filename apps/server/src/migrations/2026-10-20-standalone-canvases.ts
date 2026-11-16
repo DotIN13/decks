@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, sep } from "node:path";
+import { LINK, rewriteLinks } from "../stage/links.ts";
 import { canvasFolder, isHidden, plainSegment, urlFor } from "@decks/hub/layout";
 
 /**
@@ -71,8 +72,6 @@ interface BoardNode {
 
 const BOARD_ITEM = "decks.board";
 const BOARD_FILE = /\.(?:x?html?|mdx?)$/i;
-/** A link a board's text may hold: in quotes, in `url(…)` or a markdown link, with a file extension. */
-const LINK = /(["'(])((?:\.{1,2}\/)*[A-Za-z0-9_ -￿][^"'()\s<>?#|*:]*\.[A-Za-z0-9]{1,8})(?=[?#"')])/g;
 
 const toPosix = (path: string) => path.split(sep).join("/");
 const readJson = <T>(file: string): T | undefined => {
@@ -434,11 +433,6 @@ function run(deck: string, plan: Plan): void {
 	for (const step of plan.steps) if (step.kind === "drawing" && !plan.byCanvas.has(step.canvas)) rewriteDrawing(deck, step.canvas, new Map());
 }
 
-/** A board's text with each changed link put in, in quotes, `url(…)` and markdown links alike. */
-export function rewriteLinks(text: string, links: ReadonlyArray<{ from: string; to: string }>): string {
-	const map = new Map(links.map((one) => [one.from, one.to]));
-	return text.replace(LINK, (all, lead: string, link: string) => (map.has(link) ? `${lead}${map.get(link)}` : all));
-}
 
 /** A canvas's drawing, its boards named from its own folder and its fills pointing at their copies in `files/`. */
 function rewriteDrawing(deck: string, name: string, map: ReadonlyMap<string, string>): void {

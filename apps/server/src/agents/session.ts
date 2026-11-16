@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { recordedBoardsToAdopt } from "../migrations/2026-10-16-board-lists-into-canvas-files.ts";
+import { recordedBoardsToAdopt } from "./old-records.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
@@ -821,8 +821,8 @@ export class DeckAgent {
 		if (!this.stage.pens) return;
 		const restored = this.restoredPlaying;
 		this.restoredPlaying = undefined;
-		// `migrations/2026-10-16-board-lists-into-canvas-files.ts`
-		const adopt = recordedBoardsToAdopt(this.onCanvas().length, restored);
+		// A record's own list of boards, from before deck version 0.1.0: only in a deck old enough to hold one (`old-records.ts`).
+		const adopt = this.deck.readsOldShapes ? recordedBoardsToAdopt(this.onCanvas().length, restored) : [];
 		if (adopt.length === 0) {
 			if (this.canvasName()) this.penChanged();
 			return;

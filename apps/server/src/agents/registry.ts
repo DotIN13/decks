@@ -14,7 +14,7 @@ import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore, type AgentRecord } from "./store.ts";
 import { resumeNote, WorkingLog } from "./working.ts";
-import { fromSharedCanvas } from "../migrations/2026-09-22-shared-canvases-to-agents.ts";
+import { fromSharedCanvas } from "./old-records.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -321,7 +321,8 @@ export class Registry {
 			.list()
 			.map(({ record }) => record)
 			.filter((record) => !record.wasDispatcher)
-			.map((record) => this.fromCanvas(record));
+			// A record from before deck version 0.1.0 is read only in a deck old enough to hold one (`deck/old-shapes.ts`).
+			.map((record) => (this.deck.readsOldShapes ? this.fromCanvas(record) : record));
 		for (const record of [...records].reverse()) {
 			this.create({
 				name: record.name,
@@ -373,7 +374,7 @@ export class Registry {
 		return this.agents.filter((agent) => agent.kind !== "outside").length;
 	}
 
-	/** A record from the shared-canvas days, made the chat's own (`migrations/2026-09-22-shared-canvases-to-agents.ts`). */
+	/** A record from the shared-canvas days, made the chat's own (`old-records.ts`). */
 	private fromCanvas(record: AgentRecord): AgentRecord {
 		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.board(path), (next) => this.store.writeRecord(next));
 	}

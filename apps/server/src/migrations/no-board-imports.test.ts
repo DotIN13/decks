@@ -13,7 +13,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, "..");
 
 /** What a migration may import from the rest of the server, directly. */
-const ALLOWED = new Set(["deck/loader.ts", "deck/layout.ts", "deck/roots.ts", "pictures/ladder.ts", "cards/size.ts", "stage/canvas-files.ts", "config.ts", "agents/slug.ts", "agents/store.ts"]);
+const ALLOWED = new Set(["deck/loader.ts", "deck/layout.ts", "deck/roots.ts", "pictures/ladder.ts", "cards/size.ts", "stage/canvas-files.ts", "config.ts", "agents/slug.ts", "agents/store.ts", "deck/old-shapes.ts", "stage/links.ts"]);
 
 const isForbidden = (path: string) => /^boards\//.test(path) || /^routes\/board-pages(\.|\/)/.test(path) || /(^|\/)lib\/board\.js$/.test(path);
 
