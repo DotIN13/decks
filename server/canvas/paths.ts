@@ -117,6 +117,8 @@ export function keyOf(raw: string, canvas: string): { key: string; why?: string 
 		if (!layout.deckPathOk(path) || path.split("/").includes("..")) return { key: `ref:${path}`, why: "it climbs, or names a hidden folder" };
 		return { key: path.replace(/\/+$/, "") };
 	}
+	// A bare name (a file chip's itinerary.pdf, a markdown embed) has no folder to climb by: it is the canvas's own.
+	if (/^[^/\\]+$/.test(path) && path !== "." && path !== ".." && !path.startsWith(".")) return { key: `${layout.canvasFolder(canvas)}/${path}` };
 	const resolved = layout.resolveReference(canvas, path);
 	return "path" in resolved ? { key: resolved.path } : { key: `ref:${path}`, why: resolved.refused };
 }
