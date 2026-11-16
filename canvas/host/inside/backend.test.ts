@@ -155,3 +155,14 @@ test("a drop before the frame follows is read whole once it does, since nothing 
 		mock.timers.reset();
 	}
 });
+
+test("a call in flight when the pass is renewed is answered, not refused", async () => {
+	const { backend, ws, renew } = frameOn();
+	const asked = backend.act("item.batch", { canvas: "plan", ops: [], edit: "e1" });
+	const call = ws.sent.find((m) => m.type === "call")!;
+	renew("t2");
+	assert.equal(ws.closed, false);
+	ws.hello();
+	ws.say({ type: "answer", id: call.id, envelope: { ok: true, value: [], notes: [] } });
+	assert.deepEqual(await asked, { ok: true, value: [], notes: [] });
+});
