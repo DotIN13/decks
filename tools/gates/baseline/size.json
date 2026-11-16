@@ -16,7 +16,6 @@
 	"canvas/editor/dom/TextEditing.tsx: function createTextEditing over 80 lines": 1,
 	"canvas/editor/dom/TextEditing.tsx: function TextEditor over 80 lines": 1,
 	"canvas/editor/editor.tsx: function createEditor over 80 lines": 1,
-	"canvas/ink/InkLayer.tsx: function StageInk over 80 lines": 1,
 	"canvas/view/CanvasView.tsx: function Stage over 80 lines": 1,
 	"canvas/view/items-layer.tsx: function createItemsLayer over 80 lines": 1,
 	"canvas/view/selection.tsx: function createSelection over 80 lines": 1,
