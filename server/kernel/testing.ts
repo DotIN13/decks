@@ -6,7 +6,7 @@ import { listen } from "./doors/http.ts";
 import { buildKernel, type Built } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { MemoryStore, memoryStores, memoryVersion } from "./store.ts";
-import type { CanvasDoc, Client, Context, Deck, Feature, VersionFile } from "./types.ts";
+import type { CanvasDoc, Client, Context, Deck, Feature, Kernel, VersionFile } from "./types.ts";
 
 // For a feature's tests: the real kernel and router on an in-memory deck.
 // Make a call by name as any caller, read every event it emitted, read the
@@ -35,10 +35,10 @@ export const callers = {
 	app: (name: string): Caller => ({ kind: "app", id: name, name }),
 };
 
-export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number; version?: VersionFile } = {}): Promise<TestServer> {
+export async function testServer(options: { features?: Feature[]; deck?: Deck | Record<string, string>; clock?: () => number; relayWaitMs?: number; version?: VersionFile; run?: Kernel["run"] } = {}): Promise<TestServer> {
 	const deck = options.deck instanceof Object && "read" in options.deck ? (options.deck as Deck) : new MemoryDeck((options.deck ?? {}) as Record<string, string>);
 	const machine = await tempFolder("keel-machine");
-	const built = await buildKernel({ deck, stores: memoryStores(), machine: machine.folder, features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}), ...(options.version ? { version: options.version } : {}) });
+	const built = await buildKernel({ deck, stores: memoryStores(), machine: machine.folder, features: options.features ?? [], checkAnswers: true, ...(options.clock ? { clock: options.clock } : {}), ...(options.relayWaitMs ? { relayWaitMs: options.relayWaitMs } : {}), ...(options.version ? { version: options.version } : {}), ...(options.run ? { run: options.run } : {}) });
 	const heard: Heard[] = [];
 	const stopHearing = built.events.subscribe({ caller: callers.person }, (one) => void heard.push(one));
 	const call = (name: string, args: Record<string, unknown> = {}, as?: Caller | Who, client?: Client) => built.router.call(name, args, asCaller(as), client);

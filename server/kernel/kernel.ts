@@ -14,7 +14,7 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Sto
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
 
-export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string };
+export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string; run?: Kernel["run"] };
 
 export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
 
@@ -46,6 +46,7 @@ export async function buildKernel(options: KernelOptions): Promise<Built> {
 		filter: (one) => router.filter(one),
 		call: (name, args, caller) => router.call(name, args, caller),
 		sees: (one) => void events.sees.push(one),
+		...(options.run ? { run: options.run } : {}),
 		...{ url: () => address.url, folder: () => options.deck.root, machine: () => machine, deckId: () => deckId },
 	};
 	source = canvasSource(features, kernel);

@@ -167,6 +167,8 @@ export interface Kernel {
 	filter(filter: Filter): void;
 	/** Whether a caller may see a canvas; an event of a canvas it may not see is not sent to it. */
 	sees(sees: Sees): void;
+	/** Start a program on this machine (tectonic, git); undefined in memory and on Studio. */
+	run?: (job: RunJob) => Promise<RunResult>;
 	/** The deck's absolute folder on Decks-local; undefined in memory and on Studio. For old routes only. */
 	folder(): string | undefined;
 	/** The server's own address once a door listens, for apps and pictures; undefined before. */
@@ -189,6 +191,12 @@ export type Translator = (
 	name: string,
 	args: unknown,
 ) => { name: string; args: Record<string, unknown>; back?: (value: unknown) => unknown } | { refusal: { code: RefusalCode; message: string; hint?: string } } | undefined;
+
+/** A program to run: the first candidate that exists, in a deck folder; "{out}" in an argument is a
+ *  fresh scratch folder outside the deck, and each name in outputs is read back from it. */
+export type RunJob = { command: string[]; args: string[]; cwd: DeckPath | ""; env?: Record<string, string>; timeoutMs: number; outputs?: string[] };
+/** How it ended: stdout and stderr together, missing when no candidate exists, the outputs read back. */
+export type RunResult = { code: number | null; signal?: string; out: string; missing?: true; files: Record<string, Bytes> };
 
 /** Refuses a call by throwing Refused; for a server with many people (Studio). */
 export type Guard = (name: string, args: unknown, caller: Caller) => void | Promise<void>;
