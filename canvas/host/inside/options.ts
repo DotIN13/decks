@@ -41,6 +41,61 @@ const focusOn = (ctx: FrameContext, targets: string[]) => {
 	handle.glide(fitInto(boxes, view, canvasBox(view)), 400);
 };
 
+/** The apps on the canvas: what one is, opening it in a tab or inside the canvas, and what it saves here. */
+function appsHost(ctx: FrameContext) {
+	const { start, end, studio } = ctx;
+	return {
+		status: async (name: string) => {
+			if (studio) return undefined;
+			try {
+				const response = await fetch(`${start.backend.api.replace(/\/+$/, "")}/apps/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${ctx.backendToken()}` } });
+				return response.ok ? ((await response.json()) as { title?: string; status?: string }) : undefined;
+			} catch {
+				return undefined;
+			}
+		},
+		open: (name: string) => end.emit("open-app", { name }),
+		// Its state as the stream says it changed (`app.state`): read once with `status`, then watched.
+		watch: (name: string, listener: (state: { title?: string; status?: string }) => void) => {
+			const set = ctx.appWatchers.get(name) ?? new Set<typeof listener>();
+			set.add(listener);
+			ctx.appWatchers.set(name, set);
+			return () => {
+				set.delete(listener);
+			};
+		},
+		/*
+		 * Inside the canvas, on a canvas that is yours alone: asked of the harness with this frame's canvas
+		 * pass, which answers the app's address with an app pass in its path (`server/src/routes/apps.ts`).
+		 * What the app saved in this browser goes after `#`, which never reaches the server.
+		 */
+		...(studio
+			? {}
+			: {
+					inCanvas: async (name: string): Promise<{ url: string } | { tab: string }> => {
+						try {
+							const api = start.backend.api.replace(/\/+$/, "");
+							const response = await fetch(`${api}/apps/${encodeURIComponent(name)}/open`, { method: "POST", headers: { authorization: `Bearer ${ctx.backendToken()}` } });
+							const answer = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+							if (!response.ok || !answer.url) return { tab: answer.error ?? `The app did not open here (${response.status}).` };
+							const saved = ctx.appStored.get(name) ?? {};
+							const hash = Object.keys(saved).length ? `#decks-storage=${base64url(JSON.stringify(saved))}` : "";
+							return { url: `${new URL(answer.url, api).href}${hash}` };
+						} catch (error) {
+							return { tab: (error as Error).message };
+						}
+					},
+					store: (name: string, key: string, value: string | null) => {
+						const saved = ctx.appStored.get(name) ?? {};
+						if (value === null) delete saved[key];
+						else saved[key] = value;
+						ctx.appStored.set(name, saved);
+						end.emit("app-store", { app: name, key, value });
+					},
+				}),
+	};
+}
+
 /**
  * What a host answers for the canvas (`host.ts`), worked out here from `start` and the ticket: the
  * files' ticketed address, the pages' trust, the documents' line, the apps, the composer and the
@@ -96,56 +151,7 @@ export function installHost(ctx: FrameContext): void {
 					},
 				}),
 		// An app opens in a tab, which the page opens, outside this sandbox; the frame only asks what it is.
-		apps: {
-			status: async (name: string) => {
-				if (studio) return undefined;
-				try {
-					const response = await fetch(`${start.backend.api.replace(/\/+$/, "")}/apps/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${ctx.backendToken()}` } });
-					return response.ok ? ((await response.json()) as { title?: string; status?: string }) : undefined;
-				} catch {
-					return undefined;
-				}
-			},
-			open: (name: string) => end.emit("open-app", { name }),
-			// Its state as the stream says it changed (`app.state`): read once with `status`, then watched.
-			watch: (name: string, listener: (state: { title?: string; status?: string }) => void) => {
-				const set = ctx.appWatchers.get(name) ?? new Set<typeof listener>();
-				set.add(listener);
-				ctx.appWatchers.set(name, set);
-				return () => {
-					set.delete(listener);
-				};
-			},
-			/*
-			 * Inside the canvas, on a canvas that is yours alone: asked of the harness with this frame's canvas
-			 * pass, which answers the app's address with an app pass in its path (`server/src/routes/apps.ts`).
-			 * What the app saved in this browser goes after `#`, which never reaches the server.
-			 */
-			...(studio
-				? {}
-				: {
-						inCanvas: async (name: string): Promise<{ url: string } | { tab: string }> => {
-							try {
-								const api = start.backend.api.replace(/\/+$/, "");
-								const response = await fetch(`${api}/apps/${encodeURIComponent(name)}/open`, { method: "POST", headers: { authorization: `Bearer ${ctx.backendToken()}` } });
-								const answer = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
-								if (!response.ok || !answer.url) return { tab: answer.error ?? `The app did not open here (${response.status}).` };
-								const saved = ctx.appStored.get(name) ?? {};
-								const hash = Object.keys(saved).length ? `#decks-storage=${base64url(JSON.stringify(saved))}` : "";
-								return { url: `${new URL(answer.url, api).href}${hash}` };
-							} catch (error) {
-								return { tab: (error as Error).message };
-							}
-						},
-						store: (name: string, key: string, value: string | null) => {
-							const saved = ctx.appStored.get(name) ?? {};
-							if (value === null) delete saved[key];
-							else saved[key] = value;
-							ctx.appStored.set(name, saved);
-							end.emit("app-store", { app: name, key, value });
-						},
-					}),
-		},
+		apps: appsHost(ctx),
 		// So is any other tab a link opens: this sandbox may not open one.
 		openLink: (href) => end.emit("open-link", { href }),
 		// The composer is the page's, where the page said it is: a drag let go over it is a mention, sent as a draft.
@@ -170,13 +176,92 @@ export function installHost(ctx: FrameContext): void {
 	});
 }
 
+/** The cards' pages and pictures on the ticket, and what a card says back. */
+function pagesOptions(ctx: FrameContext): Parameters<typeof createEditor>[0]["pages"] {
+	const { end, studio, backend, pages, address, trust, cardItem, takeOff } = ctx;
+	return {
+		list: () => ctx.places() as Page[],
+		page: (path) => {
+			// A document or an app item has no page to load: it is drawn in place, and only needs saying it may be.
+			if (path.startsWith("item:")) return path;
+			const page = pages().find((one) => one.path === path);
+			return page ? `${address(path)}?rev=${page.rev}` : undefined;
+		},
+		picture: (path, scheme) => {
+			const page = untrack(pages).find((one) => one.path === path);
+			const at = path.split("/").map(encodeURIComponent).join("/");
+			const picturesAt = ctx.picturesAt();
+			if (picturesAt.includes("{path}")) return picturesAt.replace("{path}", at).replace("{scheme}", scheme);
+			// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
+			// `look`, so a picture kept a year under its revision is asked for again when the server draws cards another way.
+			return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&look=${PICTURE_LOOK}&whole=1`;
+		},
+		// A friend's card, on their canvas or pasted from it with its scripts off until you turn them on (`canvas.paste`).
+		cardScripts: (path) => trust(path) !== "friend" && cardItem(path)?.metadata?.scripts !== false,
+		onScriptsOn: (path) => {
+			const item = cardItem(path);
+			if (!item?.metadata) return;
+			const { scripts: _scripts, from: _from, ...rest } = item.metadata;
+			ctx.handle().edit([{ op: "update", id: item.id, set: { metadata: rest } }]);
+			setTimeout(() => ctx.handle().reloadCard(path), 300);
+		},
+		// How a card measured, kept by the harness for `decks canvas fit` to report.
+		onExtent: (path, extent) => void (studio ? undefined : backend.post("card-extent", { path, ...extent })),
+		onOpenLink: (path, from) => {
+			void end.call("open", { path, from });
+			return true;
+		},
+		news: () => ctx.news(),
+		onRead: (path) => void (studio ? undefined : backend.post("card-seen", { path })),
+		// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
+		onHide: (path) => {
+			if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path]);
+		},
+	};
+}
+
+/** What the editor says of selection, comments, ink and export: drafts for the page's composer, and presence for the others. */
+function sayOptions(ctx: FrameContext): Partial<Parameters<typeof createEditor>[0]> {
+	const { start, end, chrome } = ctx;
+	return {
+	onSelection: (ids) => {
+		end.emit("composer", { selection: { ids: [...ids] } });
+		ctx.presence?.selection(ids);
+	},
+	onSelect: (path) => {
+		end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } });
+		// A card selected is its item on the drawing, for the others on the canvas. Said once the editor is made: the first selection comes while it is being made.
+		queueMicrotask(() => {
+			try {
+				const item = path ? ((ctx.handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path) : undefined;
+				ctx.presence?.selection(item?.id ? [item.id] : []);
+			} catch {
+				/* the editor is not made yet: nothing is selected for anyone to see */
+			}
+		});
+	},
+	onViewport: (viewport) => end.emit("viewport", viewport),
+	onRefer: (pills) => end.emit("composer", { pills }),
+	onComment: (target) => {
+		// The page draws the box when it can (`pageComments`): a Send now pressed there is yours, where one pressed in this frame could be a card's script.
+		if (chrome && !start.look.pageComments) return void ctx.setComment(target);
+		const at = rectOf(target.anchor());
+		end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
+	},
+	onExport: (ids, format) => end.emit("export", { ids, ...(format ? { format } : {}) }),
+	onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
+	// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
+	inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
+	};
+}
+
 /**
  * The editor's options: the drawing first read, who keeps it and its undo (Studio, or the harness),
  * the cards' pages and pictures on the ticket, and what the editor says, sent to the page.
  * `reread` reads the drawing whole again (`events.ts`), once it is wired.
  */
 export function editorOptions(ctx: FrameContext, reread: () => void, world?: () => JSX.Element): Parameters<typeof createEditor>[0] {
-	const { start, end, chrome, studio, backend, first, mode, setMode, pages, address, trust, cardItem, takeOff, changed } = ctx;
+	const { start, end, chrome, studio, backend, first, mode, setMode, takeOff, changed } = ctx;
 	let restUntil: ReturnType<typeof setTimeout> | undefined;
 	return {
 		text: serialize(first.doc),
@@ -220,45 +305,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 				});
 			},
 		} }),
-		pages: {
-			list: () => ctx.places() as Page[],
-			page: (path) => {
-				// A document or an app item has no page to load: it is drawn in place, and only needs saying it may be.
-				if (path.startsWith("item:")) return path;
-				const page = pages().find((one) => one.path === path);
-				return page ? `${address(path)}?rev=${page.rev}` : undefined;
-			},
-			picture: (path, scheme) => {
-				const page = untrack(pages).find((one) => one.path === path);
-				const at = path.split("/").map(encodeURIComponent).join("/");
-				const picturesAt = ctx.picturesAt();
-				if (picturesAt.includes("{path}")) return picturesAt.replace("{path}", at).replace("{scheme}", scheme);
-				// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
-				// `look`, so a picture kept a year under its revision is asked for again when the server draws cards another way.
-				return `${picturesAt}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&look=${PICTURE_LOOK}&whole=1`;
-			},
-			// A friend's card, on their canvas or pasted from it with its scripts off until you turn them on (`canvas.paste`).
-			cardScripts: (path) => trust(path) !== "friend" && cardItem(path)?.metadata?.scripts !== false,
-			onScriptsOn: (path) => {
-				const item = cardItem(path);
-				if (!item?.metadata) return;
-				const { scripts: _scripts, from: _from, ...rest } = item.metadata;
-				ctx.handle().edit([{ op: "update", id: item.id, set: { metadata: rest } }]);
-				setTimeout(() => ctx.handle().reloadCard(path), 300);
-			},
-			// How a card measured, kept by the harness for `decks canvas fit` to report.
-			onExtent: (path, extent) => void (studio ? undefined : backend.post("card-extent", { path, ...extent })),
-			onOpenLink: (path, from) => {
-				void end.call("open", { path, from });
-				return true;
-			},
-			news: () => ctx.news(),
-			onRead: (path) => void (studio ? undefined : backend.post("card-seen", { path })),
-			// Hidden is the card taken off the drawing, as canvas.delete does, but as an edit of yours: gone at once, not when the harness answers.
-			onHide: (path) => {
-				if (!takeOff(path) && !studio) void backend.call("canvas.delete", [path]);
-			},
-		},
+		pages: pagesOptions(ctx),
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.
 		onCamera: (moved) => {
 			ctx.setCamera(moved);
@@ -269,34 +316,7 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 			}, 250);
 		},
 		// What you point at, a comment, a sketch: drafts for the composer, which the page sends only on your Send; and the others on the canvas see it.
-		onSelection: (ids) => {
-			end.emit("composer", { selection: { ids: [...ids] } });
-			ctx.presence?.selection(ids);
-		},
-		onSelect: (path) => {
-			end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } });
-			// A card selected is its item on the drawing, for the others on the canvas. Said once the editor is made: the first selection comes while it is being made.
-			queueMicrotask(() => {
-				try {
-					const item = path ? ((ctx.handle().drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path) : undefined;
-					ctx.presence?.selection(item?.id ? [item.id] : []);
-				} catch {
-					/* the editor is not made yet: nothing is selected for anyone to see */
-				}
-			});
-		},
-		onViewport: (viewport) => end.emit("viewport", viewport),
-		onRefer: (pills) => end.emit("composer", { pills }),
-		onComment: (target) => {
-			// The page draws the box when it can (`pageComments`): a Send now pressed there is yours, where one pressed in this frame could be a card's script.
-			if (chrome && !start.look.pageComments) return void ctx.setComment(target);
-			const at = rectOf(target.anchor());
-			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}), ...(target.open ? { open: true } : {}) });
-		},
-		onExport: (ids, format) => end.emit("export", { ids, ...(format ? { format } : {}) }),
-		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
-		// The agent on screen, the one the page's composer talks to, which the ink's Make a drawing, Make a card and Send go to.
-		inkAgent: () => { const id = ctx.agent(); return (id ? ctx.agents()[id]?.name : undefined) ?? ctx.busy().writer?.name; },
+		...sayOptions(ctx),
 		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
 		onDeleteCard: async (path) => {
 			if (studio) return takeOff(path);
