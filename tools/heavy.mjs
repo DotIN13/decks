@@ -99,11 +99,10 @@ export function freeGb() {
 	return (fs.bavail * fs.bsize) / 1024 ** 3;
 }
 
-function run(cmd, cls) {
+function run(cmd, cls, started) {
 	return new Promise((resolve) => {
 		const child = spawn(cmd[0], cmd.slice(1), { stdio: "inherit", env: { ...process.env, HEAVY_HELD: cls } });
-		const forward = (sig) => child.kill(sig);
-		for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, forward);
+		started(child);
 		child.on("error", (e) => { console.error(`heavy: could not start ${cmd[0]}: ${e.message}`); resolve(127); });
 		child.on("exit", (code, sig) => resolve(code ?? 128 + (constants.signals[sig] || 1)));
 	});
@@ -120,9 +119,14 @@ async function main(argv) {
 		return 3;
 	}
 	const cls = flags.includes("--class") && flags[flags.indexOf("--class") + 1] === "check" ? "check" : "exclusive";
+	// One handler for the whole job, never removed (removing the last one restores the default, which kills):
+	// it passes a signal to the child once there is one, and before that exits cleanly, so the exit handler
+	// lets go of the slot and the ticket.
+	let child;
+	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => (child ? child.kill(sig) : process.exit(128 + (constants.signals[sig] || 1))));
 	const got = await acquire({ cls, wait: flags.includes("--wait") });
 	if (!got) { console.error(`heavy: the lock is held (${holders().join("; ")}). Wait, or pass --wait.`); return BUSY; }
-	try { return await run(cmd, cls); } finally { got.release(); }
+	try { return await run(cmd, cls, (started) => (child = started)); } finally { got.release(); }
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) process.exitCode = await main(process.argv.slice(2));
