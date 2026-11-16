@@ -426,3 +426,12 @@ ten long files are split along their stories. Every other code file gets one pas
 one subject, an opening sentence, the main thing first, clusters together, no change of behaviour. The
 brief is the card "The story pass" on the build canvas; each owner counts its files in its progress file.
 No gate can read meaning, so a second agent reads a sample of each folder afterwards.
+
+**The canvas frame leaves the old wire (Mason, 2026-11-15).** The rewire is not a change of type names:
+the canvas's frame still speaks today's line through compat (`line.hello`, `canvas.watch`, the old verb
+names, the `doc.*` messages). It moves to the new socket and calls, in steps that each land on their
+own and are each followed by the full browser checks: the line and the drawing's read; edits; views;
+presence; cards and the card runtime's verbs; documents. Old types are not copied into the canvas.
+Compat stays, for clients that are not rebuilt yet (an older Studio page, an older iPad app), until
+its date; the frame no longer uses it. A step that cannot pass its checks stays on compat and is
+listed, rather than holding the others.
