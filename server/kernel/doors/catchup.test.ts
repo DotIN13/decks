@@ -44,7 +44,7 @@ test("a watch with since replays the canvas's changes after it, then goes live; 
 	const canvas = defineFeature({
 		name: "canvasy",
 		calls: [],
-		canvases: () => ({ doc: () => doc, name: (raw) => raw, replay: (_name, since) => (since < 1 ? { missed: true } : past.filter((one) => one.rev > since)) }),
+		canvases: () => ({ doc: () => doc, name: (raw) => (raw === "a" ? raw : (() => { throw new Error(`no canvas ${raw}`); })()), replay: (_name, since) => (since < 1 ? { missed: true } : past.filter((one) => one.rev > since)) }),
 	});
 	const server = await testServer({ features: [canvas] });
 	const doors = await server.listen(0);
@@ -56,6 +56,10 @@ test("a watch with since replays the canvas's changes after it, then goes live; 
 	assert.deepEqual(line.got.filter((m) => m.type === "event").map((m) => m.payload.rev), [2, 3, 4]);
 	line.got.length = 0;
 	line.ws.send(JSON.stringify({ type: "watch", canvas: "a", since: 0 }));
+	await settle();
+	assert.equal(line.got[0]?.payload.missed, true);
+	line.got.length = 0;
+	line.ws.send(JSON.stringify({ type: "watch", canvas: "nowhere-at-all", since: 2 }));
 	await settle();
 	assert.equal(line.got[0]?.payload.missed, true);
 	line.ws.close();

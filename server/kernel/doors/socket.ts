@@ -95,16 +95,16 @@ function catchUp(built: Built, caller: Caller, client: string, message: Record<s
 	return stop;
 }
 
-/** The canvas's item.changed after since, as the caller may hear them; one missed when the log is short. */
+/** The canvas's item.changed after since, as the caller may hear them; one missed when they cannot be had. */
 function replayed(built: Built, caller: Caller, canvas: string, since: number): Heard[] {
 	let answer: ReturnType<Built["replay"]>;
 	try {
 		answer = built.replay(canvas, since);
 	} catch {
-		return [];
+		answer = undefined;
 	}
-	if (!answer) return [];
-	const past = "missed" in answer ? [{ canvas, ids: [], by: "server", rev: since, missed: true }] : answer;
+	const missed = [{ canvas, ids: [], by: "server", rev: since, missed: true }];
+	const past = !answer || "missed" in answer ? missed : answer;
 	return past.map((payload) => ({ name: "item.changed", payload })).filter((one) => built.events.may(caller, one.name, one.payload));
 }
 
