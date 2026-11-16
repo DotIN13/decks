@@ -54,7 +54,7 @@
 	"canvas/cards/runtime/vendor.mjs: board": 6,
 	"canvas/chrome/AgentCursor.tsx: board": 2,
 	"canvas/chrome/AgentCursor.tsx: stage": 1,
-	"canvas/chrome/Callout.tsx: board": 37,
+	"canvas/chrome/Callout.tsx: board": 22,
 	"canvas/chrome/Callout.tsx: stage": 10,
 	"canvas/chrome/ColorPicker.tsx: stage": 1,
 	"canvas/chrome/InkBar.tsx: board": 2,

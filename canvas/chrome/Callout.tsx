@@ -69,10 +69,49 @@ export function PageCallout(props: {
 	/** The other boards and items on the canvas, in its coordinates: the pill takes the slot that covers none of them. */
 	obstacles?: () => ReadonlyArray<{ x: number; y: number; w: number; h: number }>;
 }) {
+	let element: HTMLDivElement | undefined;
+	const place = pillPlace(props, () => element);
+	const stop = (event: Event) => event.stopPropagation();
+	/** A card's pill, or drawn items' and a group's that can be exported: a ⋯ menu in place of the Delete button. The lasso's has none. */
+	const withMenu = () => !!props.board || !!props.onExport;
+	const remove = () => props.onDelete;
+	return (
+		<div
+			ref={element}
+			class="card-callout"
+			role="menu"
+			aria-label={props.label}
+			data-below={place().below ? "true" : undefined}
+			data-hidden={props.hidden ? "true" : undefined}
+			style={{ left: `${place().x}px`, top: `${place().y}px`, ...(place().arrow !== undefined ? { "--arrow": `${place().arrow}px` } : {}) }}
+			onPointerDown={stop}
+			onClick={stop}
+		>
+			<Show when={props.ink}>{(ink) => <InkWords ink={ink()} />}</Show>
+			<PillActions card={props.board} ink={!!props.ink} onOpen={props.onOpen} onComment={props.onComment} onDuplicate={props.onDuplicate} />
+			<Show
+				when={withMenu()}
+				fallback={<PlainEnd onDelete={props.onDelete} onHide={props.onHide} />}
+			>
+				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
+				<Show when={props.board && props.onHide}>
+					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+						<Icon of={X} size={17} />
+					</button>
+				</Show>
+				<span class="callout-rule" aria-hidden="true" />
+				<MoreMenu pill={() => element} hidden={props.hidden} card={props.board} onExport={props.onExport} onCopyPath={props.onCopyPath} onDelete={remove()} />
+			</Show>
+		</div>
+	);
+}
+
+/** Where the pill sits: measured, on the edge chosen once the box rests, centred on what it is for. */
+function pillPlace(props: Parameters<typeof PageCallout>[0], elementOf: () => HTMLDivElement | undefined) {
 	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
 	const [width, setWidth] = createSignal(0);
-	let element: HTMLDivElement | undefined;
 	onMount(() => {
+		const element = elementOf();
 		if (!element) return;
 		const observer = new ResizeObserver(() => {
 			setWidth(element?.offsetWidth ?? 0);
@@ -83,61 +122,8 @@ export function PageCallout(props: {
 	});
 	/* The pill's own height, measured: it goes above the board only if it fits there whole. */
 	const [tall, setTall] = createSignal(40);
-	/** Where the selection's top and bottom middles are on screen, with the camera as it is now. */
-	const edges = () => {
-		const { box, camera, view } = props;
-		return {
-			top: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y }),
-			bottom: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y + box.h }),
-		};
-	};
-	/*
-	 * Which edge the pill is on, chosen when the selection appears and again only when what it is on
-	 * moves or changes size: never as the camera moves, so a pan carries the pill with its edge, off
-	 * the screen with it, rather than sending it looking for room. Of the two edges, the one whose
-	 * slot is on screen, clear of floating chrome and covering no other board or item; else the one
-	 * covering less of them. With neither on screen when it was chosen (the camera on its way to the
-	 * selection), it is chosen again once the camera has stopped.
-	 */
-	const choose = (): { below: boolean; sure: boolean } => {
-		const { camera, view } = props;
-		const room = canvasBox(view);
-		const { top, bottom } = edges();
-		const x = top.x;
-		const half = width() / 2;
-		const gap = props.gap ?? GAP;
-		const stage = element?.parentElement?.getBoundingClientRect();
-		// Chrome floating over the canvas (the composer, a toolbar, a float): the room leaves out only what is docked.
-		const underChrome = (slot: { from: number; to: number }) => {
-			if (!stage || typeof document === "undefined") return false;
-			const y = stage.top + (slot.from + slot.to) / 2;
-			return [x - half + 8, x, x + half - 8].some((at) => {
-				const hit = document.elementFromPoint(stage.left + at, y);
-				return !!hit && !hit.closest(".stage");
-			});
-		};
-		const slots = [
-			{ from: top.y - gap - tall(), to: top.y - gap, below: false },
-			{ from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
-		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
-		if (!slots.length) return { below: false, sure: false };
-		// Under a finger the pill goes below whenever below is on screen: never over what the hand holds, and the same place every time.
-		if (COARSE) return { below: slots.some((slot) => slot.below), sure: true };
-		const others = props.obstacles?.() ?? [];
-		const covered = (slot: { from: number; to: number }) => {
-			let area = 0;
-			for (const other of others) {
-				const a = toScreen(camera, view, { x: other.x, y: other.y });
-				const b = toScreen(camera, view, { x: other.x + other.w, y: other.y + other.h });
-				const w = Math.min(x + half, b.x) - Math.max(x - half, a.x);
-				const h = Math.min(slot.to, b.y) - Math.max(slot.from, a.y);
-				if (w > 0 && h > 0) area += w * h;
-			}
-			return area;
-		};
-		const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
-		return { below: best.slot.below, sure: true };
-	};
+	const edges = () => edgesOf(props);
+	const choose = () => chooseSide(props, elementOf(), width(), tall());
 	const [side, setSide] = createSignal<{ below: boolean; sure: boolean }>({ below: false, sure: false });
 	/*
 	 * Chosen once the box has stopped changing, not at every step it moves: choosing reads the page's
@@ -173,7 +159,144 @@ export function PageCallout(props: {
 		// Centred on what it is for, wherever that is: its arrow points at the middle.
 		return { x: top.x, y: below ? bottom.y + gap : top.y - gap, below, arrow: width() > 0 ? width() / 2 : undefined };
 	};
-	const stop = (event: Event) => event.stopPropagation();
+	return place;
+}
+
+/** Where the selection's top and bottom middles are on screen, with the camera as it is now. */
+function edgesOf(props: { box: { x: number; y: number; w: number; h: number }; camera: Camera; view: Viewport }) {
+	const { box, camera, view } = props;
+	return {
+		top: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y }),
+		bottom: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y + box.h }),
+	};
+}
+
+/*
+ * Which edge the pill is on, chosen when the selection appears and again only when what it is on
+ * moves or changes size: never as the camera moves, so a pan carries the pill with its edge, off
+ * the screen with it, rather than sending it looking for room. Of the two edges, the one whose
+ * slot is on screen, clear of floating chrome and covering no other board or item; else the one
+ * covering less of them. With neither on screen when it was chosen (the camera on its way to the
+ * selection), it is chosen again once the camera has stopped.
+ */
+function chooseSide(props: Parameters<typeof PageCallout>[0], element: HTMLDivElement | undefined, width: number, tall: number): { below: boolean; sure: boolean } {
+	const { camera, view } = props;
+	const room = canvasBox(view);
+	const { top, bottom } = edgesOf(props);
+	const x = top.x;
+	const half = width / 2;
+	const gap = props.gap ?? GAP;
+	const stage = element?.parentElement?.getBoundingClientRect();
+	// Chrome floating over the canvas (the composer, a toolbar, a float): the room leaves out only what is docked.
+	const underChrome = (slot: { from: number; to: number }) => {
+		if (!stage || typeof document === "undefined") return false;
+		const y = stage.top + (slot.from + slot.to) / 2;
+		return [x - half + 8, x, x + half - 8].some((at) => {
+			const hit = document.elementFromPoint(stage.left + at, y);
+			return !!hit && !hit.closest(".stage");
+		});
+	};
+	const slots = [
+		{ from: top.y - gap - tall, to: top.y - gap, below: false },
+		{ from: bottom.y + gap, to: bottom.y + gap + tall, below: true },
+	].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
+	if (!slots.length) return { below: false, sure: false };
+	// Under a finger the pill goes below whenever below is on screen: never over what the hand holds, and the same place every time.
+	if (COARSE) return { below: slots.some((slot) => slot.below), sure: true };
+	const others = props.obstacles?.() ?? [];
+	const covered = (slot: { from: number; to: number }) => {
+		let area = 0;
+		for (const other of others) {
+			const a = toScreen(camera, view, { x: other.x, y: other.y });
+			const b = toScreen(camera, view, { x: other.x + other.w, y: other.y + other.h });
+			const w = Math.min(x + half, b.x) - Math.max(x - half, a.x);
+			const h = Math.min(slot.to, b.y) - Math.max(slot.from, a.y);
+			if (w > 0 && h > 0) area += w * h;
+		}
+		return area;
+	};
+	const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
+	return { below: best.slot.below, sure: true };
+}
+
+/** Ink selected: hand it to the agent, as a drawing, as a card, or as it is. */
+function InkWords(props: { ink: NonNullable<Parameters<typeof PageCallout>[0]["ink"]> }) {
+	const ink = () => props.ink;
+	return (
+		<>
+			<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} redraws it as shapes, words and arrows you can edit`} onClick={() => ink().onDrawing()}>
+				<Icon of={Shapes} size={15} />
+				Make a drawing
+			</button>
+			<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onCard()}>
+				<Icon of={LayoutTemplate} size={15} />
+				Make a card
+			</button>
+			<button type="button" role="menuitem" class="callout-word callout-ask" title={`${ink().agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => ink().onSend()}>
+				<Icon of={Send} size={15} />
+				Send to {ink().agent}
+			</button>
+			<span class="callout-rule" aria-hidden="true" />
+		</>
+	);
+}
+
+/** Fit, a card's New tab, Properties on touch, Comment and Duplicate. */
+function PillActions(props: { card?: Page | undefined; ink: boolean; onOpen: () => void; onComment?: (() => void) | undefined; onDuplicate?: (() => void) | undefined }) {
+	return (
+		<>
+			<button type="button" role="menuitem" class="icon-button" aria-label={props.card ? "Fit" : "Zoom to it"} title={props.card ? "Fit the card to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
+				<Icon of={Scan} size={16} />
+			</button>
+			<Show when={props.card && !props.card.live ? props.card : undefined}>
+				{(card) => (
+				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={card().item === "app" && card().app ? "#" : canvasHost().fileUrl(card().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (card().item === "app" && card().app) canvasHost().apps?.open(card().app!); else openInTab(canvasHost().fileUrl(card().path)); }}>
+					<Icon of={ExternalLink} size={16} />
+				</a>
+				)}
+			</Show>
+			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
+			<Show when={COARSE && !props.card && !props.ink}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => setPropsOpen(true)}>
+					<Icon of={SlidersHorizontal} size={16} />
+				</button>
+			</Show>
+			<Show when={props.onComment}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.card ? "Comment on this card" : "Comment on this"} onClick={() => props.onComment?.()}>
+					<Icon of={MessageSquarePlus} size={16} />
+				</button>
+			</Show>
+			<Show when={props.onDuplicate}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Duplicate" title="Duplicate" onClick={() => props.onDuplicate?.()}>
+					<Icon of={Copy} size={16} />
+				</button>
+			</Show>
+		</>
+	);
+}
+
+/** The end of a pill with no ⋯ menu: Delete, or a card's ✕. */
+function PlainEnd(props: { onDelete?: (() => void) | undefined; onHide?: (() => void) | undefined }) {
+	return (
+		<>
+			<Show when={props.onDelete}>
+				<span class="callout-rule" aria-hidden="true" />
+				<button type="button" role="menuitem" class="icon-button callout-danger" aria-label="Delete" title="Delete" onClick={() => props.onDelete?.()}>
+					<Icon of={Trash} size={16} />
+				</button>
+			</Show>
+			<Show when={props.onHide}>
+				<span class="callout-rule" aria-hidden="true" />
+				<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
+					<Icon of={X} size={17} />
+				</button>
+			</Show>
+		</>
+	);
+}
+
+/** A card's ⋯ menu, and drawn items' that can be exported: what is done less often, opening down under the pill. */
+function MoreMenu(props: { pill: () => HTMLDivElement | undefined; hidden?: boolean | undefined; card?: Page | undefined; onExport?: ((format: "png" | "pdf") => void) | undefined; onCopyPath?: (() => void) | undefined; onDelete?: (() => void) | undefined }) {
 	/*
 	 * A card's ⋯ menu: what is done less often, under the pill, gone at a press anywhere else, at Escape,
 	 * or when the pill hides for a movement.
@@ -186,7 +309,8 @@ export function PageCallout(props: {
 	 */
 	const [menuAt, setMenuAt] = createSignal<{ left: number }>();
 	const placeMenu = (menu: HTMLDivElement) => {
-		const stage = element?.parentElement?.getBoundingClientRect();
+		const stage = props.pill()?.parentElement?.getBoundingClientRect();
+		const element = props.pill();
 		if (!element || !moreButton || !stage) return;
 		const pill = element.getBoundingClientRect();
 		const button = moreButton.getBoundingClientRect();
@@ -197,6 +321,7 @@ export function PageCallout(props: {
 	createEffect(() => {
 		if (!more()) return;
 		const away = (event: Event) => {
+			const element = props.pill();
 			if (element && event.target instanceof Node && element.contains(event.target)) return;
 			setMore(false);
 		};
@@ -216,129 +341,53 @@ export function PageCallout(props: {
 		setMore(false);
 		run?.();
 	};
-	/** A card's pill, or drawn items' and a group's that can be exported: a ⋯ menu in place of the Delete button. The lasso's has none. */
-	const withMenu = () => !!props.board || !!props.onExport;
-	const remove = () => props.onDelete;
 	return (
-		<div
-			ref={element}
-			class="card-callout"
-			role="menu"
-			aria-label={props.label}
-			data-below={place().below ? "true" : undefined}
-			data-hidden={props.hidden ? "true" : undefined}
-			style={{ left: `${place().x}px`, top: `${place().y}px`, ...(place().arrow !== undefined ? { "--arrow": `${place().arrow}px` } : {}) }}
-			onPointerDown={stop}
-			onClick={stop}
-		>
-			<Show when={props.ink}>
-				{(ink) => (
-					<>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} redraws it as shapes, words and arrows you can edit`} onClick={() => ink().onDrawing()}>
-							<Icon of={Shapes} size={15} />
-							Make a drawing
-						</button>
-						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a card from it, in its place`} onClick={() => ink().onCard()}>
-							<Icon of={LayoutTemplate} size={15} />
-							Make a card
-						</button>
-						<button type="button" role="menuitem" class="callout-word callout-ask" title={`${ink().agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => ink().onSend()}>
-							<Icon of={Send} size={15} />
-							Send to {ink().agent}
-						</button>
-						<span class="callout-rule" aria-hidden="true" />
-					</>
-				)}
-			</Show>
-			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the card to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
-				<Icon of={Scan} size={16} />
+		<>
+			<button ref={moreButton} type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
+				<Icon of={Ellipsis} size={17} />
 			</button>
-			<Show when={props.board && !props.board.live ? props.board : undefined}>
-				{(board) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={board().item === "app" && board().app ? "#" : canvasHost().fileUrl(board().path)} target="_blank" rel="noopener" onClick={(event) => { event.preventDefault(); if (board().item === "app" && board().app) canvasHost().apps?.open(board().app!); else openInTab(canvasHost().fileUrl(board().path)); }}>
-					<Icon of={ExternalLink} size={16} />
-				</a>
-				)}
+			<Show when={more()}>
+				<div
+					ref={(menu) => queueMicrotask(() => placeMenu(menu))}
+					class="callout-more"
+					role="menu"
+					aria-label={props.card ? "More card actions" : "More actions"}
+					style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
+				>
+					<MoreItems card={props.card} onExport={props.onExport} onCopyPath={props.onCopyPath} onDelete={props.onDelete} pick={pick} />
+				</div>
 			</Show>
-			{/* On a touch screen the properties drawer opens from here, not with every selection (`Properties.tsx`). */}
-			<Show when={COARSE && !props.board && !props.ink}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => setPropsOpen(true)}>
-					<Icon of={SlidersHorizontal} size={16} />
+		</>
+	);
+}
+
+/** The ⋯ menu's items: export, copy path and delete, each closing the menu. */
+function MoreItems(props: { card?: Page | undefined; onExport?: ((format: "png" | "pdf") => void) | undefined; onCopyPath?: (() => void) | undefined; onDelete?: (() => void) | undefined; pick: (run?: () => void) => () => void }) {
+	return (
+		<>
+			<Show when={props.onExport}>
+				<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PNG" onClick={props.pick(() => props.onExport?.("png"))}>
+					<Icon of={ImageDown} size={15} />
+					Export as PNG
+				</button>
+				<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PDF" onClick={props.pick(() => props.onExport?.("pdf"))}>
+					<Icon of={FileDown} size={15} />
+					Export as PDF
 				</button>
 			</Show>
-			<Show when={props.onComment}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.board ? "Comment on this card" : "Comment on this"} onClick={() => props.onComment?.()}>
-					<Icon of={MessageSquarePlus} size={16} />
+			<Show when={props.onCopyPath}>
+				<button type="button" role="menuitem" class="callout-more-item" aria-label="Copy path" onClick={props.pick(props.onCopyPath)}>
+					<Icon of={Link} size={15} />
+					Copy path
 				</button>
 			</Show>
-			<Show when={props.onDuplicate}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Duplicate" title="Duplicate" onClick={() => props.onDuplicate?.()}>
-					<Icon of={Copy} size={16} />
+			<Show when={props.onDelete}>
+				<span class="callout-more-rule" aria-hidden="true" />
+				<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.card ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={props.pick(props.onDelete)}>
+					<Icon of={Trash} size={15} />
+					Delete
 				</button>
 			</Show>
-			<Show
-				when={withMenu()}
-				fallback={
-					<>
-						<Show when={props.onDelete}>
-							<span class="callout-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="icon-button callout-danger" aria-label="Delete" title="Delete" onClick={() => props.onDelete?.()}>
-								<Icon of={Trash} size={16} />
-							</button>
-						</Show>
-						<Show when={props.onHide}>
-							<span class="callout-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
-								<Icon of={X} size={17} />
-							</button>
-						</Show>
-					</>
-				}
-			>
-				{/* A card's pill: Fit, New tab, Comment, ✕ to hide it and ⋯ for the rest; drawn items' and a group's: their actions and ⋯. */}
-				<Show when={props.board && props.onHide}>
-					<button type="button" role="menuitem" class="icon-button" aria-label="Hide" title="Hide from the canvas" onClick={() => props.onHide?.()}>
-						<Icon of={X} size={17} />
-					</button>
-				</Show>
-				<span class="callout-rule" aria-hidden="true" />
-				<button ref={moreButton} type="button" role="menuitem" class="icon-button" aria-label="More" title="More" aria-haspopup="menu" aria-expanded={more()} data-on={more() ? "true" : undefined} onClick={() => setMore((open) => !open)}>
-					<Icon of={Ellipsis} size={17} />
-				</button>
-				<Show when={more()}>
-					<div
-						ref={(menu) => queueMicrotask(() => placeMenu(menu))}
-						class="callout-more"
-						role="menu"
-						aria-label={props.board ? "More card actions" : "More actions"}
-						style={menuAt() ? { left: `${menuAt()!.left}px` } : { visibility: "hidden", left: "0" }}
-					>
-						<Show when={props.onExport}>
-							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PNG" onClick={pick(() => props.onExport?.("png"))}>
-								<Icon of={ImageDown} size={15} />
-								Export as PNG
-							</button>
-							<button type="button" role="menuitem" class="callout-more-item" aria-label="Export as PDF" onClick={pick(() => props.onExport?.("pdf"))}>
-								<Icon of={FileDown} size={15} />
-								Export as PDF
-							</button>
-						</Show>
-						<Show when={props.onCopyPath}>
-							<button type="button" role="menuitem" class="callout-more-item" aria-label="Copy path" onClick={pick(props.onCopyPath)}>
-								<Icon of={Link} size={15} />
-								Copy path
-							</button>
-						</Show>
-						<Show when={remove()}>
-							<span class="callout-more-rule" aria-hidden="true" />
-							<button type="button" role="menuitem" class="callout-more-item callout-more-danger" aria-label="Delete" title={props.board ? "Take the card off the canvas; its folder stays in the deck" : "Delete"} onClick={pick(remove())}>
-								<Icon of={Trash} size={15} />
-								Delete
-							</button>
-						</Show>
-					</div>
-				</Show>
-			</Show>
-		</div>
+		</>
 	);
 }
