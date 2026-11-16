@@ -121,7 +121,8 @@
 		"harness/page/chat/",
 		"harness/page/composer/",
 		"canvas/chrome/",
-		"canvas/view/selection.tsx"
+		"canvas/view/selection.tsx",
+		"harness/page/agent-ui/"
 	],
 	"Anvil": [
 		"packages/stage/crates/apple/",
