@@ -1,11 +1,11 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
 import type { Page } from "@decks/protocol-old";
+import { isPage, itemKind } from "../../drawing/pages.ts";
 import type { FrameSocket } from "./socket.ts";
 
 // The drawing as the frame reads it from the server (`canvas.drawing`): its cards named from the deck's
 // root, as the frame keys them, and the cards' records read off the drawing with their news (`card.list`).
 
-const PAGES = new Set(["decks.card", "decks.board"]);
 type Meta = { type?: string; path?: string };
 
 /** The drawing, its revision and its cards, in one read. */
@@ -35,8 +35,11 @@ export function deckPathEdits(canvas: string, edits: readonly PenEdit[]): PenEdi
 
 const folderOf = (canvas: string) => `canvases/${canvas}`;
 
-/** A card's or board's path the canvas's folder holds, as the file names it: relative to that folder. */
-const owned = (meta: Meta) => typeof meta.path === "string" && PAGES.has(meta.type ?? "") && !/^(canvases|shared)\//.test(meta.path);
+/** A card the canvas's folder holds, as the file names it: relative to that folder (documents and apps are items, not files). */
+const owned = (meta: Meta) => {
+	const node = { type: "browser", id: "", metadata: { type: meta.type ?? "" } };
+	return typeof meta.path === "string" && isPage(node) && !itemKind(node) && !/^(canvases|shared)\//.test(meta.path);
+};
 
 function deckPaths(canvas: string, nodes: PenDocument["children"] | undefined): PenDocument["children"] | undefined {
 	return nodes?.map((node) => {
@@ -52,7 +55,7 @@ type News = { path: string; by?: string; named?: number; changed?: number; seen?
 /** The cards at the top of the drawing as the frame's records, with their news. */
 function pagesOf(doc: PenDocument, news: Map<string, News>): Page[] {
 	return (doc.children ?? [])
-		.filter((node) => PAGES.has((node.metadata as Meta | undefined)?.type ?? "") && typeof (node.metadata as Meta).path === "string")
+		.filter((node) => isPage(node) && !itemKind(node) && typeof (node.metadata as Meta).path === "string")
 		.map((node) => {
 			const meta = node.metadata as Meta;
 			const one = news.get(meta.path!);

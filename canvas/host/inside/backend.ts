@@ -40,8 +40,6 @@ export interface Backend {
 export type Heard =
 	/** The canvas changed: from `from` as `edits`, or whole as `doc` (`server/canvas/store.ts`). */
 	| { type: "canvas.changed"; canvas: string; rev: number; from?: number; edits?: PenEdit[]; doc?: PenDocument; base: string; made?: string[]; by?: string; author?: ChangeAuthor; error?: string }
-	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
-	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "card.changed"; path: string; rev: number; card?: Page; removed?: boolean; sized?: true }
 	/** An app placed on this canvas changed state: for its windows (`item-surfaces.tsx`), through `apps.watch`. */
 	| { type: "app.changed"; name: string; title?: string; status: string }
@@ -78,27 +76,13 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 			watch: () => [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }],
 			// The drawing is the socket's now (`sock`): the line's copies of its changes are passed over.
 			hear: (message) => {
-				if (LINE_DRAWING.has((message as { type?: string }).type ?? "")) return;
+				if ((message as { type?: string }).type === "canvas.changed") return;
 				for (const one of hearers) one(message as Heard);
 			},
 		}));
 
 	let socket: FrameSocket | undefined;
-	/** The socket on the protocol, opened on first use: the drawing read, and its changes (`item.changed`). */
-	const sock = () =>
-		(socket ??= openSocket({
-			origin: new URL(base).origin,
-			token: () => token,
-			canvas,
-			hear: (name, payload) => {
-				const heard = drawingHeard(canvas, name, payload);
-				if (heard) for (const one of hearers) one(heard);
-			},
-			// Back after a drop: what was missed is not said, so the drawing is read again.
-			onState: (open, again) => {
-				if (open && again) for (const one of hearers) one({ type: "reconnected" });
-			},
-		}));
+	const sock = () => (socket ??= drawingSocket(new URL(base).origin, () => token, canvas, hearers));
 
 	// The line and the socket are this canvas's: they stop when the frame moves to another canvas in place (`life.ts`).
 	life().addEventListener("abort", () => (opened?.stop(), socket?.stop()), { once: true });
@@ -152,8 +136,22 @@ export function createBackend(api: string, canvas: string, firstToken: string, f
 	};
 }
 
-/** The line's messages about the drawing, which the socket carries now. */
-const LINE_DRAWING = new Set(["canvas.changed", "stage.pen", "stage.pen.delta"]);
+/** The socket on the protocol, for the drawing read and its changes (`item.changed`), told to the hearers. */
+function drawingSocket(origin: string, token: () => string, canvas: string, hearers: Set<(message: Heard) => void>): FrameSocket {
+	return openSocket({
+		origin,
+		token,
+		canvas,
+		hear: (name, payload) => {
+			const heard = drawingHeard(canvas, name, payload);
+			if (heard) for (const one of hearers) one(heard);
+		},
+		// Back after a drop: what was missed is not said, so the drawing is read again.
+		onState: (open, again) => {
+			if (open && again) for (const one of hearers) one({ type: "reconnected" });
+		},
+	});
+}
 
 /**
  * An event on the socket as the drawing's follower hears it: `item.changed` with pen's own edits from the
@@ -170,9 +168,8 @@ function drawingHeard(canvas: string, name: string, payload: Record<string, unkn
 }
 
 /**
- * Keeps one drawing from the line: a revision already held is passed over; edits from the revision
- * held are applied; anything else, a gap, and the drawing is read whole again. `canvas.changed` is
- * what the harness says now; `stage.pen` and `stage.pen.delta` are the same from an older one.
+ * Keeps one drawing: a revision already held is passed over; edits from the revision held are applied;
+ * anything else, a gap, and the drawing is read whole again.
  */
 export function drawingFollower(handlers: {
 	whole(doc: PenDocument, base: string, made?: readonly string[]): void;
@@ -202,17 +199,6 @@ export function drawingFollower(handlers: {
 					}
 					rev = message.rev;
 				}
-			} else if (message.type === "stage.pen") {
-				if (message.rev === rev) return;
-				rev = message.rev;
-				handlers.whole(message.doc, message.base, message.made);
-			} else if (message.type === "stage.pen.delta") {
-				if (message.rev <= rev) return;
-				if (message.from !== rev || !handlers.edits(message.edits, message.base, message.made)) {
-					handlers.reread();
-					return;
-				}
-				rev = message.rev;
 			} else if (message.type === "reconnected") handlers.reread();
 		},
 	};

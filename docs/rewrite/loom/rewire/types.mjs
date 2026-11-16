@@ -8,7 +8,7 @@ const SAME = new Set(["Camera", "Presence", "PresenceBy", "ChangeAuthor", "Agent
 const dry = process.argv.includes("--dry");
 const files = execFileSync("git", ["grep", "-l", "@decks/protocol-old", "--", "canvas", "ui", "pen"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 const OLD = /^import (type )?\{([^}]*)\} from "@decks\/protocol-old";$/m;
-let changed = 0;
+const moved = [];
 for (const file of files) {
 	const text = readFileSync(file, "utf8");
 	const m = OLD.exec(text);
@@ -24,7 +24,7 @@ for (const file of files) {
 	if (staying.length) lines.push(allType ? `import type { ${staying.map(bare).join(", ")} } from "@decks/protocol-old";` : `import { ${staying.join(", ")} } from "@decks/protocol-old";`);
 	lines.push(`import type { ${typed(moving).map(bare).join(", ")} } from "@decks/protocol";`);
 	if (!dry) writeFileSync(file, text.replace(OLD, lines.join("\n")));
-	changed++;
+	moved.push(file);
 	console.log(`${dry ? "would move" : "moved"} ${moving.map(bare).join(", ")} in ${file}`);
 }
-console.log(`${changed} files`);
+console.log(`${moved.length} files`);
