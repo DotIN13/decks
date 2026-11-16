@@ -15,16 +15,19 @@ import { told } from "./events.ts";
 
 test("every old call reaches a new call the server knows", async () => {
 	const server = await testServer({ features: features(), relayWaitMs: 5 });
-	const missed: string[] = [];
-	for (const [old] of OLD_CALLS) {
-		const turned = turn(old, []);
-		assert.ok(!("refusal" in turned), `${old} is refused before it is called`);
-		const envelope = await server.call(turned.name, turned.args);
-		if (!envelope.ok && /There is no call named/.test(envelope.error.message)) missed.push(`${old} -> ${turned.name}`);
+	try {
+		const missed: string[] = [];
+		for (const [old] of OLD_CALLS) {
+			const turned = turn(old, []);
+			assert.ok(!("refusal" in turned), `${old} is refused before it is called`);
+			const envelope = await server.call(turned.name, turned.args);
+			if (!envelope.ok && /There is no call named/.test(envelope.error.message)) missed.push(`${old} -> ${turned.name}`);
+		}
+		assert.deepEqual(missed, []);
+		assert.equal(OLD_CALLS.length, 117);
+	} finally {
+		await server.close();
 	}
-	assert.deepEqual(missed, []);
-	assert.equal(OLD_CALLS.length, 117);
-	await server.close();
 });
 
 test("a dropped old call says why, and an unknown one is not found", () => {
@@ -91,13 +94,16 @@ test("every old event name is told as one the server emits", async () => {
 test("an old name posted to /api/v1 answers through the kernel's translator", async () => {
 	const server = await testServer({ features: features(), deck: { "canvases/c/canvas.pen": JSON.stringify({ version: "2.14", children: [{ type: "note", id: "n", x: 0, y: 0, content: "hi" }] }) } });
 	const doors = await server.listen(0);
-	const post = (name: string, body: unknown) => fetch(`${doors.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify(body) }).then((r) => r.json() as Promise<{ ok: boolean; value?: { items?: unknown[] } }>);
-	const read = await post("canvas.read", { args: [{ canvas: "c" }] });
-	assert.equal(read.ok, true);
-	assert.equal(read.value?.items?.length, 1, "canvas.read answers { items } as it did");
-	assert.equal((await post("canvas.file", { args: [] })).ok, false);
-	await doors.close();
-	await server.close();
+	try {
+		const post = (name: string, body: unknown) => fetch(`${doors.url}/api/v1/${name}`, { method: "POST", headers: { authorization: `Bearer ${doors.token}` }, body: JSON.stringify(body) }).then((r) => r.json() as Promise<{ ok: boolean; value?: { items?: unknown[] } }>);
+		const read = await post("canvas.read", { args: [{ canvas: "c" }] });
+		assert.equal(read.ok, true);
+		assert.equal(read.value?.items?.length, 1, "canvas.read answers { items } as it did");
+		assert.equal((await post("canvas.file", { args: [] })).ok, false);
+	} finally {
+		await doors.close();
+		await server.close();
+	}
 });
 
 test("a same-name old call in the positional form answers through the translator", async () => {
