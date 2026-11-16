@@ -12,7 +12,7 @@ import { highlight, runStageCall } from "../../camera/view-calls.ts";
 import { cardShot } from "../../cards/card-surface.tsx";
 import { handsOn } from "../../camera/hands-on.ts";
 import { drawingFollower } from "./backend.ts";
-import { installClipboard, sayer } from "./clipboard.ts";
+import { installClipboard } from "./clipboard.ts";
 import type { FrameContext } from "./boot.ts";
 import type { CardSlot } from "../messages.ts";
 
@@ -55,9 +55,9 @@ export function wireFrame(ctx: FrameContext): { reread: () => void } {
  * copies the files a paste needs; on Studio, what needs no file.
  */
 function wireClipboard(ctx: FrameContext, handle: Handle): void {
-	const { root, start, end, studio, backend, first } = ctx;
+	const { start, end, studio, backend, first } = ctx;
 	const harness = studio ? `studio:${start.backend.api}` : ((first as { harness?: string }).harness ?? `harness:${start.backend.api}`);
-	const say = sayer(root);
+	const say = ctx.say;
 	const clipboard = installClipboard({
 		handle,
 		canvas: start.canvas.name,

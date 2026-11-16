@@ -216,7 +216,8 @@ export function editorOptions(ctx: FrameContext, reread: () => void, world?: () 
 				void backend.act("canvas.undo", { canvas: start.canvas.name, ...(direction === "redo" ? { redo: true } : {}), ...(edit ? { edit } : {}) }).then((answer) => {
 					if (answer.ok) return;
 					if (edit) ctx.handle().refused(edit);
-					console.info(answer.error);
+					// The server says why (an agent changed the drawing since, nothing to undo): the person is told.
+					ctx.say(answer.error ?? (direction === "redo" ? "Nothing was redone." : "Nothing was undone."));
 				});
 			},
 		} }),

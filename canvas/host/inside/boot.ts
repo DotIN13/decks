@@ -10,6 +10,7 @@ import { isNews } from "../../items/news.ts";
 import { pagesOf } from "../../drawing/drawing.ts";
 import { pageItems } from "../../drawing/boxes.ts";
 import { createBackend } from "./backend.ts";
+import { sayer } from "./clipboard.ts";
 import { installPresence } from "./presence.ts";
 import { installMarks } from "./marks.ts";
 import { createStudioLine } from "./studio-line.ts";
@@ -71,6 +72,8 @@ export async function openFrame(root: HTMLElement, start: Start, end: FrameEnd, 
 	const appWatchers = new Map<string, Set<(state: { title?: string; status?: string }) => void>>();
 	return {
 		cardsReads: placer.reads,
+		/** A line at the foot of the frame for a moment: why something the person did did nothing. */
+		say: sayer(root),
 		...stored,
 		appWatchers,
 		root,
