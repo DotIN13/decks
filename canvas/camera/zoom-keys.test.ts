@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { zoomKey } from "./zoom-keys.ts";
 
+// Cmd or Ctrl with plus, minus or zero zooms the canvas; a bare key is not ours.
+
 /** A keystroke, with ⌘ held unless said otherwise. */
 const press = (key: string, code: string, extra: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean } = {}) => ({
 	key,

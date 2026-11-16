@@ -50,33 +50,9 @@ export interface StageOpsHost {
 	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): boolean;
 }
 
-/**
- * A background agent's view waits for you, and it is told that it is waiting.
- *
- * The canvas is per conversation — it draws the focused agent's in-play set and nothing else
- * — and the camera has to follow the same rule or it is the one part of the view an agent
- * you are not watching can reach into. It could, and did: an agent working in another corner
- * of the deck flew your camera to a board that was not drawn on your canvas at all, which is
- * an empty view arriving while you sit still.
- *
- * So the fit is *remembered against that agent* rather than applied, and `viewOnSwitch` hands
- * it to you when you open that chat. Returns the sentence to put in the agent's result, or
- * nothing when the agent asking is the one on screen and the op should simply happen.
- */
-function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
-	/*
-	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
-	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
-	 * this is their conversation already; the board is on the stage where it was put.
-	 */
-	if (call.agentId && call.agentId === host.focused() && host.handsOn?.()) {
-		host.offerView?.(call.agentId, camera, selected, what);
-		return { deferred: "the person is using the canvas, so the view stayed where they had it and they were offered a button to go there" };
-	}
-	if (!call.agentId || call.agentId === host.focused()) return undefined;
-	host.rememberView(call.agentId, camera, selected);
-	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
-}
+/** A call to this screen, and the screen it runs on, as `defer` takes them. */
+type Call = Parameters<typeof defer>[0];
+type Host = Parameters<typeof defer>[1];
 
 export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 	const args = (call.args ?? {}) as Record<string, unknown>;
@@ -138,10 +114,6 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 	}
 }
 
-/** A call to this screen, and the screen it runs on, as `defer` takes them. */
-type Call = Parameters<typeof defer>[0];
-type Host = Parameters<typeof defer>[1];
-
 /** `show` (`view.focus`): the camera framed on the cards and items named, the first card selected. */
 function showCall(call: Call, host: Host, args: Record<string, unknown>): unknown {
 	// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
@@ -195,9 +167,6 @@ function cursorCall(host: Host, args: Record<string, unknown>): unknown {
 	return { cursor: at ? "shown" : "cleared" };
 }
 
-/** Outline one component inside a board, and take it off again on its own. */
-let clearLast: { run: () => void } | undefined;
-
 export function highlight(path: string, id: string): void {
 	clearLast?.run();
 	clearLast = undefined;
@@ -219,3 +188,33 @@ export function highlight(path: string, id: string): void {
 	};
 }
 
+/** Outline one component inside a board, and take it off again on its own. */
+let clearLast: { run: () => void } | undefined;
+
+/**
+ * A background agent's view waits for you, and it is told that it is waiting.
+ *
+ * The canvas is per conversation — it draws the focused agent's in-play set and nothing else
+ * — and the camera has to follow the same rule or it is the one part of the view an agent
+ * you are not watching can reach into. It could, and did: an agent working in another corner
+ * of the deck flew your camera to a board that was not drawn on your canvas at all, which is
+ * an empty view arriving while you sit still.
+ *
+ * So the fit is *remembered against that agent* rather than applied, and `viewOnSwitch` hands
+ * it to you when you open that chat. Returns the sentence to put in the agent's result, or
+ * nothing when the agent asking is the one on screen and the op should simply happen.
+ */
+function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "card" | "view" = "view"): { deferred: string } | undefined {
+	/*
+	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
+	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
+	 * this is their conversation already; the board is on the stage where it was put.
+	 */
+	if (call.agentId && call.agentId === host.focused() && host.handsOn?.()) {
+		host.offerView?.(call.agentId, camera, selected, what);
+		return { deferred: "the person is using the canvas, so the view stayed where they had it and they were offered a button to go there" };
+	}
+	if (!call.agentId || call.agentId === host.focused()) return undefined;
+	host.rememberView(call.agentId, camera, selected);
+	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
+}

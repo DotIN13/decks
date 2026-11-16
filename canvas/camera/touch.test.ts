@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { COAST_TAU, coastStep, createTouches, STALE_MS } from "./touch.ts";
 import { pinchCamera, toScreen, toWorld } from "./camera.ts";
 
+// Touch on the canvas: one finger pans, two pinch, and a lift never jumps.
+
 const view = { width: 800, height: 600 };
 
 test("one finger is a pan, measured against the last event and not the first", () => {

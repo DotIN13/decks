@@ -5,6 +5,8 @@ import { createAgentViews } from "./agent-views.ts";
 import { createLanding, type LandingHost } from "./landing.ts";
 import type { CameraOwner } from "./land.ts";
 
+// Parking a view and landing one, per key, and a person's move calling a landing off.
+
 /** A host whose canvas on screen, boxes and camera a test sets. */
 function host() {
 	const store = new Map<string, string>();

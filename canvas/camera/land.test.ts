@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { landingCamera, sameOwner } from "./land.ts";
 
+// Where the camera lands on arriving at a view's key: a saved view, else the middle of all.
+
 const viewport = { width: 1400, height: 900 };
 const region = { x: 0, y: 0, width: 1400, height: 900 };
 

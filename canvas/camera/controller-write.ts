@@ -2,6 +2,9 @@ import type { Camera } from "@decks/protocol-old";
 import type { Accessor, Setter } from "solid-js";
 import type { Viewport } from "./camera.ts";
 
+// The camera controller's state, and its one write to the page per step, with whether the
+// camera is moving or scaling.
+
 export interface CameraHost {
 	/** The stage's size on screen. */
 	view: Accessor<Viewport>;
@@ -102,17 +105,42 @@ export interface CameraRun {
 }
 
 /**
- * A glide the app has asked for and this file has not started yet.
+ * Move the camera now: the body `pushCamera` has always been, given the name it deserves.
  *
- * The camera signal and the glide request arrive in the same batch, and the boards are
- * rendered from that batch **before** the effect below gets to start the loop — so for one
- * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
- * that the new camera brings into view would begin parsing its document exactly then, at
- * the top of the flight. This closes that window: the request itself counts as movement.
+ * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
+ * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
+ * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp,
+ * and the camera signal going up once per frame, so the zoom readout
+ * ticks and `camera()` is never a lie about where the view is going.
  */
-export function glidePending(c: CameraRun): boolean {
-	const glide = c.host.asked().glide;
-	return glide !== undefined && glide.token !== c.lastGlideToken;
+export function write(c: CameraRun, cam: Camera): void {
+	if (cam.zoom !== c.localCamera.zoom) nowScaling(c);
+	if (cam.x !== c.localCamera.x || cam.y !== c.localCamera.y || cam.zoom !== c.localCamera.zoom) nowMoving(c);
+	c.lastMoved = performance.now();
+	c.localCamera = cam;
+	c.host.moved();
+	/*
+	 * Placed and published once a frame, however many events move the camera in it. A pinch's two
+	 * fingers and a trackpad's wheel send two or three a frame, and each placed the world and gave the
+	 * engine its camera (its transform, its timers, a message to the worker) for a picture the frame
+	 * never showed; the frame's callback runs before the browser paints, so the one placing lands in
+	 * the same frame the events did. A glide's or a coast's step is in a frame already and places at once (`placeNow`).
+	 */
+	c.pendingCamera = cam;
+	if (c.rafId === undefined) {
+		c.rafId = requestAnimationFrame(() => {
+			c.rafId = undefined;
+			const next = c.pendingCamera!;
+			c.pendingCamera = undefined;
+			writeTransform(c, next);
+			c.host.publish(next);
+		});
+	}
+}
+
+/** Place the camera written and not yet placed now: for a caller in an animation frame that flushes the drawing itself. */
+export function placeNow(c: CameraRun): void {
+	if (c.pendingCamera) writeTransform(c, c.pendingCamera);
 }
 
 export function writeTransform(c: CameraRun, cam: Camera): void {
@@ -157,40 +185,15 @@ export function stopped(c: CameraRun): void {
 }
 
 /**
- * Move the camera now: the body `pushCamera` has always been, given the name it deserves.
+ * A glide the app has asked for and this file has not started yet.
  *
- * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
- * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
- * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp,
- * and the camera signal going up once per frame, so the zoom readout
- * ticks and `camera()` is never a lie about where the view is going.
+ * The camera signal and the glide request arrive in the same batch, and the boards are
+ * rendered from that batch **before** the effect below gets to start the loop — so for one
+ * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
+ * that the new camera brings into view would begin parsing its document exactly then, at
+ * the top of the flight. This closes that window: the request itself counts as movement.
  */
-export function write(c: CameraRun, cam: Camera): void {
-	if (cam.zoom !== c.localCamera.zoom) nowScaling(c);
-	if (cam.x !== c.localCamera.x || cam.y !== c.localCamera.y || cam.zoom !== c.localCamera.zoom) nowMoving(c);
-	c.lastMoved = performance.now();
-	c.localCamera = cam;
-	c.host.moved();
-	/*
-	 * Placed and published once a frame, however many events move the camera in it. A pinch's two
-	 * fingers and a trackpad's wheel send two or three a frame, and each placed the world and gave the
-	 * engine its camera (its transform, its timers, a message to the worker) for a picture the frame
-	 * never showed; the frame's callback runs before the browser paints, so the one placing lands in
-	 * the same frame the events did. A glide's or a coast's step is in a frame already and places at once (`placeNow`).
-	 */
-	c.pendingCamera = cam;
-	if (c.rafId === undefined) {
-		c.rafId = requestAnimationFrame(() => {
-			c.rafId = undefined;
-			const next = c.pendingCamera!;
-			c.pendingCamera = undefined;
-			writeTransform(c, next);
-			c.host.publish(next);
-		});
-	}
-}
-
-/** Place the camera written and not yet placed now: for a caller in an animation frame that flushes the drawing itself. */
-export function placeNow(c: CameraRun): void {
-	if (c.pendingCamera) writeTransform(c, c.pendingCamera);
+export function glidePending(c: CameraRun): boolean {
+	const glide = c.host.asked().glide;
+	return glide !== undefined && glide.token !== c.lastGlideToken;
 }

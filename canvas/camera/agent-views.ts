@@ -5,7 +5,6 @@ import type { AgentView } from "./agent-view.ts";
  * Each conversation's camera, kept per device: what it was last left looking at, per canvas. The
  * rules are `agent-view.ts`; this is where they are kept (`localStorage`, or a store a test passes).
  */
-const PREFIX = "decks.views:";
 
 /** One deck's views, read once and written back on every change. */
 export interface AgentViews {
@@ -28,6 +27,8 @@ export interface ViewStorage {
 	getItem(key: string): string | null;
 	setItem(key: string, value: string): void;
 }
+
+const PREFIX = "decks.views:";
 
 export function createAgentViews(deckPath: string, storage: ViewStorage | undefined = globalThis.localStorage): AgentViews {
 	const key = `${PREFIX}${deckPath}`;

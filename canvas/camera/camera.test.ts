@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
+// The camera's conversions and fits: world and screen, zoom about a point, limits, fit, middle.
+
 const view = { width: 1200, height: 800 };
 
 test("world and screen are inverses of each other", () => {

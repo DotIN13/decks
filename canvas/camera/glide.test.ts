@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { fakeScene } from "../editor/core/fake-scene.test-helper.ts";
 import { easeOut, GLIDE_MS, glideAt, glideShifts, landingBoxes } from "./glide.ts";
 
+// Items gliding after a change: what moved glides from where it was drawn, easing out.
+
 /** A column holding a b c, and a loose item x, inside an outer frame that holds the column and a note. */
 const scene = () =>
 	fakeScene([

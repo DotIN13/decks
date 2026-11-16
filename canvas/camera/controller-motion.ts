@@ -5,43 +5,14 @@ import { nowMoving, nowScaling, placeNow, write, writeTransform, type CameraRun 
 import { springCurve } from "./spring.ts";
 import { coastStep } from "./touch.ts";
 
-export function cancelCoast(c: CameraRun): void {
-	if (c.coastRaf === undefined) return;
-	cancelAnimationFrame(c.coastRaf);
-	c.coastRaf = undefined;
-}
+// The camera in motion: a flick's coast, a glide to where it is asked to go, and wheel and
+// pinch steps, each ending in one write (controller-write.ts).
 
-/** The coast after a thrown one-finger pan (`CameraRun.coastRaf`). */
-export function coast(c: CameraRun, start: { vx: number; vy: number }): void {
-	cancelCoast(c);
-	let v = start;
-	let last = performance.now();
-	const frame = () => {
-		const now = performance.now();
-		const step = coastStep(v, now - last);
-		last = now;
-		v = step.v;
-		write(c, pan(c.localCamera, step.dx, step.dy));
-		// In an animation frame already: the world is placed and the drawing drawn now, in this frame, not at the next.
-		placeNow(c);
-		c.host.flush();
-		if (Math.hypot(v.vx, v.vy) < 0.01) {
-			c.coastRaf = undefined;
-			return;
-		}
-		c.coastRaf = requestAnimationFrame(frame);
-	};
-	c.coastRaf = requestAnimationFrame(frame);
-}
-
-export function cancelGlide(c: CameraRun): void {
-	cancelCoast(c);
-	c.glideToken++;
-	if (c.glideRaf !== undefined) {
-		cancelAnimationFrame(c.glideRaf);
-		c.glideRaf = undefined;
-	}
-	c.setGliding(false);
+// A push: the camera set at once, or as the browser scrolled
+/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
+export function push(c: CameraRun, cam: Camera): void {
+	cancelGlide(c);
+	write(c, cam);
 }
 
 /**
@@ -70,12 +41,7 @@ export function scrolled(c: CameraRun, cam: Camera): void {
 	}
 }
 
-/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
-export function push(c: CameraRun, cam: Camera): void {
-	cancelGlide(c);
-	write(c, cam);
-}
-
+// A glide to where the camera is asked to go
 /**
  * Arrive at `to` over `ms`, from wherever the camera is *now*.
  *
@@ -175,6 +141,47 @@ export function followAsked(c: CameraRun): void {
 	});
 }
 
+export function cancelGlide(c: CameraRun): void {
+	cancelCoast(c);
+	c.glideToken++;
+	if (c.glideRaf !== undefined) {
+		cancelAnimationFrame(c.glideRaf);
+		c.glideRaf = undefined;
+	}
+	c.setGliding(false);
+}
+
+// A flick's coast
+/** The coast after a thrown one-finger pan (`CameraRun.coastRaf`). */
+export function coast(c: CameraRun, start: { vx: number; vy: number }): void {
+	cancelCoast(c);
+	let v = start;
+	let last = performance.now();
+	const frame = () => {
+		const now = performance.now();
+		const step = coastStep(v, now - last);
+		last = now;
+		v = step.v;
+		write(c, pan(c.localCamera, step.dx, step.dy));
+		// In an animation frame already: the world is placed and the drawing drawn now, in this frame, not at the next.
+		placeNow(c);
+		c.host.flush();
+		if (Math.hypot(v.vx, v.vy) < 0.01) {
+			c.coastRaf = undefined;
+			return;
+		}
+		c.coastRaf = requestAnimationFrame(frame);
+	};
+	c.coastRaf = requestAnimationFrame(frame);
+}
+
+export function cancelCoast(c: CameraRun): void {
+	if (c.coastRaf === undefined) return;
+	cancelAnimationFrame(c.coastRaf);
+	c.coastRaf = undefined;
+}
+
+// The wheel and the pinch
 /**
  * Scroll units per e-fold of zoom: smaller zooms faster (see `wheel`). A trackpad pinch, which
  * Chrome reports as `ctrlKey` without ⌘, has its own; every other zoom (⌘ with a wheel, a mouse

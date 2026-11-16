@@ -28,19 +28,43 @@ export interface Point {
 	y: number;
 }
 
-/**
- * How much room `fit` leaves around what it framed.
- *
- * A constant 96 is a third of a phone's width on each side — the deck fitted into the
- * middle 25% of the screen, which reads as the app having failed to load rather than as
- * breathing room. So the padding is a fraction of the smaller side, capped at the 96
- * that a laptop has always had: at 1500x950 and on a tablet this is exactly 96, and it
- * only gives way where there is nothing to give.
- */
-export const breathingRoom = (view: Viewport) => Math.min(96, view.width / 8, view.height / 8);
+// Converting between the world and the screen
+/** World -> screen, in CSS pixels relative to the stage element. */
+export function toScreen(camera: Camera, view: Viewport, world: { x: number; y: number }) {
+	return {
+		x: (world.x - camera.x) * camera.zoom + view.width / 2,
+		y: (world.y - camera.y) * camera.zoom + view.height / 2,
+	};
+}
+
+/** Screen -> world. The inverse, kept beside it so they cannot drift apart. */
+export function toWorld(camera: Camera, view: Viewport, screen: { x: number; y: number }) {
+	return {
+		x: (screen.x - view.width / 2) / camera.zoom + camera.x,
+		y: (screen.y - view.height / 2) / camera.zoom + camera.y,
+	};
+}
 
 export function clampZoom(zoom: number): number {
 	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+}
+
+/**
+ * Zoom by a factor, keeping the world point under the cursor under the cursor.
+ *
+ * The property everyone notices when it is missing: zoom that drifts means you
+ * chase the thing you are zooming into across the screen.
+ */
+export function zoomAbout(camera: Camera, view: Viewport, screen: { x: number; y: number }, factor: number): Camera {
+	const zoom = clampZoom(camera.zoom * factor);
+	if (zoom === camera.zoom) return camera;
+	const anchor = toWorld(camera, view, screen);
+	// Solve for the camera that puts `anchor` back under `screen` at the new zoom.
+	return {
+		zoom,
+		x: anchor.x - (screen.x - view.width / 2) / zoom,
+		y: anchor.y - (screen.y - view.height / 2) / zoom,
+	};
 }
 
 /**
@@ -64,46 +88,10 @@ export function between(from: Camera, to: Camera, t: number): Camera {
 	};
 }
 
-/** World -> screen, in CSS pixels relative to the stage element. */
-export function toScreen(camera: Camera, view: Viewport, world: { x: number; y: number }) {
-	return {
-		x: (world.x - camera.x) * camera.zoom + view.width / 2,
-		y: (world.y - camera.y) * camera.zoom + view.height / 2,
-	};
-}
-
-/** Screen -> world. The inverse, kept beside it so they cannot drift apart. */
-export function toWorld(camera: Camera, view: Viewport, screen: { x: number; y: number }) {
-	return {
-		x: (screen.x - view.width / 2) / camera.zoom + camera.x,
-		y: (screen.y - view.height / 2) / camera.zoom + camera.y,
-	};
-}
-
-/**
- * Zoom by a factor, keeping the world point under the cursor under the cursor.
- *
- * The property everyone notices when it is missing: zoom that drifts means you
- * chase the thing you are zooming into across the screen.
- */
-export function zoomAbout(camera: Camera, view: Viewport, screen: { x: number; y: number }, factor: number): Camera {
-	const zoom = clampZoom(camera.zoom * factor);
-	if (zoom === camera.zoom) return camera;
-	const anchor = toWorld(camera, view, screen);
-	// Solve for the camera that puts `anchor` back under `screen` at the new zoom.
-	return {
-		zoom,
-		x: anchor.x - (screen.x - view.width / 2) / zoom,
-		y: anchor.y - (screen.y - view.height / 2) / zoom,
-	};
-}
-
+// Moving: a pan, a pinch, a box kept in view
 export function pan(camera: Camera, dx: number, dy: number): Camera {
 	return { ...camera, x: camera.x - dx / camera.zoom, y: camera.y - dy / camera.zoom };
 }
-
-const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-const spread = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 
 /**
  * Two fingers: one step of a pinch, which is a pan and a zoom at once.
@@ -134,6 +122,9 @@ export function pinchCamera(camera: Camera, view: Viewport, from: [Point, Point]
 		y: anchor.y - (at.y - view.height / 2) / zoom,
 	};
 }
+
+const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+const spread = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 
 /**
  * The camera moved as little as it can to bring a world box into view.
@@ -171,6 +162,7 @@ export function keepVisible(
 	return dx === 0 && dy === 0 ? camera : pan(camera, dx, dy);
 }
 
+// Fitting: a box, a set of boxes, what is on screen
 /** A camera that fits the given boxes, with room to breathe. */
 export function fit(
 	boxes: Array<{ x: number; y: number; w: number; h: number }>,
@@ -189,19 +181,15 @@ export function fit(
 }
 
 /**
- * The smallest gap left between a board and the chrome beside it.
+ * How much room `fit` leaves around what it framed.
  *
- * This constant is a bug fix with a name. `fit` pads by `breathingRoom`, up to 96px a
- * side, which is right when the whole window is the canvas — and wrong once the chrome
- * insets it, because then the padding is counted *on top of* a 264px panel and a 240px
- * inspector. A board flown to on a laptop landed at 42%, below `LIVE_ZOOM`, where a
- * board takes no pointer events: clicking the thing you had just asked to look at did
- * nothing at all.
- *
- * **The chrome is the breathing room.** So when there is chrome to subtract, all that is
- * wanted is a floor — enough that a board does not appear to touch a panel's edge.
+ * A constant 96 is a third of a phone's width on each side — the deck fitted into the
+ * middle 25% of the screen, which reads as the app having failed to load rather than as
+ * breathing room. So the padding is a fraction of the smaller side, capped at the 96
+ * that a laptop has always had: at 1500x950 and on a tablet this is exactly 96, and it
+ * only gives way where there is nothing to give.
  */
-export const EDGE_FLOOR = 24;
+export const breathingRoom = (view: Viewport) => Math.min(96, view.width / 8, view.height / 8);
 
 /**
  * A camera that fits the boxes into a *region* of the viewport rather than into all of it.
@@ -234,8 +222,43 @@ export function fitInto(
 	};
 }
 
+/**
+ * The smallest gap left between a board and the chrome beside it.
+ *
+ * This constant is a bug fix with a name. `fit` pads by `breathingRoom`, up to 96px a
+ * side, which is right when the whole window is the canvas — and wrong once the chrome
+ * insets it, because then the padding is counted *on top of* a 264px panel and a 240px
+ * inspector. A board flown to on a laptop landed at 42%, below `LIVE_ZOOM`, where a
+ * board takes no pointer events: clicking the thing you had just asked to look at did
+ * nothing at all.
+ *
+ * **The chrome is the breathing room.** So when there is chrome to subtract, all that is
+ * wanted is a floor — enough that a board does not appear to touch a panel's edge.
+ */
+export const EDGE_FLOOR = 24;
+
 export const boxOf = (board: Page) => ({ x: board.x, y: board.y, w: board.w, h: board.h });
 
+/**
+ * Whether a camera has any of these boxes on screen.
+ *
+ * For deciding whether a *remembered* view is still a view of anything. A saved camera keeps
+ * pointing wherever it pointed, and the boards under it can be moved, hidden or deleted while
+ * you are reading another conversation — so coming back to it can mean landing on empty
+ * canvas, which is the same failure as not remembering it at all.
+ *
+ * Any overlap counts, deliberately: a board half off the edge is a board you can see, and a
+ * margin here would be a second opinion about what "looking at it" means.
+ */
+export function frames(camera: Camera, view: Viewport, boxes: Array<{ x: number; y: number; w: number; h: number }>): boolean {
+	return boxes.some((box) => {
+		const topLeft = toScreen(camera, view, { x: box.x, y: box.y });
+		const bottomRight = toScreen(camera, view, { x: box.x + box.w, y: box.y + box.h });
+		return bottomRight.x > 0 && topLeft.x < view.width && bottomRight.y > 0 && topLeft.y < view.height;
+	});
+}
+
+// Arriving on a canvas
 /**
  * What an arrival looks at: a few boards at once, not one board's words.
  *
@@ -283,23 +306,4 @@ export function middleOf(
 		x: middle.x - (region.x + region.width / 2 - view.width / 2) / zoom,
 		y: middle.y - (region.y + region.height / 2 - view.height / 2) / zoom,
 	};
-}
-
-/**
- * Whether a camera has any of these boxes on screen.
- *
- * For deciding whether a *remembered* view is still a view of anything. A saved camera keeps
- * pointing wherever it pointed, and the boards under it can be moved, hidden or deleted while
- * you are reading another conversation — so coming back to it can mean landing on empty
- * canvas, which is the same failure as not remembering it at all.
- *
- * Any overlap counts, deliberately: a board half off the edge is a board you can see, and a
- * margin here would be a second opinion about what "looking at it" means.
- */
-export function frames(camera: Camera, view: Viewport, boxes: Array<{ x: number; y: number; w: number; h: number }>): boolean {
-	return boxes.some((box) => {
-		const topLeft = toScreen(camera, view, { x: box.x, y: box.y });
-		const bottomRight = toScreen(camera, view, { x: box.x + box.w, y: box.y + box.h });
-		return bottomRight.x > 0 && topLeft.x < view.width && bottomRight.y > 0 && topLeft.y < view.height;
-	});
 }

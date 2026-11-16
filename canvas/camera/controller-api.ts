@@ -14,6 +14,43 @@ import { glidePending, stopped, write, type CameraRun } from "./controller-write
  *
  * `knobs.exactCamera` hands every camera through, for measuring.
  */
+
+/** The controller `createCameraController` answers, over the state it holds. */
+export function controllerApi(c: CameraRun) {
+	/**
+	 * The camera's zoom alone. What depends on the zoom only (handle sizes, the live zoom, a text
+	 * editor's scale) reads this, and so hears nothing of a pan: the camera itself is a new object
+	 * every frame, and reading `camera.zoom` off it re-ran each of them on every frame of a pan.
+	 */
+	const zoom = createMemo(() => c.host.asked().camera.zoom);
+	const settled = settledCamera(c);
+	const rest = restCamera(c);
+	return {
+		/** The camera as of the last step, exactly: what a gesture or a point on the screen needs. */
+		now: () => c.localCamera,
+		zoom,
+		settled,
+		rest,
+		/** When the camera last moved. */
+		lastMoved: () => c.lastMoved,
+		moving: c.moving,
+		scaling: c.scaling,
+		gliding: c.gliding,
+		panning: c.panning,
+		setPanning: c.setPanning,
+		glidePending: () => glidePending(c),
+		write: (cam: Camera) => write(c, cam),
+		push: (cam: Camera) => push(c, cam),
+		glideTo: (to: Camera, ms: number) => glideTo(c, to, ms),
+		cancelGlide: () => cancelGlide(c),
+		scrolled: (cam: Camera) => scrolled(c, cam),
+		coast: (start: { vx: number; vy: number }) => coast(c, start),
+		cancelCoast: () => cancelCoast(c),
+		stopped: () => stopped(c),
+		wheel: (gesture: Parameters<typeof wheel>[1]) => wheel(c, gesture),
+	};
+}
+
 function settledCamera(c: CameraRun) {
 	const { host, moving, gliding, panning } = c;
 	return createMemo<Camera>(
@@ -54,40 +91,4 @@ function restCamera(c: CameraRun) {
 		untrack(() => c.host.asked().camera),
 		{ equals: (was, next) => was === next || (was.x === next.x && was.y === next.y && was.zoom === next.zoom) },
 	);
-}
-
-/** The controller `createCameraController` answers, over the state it holds. */
-export function controllerApi(c: CameraRun) {
-	/**
-	 * The camera's zoom alone. What depends on the zoom only (handle sizes, the live zoom, a text
-	 * editor's scale) reads this, and so hears nothing of a pan: the camera itself is a new object
-	 * every frame, and reading `camera.zoom` off it re-ran each of them on every frame of a pan.
-	 */
-	const zoom = createMemo(() => c.host.asked().camera.zoom);
-	const settled = settledCamera(c);
-	const rest = restCamera(c);
-	return {
-		/** The camera as of the last step, exactly: what a gesture or a point on the screen needs. */
-		now: () => c.localCamera,
-		zoom,
-		settled,
-		rest,
-		/** When the camera last moved. */
-		lastMoved: () => c.lastMoved,
-		moving: c.moving,
-		scaling: c.scaling,
-		gliding: c.gliding,
-		panning: c.panning,
-		setPanning: c.setPanning,
-		glidePending: () => glidePending(c),
-		write: (cam: Camera) => write(c, cam),
-		push: (cam: Camera) => push(c, cam),
-		glideTo: (to: Camera, ms: number) => glideTo(c, to, ms),
-		cancelGlide: () => cancelGlide(c),
-		scrolled: (cam: Camera) => scrolled(c, cam),
-		coast: (start: { vx: number; vy: number }) => coast(c, start),
-		cancelCoast: () => cancelCoast(c),
-		stopped: () => stopped(c),
-		wheel: (gesture: Parameters<typeof wheel>[1]) => wheel(c, gesture),
-	};
 }

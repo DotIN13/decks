@@ -2,6 +2,8 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { cameraFor, originFor, MIDDLE, nearEdge, scrollFor, SIZE } from "./scroll-area.ts";
 
+// The camera as the canvas's scroll position, and the scroll position as the camera.
+
 const view = { width: 1500, height: 900 };
 
 describe("scroll area", () => {
