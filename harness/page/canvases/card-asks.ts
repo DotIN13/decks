@@ -18,7 +18,7 @@ export async function cardAgentCall(call: { name: string; args: Record<string, u
 	const asking = ASKS_FIRST[call.name];
 	if (asking) {
 		const yes = await ask({ title: "Let this card message an agent?", body: `${call.card} wants to ${asking(call.args)}.`, yes: "Allow", no: "Don't allow" });
-		if (!yes) throw new Error(`You did not let ${call.card} ${call.name === "agent.create" ? "start an agent" : "message an agent"}.`);
+		if (!yes) throw new Error(`You did not let ${call.card} message an agent.`);
 	}
 	const answer = await callServer(call.name, call.args);
 	if (!answer.ok) throw new Error(answer.error);
@@ -29,7 +29,6 @@ export async function cardAgentCall(call: { name: string; args: Record<string, u
 const ASKS_FIRST: Record<string, (args: Record<string, unknown>) => string> = {
 	"agent.send": (args) => `send ${String(args.agent ?? "an agent")} this message now: “${clip(args.task)}”`,
 	"agent.queue": (args) => `give ${String(args.agent ?? "an agent")} this task: “${clip(args.task)}”`,
-	"agent.create": (args) => `start a new agent called ${String(args.name ?? "something")}`,
 };
 const clip = (text: unknown) => {
 	const words = String(text ?? "").trim().replace(/\s+/g, " ");
