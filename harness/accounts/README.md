@@ -5,7 +5,8 @@ The Claude logins the harness spends from, and their usage reports. Moved from t
 
 ## Owns
 
-`accounts.ts` (`ClaudeAccounts`), `usage.ts` (a usage report from the CLI's answer),
+`accounts.ts` (`ClaudeAccounts`: the list, signing in, the links), `folders.ts` (where an account's
+files live and what it shares with the CLI's own login), `usage.ts` (a usage report),
 `answers.ts` (`account.list create use delete report`), and `index.ts`.
 
 ## May import

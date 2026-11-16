@@ -18,7 +18,7 @@ export type ChatEvent =
  *
  * The transcript is kept in memory as well as sent, because a browser that
  * reconnects needs the conversation back and the runtime's session file is its
- * format, not ours. It is capped at the tail: `agents/store.ts` writes that tail to disk so
+ * format, not ours. It is capped at the tail: `sessions/transcript.ts` writes that tail to disk so
  * a chat survives a restart, and `load` is how it comes back. What falls off the far end is
  * handed to `onEvict` and kept in an append log beside it, so a reader scrolling back past
  * the window still reaches it.
@@ -41,7 +41,7 @@ export class Translator {
 		/** The deck, so a tool call on a board reads as `boards/plan.html`. */
 		private readonly deckPath?: string,
 		/**
-		 * The transcript reached a stable shape — persist it (`agents/store.ts`).
+		 * The transcript reached a stable shape — persist it (`sessions/transcript.ts`).
 		 *
 		 * Called where an item stops changing, not on every delta: a reply arrives a token
 		 * at a time and `endAssistant` is the point at which it is worth writing down. The
@@ -50,7 +50,7 @@ export class Translator {
 		 */
 		private readonly onChange?: () => void,
 		/**
-		 * Rows leaving the window, on their way to the archive (`agents/store.ts`).
+		 * Rows leaving the window, on their way to the archive (`sessions/transcript.ts`).
 		 *
 		 * The window is what a session holds in memory and what the browser is given to
 		 * open with; this is the far end of it. Called with the rows in order, exactly once
@@ -62,6 +62,7 @@ export class Translator {
 		private readonly onEvict?: (items: ChatItem[]) => void,
 	) {}
 
+	// --- the window of entries: putting back, adding and cutting ---------------------
 	/**
 	 * Put a stored transcript back.
 	 *
@@ -158,6 +159,7 @@ export class Translator {
 		this.streaming = undefined;
 	}
 
+	// --- reading the conversation back, and the user's messages ----------------------
 	/** The user's messages, oldest first, for pairing with the session's entries. */
 	userMessages(): Array<Extract<ChatItem, { kind: "user" }>> {
 		return this.items.filter((item): item is Extract<ChatItem, { kind: "user" }> => item.kind === "user");

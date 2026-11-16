@@ -2,6 +2,7 @@ import type { Client } from "@decks/sdk";
 import type { AgentBackend, AgentBackendContext, ClaudeAccountSwitcher } from "../runtimes/backend.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import { ExtensionUiBridge } from "../runtimes/shared/extension-ui.ts";
+import { sessionTokenFiles } from "../runtimes/shared/session-tokens.ts";
 import { Translator, type ChatEvent } from "../runtimes/shared/translator.ts";
 import type { AgentMode, AgentState, AgentUsage, ChatItem, MessagePart, ThinkingLevel } from "../runtimes/types/index.ts";
 import { identityReminder, type Agent, type Spec } from "./identity.ts";
@@ -240,6 +241,7 @@ export class Session {
 			},
 			agent: { id: this.id },
 			decks: decksAccess(this.deps.url, this.id, saved.token),
+			sessionTokens: sessionTokenFiles(saved.token),
 			briefing: () => this.briefing,
 			...(saved.sessionRef ? { resumeRef: saved.sessionRef } : {}),
 			...(saved.model ? { model: saved.model } : {}),

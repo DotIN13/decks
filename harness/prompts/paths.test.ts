@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { test } from "node:test";
-import { antigravityServer, installDir, opencodeConfigDir, runtimeDir, SHIPPED, skillsDir } from "./paths.ts";
+import { installDir, mcpRelay, opencodeConfigDir, runtimeDir, SHIPPED, skillsDir } from "./paths.ts";
 
 test("every shipped path resolves to something real", () => {
 	for (const asset of SHIPPED) {
@@ -17,7 +17,7 @@ test("the named spots are the ones the runtimes ask for", () => {
 	assert.ok(isAbsolute(runtimeDir()));
 	assert.equal(skillsDir(), join(runtimeDir(), "skills"));
 	assert.equal(opencodeConfigDir(), join(runtimeDir(), "opencode"));
-	assert.equal(antigravityServer(), join(runtimeDir(), "antigravity", "mcp-server.mjs"));
+	assert.ok(existsSync(mcpRelay()), "the MCP relay the runtimes outside this process run");
 });
 
 test("the install folder is the one node_modules sits in", () => {

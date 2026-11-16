@@ -5,7 +5,7 @@ import { AGENT_KINDS, type RunKind } from "./runtimes/types/index.ts";
 import { runtimeOf } from "./runtimes/registry.ts";
 import { harnessHome } from "./runtimes/shared/home.ts";
 import { Sessions, specOf, Transcripts, type HostLink } from "./sessions/index.ts";
-import { Settings } from "./voice.ts";
+import { Settings } from "./runtimes/settings.ts";
 
 // The harness's line to a server: offer the kinds it runs and the calls it
 // answers, start the agents the server asks for, deliver their mail, and

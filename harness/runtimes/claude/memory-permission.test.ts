@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { inMemoryFolder } from "./backend.ts";
+import { inMemoryFolder } from "./query.ts";
 
 /*
  * Which writes count as the agent's own memory, allowed in auto mode without a question. Too

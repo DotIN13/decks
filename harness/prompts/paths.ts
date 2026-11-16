@@ -20,12 +20,14 @@ export const decksCommands = (): string => process.env.DECKS_REFERENCE ?? resolv
 export const guidelinesFile = (): string => resolve(HERE, "guidelines.txt");
 /** The base context, with {{DECK_NAME}} and the rest filled in. */
 export const agentsTemplate = (): string => resolve(HERE, "AGENTS.md.tmpl");
+/** The Google Docs tools' words. */
+export const gdocsTools = (): string => resolve(HERE, "gdocs-tools.json");
+/** The MCP relay (clients/mcp): a runtime outside this process gets its Decks tools from it. */
+export const mcpRelay = (): string => resolve(REPO, "clients/mcp/main.ts");
 /** opencode's config folder: its tools, plugin and skills. */
 export const opencodeConfigDir = (): string => resolve(HERE, "opencode");
 /** OpenCode 2's plugin folder, named to its server by absolute path. */
 export const opencode2PluginDir = (): string => resolve(HERE, "opencode2", "plugin");
-/** Antigravity's MCP server, spawned by its CLI. */
-export const antigravityServer = (): string => resolve(HERE, "antigravity", "mcp-server.mjs");
 
 /** Everything this folder ships, checked by the test beside it. */
 export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean }> = [
@@ -35,5 +37,4 @@ export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean 
 	{ path: "gdocs-tools.json", what: "the Google Docs tools' words" },
 	{ path: "opencode", what: "opencode's config folder", dir: true },
 	{ path: "opencode2/plugin", what: "OpenCode 2's plugin", dir: true },
-	{ path: "antigravity/mcp-server.mjs", what: "antigravity's MCP server" },
 ];

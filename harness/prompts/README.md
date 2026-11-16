@@ -6,8 +6,9 @@ out-of-process runtimes load. Moved from today's `runtime/`.
 ## Owns
 
 `AGENTS.md.tmpl`, `guidelines.txt`, `skills/`, `.claude-plugin/` (Claude reads the skills as a
-plugin), `opencode/`, `opencode2/`, `antigravity/`, `gdocs-tools.json`, `bin/decks` (the decks
-command on an agent's PATH), and `paths.ts`, where each of them is.
+plugin), `opencode/`, `opencode2/`, `gdocs-tools.json`, `bin/decks` (the decks command on an agent's
+PATH), `shims/` (the SDK an agent's script imports, and the opencode plugins' protocol calls), and
+`paths.ts`, where each of them is.
 
 ## May import
 

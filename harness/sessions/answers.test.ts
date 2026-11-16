@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { ClaudeAccounts } from "../accounts/index.ts";
 import { HARNESS_CALLS, harnessAnswers } from "../calls.ts";
-import { Settings } from "../voice.ts";
+import { Settings } from "../runtimes/settings.ts";
 import { Sessions, Transcripts } from "./index.ts";
 
 const who = { kind: "person" as const, id: "p", name: "P" };

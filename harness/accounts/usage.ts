@@ -366,3 +366,21 @@ export function eventPercent(value: unknown): number | null {
 	const scaled = value <= 1 ? value * 100 : value;
 	return Math.max(0, Math.min(100, Math.round(scaled)));
 }
+
+/**
+ * A rate limit's reset time in milliseconds, whichever unit it arrived in.
+ *
+ * `SDKRateLimitInfo.resetsAt` is **unix seconds**, and it was being formatted as
+ * milliseconds — which through `new Date()` prints 1970, so the deck told people their limit
+ * would lift in January of that year. The number reaches a person as a sentence, and a
+ * sentence with the wrong year in it is worse than no sentence.
+ *
+ * The threshold is the only honest way to take both units: below `1e12` cannot be
+ * milliseconds in any year anyone will see this (1e12 ms is September 2001), and above it
+ * cannot be seconds (1e12 s is the year 33658). Idempotent, so it is safe at the boundary
+ * *and* on the way out of the file — which is what migrates a list written before this.
+ */
+export function epochMs(value: number | undefined): number | undefined {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+	return value < 1e12 ? Math.round(value * 1000) : value;
+}

@@ -1,6 +1,6 @@
 import type { Answerer } from "@decks/sdk";
 import type { Sessions, Session } from "../sessions/index.ts";
-import type { Settings } from "../voice.ts";
+import type { Settings } from "./settings.ts";
 import { runtimeList, runtimeOf } from "./registry.ts";
 import type { ModelOption, RunKind } from "./types/index.ts";
 

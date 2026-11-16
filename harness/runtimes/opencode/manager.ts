@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { opencodeConfigDir } from "../../prompts/paths.ts";
 import { opencodeExecutable } from "./install.ts";
 import { decksServerEnv } from "../env.ts";
+import { sessionTokensDir } from "../shared/session-tokens.ts";
 /**
  * One `opencode serve` for every opencode agent on the deck (DESIGN §6.1, "the server").
  *
@@ -200,6 +201,8 @@ export class OpencodeManager {
 				// …and what the Google Docs tools call back with. One token for the whole server,
 				// and the session id does the rest of the naming.
 				DECKS_OPENCODE_SECRET: this.token,
+				// Where each session's agent token is (runtimes/shared/session-tokens.ts).
+				DECKS_OPENCODE_SESSIONS: sessionTokensDir(),
 				// The `decks` command and where Decks is, for every session's shell; the plugin in
 				// The opencode plugin trades the session for its agent's token (the harness's agent environment).
 				...(spec.decksUrl ? decksServerEnv(spec.decksUrl) : {}),

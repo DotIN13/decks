@@ -9,8 +9,8 @@ import type { AgentBackend, AgentBackendContext } from "./backend.ts";
  * Four things were written down in four different places before this existed, and none of
  * them was next to the runtime they described:
  *
- * - **the class that answers for it** — a table in `agents/session.ts`, so the neutral shell
- *   imported all four runtimes, which is the opposite of the layering `agents/backend.ts`
+ * - **the class that answers for it** — a table in the old server's `agents/session.ts`, so the neutral shell
+ *   imported all four runtimes, which is the opposite of the layering `runtimes/backend.ts`
  *   claims;
  * - **its capabilities** — a constant in its own `backend.ts`, gathered into a second table
  *   in the shell;

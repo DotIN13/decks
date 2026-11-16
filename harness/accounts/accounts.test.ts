@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ClaudeAccounts, DEFAULT_ACCOUNT, epochMs } from "./accounts.ts";
+import { ClaudeAccounts } from "./accounts.ts";
+import { DEFAULT_ACCOUNT } from "./folders.ts";
+import { epochMs } from "./usage.ts";
 
 /**
  * Several Claude subscriptions, and which one each conversation spends.
@@ -361,47 +363,6 @@ test("an id that is not one this store issued is never turned into a path", () =
 	cleanup();
 });
 
-/*
- * Reading the list must not reorder it.
- *
- * `describeDefault` records what the CLI's own login is called, so a row keeps its name when
- * `auth status` is next slow. It is the one part of publishing the list that writes, and it
- * moves the CLI's own row to the end of the stored array — so the reading of that array has
- * to be the thing that puts it back at the head, rather than the array's own order.
- */
-test("recording the default account's name leaves the list in the order it publishes in", () => {
-	const { accounts, cleanup } = store();
-	const other = add(accounts, "other@example.com");
-
-	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "Claude Max" });
-	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "Claude Max" });
-
-	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, other], "the CLI's own first, however often it is described");
-	assert.equal(accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.email, "me@example.com", "and named");
-	cleanup();
-});
-
-/*
- * Signing in as the subscription the CLI is already on adds a row of its own, and the CLI's
- * own row stays at the head of the list, labelled.
- */
-test("the CLI's own row is never removed as a duplicate of an added account", () => {
-	const { accounts, cleanup } = store();
-	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "enterprise" });
-
-	// The same email, added by hand. Whatever else happens, the first row stays.
-	const copy = add(accounts, "me@example.com");
-
-	const ids = accounts.list().map((account) => account.id);
-	assert.deepEqual(ids, [DEFAULT_ACCOUNT, copy], "two rows, the CLI's own at the head of the list");
-	assert.equal(
-		accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.email,
-		"me@example.com",
-		"and still labelled, rather than dropped and re-synthesised nameless",
-	);
-	cleanup();
-});
-
 test("forgetting the account in force moves the link to the CLI's own, not to nothing", () => {
 	const { accounts, dir, cleanup } = store();
 	const only = add(accounts, "me@example.com");
@@ -490,7 +451,7 @@ test("a list written by an older build loses its limits and its order, and nothi
 	assert.deepEqual(Object.keys(rows[1] ?? {}).sort(), ["addedAt", "email", "id"], "no limit survives the read");
 	assert.equal(rows[2]?.plan, "Claude Max", "and everything that is still a field does");
 	// And it is gone from the file itself the next time anything writes.
-	accounts.describeDefault({ email: "me@example.com" });
+	accounts.use(id);
 	const written = JSON.parse(readFileSync(file, "utf8")) as { order?: unknown; accounts: Array<Record<string, unknown>> };
 	assert.equal(written.order, undefined, "the order is not written back");
 	assert.ok(

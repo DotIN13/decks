@@ -126,7 +126,7 @@ export interface AgentBackendContext {
 	 * Both runtimes take a model at session creation and neither reads one back out of a
 	 * resumed session, so without this a chat continued after a restart answers from
 	 * whatever the runtime's own configuration says — which is not the model the rest of
-	 * the conversation was held in, and not what the row promised (`agents/store.ts`).
+	 * the conversation was held in, and not what the row promised (`sessions/transcript.ts`).
 	 *
 	 * Advisory: a model that has since lost its credentials, or been renamed, is not worth
 	 * refusing to start over. A backend that cannot honour it falls back and reports what

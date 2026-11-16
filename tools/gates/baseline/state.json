@@ -62,7 +62,6 @@
 	"harness/page/state/camera.ts: top-level let glides": 1,
 	"harness/page/state/confirm.ts: top-level let queue": 1,
 	"harness/page/state/notices.ts: top-level let noticeId": 1,
-	"harness/prompts/antigravity/mcp-server.mjs: top-level let buffer": 1,
 	"harness/runtimes/antigravity/install.ts: top-level let models": 1,
 	"harness/runtimes/antigravity/install.ts: top-level let prepared": 1,
 	"scripts/alloc-shares.mjs: top-level let total": 1,

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { opencode2Executable, opencode2Folders } from "./install.ts";
 import { decksServerEnv } from "../env.ts";
+import { sessionTokensDir } from "../shared/session-tokens.ts";
 
 /**
  * One `opencode serve` (OpenCode 2) for every OpenCode 2 agent on the deck.
@@ -202,6 +203,8 @@ export class Opencode2Manager {
 			// under a running deck.
 			OPENCODE_DISABLE_AUTOUPDATE: "1",
 			DECKS_OPENCODE_SECRET: secret,
+			// Where each session's agent token is (runtimes/shared/session-tokens.ts).
+			DECKS_OPENCODE_SESSIONS: sessionTokensDir(),
 			// The `decks` command and where Decks is, for every session's shell; the plugin trades the
 			// session for its agent's token (the harness's agent environment).
 			...(spec.decksUrl ? decksServerEnv(spec.decksUrl, this.baseEnv.PATH) : {}),

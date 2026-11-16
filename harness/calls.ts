@@ -4,7 +4,7 @@ import type { ClaudeAccounts } from "./accounts/accounts.ts";
 import { accountAnswers } from "./accounts/answers.ts";
 import { runtimeAnswers } from "./runtimes/answers.ts";
 import { chatAnswers, type HostLink, type Sessions } from "./sessions/index.ts";
-import type { Settings } from "./voice.ts";
+import type { Settings } from "./runtimes/settings.ts";
 
 // The harness's own calls, for the person only: chat.*, account.* and
 // runtime.*. Declared in the protocol, passed here by the server, and

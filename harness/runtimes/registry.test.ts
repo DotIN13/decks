@@ -8,7 +8,7 @@ import { RUNTIMES, runtimeList, runtimeOf } from "./registry.ts";
  * The registry, and the two ways it can silently disagree with the protocol.
  *
  * This test exists because the seam it guards is the one that used to be *four* tables in
- * `agents/session.ts` — a class, a capability set and a command list per runtime, plus the
+ * the old server's `agents/session.ts`: a class, a capability set and a command list per runtime, plus the
  * union in `packages/protocol`. Four places to add a runtime, and nothing that noticed one
  * being missed: a kind with no `CAPABILITIES` entry was a lookup that returned `undefined`
  * and a row drawn without a mode control.

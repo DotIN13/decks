@@ -1,5 +1,6 @@
 import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installDir } from "../prompts/paths.ts";
 
 // What an agent's shell needs to call Decks: the decks command on its PATH, the
 // server's address, and the agent's own token, which is who is calling.
@@ -7,8 +8,8 @@ import { fileURLToPath } from "node:url";
 
 /** The folder holding the decks command (prompts/bin). */
 export const DECKS_BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../prompts/bin");
-/** The SDK, for a node script: const { connect } = await import(process.env.DECKS_SDK). */
-export const SDK_FILE = resolve(DECKS_BIN, "../../../clients/sdk/index.ts");
+/** The SDK, for a node script: const { decks } = await import(process.env.DECKS_SDK). */
+export const SDK_FILE = resolve(DECKS_BIN, "../shims/sdk.ts");
 
 /** The variables every agent's shell shares: where Decks is, and the node to run decks with. */
 export function decksServerEnv(url: string, path = process.env.PATH ?? ""): Record<string, string> {
@@ -16,6 +17,8 @@ export function decksServerEnv(url: string, path = process.env.PATH ?? ""): Reco
 		DECKS_URL: url,
 		DECKS_NODE: process.execPath,
 		DECKS_SDK: SDK_FILE,
+		// Where Decks is installed: the card-debug skill finds Playwright from it.
+		DECKS_APP_DIR: installDir(),
 		PATH: path.split(delimiter).includes(DECKS_BIN) ? path : `${DECKS_BIN}${delimiter}${path}`,
 	};
 }

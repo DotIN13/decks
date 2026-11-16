@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { antigravityServer, skillsDir } from "../../prompts/paths.ts";
+import { mcpRelay, skillsDir } from "../../prompts/paths.ts";
 import { harnessHome } from "../shared/home.ts";
 
 /**
@@ -68,9 +68,9 @@ export function antigravityAvailability(): { available: boolean; reason: string 
 
 // --- the sandbox HOME
 
-/** The canvas-tool MCP server `mcp_config.json` names. Node runs it; agy spawns it. */
+/** The MCP relay `mcp_config.json` names (clients/mcp). Node runs it; agy spawns it. */
 export function mcpServerPath(): string {
-	return antigravityServer();
+	return mcpRelay();
 }
 
 /** The HOME Decks hands every `agy` it spawns, under the data dir like all its state. */
@@ -160,11 +160,10 @@ function linkKeychain(homeDir: string, realHome: string): void {
 	if (existsSync(searchList)) link(join(homeDir, "Library", "Preferences", "com.apple.security.plist"), searchList, "file");
 }
 
-/** `mcp_config.json`: the one tool, served by the machine's own Node. */
-function mcpConfig(): string {
-	// `process.execPath` rather than the literal "node": the server is a Node file and the
-	// Node running Decks is by construction the one that can run it.
-	return JSON.stringify({ mcpServers: { decks: { command: process.execPath, args: [mcpServerPath()] } } }, null, 2) + "\n";
+/** `mcp_config.json`: the relay, offering the Google Docs calls, run by the machine's own Node. */
+export function mcpConfig(): string {
+	// The agent's DECKS_URL and DECKS_TOKEN reach the relay from agy's own environment.
+	return JSON.stringify({ mcpServers: { decks: { command: process.execPath, args: [mcpServerPath()], env: { DECKS_TOOLS: "google.read,google.edit" } } } }, null, 2) + "\n";
 }
 
 /** A symlink, or a quiet "already there" — two agents starting at once race here. */

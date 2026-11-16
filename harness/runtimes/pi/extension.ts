@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";
 
 /**
- * `decks-stage`: what Pi needs from Decks besides the deck context.
+ * `decks-tools`: what Pi needs from Decks besides the deck context.
  *
  * The canvas is reached with the `decks` command in the agent's shell, so this registers Pi's
  * bash again with the agent's variables in it, and the Google Docs tools.
@@ -15,7 +15,7 @@ import { GDOCS_TOOLS, type GdocsCall } from "../shared/gdocs.ts";
  * close over this agent's hooks and variables.
  */
 
-export function decksStage(deps: {
+export function decksTools(deps: {
 	gdocs?: GdocsCall;
 	/** The agent's shell: where it runs, and the variables that put `decks` in it (the harness's agent environment). */
 	shell?: { cwd: string; env: Record<string, string> };
@@ -23,7 +23,7 @@ export function decksStage(deps: {
 	const { gdocs, shell } = deps;
 
 	return {
-		name: "decks-stage",
+		name: "decks-tools",
 		factory: (pi: ExtensionAPI) => {
 			/*
 			 * Pi's own bash, with this agent's `decks` in it.

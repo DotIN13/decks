@@ -16,7 +16,7 @@ import {
 import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "../types/index.ts";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../backend.ts";
 import { helpText, mergeCommands, parseSlash } from "../shared/slash.ts";
-import { decksStage } from "./extension.ts";
+import { decksTools } from "./extension.ts";
 import { skillsDir } from "../../prompts/paths.ts";
 import { handlePiEvent } from "./events.ts";
 
@@ -88,7 +88,7 @@ export class PiBackend implements AgentBackend {
 			// come from here, and where they came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ gdocs: gdocsCaller(), shell: { cwd, env: this.context.decks.env() } }), this.commandReader()],
+			extensionFactories: [decksTools({ gdocs: gdocsCaller(this.context.decks), shell: { cwd, env: this.context.decks.env() } }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
@@ -187,7 +187,7 @@ export class PiBackend implements AgentBackend {
 	/**
 	 * A one-line extension whose only job is to hold on to `pi.getCommands`.
 	 *
-	 * Inline for the same reason `decks-stage` is: a factory is handed `ExtensionAPI` and
+	 * Inline for the same reason `decks-tools` is: a factory is handed `ExtensionAPI` and
 	 * nothing else, so this is the only place the accessor exists. It registers nothing
 	 * and answers nothing — it closes over a function and returns.
 	 */

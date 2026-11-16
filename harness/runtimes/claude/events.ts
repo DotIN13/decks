@@ -7,7 +7,7 @@ import { titleFor, type Translator } from "../shared/translator.ts";
  * Claude's message stream, read into the transcript's terms.
  *
  * The counterpart of `pi/events.ts`, and the only file that reads the SDK's shapes. What a
- * transcript *is* belongs to `agents/translator.ts` and is shared.
+ * transcript *is* belongs to `runtimes/shared/translator.ts` and is shared.
  *
  * Two differences from Pi's stream shape the code:
  *

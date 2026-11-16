@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { firstUrl, lastLine, plain } from "./cli-output.ts";
+import { firstUrl, lastLine, plain } from "./login.ts";
 
 /** What `claude auth login --claudeai` actually writes, escapes and all. */
 const URL =
