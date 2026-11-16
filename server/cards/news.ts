@@ -22,7 +22,8 @@ export async function newsOf(deck: Deck, store: Store, path: DeckPath): Promise<
 
 /** Who named the card theirs, and when: the last write of its index.html, or a later claim. */
 async function writerOf(deck: Deck, store: Store, path: DeckPath): Promise<{ by: string; at: number } | undefined> {
-	const wrote = (await deck.revisions?.(path))?.filter((r) => r.by !== "before").at(-1);
+	// A write through a call names its writer; one heard on the disk ("disk") or kept from before history does not.
+	const wrote = (await deck.revisions?.(path))?.filter((r) => r.by !== "before" && r.by !== "disk").at(-1);
 	const claimed = await readJson<{ by: string; rev: number; at?: number } | undefined>(store, CLAIMS + path, undefined);
 	if (claimed && (!wrote || claimed.rev >= wrote.rev)) return { by: claimed.by, at: claimed.at ?? wrote?.at ?? 0 };
 	return wrote ? { by: wrote.by, at: wrote.at } : undefined;

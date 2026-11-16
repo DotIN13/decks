@@ -7,6 +7,8 @@ import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { slug, titleOf } from "./cards.ts";
 import { PAGE_PASS_MS } from "./calls.ts";
 import { cards } from "./feature.ts";
+import { newsOf } from "./news.ts";
+import { MemoryStore } from "../kernel/store.ts";
 import { cardKind } from "./item.ts";
 import { syncLib } from "./lib.ts";
 import { answerFile, cardModules } from "./page.ts";
@@ -156,4 +158,14 @@ test("rule 14: card.url's pass ends after an hour", async (t) => {
 	t.mock.timers.tick(PAGE_PASS_MS + 1);
 	assert.equal(s.callers.resolve(pass), undefined);
 	await s.close();
+});
+
+test("rule 10: a write heard on the disk does not take a card's byline; a call's write or a later claim does", async () => {
+	const path = "canvases/a/cards/n/index.html" as never;
+	const revisions = [{ path, rev: 1, by: "ann", at: 10 }, { path, rev: 2, by: "disk", at: 20 }];
+	const deck = { revisions: async () => revisions, list: async () => [] } as never;
+	const store = new MemoryStore();
+	assert.deepEqual(await newsOf(deck, store, path), { by: "ann", named: 10 });
+	revisions.push({ path, rev: 3, by: "bo", at: 30 });
+	assert.deepEqual(await newsOf(deck, store, path), { by: "bo", named: 30 });
 });
