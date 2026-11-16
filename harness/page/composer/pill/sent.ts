@@ -36,7 +36,7 @@ export function messageParts(draft: Draft, comments: readonly WaitingComment[], 
 				label: commentPill(comment, names.titleOf, names.itemName).label,
 				...(comment.quote ? { quote: comment.quote } : {}),
 				...(comment.text ? { note: comment.text } : {}),
-				path: comment.board,
+				path: comment.path,
 				...(comment.items?.length ? { items: [...comment.items] } : {}),
 				...(comment.component ? { component: comment.component } : {}),
 				exact: commentItem(comment, n),
@@ -95,7 +95,7 @@ export function readParts(parts: readonly MessagePart[]): SentReading | undefine
 function partComment(part: MessageMention): WaitingComment {
 	return {
 		id: part.id,
-		board: part.path ?? "",
+		path: part.path ?? "",
 		quote: part.quote ?? "",
 		text: part.note ?? "",
 		at: 0,
@@ -189,10 +189,10 @@ export function readSent(text: string, titleOf: TitleOf = none): SentReading | u
 function readEntry(lines: string[], n: number): WaitingComment {
 	const first = lines[0]!.slice(`${n}. `.length);
 	const rest = lines.slice(1).map((line) => line.slice(3));
-	const comment: WaitingComment = { id: `sent-${n}`, board: first, quote: "", text: "", at: 0 };
+	const comment: WaitingComment = { id: `sent-${n}`, path: first, quote: "", text: "", at: 0 };
 	const drawn = /^on (.+?), items? ((?:"[^"]*"(?:, )?)+)(?: \("([\s\S]*)"\))?$/.exec(first);
 	if (drawn) {
-		comment.board = drawn[1]!;
+		comment.path = drawn[1]!;
 		comment.items = [...drawn[2]!.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
 		comment.quote = drawn[3] ?? "";
 	} else {
@@ -201,7 +201,7 @@ function readEntry(lines: string[], n: number): WaitingComment {
 		if (whole) where = where.slice(0, -whole.length);
 		else if (rest[0]?.startsWith("> ")) comment.quote = rest.shift()!.slice(2);
 		const inside = /^(.*), in #(\S+)$/.exec(where);
-		comment.board = inside ? inside[1]! : where;
+		comment.path = inside ? inside[1]! : where;
 		if (inside) comment.component = inside[2]!;
 	}
 	comment.text = rest.join("\n");

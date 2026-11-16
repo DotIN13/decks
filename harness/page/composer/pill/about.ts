@@ -30,7 +30,8 @@ export function commentName(comment: WaitingComment, titleOf: TitleOf = none, it
 	const items = comment.items ?? [];
 	if (items.length > 1) return `${items.length} items`;
 	if (items.length === 1) return itemName(items[0]!) ?? items[0]!;
-	return titleOf(comment.board) ?? pathName(comment.board);
+	const path = comment.path ?? "";
+	return titleOf(path) ?? pathName(path);
 }
 
 /**
@@ -54,7 +55,7 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	const drawn = !!comment.items?.length;
 	const name = commentName(comment, titleOf, itemName);
 	// Where on it, never its name again: the tooltip and the card name it already.
-	const where = drawn ? `, on ${pathName(comment.board.replace(/\/canvas\.pen$/, ""))}` : comment.component ? `, #${comment.component}` : "";
+	const where = drawn ? `, on ${pathName((comment.path ?? "").replace(/\/canvas\.pen$/, ""))}` : comment.component ? `, #${comment.component}` : "";
 	return {
 		name,
 		of: drawn ? "shape" : "card",

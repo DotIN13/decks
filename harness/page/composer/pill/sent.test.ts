@@ -57,7 +57,7 @@ test("comments sent with no words, items, whole cards, and plain messages", () =
 	assert.equal(only.draft.filter((node) => node.type === "mention").length, 2);
 	assert.deepEqual(only.comments.get("sent-2")?.items, ["note-4", "arrow-7"]);
 	assert.equal(only.comments.get("sent-2")?.quote, "hello");
-	const whole = readSent(withComments("Look", [{ id: "w", board: "cards/plan/index.html", quote: "", text: "all of it", at: 0 }]))!;
+	const whole = readSent(withComments("Look", [{ id: "w", path: "cards/plan/index.html", quote: "", text: "all of it", at: 0 }]))!;
 	assert.equal(whole.comments.get("sent-1")?.text, "all of it");
 	assert.equal(whole.comments.get("sent-1")?.quote, "");
 	// Words with no pills, a name, an email: the text as it is.
