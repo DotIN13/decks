@@ -1,4 +1,5 @@
-import type { Page, Camera, StageCall } from "@decks/protocol-old";
+import type { Page, StageCall } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { cssEscape } from "@decks/ui";
 import { cardRootIn } from "../cards/card.ts";
 import { probes } from "../debug.ts";

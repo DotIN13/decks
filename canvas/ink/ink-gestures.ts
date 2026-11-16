@@ -1,5 +1,5 @@
 import { hitStroke, lassoPick, simplify, type InkStroke } from "./index.ts";
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { inkColor, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "./ink.ts";
 import { inkItem } from "./model.ts";
 import type { StageEngine } from "../render/engine.ts";

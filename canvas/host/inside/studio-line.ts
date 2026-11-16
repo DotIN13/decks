@@ -1,6 +1,7 @@
 import { CanvasFollower } from "@decks/hub/follower";
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Presence, ServerMessage } from "@decks/protocol-old";
+import type { ServerMessage } from "@decks/protocol-old";
+import type { Presence } from "@decks/protocol";
 
 /**
  * The canvas frame's line to Decks Studio, where a canvas is kept by Studio rather than a harness:

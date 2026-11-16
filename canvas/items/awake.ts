@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { Rect } from "../render/spatial.ts";
 

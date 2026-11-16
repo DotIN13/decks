@@ -9,7 +9,7 @@ import { glideShifts, glideStep, type Shift, shiftsFrom } from "../items/glide.t
 import { type Frame, isArrow } from "@decks/pen";
 import type { PenPreview, TileFromWorker } from "./types.ts";
 import { cardReader } from "./reader.ts";
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 
 /** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
 export const SHEET_MARGIN = 0.25;

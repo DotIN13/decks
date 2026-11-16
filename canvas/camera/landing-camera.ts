@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import type { AgentView } from "./agent-view.ts";
 import { middleOf, type Viewport } from "./camera.ts";
 

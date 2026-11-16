@@ -1,7 +1,8 @@
 // The placed items on the canvas: which are near, awake and have a slot, how the sheet draws each, the
 // live files and the one film or sound playing; made inside `Stage` (`CanvasView.tsx`), one part per story.
 import { probes } from "../debug.ts";
-import type { Page, Camera } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { For, Show, createEffect, createMemo, createSelector, createSignal, on, onCleanup, untrack, type Accessor, type Component } from "solid-js";
 import { boxOf, LIVE_ZOOM, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";

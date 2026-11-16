@@ -14,7 +14,7 @@
 import { knobs } from "../debug.ts";
 import type { PageEngine } from "@decks/engine";
 import { type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { fontFiles, textNeeds, type FontFile } from "../look/font-files.ts";
 import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../editor/snap.ts";

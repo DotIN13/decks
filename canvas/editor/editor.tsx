@@ -1,7 +1,8 @@
 // The Decks canvas editor made inside a host's Solid tree: the drawing, the camera
 // and its views, the canvas view and its bars, and the handle the host calls.
 import { emptyDocument, parse, serialize, type PenDocument } from "@decks/pen";
-import type { Page, Camera } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { fitInto, frames } from "../camera/camera.ts";

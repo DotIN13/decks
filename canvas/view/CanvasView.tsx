@@ -2,7 +2,8 @@
 // and the parts made here: input, the engine, the items, the overlay's colours, the selection, probes, the pen.
 import { probes } from "../debug.ts";
 import type { JSX } from "solid-js";
-import type { Page, Camera } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createEffect, type Component, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { boxOf, fitInto, toScreen, toWorld, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";

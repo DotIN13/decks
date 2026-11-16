@@ -6,7 +6,7 @@ import type { createItemsLayer } from "./items-layer.tsx";
 import type { createSelection } from "./selection.tsx";
 import type { Viewport } from "../camera/camera.ts";
 import { type Origin, worldTransform, scrollFor, originFor, nearEdge, cameraFor } from "../camera/scroll-area.ts";
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createCameraController } from "../camera/controller.ts";
 import { probes } from "../debug.ts";
 import type { Props } from "./CanvasView.tsx";

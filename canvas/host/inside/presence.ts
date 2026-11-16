@@ -1,6 +1,7 @@
 import { life } from "./life.ts";
 import { createSignal, type Accessor, type Setter } from "solid-js";
-import type { Camera, Presence, PresenceBy, ServerMessage } from "@decks/protocol-old";
+import type { ServerMessage } from "@decks/protocol-old";
+import type { Camera, Presence, PresenceBy } from "@decks/protocol";
 import { toWorld } from "../../camera/camera.ts";
 
 // Presence: where everyone else on this canvas is, and where this frame is for them (`installPresence`).

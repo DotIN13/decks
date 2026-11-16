@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createMemo, untrack } from "solid-js";
 import { knobs } from "../debug.ts";
 import { cancelCoast, cancelGlide, coast, glideTo, push, scrolled, wheel } from "./controller-motion.ts";

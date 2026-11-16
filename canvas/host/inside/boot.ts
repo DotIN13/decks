@@ -1,6 +1,7 @@
 import { life } from "./life.ts";
 import { createSignal, untrack } from "solid-js";
-import type { Page, Camera } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import type { Editor, StageComment } from "../../types.ts";
 import type { FrameChromeView, ViewOffer } from "../chrome.ts";

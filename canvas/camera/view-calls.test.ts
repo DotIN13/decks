@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Page, Camera, StageCall } from "@decks/protocol-old";
+import type { Page, StageCall } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { runStageCall, type StageOpsHost } from "./view-calls.ts";
 
 /*

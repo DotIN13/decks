@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createAgentViews } from "./agent-view-store.ts";
 import { createLanding, type LandingHost } from "./landing.ts";
 import type { CameraOwner } from "./landing-camera.ts";

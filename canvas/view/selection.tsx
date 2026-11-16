@@ -1,6 +1,6 @@
 // What the canvas draws over the selection and under the pointer, and the pills over what is picked:
 // made inside `Stage` (`CanvasView.tsx`), one part per story, from the editor it reads.
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { Show, createEffect, createMemo, type Accessor } from "solid-js";
 import { boxOf, type Viewport } from "../camera/camera.ts";
 import type { CameraController } from "../camera/controller.ts";

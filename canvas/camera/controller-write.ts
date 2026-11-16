@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import type { Accessor, Setter } from "solid-js";
 import type { Viewport } from "./camera.ts";
 

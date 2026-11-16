@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { viewToPark } from "./agent-view.ts";
 import type { AgentViews } from "./agent-view-store.ts";
 import { frames as showsAny, type Viewport } from "./camera.ts";

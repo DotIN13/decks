@@ -1,4 +1,5 @@
-import type { Page, Camera } from "@decks/protocol-old";
+import type { Page } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";

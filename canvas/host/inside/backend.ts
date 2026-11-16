@@ -1,6 +1,7 @@
 import { life } from "./life.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Page, Presence, PresenceBy, StageCall, ChangeAuthor } from "@decks/protocol-old";
+import type { Page, StageCall } from "@decks/protocol-old";
+import type { Presence, PresenceBy, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../cards/card-snapshot.ts";
 import { openLine, type LineClient } from "./line.ts";
 

@@ -1,4 +1,4 @@
-import type { Camera } from "@decks/protocol-old";
+import type { Camera } from "@decks/protocol";
 import { createEffect } from "solid-js";
 import { between, pan, zoomAbout } from "./camera.ts";
 import { nowMoving, nowScaling, placeNow, write, writeTransform, type CameraRun } from "./controller-write.ts";
