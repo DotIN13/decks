@@ -58,3 +58,12 @@ test("old card shapes carry no date; a program's call stops on the day it is giv
 	assert.ok("refusal" in turn("canvas.insert", [{ type: "note" }], { day: "2027-05-14", now: Date.parse("2027-06-01") }));
 	assert.deepEqual(withEdit({ name: "item.batch", args: { ops: [] } }, "e1").args, { ops: [], edit: "e1" });
 });
+
+test("an old card's agent.send and agent.queue name the agent and spread the message; boards are cards", () => {
+	const send = ok(cardCall("agent.send", ["Mason", { task: "Option A", cards: ["c/index.html"] }]));
+	assert.deepEqual(send, { ...send, name: "agent.send" });
+	assert.deepEqual(send.args, { agent: "Mason", task: "Option A", cards: ["c/index.html"] });
+	assert.deepEqual(turn("agent.queue", ["Mason", { task: "go", boards: ["b.html"] }]), { name: "agent.queue", args: { agent: "Mason", task: "go", cards: ["b.html"] }, old: ["agent.queue", "agents", "agent.queue", ["name", "work"]] });
+	assert.deepEqual(turn("agent.get", ["Mason"]), { name: "agent.get", args: { agent: "Mason" }, old: ["agent.get", "agents", "agent.get", ["name"]] });
+});
+

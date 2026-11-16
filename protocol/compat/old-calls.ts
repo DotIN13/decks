@@ -89,6 +89,15 @@ function shaped(now: string, old: string, args: Args): Args {
 		args.change = args.patch;
 		delete args.patch;
 	}
+	// Today's agent.send, queue and get named the agent as name, and send and queue took the message
+	// as one object (an old board's boards are a card's cards); the new calls take agent and its parts.
+	if (/^agent\.(send|queue|get)$/.test(now) && args.name !== undefined && args.agent === undefined) {
+		const { name, message, work, ...rest } = args;
+		const body = isObject(message) ? message : isObject(work) ? work : {};
+		const { boards, ...parts } = body as Args;
+		const cards = [...(Array.isArray(parts.cards) ? parts.cards : []), ...(Array.isArray(boards) ? boards : [])];
+		args = { ...rest, agent: name, ...parts, ...(cards.length ? { cards } : {}) };
+	}
 	// An agent was named by id in today's person calls; the new agent and chat calls take agent.
 	if (/^(agent|chat)\./.test(now) && args.id !== undefined && args.agent === undefined) {
 		args.agent = args.id;
