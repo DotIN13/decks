@@ -11,20 +11,6 @@
 const DIGITS: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const BASE: usize = 62;
 
-fn digit(byte: u8) -> usize {
-	match byte {
-		b'0'..=b'9' => (byte - b'0') as usize,
-		b'A'..=b'Z' => (byte - b'A') as usize + 10,
-		b'a'..=b'z' => (byte - b'a') as usize + 36,
-		_ => 0,
-	}
-}
-
-/// Whether `key` is a valid key: base-62 digits, not empty, not ending in `0`.
-pub fn valid(key: &str) -> bool {
-	!key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric()) && !key.ends_with('0')
-}
-
 /// A key strictly between `a` and `b`: `None` for `a` is the start, `None` for `b` the end.
 ///
 /// Panics when `a >= b`, which is a caller's bug: siblings never share a key.
@@ -64,6 +50,15 @@ fn midpoint(a: &[u8], b: Option<&[u8]>, out: &mut Vec<u8>) {
 	}
 }
 
+fn digit(byte: u8) -> usize {
+	match byte {
+		b'0'..=b'9' => (byte - b'0') as usize,
+		b'A'..=b'Z' => (byte - b'A') as usize + 10,
+		b'a'..=b'z' => (byte - b'a') as usize + 36,
+		_ => 0,
+	}
+}
+
 /// `n` keys in order, evenly spread and as short as they can be: for a list read from a file.
 pub fn spread(n: usize) -> Vec<String> {
 	if n == 0 {
@@ -89,6 +84,11 @@ pub fn spread(n: usize) -> Vec<String> {
 			String::from_utf8(digits).expect("digits are ASCII")
 		})
 		.collect()
+}
+
+/// Whether `key` is a valid key: base-62 digits, not empty, not ending in `0`.
+pub fn valid(key: &str) -> bool {
+	!key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric()) && !key.ends_with('0')
 }
 
 #[cfg(test)]

@@ -129,30 +129,29 @@ mod tests {
 			other => other,
 		}
 	}
-}
 
-/// TypeScript's diff, applied here: set `EDIT_PAIRS` to a JSON list of `{ a, b, edits }`.
-#[cfg(test)]
-#[test]
-fn typescript_diffs_apply_here() {
-	let Ok(path) = std::env::var("EDIT_PAIRS") else { return };
-	let pairs: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-	fn sort(v: Value) -> Value {
-		match v {
-			Value::Object(m) => {
-				let mut keys: Vec<_> = m.into_iter().collect();
-				keys.sort_by(|a, b| a.0.cmp(&b.0));
-				Value::Object(keys.into_iter().map(|(k, v)| (k, sort(v))).collect())
+	/// TypeScript's diff, applied here: set `EDIT_PAIRS` to a JSON list of `{ a, b, edits }`.
+	#[test]
+	fn typescript_diffs_apply_here() {
+		let Ok(path) = std::env::var("EDIT_PAIRS") else { return };
+		let pairs: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+		fn sort(v: Value) -> Value {
+			match v {
+				Value::Object(m) => {
+					let mut keys: Vec<_> = m.into_iter().collect();
+					keys.sort_by(|a, b| a.0.cmp(&b.0));
+					Value::Object(keys.into_iter().map(|(k, v)| (k, sort(v))).collect())
+				}
+				Value::Array(a) => Value::Array(a.into_iter().map(sort).collect()),
+				other => other,
 			}
-			Value::Array(a) => Value::Array(a.into_iter().map(sort).collect()),
-			other => other,
 		}
+		for (i, pair) in pairs.iter().enumerate() {
+			let mut d = Document::from_json(pair["a"].clone()).unwrap();
+			let list: Vec<Edit> = pair["edits"].as_array().unwrap().iter().map(|e| Edit::from_json(e).unwrap()).collect();
+			d.apply_edits(&list).unwrap_or_else(|e| panic!("pair {i}: {e}"));
+			assert_eq!(sort(d.to_json()), sort(pair["b"].clone()), "pair {i}");
+		}
+		eprintln!("{} pairs applied", pairs.len());
 	}
-	for (i, pair) in pairs.iter().enumerate() {
-		let mut d = Document::from_json(pair["a"].clone()).unwrap();
-		let list: Vec<Edit> = pair["edits"].as_array().unwrap().iter().map(|e| Edit::from_json(e).unwrap()).collect();
-		d.apply_edits(&list).unwrap_or_else(|e| panic!("pair {i}: {e}"));
-		assert_eq!(sort(d.to_json()), sort(pair["b"].clone()), "pair {i}");
-	}
-	eprintln!("{} pairs applied", pairs.len());
 }

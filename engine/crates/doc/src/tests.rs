@@ -1,3 +1,6 @@
+//! The document's rules, tested: reading and writing `.pen` files as they were, batches applied
+//! whole or not at all, undo of this session's own batches, fresh ids, and real stages.
+
 use super::*;
 use serde_json::json;
 
