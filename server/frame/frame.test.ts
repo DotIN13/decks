@@ -85,12 +85,32 @@ test("a pass names its asker, and page: false leaves the page to the host", asyn
 test("a pass's caller id starts with its asker's id", async () => {
 	const { Passes, isPass } = await import("./passes.ts");
 	const issued: Array<{ id: string; name: string; canvas?: string }> = [];
-	const passes = new Passes({ issue: (who) => (issued.push(who), "tok"), revoke: () => undefined, describe: () => undefined });
+	const passes = new Passes({ issue: (who) => (issued.push(who), "tok"), forget: () => undefined });
 	passes.issue("plan", { kind: "person", id: "acct-7", name: "Ada" });
 	assert.match(issued[0]!.id, /^acct-7~frame-\d+-/);
 	assert.equal(issued[0]!.name, "Ada");
 	assert.ok(isPass(issued[0]!.id) && !isPass("acct-7"));
 	passes.end("tok");
+});
+
+test("a renewal keeps its pass's caller id, and the old pass ends by its own token", async () => {
+	const { Passes } = await import("./passes.ts");
+	const ids = new Map<string, string>();
+	const forgotten: string[] = [];
+	let n = 0;
+	const passes = new Passes({ issue: (who) => { const token = `tok-${++n}`; ids.set(token, who.id); return token; }, forget: (token) => void forgotten.push(token) });
+	const ada = { kind: "person" as const, id: "acct-7", name: "Ada" };
+	const first = passes.issue("plan", ada).pass;
+	const renewed = passes.issue("plan", ada, first).pass;
+	assert.equal(ids.get(renewed), ids.get(first));
+	// Only a pass held for the same asker and canvas lends its id.
+	assert.notEqual(ids.get(passes.issue("other", ada, first).pass), ids.get(first));
+	assert.notEqual(ids.get(passes.issue("plan", { ...ada, id: "acct-8" }, first).pass), ids.get(first));
+	assert.notEqual(ids.get(passes.issue("plan", ada, "tok-unknown").pass), ids.get(first));
+	passes.end(first);
+	assert.deepEqual(forgotten, [first]);
+	assert.equal(passes.canvasOf(renewed), "plan");
+	for (const token of ids.keys()) passes.end(token);
 });
 
 test("the sandboxed frame (origin null) reads its page, assets and pass files", async () => {

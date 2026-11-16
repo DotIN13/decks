@@ -21,15 +21,18 @@ export function passRoute(passes: Passes): Route {
 		async answer(ctx, _path, _query, body) {
 			if (ctx.caller.kind !== "person" || isPass(ctx.caller.id)) return json(403, { error: "Only the person's own token asks for a canvas pass." });
 			let canvas = "";
+			let renewing: string | undefined;
 			try {
-				canvas = String((JSON.parse(new TextDecoder().decode(body)) as { canvas?: unknown }).canvas ?? "");
+				const asked = JSON.parse(new TextDecoder().decode(body)) as { canvas?: unknown; renewing?: unknown };
+				canvas = String(asked.canvas ?? "");
+				if (typeof asked.renewing === "string") renewing = asked.renewing;
 			} catch {
-				return json(400, { error: "Send { canvas }." });
+				return json(400, { error: "Send { canvas }, and the pass it renews as renewing." });
 			}
 			const got = await ctx.call<{ name: string }>("canvas.get", { canvas }).catch(() => undefined);
 			if (!got) return json(404, { error: `There is no canvas called ${canvas}.` });
 			const imports = await importsOf(ctx);
-			return json(200, { ...passes.issue(got.name, ctx.caller), imports });
+			return json(200, { ...passes.issue(got.name, ctx.caller, renewing), imports });
 		},
 	};
 }

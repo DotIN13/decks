@@ -1,6 +1,6 @@
 // The canvas page clients frame, and the pass its frame calls with.
-import { defineFeature, type Feature, type Kernel, type Tokens } from "../kernel/index.ts";
-import { Passes } from "./passes.ts";
+import { defineFeature, type Feature, type Kernel } from "../kernel/index.ts";
+import { Passes, type PassTokens } from "./passes.ts";
 import { passFilesRoute, passRoute } from "./routes.ts";
 import { DIST, staticRoutes } from "./static.ts";
 
@@ -13,10 +13,9 @@ export function frameFeature(options: FrameOptions = {}): Feature {
 		if (!kernel) throw new Error("frame has not started");
 		return kernel;
 	};
-	const tokens: Tokens = {
+	const tokens: PassTokens = {
 		issue: (who, label) => started().callers.issue(who, label),
-		revoke: (id) => started().callers.revoke(id),
-		describe: (kind, now) => started().callers.describe(kind, now),
+		forget: (token) => started().callers.forget!(token),
 	};
 	const passes = new Passes(tokens, options.clock);
 	return defineFeature({

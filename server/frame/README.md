@@ -21,6 +21,9 @@ The kernel and the protocol through their entries. No other feature.
    503 with the command that builds it.
 2. A pass is a kernel token for the asker on one canvas, its caller id `<asker id>~frame-<n>`,
    issued only once `canvas.get` answers the asker. It lives an hour, then is revoked.
+   A renewal (`{ canvas, renewing: <pass> }`, that pass still held for the same asker and canvas)
+   keeps its caller id, so the frame's socket takes the new token as the same caller; each pass is
+   revoked by its own token.
    `frameFeature({ page: false })` keeps the passes and leaves the page to the host (Studio).
 3. A file on a pass is a file of that pass's canvas folder, or of the deck's `assets/` and
    `lib/`. Anything else is 404, and so is a pass that ran out.
