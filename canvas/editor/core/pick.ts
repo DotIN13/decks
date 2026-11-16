@@ -19,7 +19,6 @@ import type { SceneQuery } from "./scene.ts";
  * select a group whole. A group's empty space is nothing. What an arrow's end joins still asks this.
  */
 type PickPolicy = "exact" | "outermost";
-
 export type PickOptions = {
 	/** `"exact"` unless said. */
 	policy?: PickPolicy;
@@ -28,13 +27,26 @@ export type PickOptions = {
 	/** Items to look through, as if they were not there. */
 	skip?: (node: PenNode) => boolean;
 };
-
 /** What a press found: the item, its node, and the box it covers (a copy). */
 export type Picked = { id: string; node: PenNode; box: Rect };
-
 const isPage = (node: PenNode) => node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type));
 const contains = (box: Rect, point: Pt) => point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
 
+// A press or a hover.
+/** The item a press at a stage point picks. Boards are not found here, and an item inside an instance is found as the instance. */
+export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}): Picked | undefined {
+	const policy = options.policy ?? "exact";
+	let best = topAt(scene, point, options.skip);
+	// "exact": a group drawn over what was hit, with the point in its empty space, is what the press is on.
+	if (policy === "exact") best = groupGapAt(scene, point, best?.order ?? -1, options.skip) ?? best;
+	if (!best) return undefined;
+	if (!options.deep) {
+		// Every qualifying parent on the way up, the last one winning.
+		const hit = best.node;
+		for (let up = best.parent ? scene.item(best.parent) : undefined; up; up = up.parent ? scene.item(up.parent) : undefined) if (climbsTo(policy, up.node, hit)) best = up;
+	}
+	return { id: best.node.id, node: best.node, box: { ...(scene.box(best.node.id) ?? best.box) } };
+}
 /**
  * The topmost item a press at a point lands on. Never an item inside an instance, a group itself
  * or a board. The press's reach is for lines: anything else is hit only inside what it draws, so
@@ -55,12 +67,6 @@ function topAt(scene: SceneQuery, point: Pt, skip?: (node: PenNode) => boolean):
 	}
 	return undefined;
 }
-
-/** One thing made of parts: a press on a part picks it whole (a card, only from its markdown). */
-const isWhole = (up: PenNode, hit: PenNode) => isShape(up) || isFile(up) || isLiveFile(up) || (isCard(up) && isMarkdownText(hit));
-/** Whether a press on `hit` climbs to `up`, one of the parents round it, under a policy. */
-const climbsTo = (policy: PickPolicy, up: PenNode, hit: PenNode) => (policy === "outermost" && up.type === "group") || isWhole(up, hit);
-
 /**
  * The topmost group whose box holds the point and that is drawn over `above` (its order), if any:
  * a press in its empty space, between what it holds. The engine never finds a group under a point
@@ -76,29 +82,18 @@ function groupGapAt(scene: SceneQuery, point: Pt, above: number, skip?: (node: P
 	}
 	return top;
 }
+/** One thing made of parts: a press on a part picks it whole (a card, only from its markdown). */
+const isWhole = (up: PenNode, hit: PenNode) => isShape(up) || isFile(up) || isLiveFile(up) || (isCard(up) && isMarkdownText(hit));
+/** Whether a press on `hit` climbs to `up`, one of the parents round it, under a policy. */
+const climbsTo = (policy: PickPolicy, up: PenNode, hit: PenNode) => (policy === "outermost" && up.type === "group") || isWhole(up, hit);
 
-/** The item a press at a stage point picks. Boards are not found here, and an item inside an instance is found as the instance. */
-export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}): Picked | undefined {
-	const policy = options.policy ?? "exact";
-	let best = topAt(scene, point, options.skip);
-	// "exact": a group drawn over what was hit, with the point in its empty space, is what the press is on.
-	if (policy === "exact") best = groupGapAt(scene, point, best?.order ?? -1, options.skip) ?? best;
-	if (!best) return undefined;
-	if (!options.deep) {
-		// Every qualifying parent on the way up, the last one winning.
-		const hit = best.node;
-		for (let up = best.parent ? scene.item(best.parent) : undefined; up; up = up.parent ? scene.item(up.parent) : undefined) if (climbsTo(policy, up.node, hit)) best = up;
-	}
-	return { id: best.node.id, node: best.node, box: { ...(scene.box(best.node.id) ?? best.box) } };
-}
-
+// Parents and children.
 /** The node an item sits in that the editor can select: not a board, not inside an instance. */
 export function parentOf(scene: SceneQuery, id: string): string | undefined {
 	const up = scene.item(id)?.parent;
 	const node = up ? scene.item(up)?.node : undefined;
 	return node && !isPage(node) && !node.id.includes("/") ? node.id : undefined;
 }
-
 /**
  * What an item holds that the editor can select one by one: a group's or a frame's children. Not
  * the parts of what is one thing (a shape, a file, a live file, a card), and nothing in an instance.
@@ -110,6 +105,7 @@ export function childrenOf(scene: SceneQuery, id: string): string[] {
 	return (scene.node(id)?.children ?? node.children ?? []).map((child) => child.id).filter((child) => !child.includes("/") && !!scene.item(child));
 }
 
+// A card's block, and a page's picture.
 /**
  * The text block of a card at a stage point: the one under it, or in the card's margin, the one
  * level with it (4 px either side). Not in the card open for typing (`typing`), which has its own
@@ -127,7 +123,6 @@ export function blockAt(scene: SceneQuery, point: Pt, typing?: string): string |
 		return box && point.y >= box.y - 4 && point.y <= box.y + box.h + 4;
 	})?.id;
 }
-
 /**
  * The board whose picture is under a point and that has no node of its own to take the press:
  * one not in `rendered`. The last in file order, as the sheet draws it on top.
@@ -142,11 +137,10 @@ export function pictureAt(boards: readonly PageBox[], point: Pt, rendered: Reado
 	return top;
 }
 
+// The marquee.
 /** The rectangle a marquee dragged between two corners covers. */
 export const marqueeRect = (m: { x1: number; y1: number; x2: number; y2: number }): Rect => ({ x: Math.min(m.x1, m.x2), y: Math.min(m.y1, m.y2), w: Math.abs(m.x2 - m.x1), h: Math.abs(m.y2 - m.y1) });
-
 const wholly = (box: Rect, r: Rect) => box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h;
-
 /**
  * Every item and board wholly inside a stage rectangle: a marquee. Never an instance's inside, a
  * board's own node, or a part of a shape; an item whose parent is picked too is left to its parent.

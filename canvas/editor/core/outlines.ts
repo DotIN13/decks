@@ -1,9 +1,12 @@
+// The outlines the overlay draws: round the selection, the item under the pointer and its kin, the
+// selection's frame, a card block's grip, the frame a drop goes into, and drafts being drawn.
 import { arrowRoute, isArrow, type PenNode } from "@decks/pen";
 import type { PageBox, Rect } from "./model.ts";
 import { childrenOf, marqueeRect, parentOf } from "./pick.ts";
 import type { SceneQuery } from "./scene.ts";
 import { type Corners, type DropBox, type GripBox, type HoverBox, type KinBox, type Offset, type Outline, type SelectionFrame } from "./overlay.ts";
 
+// The selection's outlines.
 export type OutlineInput = {
 	selection: readonly string[];
 	/** The item being typed into, which its editor outlines. */
@@ -27,24 +30,6 @@ export type OutlineInput = {
 	pageResize?: (Rect & { path: string }) | undefined;
 	marquee?: Corners | undefined;
 };
-const rounded = (scene: SceneQuery, id: string): true | undefined => {
-	const type = scene.item(id)?.node.type;
-	return type === "note" || type === "prompt" || type === "context" ? true : undefined;
-};
-const NO_SHIFT: Offset = { dx: 0, dy: 0 };
-/**
- * How far a drop's glide (`glide.ts`, the engine runs it) still draws an item from where it lands:
- * its own shift, or that of the nearest parent that glides, which carries it. None with no glide.
- */
-export function glideShift(glide: ReadonlyMap<string, Offset> | undefined, scene: SceneQuery, id: string): Offset {
-	if (!glide?.size) return NO_SHIFT;
-	for (let at: string | undefined = id; at; at = scene.item(at)?.parent) {
-		const shift = glide.get(at);
-		if (shift) return shift;
-	}
-	return NO_SHIFT;
-}
-const outline = (id: string, role: Outline["role"], box: Rect, round?: true, corner?: number): Outline => ({ id, role, x: box.x, y: box.y, w: box.w, h: box.h, ...(round ? { round } : {}), ...(corner !== undefined ? { corner } : {}) });
 /**
  * Where each selected item is now, moved by any drag and sized by any resize in progress; each
  * board picked up and the app's selected board; and the marquee. Never an arrow (its own two end
@@ -87,6 +72,26 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 	if (input.marquee) out.push(outline("", "marquee", marqueeRect(input.marquee)));
 	return out;
 }
+const rounded = (scene: SceneQuery, id: string): true | undefined => {
+	const type = scene.item(id)?.node.type;
+	return type === "note" || type === "prompt" || type === "context" ? true : undefined;
+};
+const NO_SHIFT: Offset = { dx: 0, dy: 0 };
+/**
+ * How far a drop's glide (`glide.ts`, the engine runs it) still draws an item from where it lands:
+ * its own shift, or that of the nearest parent that glides, which carries it. None with no glide.
+ */
+export function glideShift(glide: ReadonlyMap<string, Offset> | undefined, scene: SceneQuery, id: string): Offset {
+	if (!glide?.size) return NO_SHIFT;
+	for (let at: string | undefined = id; at; at = scene.item(at)?.parent) {
+		const shift = glide.get(at);
+		if (shift) return shift;
+	}
+	return NO_SHIFT;
+}
+const outline = (id: string, role: Outline["role"], box: Rect, round?: true, corner?: number): Outline => ({ id, role, x: box.x, y: box.y, w: box.w, h: box.h, ...(round ? { round } : {}), ...(corner !== undefined ? { corner } : {}) });
+
+// The hover and its kin.
 export type HoverInput = {
 	/** Hover outlines are edit mode's. */
 	editing: boolean;
@@ -164,6 +169,8 @@ export function kinOutlines(input: KinInput, scene: SceneQuery): KinBox[] {
 	}
 	return out;
 }
+
+// The selection's frame, the grip, the drop and the drafts.
 /** The size a box is said to be: its width and height in stage pixels, rounded. */
 export const sizeLabel = (box: { w: number; h: number }) => `${Math.round(box.w)} × ${Math.round(box.h)}`;
 /**

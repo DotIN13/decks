@@ -1,7 +1,8 @@
+// The seam: every question the editor asks of the scene, and what it tells the engine.
 /**
  * The seam: everything the editor asks of the scene, and nothing else.
  *
- * Today `scene-ts.ts` answers it from the TypeScript side of the engine (`stage/engine.ts`).
+ * Today `scene-ts.ts` answers it from the TypeScript side of the engine (`render/engine.ts`).
  * Later the Rust engine can answer parts of it itself (picking, snapping, drop slots), and the
  * same core tests run against both.
  */

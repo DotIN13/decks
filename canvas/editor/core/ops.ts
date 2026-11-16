@@ -1,3 +1,4 @@
+// The pen ops an edit of the drawing writes: items moved, copied, duplicated, deleted, or made with a tool.
 /**
  * The pen ops an edit of the drawing writes: moving items (into a frame, out of one, along its
  * order), copying them, duplicating, deleting, and making a new one with a tool. Each builder
@@ -11,11 +12,9 @@ import { ARROW, arrowEndItem, isArrow, isCard, isMarkdownText, makeShape, MARKDO
 import type { PageBox, MakingTool, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
+// Ids for what an edit makes.
 /** Where a new id comes from: each call one not used before. */
 export type NextId = () => string;
-/** A board moved to its own new corner, as `onMove` takes it. */
-export type PageMove = { path: string; x: number; y: number };
-
 /** Ids for several new items at once, none the same as another or as any already taken. */
 export function idMaker(taken: Iterable<string>): NextId {
 	const used = new Set(taken);
@@ -26,8 +25,8 @@ export function idMaker(taken: Iterable<string>): NextId {
 	};
 }
 
+// Moving items.
 const own = (value: unknown) => (typeof value === "number" ? value : 0);
-
 /**
  * What moving an item by `dx dy` sets. An arrow's point ends are on the stage rather than in its
  * box, so they move with it; its joined ends stay joined (`moveArrowEnds`).
@@ -39,7 +38,6 @@ export function movedBy(node: PenNode, dx: number, dy: number): Record<string, u
 		...(isArrow(node) && node.metadata ? { metadata: moveArrowEnds(node.metadata as Record<string, unknown>, dx, dy) } : {}),
 	};
 }
-
 /**
  * An arrow joined at either end, carried while what that end joins stays: it does not move. Dragging
  * its line would only stretch it round the join, and an arrow's shape is changed by its handles
@@ -53,12 +51,10 @@ function pinned(node: PenNode, moving: ReadonlySet<string>, scene: SceneQuery): 
 	// An end that names an item no longer there joins nothing: it does not hold the arrow still.
 	return ends.some((end) => end !== undefined && !moving.has(end) && joinsSomething(scene, end));
 }
-
 /** Whether an arrow's end names something still on the stage: an item, or a board by its path. */
 function joinsSomething(scene: SceneQuery, end: string): boolean {
 	return !!scene.node(end) || scene.boards().some((board) => board.path === end);
 }
-
 /**
  * Where an arrow's two ends are drawn now, on the stage: the first and last point of its line,
  * the first subpath of its geometry, through its box. Undefined for an arrow with no geometry yet.
@@ -78,7 +74,6 @@ function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [number, n
 	const at = (x: number, y: number): [number, number] => [Math.round(own(node.x) + x * sx - ox), Math.round(own(node.y) + y * sy - oy)];
 	return { from: at(n[0]!, n[1]!), to: at(n[n.length - 2]!, n[n.length - 1]!) };
 }
-
 /**
  * An arrow's metadata with each end that joins something in `gone` (or no longer there at all) set
  * to the point it is drawn at now, so the arrow stays where it was, joined to nothing, and can be
@@ -98,7 +93,6 @@ function freedEnds(node: PenNode, scene: SceneQuery, gone: ReadonlySet<string> =
 	if (!drawn) return undefined;
 	return { ...meta, ...(fromLoose ? { from: drawn.from } : {}), ...(toLoose ? { to: drawn.to } : {}) };
 }
-
 /**
  * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
  * because a group's box starts where its children do, not at its own `x` and `y`.
@@ -151,6 +145,7 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 	});
 }
 
+// Copying, duplicating and deleting.
 /** Copies of items, `dx dy` from where they are, and the ids they are made as: an Alt-drag lets go of copies and leaves the originals. */
 export function copyOps(scene: SceneQuery, ids: readonly string[], dx: number, dy: number, nextId: NextId): { ops: Op[]; made: string[] } {
 	const made: string[] = [];
@@ -163,15 +158,12 @@ export function copyOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 	});
 	return { ops, made };
 }
-
 /** How far down and right a duplicate (⌘D, the pill's Duplicate) is put from what it copies. */
 const DUPLICATE_OFFSET = 24;
-
 /** A copy of each item, `DUPLICATE_OFFSET` down and right of it. */
 export function duplicateOps(scene: SceneQuery, ids: readonly string[], nextId: NextId): { ops: Op[]; made: string[] } {
 	return copyOps(scene, ids, DUPLICATE_OFFSET, DUPLICATE_OFFSET, nextId);
 }
-
 /** Take items off the canvas. */
 export function deleteOps(ids: readonly string[], scene?: SceneQuery): Op[] {
 	const deleting: Op[] = ids.map((id) => ({ op: "delete", id }));
@@ -197,6 +189,9 @@ export function deleteOps(ids: readonly string[], scene?: SceneQuery): Op[] {
 	return [...freeing, ...deleting];
 }
 
+// Pages moved.
+/** A board moved to its own new corner, as `onMove` takes it. */
+export type PageMove = { path: string; x: number; y: number };
 /** Boards moved by `dx dy`, each to its own new corner, rounded; a path not on the stage is left out. */
 export function pageMoves(boards: readonly PageBox[], paths: readonly string[], dx: number, dy: number): PageMove[] {
 	return paths.flatMap((path) => {
@@ -205,6 +200,7 @@ export function pageMoves(boards: readonly PageBox[], paths: readonly string[], 
 	});
 }
 
+// Making an item with a tool.
 /*
  * What a frame starts with. The padding is what makes a frame readable as a container rather
  * than an outline round its contents, and the radius is that padding plus a card's own corner:
@@ -212,10 +208,9 @@ export function pageMoves(boards: readonly PageBox[], paths: readonly string[], 
  * so a card dropped into a frame sits concentric with it instead of inside a tighter arc.
  */
 export const FRAME_PAD = 18;
-/** A note's and a card's corner (`pen/look.ts` `NOTE_RADIUS`, held equal by `editor/ops-constants.test.ts`). */
+/** A note's and a card's corner (`look/look.ts` `NOTE_RADIUS`, held equal by `editor/ops-constants.test.ts`). */
 export const NOTE_CORNER = 12;
 export const FRAME_RADIUS = NOTE_CORNER + FRAME_PAD;
-
 /**
  * What each tool makes, before its box: pen's own items, with nothing of ours in them but their
  * colours, the drawing's own light/dark variables (`@decks/pen` `DECKS_COLORS`), which the drawing's
@@ -235,18 +230,16 @@ const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial<PenNod
 	text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 	/*
 	 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
-	 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
+	 * `cards/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
 	 */
 	card: { node: { type: "frame", name: "Card" }, w: 320, h: 48 },
 	note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 };
-
 /** Shapes that are as tall as they are wide when made with a click: a circle, a star, a ring. */
 const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pentagon", "Hexagon", "Plus", "Heart", "Triangle"]);
-
 /**
  * What a tool makes depends on more than the tool: the shape and the icon picked in the insert
- * panel, ids for the items inside it, and a card's first block (`pen/card-frame.ts` `newCard`,
+ * panel, ids for the items inside it, and a card's first block (`cards/card-frame.ts` `newCard`,
  * passed in because it is markdown's and not core's).
  */
 export type MakeOptions = {
@@ -256,30 +249,25 @@ export type MakeOptions = {
 	nextId: NextId;
 	card: (id: string, child: string) => PenNode;
 };
-
 /** The size a click makes, for every tool: a shape's by its kind, an icon's 48 square. */
 export function madeSize(tool: MakingTool, shape: string): { w: number; h: number } {
 	if (tool === "shape") return SQUARE_SHAPES.has(shape) ? { w: 120, h: 120 } : shape === "Decision" ? { w: 160, h: 120 } : { w: 160, h: 100 };
 	if (tool === "icon") return { w: 48, h: 48 };
 	return { w: MADE[tool].w, h: MADE[tool].h };
 }
-
 /** The item a tool makes, with its id: a shape from the library (`@decks/pen`, `makeShape`), the icon picked, or the tool's own. */
 export function madeNode(tool: MakingTool, id: string, size: { w: number; h: number }, options: MakeOptions): PenNode {
 	if (tool === "shape") return makeShape(shapeKind(options.shape) ?? SHAPES[0]!, { frame: id, outline: options.nextId() }, size);
 	if (tool === "icon") return { type: "icon", id, name: options.icon.name, library: options.icon.library, icon: options.icon.name, fill: "$decks-text", weight: 400 } as PenNode;
-	// A card is a column frame of blocks (`pen/card-frame.ts`), starting with one empty one.
+	// A card is a column frame of blocks (`cards/card-frame.ts`), starting with one empty one.
 	if (tool === "card") return options.card(id, options.nextId());
 	return { ...MADE[tool].node, id } as PenNode;
 }
-
-/** A made item: the insert op, its node, and the box it is drawn at (a card's opens 80 tall for typing). */
 type InsertOp = Extract<Op, { op: "insert" }>;
+/** A made item: the insert op, its node, and the box it is drawn at (a card's opens 80 tall for typing). */
 export type Made = { op: InsertOp; node: PenNode; box: Rect };
-
 const insertOp = (node: PenNode, box: Partial<Box>, parent: string | undefined): InsertOp => ({ op: "insert", ...(parent ? { parent } : {}), node, box });
 const typingBox = (tool: MakingTool, x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h: tool === "card" ? 80 : h });
-
 /**
  * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
  * from the canvas menu. From the insert panel (`centred`) the item is put with its middle there; from a click, its corner.
@@ -293,7 +281,6 @@ export function makeAtOp(tool: MakingTool, id: string, at: Pt, options: MakeOpti
 	const node = madeNode(tool, id, made, options);
 	return { op: insertOp(node, box, options.parent), node, box: typingBox(tool, x1, y1, made.w, made.h) };
 }
-
 /**
  * One item of a tool, drawn by a drag from `at` to `end`: the box between them, at least 8 each way.
  * A text grows with its words unless a width was drawn for it; its height is always its words'.
@@ -308,7 +295,6 @@ export function drawnOp(tool: MakingTool, id: string, at: Pt, end: Pt, options: 
 	const node = madeNode(tool, id, { w, h }, options);
 	return { op: insertOp(node, box, options.parent), node, box: typingBox(tool, x1, y1, w, h) };
 }
-
 /** A new arrow between two ends (`newArrowEnds` in `arrows.ts`), curved unless asked otherwise, in the drawing's light/dark grey (`$decks-line`). */
 export function arrowInsertOp(id: string, from: unknown, to: unknown, style: { route?: "straight" | "curved" | "elbow"; heads?: "end" | "none" } = {}): InsertOp {
 	const metadata = { type: ARROW, from, to, route: style.route ?? "curved", ...(style.heads && style.heads !== "end" ? { heads: style.heads } : {}) };

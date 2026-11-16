@@ -1,3 +1,5 @@
+// The words typed over the drawing: how they look in the editor laid over them, what opens for
+// typing, and what putting the typing away writes.
 /**
  * The words typed on the stage, decided with no page under it: how an item's words are set for
  * the editor laid over them (`textLook`, `cardLook`), what an item is part of that opens for typing
@@ -34,7 +36,7 @@ export interface TextLook {
 
 /**
  * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
- * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
+ * (`cards/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
  * `fresh` is an item just made to be typed into, which an empty text does not outlive.
  */
 export type TextSession = {
@@ -51,9 +53,10 @@ export type TextSession = {
 	caretAt?: Pt;
 };
 
-/** The colours of the app's own words and paper, in the scheme now (`pen/look.ts`, `CARD_PALETTE`). */
+// How the words look.
+/** The colours of the app's own words and paper, in the scheme now (`look/look.ts`, `CARD_PALETTE`). */
 export type Palette = { paper: string; fg: string };
-/** The font the page sets a family in, at a weight and a style (`pen/look.ts`, `pageFont`). */
+/** The font the page sets a family in, at a weight and a style (`look/look.ts`, `pageFont`). */
 type FontOf = (family: string, weight: number, italic: boolean) => string;
 export type Scheme = "light" | "dark";
 
@@ -105,6 +108,7 @@ export function cardLook(given: PenDocument | undefined, card: PenNode, scheme: 
 	return { ...look, pad: typeof card.padding === "number" ? card.padding : cardPad, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
 }
 
+// What opens for typing.
 /** The shape an item is, or is part of (its outline or its words): the frame, by id. */
 export function shapeOf(doc: PenDocument | undefined, id: string): string | undefined {
 	if (!doc) return undefined;
@@ -134,6 +138,7 @@ export function fileOf(doc: PenDocument | undefined, id: string): (PenNode & { m
 	return file && typeof file.metadata?.path === "string" ? (file as PenNode & { metadata: { path: string } }) : undefined;
 }
 
+// Where the words are typed, and how wide.
 /** Where the words a shape gets are typed, before it has them: centred and as wide as the shape, less 10 each side. */
 export function labelBox(shape: Rect): Rect {
 	return { x: shape.x + 10, y: shape.y + shape.h / 2 - 10, w: Math.max(20, shape.w - 20), h: 20 };
@@ -151,6 +156,7 @@ export function pictureUrls(markdown: string): string[] {
 	return [...markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)|!\[\[([^\]|]+\.(?:png|jpe?g|gif|webp|svg|avif|bmp))(?:\|[^\]]*)?\]\]/gi)].map((m) => (m[1] ?? m[2])!);
 }
 
+// Putting the typing away.
 /** A plain text item with no words is invisible, so a fresh one left empty goes; a note or a card is a shape you can see, and is kept. */
 export const emptyVanishes = (open: { kind?: string | undefined; card?: true | undefined }) => !open.card && open.kind === "text";
 

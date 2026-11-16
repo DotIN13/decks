@@ -1,14 +1,8 @@
+// The overlay as one JSON string for the engine to paint: boxes, lines, paths and dots in canvas units.
 import { ARROW_SIDES, sidePoint } from "@decks/pen";
 import { HANDLES } from "./resize.ts";
 import { anchorAt, draftBox, draftCurve, handleAt, pageHandleList, radiusInset, radiusShown, type Overlay } from "./overlay.ts";
 
-/**
- * The overlay as the engine paints it (`stage_paint::overlay`): every outline, handle, guide, slot
- * and draft of `Overlay` as boxes, lines, paths and dots in canvas units, with the sizes the screen
- * needs in pixels (a handle is as big at 5% as at 400%). Written whenever the overlay or the zoom
- * changes, and handed to the engine as one JSON string (`StageEngine.setOverlay`); the DOM keeps
- * only the hit areas (`dom/OverlayLayer.tsx`, invisible under `[data-engine-overlays]`).
- */
 type OverlayStyle = {
 	/** The main pointer is a finger: round corner handles, bigger arrow ends, no edge handles or anchors. */
 	coarse: boolean;
@@ -29,6 +23,13 @@ type Dot = { x: number; y: number; px: number; kind: string };
 const ROUND = 12;
 const SQUARE = 4;
 
+/**
+ * The overlay as the engine paints it (`stage_paint::overlay`): every outline, handle, guide, slot
+ * and draft of `Overlay` as boxes, lines, paths and dots in canvas units, with the sizes the screen
+ * needs in pixels (a handle is as big at 5% as at 400%). Written whenever the overlay or the zoom
+ * changes, and handed to the engine as one JSON string (`StageEngine.setOverlay`); the DOM keeps
+ * only the hit areas (`dom/OverlayLayer.tsx`, invisible under `[data-engine-overlays]`).
+ */
 export function overlayJson(o: Overlay, zoom: number, style: OverlayStyle): string {
 	const boxes: Box[] = [];
 	const lines: Line[] = [];

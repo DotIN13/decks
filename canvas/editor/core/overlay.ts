@@ -1,3 +1,5 @@
+// Everything the editor draws over the canvas, as one value: its parts' types and `deriveOverlay`,
+// which puts together the outlines, handles and distances from their own files.
 import { type ArrowSide, type PenNode } from "@decks/pen";
 import type { Box, Guide } from "../snap.ts";
 import { type ArrowHandles, type RouteDraft } from "./arrows.ts";

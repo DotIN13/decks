@@ -53,7 +53,6 @@ export function pressPage(state: EditorState, path: string, p: PointerInput, sce
 	return done(started.state, [{ do: "select-board", path }, started.effect]);
 }
 
-
 /** The selection with its items, its boards, or both replaced. */
 export function withSelection(state: EditorState, next: { items?: readonly string[]; boards?: readonly string[] }): EditorState {
 	return { ...state, selection: { ...state.selection, ...(next.items ? { items: next.items } : {}), ...(next.boards ? { boards: next.boards } : {}) } };

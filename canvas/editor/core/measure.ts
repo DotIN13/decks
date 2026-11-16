@@ -1,5 +1,16 @@
+// Alt's distances: the lines from the selection to the item under the pointer, each with its length.
 import type { Rect } from "./model.ts";
 import { type Distances, type MeasureLine } from "./overlay.ts";
+
+/**
+ * Alt's distances: in edit mode, with something selected, Alt held and the pointer over another
+ * item or board (`over`, its box as drawn), and no press in hand. From the box round the selection.
+ */
+export function distances(input: { editing: boolean; alt: boolean; busy: boolean; selection?: Rect | undefined; over?: Rect | undefined }): Distances | undefined {
+	const { selection, over } = input;
+	if (!input.editing || !input.alt || input.busy || !selection || !over) return undefined;
+	return { from: { x: selection.x, y: selection.y, w: selection.w, h: selection.h }, to: { x: over.x, y: over.y, w: over.w, h: over.h }, lines: measure(selection, over) };
+}
 
 /**
  * The distances from `a`, the selection, to `b`, the hovered item, as Alt shows them: apart on an axis,
@@ -39,13 +50,4 @@ export function measure(a: Rect, b: Rect): MeasureLine[] {
 		down(a.y + a.h, b.y + b.h, ax);
 	}
 	return out;
-}
-/**
- * Alt's distances: in edit mode, with something selected, Alt held and the pointer over another
- * item or board (`over`, its box as drawn), and no press in hand. From the box round the selection.
- */
-export function distances(input: { editing: boolean; alt: boolean; busy: boolean; selection?: Rect | undefined; over?: Rect | undefined }): Distances | undefined {
-	const { selection, over } = input;
-	if (!input.editing || !input.alt || input.busy || !selection || !over) return undefined;
-	return { from: { x: selection.x, y: selection.y, w: selection.w, h: selection.h }, to: { x: over.x, y: over.y, w: over.w, h: over.h }, lines: measure(selection, over) };
 }
