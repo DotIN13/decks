@@ -78,6 +78,22 @@ test("a write from outside the server is read in as one change by its writer", a
 	await s.close();
 });
 
+test("a drawing's versions are its file's revisions, newest first; one reads back and restores as a new change", async () => {
+	const s = await start();
+	await s.value("item.update", { id: "a", set: { content: "one" } }, ann);
+	await s.value("item.update", { id: "a", set: { content: "two" } }, ann);
+	const versions = await s.value<{ rev: number; by: string }[]>("canvas.versions", { canvas: "plan" });
+	assert.ok(versions.length >= 2 && versions[0]!.rev > versions[1]!.rev && versions[0]!.by === "ann", JSON.stringify(versions));
+	const older = await s.value<{ rev: number; text: string }>("canvas.version", { rev: versions[1]!.rev, canvas: "plan" });
+	assert.match(older.text, /"one"/);
+	const restored = await s.value<{ rev: number }>("canvas.restore", { rev: versions[1]!.rev, canvas: "plan" });
+	assert.equal((await s.value<Item & { content: string }>("item.get", { id: "a", canvas: "plan" })).content, "one");
+	assert.match(await text(s, "canvases/plan/canvas.pen"), /"one"/);
+	assert.ok(s.heard.some((e) => e.name === "item.changed" && e.payload.rev === restored.rev && e.payload.by === "person"));
+	assert.equal((await s.call("canvas.restore", { rev: versions[1]!.rev, canvas: "plan" }, ann)).ok, false);
+	await s.close();
+});
+
 async function waitFor<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
 	for (let i = 0; i < 50; i++) {
 		const v = await read();

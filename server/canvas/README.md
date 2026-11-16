@@ -1,16 +1,14 @@
 # server/canvas
 
 The canvas feature: a canvas's drawing, the ops that change it, and the log of those changes.
-It answers `item.*` (13 calls), `canvas.*` (8 of 10) and `frame.*` (4).
+It answers `item.*` (13 calls), `canvas.*` (11 of 13: not `screenshot` or `export`), `frame.*` (4).
 
 ## Owns
 
 - `doc.ts`: `PenCanvas`, one drawing's `CanvasDoc`; `log.ts` its changes and undo; `arrows.ts` reroutes.
 - `ops.ts` (ops into pen's edits), `place.ts` (at, beside, below, space), `kinds.ts` (who owns a node).
-- `spans.ts` writes a file back keeping untouched items' bytes; `store.ts` holds every canvas,
-  its title and file; `clips.ts` keeps clips for paste.
-- `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`. Not answered here:
-  `canvas.screenshot` and `export` (pictures), `versions`, `version`, `restore` (Studio's history).
+- `spans.ts` keeps untouched items' bytes; `store.ts` every canvas, title, file and its history; `clips.ts`.
+- `item-calls.ts`, `canvas-calls.ts`, `frame-calls.ts`, `feature.ts`: the calls, and the feature.
 
 ## May import
 
@@ -54,6 +52,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
     none is the caller's here.
 14. A frame file holds one reusable item. `frame.save` writes an item to one and puts a ref in
     its place unless `replace` is false.
+15. A drawing's versions are its file's revisions in the deck's history, newest first. `restore`
+    reads one back in at once and writes it as a new change, announced like any other.
 
 ## Check
 

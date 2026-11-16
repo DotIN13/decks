@@ -199,6 +199,34 @@ export class CanvasStore {
 		this.kernel.events.emit(events.canvasChanged, { canvas: name, ids: [name], by, rev: 0 });
 	}
 
+	// History: a drawing's versions, from the deck's record of its file
+	/** canvas.pen's revisions, newest first. */
+	async versions(name: string): Promise<{ rev: number; by: string; at: number; items: number }[]> {
+		const revs = (await this.history().revisions!(this.file(name))) ?? [];
+		return revs.map(({ rev, by, at }) => ({ rev, by, at, items: 0 })).reverse();
+	}
+
+	/** canvas.pen's text at one revision of the deck. */
+	async version(name: string, rev: number): Promise<string> {
+		return dec.decode(await this.history().readAt!(this.file(name), rev));
+	}
+
+	/** The drawing as it was at rev, read in now and written as a new change. */
+	async restore(name: string, rev: number, by: Caller): Promise<void> {
+		const text = await this.version(name, rev);
+		const kept = this.drawing(this.file(name));
+		const change = kept.doc.reload(text, by.id);
+		if (!change) return;
+		kept.mine.push(text);
+		kept.queue = kept.queue.then(() => this.deck.write(kept.file, enc.encode(text), by)).then(() => this.announce(name, change, change.ops.flatMap(idsOf)), () => undefined);
+		await kept.queue;
+	}
+
+	private history(): Deck {
+		if (!this.deck.revisions || !this.deck.readAt) throw new Refused("unavailable", "This server keeps no history of its files.", "canvas.get");
+		return this.deck;
+	}
+
 	// Reading the deck
 	private async names(): Promise<string[]> {
 		const own = (await this.dirs(toDeckPath(layout.CANVASES))).map((dir) => dir.split("/").pop()!);

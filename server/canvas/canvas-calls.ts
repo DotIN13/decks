@@ -3,11 +3,11 @@ import { handleAll, toDeckPath, type Context, type Deck, type DeckPath } from ".
 import { emptyDrawing, type CanvasStore } from "./store.ts";
 
 // The canvas calls this feature answers, named one by one so a call added to
-// the protocol (screenshot, export, versions) is another feature's until
-// named here. A canvas's name is its folder and never changes; its title can.
+// the protocol (screenshot, export) is another feature's until named here.
+// A canvas's name is its folder and never changes; its title can.
 
-const { list, get, here, create, update, remove, copy, undo } = calls.canvas;
-const mine = { list, get, here, create, update, remove, copy, undo };
+const { list, get, here, create, update, remove, copy, undo, versions, version, restore } = calls.canvas;
+const mine = { list, get, here, create, update, remove, copy, undo, versions, version, restore };
 
 export function canvasCalls(store: CanvasStore) {
 	const changed = (ctx: Context, name: string) => ctx.events.emit(events.canvasChanged, { canvas: name, ids: [name], by: ctx.caller.id, rev: 0 });
@@ -40,6 +40,13 @@ export function canvasCalls(store: CanvasStore) {
 			await copyFolder(ctx.deck, toDeckPath(layout.canvasFolder(from)), toDeckPath(layout.canvasFolder(name)), ctx.caller);
 			await store.open(name);
 			await store.setTitle(name, title ?? `Copy of ${store.title(from)}`, ctx.caller);
+			return store.describe(name);
+		},
+		versions: (ctx, { canvas }) => store.versions(ctx.canvasName(canvas)),
+		version: async (ctx, { rev, canvas }) => ({ rev, text: await store.version(ctx.canvasName(canvas), rev) }),
+		restore: async (ctx, { rev, canvas }) => {
+			const name = ctx.canvasName(canvas);
+			await store.restore(name, rev, ctx.caller);
 			return store.describe(name);
 		},
 		undo: async (ctx, { redo, canvas }) => {
