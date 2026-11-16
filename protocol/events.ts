@@ -1,7 +1,7 @@
 import { defineEvent } from "./event.ts";
 import { any, arr, bool, int, lit, nul, opt, str, union } from "./schema.ts";
 import { ChangeAuthor } from "./page.ts";
-import { Box, Camera, ChatItem, Message, Point, Splice } from "./shapes.ts";
+import { Box, Camera, ChatItem, DocChange, Message, Point, Splice } from "./shapes.ts";
 
 // Every event, on one stream. Each says which ids changed, who changed them
 // and the revision; a client that wants the whole thing makes a call.
@@ -25,6 +25,7 @@ export const fileChanged = defineEvent("file.changed", "A file changed: its word
 	client: opt(str()),
 	batch: opt(str()),
 	change: opt(str()),
+	record: opt(DocChange),
 	settled: opt(bool()),
 });
 export const appChanged = defineEvent("app.changed", "An app's state changed; app.get reads it.", { status: opt(str()) });
