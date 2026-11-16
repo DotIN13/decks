@@ -1,0 +1,39 @@
+{
+  "id": "0f3c1a2e-0000-4000-8000-000000000001",
+  "kind": "claude",
+  "resumeRef": "11111111-aaaa-4bbb-8ccc-000000000001",
+  "name": "Ada",
+  "avatar": "/api/avatar/0f3c1a2e-0000-4000-8000-000000000001?rev=1",
+  "color": "#e7af36",
+  "context": [
+    "canvases/plan/cards/a/index.html"
+  ],
+  "inPlay": [],
+  "workspace": "demo",
+  "stage": "plan",
+  "createdAt": 1790000000000,
+  "model": {
+    "provider": "anthropic",
+    "model": "opus",
+    "thinking": "high"
+  },
+  "mode": "auto",
+  "usage": {
+    "contextTokens": 1200,
+    "contextWindow": 200000,
+    "cost": 0.5
+  },
+  "account": "default",
+  "lastLine": "Done.",
+  "lastAt": 1790000500000,
+  "tags": [
+    "films"
+  ],
+  "positions": {
+    "plan": {
+      "x": 10,
+      "y": 20,
+      "zoom": 1
+    }
+  }
+}

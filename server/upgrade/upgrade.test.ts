@@ -6,6 +6,7 @@ import { MemoryDeck } from "../kernel/memory-deck.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { upgradeDeck } from "./feature.ts";
+import { LATEST } from "./migrations.ts";
 import { memoryVersion, readRecord } from "./version.ts";
 
 const FIXTURE = new URL("../../tools/fixtures/deck/", import.meta.url).pathname;
@@ -22,11 +23,11 @@ function fixtureFiles(dir = FIXTURE): Record<string, string> {
 
 const text = (deck: MemoryDeck, path: string) => deck.read(path as never).then((b) => new TextDecoder().decode(b));
 
-test("the fixture deck upgrades to the floor and keeps its friend's old board", async () => {
+test("the fixture deck upgrades to the latest and keeps its friend's old board", async () => {
 	const deck = new MemoryDeck(fixtureFiles());
 	const file = memoryVersion();
 	assert.deepEqual(await upgradeDeck(deck, file), []);
-	assert.equal((await readRecord(file)).version, "0.5.1");
+	assert.equal((await readRecord(file)).version, LATEST);
 	assert.match(await text(deck, "shared/canvases/ada/old-notes/canvas.pen"), /decks\.board/);
 	assert.deepEqual(await upgradeDeck(deck, file), [], "up to date: nothing runs");
 });
@@ -39,7 +40,7 @@ test("a deck older than the floor is refused, naming what is old", async () => {
 test("a new deck starts at the latest; migrations after the floor run once, in order", async () => {
 	const fresh = memoryVersion();
 	await upgradeDeck(new MemoryDeck({}), fresh);
-	assert.equal((await readRecord(fresh)).version, "0.5.1");
+	assert.equal((await readRecord(fresh)).version, LATEST);
 	const ran: string[] = [];
 	const deck = new MemoryDeck({ "canvases/a/canvas.pen": "{}" });
 	const file = memoryVersion('{"version":"0.5.1"}');

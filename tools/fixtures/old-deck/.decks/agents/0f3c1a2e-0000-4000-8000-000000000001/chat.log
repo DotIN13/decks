@@ -1,0 +1,4 @@
+{"kind": "notice", "id": "0f3c1a2e-0000-4000-8000-000000000001:n0", "level": "info", "text": "Started.", "at": 1790000495000}
+{"kind": "user", "id": "0f3c1a2e-0000-4000-8000-000000000001:u1", "text": "Draw the plan.", "at": 1790000499000}
+{"kind": "assistant", "id": "0f3c1a2e-0000-4000-8000-000000000001:a1", "text": "The plan is on the canvas.", "at": 1790000500000}
+{"kind": "tool", "id": "0f3c1a2e-0000-4000-8000-000000000001:t1", "name": "Bash", "title": "", "args": {"command": "decks canvas read"}, "result": "{}", "state": "done", "images": []}

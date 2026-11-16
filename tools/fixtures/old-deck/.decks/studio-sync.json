@@ -1,0 +1,16 @@
+{
+  "studio": "http://127.0.0.1:9",
+  "user": "00000000-0000-4000-8000-0000000000aa",
+  "canvases": {
+    "plan": {
+      "id": "00000000-0000-4000-8000-0000000000bb",
+      "rev": 1,
+      "files": {
+        "cards/a/index.html": {
+          "version": 1,
+          "hash": "3a013ebb8fc5d327122ff2ac03741d6b395b5fa8b44880c638c0eea682a3ef83"
+        }
+      }
+    }
+  }
+}

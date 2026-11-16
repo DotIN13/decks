@@ -1,16 +1,18 @@
 // The migrations a deck may still need, oldest first. Today's seven (to 0.5.1) moved stages,
 // boards and leftovers once; every deck in use has run them, so they stay with today's server,
-// and an older shape is named and refused (OLD_SHAPES). New ones are added below FLOOR.
-import { toDeckPath, type Deck, type DeckPath } from "../kernel/index.ts";
+// and an older shape is named and refused (OLD_SHAPES). New ones are added after FLOOR, in MIGRATIONS.
+import { toDeckPath, type Deck, type DeckPath, type UpgradeParts } from "../kernel/index.ts";
+import { agentsToPeople } from "./agents.ts";
 import type { Semver } from "./version.ts";
 
 /** The version every migration of today's server leaves a deck at. */
 export const FLOOR: Semver = "0.5.1";
 
-export type Migration = { version: Semver; id: string; run(deck: Deck, say: (line: string) => void): Promise<void> };
+/** One migration: the deck's files, a line to say what it did, and the stores and today's .decks leftovers (parts). */
+export type Migration = { version: Semver; id: string; run(deck: Deck, say: (line: string) => void, parts: UpgradeParts): Promise<void> };
 
 /** Migrations after FLOOR, oldest first. Each is idempotent: run twice, the second changes nothing. */
-export const MIGRATIONS: readonly Migration[] = [];
+export const MIGRATIONS: readonly Migration[] = [{ version: "0.6.0", id: "2026-11-15-agents-to-people", run: agentsToPeople }];
 
 export const LATEST: Semver = MIGRATIONS.at(-1)?.version ?? FLOOR;
 

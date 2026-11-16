@@ -1,0 +1,20 @@
+{
+  "id": "0f3c1a2e-0000-4000-8000-000000000002",
+  "kind": "pi",
+  "resumeRef": "/sessions/pi-0002.jsonl",
+  "name": "Bo",
+  "color": "#0f9ba8",
+  "context": [],
+  "inPlay": [],
+  "stage": "gone-canvas",
+  "createdAt": "2026-09-20T10:00:00.000Z",
+  "model": {
+    "provider": "deepseek",
+    "model": "deepseek-v4",
+    "thinking": "medium"
+  },
+  "mode": "manual",
+  "usage": {},
+  "account": "default",
+  "lastAt": 1790000600000
+}
