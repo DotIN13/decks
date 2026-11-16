@@ -1,6 +1,7 @@
 import { events, Refused, type Caller } from "../../protocol/index.ts";
 import type { Deck, DeckPath, Events, Store } from "../kernel/types.ts";
 import { remoteOf } from "./links.ts";
+import { Queues } from "./queue.ts";
 import { loadChanges, saveChanges, skip, type DocChange, type Waiting } from "./records.ts";
 import { applyAll, diff, invert, land, type Splice } from "./splice.ts";
 
@@ -28,7 +29,7 @@ type Sent = { by: string; splices: Splice[]; base: number; client?: string; batc
 
 export class Documents {
 	private open = new Map<string, Open>();
-	private queues = new Map<string, Promise<unknown>>();
+	private queues = new Queues();
 	private stopWatch: () => void;
 
 	constructor(
@@ -45,9 +46,7 @@ export class Documents {
 
 	/** One thing at a time per document, in order. */
 	private queue<T>(path: string, run: () => Promise<T>): Promise<T> {
-		const next = (this.queues.get(path) ?? Promise.resolve()).then(run, run);
-		this.queues.set(path, next.catch(() => undefined));
-		return next;
+		return this.queues.run(path, run);
 	}
 
 	/** Whether a page has this document open. */

@@ -2,6 +2,7 @@ import { FILES_PATH, layout, Refused } from "../../protocol/index.ts";
 import type { Context, Route, RouteAnswer } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { titleOf } from "./cards.ts";
+import { metaSize } from "./prepare.ts";
 import { stat } from "./files.ts";
 
 // A card's page and its modules, and every other file, under /files/. Rules 8 and 14.
@@ -125,13 +126,7 @@ export function cardModules(source: string): string[] {
 
 /** The width a card asks for in its meta tag. */
 export function widthOf(source: string): number {
-	const content = /<meta\s+name=["'][\w-]+["']\s+content='(\{[^']*)'/i.exec(source)?.[1];
-	try {
-		const w = (JSON.parse(content ?? "{}") as { w?: unknown }).w;
-		return typeof w === "number" && w > 0 ? w : 1000;
-	} catch {
-		return 1000;
-	}
+	return metaSize(source).w ?? 1000;
 }
 
 const STYLE = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;

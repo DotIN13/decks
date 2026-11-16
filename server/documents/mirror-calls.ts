@@ -1,18 +1,12 @@
 import { Refused } from "../../protocol/index.ts";
 import type { Context } from "../kernel/types.ts";
-import { guarded } from "./google.ts";
-import { credit, linkOf, syncOnce, type GoogleDocs } from "./links.ts";
+import { guarded, type GoogleDocs } from "./google.ts";
+import { credit, linkOf, syncOnce } from "./links.ts";
 import { fence } from "./path.ts";
 
 // The calls a Google Doc's page makes by its mirror's path: the Doc for drawing, styles, comments.
 // Rule 15: a style is applied in Google at once, and what it changed in the words is pulled into
 // the mirror credited to whoever pressed it.
-
-function needs<K extends keyof GoogleDocs>(docs: GoogleDocs | undefined, part: K): NonNullable<GoogleDocs[K]> {
-	const found = docs?.[part];
-	if (!found) throw new Refused("unavailable", "This server's Docs API cannot do that.", "google.status");
-	return (found as (...args: never[]) => unknown).bind(docs) as NonNullable<GoogleDocs[K]>;
-}
 
 export function googleOnMirror(docs: GoogleDocs | undefined) {
 	return {
@@ -42,3 +36,9 @@ export function googleOnMirror(docs: GoogleDocs | undefined) {
 	};
 }
 
+/** One part of the Docs API, or unavailable when this server's Docs API has none. */
+function needs<K extends keyof GoogleDocs>(docs: GoogleDocs | undefined, part: K): NonNullable<GoogleDocs[K]> {
+	const found = docs?.[part];
+	if (!found) throw new Refused("unavailable", "This server's Docs API cannot do that.", "google.status");
+	return (found as (...args: never[]) => unknown).bind(docs) as NonNullable<GoogleDocs[K]>;
+}

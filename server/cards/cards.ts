@@ -5,7 +5,8 @@ import { fence } from "./fence.ts";
 import { stat } from "./files.ts";
 import { newsOf } from "./news.ts";
 
-// Cards: rules 9 to 11 of the README.
+// Cards: a card's path and title, a blank card written in a free folder, every card in the
+// deck, and a card as a call answers it. Rules 9 to 11 of the README.
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -64,12 +65,16 @@ export async function createCard(deck: Deck, canvas: string, title: string, size
 	if (!title.trim()) throw new Refused("invalid", "A card needs a title: the finding, as a sentence.", "card.create");
 	const folder = layout.canvasFolder(canvas);
 	if (!(await stat(deck, fence(folder)))) throw new Refused("not_found", `There is no canvas ${canvas}.`, "canvas.list");
-	const base = slug(title);
+	const path = await freeCard(deck, folder, slug(title));
+	await deck.write(path, encoder.encode(cardShell(title.trim(), size)), by);
+	return path;
+}
+
+/** A card's index.html in a folder of the canvas no card has yet: the name, then name-2, name-3. */
+export async function freeCard(deck: Deck, folder: string, base: string): Promise<DeckPath> {
 	for (let n = 1; n < 1000; n++) {
 		const path = fence(layout.cardAt(folder, n === 1 ? base : `${base}-${n}`));
-		if (await stat(deck, fence(path.slice(0, -"/index.html".length)))) continue;
-		await deck.write(path, encoder.encode(cardShell(title.trim(), size)), by);
-		return path;
+		if (!(await stat(deck, fence(path.slice(0, -"/index.html".length))))) return path;
 	}
 	throw new Refused("conflict", `Too many cards are named ${base}.`, "card.list");
 }

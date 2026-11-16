@@ -1,6 +1,7 @@
 import { Refused, type Caller } from "../../protocol/index.ts";
 import type { Store } from "../kernel/types.ts";
-import { credit, docIdOf, type GoogleDocs } from "./links.ts";
+import { docIdOf, type GoogleDocs } from "./google.ts";
+import { credit } from "./links.ts";
 
 // What an agent does to a Google Doc: reads it as markdown, and edits it by one exact replacement.
 // The edit goes to Google; the next pull into its mirror is credited to the agent. Rule 13.

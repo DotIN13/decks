@@ -1,7 +1,7 @@
 import { layout, Refused } from "../../protocol/index.ts";
 import { toDeckPath, type DeckPath } from "../kernel/types.ts";
 
-// Rule 1: a document's path is fenced as every file's is.
+// A document's path, fenced as every file's is: from the deck's root, nothing hidden. Rule 1.
 
 export function fence(raw: unknown): DeckPath {
 	if (typeof raw !== "string" || !raw.trim()) throw new Refused("invalid", "The path is empty: name a document from the deck's root.", "file.list");

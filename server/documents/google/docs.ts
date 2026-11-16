@@ -1,7 +1,7 @@
 import { Refused } from "../../../protocol/index.ts";
 import type { Store } from "../../kernel/types.ts";
-import type { GoogleAccount } from "../google.ts";
-import type { GoogleDocs } from "../links.ts";
+import type { GoogleAccount, GoogleDocs } from "../google.ts";
+
 import { applyAll, type Splice } from "../splice.ts";
 import { GoogleApi, GoogleSignIn, type Fetch } from "./client.ts";
 import { signInRoutes } from "./routes.ts";

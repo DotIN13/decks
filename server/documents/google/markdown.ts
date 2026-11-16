@@ -6,6 +6,8 @@ import { OBJECT, type Block, type Cell, type DocsDocument, type DocsParagraph, t
  * page breaks are atoms kept in place; empty spacing paragraphs are never shown or touched.
  */
 
+// -- reading a Doc into blocks -------------------------------------------------------------------
+
 const MONO = /^(courier|courier new|consolas|monaco|menlo|roboto mono|source code pro|inconsolata|fira code|fira mono|ubuntu mono|jetbrains mono|space mono|cousine|ibm plex mono)$/i;
 
 /** How a picture is fetched by the page: a path on this server that knows how to reach it. */

@@ -1,4 +1,5 @@
 import type { Caller } from "../../protocol/index.ts";
+import { readJson, writeJson } from "../kernel/store.ts";
 import type { Deck, DeckPath, Store } from "../kernel/types.ts";
 import { parentOf } from "./fence.ts";
 import { walk } from "./files.ts";
@@ -9,19 +10,20 @@ import { walk } from "./files.ts";
 
 const CLAIMS = "claims/";
 const SEEN = "seen/";
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 export type News = { by?: string; named?: number; changed?: number; seen?: number };
 
-async function getJson<T>(store: Store, key: string): Promise<T | undefined> {
-	const bytes = await store.get(key);
-	return bytes ? (JSON.parse(decoder.decode(bytes)) as T) : undefined;
+/** What the person sees of a card's news: its writer and when, its last change, their last read. */
+export async function newsOf(deck: Deck, store: Store, path: DeckPath): Promise<News> {
+	const writer = await writerOf(deck, store, path);
+	const changed = await changedAt(deck, path);
+	const seen = await readJson<number | undefined>(store, SEEN + path, undefined);
+	return { ...(writer ? { by: writer.by, named: writer.at } : {}), ...(changed ? { changed } : {}), ...(seen ? { seen } : {}) };
 }
 
 /** Who named the card theirs, and when: the last write of its index.html, or a later claim. */
 async function writerOf(deck: Deck, store: Store, path: DeckPath): Promise<{ by: string; at: number } | undefined> {
 	const wrote = (await deck.revisions?.(path))?.filter((r) => r.by !== "before").at(-1);
-	const claimed = await getJson<{ by: string; rev: number; at?: number }>(store, CLAIMS + path);
+	const claimed = await readJson<{ by: string; rev: number; at?: number } | undefined>(store, CLAIMS + path, undefined);
 	if (claimed && (!wrote || claimed.rev >= wrote.rev)) return { by: claimed.by, at: claimed.at ?? wrote?.at ?? 0 };
 	return wrote ? { by: wrote.by, at: wrote.at } : undefined;
 }
@@ -33,22 +35,15 @@ async function changedAt(deck: Deck, path: DeckPath): Promise<number | undefined
 	return times.length ? Math.max(...times) : undefined;
 }
 
-export async function newsOf(deck: Deck, store: Store, path: DeckPath): Promise<News> {
-	const writer = await writerOf(deck, store, path);
-	const changed = await changedAt(deck, path);
-	const seen = await getJson<number>(store, SEEN + path);
-	return { ...(writer ? { by: writer.by, named: writer.at } : {}), ...(changed ? { changed } : {}), ...(seen ? { seen } : {}) };
-}
-
 /** A claim holds until the card's index.html is written again. */
 export async function claim(store: Store, path: DeckPath, by: Caller, rev: number, at = Date.now()): Promise<void> {
-	await store.put(CLAIMS + path, encoder.encode(JSON.stringify({ by: by.id, rev, at })));
+	await writeJson(store, CLAIMS + path, { by: by.id, rev, at });
 }
 
 /** The person read the card now; never earlier than its last change, so a skewed clock leaves no dot. */
 export async function markSeen(deck: Deck, store: Store, path: DeckPath, now = Date.now()): Promise<number> {
 	const news = await newsOf(deck, store, path);
 	const at = Math.max(now, news.changed ?? 0, news.named ?? 0);
-	await store.put(SEEN + path, encoder.encode(JSON.stringify(at)));
+	await writeJson(store, SEEN + path, at);
 	return at;
 }

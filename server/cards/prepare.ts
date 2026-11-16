@@ -1,8 +1,7 @@
 import { layout, Refused, type Caller } from "../../protocol/index.ts";
 import type { Deck, Item, ItemKind } from "../kernel/types.ts";
-import { slug, titleOf } from "./cards.ts";
+import { freeCard, slug, titleOf } from "./cards.ts";
 import { fence } from "./fence.ts";
-import { stat } from "./files.ts";
 import { cardKind } from "./item.ts";
 
 // Rules 16 and 17: a card given as html is written before it is placed, and a
@@ -44,15 +43,10 @@ async function writeHtml(deck: Deck, canvas: string, item: Item, caller: Caller)
 	const html = String(item.html);
 	const title = (typeof item.title === "string" && item.title.trim()) || titleOf("card/x", html);
 	const folder = layout.canvasFolder(canvas);
-	const base = slug(title);
-	for (let n = 1; n < 1000; n++) {
-		const path = fence(layout.cardAt(folder, n === 1 ? base : `${base}-${n}`));
-		if (await stat(deck, fence(path.slice(0, -"/index.html".length)))) continue;
-		const source = /<title[\s>]/i.test(html) ? html : `<title>${title.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</title>\n${html}`;
-		await deck.write(path, encoder.encode(source), caller);
-		return path;
-	}
-	throw new Refused("conflict", `Too many cards are named ${base}.`, "card.list");
+	const path = await freeCard(deck, folder, slug(title));
+	const source = /<title[\s>]/i.test(html) ? html : `<title>${title.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</title>\n${html}`;
+	await deck.write(path, encoder.encode(source), caller);
+	return path;
 }
 
 /** A card named by its folder or index.html, from the deck's root or the canvas's folder, as its index.html. */

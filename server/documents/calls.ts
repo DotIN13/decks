@@ -1,10 +1,10 @@
 import { calls, Refused, type Handled } from "../../protocol/index.ts";
 import { handleAll, type Context, type Deck, type DeckPath, type Store } from "../kernel/types.ts";
 import type { Documents } from "./doc.ts";
-import { guarded, type GoogleAccount } from "./google.ts";
+import { guarded, type GoogleAccount, type GoogleDocs } from "./google.ts";
 import { googleOnMirror } from "./mirror-calls.ts";
 import { editDoc, readDoc } from "./google-tools.ts";
-import { link, type GoogleDocs } from "./links.ts";
+import { link } from "./links.ts";
 import { fence } from "./path.ts";
 import { skipped } from "./records.ts";
 
