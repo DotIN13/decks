@@ -129,7 +129,7 @@ function editorRef(revision: () => number) {
  */
 function keeperOf(start: Start, end: FrameEnd) {
 	const studio = start.backend.kind === "studio" ? createStudioLine(start.backend.api, start.canvas.name, start.backend.token) : undefined;
-	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
+	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token, start.files.base);
 	let currentToken = start.backend.token;
 	const backendToken = () => currentToken;
 	/*

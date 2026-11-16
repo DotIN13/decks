@@ -3,7 +3,9 @@ import type { PenDocument, PenEdit } from "@decks/pen";
 import type { Page, StageCall } from "@decks/protocol-old";
 import type { Presence, PresenceBy, ChangeAuthor } from "@decks/protocol";
 import type { CardShot } from "../../cards/card-snapshot.ts";
+import { deckPathEdits, readDrawing } from "./drawing-read.ts";
 import { openLine, type LineClient } from "./line.ts";
+import { openSocket, type FrameSocket } from "./socket.ts";
 
 /**
  * The canvas frame's own line to the harness: its drawing, the canvas's stream, and the calls it makes
@@ -54,8 +56,11 @@ export type Heard =
 	/** The line is back after a drop and nothing says what was missed: the drawing is read again. */
 	| { type: "reconnected" };
 
-/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
-export function createBackend(api: string, canvas: string, firstToken: string): Backend {
+/**
+ * `api` is the harness's compat address as the frame reaches it (`http://host:4329/compat`); `files`, the
+ * canvas folder's address on the pass, which the drawing's relative paths are read against.
+ */
+export function createBackend(api: string, canvas: string, firstToken: string, files: string): Backend {
 	let token = firstToken;
 	/** This frame's name on its stream: what the harness says to it alone (a document's answers) carries it. */
 	const frame = `f${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -71,28 +76,40 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 			api: base,
 			token: () => token,
 			watch: () => [{ canvas, ...(sinceOf ? { since: sinceOf() } : {}) }],
+			// The drawing is the socket's now (`sock`): the line's copies of its changes are passed over.
 			hear: (message) => {
+				if (LINE_DRAWING.has((message as { type?: string }).type ?? "")) return;
 				for (const one of hearers) one(message as Heard);
-			},
-			onState: (open, again) => {
-				// Back with no revision to catch up from: the drawing is read again.
-				if (open && again && !sinceOf) for (const one of hearers) one({ type: "reconnected" });
 			},
 		}));
 
-	// The line is this canvas's: it stops when the frame moves to another canvas in place (`life.ts`).
-	life().addEventListener("abort", () => opened?.stop(), { once: true });
+	let socket: FrameSocket | undefined;
+	/** The socket on the protocol, opened on first use: the drawing read, and its changes (`item.changed`). */
+	const sock = () =>
+		(socket ??= openSocket({
+			origin: new URL(base).origin,
+			token: () => token,
+			canvas,
+			hear: (name, payload) => {
+				const heard = drawingHeard(canvas, name, payload);
+				if (heard) for (const one of hearers) one(heard);
+			},
+			// Back after a drop: what was missed is not said, so the drawing is read again.
+			onState: (open, again) => {
+				if (open && again) for (const one of hearers) one({ type: "reconnected" });
+			},
+		}));
+
+	// The line and the socket are this canvas's: they stop when the frame moves to another canvas in place (`life.ts`).
+	life().addEventListener("abort", () => (opened?.stop(), socket?.stop()), { once: true });
 
 	return {
-		async drawing() {
-			const response = await fetch(`${base}/stage-pen/${encodeURIComponent(canvas)}`, { headers: headers(), cache: "no-store" });
-			if (!response.ok) throw new Error(`The canvas ${canvas} did not load: ${response.status} ${await response.text().catch(() => "")}`.trim());
-			return (await response.json()) as { doc: PenDocument; base: string; rev: number; by?: string; cards: Page[]; harness?: string };
-		},
+		drawing: () => readDrawing(sock(), canvas, files),
 
 		follow(hear, since) {
 			sinceOf = since;
 			hearers.add(hear);
+			sock();
 			line();
 			return () => {
 				hearers.delete(hear);
@@ -129,8 +146,26 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 		setToken(next) {
 			token = next;
 			opened?.setToken(next);
+			socket?.renew();
 		},
 	};
+}
+
+/** The line's messages about the drawing, which the socket carries now. */
+const LINE_DRAWING = new Set(["canvas.changed", "stage.pen", "stage.pen.delta"]);
+
+/**
+ * An event on the socket as the drawing's follower hears it: `item.changed` with pen's own edits from the
+ * revision before, named from the deck's root; one too large to carry them is read again whole.
+ */
+function drawingHeard(canvas: string, name: string, payload: Record<string, unknown>): Heard | undefined {
+	if (name !== "item.changed") return undefined;
+	const rev = payload.rev as number;
+	const pen = payload.pen as PenEdit[] | undefined;
+	if (!pen) return { type: "reconnected" };
+	const made = payload.made as string[] | undefined;
+	const author = payload.author as ChangeAuthor | undefined;
+	return { type: "canvas.changed", canvas, rev, from: payload.base as number, edits: deckPathEdits(canvas, pen), base: "", ...(made ? { made } : {}), ...(author ? { author } : {}) };
 }
 
 /**
