@@ -47,23 +47,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 	 * are drawing they mean the drawing.
 	 */
 	onMount(() => {
-		const onKey = (event: KeyboardEvent) => {
-			const target = event.target as HTMLElement | null;
-			if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
-			const action = inkKey(event);
-			if (!action) return;
-			if (action === "escape") {
-				if (inkSelection()) setInkSelection(undefined);
-				else props.onDone();
-			} else if (action === "undo") props.onStep("undo");
-			else if (action === "redo") props.onStep("redo");
-			else if (action === "delete") {
-				if (!inkSelection()) return;
-				deleteSelection();
-			}
-			event.preventDefault();
-			event.stopPropagation();
-		};
+		const onKey = (event: KeyboardEvent) => inkKeyDown(event, props, deleteSelection);
 		window.addEventListener("keydown", onKey, true);
 		onCleanup(() => window.removeEventListener("keydown", onKey, true));
 	});
@@ -93,41 +77,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 			</For>
 
 			<Show when={paints()}>
-				<span class="pill-sep" aria-hidden="true" />
-				<span class="inkbar-swatches" role="group" aria-label="Colour">
-					<For each={INK_COLORS}>
-						{(color) => (
-							<button
-								type="button"
-								class="inkbar-swatch"
-								data-on={inkColor() === color ? "true" : undefined}
-								aria-pressed={inkColor() === color}
-								title={COLOR_NAMES[color]}
-								aria-label={COLOR_NAMES[color]}
-								style={{ "--swatch": inkSwatch(color) }}
-								onClick={() => setInkColor(color)}
-							/>
-						)}
-					</For>
-				</span>
-				<span class="pill-sep" aria-hidden="true" />
-				<span class="inkbar-widths" role="group" aria-label="Width">
-					<For each={[0, 1, 2]}>
-						{(index) => (
-							<button
-								type="button"
-								class="icon-button inkbar-width"
-								data-on={inkWidth() === index ? "soft" : undefined}
-								aria-pressed={inkWidth() === index}
-								title={`${widths()[index]} pixels wide`}
-								aria-label={`${widths()[index]} pixels wide`}
-								onClick={() => setInkWidth(index)}
-							>
-								<span style={{ height: `${2 + index * 3}px` }} />
-							</button>
-						)}
-					</For>
-				</span>
+				<InkPaint widths={widths} />
 			</Show>
 
 			<Show when={inkSelection()}>
@@ -149,5 +99,68 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 				<Icon of={X} size={15} />
 			</button>
 		</div>
+	);
+}
+
+
+/** A key while the ink tool is on: Escape lets go of the strokes held or ends drawing; undo, redo and delete act on the drawing. */
+function inkKeyDown(event: KeyboardEvent, props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void }, deleteSelection: () => void): void {
+	const target = event.target as HTMLElement | null;
+	if (target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+	const action = inkKey(event);
+	if (!action) return;
+	if (action === "escape") {
+		if (inkSelection()) setInkSelection(undefined);
+		else props.onDone();
+	} else if (action === "undo") props.onStep("undo");
+	else if (action === "redo") props.onStep("redo");
+	else if (action === "delete") {
+		if (!inkSelection()) return;
+		deleteSelection();
+	}
+	event.preventDefault();
+	event.stopPropagation();
+}
+
+/** The colour and width of a pen or a marker, while one is in hand. */
+function InkPaint(props: { widths: () => readonly number[] }) {
+	return (
+		<>
+			<span class="pill-sep" aria-hidden="true" />
+			<span class="inkbar-swatches" role="group" aria-label="Colour">
+				<For each={INK_COLORS}>
+					{(color) => (
+						<button
+							type="button"
+							class="inkbar-swatch"
+							data-on={inkColor() === color ? "true" : undefined}
+							aria-pressed={inkColor() === color}
+							title={COLOR_NAMES[color]}
+							aria-label={COLOR_NAMES[color]}
+							style={{ "--swatch": inkSwatch(color) }}
+							onClick={() => setInkColor(color)}
+						/>
+					)}
+				</For>
+			</span>
+			<span class="pill-sep" aria-hidden="true" />
+			<span class="inkbar-widths" role="group" aria-label="Width">
+				<For each={[0, 1, 2]}>
+					{(index) => (
+						<button
+							type="button"
+							class="icon-button inkbar-width"
+							data-on={inkWidth() === index ? "soft" : undefined}
+							aria-pressed={inkWidth() === index}
+							title={`${props.widths()[index]} pixels wide`}
+							aria-label={`${props.widths()[index]} pixels wide`}
+							onClick={() => setInkWidth(index)}
+						>
+							<span style={{ height: `${2 + index * 3}px` }} />
+						</button>
+					)}
+				</For>
+			</span>
+		</>
 	);
 }

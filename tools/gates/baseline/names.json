@@ -58,7 +58,7 @@
 	"canvas/chrome/Callout.tsx: stage": 10,
 	"canvas/chrome/ColorPicker.tsx: stage": 1,
 	"canvas/chrome/InkBar.tsx: board": 2,
-	"canvas/chrome/InkBar.tsx: stage": 5,
+	"canvas/chrome/InkBar.tsx: stage": 4,
 	"canvas/chrome/InsertMenu.tsx: stage": 3,
 	"canvas/chrome/keycaps.test.ts: board": 2,
 	"canvas/chrome/keycaps.ts: board": 2,

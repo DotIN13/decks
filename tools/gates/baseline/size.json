@@ -9,7 +9,6 @@
 	"canvas/cards/CardEditor.tsx: over 1000 lines": 1,
 	"canvas/chrome/Callout.tsx: function PageCallout over 80 lines": 1,
 	"canvas/chrome/ColorPicker.tsx: function ColorPicker over 80 lines": 1,
-	"canvas/chrome/InkBar.tsx: function InkBar over 80 lines": 1,
 	"canvas/chrome/Insert.tsx: function Insert over 80 lines": 1,
 	"canvas/chrome/InsertMenu.tsx: function createInsertMenu over 80 lines": 1,
 	"canvas/documents/google/view.ts: function paragraph over 80 lines": 1,
