@@ -73,7 +73,7 @@ test("every declared event is heard after the action that causes it, or listed w
 			if (!heard && !isListed(step.event)) silent.push(step.event);
 			if (heard && isListed(step.event)) stale.push(step.event);
 		}
-		const declared = EVENTS.map((event) => event.name);
+		const declared: string[] = EVENTS.map((event) => event.name);
 		const uncovered = declared.filter((name) => !STEPS.some((step) => step.event === name) && !isListed(name));
 		const gone = [...Object.keys(listed.unheard), ...Object.keys(listed.notDrivenHere)].filter((name) => !declared.includes(name));
 		assert.deepEqual(silent, [], "driven but not heard, and not in unheard.json");

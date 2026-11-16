@@ -1,4 +1,5 @@
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import type { Stores } from "./store.ts";
@@ -65,8 +66,10 @@ export async function machineFolder(given?: string): Promise<string> {
 	return folder;
 }
 
-/** A fresh temporary folder, and a way to remove it: for tests and a machine folder in memory. */
+/** A fresh temporary folder and a way to remove it; one never removed goes when the process exits. */
 export async function tempFolder(name: string): Promise<{ folder: string; remove(): Promise<void> }> {
 	const folder = await mkdtemp(join(tmpdir(), `${name}-`));
-	return { folder, remove: () => rm(folder, { recursive: true, force: true }) };
+	const atExit = () => rmSync(folder, { recursive: true, force: true });
+	process.once("exit", atExit);
+	return { folder, remove: () => (process.off("exit", atExit), rm(folder, { recursive: true, force: true })) };
 }

@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { tempFolder } from "./disk.ts";
 import { buildKernel } from "./kernel.ts";
 import { MemoryDeck } from "./memory-deck.ts";
 import { memoryStores } from "./store.ts";
@@ -15,8 +14,12 @@ test("the kernel gives a machine folder and a deck id that stays across starts",
 	assert.match(server.kernel.deckId(), /^[0-9a-f-]{36}$/);
 	await server.close();
 	const stores = memoryStores();
-	const machine = join(tmpdir(), "keel-m1");
-	const first = await buildKernel({ deck: new MemoryDeck(), stores, features: [], machine });
-	const second = await buildKernel({ deck: new MemoryDeck(), stores, features: [], machine });
-	assert.equal(first.kernel.deckId(), second.kernel.deckId());
+	const machine = await tempFolder("keel-m1");
+	try {
+		const first = await buildKernel({ deck: new MemoryDeck(), stores, features: [], machine: machine.folder });
+		const second = await buildKernel({ deck: new MemoryDeck(), stores, features: [], machine: machine.folder });
+		assert.equal(first.kernel.deckId(), second.kernel.deckId());
+	} finally {
+		await machine.remove();
+	}
 });
