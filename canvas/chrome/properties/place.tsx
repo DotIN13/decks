@@ -1,5 +1,7 @@
-// The panel's sections for everything: position and size, shadow and blur, and arranging.
-import { isArrow, isCard, isMarkdown } from "@decks/pen";
+// The panel's sections for every item: position and size, the shadow and blur section (its control,
+// Effects, is in fields.tsx), and arranging, with a card's export as an Obsidian note.
+import { isArrow, isCard, isMarkdown, type PenNode } from "@decks/pen";
+import { obsidianNote } from "../../cards/card-frame.ts";
 import AlignCenterHorizontal from "lucide-solid/icons/align-center-horizontal";
 import AlignCenterVertical from "lucide-solid/icons/align-center-vertical";
 import AlignEndHorizontal from "lucide-solid/icons/align-end-horizontal";
@@ -82,7 +84,7 @@ export function EffectsSection(own: { ctx: PanelCtx }) {
 
 /** Align, distribute, order, duplicate, export and delete. */
 export function ArrangeSection(own: { ctx: PanelCtx }) {
-	const { props, selected, single, order, duplicate, remove, align, distribute, exportNote } = own.ctx;
+	const { props, selected, single, order, duplicate, remove, align, distribute } = own.ctx;
 	return (
 		<Section key="arrange" title="Arrange">
 			<Show when={selected().filter((node) => !isArrow(node)).length >= 2}>
@@ -111,4 +113,15 @@ export function ArrangeSection(own: { ctx: PanelCtx }) {
 			</div>
 		</Section>
 	);
+}
+
+/** A card downloaded as an Obsidian note (`card-frame.ts`, `obsidianNote`), named for the card. */
+export function exportNote(node: PenNode): void {
+	const name = (String(node.name ?? "") || "Card").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Card";
+	const url = URL.createObjectURL(new Blob([obsidianNote(node)], { type: "text/markdown;charset=utf-8" }));
+	const link = Object.assign(document.createElement("a"), { href: url, download: `${name}.md` });
+	document.body.append(link);
+	link.click();
+	link.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

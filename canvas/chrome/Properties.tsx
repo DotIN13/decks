@@ -5,7 +5,8 @@ import { penTyping, propsOpen, setPenSelection, setPropsOpen } from "../editor/p
 import { Icon } from "@decks/ui";
 import { COARSE } from "../input/touch-rules.ts";
 import { kindOf, KIND_ICON } from "./properties/model.ts";
-import { createPanel, createPanelPlace, type PanelProps } from "./properties/state.ts";
+import { createPanel, type PanelProps } from "./properties/state.ts";
+import { createPanelPlace } from "./properties/panel-place.ts";
 import { held } from "./properties/fields.tsx";
 import { ShapeSection, LayoutSection, CornersSection } from "./properties/shape.tsx";
 import { FillSection, LineSection } from "./properties/paint.tsx";
@@ -14,8 +15,8 @@ import { WordsSection, IconSection } from "./properties/words.tsx";
 import { PlaceSection, EffectsSection, ArrangeSection } from "./properties/place.tsx";
 
 /**
- * The properties panel: everything about what is selected in the drawing, in the board inspector's
- * corner (top right).
+ * The properties panel: everything about what is selected in the drawing, at the top right of the
+ * canvas (a sheet or a popover on a touch screen, `properties/panel-place.ts`).
  *
  * It shows only what the selection has: a shape its kind, fill, line and words; an arrow its route,
  * heads, sides and words; an icon its library, name and weight; words their font. Position, size,

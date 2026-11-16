@@ -1,4 +1,5 @@
-// The properties panel's controls: shadow and blur, a number field, a colour field, swatches and a toggle.
+// The properties panel's parts: a section that opens and shuts (remembered for the page's life), and its
+// controls: shadow and blur, a number field, a colour field, swatches and a toggle.
 import { decksColorOf, type PenNode } from "@decks/pen";
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { adaptiveTitle, sameColor, swatchPaint } from "../adaptive.ts";

@@ -1,10 +1,8 @@
 // What the properties panel knows about the selection, and the edits it sends: one creator per
 // subject, joined by createPanel into the one object every section is given.
 import { baseTheme, DECKS_COLORS, decksColorOf, resolve, arrowEndItem, arrowEndSide, arrowStyle, indexOf, isArrow, isPointEnd, isShape, makeLabel, newId, ids as penIds, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
-import { obsidianNote } from "../../cards/card-frame.ts";
-import { createEffect, createMemo, createSignal, onCleanup, onMount, on, untrack } from "solid-js";
-import { penBoxes, penSelection, penTyping, propsOpen, setPenLive, setPenSelection, setPropsOpen } from "../../editor/pen-tools.ts";
-import { COARSE } from "../../input/touch-rules.ts";
+import { createMemo, createSignal } from "solid-js";
+import { penBoxes, penSelection, setPenLive, setPenSelection } from "../../editor/pen-tools.ts";
 import { scheme } from "../../theme.ts";
 import { MIXED, type Kind, kindOf, hexOf, colorOf, type FillMode, gradientOf, fillModeOf, legacyStroke, lineWidthOf, lineColorOf, numberOf, shared } from "./model.ts";
 
@@ -24,7 +22,7 @@ export function createPanel(props: PanelProps) {
 	const selection = createSelection(props);
 	const writing = createWriting(props);
 	const both = { ...selection, ...writing };
-	return { props, ...both, ...createPaint(both), ...createWords(both, props), ...createLayout(both), ...createPlacing(both), ...createArranging(both, props), ...createArrowEnds(both), exportNote };
+	return { props, ...both, ...createPaint(both), ...createWords(both, props), ...createLayout(both), ...createPlacing(both), ...createArranging(both, props), ...createArrowEnds(both) };
 }
 
 /** What is selected, and what each kind of control is set on: a shape's outline and words, or the item itself. */
@@ -124,7 +122,7 @@ export function createWriting(props: PanelProps) {
 	/**
 	 * The same change, drawn on the stage and not saved: what a colour picker sends while the hand is
 	 * still down, so the colour follows the pointer and the file takes one edit when it lifts
-	 * (`state/pen-tools.ts`, `penLive`).
+	 * (`editor/pen-tools.ts`, `penLive`).
 	 */
 	const show = (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) =>
 		setPenLive(nodes.length ? nodes.map((node) => ({ id: node.id, set: fields(node) })) : undefined);
@@ -370,59 +368,3 @@ export function createArrowEnds(ctx: Selection & Writing) {
 	};
 	return { arrowSet, style, endName, setSide, joinToMiddle };
 }
-
-/**
- * Where the panel stands. On a touch screen it is not a column at the right: on a phone (under 600 px)
- * a sheet at the bottom, under the thumb; on a tablet a popover beside the selection, placed from the
- * selection's outline on screen when the selection changes, when the drawing changes under it, and
- * when a pan or a pinch ends: to its right when there is room, else its left, else under it.
- */
-export function createPanelPlace() {
-	const [narrow, setNarrow] = createSignal(typeof innerWidth === "number" && innerWidth < 600);
-	const [anchor, setAnchor] = createSignal<{ left: number; top: number } | null>(null);
-	const PANEL_W = 276;
-	const place = () => {
-		if (!COARSE || untrack(narrow) || typeof document === "undefined") return setAnchor(null);
-		const outline = document.querySelector(".world > .pen-selection, .world > .pen-selection-box");
-		const r = outline?.getBoundingClientRect();
-		if (!r || r.width === 0) return setAnchor(null);
-		const top = Math.max(60, Math.min(r.top, innerHeight - 420));
-		// Clear of the pill too, which is centred under the selection and about 220 px wide (`Callout.tsx`): a narrow item's pill reaches past its sides.
-		const PILL_HALF = 112;
-		const right = Math.max(r.right, (r.left + r.right) / 2 + PILL_HALF);
-		const left = Math.min(r.left, (r.left + r.right) / 2 - PILL_HALF);
-		if (right + 12 + PANEL_W <= innerWidth - 12) return setAnchor({ left: right + 12, top });
-		if (left - 12 - PANEL_W >= 12) return setAnchor({ left: left - 12 - PANEL_W, top });
-		return setAnchor({ left: Math.max(12, Math.min(r.left, innerWidth - PANEL_W - 12)), top: Math.min(r.bottom + 12, innerHeight - 420) });
-	};
-	onMount(() => {
-		if (!COARSE) return;
-		const onResize = () => { setNarrow(innerWidth < 600); place(); };
-		const settle = () => setTimeout(place, 0);
-		addEventListener("resize", onResize);
-		addEventListener("pointerup", settle, true);
-		addEventListener("touchend", settle, true);
-		onCleanup(() => { removeEventListener("resize", onResize); removeEventListener("pointerup", settle, true); removeEventListener("touchend", settle, true); });
-	});
-	createEffect(on([penSelection, penBoxes], () => { if (COARSE) queueMicrotask(place); }));
-	// Nothing selected: the drawer is shut, so the next selection does not open it unasked.
-	createEffect(on(penSelection, (ids) => { if (!ids.length) setPropsOpen(false); }));
-	// The sheet open or shut, said to the page (`events.ts`, `decks-sheet`): its composer makes way, as under an iOS sheet.
-	createEffect(on(() => COARSE && narrow() && propsOpen() && penSelection().length > 0 && !penTyping(), (open, was) => {
-		if (open === was || typeof document === "undefined") return;
-		document.dispatchEvent(new CustomEvent("decks-sheet", { detail: { open } }));
-	}));
-	return { narrow, anchor };
-}
-
-/** A card downloaded as an Obsidian note (`card-frame.ts`, `obsidianNote`), named for the card. */
-export function exportNote(node: PenNode): void {
-	const name = (String(node.name ?? "") || "Card").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Card";
-	const url = URL.createObjectURL(new Blob([obsidianNote(node)], { type: "text/markdown;charset=utf-8" }));
-	const link = Object.assign(document.createElement("a"), { href: url, download: `${name}.md` });
-	document.body.append(link);
-	link.click();
-	link.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
