@@ -54,7 +54,7 @@ export const ClientMessage = named(
 		obj({ type: lit("hello"), token: str(), protocol: str() }),
 		obj({ type: lit("call"), id: str(), name: str(), args: any() }),
 		obj({ type: lit("watch"), events: opt(arr(str())), canvas: opt(str()), since: opt(int("With canvas: first replay item.changed for every revision after this one from the canvas's log, then go live.")) }),
-		/** A fresh token for the same caller and canvas, taken from then on and answered with a fresh hello; any other closes the socket, 4403. */
+		/** A fresh token for the same caller (and, for a card pass, the same canvas), taken from then on and answered with a fresh hello; any other closes the socket, 4403. */
 		obj({ type: lit("token"), token: str() }),
 		obj({ type: lit("reply"), id: str(), envelope: Envelope }),
 		obj({ type: lit("tell"), name: str(), payload: any() }),
