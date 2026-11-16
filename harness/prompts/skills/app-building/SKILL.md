@@ -108,7 +108,7 @@ await decks.sendTo({ name: "Helper", kind: "claude" }, { task: "…" }); // made
   the agent writes in your app's folder.
 - Keep the calls in your server, not in the page, when the server can make them: then what the app
   may do is in one file somebody can read.
-- `packages/sdk/README.md` has the rest, and `examples/mcp-server.mjs` is an MCP server on it.
+- `clients/sdk/README.md` has the rest, and `clients/mcp/main.ts` is an MCP server built on it.
 
 ## Recipes
 
