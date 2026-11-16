@@ -4,9 +4,9 @@ import { callsFor } from "@decks/protocol";
 import { ask } from "../state/confirm.ts";
 import { call as callServer } from "../state/line.ts";
 
-/** What the frame hands the page: a card's call by its protocol name, already turned from an old card's shape. */
+/** The calls a card may make through the page: the agent calls and view.goto a card's role has (the frame hands them by protocol name, an old card's already turned). */
 const CARD_MAY = callsFor("card");
-const mayCall = (name: string) => CARD_MAY.has(name) && (name.startsWith("agent.") || name === "view.goto");
+export const mayCall = (name: string): boolean => CARD_MAY.has(name) && (name.startsWith("agent.") || name === "view.goto");
 
 /**
  * A card's agent call. Anything in the frame can make one and which card asked is only what the
