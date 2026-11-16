@@ -7,8 +7,10 @@ import { test } from "node:test";
 import { Refused, type Caller } from "../../../protocol/index.ts";
 import { MemoryDeck, toDeckPath } from "../../kernel/index.ts";
 import { folderRunner } from "../../kernel/run.ts";
-import type { RunJob, RunResult } from "../../kernel/types.ts";
-import { NO_TECTONIC, TOO_LONG, Typesetter, type Run } from "./compile.ts";
+import type { Kernel, RunJob, RunResult } from "../../kernel/types.ts";
+import { NO_TECTONIC, TOO_LONG, Typesetter } from "./compile.ts";
+
+type Run = NonNullable<Kernel["run"]>;
 import { buildPath, readErrors, tectonicCandidates, tectonicJob } from "./tectonic.ts";
 
 // Tests from the README's rules: the machine faked at its edge, and one real run when Tectonic is here.

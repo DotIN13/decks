@@ -1,11 +1,8 @@
 import { Refused, type Caller } from "../../../protocol/index.ts";
-import { toDeckPath, type Deck, type DeckPath, type RunJob, type RunResult } from "../../kernel/types.ts";
+import { toDeckPath, type Deck, type DeckPath, type Kernel } from "../../kernel/types.ts";
 import { buildPath, readErrors, tectonicJob, type CompileError } from "./tectonic.ts";
 
 // Typesetting a LaTeX document: one run at a time per document, the PDF and log written through the deck.
-
-/** The kernel's run, read when a call comes. */
-export type Run = (job: RunJob) => Promise<RunResult>;
 
 export type Compiled = { path: string; ok: boolean; pdf?: string; errors: CompileError[]; at: number; ms: number; error?: string };
 
@@ -18,7 +15,7 @@ export class Typesetter {
 	private queues = new Map<string, Promise<unknown>>();
 
 	constructor(
-		private machine: () => Run | undefined,
+		private machine: () => Kernel["run"],
 		private candidates?: string[],
 	) {}
 
@@ -44,7 +41,7 @@ export function texPath(raw: string): DeckPath {
 }
 
 /** One run: the job on the machine, then its PDF and log into docs/build/ (rules 6 to 8). */
-async function typeset(run: Run, deck: Deck, path: DeckPath, by: Caller, candidates?: string[]): Promise<Compiled> {
+async function typeset(run: NonNullable<Kernel["run"]>, deck: Deck, path: DeckPath, by: Caller, candidates?: string[]): Promise<Compiled> {
 	const started = Date.now();
 	const job = tectonicJob(path, candidates);
 	const result = await run(job);

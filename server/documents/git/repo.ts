@@ -1,11 +1,13 @@
 import { Refused } from "../../../protocol/index.ts";
-import { toDeckPath, type DeckPath, type RunJob, type RunResult } from "../../kernel/types.ts";
+import { toDeckPath, type DeckPath, type Kernel } from "../../kernel/types.ts";
 import { capital, cleanRemote, plural, readStatus, remoteLabel, why, type DocRepo, type GitRun } from "./status.ts";
 
 // A document's git repository: read it, pull it (commit first, then merge), push it (pull first, then send).
 
-export type Run = (job: RunJob) => Promise<RunResult>;
+type Run = NonNullable<Kernel["run"]>;
 export type Synced = { ok: boolean; message: string; status?: DocRepo };
+/** What the pull half did, for push to build on. */
+type Pulled = { ok: boolean; message: string; label: string; count: number };
 
 const TIMEOUT_MS = 90_000;
 const MESSAGE = "Edited in Decks";
@@ -19,7 +21,7 @@ type Found = { top: DeckPath | ""; file: string; git: (args: string[]) => Promis
 export class Repos {
 	private queues = new Map<string, Promise<unknown>>();
 
-	constructor(private machine: () => Run | undefined) {}
+	constructor(private machine: () => Kernel["run"]) {}
 
 	/** The repository the document is in, or null (rules 1, 2). */
 	async repo(raw: string): Promise<DocRepo | null> {
@@ -102,27 +104,6 @@ async function withStatus(found: Found): Promise<{ status?: DocRepo }> {
 	return status ? { status } : {};
 }
 
-/** Who commits: the repository's own name, else Decks, so a commit is never refused for it (rule 4). */
-async function identity(found: Found): Promise<string[]> {
-	const named = (await found.git(["config", "user.email"])).out.trim();
-	return named ? [] : ["-c", "user.name=Decks", "-c", "user.email=decks@localhost"];
-}
-
-/** Commit the tracked files' edits and the document itself, if anything changed (rule 4). */
-async function commitAll(found: Found): Promise<GitRun> {
-	await found.git(["add", "-u"]);
-	await found.git(["add", "--", found.file]);
-	if ((await found.git(["diff", "--cached", "--quiet"])).code === 0) return { code: 0, out: "" };
-	return found.git([...(await identity(found)), "commit", "-q", "-m", MESSAGE]);
-}
-
-async function count(found: Found, range: string): Promise<number> {
-	const run = await found.git(["rev-list", "--count", range]);
-	return run.code === 0 ? Number(run.out.trim()) : 0;
-}
-
-type Pulled = { ok: boolean; message: string; label: string; count: number };
-
 /** Commit, fetch, merge; a merge that stops on lines both sides changed is called off (rules 4, 5). */
 async function pullInto(found: Found): Promise<Pulled> {
 	const label = (await statusOf(found))?.label ?? "the remote";
@@ -148,6 +129,25 @@ async function mergeUpstream(found: Found): Promise<GitRun> {
 	if (merge.code === 0 || !/would be overwritten by merge/.test(merge.out)) return merge;
 	await commitAll(found);
 	return found.git([...who, "merge", "--no-edit", "@{upstream}"]);
+}
+
+/** Commit the tracked files' edits and the document itself, if anything changed (rule 4). */
+async function commitAll(found: Found): Promise<GitRun> {
+	await found.git(["add", "-u"]);
+	await found.git(["add", "--", found.file]);
+	if ((await found.git(["diff", "--cached", "--quiet"])).code === 0) return { code: 0, out: "" };
+	return found.git([...(await identity(found)), "commit", "-q", "-m", MESSAGE]);
+}
+
+/** Who commits: the repository's own name, else Decks, so a commit is never refused for it (rule 4). */
+async function identity(found: Found): Promise<string[]> {
+	const named = (await found.git(["config", "user.email"])).out.trim();
+	return named ? [] : ["-c", "user.name=Decks", "-c", "user.email=decks@localhost"];
+}
+
+async function count(found: Found, range: string): Promise<number> {
+	const run = await found.git(["rev-list", "--count", range]);
+	return run.code === 0 ? Number(run.out.trim()) : 0;
 }
 
 /** Send what the remote lacks; nothing to send says so (rule 6). */
