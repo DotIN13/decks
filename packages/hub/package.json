@@ -7,8 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./layout": "./src/layout.ts",
-    "./node": "./src/node.ts",
-    "./follower": "./src/follower.ts"
+    "./node": "./src/node.ts"
   },
   "dependencies": {
     "@decks/card-host": "*",

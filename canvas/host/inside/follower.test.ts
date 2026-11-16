@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { applyEdits, type PenDocument, type PenEdit } from "@decks/pen";
-import { CanvasFollower, loosely } from "../src/follower.ts";
+import { CanvasFollower, loosely } from "./follower.ts";
 
 const start = (): PenDocument => ({ version: "2.14", children: [{ id: "a", type: "note", x: 0, y: 0 } as never, { id: "b", type: "note", x: 100, y: 0 } as never] });
 const x = (id: string, value: number): PenEdit => ({ op: "set", id, key: "x", value });

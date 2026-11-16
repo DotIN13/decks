@@ -544,7 +544,6 @@
 	"packages/docs/src/server/versions.ts: comment over 5 lines": 1,
 	"packages/docs/src/server/zip.ts: comment over 5 lines": 1,
 	"packages/hub/src/commit.ts: comment over 5 lines": 1,
-	"packages/hub/src/follower.ts: comment over 5 lines": 1,
 	"packages/hub/src/handlers.ts: comment over 5 lines": 1,
 	"packages/hub/src/index.ts: comment over 5 lines": 1,
 	"packages/hub/src/layout.ts: comment over 5 lines": 4,

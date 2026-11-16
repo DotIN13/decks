@@ -1,4 +1,4 @@
-import { CanvasFollower } from "@decks/hub/follower";
+import { CanvasFollower } from "./follower.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
 import type { ServerMessage } from "@decks/protocol-old";
 import type { Presence } from "@decks/protocol";
@@ -9,7 +9,7 @@ import type { Presence } from "@decks/protocol";
  * (`POST /api/canvases/:id/edits`) and Studio's live socket, held to this one canvas, all on a token
  * Studio made for this frame and canvas (`frame-token`), which the page renews.
  *
- * The drawing is kept in step as Studio's own page keeps it (`@decks/hub`'s `CanvasFollower`): the
+ * The drawing is kept in step as Studio's own page keeps it (`follower.ts`, `CanvasFollower`): the
  * page's edits shown at once and sent in order, Studio's revisions applied as they are said, the
  * whole drawing only when its log no longer reaches back. The same socket carries presence both
  * ways: where this frame's person is, said as `presence` (`presence.ts`, as `presence.set` is said

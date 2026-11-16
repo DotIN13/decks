@@ -10,6 +10,7 @@
 		"./tools": "./entries/tools.ts",
 		"./camera": "./entries/camera.ts",
 		"./host": "./entries/host.ts",
+		"./follower": "./host/inside/follower.ts",
 		"./card-reading": "./cards/card-reading.ts",
 		"./card": "./cards/card.ts",
 		"./styles.css": "./styles/surface.css",

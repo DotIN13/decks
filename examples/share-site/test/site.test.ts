@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyEdits, diff, parse, serialize, type PenDocument, type PenEdit } from "@decks/pen";
 import { HarnessSync } from "@decks/sync-client";
-import { CanvasFollower } from "@decks/hub/follower";
+import { CanvasFollower } from "@decks/canvas/follower";
 import { LiveEvent, type EditsAnswer } from "@decks/sync-protocol";
 import WebSocket from "ws";
 import { startSite } from "../src/server.ts";

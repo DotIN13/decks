@@ -1,5 +1,4 @@
 {
-	"canvas/host/inside/studio-line.ts: canvas may not import server (packages/hub)": 1,
 	"examples/share-site/src/page.ts: reaches past the entry of canvas": 1,
 	"harness/page/camera/landing.ts: harness may not import pen (pen)": 1,
 	"harness/page/connections/bundle.ts: harness may not import pen (pen)": 1,

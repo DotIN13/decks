@@ -1,20 +1,11 @@
 import { applyEdits, type PenDocument, type PenEdit } from "@decks/pen";
-import type { Changes, LiveEvent } from "@decks/sync-protocol";
+import type { Changes, LiveEvent } from "@decks/protocol";
 
-/**
- * The page's side of a shared canvas (browser-safe: no Node), for any site on the hub.
- *
- * How an open canvas keeps in step with Studio without downloading the drawing: Studio says what
- * each revision changed, in the live message or as `changes?since=`, and the page applies it to the
- * drawing it already has. The whole drawing comes only when Studio's log no longer reaches back.
- *
- * The page's own edits are shown at once and sent in order. Studio answers each with its revision
- * and the one it went onto (`base`): when that is the page's own, nothing else happened meanwhile and
- * the drawing is already right. The page's own revisions are known by its `client` name, in the
- * answer and in the live message, so they are never applied twice. Someone else's edit that arrives
- * while one of the page's is on its way is shown under it: Studio applies the page's after, so a
- * field both set keeps the page's value, here as there.
- */
+// A page's side of a shared canvas, browser-safe: it applies what each of Studio's revisions changed to the
+// drawing it has, reading it whole only when Studio's log no longer reaches back. Its own edits show at once,
+// go in order, and are known by its client name so they never apply twice; another's edit arriving while one
+// of its own is on the way goes under it, as Studio applies them.
+
 export interface FollowerHost {
 	/** The drawing as the page has it now. */
 	doc(): PenDocument;

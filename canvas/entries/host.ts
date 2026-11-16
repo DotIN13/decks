@@ -10,6 +10,8 @@ export * from "../camera/view-calls.ts";
 export * from "../cards/card-reading.ts";
 export * from "../chrome/keycaps.ts";
 export * from "../theme.ts";
+// How a page on a shared canvas keeps its drawing in step with Studio (Decks Studio's own page uses it too).
+export { CanvasFollower, type FollowerHost } from "../host/inside/follower.ts";
 // The engine itself, for a host that draws a stage with no editor round it (the Decks app's shot page).
 export { StageEngine } from "../render/engine.ts";
 // The knobs the measuring scripts set and the probes the browser checks read (`debug.ts`), typed once.

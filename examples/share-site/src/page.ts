@@ -1,6 +1,6 @@
 import { createEditor, type Editor } from "@decks/canvas";
 import "@decks/canvas/canvas.css";
-import { CanvasFollower } from "@decks/hub/follower";
+import { CanvasFollower } from "@decks/canvas/follower";
 import { serialize, type PenDocument, type PenEdit } from "@decks/pen";
 import { render } from "solid-js/web";
 import { LiveEvent, syncPath, syncRoutes, type CanvasAnswer, type Changes, type EditsAnswer, type SyncCanvas } from "@decks/sync-protocol";
@@ -34,7 +34,7 @@ render(() => {
 }, host);
 const engine = editor.handle;
 
-// The page's side of syncing: the hub's follower applies others' edits and sends the page's in order.
+// The page's side of syncing: the canvas's follower applies others' edits and sends the page's in order.
 const follower = new CanvasFollower(
 	{
 		doc: () => engine.document(),
