@@ -63,7 +63,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1300, height: 900, cards: false });
 await settle(page, 1200);
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 await editMode(page, true);
 // The canvas, its cards and their editor are in the canvas frame; a key reaches it while the focus is there.
 const canvas = await focusCanvas(page);
@@ -110,9 +110,9 @@ for (let i = 0; i < 20; i++) {
 // Clear of the page's top bar too, which sits over the canvas frame: the card's style bar shows above its words.
 const world = { x1: Math.round((420 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
 // A card left by a run that stopped half way would keep the id, and the insert would be refused.
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
+link.edit(agentId, [{ op: "delete", id: "card-editor" }]);
 await settle(page, 400);
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "card-editor", content: SOURCE, metadata: { type: "decks.markdown" }, width: 360 }, box: world }] });
+link.edit(agentId, [{ op: "insert", node: { type: "note", id: "card-editor", content: SOURCE, metadata: { type: "decks.markdown" }, width: 360 }, box: world }]);
 // Drawn once its fonts have arrived, which is when it is as tall as its markdown.
 const box = await until(async () => {
 	const now = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-editor"));
@@ -440,10 +440,10 @@ const where = (id) => {
 };
 await page.keyboard.press("Escape");
 await settle(page, 300);
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });
+link.edit(agentId, [{ op: "delete", id: "card-picture" }]);
 await settle(page, 300);
 const beside = { x1: Math.round((880 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "card-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...beside, x2: beside.x1 + 160, y2: beside.y1 + 90 } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "card-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...beside, x2: beside.x1 + 160, y2: beside.y1 + 90 } }]);
 const picture = await until(() => canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("card-picture")));
 const kids = where("card-picture")?.kids ?? [];
 const second = await canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id), kids[1]);
@@ -541,7 +541,7 @@ const outside = await until(() => {
 	}
 });
 say("…and dragging the grip takes the block out of the card, keeping its width", !!outside && typeof outside.width === "number" && !(cardNode()?.children ?? []).some((n) => n.id === blockId), JSON.stringify(outside && { width: outside.width }));
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: blockId }] });
+link.edit(agentId, [{ op: "delete", id: blockId }]);
 await settle(page, 300);
 
 // The text tool makes markdown words, typed into with the card's toolbar.
@@ -572,10 +572,10 @@ const words = await until(() => {
 	}
 });
 say("the text tool makes markdown words, typed into with the card's editor", !!words && words.metadata?.type === "decks.markdown", JSON.stringify({ freeAt, made: words && { type: words.metadata?.type, width: words.width } }));
-if (words) link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: words.id }] });
+if (words) link.edit(agentId, [{ op: "delete", id: words.id }]);
 
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });
+link.edit(agentId, [{ op: "delete", id: "card-editor" }]);
+link.edit(agentId, [{ op: "delete", id: "card-picture" }]);
 await settle(page, 300);
 say("no page errors", !errors.length, errors.slice(0, 3).join(" | "));
 await editMode(page, false);

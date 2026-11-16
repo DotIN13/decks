@@ -89,7 +89,7 @@ try {
 	 * and not the rewound second one. Counted, not looked for by name: a fork can take its
 	 * parent's name.
 	 */
-	const chatIds = () => new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	const chatIds = () => new Set((link.last("agent.list")?.chats ?? []).map((chat) => chat.id));
 	const chatsBefore = chatIds();
 	const third = mine.last();
 	await third.hover();
@@ -100,7 +100,7 @@ try {
 		if (!forkId) await settle(page, 250);
 	}
 	say("forking opens a new chat", Boolean(forkId));
-	const forkKind = (link.last("agents")?.chats ?? []).find((chat) => chat.id === forkId)?.kind;
+	const forkKind = (link.last("agent.list")?.chats ?? []).find((chat) => chat.id === forkId)?.kind;
 	say(
 		"…on the runtime this run is about",
 		!process.env.DECKS_E2E_KIND || forkKind === process.env.DECKS_E2E_KIND,

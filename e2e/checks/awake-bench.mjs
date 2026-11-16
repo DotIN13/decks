@@ -115,7 +115,7 @@ const spot = busiest(pen, ZOOM);
 // --- the page -----------------------------------------------------------------------------------------
 at("opening the page");
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 const { page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
 const cdp = await context.newCDPSession(page);
@@ -133,9 +133,8 @@ page.on("request", (request) => {
 });
 
 at("switching to the awake canvas");
-link.send({ type: "agent.stage", id: agentId, stage: AWAKE_CANVAS });
-setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1200);
-await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === AWAKE_CANVAS), 20000);
+link.call("agent.set", [agentId, { canvas: AWAKE_CANVAS }]);
+await until(() => link.canvasOf(agentId) === AWAKE_CANVAS && link.drawing(AWAKE_CANVAS), 20000);
 at("reloading onto it");
 if (QUERY) await page.goto(`${page.url().split("?")[0]}?${QUERY}`, { waitUntil: "domcontentloaded" });
 else await page.reload({ waitUntil: "domcontentloaded" });

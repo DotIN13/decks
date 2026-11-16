@@ -20,7 +20,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 await editMode(page, true);
 /** The canvas frame: the stage, its pill and its handles are there. */
 const canvas = await canvasFrame(page);
@@ -32,7 +32,7 @@ const spot = await canvas.evaluate(() => {
 });
 const w = 200 / spot.zoom;
 const h = 120 / spot.zoom;
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-box", fill: "#4c8bf5" }, box: { x1: spot.x, y1: spot.y, x2: spot.x + w, y2: spot.y + h } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "pill-box", fill: "#4c8bf5" }, box: { x1: spot.x, y1: spot.y, x2: spot.x + w, y2: spot.y + h } }]);
 const box = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-box")));
 say("the box is on screen", !!box, JSON.stringify(box));
 
@@ -54,11 +54,11 @@ await page.mouse.down();
 await page.mouse.move(anchor.x + 200, anchor.y - 40, { steps: 6 });
 await page.mouse.move(anchor.x + 260, anchor.y - 60, { steps: 6 });
 await page.mouse.up();
-const arrow = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId).at(-1)?.doc.children.find((n) => n.metadata?.type === "decks.arrow" && (n.metadata.from === "pill-box" || n.metadata.from?.item === "pill-box")));
+const arrow = await until(() => link.drawings(agentId).at(-1)?.doc.children.find((n) => n.metadata?.type === "decks.arrow" && (n.metadata.from === "pill-box" || n.metadata.from?.item === "pill-box")));
 say("a drag from the handle draws an arrow from the top", arrow?.metadata.from?.side === "top", JSON.stringify(arrow?.metadata));
 
 // Two items selected have no handles, and their pill keeps its own 10 px.
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-two", fill: "#f5a34c" }, box: { x1: spot.x + w + 40 / spot.zoom, y1: spot.y, x2: spot.x + 2 * w + 40 / spot.zoom, y2: spot.y + h } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "pill-two", fill: "#f5a34c" }, box: { x1: spot.x + w + 40 / spot.zoom, y1: spot.y, x2: spot.x + 2 * w + 40 / spot.zoom, y2: spot.y + h } }]);
 const two = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-two")));
 await page.keyboard.press("Escape");
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -136,7 +136,7 @@ await rest(page);
  * Two slots only, over the top edge and under the bottom one, and the one that covers nothing else:
  * with an item just above the box, the pill goes under it, on neither the box nor the item above.
  */
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-roof", fill: "#7a7a7a" }, box: { x1: spot.x - 40 / spot.zoom, y1: spot.y - 70 / spot.zoom, x2: spot.x + w + 40 / spot.zoom, y2: spot.y - 20 / spot.zoom } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "pill-roof", fill: "#7a7a7a" }, box: { x1: spot.x - 40 / spot.zoom, y1: spot.y - 70 / spot.zoom, x2: spot.x + w + 40 / spot.zoom, y2: spot.y - 20 / spot.zoom } }]);
 const roof = await until(() => canvas.evaluate(() => window.__decksProbes?.penBox?.("pill-roof")));
 await page.keyboard.press("Escape");
 await settle(page, 300);

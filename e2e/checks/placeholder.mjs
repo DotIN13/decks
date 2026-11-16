@@ -41,13 +41,9 @@ const X = Math.round(Math.max(0, ...placed.map((b) => b.x + (b.w ?? 0))) + 400);
 const Y = Math.round((placed.length ? Math.min(...placed.map((b) => b.y)) : 0) + 120);
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [{ op: "insert", node: { type: "frame", id: ID, width: W, height: H, layout: "none", placeholder: true, fill: "#ffffff" }, box: { x1: X, y1: Y, x2: X + W, y2: Y + H } }],
-});
-const landed = await until(() => link.received.some((m) => m.type === "stage.pen" && m.doc?.children?.some((n) => n.id === ID)) || link.received.some((m) => m.type === "stage.pen.delta"));
+const agentId = await until(() => link.last("agent.list")?.focused);
+link.edit(agentId, [{ op: "insert", node: { type: "frame", id: ID, width: W, height: H, layout: "none", placeholder: true, fill: "#ffffff" }, box: { x1: X, y1: Y, x2: X + W, y2: Y + H } }]);
+const landed = await until(() => link.drawn.some((m) => m.doc?.children?.some((n) => n.id === ID)));
 say("the placeholder frame is on the stage", !!landed);
 
 /** The accent as `[r, g, b]`, as the page resolves `--color-accent` in this scheme. */

@@ -51,10 +51,9 @@ writeFileSync(join(folder, "canvas.json"), `${JSON.stringify({ title: CANVAS })}
 writeFileSync(join(folder, "canvas.pen"), JSON.stringify({ version: "2.14", children }));
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
-link.send({ type: "agent.stage", id: agentId, stage: CANVAS });
-setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
-const on = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
+const agentId = await until(() => link.last("agent.list")?.focused);
+link.call("agent.set", [agentId, { canvas: CANVAS }]);
+const on = await until(() => link.canvasOf(agentId) === CANVAS && link.drawing(CANVAS), 20000);
 say("the agent is on the text canvas", !!on);
 
 const { browser, page } = await open({ width: W, height: H, dpr: DPR, cards: false });

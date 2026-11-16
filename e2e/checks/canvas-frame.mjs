@@ -21,17 +21,17 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const focused = await until(() => link.last("agents")?.focused);
+const focused = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!focused);
 
 // A second chat in a workspace of its own, so it gets its own canvas, holding three notes and nothing else.
-const before = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
-link.send({ type: "agent.create", workspace: "canvas-frame-check" });
-const other = await until(() => (link.last("agents")?.chats ?? []).map((chat) => chat.id).find((id) => !before.has(id)), 15000);
+const before = new Set((link.last("agent.list")?.chats ?? []).map((chat) => chat.id));
+link.call("agent.add", [{ workspace: "canvas-frame-check" }]);
+const other = await until(() => (link.last("agent.list")?.chats ?? []).map((chat) => chat.id).find((id) => !before.has(id)), 15000);
 say("a second chat to draw with", !!other);
 const notes = [[6000, 4000], [6400, 4100], [6200, 4400]].map(([x, y], index) => ({ op: "insert", node: { type: "note", id: `far-${index}`, content: "Far away" }, box: { x1: x, y1: y, x2: x + 240, y2: y + 120 } }));
-link.send({ type: "stage.pen.edit", agentId: other, ops: notes });
-const canvas = await until(() => (link.received.filter((m) => m.type === "stages").at(-1)?.stages ?? []).find((one) => one.agents.some((agent) => agent.id === other))?.name, 12000);
+link.edit(other, notes);
+const canvas = await until(() => (link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? []).find((one) => one.agents.some((agent) => agent.id === other))?.name, 12000);
 say("the second chat has a canvas of drawing only", !!canvas, String(canvas));
 
 // What the camera shows: are the notes' middle and the window's middle close, at a zoom where notes read?
@@ -46,7 +46,7 @@ const middleShown = async () => (await canvasFrame(page)).evaluate(() => {
 const near = (camera) => !!camera && camera.x > 5600 && camera.x < 6900 && camera.y > 3800 && camera.y < 4800;
 
 // Switch the conversation on screen to that canvas: the camera must land on the notes.
-link.send({ type: "agent.stage", id: focused, stage: canvas });
+link.call("agent.set", [focused, { canvas: canvas }]);
 const landed = await until(async () => { const c = await middleShown(); return near(c) ? c : undefined; }, 8000);
 say("switching to a canvas of drawing lands on its drawing", !!landed, JSON.stringify(await middleShown()));
 

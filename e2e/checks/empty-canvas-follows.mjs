@@ -12,7 +12,7 @@ const until = async (test, ms = 8000) => { const end = Date.now() + ms; for (;;)
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 300 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const person = await asPerson();
 const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 

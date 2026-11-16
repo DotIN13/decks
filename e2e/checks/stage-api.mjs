@@ -47,7 +47,7 @@ say("taking one off leaves the other", (await onCanvas()).join() === base(two[0]
 say("…and the Canvas tab lists only that one", (await inPanel()).join() === labelOf(two[0]), (await inPanel()).join(" | "));
 
 const tidy = await socket();
-tidy.send({ type: "agent.remove", id: made.id });
+tidy.call("agent.remove", [made.id]);
 await new Promise((resolve) => setTimeout(resolve, 300));
 tidy.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

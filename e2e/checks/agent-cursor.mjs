@@ -20,7 +20,7 @@ try {
 	const frame = await canvasFrame(page);
 	await rest(page);
 	const link = await socket();
-	const agent = await until(async () => link.last("agents")?.focused);
+	const agent = await until(async () => link.last("agent.list")?.focused);
 	// As the agent itself, on its token.
 	const token = (await call("agent.get", [agent])).value ? undefined : undefined;
 	// The card on screen first, as an agent working on it would have it.

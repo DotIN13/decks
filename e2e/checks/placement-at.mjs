@@ -25,8 +25,8 @@ const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
 const LINK = await socket();
 
-const agentId = await until(() => LINK.last("agents")?.focused);
-const stageName = await until(() => LINK.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const agentId = await until(() => LINK.last("agent.list")?.focused);
+const stageName = await until(() => LINK.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 const file = join((await deckState()).path, "canvases", stageName ?? "?", "canvas.pen");
 /** Where a card sits in the canvas file, found by its folder. */
 const placed = (path) => {

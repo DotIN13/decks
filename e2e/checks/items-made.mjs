@@ -3,7 +3,7 @@
  *
  * - A PDF dropped on empty canvas is a file card, as any other dropped file is (`files.ts`,
  *   `placeFileCards`): a picture of its first page with its name, and no board in `boards/files/`.
- * - A document from the file picker is a document item (`document.create`), `{ type: "browser",
+ * - A document from the file picker is a document item (`doc.place`), `{ type: "browser",
  *   metadata: { type: "decks.document", path } }`, where it was asked for, answered with its path on
  *   the stage (`item:<id>`), and no board in `boards/documents/`.
  * - An app made with `apps create` answers with the item that shows it, `{ type: "app", app }`, and
@@ -30,8 +30,8 @@ await resetStage(page);
 await settle(page, 900);
 const link = await socket();
 const deck = await deckState();
-const agentId = await until(() => link.last("agents")?.focused);
-const stageName = await until(() => link.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const agentId = await until(() => link.last("agent.list")?.focused);
+const stageName = await until(() => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 const file = join(deck.path, "canvases", stageName ?? "?", "canvas.pen");
 const items = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).children ?? [] : []);
 const tagged = (type) => items().filter((node) => node.type === "browser" && node.metadata?.type === type);
@@ -61,16 +61,14 @@ say("…and no board is made for it", tagged("decks.board").length === boardsBef
 
 // --- a document from the picker, at a point -------------------------------------------------
 
-link.send({ type: "document.create", document: "docs/notes.md", at: { x: 40000, y: 30000 }, request: "items-1" });
-const answered = await until(() => link.received.find((m) => m.type === "document.created" && m.request === "items-1"));
+const answered = (await link.call("doc.place", [{ document: "docs/notes.md", at: { x: 40000, y: 30000 } }])).value;
 say("a document from the picker is answered with its item's path", /^item:/.test(answered?.path ?? ""), JSON.stringify(answered));
 const doc = tagged("decks.document").find((node) => `item:${node.id}` === answered?.path);
 say("…a document item naming the file, where it was asked for", doc?.metadata?.path === "docs/notes.md" && doc.x === 40000 && doc.y === 30000, JSON.stringify(doc));
 say("…drawn on the stage", !!(await until(() => (answered ? onStage(answered.path) : false))));
 say("…and no board is made for it", !existsSync(join(deck.path, "boards", "documents")));
-link.send({ type: "document.create", document: "docs/no-such-file.md", request: "items-2" });
-const refused = await until(() => link.received.find((m) => m.type === "notice" && /no-such-file/.test(m.text)));
-say("a file that is not there is refused in a sentence", !!refused && !link.received.some((m) => m.request === "items-2"), JSON.stringify(refused));
+const refused = await link.call("doc.place", [{ document: "docs/no-such-file.md" }]);
+say("a file that is not there is refused in a sentence", !refused.ok && /no-such-file/.test(refused.error ?? ""), JSON.stringify(refused));
 
 // --- an app, made and placed ------------------------------------------------------------------
 

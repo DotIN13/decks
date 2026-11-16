@@ -29,7 +29,7 @@ const { browser, context, page, errors } = await open({ width: 1500, height: 100
 const LINKED = cardPath("risks");
 const link = await socket();
 // The linked board off the canvas first, so the link is what brings it back.
-link.send({ type: "card.hide", path: LINKED });
+link.call("card.hide", [LINKED]);
 const canvas = await canvasFrame(page);
 const onCanvas = () => canvas.evaluate(() => (window.__decksProbes?.cards?.() ?? []).map((one) => one.path));
 await canvas.waitForFunction((path) => !(window.__decksProbes?.cards?.() ?? []).some((one) => one.path === path), LINKED, { timeout: 8000 }).catch(() => {});

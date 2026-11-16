@@ -1,7 +1,7 @@
 /**
  * An agent's edits and a person's end in the same drawing as opening the canvas afresh.
  *
- * The stage takes in a change as the edits that made it (`stage.pen.delta`, applied to the app's
+ * The stage takes in a change as the edits that made it (`canvas.changed`, applied to the app's
  * copy sharing what they did not reach, `editDocument`) and its engine re-lays and reads back only
  * the top-level items they reached (`layoutChanges`, `stage/engine.ts` `laidOut`). This puts it
  * through every kind of change, from an agent over the wire and from a person's drag, and then asks
@@ -27,7 +27,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const cam = await (await inCanvas(page)).evaluate(() => globalThis.__decksProbes.rust.camera);
 const z = cam.zoom;
 const at = (dx, dy, w, h) => ({ x1: cam.x + dx / z, y1: cam.y + dy / z, x2: cam.x + (dx + w) / z, y2: cam.y + (dy + h) / z });
@@ -56,7 +56,7 @@ const agree = async (after) => {
 };
 let edits = 0;
 const edit = async (ops, ready, arg) => {
-	link.send({ type: "stage.pen.edit", agentId, ops });
+	link.edit(agentId, ops);
 	const done = await until(async () => (await inCanvas(page)).evaluate(ready, arg));
 	await agree(`edit ${++edits}`);
 	return done;
@@ -122,8 +122,7 @@ const live = await layouts();
 say("after each change, the layout held is the engine's whole one", disagreed.length === 0, disagreed.slice(0, 2).join(" | "));
 say("the stage's layout, made change by change, is its engine's whole one, in paint order", JSON.stringify(live.held) === JSON.stringify(live.whole), first(live.held, live.whole) || `${live.held.length} items`);
 say("…and so are the cards", JSON.stringify(live.cards) === JSON.stringify(live.wholeCards), first(live.cards, live.wholeCards) || `${live.cards.length} cards`);
-link.send({ type: "stage.pen.get", agentId });
-const server = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId).at(-1));
+const server = await until(() => link.drawing(agentId));
 const serverDoc = server?.doc;
 say("the page's drawing is the server's", !!serverDoc && JSON.stringify(canon(live.doc)) === JSON.stringify(canon(serverDoc)));
 

@@ -18,9 +18,9 @@ const until = async (test, ms = 15000) => {
 		await new Promise((resolve) => setTimeout(resolve, 150));
 	}
 };
-const agent = await until(() => link.last("agents")?.focused);
-link.send({ type: "agent.stage", id: agent, stage: SHARED_CANVAS });
-const opened = await until(() => link.received.some((m) => m.type === "stage.pen" && m.agentId === agent && m.stage === SHARED_CANVAS));
+const agent = await until(() => link.last("agent.list")?.focused);
+link.call("agent.set", [agent, { canvas: SHARED_CANVAS }]);
+const opened = await until(() => link.canvasOf(agent) === SHARED_CANVAS && link.drawing(SHARED_CANVAS));
 say("the focused agent opens the friend's canvas", !!opened);
 link.close();
 

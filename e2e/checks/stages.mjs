@@ -30,27 +30,27 @@ const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await rest(page, { start: 0 });
 
 const link = await socket();
-const focused = await until(() => link.last("agents")?.focused);
+const focused = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!focused);
 
 /*
- * Two stages, made the way stages are made: an agent draws on one. `stage.pen.edit` claims a
+ * Two stages, made the way stages are made: an agent draws on one. An edit (`canvas.edit`) claims a
  * folder for whoever sends it — the path `stage.newStage` takes as well — so two chats each
  * drawing a note is two stages, with no model and no agent turn. The fixture ships with one
  * chat, so the second one is made first.
  */
 // In a workspace nobody is in, so it gets a canvas of its own: a new agent otherwise joins its workspace's latest.
-link.send({ type: "agent.create", workspace: "stages-check" });
+link.call("agent.add", [{ workspace: "stages-check" }]);
 await settle(page, 1500);
 const chats = await until(async () => {
-	const list = (link.last("agents")?.chats ?? []).map((chat) => chat.id);
+	const list = (link.last("agent.list")?.chats ?? []).map((chat) => chat.id);
 	return list.length >= 2 ? list : undefined;
 }, 15000);
 say("there are two chats, so there can be two stages", !!chats && chats.length >= 2, String(chats?.length));
-const note = (agentId, id) => ({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id, content: "Made for the stages check" }, box: { x1: 0, y1: 0, x2: 240, y2: 120 } }] });
-for (const [index, id] of (chats ?? []).entries()) link.send(note(id, `s-${index}`));
+const note = (id) => [{ op: "insert", node: { type: "note", id, content: "Made for the stages check" }, box: { x1: 0, y1: 0, x2: 240, y2: 120 } }];
+for (const [index, id] of (chats ?? []).entries()) link.edit(id, note(`s-${index}`));
 const listed = await until(async () => {
-	const rows = link.received.filter((m) => m.type === "stages").at(-1)?.stages ?? [];
+	const rows = link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? [];
 	return rows.length >= 2 ? rows : undefined;
 }, 12000);
 say("the server tells the browser what stages exist", !!listed && listed.length >= 2, JSON.stringify((listed ?? []).map((one) => one.name)));
@@ -109,7 +109,7 @@ say("a search leaves only the canvases that match", searched.length === 1 && sea
 
 await page.locator(`.stage-card[data-name="${wanted}"]`).click();
 await settle(page, 2500);
-const sent = link.received.filter((m) => m.type === "stages").at(-1)?.stages ?? [];
+const sent = link.received.filter((m) => m.type === "canvas.list").at(-1)?.stages ?? [];
 say("the panel closes on a pick", await page.evaluate(() => !document.querySelector(".stage-manager")));
 say("…the agent you are talking to is on that stage now", (await pillStage()) === wantedTitle, `${mine} → ${await pillStage()}`);
 say("…and the server says so too", sent.find((one) => one.name === wanted)?.agents.some((agent) => agent.id === focused) === true, JSON.stringify(sent.map((one) => [one.name, one.agents.length])));

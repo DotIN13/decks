@@ -52,16 +52,12 @@ const RECT = "shot-rect";
 const FILL = "#2563eb";
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+const agentId = await until(() => link.last("agent.list")?.focused);
+link.edit(agentId, [
 		{ op: "insert", node: { type: "text", id: TEXT, content: "Shot text 12", fontSize: 32, fill: "#1f2328" }, box: { x1: X, y1: Y } },
 		{ op: "insert", node: { type: "rectangle", id: RECT, width: 180, height: 96, fill: FILL, stroke: "#1f2328", strokeWidth: 2 }, box: { x1: X, y1: Y + 110, x2: X + 180, y2: Y + 206 } },
-	],
-});
-const landed = await until(() => link.received.some((m) => m.type === "stage.pen" && [TEXT, RECT].every((id) => m.doc?.children?.some((n) => n.id === id))));
+	]);
+const landed = await until(() => link.drawn.some((m) => [TEXT, RECT].every((id) => m.doc?.children?.some((n) => n.id === id))));
 say("the text item and the rectangle are on the stage", !!landed);
 
 /** The canvas's camera: `translate(a, b) scale(z) translate(c, d)` on the world, inside the stage's box. */
@@ -280,7 +276,7 @@ function roundBox(b) {
 	return Object.fromEntries(Object.entries(b).map(([k, v]) => [k, Math.round(v * 10) / 10]));
 }
 
-link.send({ type: "stage.pen.edit", agentId, ops: [TEXT, RECT].map((id) => ({ op: "delete", id })) });
+link.edit(agentId, [TEXT, RECT].map((id) => ({ op: "delete", id })));
 link.close();
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();

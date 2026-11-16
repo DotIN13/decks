@@ -41,18 +41,6 @@ let line;
 let cv;
 async function laggedSocket(page) {
 	let queue = Promise.resolve();
-	await page.routeWebSocket(/\/ws/, (ws) => {
-		const server = ws.connectToServer();
-		ws.onMessage((message) => server.send(message));
-		server.onMessage((message) => {
-			const ms = lag.ms;
-			lag.queued++;
-			queue = queue.then(() => (ms ? new Promise((resolve) => setTimeout(resolve, ms)) : undefined)).then(() => {
-				lag.queued--;
-				ws.send(message);
-			});
-		});
-	});
 	await page.reload({ waitUntil: "load" });
 	await rest(page, { start: 300 });
 }
@@ -201,8 +189,8 @@ async function run(engine, { all }) {
 	await laggedSocket(page);
 	await liveZoom(page);
 	const link = await socket();
-	const agentId = await until(() => link.last("agents")?.focused);
-	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
+	const agentId = await until(() => link.last("agent.list")?.focused);
+	const send = (ops) => link.edit(agentId, ops);
 	const cam = await (await cv()).evaluate(() => globalThis.__decksProbes.rust.camera);
 	const z = cam.zoom;
 	/** A box in stage units from screen pixels off the middle of the window. */

@@ -23,7 +23,7 @@ const { browser, page, errors } = await open({ width: 1500, height: 950, scheme:
 const canvas = await canvasFrame(page);
 const NOTES = card("notes");
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 
 // The card on screen, then a blue square and a word just right of it.
 await page.locator('.panel-shell [title^="What the survey round found"]').first().click();
@@ -39,15 +39,11 @@ const toWorld = (x, y) => ({ x: (x - world.left) / world.zoom - world.cx, y: (y 
 const right = toWorld(cardRect.x + cardRect.width, cardRect.y);
 const X = Math.round(right.x + 60);
 const Y = Math.round(right.y);
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: "ex-square", width: 160, height: 160, fill: "#2563eb", stroke: "#1f2328", strokeWidth: 2 }, box: { x1: X, y1: Y, x2: X + 160, y2: Y + 160 } },
 		{ op: "insert", node: { type: "text", id: "ex-word", content: "Exported", fontSize: 28, fill: "#1f2328" }, box: { x1: X, y1: Y + 180 } },
-	],
-});
-await until(() => link.received.some((m) => m.type === "stage.pen" && m.doc?.children?.some((n) => n.id === "ex-square")));
+	]);
+await until(() => link.drawn.some((m) => m.doc?.children?.some((n) => n.id === "ex-square")));
 await page.keyboard.press("Escape");
 await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
 await rest(page);

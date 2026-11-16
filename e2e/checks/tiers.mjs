@@ -65,7 +65,7 @@ say("…and the panel's Canvas tab lists nothing", (await panelBoards()) === 0, 
  */
 const roster = await socket();
 await settle(page, 600);
-const chatNames = (roster.last("agents")?.chats ?? []).map((chat) => chat.name);
+const chatNames = (roster.last("agent.list")?.chats ?? []).map((chat) => chat.name);
 roster.close();
 say("…with a number of its own: Agent 1, Agent 2", chatNames.every((name) => /^Agent \d+$/.test(name)), JSON.stringify(chatNames));
 say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowerCase())).size === chatNames.length, JSON.stringify(chatNames));
@@ -82,8 +82,8 @@ say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowe
 const twoNames = names.slice(0, 2);
 const two = twoNames.map((name) => paths.find((path) => base(path) === name));
 const link = await socket();
-if (made) link.send({ type: "agent.focus", id: made.id });
-for (const path of two) link.send({ type: "card.play", path });
+if (made) link.call("agent.focus", [made.id]);
+for (const path of two) link.call("card.play", [path]);
 await (await canvasFrame(page)).waitForFunction((wanted) => (window.__decksProbes?.cards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page);
@@ -107,11 +107,11 @@ say("the hide button takes a board off the stage", !(await onCanvas()).includes(
  */
 const told = async () => {
 	for (let i = 0; i < 40; i += 1) {
-		const said = link.received.filter((m) => m.type === "context.changed" && (!made || m.agentId === made.id)).at(-1);
+		const said = link.received.filter((m) => m.type === "agent.context" && (!made || m.agentId === made.id)).at(-1);
 		if (said && !said.inPlay.some((path) => base(path) === base(first))) return said;
 		await new Promise((resolve) => setTimeout(resolve, 200));
 	}
-	return link.received.filter((m) => m.type === "context.changed").at(-1);
+	return link.received.filter((m) => m.type === "agent.context").at(-1);
 };
 const context = await told();
 say(
@@ -122,7 +122,7 @@ say(
 await page.mouse.move(800, 500);
 
 // The agent this check made is its own: removed, so the checks after it see the deck they expect.
-if (made) link.send({ type: "agent.remove", id: made.id });
+if (made) link.call("agent.remove", [made.id]);
 await new Promise((resolve) => setTimeout(resolve, 300));
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

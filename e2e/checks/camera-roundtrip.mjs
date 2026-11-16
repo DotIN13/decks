@@ -20,7 +20,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const focused = await until(() => link.last("agents")?.focused);
+const focused = await until(() => link.last("agent.list")?.focused);
 
 /** The camera, read off the world's own transform in the canvas frame (made again on a switch), which is what the eye sees. */
 const camera = async () =>

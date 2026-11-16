@@ -53,11 +53,6 @@ async function lagged(page) {
 			deliver();
 		}, at - Date.now());
 	};
-	await page.routeWebSocket(/\/ws/, (ws) => {
-		const server = ws.connectToServer();
-		ws.onMessage((message) => server.send(message));
-		server.onMessage((message) => later(lag.ms, () => ws.send(message)));
-	});
 	// The answer to an edit sent over HTTP held back as long (its request goes at once).
 	await page.route(/\/api\/v1\/canvas\.batch/, async (route) => {
 		const ms = lag.ms;
@@ -131,14 +126,13 @@ async function run(engine, lags) {
 	/** The canvas frame, where the stage, its engine and the sampler are. */
 	const cv = () => canvasFrame(page);
 	const link = await socket();
-	const agentId = await until(() => link.last("agents")?.focused);
-	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
-	// The server's drawing on this socket from the start, to read where things are.
-	link.send({ type: "stage.pen.get", agentId });
-	await until(() => link.last("stage.pen"), 4000);
+	const agentId = await until(() => link.last("agent.list")?.focused);
+	const send = (ops) => link.edit(agentId, ops);
+	// The server's drawing on this line from the start, to read where things are.
+	await until(() => link.drawing(agentId), 4000);
 	/** The server's drawing, as the check's own socket last had it. */
 	const serverNode = (id) => {
-		const doc = link.last("stage.pen")?.doc;
+		const doc = link.drawing(agentId)?.doc;
 		const find = (nodes) => {
 			for (const node of nodes ?? []) {
 				if (node.id === id) return node;
@@ -221,8 +215,8 @@ async function run(engine, lags) {
 	const serverBoards = async () => {
 		const out = {};
 		// The drawing names its own cards from its folder (`cards/plan/index.html`); the stage names them from the deck.
-		const canvasPath = (path) => (/^(?:shared\/)?canvases\//.test(path) ? path : `canvases/${link.last("stage.pen")?.stage}/${path}`);
-		for (const node of link.last("stage.pen")?.doc?.children ?? []) if (node.type === "browser" && (node.metadata?.type === "decks.card" || node.metadata?.type === "decks.board")) out[canvasPath(String(node.metadata.path ?? node.id))] = { x: node.x, y: node.y };
+		const canvasPath = (path) => (/^(?:shared\/)?canvases\//.test(path) ? path : `canvases/${link.drawing(agentId)?.canvas}/${path}`);
+		for (const node of link.drawing(agentId)?.doc?.children ?? []) if (node.type === "browser" && (node.metadata?.type === "decks.card" || node.metadata?.type === "decks.board")) out[canvasPath(String(node.metadata.path ?? node.id))] = { x: node.x, y: node.y };
 		return out;
 	};
 

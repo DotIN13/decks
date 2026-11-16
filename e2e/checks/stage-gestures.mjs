@@ -8,7 +8,7 @@
  * board outlines itself under the pointer too. With the pen out: a held stroke straightens, the
  * lasso's box resizes what it holds, and two fingers tapped together undo.
  *
- * Needs no model: every edit goes over the wire as `stage.pen.edit`, as a hand edit does.
+ * Needs no model: every edit goes over the wire as `canvas.edit`, as a hand edit does.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,7 +28,7 @@ const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 /** The canvas frame: the stage, its tools and its panels are there; the side panel and the composer are the page's, over it. */
 const canvas = await canvasFrame(page);
@@ -92,15 +92,11 @@ let m = await matrix();
 const A = toWorld(m, room.x + 20, room.y + 30);
 const B = toWorld(m, room.x + 300, room.y + 30);
 const size = { w: Math.round(100 / m.a), h: Math.round(60 / m.a) };
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: "g-a", fill: "#bfdbfe" }, box: { x1: A.x, y1: A.y, x2: A.x + size.w, y2: A.y + size.h } },
 		{ op: "insert", node: { type: "rectangle", id: "g-b", fill: "#fde68a" }, box: { x1: B.x, y1: B.y + Math.round(40 / m.a), x2: B.x + size.w, y2: B.y + Math.round(40 / m.a) + size.h } },
-	],
-});
-const frame = await until(() => link.received.filter((msg) => msg.type === "stage.pen" && msg.agentId === agentId && msg.doc.children.some((n) => n.id === "g-b")).at(-1));
+	]);
+const frame = await until(() => link.drawings(agentId).filter((msg) => msg.doc.children.some((n) => n.id === "g-b")).at(-1));
 const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 // The last whole read: a read that lands while the server is writing sees half a file.
 let lastRead = { children: [] };
@@ -245,17 +241,13 @@ if (bar) {
 		JSON.stringify({ want, a: [item("g-a").x - carried.a.x, item("g-a").y - carried.a.y] }),
 	);
 	// The items back where they were, and the camera too, for the checks after this one.
-	link.send({
-		type: "stage.pen.edit",
-		agentId,
-		ops: ["a", "b"].map((k) => ({ op: "update", id: `g-${k}`, set: { x: carried[k].x, y: carried[k].y } })),
-	});
+	link.edit(agentId, ["a", "b"].map((k) => ({ op: "update", id: `g-${k}`, set: { x: carried[k].x, y: carried[k].y } })));
 	await until(() => item("g-a").y === carried.a.y && item("g-b").y === carried.b.y);
 	await page.mouse.move(room.x + 5, room.y + 5);
 	await page.mouse.wheel(0, -160);
 	await settle(page, 400);
 	// Put it back where the fixture had it.
-	link.send({ type: "card.move", path: bar.path, x: boardBefore.x, y: boardBefore.y });
+	link.call("card.move", [bar.path, { x: boardBefore.x, y: boardBefore.y }]);
 }
 await page.keyboard.press("Escape");
 say("Escape lets the whole selection go", (await count(".pen-selection")) === 0);
@@ -301,7 +293,7 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	const copied = await until(() => onDisk().children.length === had + 1);
 	say("Alt and a drag leaves a copy and the original", !!copied && item("g-b").y === b.y, JSON.stringify({ had, now: onDisk().children.length, b: [b.y, item("g-b").y] }));
 	const copy = onDisk().children.at(-1);
-	if (copy && copy.id !== "g-b") link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: copy.id }] });
+	if (copy && copy.id !== "g-b") link.edit(agentId, [{ op: "delete", id: copy.id }]);
 	await page.keyboard.press("Escape");
 }
 
@@ -345,7 +337,7 @@ let ITEM_WASH = "";
 	say("…and leaves the item where it was, because that was never a move", after.x === before.x && after.y === before.y, JSON.stringify({ before: [before.x, before.y], after: [after.x, after.y] }));
 	// Put back if it was moved after all, so what follows finds it where it was.
 	if (after.x !== before.x || after.y !== before.y) {
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: "g-a", set: { x: before.x, y: before.y } }] });
+		link.edit(agentId, [{ op: "update", id: "g-a", set: { x: before.x, y: before.y } }]);
 		await until(() => item("g-a").x === before.x && item("g-a").y === before.y);
 	}
 
@@ -424,7 +416,7 @@ let ITEM_WASH = "";
 			return now && now.metadata.route === undefined && !/ C/.test(now.geometry) ? now : undefined;
 		});
 		say("…and straight again drops the route from the file", !!straight, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: arrow.id }] });
+		link.edit(agentId, [{ op: "delete", id: arrow.id }]);
 	}
 	await page.keyboard.press("Escape");
 }
@@ -502,7 +494,7 @@ let ITEM_WASH = "";
 // --- typing into a note: the editor sits exactly on it, and the canvas stops drawing its words -------
 {
 	const at = item("g-b");
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "g-note", content: "Words to edit" }, box: { x1: at.x, y1: at.y + at.height + Math.round(60 / m.a) } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "note", id: "g-note", content: "Words to edit" }, box: { x1: at.x, y1: at.y + at.height + Math.round(60 / m.a) } }]);
 	await until(() => canvas.evaluate(() => !!window.__decksProbes?.penBox?.("g-note")));
 	// A note is as tall as its words, so the file has no size for it: aim at what is drawn.
 	await settle(page, 400);
@@ -558,7 +550,7 @@ let ITEM_WASH = "";
 	say("a card grows round its markdown while it is typed, before it is saved", !!grown, JSON.stringify({ before, now: await height() }));
 	await page.keyboard.press("Control+Enter");
 	await page.keyboard.press("Escape");
-	if (card) link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: card.id }] });
+	if (card) link.edit(agentId, [{ op: "delete", id: card.id }]);
 }
 
 // --- edit mode: items and boards outline themselves under the pointer --------------------------------
@@ -719,7 +711,7 @@ await canvas.waitForSelector(".stage-ink");
 			return width > stroke.width * 1.5 && width < stroke.width * 3;
 		});
 		say("…and dragging one grows what the lasso holds", !!grown, JSON.stringify({ was: stroke.width, now: onDisk().children.find((n) => n.id === stroke.id)?.width }));
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: stroke.id }] });
+		link.edit(agentId, [{ op: "delete", id: stroke.id }]);
 	}
 }
 await page.keyboard.press("Escape");
@@ -796,7 +788,7 @@ await page.keyboard.press("Escape");
 		});
 		say("a drag on a board moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
 		if (moved) {
-			link.send({ type: "card.move", path: chrome.path, x: start.x, y: start.y });
+			link.call("card.move", [chrome.path, { x: start.x, y: start.y }]);
 			await until(() => itemOf(onDisk(), chrome.path)?.x === start.x);
 			await settle(page, 500);
 			const again = await grip(chrome.path);
@@ -823,7 +815,7 @@ await page.keyboard.press("Escape");
 	}
 }
 
-link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("g-")).map((n) => ({ op: "delete", id: n.id })) });
+link.edit(agentId, onDisk().children.filter((n) => n.id.startsWith("g-")).map((n) => ({ op: "delete", id: n.id })));
 await settle(page, 300);
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

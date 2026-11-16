@@ -55,9 +55,9 @@ const select = async (path) => {
 	 */
 	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
-	for (const other of others) link.send({ type: "card.hide", path: other });
+	for (const other of others) link.call("card.hide", [other]);
 	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
-	link.send({ type: "card.play", path });
+	link.call("card.play", [path]);
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	link.close();
 	await settle(page, 500);
@@ -312,7 +312,7 @@ say("a double-click on a board's own bar makes nothing", countAfterBar === count
  */
 const link = await socket();
 for (const path of await canvas.evaluate(() => [...document.querySelectorAll(".card-node")].map((node) => node.dataset.path))) {
-	link.send({ type: "card.hide", path });
+	link.call("card.hide", [path]);
 }
 await new Promise((resolve) => setTimeout(resolve, 800));
 link.close();
@@ -349,7 +349,7 @@ say("…at the point that was pressed", box !== null && Math.abs(box.x - spot.x)
 await page.keyboard.type("hello");
 await page.mouse.click(spot.x + 300, spot.y + 120);
 await settle(page, 1500);
-const notes = (pens.last("stage.pen")?.doc?.children ?? []).filter((node) => node.type === "note");
+const notes = (pens.drawn.at(-1)?.doc?.children ?? []).filter((node) => node.type === "note");
 say("…and the note is saved with what was typed", JSON.stringify(notes).includes("hello"), `${notes.length} note(s)`);
 const boardsAfter = await canvas.evaluate(() => document.querySelectorAll(".card-node").length);
 say("…and no board was made", boardsAfter === 0, `${boardsAfter} board(s)`);

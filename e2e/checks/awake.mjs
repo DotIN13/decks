@@ -35,7 +35,7 @@ const written = writeAwakeCanvas(deck.path, { cards: 3, apps: 3, documents: 1, n
 say("the small awake canvas is written", written.cards === 3 && written.apps === 3 && written.documents === 1, JSON.stringify(written));
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const { page, context, errors } = await open({ width: 1400, height: 900, cards: false });
 /** Picture requests and their answers, for a failure to explain itself. */
 const pictureLog = [];
@@ -43,9 +43,8 @@ page.on("response", (response) => {
 	const url = response.url();
 	if (/\/thumb\//.test(url)) pictureLog.push(`${response.status()} ${response.headers()["x-decks-picture"] ?? ""} ${decodeURIComponent(url.replace(/^.*\/thumb\//, "")).slice(0, 90)}`);
 });
-link.send({ type: "agent.stage", id: agentId, stage: CANVAS });
-setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1000);
-await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
+link.call("agent.set", [agentId, { canvas: CANVAS }]);
+await until(() => link.canvasOf(agentId) === CANVAS && link.drawing(CANVAS), 20000);
 await page.reload({ waitUntil: "domcontentloaded" });
 const canvas = await canvasFrame(page);
 const seven = await canvas

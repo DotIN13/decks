@@ -54,7 +54,7 @@ if (card) {
 	// Not news to start with, then named the person's by their resize, then changed after that.
 	// The person's resize as the socket carries it (`card.resize`, `calls/gestures.ts`).
 	const link = await socket();
-	link.send({ type: "card.resize", path: card.path, w: (card.w ?? 800) + 24 });
+	link.call("card.resize", [card.path, { w: (card.w ?? 800) + 24 }]);
 	const named = await waitFor(async () => (await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy === "you");
 	say("the person's resize names them the card's writer", named, JSON.stringify((await deckState()).boards.find((board) => board.path === card.path)?.lastWrittenBy));
 	link.close?.();

@@ -200,7 +200,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const canvas = await canvasFrame(page);
 /*
  * The check draws round the middle of the window, so the view is moved first onto bare canvas right
@@ -217,7 +217,7 @@ const canvas = await canvasFrame(page);
 const cam = await canvas.evaluate(() => globalThis.__decksProbes.rust.camera);
 const r = await canvas.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }]);
 say("the box is drawn", !!(await until(() => canvas.evaluate(() => globalThis.__decksProbes?.rust?.placed.get("lift-a")))));
 await editMode(page, true);
 const x = r.left + r.width / 2;
@@ -241,15 +241,11 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 {
 	const z = cam.zoom;
 	const rect = (id, fill) => ({ type: "rectangle", id, fill, width: 160, height: 50 });
-	link.send({
-		type: "stage.pen.edit",
-		agentId,
-		ops: [
+	link.edit(agentId, [
 			{ op: "insert", node: { type: "frame", id: "lift-col", name: "Column", layout: "vertical", gap: 10, padding: 12, fill: "#eeeeee", children: [rect("lift-r1", "#88aaff"), rect("lift-r2", "#88ffaa"), rect("lift-r3", "#ffcc88")] }, box: { x1: cam.x + 260 / z, y1: cam.y - 260 / z, x2: cam.x + 444 / z, y2: cam.y - 60 / z } },
 			// Clear of the side panel (360px since the redesign): at -420 its middle was under it, and the press picked nothing.
 			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 300 / z, y1: cam.y + 120 / z, x2: cam.x - 200 / z, y2: cam.y + 180 / z } },
-		],
-	});
+		]);
 	const box = (id) => canvas.evaluate((id) => globalThis.__decksProbes?.penBox?.(id)?.toJSON(), id);
 	await until(async () => (await box("lift-r3")) && (await box("lift-b")));
 	await settle(page, 600);
@@ -300,7 +296,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	say("…and glides there over several frames", moving.length >= 3, `${moving.length} gliding frames`);
 	const off = frames.filter((f) => Math.abs(f.outline[0] - f.item[0]) > 1 || Math.abs(f.outline[1] - f.item[1]) > 1);
 	say("…its outline riding with it on every frame of the glide", frames.length > 0 && off.length === 0, JSON.stringify(off.slice(0, 3)));
-	link.send({ type: "stage.pen.edit", agentId, ops: ["lift-col", "lift-b"].map((id) => ({ op: "delete", id })) });
+	link.edit(agentId, ["lift-col", "lift-b"].map((id) => ({ op: "delete", id })));
 	await settle(page, 300);
 }
 

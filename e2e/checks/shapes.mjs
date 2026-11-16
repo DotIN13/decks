@@ -27,11 +27,11 @@ const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 
 // The stage's file, found from the frame the server sends after the first edit.
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "shapes-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
-const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "shapes-anchor")).at(-1));
+link.edit(agentId, [{ op: "insert", node: { type: "note", id: "shapes-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }]);
+const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "shapes-anchor")).at(-1));
 const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 // Read mid-write the file is cut short: the last whole read stands until the next one parses.
 let lastDisk = { children: [] };
@@ -243,10 +243,7 @@ if (room) {
 	// A size on screen, whatever the zoom the checks above left: about 120 by 70 pixels each, 12 apart.
 	const size = { w: Math.round(120 / room.zoom), h: Math.round(70 / room.zoom) };
 	const gap = Math.round(12 / room.zoom);
-	link.send({
-		type: "stage.pen.edit",
-		agentId,
-		ops: ["top", "under"].map((which, i) => ({
+	link.edit(agentId, ["top", "under"].map((which, i) => ({
 			op: "insert",
 			node: {
 				type: "frame",
@@ -263,8 +260,7 @@ if (room) {
 				children: [{ type: "path", id: `oval-${which}-out`, layoutPosition: "absolute", x: 0, y: 0, width: size.w, height: size.h, viewBox: [0, 0, 100, 100], geometry: "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z", fill: "#ffffff", stroke: "#1f2328", strokeWidth: 1.5 }],
 			},
 			box: { x1: room.world.x, y1: room.world.y + i * (size.h + gap), x2: room.world.x + size.w, y2: room.world.y + i * (size.h + gap) + size.h },
-		})),
-	});
+		})));
 	const boxOf = (id) => canvas.evaluate((one) => globalThis.__decksProbes?.penBox?.(one), id);
 	const drawn = await until(async () => {
 		const all = { top: await boxOf("oval-top"), out: await boxOf("oval-top-out"), under: await boxOf("oval-under") };
@@ -286,7 +282,7 @@ if (room) {
 		}));
 		say("clicking near the bottom of the upper one selects the upper one", !!picked && Math.abs(picked.y - drawn.top.y) <= 4, JSON.stringify({ picked, top: Math.round(drawn.top.y), under: Math.round(drawn.under.y) }));
 	}
-	link.send({ type: "stage.pen.edit", agentId, ops: ["oval-top", "oval-under"].map((id) => ({ op: "delete", id })) });
+	link.edit(agentId, ["oval-top", "oval-under"].map((id) => ({ op: "delete", id })));
 	await settle(page, 300);
 }
 
@@ -295,7 +291,7 @@ if (room) {
 // The arrow from the act above is cleared first: it crosses this part of the canvas, and a press
 // near its line is a press on it, which is the very thing being asserted about the new one.
 if (arrowDrawn) {
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: arrowDrawn }] });
+	link.edit(agentId, [{ op: "delete", id: arrowDrawn }]);
 	await settle(page, 400);
 }
 /*
@@ -317,7 +313,7 @@ say("the canvas has room for a diagonal arrow", !!diagonal, JSON.stringify(diago
 if (diagonal) {
 	const a = { x: Math.round(diagonal.world.x), y: Math.round(diagonal.world.y) };
 	const b = { x: a.x + 700, y: a.y + 500 };
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "slash", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: "decks.arrow", from: [a.x, a.y], to: [b.x, b.y], route: "straight" } } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "path", id: "slash", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: "decks.arrow", from: [a.x, a.y], to: [b.x, b.y], route: "straight" } } }]);
 	const drawn = await until(async () => {
 		const box = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("slash"));
 		return box && box.width > 40 && box.height > 40 ? box : undefined;
@@ -420,7 +416,7 @@ if (diagonal) {
 		const inside = { near: await reach(close, 5), away: await reach(close, 18) };
 		say("…and zoomed in four times, the same 5 px reaches it and 18 px still does not", inside.near && !inside.away, JSON.stringify({ zoom: close.zoom, ...inside }));
 	}
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "slash" }] });
+	link.edit(agentId, [{ op: "delete", id: "slash" }]);
 	await settle(page, 300);
 }
 
@@ -440,7 +436,7 @@ if (diagonal) {
 		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
 	});
 	const w = Math.round(200 / at.zoom), h = Math.round(120 / at.zoom);
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "pill-shape", name: "Process", width: w, height: h, layout: "vertical", metadata: { type: "decks.shape", kind: "Process" }, children: [{ type: "path", id: "pill-shape-o", layoutPosition: "absolute", x: 0, y: 0, width: w, height: h, viewBox: [0, 0, w, h], geometry: `M0 0H${w}V${h}H0Z`, fill: "#fde68a", stroke: "#1f2328" }] }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "frame", id: "pill-shape", name: "Process", width: w, height: h, layout: "vertical", metadata: { type: "decks.shape", kind: "Process" }, children: [{ type: "path", id: "pill-shape-o", layoutPosition: "absolute", x: 0, y: 0, width: w, height: h, viewBox: [0, 0, w, h], geometry: `M0 0H${w}V${h}H0Z`, fill: "#fde68a", stroke: "#1f2328" }] }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }]);
 	await until(() => onDisk().children.find((n) => n.id === "pill-shape"));
 	await settle(page, 800);
 	const target = onDisk().children.find((n) => n.id === "pill-shape");
@@ -486,11 +482,11 @@ if (diagonal) {
 		return { a: toStage(stage.left + stage.width * 0.3, stage.top + stage.height * 0.3), b: toStage(stage.left + stage.width * 0.6, stage.top + stage.height * 0.55), zoom: m.a };
 	});
 	const w = Math.round(160 / at.zoom), h = Math.round(120 / at.zoom);
-	link.send({ type: "stage.pen.edit", agentId, ops: [
+	link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: "bend-a", width: w, height: h, fill: "#dbeafe" }, box: { x1: Math.round(at.a.x), y1: Math.round(at.a.y) } },
 		{ op: "insert", node: { type: "rectangle", id: "bend-b", width: w, height: h, fill: "#dcfce7" }, box: { x1: Math.round(at.b.x), y1: Math.round(at.b.y) } },
 		{ op: "insert", node: { type: "path", id: "bend-arrow", stroke: "#1f2328", strokeWidth: 2, metadata: { type: "decks.arrow", from: { item: "bend-a", side: "right" }, to: { item: "bend-b", side: "left" }, route: "elbow" } } },
-	] });
+	]);
 	await until(() => onDisk().children.find((n) => n.id === "bend-arrow")?.geometry);
 	await settle(page, 800);
 	// The arrow is picked on its line: its middle, where the elbow's middle segment is.
@@ -531,12 +527,12 @@ if (diagonal) {
 		const middle = await until(() => { const from = onDisk().children.find((n) => n.id === "bend-arrow")?.metadata?.from; return from && from.at === undefined ? from : undefined; });
 		say("…and on the diamond, the join back in the middle of its side", middle?.side === "right", JSON.stringify(middle));
 	}
-	link.send({ type: "stage.pen.edit", agentId, ops: ["bend-arrow", "bend-a", "bend-b"].map((id) => ({ op: "delete", id })) });
+	link.edit(agentId, ["bend-arrow", "bend-a", "bend-b"].map((id) => ({ op: "delete", id })));
 	await settle(page, 300);
 }
 
 say("no errors in the page", errors.length === 0, errors.join(" | "));
-link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.metadata?.type === "decks.shape" || n.metadata?.type === "decks.arrow" || n.id === "shapes-anchor").map((n) => ({ op: "delete", id: n.id })) });
+link.edit(agentId, onDisk().children.filter((n) => n.metadata?.type === "decks.shape" || n.metadata?.type === "decks.arrow" || n.id === "shapes-anchor").map((n) => ({ op: "delete", id: n.id })));
 await settle(page, 400);
 link.close?.();
 await browser.close();

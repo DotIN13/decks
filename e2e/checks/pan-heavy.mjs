@@ -103,7 +103,7 @@ const busiest = (canvas, zoom) => {
 
 // --- the page -----------------------------------------------------------------------------------------
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 const { page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
 const cdp = await context.newCDPSession(page);
@@ -114,9 +114,8 @@ let canvas;
 const metrics = async () => Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
 
 const goCanvas = async (name) => {
-	link.send({ type: "agent.stage", id: agentId, stage: name });
-	setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1200);
-	await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === name), 20000);
+	link.call("agent.set", [agentId, { canvas: name }]);
+	await until(() => link.canvasOf(agentId) === name && link.drawing(name), 20000);
 	// The page opens on the agent's canvas; a page already open is reloaded onto it.
 	await page.reload({ waitUntil: "domcontentloaded" });
 	// The stage is in the canvas frame, made again with the page.

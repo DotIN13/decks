@@ -28,8 +28,8 @@ await resetStage(page);
 await settle(page, 900);
 const link = await socket();
 const deck = await deckState();
-const agentId = await until(async () => link.last("agents")?.focused);
-const stageName = await until(async () => link.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
+const agentId = await until(async () => link.last("agent.list")?.focused);
+const stageName = await until(async () => link.last("canvas.list")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
 
 const made = await call("apps.create", ["e2e-counter", { title: "E2E counter", starter: "static" }]);
 say("a static app is made from the starter, which asks for decks-canvas.js", made.ok && /decks-canvas\.js/.test(readFileSync(join(deck.path, "apps", "e2e-counter", "index.html"), "utf8")), JSON.stringify(made.error ?? ""));

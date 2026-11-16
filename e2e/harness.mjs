@@ -568,58 +568,99 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 	await idle(page, { timeout });
 }
 
-/** Talk to the server the way the client does. */
+/**
+ * Talk to the server the way the page does: on the line (`/api/v1/socket`), greeted as a page with a
+ * screen of its own, and hearing everything.
+ *
+ * - `call(verb, args, on)` runs one of the person's calls and answers `{ ok, value, error }`; `on`
+ *   names the agent or the canvas it is for (`{ agent, stage }`), as the page's own calls do.
+ * - `edit(agent, ops)` is the person's edit to the drawing of that agent's canvas.
+ * - `received` is every message heard, and `last(type)` the latest of a kind.
+ * - `drawing(of)` is a canvas's drawing as last heard, whole, and `drawings(of)` every revision heard:
+ *   `of` is a canvas's name, or an agent's id for the canvas it is on. A canvas's change comes whole
+ *   once and then as edits (`canvas.changed`); each is kept as the whole drawing it makes, so a check
+ *   reads every revision the same way; `drawn` is every revision of every canvas. Every canvas in the
+ *   list is asked for whole once.
+ *
+ * What a card call acts on, when it names no canvas, is the canvas of the agent this line is on. A
+ * new line starts on the conversation last opened anywhere, which is the page's own when a check has
+ * just opened one; a check that drives cards for a particular agent calls `agent.focus` first, which
+ * moves this line alone.
+ */
 export async function socket(api) {
 	api = typeof api === "string" ? api : API;
-	const ws = new WebSocket(`${api.replace("http", "ws")}/ws?decks_token=${encodeURIComponent(await personToken(api))}`);
+	const token = await personToken(api);
+	const ws = new WebSocket(`${api.replace("http", "ws")}/api/v1/socket`);
 	const received = [];
 	await new Promise((resolve, reject) => {
 		ws.onopen = resolve;
 		ws.onerror = reject;
 	});
-	/*
-	 * A stage drawing comes whole once and then as edits (`stage.pen.delta`). Each delta is also
-	 * recorded as the whole `stage.pen` frame it makes, so a check reads every revision the same way.
-	 */
-	const pens = new Map();
+	const say = (message) => ws.send(JSON.stringify(message));
+	/** Each canvas's drawing as last heard, and every revision heard, whole. */
+	const held = new Map();
+	const drawn = [];
+	const asked = new Set();
+	const waiting = new Map();
+	let calls = 0;
 	ws.onmessage = (event) => {
 		const message = JSON.parse(String(event.data));
 		received.push(message);
-		const key = `${message.agentId}|${message.stage}`;
-		if (message.type === "stage.pen") pens.set(key, message);
-		else if (message.type === "stage.pen.delta") {
-			const held = pens.get(key);
-			if (held?.rev !== message.from) return ws.send(JSON.stringify({ type: "stage.pen.get", agentId: message.agentId }));
-			const whole = { type: "stage.pen", agentId: message.agentId, stage: message.stage, rev: message.rev, doc: applyEdits(held.doc, message.edits), base: message.base };
-			pens.set(key, whole);
-			received.push(whole);
+		if (message.type === "call.answered") {
+			waiting.get(message.id)?.(message);
+			waiting.delete(message.id);
+		} else if (message.type === "canvas.list") {
+			for (const row of message.stages ?? []) {
+				if (asked.has(row.name)) continue;
+				asked.add(row.name);
+				say({ type: "canvas.watch", canvas: row.name, whole: true });
+			}
+		} else if (message.type === "canvas.changed") {
+			const before = held.get(message.canvas);
+			let doc = message.doc;
+			if (!doc && message.edits && before?.rev === message.from) doc = applyEdits(before.doc, message.edits);
+			if (!doc) return say({ type: "canvas.watch", canvas: message.canvas, whole: true });
+			const whole = { canvas: message.canvas, rev: message.rev, doc, base: message.base };
+			held.set(message.canvas, whole);
+			drawn.push(whole);
 		}
 	};
-	const link = {
+	say({ type: "line.hello", token, greet: true, all: true });
+	const last = (type) => received.filter((m) => m.type === type).at(-1);
+	/** A canvas's own name, or the canvas an agent is on, as the last list of canvases said. */
+	const canvasOf = (of) => {
+		const rows = last("canvas.list")?.stages ?? [];
+		return rows.some((row) => row.name === of) ? of : rows.find((row) => row.agents?.some((agent) => agent.id === of))?.name;
+	};
+	const call = (verb, args = [], on = {}) =>
+		new Promise((resolve) => {
+			const id = `c${++calls}`;
+			waiting.set(id, resolve);
+			say({ type: "line.call", id, verb, args, ...on });
+		});
+	return {
 		received,
-		send: (message) => ws.send(JSON.stringify(message)),
-		last: (type) => received.filter((m) => m.type === type).at(-1),
+		last,
+		call,
+		edit: (agent, ops) => call("canvas.edit", [ops, { agent }], { agent }),
+		canvasOf,
+		drawing: (of) => held.get(canvasOf(of) ?? of),
+		drawings: (of) => drawn.filter((one) => one.canvas === (canvasOf(of) ?? of)),
+		drawn,
 		close: () => ws.close(),
 	};
-	/*
-	 * What a board frame acts on is **the stage of the agent this socket is on**. A new socket
-	 * starts on the conversation last opened anywhere, which is the page's own when a check has
-	 * just opened one; a check that drives boards over the wire for a particular agent sends
-	 * `agent.focus` first, which moves this socket alone.
-	 */
-	return link;
 }
 
 /*
- * What the server last said an agent has on its stage: its `context.changed`, or its row in the
- * `agents` roster, whichever came later. The roster is the only word when nothing changed: a fresh
+ * What the server last said an agent has on its stage: its `agent.context`, or its row in the
+ * `agent.list` roster, whichever came later. The roster is the only word when nothing changed: a fresh
  * server's first agent may already be on the fixture's canvas, and opening it again changes nothing.
  */
 const holding = (link, agent) => {
 	let inPlay = [];
 	for (const m of link.received) {
-		if (m.type === "context.changed" && m.agentId === agent) inPlay = m.inPlay ?? [];
-		else if (m.type === "agents") inPlay = m.chats?.find((chat) => chat.id === agent)?.inPlay ?? inPlay;
+		if (m.type === "agent.context" && m.agentId === agent) inPlay = m.inPlay ?? [];
+		else if (m.type === "agent.list") inPlay = m.chats?.find((chat) => chat.id === agent)?.inPlay ?? inPlay;
 	}
 	return inPlay;
 };
@@ -650,18 +691,18 @@ export async function resetStage(at) {
 	 *
 	 * A fresh server is still starting its first agent when the first check begins, and that agent opens
 	 * on a canvas of its own (a new agent joins the latest canvas of its workspace's agents, and it has
-	 * none), so it is sent to the fixture's canvas (`agent.stage`) and this waits until the server says
-	 * that agent holds every card. The greeting says who is focused; any other agent's `context.changed`
+	 * none), so it is sent to the fixture's canvas (`agent.set`) and this waits until the server says
+	 * that agent holds every card. The greeting says who is focused; any other agent's `agent.context`
 	 * describes a stage the browser is not looking at.
 	 */
 	const deadline = Date.now() + 25000;
 	let landed = [];
 	let agent;
 	while (Date.now() < deadline) {
-		agent = link.last("agents")?.focused ?? agent;
+		agent = link.last("agent.list")?.focused ?? agent;
 		if (agent) {
-			link.send({ type: "agent.stage", id: agent, stage: CANVAS });
-			for (const one of FIXTURE_PLACES) link.send({ type: "card.move", stage: CANVAS, path: one.path, x: one.x, y: one.y });
+			void link.call("agent.set", [agent, { canvas: CANVAS }]);
+			for (const one of FIXTURE_PLACES) void link.call("card.move", [one.path, { x: one.x, y: one.y }, { canvas: CANVAS }], { stage: CANVAS });
 		}
 		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.
 		const resend = Date.now() + (agent ? 1500 : 100);
@@ -1065,11 +1106,11 @@ export async function cardEdge(page, path) {
 export async function freshAgent(page, workspace) {
 	const link = await socket();
 	await page.waitForTimeout(300);
-	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
-	link.send({ type: "agent.create", workspace });
+	const known = new Set((link.last("agent.list")?.chats ?? []).map((chat) => chat.id));
+	void link.call("agent.add", [{ workspace }]);
 	let made;
 	for (let i = 0; i < 60 && !made; i += 1) {
-		made = (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id));
+		made = (link.last("agent.list")?.chats ?? []).find((chat) => !known.has(chat.id));
 		if (!made) await page.waitForTimeout(150);
 	}
 	link.close();

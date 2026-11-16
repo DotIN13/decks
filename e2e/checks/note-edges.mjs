@@ -99,10 +99,10 @@ for (const run of RUNS) {
 			return { x: -Number(m[4]), y: -Number(m[5]) };
 		});
 		const link = await socket();
-		const agentId = await until(() => link.last("agents")?.focused);
+		const agentId = await until(() => link.last("agent.list")?.focused);
 		noteId = `edge-note-${Date.now()}`;
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: noteId, content: "the edge of a note" }, box: { x1: Math.round(at?.x ?? 0), y1: Math.round(at?.y ?? 0) } }] });
-		await until(() => link.received.some((m) => m.type === "stage.pen" && m.doc?.children?.some((n) => n.id === noteId)));
+		link.edit(agentId, [{ op: "insert", node: { type: "note", id: noteId, content: "the edge of a note" }, box: { x1: Math.round(at?.x ?? 0), y1: Math.round(at?.y ?? 0) } }]);
+		await until(() => link.drawn.some((m) => m.doc?.children?.some((n) => n.id === noteId)));
 		link.close();
 	}
 	const boxOf = () => canvas.evaluate((id) => {

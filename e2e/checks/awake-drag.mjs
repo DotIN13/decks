@@ -23,11 +23,10 @@ setTimeout(() => {
 const deck = await deckState();
 writeAwakeCanvas(deck.path, { cards: 16, apps: 3, documents: 1, name: CANVAS, prefix: "drag" });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const { page } = await open({ width: 1400, height: 900, cards: false, edit: process.env.AWAKE_EDIT === "1", ...(process.env.AWAKE_DPR ? { dpr: Number(process.env.AWAKE_DPR) } : {}) });
-link.send({ type: "agent.stage", id: agentId, stage: CANVAS });
-setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1000);
-await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === CANVAS), 20000);
+link.call("agent.set", [agentId, { canvas: CANVAS }]);
+await until(() => link.canvasOf(agentId) === CANVAS && link.drawing(CANVAS), 20000);
 await page.reload({ waitUntil: "domcontentloaded" });
 const canvas = await canvasFrame(page);
 await canvas.waitForFunction(() => (globalThis.__decksProbes?.cards?.().length ?? 0) >= 20 && !!globalThis.__decksProbes?.rust?.camera, undefined, { timeout: 30000 });

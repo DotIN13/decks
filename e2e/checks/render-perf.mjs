@@ -14,7 +14,7 @@
  * - panFrameMs: main-thread time (CDP `TaskDuration`) per frame over 240 frames of two-finger pan at 50%.
  * - dragStepMs: main-thread time per step of a note dragged (browse mode moves the drawing) at 50%, one pointer move a
  *   frame (CDP mouse events), the first five steps left out.
- * - editToFrameMs: an agent's insert (`stage.pen.edit` over the wire) to the first frame drawn with
+ * - editToFrameMs: an agent's insert (`canvas.edit` over the wire) to the first frame drawn with
  *   a tile painted after the note is in the layout.
  * - strokeEndMs: main-thread time per frame over the last 60 of 600 pointer moves (10 s at 60 Hz) of a
  *   pen stroke, one CDP mouse move a frame.
@@ -98,12 +98,11 @@ const perfPicture = (width, height) => {
 const deck = await deckState();
 const made = writePerfCanvas(deck.path, { items: ITEMS });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
-link.send({ type: "agent.stage", id: agentId, stage: PERF_CANVAS });
+link.call("agent.set", [agentId, { canvas: PERF_CANVAS }]);
 // Asked for as well: an agent already on the canvas is sent nothing new.
-setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
-const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= Math.min(1000, ITEMS / 2)), 20000);
+const onPerf = await until(() => link.canvasOf(agentId) === PERF_CANVAS && link.drawing(PERF_CANVAS) && link.drawing(PERF_CANVAS).doc.children.length >= Math.min(1000, ITEMS / 2), 20000);
 say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.cards} cards`);
 
 const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, cards: false });
@@ -452,7 +451,7 @@ if (want("edit")) {
 		const sent = Date.now();
 		const x1 = Math.round(cam.x - 300 + (n % 5) * 130);
 		const y1 = Math.round(cam.y + 150 + Math.floor(n / 5) * 40);
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id, metadata: { type: "decks.markdown" }, content: `An agent's note, number ${n}`, width: 120 }, box: { x1, y1 } }] });
+		link.edit(agentId, [{ op: "insert", node: { type: "note", id, metadata: { type: "decks.markdown" }, content: `An agent's note, number ${n}`, width: 120 }, box: { x1, y1 } }]);
 		const at = await seen;
 		const task = ((await taskSeconds()) - before) * 1000;
 		const arrived = await canvas.evaluate(() => globalThis.__perfDocAt);
@@ -503,13 +502,13 @@ if (want("frameEdit")) {
 	await canvas.evaluate(() => globalThis.__perf.zoomTo(0.5));
 	await canvas.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
 	const notes = Array.from({ length: 24 }, (_, i) => ({ type: "note", id: `perf-big-${i}`, metadata: { type: "decks.markdown" }, content: `Note ${i} in the big frame`, width: 220, x: 40 + (i % 6) * 390, y: 40 + Math.floor(i / 6) * 360 }));
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "perf-big", name: "Big frame", layout: "none", fill: "#f3f4f6", width: 2400, height: 1500, children: notes }, box: { x1: HOME.x - 1200, y1: HOME.y - 750 } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "frame", id: "perf-big", name: "Big frame", layout: "none", fill: "#f3f4f6", width: 2400, height: 1500, children: notes }, box: { x1: HOME.x - 1200, y1: HOME.y - 750 } }]);
 	await until(() => canvas.evaluate(() => globalThis.__decksProbes.rust.placed.has("perf-big-23")), 10000);
 	await quiet();
 	const tiles = [];
 	for (let run = 0; run < RUNS; run++) {
 		const before = await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles);
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: "perf-big-8", set: { content: `Note 8, said again ${run}` } }] });
+		link.edit(agentId, [{ op: "update", id: "perf-big-8", set: { content: `Note 8, said again ${run}` } }]);
 		await until(() => canvas.evaluate((run) => String(globalThis.__decksProbes.rust.placed.get("perf-big-8")?.node.content).endsWith(` ${run}`), run), 5000);
 		await quiet(1000);
 		tiles.push((await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles)) - before);
@@ -541,12 +540,12 @@ if (want("images")) {
 		const tilesBefore = await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles);
 		await frame();
 		const before = await taskSeconds();
-		link.send({ type: "stage.pen.edit", agentId, ops });
+		link.edit(agentId, ops);
 		const all = await until(() => canvas.evaluate((want) => globalThis.__decksProbes.engine.stats().pictures >= want, had + N), 20000);
 		await quiet(1000);
 		const task = ((await taskSeconds()) - before) * 1000;
 		tilesPainted.push((await canvas.evaluate(() => globalThis.__decksProbes.sheet.tiles)) - tilesBefore);
-		link.send({ type: "stage.pen.edit", agentId, ops: ids.map((id) => ({ op: "delete", id })) });
+		link.edit(agentId, ids.map((id) => ({ op: "delete", id })));
 		await until(() => canvas.evaluate((id) => !globalThis.__decksProbes.rust.placed.has(id), ids[0]), 10000);
 		await quiet(1000);
 		return all ? task : NaN;

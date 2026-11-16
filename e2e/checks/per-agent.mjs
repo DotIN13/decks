@@ -52,7 +52,7 @@ const until = async (test, what, timeout = 15000) => {
 };
 
 const link = await socket();
-const home = await until(() => link.last("agents")?.focused, "the greeting to name the focused agent");
+const home = await until(() => link.last("agent.list")?.focused, "the greeting to name the focused agent");
 const paths = (await deckState()).boards.map((board) => board.path);
 say("the fixture has at least two boards to be far apart", paths.length >= 2, JSON.stringify(paths));
 
@@ -66,11 +66,11 @@ say("the fixture has at least two boards to be far apart", paths.length >= 2, JS
  * boards in the same spot and a switch between them would not have to move the camera at all.
  */
 const make = async (name, path, y) => {
-	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	const known = new Set((link.last("agent.list")?.chats ?? []).map((chat) => chat.id));
 	// A workspace of its own: a new agent joins its workspace's latest canvas, and this check wants each on its own.
-	link.send({ type: "agent.create", workspace: `per-agent-${name.toLowerCase()}` });
-	const id = await until(() => (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id))?.id, `${name} to exist`);
-	link.send({ type: "agent.rename", id, name });
+	link.call("agent.add", [{ workspace: `per-agent-${name.toLowerCase()}` }]);
+	const id = await until(() => (link.last("agent.list")?.chats ?? []).find((chat) => !known.has(chat.id))?.id, `${name} to exist`);
+	link.call("agent.set", [id, { name }]);
 	/*
 	 * Played as the library board, held as the copy the agent's canvas makes of it
 	 * (`canvases/<canvas>/boards/…`): the path the stage shows is read back from the agent's own
@@ -79,12 +79,12 @@ const make = async (name, path, y) => {
 	let shown;
 	if (path) {
 		const file = nameOf(path);
-		link.send({ type: "card.play", path });
+		link.call("card.play", [path]);
 		shown = await until(
-			() => link.received.filter((m) => m.type === "context.changed" && m.agentId === id).at(-1)?.inPlay?.find((one) => nameOf(one) === file),
+			() => link.received.filter((m) => m.type === "agent.context" && m.agentId === id).at(-1)?.inPlay?.find((one) => nameOf(one) === file),
 			`${name}'s board to be in play`,
 		);
-		link.send({ type: "card.move", path: shown, x: 0, y });
+		link.call("card.move", [shown, { x: 0, y }]);
 	}
 	/* A rename is answered with the agent's identity, not a new list. */
 	await until(() => link.received.some((m) => m.type === "agent.identity" && m.id === id && m.identity?.name === name), `${name} to be called that`);
@@ -271,9 +271,9 @@ say("…and is there when you go to that conversation", asked.dialog?.includes("
  * agent the page opened on first — which also makes that the conversation a new browser
  * starts on — so the three removals are of agents nobody is on and move no one's focus.
  */
-link.send({ type: "agent.focus", id: home });
-for (const id of [A, B, C]) link.send({ type: "agent.remove", id });
-await until(() => !(link.last("agents")?.chats ?? []).some((chat) => [A, B, C].includes(chat.id)), "the three agents to be removed").catch(() => {});
+link.call("agent.focus", [home]);
+for (const id of [A, B, C]) link.call("agent.remove", [id]);
+await until(() => !(link.last("agent.list")?.chats ?? []).some((chat) => [A, B, C].includes(chat.id)), "the three agents to be removed").catch(() => {});
 
 link.close();
 say("no console errors", errors.length === 0, errors.join(" | "));

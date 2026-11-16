@@ -35,7 +35,7 @@ const block = (id, content) => ({ type: "text", id, content, textGrowth: "fixed-
 const { browser, page, errors } = await open({ device: "iPhone 14 Pro", scheme: "light", cards: false });
 await settle(page, 1500);
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
 // The canvas, its cards and their editor are in the canvas frame; a key reaches it while the focus is there.
 const canvas = await focusCanvas(page);
@@ -85,20 +85,16 @@ for (let i = 0; i < 20; i++) {
 say("the phone's canvas has room for a card", await clear(), JSON.stringify(view));
 const world = (x, y) => ({ x1: Math.round((x - m.e) / m.a), y1: Math.round((y - m.f) / m.a) });
 const at = world(30, 110);
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-card" }] });
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-picture" }] });
+link.edit(agentId, [{ op: "delete", id: "phone-card" }]);
+link.edit(agentId, [{ op: "delete", id: "phone-picture" }]);
 await settle(page, 400);
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+link.edit(agentId, [
 		{
 			op: "insert",
 			node: { type: "frame", id: "phone-card", name: "Kyoto", layout: "vertical", gap: 14, padding: 16, cornerRadius: 12, metadata: { type: "decks.card" }, children: [block("p-h", "# Kyoto"), block("p-a", "Arrive **Thursday**, ask about {~~Arashiyama~>Ohara~~}."), block("p-l", "- one\n- two")] },
 			box: { ...at, x2: at.x1 + Math.round((view.w - 60) / m.a) },
 		},
-	],
-});
+	]);
 const box = await until(async () => {
 	const now = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
 	return now && now.height > 80 ? now : undefined;
@@ -160,7 +156,7 @@ await settle(page, 600);
 const drawn = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-card"));
 /* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (v3). */
 const spot = world(view.w / 2 - 60, Math.min(view.h * 0.58 - 80, drawn.y + drawn.height + 40));
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }]);
 const picture = await until(() => canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("phone-picture")));
 const first = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("p-h"));
 const props = () => canvas.evaluate(() => !!document.querySelector(".props-panel"));
@@ -205,8 +201,8 @@ if (inCard) await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + i
 await settle(page, 600);
 say("a tap on the picture in the card selects it there, and the drawer opens from its pill", !!inCard && (await openDrawer()) && (await until(props, 2000)));
 
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-card" }] });
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-picture" }] });
+link.edit(agentId, [{ op: "delete", id: "phone-card" }]);
+link.edit(agentId, [{ op: "delete", id: "phone-picture" }]);
 await settle(page, 300);
 say("no page errors", !errors.length, errors.slice(0, 3).join(" | "));
 link.close();

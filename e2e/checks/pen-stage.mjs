@@ -2,8 +2,8 @@
  * The stage as a pen.dev file: boards as `browser` items, a drawing under them, edits from the
  * wire, from the file and by hand, all ending in the same `canvases/<name>/canvas.pen`.
  *
- * Needs no model: the edits an agent would make with `stage.pen.edit` go over the wire as
- * `stage.pen.edit`, which is the same operation through the same server path.
+ * Needs no model: the edits an agent would make with `canvas.edit` go over the wire as
+ * `canvas.edit`, which is the same operation through the same server path.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -34,7 +34,7 @@ const pageClear = (box, step = 20) =>
 	}, { ...box, step });
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 
 // --- an edit from the wire: a note, and an arrow from it to a board --------------------------------
@@ -61,15 +61,11 @@ const middle = await (async () => {
 	for (const at of found) if (await pageClear({ x: at.x, y: at.y, w: 80, h: 40 }, 40)) return { x: (at.x - m.e) / m.a, y: (at.y - m.f) / m.a };
 	return { x: (800 - m.e) / m.a, y: (500 - m.f) / m.a };
 })();
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+link.edit(agentId, [
 		{ op: "insert", node: { type: "note", id: "e2e-note", content: "Drawn by the check" }, box: { x1: Math.round(middle.x), y1: Math.round(middle.y) } },
 		{ op: "insert", node: { type: "path", id: "e2e-arrow", metadata: { type: "decks.arrow", from: "e2e-note", to: firstCard } } },
-	],
-});
-const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
+	]);
+const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
 say("an edit comes back as a stage.pen frame", !!frame);
 const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
@@ -104,7 +100,7 @@ say("an arrow to a board is drawn when it is made", typeof arrow?.geometry === "
 
 // --- moving a board moves its item, and the arrow follows ------------------------------------------
 const before = arrow?.geometry;
-link.send({ type: "card.move", path: firstCard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
+link.call("card.move", [firstCard, { x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 }]);
 const movedItem = await until(() => {
 	const now = onDisk().children.find((n) => n.metadata?.path === inFolder(firstCard));
 	return now && now.x === (item?.x ?? 0) + 400 ? now : undefined;
@@ -138,11 +134,11 @@ const whole = await fetch(`${API}/api/stage-shot?agent=${agentId}&format=pdf`, {
 say("…and the whole stage as a PDF", whole.status === 200 && Buffer.from(await whole.arrayBuffer()).subarray(0, 4).toString() === "%PDF", String(whole.status));
 
 // --- a hand edit of the file reaches the browser ----------------------------------------------------
-const revBefore = link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId).at(-1)?.rev ?? 0;
+const revBefore = link.drawings(agentId).at(-1)?.rev ?? 0;
 const text = onDisk();
 text.children.find((n) => n.id === "e2e-note").content = "Edited in the file";
 writeFileSync(file, `${JSON.stringify(text, null, 2)}\n`);
-const handFrame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.rev > revBefore).at(-1));
+const handFrame = await until(() => link.drawings(agentId).filter((m) => m.rev > revBefore).at(-1));
 say("a hand edit of the file is sent to the browser", handFrame?.doc.children.find((n) => n.id === "e2e-note")?.content === "Edited in the file");
 
 // --- by hand in the page: select and drag the note, then delete it ----------------------------------
@@ -400,7 +396,7 @@ const cardItem = onDisk().children.find((n) => n.metadata?.path === inFolder(fir
 if (cardItem) {
 	const w = Math.round((cardItem.width ?? 400) * 0.4);
 	const h = Math.round((cardItem.height ?? 300) * 0.3);
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: cardItem.x + 20, y1: cardItem.y + 20, x2: cardItem.x + 20 + w, y2: cardItem.y + 20 + h } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: cardItem.x + 20, y1: cardItem.y + 20, x2: cardItem.x + 20 + w, y2: cardItem.y + 20 + h } }]);
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
 	await focusCanvas(page);
 	await page.keyboard.press("Escape");
@@ -427,7 +423,7 @@ if (cardItem) {
 await editMode(page, false);
 
 // Leave the fixture's stage as it was, minus the check's own drawing.
-link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("e2e-") || n.id === drawnId || n.id === cardId).map((n) => ({ op: "delete", id: n.id })) });
+link.edit(agentId, onDisk().children.filter((n) => n.id.startsWith("e2e-") || n.id === drawnId || n.id === cardId).map((n) => ({ op: "delete", id: n.id })));
 await settle(page, 300);
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

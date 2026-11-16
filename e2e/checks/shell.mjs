@@ -21,7 +21,7 @@ const LINK = await socket();
 
 let agentName = "";
 for (let i = 0; i < 30 && !agentName; i++) {
-	const agents = LINK.last("agents");
+	const agents = LINK.last("agent.list");
 	agentName = agents?.chats?.find((chat) => chat.id === agents.focused)?.name ?? "";
 	if (!agentName) await settle(page, 200);
 }

@@ -42,11 +42,6 @@ async function lagged(page) {
 			deliver();
 		}, at - Date.now());
 	};
-	await page.routeWebSocket(/\/ws/, (ws) => {
-		const server = ws.connectToServer();
-		ws.onMessage((message) => server.send(message));
-		server.onMessage((message) => later(lag.ms, () => ws.send(message)));
-	});
 	await page.route(/\/api\/v1\/canvas\.batch/, async (route) => {
 		const ms = lag.ms;
 		lag.queued++;
@@ -154,8 +149,8 @@ async function run(engine, lags) {
 	await lagged(page);
 	await liveZoom(page);
 	const link = await socket();
-	const agentId = await until(() => link.last("agents")?.focused);
-	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
+	const agentId = await until(() => link.last("agent.list")?.focused);
+	const send = (ops) => link.edit(agentId, ops);
 	const person = await asPerson();
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 

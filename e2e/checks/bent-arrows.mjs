@@ -22,17 +22,13 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 
-link.send({
-	type: "stage.pen.edit",
-	agentId,
-	ops: [
+link.edit(agentId, [
 		{ op: "insert", node: { type: "rectangle", id: "bend-a", fill: "#4c8bf5" }, box: { x1: 9000, y1: 9000, x2: 9120, y2: 9070 } },
 		{ op: "insert", node: { type: "rectangle", id: "bend-b", fill: "#f5a34c" }, box: { x1: 9400, y1: 9000, x2: 9520, y2: 9070 } },
 		{ op: "insert", node: { type: "path", id: "bend-ab", geometry: "M0 0 L1 1", metadata: { type: "decks.arrow", from: "bend-a", to: "bend-b", route: "elbow" } } },
-	],
-});
+	]);
 const canvas = await canvasFrame(page);
 const engine = await canvas.evaluateHandle(() => globalThis.__decksProbes.rust);
 const placed = (id) => canvas.evaluate((id) => globalThis.__decksProbes?.rust?.placed.get(id)?.box, id);
@@ -105,7 +101,7 @@ say("letting go puts the saved arrow back", back && Math.abs(back.h - routed.h) 
 
 // --- a board dragged alone: an arrow ending on it bends with it -------------------------------------
 const board = await canvas.evaluate(() => window.__decksProbes.cards()[0]);
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "bend-board", geometry: "M0 0 L1 1", metadata: { type: "decks.arrow", from: "bend-b", to: board.path, route: "elbow" } } }] });
+link.edit(agentId, [{ op: "insert", node: { type: "path", id: "bend-board", geometry: "M0 0 L1 1", metadata: { type: "decks.arrow", from: "bend-b", to: board.path, route: "elbow" } } }]);
 const saved = await until(() => placed("bend-board"));
 say("an arrow from a box to a board is routed by the server", !!saved, JSON.stringify(saved));
 const carry = (path, dy) => canvas.evaluate(([path, dy]) => new Promise((done) => {

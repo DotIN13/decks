@@ -63,10 +63,10 @@ const card = {
 };
 
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: card, box: { x1: X, y1: Y } }] });
-const landed = await until(() => link.received.find((m) => m.type === "stage.pen" && m.doc?.children?.some((n) => n.id === ID)) ?? (link.received.some((m) => m.type === "stage.pen.delta") ? link.received.find((m) => m.type === "stage.pen") : undefined));
-const stage = landed?.stage;
+const agentId = await until(() => link.last("agent.list")?.focused);
+link.edit(agentId, [{ op: "insert", node: card, box: { x1: X, y1: Y } }]);
+const landed = await until(() => link.drawn.find((m) => m.doc?.children?.some((n) => n.id === ID)));
+const stage = landed?.canvas;
 say("the fixture card is on the stage", !!stage);
 
 const person = await asPerson();

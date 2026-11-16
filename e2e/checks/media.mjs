@@ -6,8 +6,8 @@
  * player until it is pressed: forty-eight films playing cost about a thousand times what forty-eight stills cost, so
  * nothing decodes until one is pressed.
  *
- * Needs no model: the item goes on over the wire as `stage.pen.edit`, which is the same operation
- * an agent's `stage.pen.edit` takes, through the same server path.
+ * Needs no model: the item goes on over the wire as `canvas.edit`, which is the same operation
+ * an agent's `canvas.edit` takes, through the same server path.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,12 +27,12 @@ const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 say("the server says which agent is focused", !!agentId);
 
 // The stage's file, found from the frame the server sends after the first edit.
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "media-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
-const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "media-anchor")).at(-1));
+link.edit(agentId, [{ op: "insert", node: { type: "note", id: "media-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }]);
+const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "media-anchor")).at(-1));
 const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
@@ -103,14 +103,10 @@ if (spot) {
 		fill: "#e8eaed",
 		metadata: { type: "decks.media", kind: "audio", file: "assets/a-talk.m4a", seconds: 905 },
 	};
-	link.send({
-		type: "stage.pen.edit",
-		agentId,
-		ops: [
+	link.edit(agentId, [
 			{ op: "insert", node: film, box: { x1: Math.round(spot.x), y1: Math.round(spot.y), x2: Math.round(spot.x) + 320, y2: Math.round(spot.y) + 180 } },
 			{ op: "insert", node: sound, box: { x1: Math.round(spot.x), y1: Math.round(spot.y) + 220, x2: Math.round(spot.x) + 420, y2: Math.round(spot.y) + 292 } },
-		],
-	});
+		]);
 
 	const written = await until(() => {
 		const items = onDisk().children.filter((n) => n.metadata?.type === "decks.media");
@@ -163,10 +159,10 @@ if (spot) {
 	say("a sound is a strip, not a black box", !!soundBox && soundBox.height < soundBox.width / 3, JSON.stringify(soundBox && { w: Math.round(soundBox.width), h: Math.round(soundBox.height) }));
 
 	// Left as it was found.
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "media-film" }, { op: "delete", id: "media-sound" }] });
+	link.edit(agentId, [{ op: "delete", id: "media-film" }, { op: "delete", id: "media-sound" }]);
 }
 
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "media-anchor" }] });
+link.edit(agentId, [{ op: "delete", id: "media-anchor" }]);
 await settle(page, 300);
 await editMode(page, false);
 link.close();

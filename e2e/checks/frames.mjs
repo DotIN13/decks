@@ -5,7 +5,7 @@
  * x and y are measured from its frame's corner — so dragging one out slid it out of sight inside
  * a frame that clips. The `move` op has always taken a parent; this is the drag finally asking.
  *
- * Needs no model: the items go on over the wire as `stage.pen.edit`, the same operation an agent
+ * Needs no model: the items go on over the wire as `canvas.edit`, the same operation an agent
  * makes, and everything after that is the pointer and the panel.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -26,10 +26,10 @@ const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "frames-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
-const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "frames-anchor")).at(-1));
+link.edit(agentId, [{ op: "insert", node: { type: "note", id: "frames-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }]);
+const frame = await until(() => link.drawings(agentId).filter((m) => m.doc.children.some((n) => n.id === "frames-anchor")).at(-1));
 const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
@@ -93,14 +93,10 @@ say("the canvas has room for a frame and a note beside it", !!spot);
 
 if (spot) {
 	const at = { x: Math.round(spot.x), y: Math.round(spot.y) };
-	link.send({
-		type: "stage.pen.edit",
-		agentId,
-		ops: [
+	link.edit(agentId, [
 			{ op: "insert", node: { type: "frame", id: "f-box", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, box: { x1: at.x, y1: at.y, x2: at.x + 300, y2: at.y + 220 } },
 			{ op: "insert", node: { type: "rectangle", id: "f-note", name: "Note", fill: "#fde68a", cornerRadius: 6 }, box: { x1: at.x + 400, y1: at.y + 40, x2: at.x + 500, y2: at.y + 110 } },
-		],
-	});
+		]);
 	const both = await until(() => (onDisk().children.some((n) => n.id === "f-box") && onDisk().children.some((n) => n.id === "f-note") ? true : undefined));
 	say("a frame and a loose item start side by side at the top of the file", !!both, JSON.stringify({ note: parentOf("f-note"), frame: parentOf("f-box"), layout: onDisk().children.find((n) => n.id === "f-box")?.layout, clip: onDisk().children.find((n) => n.id === "f-box")?.clip }));
 
@@ -138,7 +134,7 @@ if (spot) {
 			selection: document.querySelectorAll(".pen-selection:not([data-page])").length,
 		}));
 		await page.mouse.up();
-		const refused = link.received.filter((m) => m.type === "notice").map((m) => m.text);
+		const refused = link.received.filter((m) => m.type === "harness.notice").map((m) => m.text);
 		say("the frame lights up while the item is over it", during.drops === 1, JSON.stringify({ midDrag: lit, atDrop: during, refused }));
 		const inside = await until(() => (parentOf("f-note") === "f-box" ? true : undefined));
 		say("dropping it on the frame makes it a child of the frame in the file", !!inside, `parent ${parentOf("f-note")}`);
@@ -249,20 +245,16 @@ if (spot) {
 				const hugs = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "string" ? h : undefined; });
 				say("…and a double-click on that handle makes it hug again, with a floor", /^fit_content\(\d+\)$/.test(String(hugs)), String(hugs));
 				// As it was drawn, for what follows.
-				link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: made.id, set: { height: made.height } }] });
+				link.edit(agentId, [{ op: "update", id: made.id, set: { height: made.height } }]);
 				await settle(page, 300);
 			}
 			await page.keyboard.press("Escape");
 			await settle(page, 200);
-			link.send({
-				type: "stage.pen.edit",
-				agentId,
-				ops: [
+			link.edit(agentId, [
 					{ op: "insert", parent: made.id, node: { type: "rectangle", id: "s-one", fill: "#bfdbfe" }, box: { x1: room.world.x + 20, y1: room.world.y + 20, x2: room.world.x + 160, y2: room.world.y + 70 } },
 					{ op: "insert", parent: made.id, node: { type: "rectangle", id: "s-two", fill: "#bbf7d0" }, box: { x1: room.world.x + 20, y1: room.world.y + 90, x2: room.world.x + 160, y2: room.world.y + 140 } },
 					{ op: "insert", node: { type: "rectangle", id: "s-new", fill: "#fecaca" }, box: { x1: room.world.x + 420, y1: room.world.y + 30, x2: room.world.x + 540, y2: room.world.y + 80 } },
-				],
-			});
+				]);
 			const three = await until(() => (parentOf("s-two") === made.id && parentOf("s-new") === null ? true : undefined));
 			say("the column holds two children, with a third loose beside it", !!three, JSON.stringify({ one: parentOf("s-one"), two: parentOf("s-two"), loose: parentOf("s-new") }));
 			const now = await until(async () => {
@@ -292,16 +284,16 @@ if (spot) {
 				});
 				say("the drop lands between the two, not at the end", !!order && order[1] === "s-new", JSON.stringify(order));
 			}
-			link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: made.id }] });
+			link.edit(agentId, [{ op: "delete", id: made.id }]);
 		}
 		await page.keyboard.press("Escape");
 		await settle(page, 300);
 	}
 
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "f-note" }, { op: "delete", id: "f-box" }] });
+	link.edit(agentId, [{ op: "delete", id: "f-note" }, { op: "delete", id: "f-box" }]);
 }
 
-link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "frames-anchor" }] });
+link.edit(agentId, [{ op: "delete", id: "frames-anchor" }]);
 await settle(page, 300);
 await editMode(page, false);
 link.close();

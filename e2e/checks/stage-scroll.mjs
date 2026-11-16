@@ -25,7 +25,7 @@ await resetStage();
 const { browser, page, errors } = await open({ width: 1200, height: 800 });
 await rest(page, { start: 0 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 await editMode(page, true);
 const canvas = await canvasFrame(page);
 
@@ -66,7 +66,7 @@ if (clear) {
 	 * which saves the check from having to zoom: at a fifth zoom a paragraph is a few pixels.
 	 */
 	const many = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}: words enough to make this card taller than any window.`).join("\n\n");
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "tall", content: many, metadata: { type: "decks.markdown" }, width: 320 }, box: { x1: Math.round(clear.world.x), y1: Math.round(clear.world.y) } }] });
+	link.edit(agentId, [{ op: "insert", node: { type: "note", id: "tall", content: many, metadata: { type: "decks.markdown" }, width: 320 }, box: { x1: Math.round(clear.world.x), y1: Math.round(clear.world.y) } }]);
 	const card = await until(async () => {
 		const box = await canvas.evaluate(() => globalThis.__decksProbes?.penBox?.("tall"));
 		return box && box.height > clear.window * 1.5 ? box : undefined;
@@ -88,7 +88,7 @@ if (clear) {
 		const after = await scrolled();
 		say("…nor is it left scrolled once the editor closes", after.top === before.top && after.left === before.left, JSON.stringify({ before, after }));
 	}
-	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "tall" }] });
+	link.edit(agentId, [{ op: "delete", id: "tall" }]);
 	await settle(page, 300);
 }
 

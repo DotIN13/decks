@@ -42,7 +42,7 @@ const r2 = (n) => Math.round(n * 100) / 100;
 await resetStage();
 const { browser, page, context, errors } = await open({ width: 1400, height: 900 });
 const link = await socket();
-const agentId = await until(() => link.last("agents")?.focused);
+const agentId = await until(() => link.last("agent.list")?.focused);
 const canvas = await canvasFrame(page);
 /*
  * The page opens at the origin and lands on its cards a moment later; on a loaded machine that
@@ -132,7 +132,7 @@ const stroke = async ({ pen, points, whole }) => {
 	const made = await until(async () => (await inks()).find((ink) => !had.has(ink.id)), 8000);
 	// Off the canvas again, so every stroke is drawn over the same drawing.
 	if (made) {
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: made.id }] });
+		link.edit(agentId, [{ op: "delete", id: made.id }]);
 		await until(async () => !(await inks()).some((ink) => ink.id === made.id), 8000);
 	}
 	await page.waitForTimeout(300);

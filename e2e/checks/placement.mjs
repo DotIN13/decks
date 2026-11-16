@@ -50,8 +50,8 @@ const stray = paths.at(-1);
 const link = await socket();
 /* Off the canvas and half a million pixels down: the place the deck-wide layout used to give a
    board that nobody had put anywhere. */
-link.send({ type: "card.hide", path: stray });
-link.send({ type: "card.move", path: stray, x: 0, y: 520_000 });
+link.call("card.hide", [stray]);
+link.call("card.move", [stray, { x: 0, y: 520_000 }]);
 /*
  * Waited for rather than slept through. A hide travels socket → canvas → every browser, and
  * a fixed 700ms was enough until the canvas list started travelling with it: under a full
@@ -64,7 +64,7 @@ await settle(page, 300);
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);
 
-link.send({ type: "card.play", path: stray });
+link.call("card.play", [stray]);
 await (await canvasFrame(page)).waitForFunction((path) => (window.__decksProbes?.cards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
 await settle(page, 1200);
 
@@ -92,20 +92,13 @@ say(
 
 /*
  * Nobody makes a board any more: what the picker puts on the canvas is an item, a document opened as
- * a page (`document.create`, an item tagged `decks.document`). With no point named it takes the open
+ * a page (`doc.place`, an item tagged `decks.document`). With no point named it takes the open
  * slot beside the newest card, by the stage's own rule (`deck/place.ts`), and the server answers with
  * its path on the stage, `item:<id>`, which is what the page selects and flies to.
  */
 const before = new Set((await onScreen()).map((board) => board.path));
-link.send({ type: "document.create", document: "docs/notes.md", request: "placement-1" });
-const answered = await (async () => {
-	for (let i = 0; i < 60; i++) {
-		const heard = link.received.find((m) => m.type === "document.created" && m.request === "placement-1");
-		if (heard) return heard;
-		await settle(page, 150);
-	}
-})();
-say("document.create is answered with the item's path on the stage", /^item:/.test(answered?.path ?? ""), JSON.stringify(answered));
+const answered = (await link.call("doc.place", [{ document: "docs/notes.md" }])).value;
+say("doc.place is answered with the item's path on the stage", /^item:/.test(answered?.path ?? ""), JSON.stringify(answered));
 await (await canvasFrame(page)).waitForFunction((path) => (window.__decksProbes?.cards?.() ?? []).some((one) => one.path === path), answered?.path, { timeout: 8000 }).catch(() => {});
 await settle(page, 600);
 
