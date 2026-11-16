@@ -12,12 +12,6 @@ const decoder = new TextDecoder();
 export const DEFAULT_W = 1000;
 export const DEFAULT_H = 600;
 
-/** The size a card's meta tag declares: { w, h }, either missing when not said (protocol's cardMeta reads the tag). */
-export function metaSize(source: string): { w?: number; h?: number } {
-	const meta = deckFiles.cardMeta(source);
-	return { ...(meta?.w ? { w: meta.w } : {}), ...(meta?.h ? { h: meta.h } : {}) };
-}
-
 /** The card's file with its meta tag saying w and h, what else it says kept; a tag is added when it has none. */
 export function withSize(source: string, size: { w: number; h: number }): string {
 	const meta = deckFiles.cardMeta(source);
@@ -55,9 +49,9 @@ export async function prepareCard(deck: Deck, item: Item, at: { canvas: string; 
 	const path = asCardPath(card, at.canvas);
 	if (item.box) return { ...rest, card: path };
 	const source = await deck.read(fence(path)).then((b) => decoder.decode(b), () => "");
-	const meta = metaSize(source);
-	const w = num(width) ?? meta.w ?? DEFAULT_W;
-	const h = num(height) ?? meta.h ?? DEFAULT_H;
+	const meta = deckFiles.cardMeta(source);
+	const w = num(width) ?? meta?.w ?? DEFAULT_W;
+	const h = num(height) ?? meta?.h ?? DEFAULT_H;
 	return { ...rest, card: path, ...(source && !item.title ? { title: titleOf(path, source) } : {}), box: { x1: 0, y1: 0, x2: w, y2: h } };
 }
 

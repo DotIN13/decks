@@ -1,8 +1,8 @@
-import { events, Refused, type Caller } from "../../protocol/index.ts";
+import { deckFiles, events, Refused, type Caller } from "../../protocol/index.ts";
 import type { Kernel, Stop } from "../kernel/types.ts";
 import { fence } from "./fence.ts";
 import { claim } from "./news.ts";
-import { metaSize, withSize } from "./prepare.ts";
+import { withSize } from "./prepare.ts";
 
 // Rule 18: a card resized on its canvas writes the new size into its own file,
 // and names whoever resized it the card's writer.
@@ -34,8 +34,8 @@ async function write(kernel: Kernel, canvas: string, ids: string[], by: string):
 			throw error;
 		}
 		const source = decoder.decode(await kernel.deck.read(path));
-		const meta = metaSize(source);
-		const rev = meta.w === size.w && meta.h === size.h ? undefined : (await kernel.deck.write(path, encoder.encode(withSize(source, size)), callerOf(by))).rev;
+		const meta = deckFiles.cardMeta(source);
+		const rev = meta?.w === size.w && meta?.h === size.h ? undefined : (await kernel.deck.write(path, encoder.encode(withSize(source, size)), callerOf(by))).rev;
 		// Whoever resized it named it theirs, also when the file already said that size.
 		await claim(kernel.store("cards"), path, callerOf(by), rev ?? (await kernel.deck.revisions?.(path))?.at(-1)?.rev ?? 0);
 	}
