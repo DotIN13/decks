@@ -84,6 +84,9 @@ say("the top-left bar has the agent and the canvas, no tabs, and the panel folds
  * to the named agent without moving you.
  */
 say("the bar's word is the focused agent's", ((await page.locator(".dock-to").getAttribute("data-dest")) ?? "").startsWith(`to ${agentName}`), await page.locator(".dock-to").getAttribute("data-dest"));
+// The page hands the composer its own faces (`setAgentUiHost`): the face carries a status, which the composer's plain stand-in does not.
+const chipFace = await page.evaluate(() => ({ faces: document.querySelectorAll(".dock-to .agent-face").length, drawn: document.querySelectorAll(".dock-to .agent-face[data-status]").length }));
+say("the chip shows the agent's own face, not a plain initial", chipFace.faces >= 1 && chipFace.drawn === chipFace.faces, JSON.stringify(chipFace));
 await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover [data-row]", { timeout: 4000 });
 const chipMenu = await page.evaluate(() => ({

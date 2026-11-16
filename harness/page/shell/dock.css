@@ -459,7 +459,7 @@
 
 	/* The same two thresholds the `⋯` button uses, so an amber corner does not open onto a
 	   blue bar — and the same ones every plan meter in the usage panel wears, because they
-	   are one function: `usageLevel` in `lib/context-usage.ts`, where 70 and 85 are
+	   are one function: `usageLevel` in `composer/context/model.ts`, where 70 and 85 are
 	   decided once. */
 	:is(.popover, .usage-modal) .track[data-level="warn"] > i {
 		background: var(--color-warn);

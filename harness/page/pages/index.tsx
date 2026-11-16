@@ -3,10 +3,18 @@
 import "../perf/probe-relay.ts";
 import "../lib/session.ts";
 import { Shell } from "../shell/view.tsx";
-import { active, PUBLIC } from "../connections/connection.ts";
+import { active, api, PUBLIC } from "../connections/connection.ts";
 import { Start } from "../connections/Start.tsx";
 import { remount, setMount } from "../connections/switch.ts";
+import { authHeaders } from "../lib/session.ts";
+import { notice } from "../state/notices.ts";
+import { AgentFace, AgentMenu } from "../agents/index.ts";
+import { FiveHour } from "../settings/index.ts";
+import { setAgentUiHost } from "../composer/index.ts";
 import "../index.css";
+
+/* What the composer borrows from this page: notices, the server's address and headers, agents' faces and menu, a five-hour reading. */
+setAgentUiHost({ notice, api, authHeaders, AgentFace, AgentMenu, FiveHour });
 
 const root = document.getElementById("root");
 if (!root) throw new Error("No #root to render into");

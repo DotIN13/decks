@@ -1,6 +1,6 @@
 import type { ClaudeAccount } from "../state/types/index.ts";
 import { Show } from "solid-js";
-import { usageLevel } from "../lib/context-usage.ts";
+import { usageLevel } from "../composer/index.ts";
 import { ago, resetsAt } from "./usage-format.ts";
 
 /**

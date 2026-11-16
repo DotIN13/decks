@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { adoptComments, commentsKey, loadComments, saveComments, type CardComment } from "../markup/comments.ts";
+import type { WaitingComment } from "../composer/index.ts";
 
 /**
  * Comments on cards: whether the one being written has words in it, and the ones waiting for the next message.
@@ -76,7 +77,7 @@ export function adoptFormerComments(agentId: string, canvas: string | undefined)
  * frame can hand one over, a card's script too, so its pill has a dashed amber edge and its card says a
  * card handed it over; the card's Exact text is all of what goes with your next message.
  */
-export type WaitingComment = CardComment & { from?: "canvas" };
+export type { WaitingComment };
 
 /** The most of any one text a frame draft may carry: longer is cut, with an ellipsis, and the cut is what is sent. */
 export const FRAME_TEXT_LIMIT = 2000;

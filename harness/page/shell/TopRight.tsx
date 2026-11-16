@@ -5,9 +5,8 @@ import Play from "lucide-solid/icons/play";
 import Check from "lucide-solid/icons/check";
 import { For, Show } from "solid-js";
 import { AgentFace } from "../agents/face/view.tsx";
-import { ContextRing } from "./ContextRing.tsx";
 import { PictureProgress } from "./PictureProgress.tsx";
-import { contextLevel, contextPercent } from "../lib/context-usage.ts";
+import { ContextRing, contextLevel, contextPercent } from "../composer/index.ts";
 import { Icon, Popover } from "@decks/ui";
 
 type MoreItem = { label: string; icon: LucideIcon; note?: string; onPick: () => void; rule?: boolean; checked?: boolean; disabled?: boolean };

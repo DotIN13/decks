@@ -2,7 +2,7 @@ import RefreshCw from "lucide-solid/icons/refresh-cw";
 import X from "lucide-solid/icons/x";
 import { For, Show, type JSX } from "solid-js";
 import { Icon } from "@decks/ui";
-import { contextLevel, contextPercent, usageLevel } from "../../lib/context-usage.ts";
+import { contextLevel, contextPercent, usageLevel } from "../../composer/index.ts";
 import type { AgentUsage, PlanLimit, SessionSpend, UsageReport, UsageShare, UsageWindow } from "../../state/types/index.ts";
 import { ago, behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "../usage-format.ts";
 import { createUsage } from "./actions.ts";

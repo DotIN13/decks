@@ -9,7 +9,7 @@ other area (the bars over the canvas, the dock and floats, the keys, the viewpor
 - `TopBar.tsx`, `TopRight.tsx`, `more-menu.ts`: the bars over the canvas and the ⋯ menu.
 - `dock.ts`, `floats.ts`: the composer and the conversation as floats, and the tab of a put-away one.
 - `keys.ts`, `viewport.ts`, `tooltip.ts`, `presenting.ts`: the page's keys, its visual viewport, tooltips, Present.
-- `NoticeStrip.tsx`, `ConfirmDialog.tsx`, `ContextRing.tsx`, `PictureProgress.tsx`: what the shell shows itself.
+- `NoticeStrip.tsx`, `ConfirmDialog.tsx`, `PictureProgress.tsx`: what the shell shows itself.
 - The v3 sheets and the tokens, imported by `../index.css` in their cascade order.
 
 ## May import

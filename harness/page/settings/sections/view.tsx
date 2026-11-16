@@ -8,7 +8,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "../rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
-import { usageLevel } from "../../lib/context-usage.ts";
+import { usageLevel } from "../../composer/index.ts";
 import { state } from "../../state/deck.ts";
 import { can } from "../../connections/backend.ts";
 import { pairing } from "../../connections/pairing.ts";
