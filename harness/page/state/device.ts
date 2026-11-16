@@ -1,5 +1,5 @@
 /**
- * Which browser this is, as the server is told with each camera reading (`camera.set`).
+ * Which browser this is, as the server is told with each camera reading (`view.move`).
  *
  * A camera is agent × canvas × device: a phone and a laptop on the same canvas look at different
  * places, and the server keeps one reading per device rather than letting the last one in replace

@@ -164,14 +164,6 @@ export function statusWords(status: AgentStatus, state: AgentState): string {
 }
 
 /**
- * The same fact, in the register a 264px dropdown row can afford.
- *
- * Lower case and shorter than `statusWords`, and it carries a time where the hover card
- * carries a sentence — `done · 2m` rather than `Done, not read yet`. Two registers rather
- * than one because the row's job is to be scanned in a list of six and the card's is to
- * answer a question, and a row wide enough for the card's phrasing would be the chat list.
- */
-/**
  * The end of an agent's row, in the panel and the dropdown alike: what it is doing while it works
  * or asks, and otherwise only how long ago, compactly ("9h", "3d", "now"), or "new" if it never ran.
  * Whether a finished turn is unread is the face's ring's to say; the full state is the row's title.

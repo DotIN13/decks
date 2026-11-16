@@ -42,11 +42,11 @@ export interface StageRow {
 	boards: number;
 	rev: number;
 	agents: Array<{ id: string; name: string; color: string }>;
-	/** The words its boards and notes carry, for the manager's search field. */
+	/** The words its cards and notes carry, for the manager's search field. */
 	words: string;
 	/**
 	 * A friend's canvas, shared with you (`shared/canvases/<owner>/<canvas>/`): who shared it, and
-	 * whether you may change it. Its boards run sandboxed, with no token.
+	 * whether you may change it. Its cards run sandboxed, with no token.
 	 */
 	shared?: { owner: string; role: "edit" | "view" };
 	/**

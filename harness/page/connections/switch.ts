@@ -3,7 +3,6 @@ import type { JSX } from "solid-js";
 import { resetDeck } from "../state/deck.ts";
 import { resetPens } from "../state/pens.ts";
 import { resetStages } from "../state/canvases.ts";
-import { resetHistory } from "../state/history.ts";
 import { resetToolResults } from "../chat/index.ts";
 import { scratch } from "../state/agent.ts";
 import { setMode, setSelected } from "../state/selection.ts";
@@ -11,7 +10,8 @@ import { setDrawing, setInkSelection } from "@decks/canvas/tools";
 import { setPenSelection, setPenTool } from "@decks/canvas/tools";
 import { setPicking, setSettings } from "../state/ui.ts";
 import { stop } from "../state/line.ts";
-import { setBackend, setPairing } from "./backend.ts";
+import { setBackend } from "./backend.ts";
+import { setPairing } from "./pairing.ts";
 import { readAddress } from "./connection.ts";
 import { prepare, warm } from "./worker.ts";
 
@@ -20,8 +20,8 @@ import { prepare, warm } from "./worker.ts";
  *
  * The app is unmounted, the stores that live outside it are emptied of what the last backend said,
  * and it is mounted again: its socket opens to the new backend and the greeting fills everything
- * in, as on a first load. The page itself, its code, its fonts, the CanvasKit it already compiled
- * and the panel as you left it stay, so a switch is the canvas and the conversations reloading
+ * in, as on a first load. The page itself, its code, its fonts and the panel as you left it
+ * stay, so a switch is the canvas (its engine with it) and the conversations reloading
  * rather than a white page.
  *
  * `index.tsx` hands over what to mount (`setMount`); this file is the only one that unmounts it.
@@ -43,7 +43,6 @@ function forget(): void {
 	resetDeck();
 	resetPens();
 	resetStages();
-	resetHistory();
 	resetToolResults();
 	scratch.clear();
 	setBackend(undefined);
@@ -72,7 +71,7 @@ export async function remount(move?: () => void): Promise<void> {
 	/*
 	 * The tab's connection changes only now, with nothing mounted: every address the old view builds
 	 * follows it (`api()`), and changed earlier, the old view would have asked the new backend for
-	 * its own boards in the moment before it went.
+	 * its own cards in the moment before it went.
 	 */
 	move?.();
 	// Ready already when the switch came from the switcher (`reach`) or `warm` ran: nothing to wait on.

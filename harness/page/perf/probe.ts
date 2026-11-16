@@ -113,7 +113,7 @@ if (target) {
 	const note = (kind: string) => (event: Event) => inputs.push({ t: Math.round(performance.now()), kind, ...("scale" in event ? { scale: Math.round((event as { scale: number }).scale * 1000) / 1000 } : {}) });
 	for (const kind of ["touchstart", "touchend", "gesturestart", "gestureend", "scrollend"]) window.addEventListener(kind, note(kind), { passive: true, capture: true });
 	// Every wheel event as the page gets it, for a trackpad's direction: its deltas, and whether anyone cancelled it.
-	// [time, dx, dy, mode, ctrl, where it landed, cancelled by the time it bubbled back, cancelable]; a board page's forwarded wheel is "frame".
+	// [time, dx, dy, mode, ctrl, where it landed, cancelled by the time it bubbled back, cancelable]; a card page's forwarded wheel is "frame".
 	const wheels: Array<[number, number, number, number, number, string, number, number]> = [];
 	const describe = (node: EventTarget | null) => {
 		const el = node instanceof Element ? node : null;
@@ -137,8 +137,8 @@ if (target) {
 	window.addEventListener("touchmove", () => moves++, { passive: true, capture: true });
 	/*
 	 * Each touch as the page's own (how many fingers it sees, and whether it was held from the browser's
-	 * scroll by the time it bubbled back), each finger a board's page forwards (`decks:touch`), and each
-	 * pointer the browser took away for its scroll: what a pinch split between a board and the canvas does.
+	 * scroll by the time it bubbled back), each finger a card's page forwards (`decks:touch`), and each
+	 * pointer the browser took away for its scroll: what a pinch split between a card and the canvas does.
 	 */
 	const fingers = (event: Event) => (event as TouchEvent).touches?.length ?? 0;
 	for (const kind of ["touchstart", "touchmove", "touchend", "touchcancel"]) window.addEventListener(kind, (event) => inputs.push({ t: Math.round(performance.now()), kind: `${kind} ${fingers(event)} ${event.defaultPrevented ? "held" : "free"}` }), { passive: true });

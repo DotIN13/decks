@@ -65,8 +65,8 @@ export async function ensureWorker(): Promise<void> {
 
 /**
  * Ready to load another backend under `/c/<id>/`: the service worker where the page can have one,
- * and otherwise, for another server, this page's own server passing it through
- * (`server/src/share/relay.ts`). A canvas file has no server to pass it through, so it needs the
+ * and otherwise, for another server, this page's own server passing it through.
+ * A canvas file has no server to pass it through, so it needs the
  * worker, and the public Decks has no server of its own to relay with.
  */
 export async function reach(one: Connection): Promise<void> {

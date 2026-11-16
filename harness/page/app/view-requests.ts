@@ -24,19 +24,19 @@ async function answer(event: Requested, deps: Parameters<typeof answerViews>[0])
 	const call = todaysCall(event, (id) => deps.boxOf(id) ?? fresh.get(id), (path) => fresh.get(path));
 	if (!call) return;
 	const frame = () => document.querySelector("iframe.canvas-frame");
-		runStageCall(call, {
-			boards: () => state.pages,
-			viewport: () => ({ width: frame()?.clientWidth ?? 0, height: frame()?.clientHeight ?? 0 }),
-			focused: () => state.focused,
-			stageOnScreen: () => canvasOf(state.focused)?.name,
-			offerGoto: (agent, canvas) => offer(`An agent wants to take you to the canvas ${canvas}`, { label: "Go", run: () => deps.moveConversation(agent, canvas) }, "agent-view"),
-			// A view call that moves this screen calls off a landing still waiting, as a person's move does.
-			setCamera: (camera, options) => (deps.took(), options?.animate ? deps.editor()?.glide(camera) : deps.editor()?.setCamera(camera)),
-			rememberView: deps.rememberView,
-			select: (path) => path && deps.editor()?.select([path]),
-			reload: (path) => deps.editor()?.reloadCard(path),
-			cursor: () => true,
-		});
+	runStageCall(call, {
+		boards: () => state.pages,
+		viewport: () => ({ width: frame()?.clientWidth ?? 0, height: frame()?.clientHeight ?? 0 }),
+		focused: () => state.focused,
+		stageOnScreen: () => canvasOf(state.focused)?.name,
+		offerGoto: (agent, canvas) => offer(`An agent wants to take you to the canvas ${canvas}`, { label: "Go", run: () => deps.moveConversation(agent, canvas) }, "agent-view"),
+		// A view call that moves this screen calls off a landing still waiting, as a person's move does.
+		setCamera: (camera, options) => (deps.took(), options?.animate ? deps.editor()?.glide(camera) : deps.editor()?.setCamera(camera)),
+		rememberView: deps.rememberView,
+		select: (path) => path && deps.editor()?.select([path]),
+		reload: (path) => deps.editor()?.reloadCard(path),
+		cursor: () => true,
+	});
 }
 
 /** Whether a focus names an item the page's copy lacks, or a card the page's list does not hold. */

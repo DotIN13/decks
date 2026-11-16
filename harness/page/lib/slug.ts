@@ -1,9 +1,6 @@
-/**
- * The server's slug, in the browser, so a field can show what a name will become.
- *
- * A copy of `apps/server/src/agents/slug.ts` rather than an import: the web package does not
- * reach into the server's, and the rule is five lines. The server is still the one that
- * decides — what is sent is the typed name, and this is only the preview under the field.
+/*
+ * Turns a typed name into a slug, so a field can show what the name will become. Only a
+ * preview: what is sent is the typed name, and the server decides.
  */
 export const MAX_WORKSPACE_LENGTH = 24;
 

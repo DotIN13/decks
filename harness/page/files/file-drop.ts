@@ -1,11 +1,4 @@
-/**
- * Files dragged in from outside the browser.
- *
- * **The app's own document must refuse the browser's default.** The default action for a
- * dropped file is to *navigate to it*, which would unload the SPA — socket, camera, transcript
- * and all — to show the file. So the app swallows file drags globally (`guardDocumentDrops`),
- * not only over the canvas.
- */
+/* Files dragged in from outside the browser. */
 
 /** Whether a drag is carrying files, as opposed to text or a component of its own. */
 export function carriesFiles(transfer: DataTransfer | null): boolean {
@@ -16,15 +9,10 @@ export function carriesFiles(transfer: DataTransfer | null): boolean {
 }
 
 /**
- * Stop the app's own document from opening a dropped file.
- *
- * The browser's default for a file dropped anywhere is to navigate to it, which
- * unloads the SPA — the socket, the camera, the transcript, all of it — to show a
- * PNG. That has to be refused globally rather than over the boards, because
- * "anywhere" includes the conversation, the rail and the gap between boards.
- *
- * The composer takes its own. So this is where a file dropped on the canvas is answered, and `outside` gets the point
- * and the files, which is enough to put them on the canvas where they landed.
+ * Stop the app's own document from opening a dropped file, which would unload the app to show
+ * it. Refused on the whole document, since "anywhere" includes the conversation and the gaps
+ * between cards. The composer takes its own drops; `outside` gets the point and the files of
+ * any other, enough to put them on the canvas where they landed.
  */
 export function guardDocumentDrops(target: Document, outside: (at: { x: number; y: number }, files: File[]) => void): () => void {
 	const onDragOver = (event: DragEvent) => {
@@ -44,5 +32,3 @@ export function guardDocumentDrops(target: Document, outside: (at: { x: number; 
 		target.removeEventListener("drop", onDrop);
 	};
 }
-
-export { naturalSize } from "@decks/canvas/tools";

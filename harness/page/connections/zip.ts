@@ -1,5 +1,5 @@
 /**
- * Reading a `.decks` file: the zip `server/src/share/zip.ts` writes.
+ * Reading a `.decks` file: the zip `server/sharing/bundle/zip.ts` writes.
  *
  * The central directory is read for the names and offsets, then each entry's bytes are taken from
  * its local header, inflated with the browser's own `DecompressionStream`. Only stored and deflated

@@ -141,7 +141,7 @@
 	}
 
 	/*
-	 * The controls row, and the two sizes the board fixes for it.
+	 * The controls row, and the two sizes the card fixes for it.
 	 *
 	 * Set as custom properties rather than as widths, so `.icon-button` and `.chip-button` come
 	 * from `chrome.css` unmodified and there is still exactly one definition of what an
@@ -479,7 +479,7 @@
 	}
 
 	/*
-	 * The amber is the boards' own warning colour (`--b-warn` in `card-host/lib/theme.css`, yellow
+	 * The amber is the cards' own warning colour (`--b-warn` in `card-host/lib/theme.css`, yellow
 	 * 900), the one the row was designed in: the app's `--color-warn` is a lighter yellow made
 	 * for fills and bars, and as text on white it is hard to read.
 	 */
@@ -688,12 +688,12 @@
 	/*
 	 * Above the conversation, which is `--z-conversation` (9).
 	 *
-	 * The column floats over the boards and stops 8px short of this bar, so the two only
+	 * The column floats over the cards and stops 8px short of this bar, so the two only
 	 * meet when a card is mid-slide or the window is short — and when they met, the history
 	 * won, because this had no z-index at all and a positioned element without one paints at
 	 * 0. The bar you type into is not something a transcript may cover.
 	 *
-	 * `--z-chrome` (10) and not 11: the boards panel is on the same layer and comes later in
+	 * `--z-chrome` (10) and not 11: the panel is on the same layer and comes later in
 	 * the document.
 	 */
 	z-index: var(--z-chrome);
@@ -710,7 +710,7 @@
 	 * Centred on the canvas column: the window minus whatever the chrome is covering.
 	 *
 	 * It used to be centred on the *window* with twice-224px subtracted from its width —
-	 * a constant standing in for the board rail plus its margins. That was exact for one
+	 * a constant standing in for the panel plus its margins. That was exact for one
 	 * arrangement and wrong for every other, and it is the mistake `camera/insets.ts` exists
 	 * to stop: a panel's width stated twice drifts the first time someone changes its
 	 * padding.
@@ -721,8 +721,8 @@
 	 * response to something you pressed, which is legible, and 160ms is enough to read it
 	 * as movement.
 	 *
-	 * **Only the boards panel is in this sum**, because it is the only chrome that stands
-	 * *beside* the canvas. The conversation floats over the boards, so summoning it never
+	 * **Only the panel is in this sum**, because it is the only chrome that stands
+	 * *beside* the canvas. The conversation floats over the cards, so summoning it never
 	 * moves the bar. The inspector used to be subtracted too, on the argument that it
 	 * arrives on its own rather than being summoned — but it is a card in the top-right
 	 * corner now, and every click on a component slid this bar 160px sideways to report a

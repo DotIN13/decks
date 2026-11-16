@@ -5,8 +5,8 @@ import { basename, matches, panelSections } from "./panel-groups.ts";
 
 /*
  * The panel is a picture of these three sections, so every case here is one a reader of the
- * screen would notice: a board in the wrong group, a board in *two* groups, a count that
- * disagrees with the rows under it, or or a board the canvas holds turning up twice.
+ * screen would notice: a card in the wrong group, a card in *two* groups, a count that
+ * disagrees with the rows under it, or or a card the canvas holds turning up twice.
  */
 
 const board = (path: string, title = path): Page => ({
@@ -30,7 +30,7 @@ const deck = [
 	board("boards/the-working-sign.html", "The working sign"),
 ];
 
-/* The canvas: three boards up, and two it took off and keeps a place for. */
+/* The canvas: three cards up, and two it took off and keeps a place for. */
 const inPlay = ["boards/the-brief.html", "boards/the-shell.html", "boards/the-system.html"];
 const kept = ["boards/the-left-panel.html", "boards/the-inspector.html"];
 

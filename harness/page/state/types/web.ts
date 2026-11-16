@@ -4,8 +4,8 @@
  *
  * The extension in the user's Chrome dials the server and attaches to one tab; this is the
  * state of that connection, broadcast whenever it changes and drawn by the `data-live="web"`
- * board (`lib/live-web.js`). Nothing in it is a picture: the tab is on the user's own screen,
- * so the board is a status card — which tab, whether it is connected, what the agent did.
+ * card. Nothing in it is a picture: the tab is on the user's own screen, so the card shows
+ * status: which tab, whether it is connected, what the agent did.
  */
 export interface WebStatus {
 	/** A pairing code exists, so the extension can be told where to connect. */

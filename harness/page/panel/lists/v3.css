@@ -33,7 +33,7 @@
 		min-width: 0;
 		padding: 0;
 	}
-	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the boards inside. */
+	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the cards inside. */
 	.v3-panel .switcher,
 	.v3-deck .switcher {
 		display: flex;

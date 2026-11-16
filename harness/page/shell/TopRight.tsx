@@ -18,7 +18,7 @@ type MoreItem = { label: string; icon: LucideIcon; note?: string; onPick: () => 
  * The faces are the agents whose canvas this is, each pressed to talk to it. Present hides the
  * chrome and fills the screen with the canvas (Escape comes back). `⋯` holds the deck's commands
  * the old corner had: how full the context is, fitting and clearing the canvas, the shortcuts, the
- * settings and the theme, and how far the boards' pictures have got.
+ * settings and the theme, and how far the cards' pictures have got.
  */
 export function TopRight(props: {
 	here: AgentChat[];

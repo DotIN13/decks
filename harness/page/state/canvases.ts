@@ -6,7 +6,7 @@ import type { StageRow } from "./types/index.ts";
  *
  * A signal of the whole list rather than a store: it is short, it is replaced whole whenever
  * anything about it changes, and the one thing that reads it — the stage manager — reads all of
- * it at once. Kept here rather than in the deck store because a stage is not a board: the deck
+ * it at once. Kept here rather than in the deck store because a canvas is not a card: the deck
  * store is what is *on* the canvas, and this is what other canvases there are.
  */
 const [stages, write] = createSignal<StageRow[]>([]);
@@ -62,7 +62,7 @@ export function viewOnly(name: string | undefined): StageRow | undefined {
 /**
  * The stages a query matches, and whether each did.
  *
- * Matched on the name, the folder, the words its boards and notes carry, and who is on it — the
+ * Matched on the name, the folder, the words its cards and notes carry, and who is on it — the
  * things a person has to go on when they are looking for the room they left something in. Every
  * stage comes back with `hit`, in its order; the manager shows only the hits.
  */

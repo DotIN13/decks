@@ -1,31 +1,8 @@
 import { type Notice, setState } from "./deck.ts";
 
-/**
- * The notice strip: the things the app has to say, briefly.
- *
- * Layer 1. It imports `deck` for the store it writes into and nothing else, and it is the
- * only writer of `state.notices` — the page's shell reads that field to draw the strip and never
- * touches it otherwise, so the whole lifetime of a notice is the two functions here.
- *
- * `Notice` itself stays declared in `deck`, deliberately. The store holds `notices: Notice[]`,
- * so `deck` needs the type; if this module declared it, `deck` would import this one while
- * this one imports `deck` for `setState`, and the graph the split exists to establish would
- * have its first cycle in it. The type belongs to the store, the behaviour belongs here.
- *
- * ### Why the id is a counter rather than a timestamp
- *
- * The id is what the expiry closure matches on to remove the right line, and two notices
- * raised in the same millisecond would share a timestamp. A counter cannot collide. It is a
- * plain module `let` rather than store state because nothing draws it — the same call the
- * agent record makes for its scratch half.
- *
- * ### Why `working` exists beside `notice`
- *
- * `notice` is for something that has already happened, so it can expire on its own. An
- * upload has not: it takes as long as the file is big, and a message that expires after four
- * seconds while the bytes are still going is worse than no message. So `working` is held open
- * by its caller, rewritten as the work progresses, and replaced by an ordinary timed notice
- * when it ends.
+/*
+ * The notice strip: the things the app has to say, briefly. This module is the only writer of
+ * `state.notices`. Ids are a counter so two notices in the same millisecond never collide.
  */
 
 let noticeId = 0;
@@ -41,8 +18,8 @@ export const notice = (level: Notice["level"], text: string) => {
 };
 
 /**
- * A notice with a button: something the person may take or leave, such as an agent's view that was
- * held while they were using the canvas (`canvas/view-calls.ts`). A newer offer with the same `key`
+ * A notice with a button: something the person may take or leave, such as an agent asking to
+ * take them to another canvas (`app/view-requests.ts`). A newer offer with the same `key`
  * replaces the older one, pressing the button takes the notice away, and an offer not taken goes
  * after twelve seconds.
  */

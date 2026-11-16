@@ -241,7 +241,7 @@
 	}
 }
 
-/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
+/* The frame-rate meter (`perf/fps.tsx`, Settings › Canvas): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
 @layer components {
 	.fps-meter {
 		position: fixed;

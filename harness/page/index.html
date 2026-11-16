@@ -13,19 +13,19 @@
 			it takes away the one zoom a person with poor eyesight has over the *chrome*, and
 			the canvas's own zoom does not help them read a transcript. **For, and this is
 			the call:** on a touchscreen the page and the canvas both answer a pinch, so the
-			gesture that is *meant* to zoom the boards would sometimes zoom the app instead —
+			gesture that is *meant* to zoom the canvas would sometimes zoom the app instead —
 			leaving the chrome at 1.4× with the input bar half off the screen and no obvious
 			way back. A control that does two things depending on which one won the frame is
 			worse than a control that does one.
 
-			iOS ignores both of these words, so `blockPageZoom` in `lib/viewport.ts` refuses
+			iOS ignores both of these words, so `blockPageZoom` in `app/viewport.ts` refuses
 			Safari's `gesture*` events as well; double-tap zoom is off through `touch-action`
-			on the body, the stage and inside the board frames.
+			on the body, the canvas and inside the card frames.
 		-->
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 
 		<!--
-			The libraries a card imports by name (`packages/canvas/src/items/card.ts`): the same map a board's
+			The libraries a card imports by name (`canvas/cards/card.ts`): the same map a card's
 			page has (the server's card sizes), here once for every card, so sixty cards that import three
 			share one copy of it.
 		-->

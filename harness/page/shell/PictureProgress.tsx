@@ -3,7 +3,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { Icon } from "@decks/ui";
 
-/** What `GET /api/pictures` answers (`PictureProgress` in the server's `pictures/service.ts`). */
+/** What `GET /api/pictures` answers: how many pictures are ready of how many, and whether work goes on. */
 interface Progress {
 	total: number;
 	ready: number;
@@ -15,12 +15,10 @@ interface Progress {
 const EVERY_MS = 1000;
 
 /**
- * How far the server has got keeping the far rungs of every card on a canvas:
- * a row in the ⋯ menu. The server takes what is missing in the background (`PictureService.index`);
- * this asks how far it has got each second, and only while the menu is open, since the menu's
- * contents exist only then.
+ * How far the server has got keeping the far rungs of every card on a canvas: a row in the ⋯ menu,
+ * asking each second while the menu is open. With `quietWhenDone` it shows only while pictures are
+ * being made, after a rule, and nothing once every card has its pictures.
  */
-/** `quietWhenDone`: shown only while pictures are being made, after a rule; nothing once every board has its pictures. */
 export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 	const [progress, setProgress] = createSignal<Progress | undefined>();
 	let timer: ReturnType<typeof setTimeout> | undefined;

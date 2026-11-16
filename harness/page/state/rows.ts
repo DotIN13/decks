@@ -3,7 +3,7 @@ import type { AgentChat, AgentKind, AgentModel, AgentState, ClaudeAccount, Ident
 
 // What the server and the harness answer, as the rows the page draws. Pure:
 // no store, no DOM. A field the protocol does not carry gets the value the
-// page drew before it arrived (idle, no lines, no boards).
+// page drew before it arrived (idle, no lines, no cards).
 
 type Agent = shapes.Agent;
 type Canvas = { name: string; title: string; open: string[]; cards: number; rev?: number; shared?: { owner: string; role: "edit" | "view" } };
@@ -75,7 +75,7 @@ export function chatOf(agent: Agent, extra: AgentExtra = {}, boards: string[] = 
 	};
 }
 
-/** One row of the canvas manager: the agents whose home it is, and its cards counted as boards. */
+/** One row of the canvas manager: the agents whose home it is, and its cards counted (`boards`). */
 export function stageRowOf(canvas: Canvas, agents: readonly Agent[]): StageRow {
 	const here = agents.filter((agent) => agent.canvas === canvas.name || canvas.open.includes(agent.id));
 	return {
@@ -95,7 +95,7 @@ export function pageOf(card: Card): Page {
 	return { path: card.path, title: card.title, card: true, x: at?.x1 ?? 0, y: at?.y1 ?? 0, w: at ? at.x2 - at.x1 : 0, h: at ? at.y2 - at.y1 : 0 } as Page;
 }
 
-/** The cards placed on a canvas, by path: an agent's boards are those on its home canvas. */
+/** The cards placed on a canvas, by path: an agent's cards are those on its home canvas. */
 export function cardsOn(cards: readonly Card[], canvas: string | undefined): string[] {
 	if (!canvas) return [];
 	return cards.filter((card) => card.placements?.some((one) => one.canvas === canvas)).map((card) => card.path);

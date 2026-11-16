@@ -114,7 +114,7 @@ const fold = (query?: string) => (query ?? "").trim().toLowerCase();
  * an agent you tagged yourself is one of them. The workspace too: `irb` finds every agent
  * filed under `irb-84069`.
  *
- * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a board: tags
+ * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a card: tags
  * and workspaces are slugs, so what somebody types is usually a word that is really in one.
  */
 export function agentMatches(row: Pick<AgentRow, "chat" | "tags" | "userTags" | "workspace">, needle: string): boolean {

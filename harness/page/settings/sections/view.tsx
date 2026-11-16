@@ -10,7 +10,8 @@ import { SetGroup, SetRow, SetSegments, SetSelect } from "../rows.tsx";
 import { browserZone, clockTime, Icon } from "@decks/ui";
 import { usageLevel } from "../../lib/context-usage.ts";
 import { state } from "../../state/deck.ts";
-import { can, pairing } from "../../connections/backend.ts";
+import { can } from "../../connections/backend.ts";
+import { pairing } from "../../connections/pairing.ts";
 import { revokeAll, setSttModel, setTimezone, unpairStudio, useCopy } from "./actions.ts";
 import { ago, foldPaired } from "./model.ts";
 
@@ -180,7 +181,7 @@ function AccountRow(props: { account: ClaudeAccount; next: boolean; onForget: ()
 /* ---------------------------------------------------------------------------------------- */
 /* Voice                                                                                      */
 
-/** The composer's mic (`composer/voice.ts`): the recogniser, the server's model, the browser's language. */
+/** The composer's mic (`composer/voice/voice.ts`): the recogniser, the server's model, the browser's language. */
 export function VoiceSettings() {
 	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
 	return (

@@ -1,7 +1,7 @@
 import { createComputed, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import type { FramedHandle } from "@decks/canvas";
-import { drawing, setDrawing } from "@decks/canvas/tools";
+import { canvasItems, drawing, setDrawing } from "@decks/canvas/tools";
 import { watchInsets } from "@decks/canvas/camera";
 import { closeHistory, createChatLayout, forgetAskedResults, receiveToolResult, setToolResultSender } from "../chat/index.ts";
 import { createPresenting } from "./presenting.ts";
@@ -21,7 +21,6 @@ import { installViewport } from "../app/viewport.ts";
 import { answerViews } from "../app/view-requests.ts";
 import { rememberView } from "../app/remember-view.ts";
 import { moveConversation } from "../canvases/actions.ts";
-import { canvasItems } from "@decks/canvas/tools";
 import { can } from "../connections/backend.ts";
 import { createFileDrops } from "../files/index.ts";
 import { scheme } from "../lib/theme.ts";
@@ -105,16 +104,6 @@ function browseWhenReadOnly() {
 		if (mode() !== "browse") setMode("browse");
 		if (drawing()) setDrawing(false);
 	});
-	onMount(() => {
-		const press = (event: PointerEvent) => {
-			const pen = event.pointerType === "pen";
-			if (pen === document.documentElement.hasAttribute("data-pen")) return;
-			document.documentElement.toggleAttribute("data-pen", pen);
-			if (pen) getSelection()?.removeAllRanges();
-		};
-		window.addEventListener("pointerdown", press, true);
-		onCleanup(() => window.removeEventListener("pointerdown", press, true));
-	});
 	return viewOnlyStage;
 }
 
@@ -191,6 +180,7 @@ function wireBrowser(inputs: { files: ReturnType<typeof createFileDrops>; editor
 		},
 	});
 	installViewport();
+	markPenPresses();
 	installKeys({ openPanel: () => setPanelOpen(true), find: inputs.find });
 	setPersonStage(() => stageOf(state.focused)?.name, () => state.focused);
 	reportCameraOnArrival();
@@ -220,3 +210,17 @@ const pickFile = () =>
 			},
 		});
 	});
+
+/** Whether the last press was a pen's, on the root (`data-pen`), so the page can tell ink from a finger. */
+function markPenPresses(): void {
+	onMount(() => {
+		const press = (event: PointerEvent) => {
+			const pen = event.pointerType === "pen";
+			if (pen === document.documentElement.hasAttribute("data-pen")) return;
+			document.documentElement.toggleAttribute("data-pen", pen);
+			if (pen) getSelection()?.removeAllRanges();
+		};
+		window.addEventListener("pointerdown", press, true);
+		onCleanup(() => window.removeEventListener("pointerdown", press, true));
+	});
+}

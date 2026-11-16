@@ -44,7 +44,7 @@ const PURPOSES = {
 } as const;
 
 /**
- * Choosing a file: to embed in a board, or, with `onGoogle`, to open as a document page.
+ * Choosing a file: to embed in a card, or, with `onGoogle`, to open as a document page.
  *
  * It browses exactly what `/api/file` will serve — the deck, and the roots declared
  * in `deck.json` — because a picker that can reach further than the route offers you
@@ -57,7 +57,7 @@ const PURPOSES = {
  * answers it with the camera and the photo library as well as the file browser, which is
  * three routes for one control and none of them ours to build.
  *
- * One dialog for every way in — the canvas's File button, the composer's paperclip, a board's
+ * One dialog for every way in — the canvas's File button, the composer's paperclip, a card's
  * embed — showing every kind of file, each row saying which kind it is, with a filter for a long
  * folder. With `onGoogle` it has a second tab for a Google Doc, which only the canvas can open.
  */
@@ -65,7 +65,7 @@ export function FilePicker(props: {
 	onPick: (path: string) => void;
 	onCancel: () => void;
 	/**
-	 * Copy this into the deck and answer with the path a board should point at.
+	 * Copy this into the deck and answer with the path a card should point at.
 	 *
 	 * One file, because one embed is what the caller asked for: the picker is opened to
 	 * answer "what does this component point at", and a batch belongs to the drop path
@@ -580,7 +580,7 @@ function kindOf(entry: BrowseEntry): { icon: LucideIcon; label: string; tone: st
 	if (["csv", "tsv"].includes(extension)) return { icon: FileSpreadsheet, label: "Table", tone: "green" };
 	if (["mp4", "m4v", "webm", "mov", "ogv", "mkv"].includes(extension)) return { icon: FileVideo, label: "Video", tone: "violet" };
 	if (["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"].includes(extension)) return { icon: FileAudio, label: "Audio", tone: "violet" };
-	// Text and source both render as escaped preformatted text on a board, so they
+	// Text and source both render as escaped preformatted text on a card, so they
 	// share an icon with markup rather than with prose: what you get is the source.
 	if (PREFORMATTED.has(extension)) return { icon: FileCode, label: extension.toUpperCase(), tone: "grey" };
 	return { icon: File, label: extension ? extension.toUpperCase() : "File", tone: "grey" };

@@ -53,8 +53,8 @@ export function CommentPopup(props: {
 	onMount(() => {
 		if (open()) queueMicrotask(() => field?.focus());
 		window.addEventListener("resize", place);
-		// A press anywhere else puts it away, typed or not: in the app, or inside a board's page, which
-		// the app hears of only as its own window losing focus to the board's frame.
+		// A press anywhere else puts it away, typed or not: in the app, or inside a card's page, which
+		// the app hears of only as its own window losing focus to the card's frame.
 		const away = (event: PointerEvent) => {
 			if (!box?.contains(event.target as Node)) props.onClose();
 		};
@@ -87,7 +87,7 @@ export function CommentPopup(props: {
 			role="dialog"
 			aria-label="Comment on the selected words"
 			style={{ left: `${at()?.left ?? -9999}px`, top: `${at()?.top ?? -9999}px` }}
-			// The press must not take the selection out of the board before it is quoted.
+			// The press must not take the selection out of the card before it is quoted.
 			onPointerDown={(event) => {
 				if (!(event.target as HTMLElement).closest("textarea")) event.preventDefault();
 			}}

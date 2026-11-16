@@ -22,23 +22,14 @@ import { onCleanup, onMount } from "solid-js";
  */
 
 /**
- * Everything this file knows, wired up — three facts about the window, one call.
- *
- * The three were three statements in an `onMount` in the page's shell that also installed the paste
- * listener and the drop guard, and when those two moved to `app/files/drops.ts` the cut took these
- * with them. Nothing caught it: they were dead *imports* afterwards, which a typechecker does
- * not report, and every browser check runs in a desktop Chromium with a mouse — no on-screen
- * keyboard, no pinch gesture, and a dock whose height never changes. Two of the three were
- * invisible to the whole suite and the third only mis-draws on a phone.
- *
- * One call that installs all three is the fix for the *shape* of that mistake, not just the
- * three lines: there is now one place to delete, and it is named after what it does.
+ * Everything this file knows, wired up in one call: the visual viewport, the page-zoom block
+ * and the dock's height, installed together so there is one place that owns them.
  */
 export function installViewport(): void {
 	onMount(() => {
 		// The visual viewport, so the dock stays above the on-screen keyboard.
 		onCleanup(trackVisualViewport());
-		// And one pinch, zooming one thing: the boards, not the app around them.
+		// And one pinch, zooming one thing: the canvas, not the app around it.
 		onCleanup(blockPageZoom());
 		// How tall the dock is, published for the stylesheet.
 		watchDock(document.querySelector(".dock"));
@@ -94,13 +85,13 @@ function obscured(): { top: number; bottom: number } {
  * before it stopped honouring the meta. Cancelling those is the only thing left that stops
  * a two-finger pinch scaling the app.
  *
- * It does not touch the canvas. The board pinch is built on pointer and touch events
+ * It does not touch the canvas. The canvas pinch is built on pointer and touch events
  * (`camera/touch.ts` in `@decks/canvas`) and Safari fires both streams for the same
- * fingers, so the gesture that zooms the boards is unaffected — which is the whole point of
+ * fingers, so the gesture that zooms the canvas is unaffected — which is the whole point of
  * this: one pinch, one thing zoomed, and it is the thing under your fingers.
  *
  * Registered non-passive, because a passive listener cannot cancel anything, and on the
- * *document* rather than the app root: a gesture that begins over a board's frame is still
+ * *document* rather than the app root: a gesture that begins over a card's frame is still
  * Safari's page zoom, and the frame is a separate document with its own root.
  */
 export function blockPageZoom(): () => void {

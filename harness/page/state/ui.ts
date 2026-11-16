@@ -3,42 +3,19 @@ import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { call } from "./line.ts";
 
-/**
- * What the browser is showing that the server has no opinion about.
- *
- * Layer 2: it imports `line` (to ask for a usage report), and nothing imports it back. Everything here is *browser* state
- * — which panel is open, which modal is up, what the composer was handed — as distinct from
- * `deck`, which is the server's view of the world. A reload is allowed to lose all of it.
- *
- * ### Three decisions worth reading before changing anything here
- *
- * **The initial width is read through a function, not inline.** `panelOpen` starts from the
- * window's width, and a module-scope `window.innerWidth` runs at *import* — so importing this
- * module in Node, which is what a unit test does, would throw before a single assertion ran.
- * `lib/media.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
- * try/catch, and this follows it.
- *
- * **`usageReport` is not called `report`.** It was, in the page's shell, where it was a closure. As
- * an import it would have been shadowed by the two upload handlers, which each declare a
- * local `const report = working(…)` and then call `report.update` on it. Shadowing is legal
- * and silent — neither the compiler nor the tests would have said anything — so the name
- * changed rather than the trap being left for whoever reads it next.
- *
- * **`unread` stays a map, and is not folded into the agent record.** It is a sixteenth thing
- * keyed by an agent id, so by the argument in `state/agent.ts` it ought to move there. It does
- * not, for the reason already recorded for `contexts` in `state/deck.ts`: it is handed *whole*
- * to three components — `AgentPill` declares `unread: Record<string, number>` twice — which
- * index it themselves. Moving it means changing those signatures, which is its own change.
+/*
+ * What the browser is showing that the server has no opinion about: which panel is open,
+ * which modal is up, what the composer was handed. A reload is allowed to lose all of it.
  */
 
 /**
- * Whether the boards panel starts open, from the width of the window.
+ * Whether the panel starts open, from the width of the window.
  *
  * **Open where it is a panel, closed where it is a sheet.** Above 1100px it stands beside the
  * canvas and costs 264px of a wide window, which is a fair trade for knowing what the agent is
  * holding. Below that it is a sheet *over* the canvas, and a canvas app that opens with
  * something covering the canvas is answering a question nobody asked — on a 393px screen the
- * sheet took the left two thirds, and a pinch aimed at a board landed on a list of filenames.
+ * sheet took the left two thirds, and a pinch aimed at a card landed on a list of filenames.
  */
 const panelOpensWith = (): boolean => {
 	try {
@@ -51,13 +28,11 @@ const panelOpensWith = (): boolean => {
 };
 
 function createUi() {
-	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
+	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a card's embed. */
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
 
 	/**
-	 * Whether the boards panel is there. One signal where the module it came from had two, because
-	 * there is one panel now — and a plain signal rather than that module's persisted pair,
-	 * since what it was mostly doing was closing one panel when the other opened.
+	 * Whether the panel is there. A plain signal, not persisted.
 	 */
 	const [panelOpen, setPanelOpen] = createSignal(panelOpensWith());
 
@@ -79,10 +54,10 @@ function createUi() {
 				/** A kept comment, by id: it arrives as a pill. */
 				comment?: string;
 				/**
-				 * Boards and drawn items dragged onto the bar, each already a pill.
+				 * Cards and drawn items dragged onto the bar, each already a pill.
 				 *
 				 * Whole mentions rather than ids, because what is dragged is the only thing that
-				 * knows what to call it — a board its title, an item its name on the stage — and a
+				 * knows what to call it — a card its title, an item its name on the canvas — and a
 				 * label worked out again at the other end would be a second answer to the same
 				 * question (the composer's draft).
 				 */

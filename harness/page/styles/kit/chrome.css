@@ -492,7 +492,7 @@
 	 * That disagreement had been patched seven times, one `font-normal` at a time — the
 	 * zoom stops, the two zoom steps, the tools menu, undo, and both "new agent" rows. Seven
 	 * opt-outs from a default is the default being wrong, so it is stated once here and the
-	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's boards, the settings
+	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's cards, the settings
 	 * groups and the dialog's options are lists you read, not lists you pick from.
 	 */
 	.popover [data-row]:not(:has(> .row-note)) > .row-label {

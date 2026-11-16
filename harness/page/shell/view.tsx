@@ -34,7 +34,7 @@ import { TopRight } from "./TopRight.tsx";
 import { createPage, type PageWiring } from "./actions.ts";
 
 // The shell: the canvas, the panels floating over it, and the dock. Each piece
-// below is the markup App.tsx drew, unchanged, handed the page's wiring.
+// below is a component handed the page's wiring (`createPage`, ./actions.ts).
 
 type P = { page: PageWiring };
 type Trigger = (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;

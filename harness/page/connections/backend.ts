@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import type { BackendInfo, PairedRow, StudioLinkRow } from "../state/types/index.ts";
+import type { BackendInfo } from "../state/types/index.ts";
 
 /**
  * What the backend on the other end can do, from the first frame of its greeting (`backend`).
@@ -14,16 +14,3 @@ export { backend, setBackend };
 export function can(what: keyof BackendInfo["can"]): boolean {
 	return backend()?.can[what] ?? true;
 }
-
-/** The pairing code on show in this server's Settings, and who holds a token (the server's tokens). */
-interface PairingState {
-	code?: string;
-	expires?: number;
-	paired: PairedRow[];
-	/** The link to Decks Studio, its key, when this harness has one. */
-	studio?: StudioLinkRow;
-}
-
-const [pairing, setPairing] = createSignal<PairingState>({ paired: [] });
-
-export { pairing, setPairing };

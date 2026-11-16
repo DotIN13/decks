@@ -55,7 +55,7 @@ export function createBar(names: BarNames) {
 				const stage = stageOf(state.focused)?.name;
 				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf: names.titleOf, itemName: names.itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
 				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
-				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
+				// Ctrl+Enter: held for the end of the turn by the agent's session (`harness/sessions/queue.ts`), which sends it at once if the agent is idle.
 				if (queue) void call("chat.queue", { agent: dest.id, action: "add", text: line, ...parts }).then(warnIfFailed);
 				else void call("chat.send", { agent: dest.id, text: line, ...parts }).then(warnIfFailed);
 				return;

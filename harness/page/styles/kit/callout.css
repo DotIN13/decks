@@ -6,7 +6,7 @@
 	/*
 	 * The pill over a selected card (`ui/Callout.tsx`): the comment popup's card
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
-	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
+	 * things that float over a card look alike and follow the theme; a toolbar's row of icons.
 	 */
 	.stage-fixed > .card-callout {
 	position: absolute;
@@ -29,7 +29,7 @@
 	transform: translate(-50%, 0);
 	animation-name: card-callout-in-below;
 }
-	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
+	/* Gone at once while the camera or the card moves, and back with a fade when it rests. */
 	.stage-fixed > .card-callout:not([data-hidden]) {
 	transition: opacity 90ms ease-out;
 }
@@ -101,7 +101,7 @@
 	color: var(--muted);
 	text-decoration: none;
 }
-	/* A hairline before Hide: the one action that takes the board away. */
+	/* A hairline before Hide: the one action that takes the card away. */
 	.stage-fixed > .card-callout > .callout-rule {
 	width: 1px;
 	height: 16px;

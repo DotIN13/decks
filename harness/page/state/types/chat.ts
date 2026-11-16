@@ -44,7 +44,7 @@ export interface RuntimeInfo {
 	/**
 	 * The models it last offered on this deck. Empty until it has run here once.
 	 *
-	 * Remembered per runtime rather than asked of a backend (`agents/store.ts`), which is what
+	 * Remembered per runtime rather than asked of a backend (`harness/sessions/transcript.ts`), which is what
 	 * lets a restored deck draw a model picker with nothing running.
 	 */
 	models: ModelOption[];

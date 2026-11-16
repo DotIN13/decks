@@ -2,7 +2,8 @@ import { probes } from "@decks/canvas/host";
 import { onCleanup, onMount } from "solid-js";
 import { toWorld } from "@decks/canvas/camera";
 import { camera } from "../state/camera.ts";
-import { guardDocumentDrops, naturalSize } from "./file-drop.ts";
+import { guardDocumentDrops } from "./file-drop.ts";
+import { naturalSize } from "@decks/canvas/tools";
 import { cardPicture, centredOp, fileCardOps, fileItem, liveFileOps, markdownText, mediaItem, pictureItem, rowOps, wordsCard, type DroppedItem, type FilePreview, type SizedItem } from "@decks/canvas/tools";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
@@ -20,14 +21,14 @@ import { authedSrc } from "../lib/authed.tsx";
 import { DOCUMENTS, fileAddress, fromCanvas, isPlayable, isRaster, isWords, showsAsItself, PLAYABLE, RASTER, sizeLabel } from "./model.ts";
 
 /**
- * Files arriving from outside: dropped on the canvas (empty or over a board), on the input bar,
+ * Files arriving from outside: dropped on the canvas (empty or over a card), on the input bar,
  * or pasted.
  *
  * **The bytes are always copied into the deck.** A deck is self-contained: an embed of
- * something on your desktop is a board that breaks the moment you tidy up. Identical files
+ * something on your desktop is a card that breaks the moment you tidy up. Identical files
  * are stored once, and nothing is ever overwritten (`files/upload.ts`).
  *
- * **Nothing goes into a board.** A drop lands on the canvas where it was let go, over a board or
+ * **Nothing goes into a card.** A drop lands on the canvas where it was let go, over a card or
  * not; a paste lands on the canvas in the middle of the view; the input bar mentions the path
  * where the caret is.
  */
@@ -98,7 +99,7 @@ export function createFileDrops() {
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }, over?: { card: string; index: number; inner: number }) => {
 		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage || refusedOn(stageOnScreen())) return;
-		// Asked first, before anything is made for them: a big file said no to leaves no board behind.
+		// Asked first, before anything is made for them: a big file said no to leaves no card behind.
 		const files: File[] = [];
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
 		if (files.length === 0) return;
@@ -227,7 +228,7 @@ export function createFileDrops() {
 	/**
 	 * Files on the clipboard: on the canvas, in the middle of the view, as a drop there would put them.
 	 *
-	 * Never into a board, whatever is selected: nothing is pasted or dropped into a board's page. A
+	 * Never into a card, whatever is selected: nothing is pasted or dropped into a card's page. A
 	 * paste while something is focused belongs to that thing — the composer, a field — so a
 	 * screenshot pasted into a sentence you are writing is not put on the canvas.
 	 */
@@ -333,7 +334,7 @@ export function createFileDrops() {
 	 * The two document-wide listeners: a paste, and a drop on the canvas.
 	 *
 	 * Both are on the document because both can land anywhere — over the rail, over the
-	 * conversation, in the gap between boards — and a drop the app does not handle would be
+	 * conversation, in the gap between cards — and a drop the app does not handle would be
 	 * the browser opening the file, which unloads the app: socket, camera and all.
 	 */
 	const install = (deps: { preview(): unknown; /** A copy of canvas items, or words, handed to the canvas (its frame's `clipboard.ts`); false when there is no canvas to take it. */ forward?(data: { clip?: string; text?: string }): boolean }) => {
@@ -361,9 +362,9 @@ export function createFileDrops() {
 		});
 
 		/*
-		 * Every file dropped on the canvas reaches here — on empty canvas, and over a board too: a
-		 * board's page hands its drop back to be replayed on its frame (`embed-guest.js`), since nothing
-		 * is dropped into a board. The input bar takes its own. The files land where they were dropped.
+		 * Every file dropped on the canvas reaches here — on empty canvas, and over a card too: a
+		 * card's page hands its drop back to be replayed on its frame (`embed-guest.js`), since nothing
+		 * is dropped into a card. The input bar takes its own. The files land where they were dropped.
 		 */
 		onMount(() => {
 			dropPreview = deps.preview;

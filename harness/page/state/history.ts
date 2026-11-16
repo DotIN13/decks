@@ -44,6 +44,3 @@ export async function loadEarlier(agentId: string): Promise<number> {
 	setState("agents", agentId, "moreHistory", answer.value.length >= PAGE);
 	return answer.value.length;
 }
-
-/** Nothing is kept between pages any more; kept for the callers that reset on a switch. */
-export function resetHistory(): void {}

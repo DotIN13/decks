@@ -3,29 +3,9 @@ import { createStore } from "solid-js/store";
 import { trackZoneWith } from "@decks/ui";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
 
-/**
- * The server's view of the world, as one store.
- *
- * Layer 0, with `selection`. It imports `agent` for the record type and
- * nothing else; every module above imports this one.
- *
- * **One store, not three.** Splitting it by reader was considered and measured against:
- * the fields do not cluster. `focused` is read by eight of the file's ten regions and
- * `boards` by seven, and almost every other field is read by the socket switch *and* the
- * render body and nowhere else. Three stores would be three imports in the same two places.
- *
- * ### What is here and what is not
- *
- * The four derived below are plain functions, so they need no owner and live here beside
- * what they read. The memos — `focusedChat`, `transcript`, `busy`, `stagePages` — stay in
- * the page's shell: a memo is a computation and
- * needs a reactive owner, which module scope does not have. They read this store by import
- * instead of by closure, which is the only thing that changed for them.
- *
- * `dialog`, `preview` and the two clears reach into `state.agents`, so they are arguably
- * `agent`'s rather than the deck's. They are here because the store is here; moving them
- * would make `agent` import `deck`, which the graph allows but which should be a decision
- * rather than a side-effect of where the store happened to land.
+/*
+ * The server's view of the world, as one store, with the plain functions that read it.
+ * Memos stay in components, since a memo needs a reactive owner.
  */
 
 /** A line in the notice strip: something the app has to say, briefly. */
@@ -67,10 +47,10 @@ function createDeck() {
 		 * cleared seven of the eleven maps by hand and missed the rest.
 		 */
 		agents: Record<string, AgentRecord | undefined>;
-		/** The user's shared Chrome, from `web.status`; the status board draws it (`live-web.js`). */
+		/** The user's shared Chrome, from `web.status`; the status card draws it. */
 		web?: { status: WebStatus; code?: string };
 		/**
-		 * Boards each agent is holding, from `context.changed`.
+		 * Cards each agent is holding, from `context.changed`.
 		 *
 		 * Still a map, unlike the nine that moved: this one is handed *whole* to
 		 * `panelSections`, which indexes it itself. Moving it means changing that signature.

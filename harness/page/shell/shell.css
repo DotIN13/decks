@@ -64,7 +64,7 @@
 		padding: 0 6px;
 		margin-bottom: 8px;
 	}
-	/* The mark on its tile, the way the app icon is drawn: ink tile, the boards in the
+	/* The mark on its tile, the way the app icon is drawn: ink tile, the cards in the
 	   ground colour on it. */
 	.panel-mark-glyph {
 		display: inline-flex;
@@ -243,7 +243,7 @@
 	/*
 	 * The conversation is a panel, at home and away: the layer colour, a strong hairline,
 	 * the shared shadow, and turns drawn as bubbles inside it rather than as cards floating
-	 * over the boards. The gutter the cards' shadows needed goes to zero, because nothing
+	 * over the cards. The gutter the cards' shadows needed goes to zero, because nothing
 	 * inside a clipped panel casts one. The specificity is deliberate: `stream.css` sets the
 	 * same properties on `.stream`, and two attributes beat one whatever the import order.
 	 */
@@ -399,8 +399,8 @@
  * off the top of the window with the canvas invisible behind it.
  *
  * `clip`, not `hidden`: a hidden box still scrolls when something inside it is brought into view,
- * and a board's title-bar button past the window's edge, focused or pressed, slid the whole canvas
- * 12px left under every board after it.
+ * and a card's title-bar button past the window's edge, focused or pressed, slid the whole canvas
+ * 12px left under every card after it.
  */
 .work {
 	position: absolute;

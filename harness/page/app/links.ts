@@ -12,15 +12,15 @@ import { call, warnIfFailed } from "../state/line.ts";
 // and following a link from one card to another, placed beside it.
 
 /*
- * Frame these boards, whatever they are: the camera moves to hold them all.
+ * Frame these cards, whatever they are: the camera moves to hold them all.
  *
- * A function over a list rather than one board, because the two things that fly — a row in
- * the rail, and a board a link on another board opened (below) — want the same arithmetic,
- * and a list is also what an agent's `decks.view.focus` on several boards asks for.
+ * A function over a list rather than one card, because the two things that fly — a row in
+ * the rail, and a card a link on another card opened (below) — want the same arithmetic,
+ * and a list is also what an agent's `decks.view.focus` on several cards asks for.
  *
  * `animate` is what the two of them ask for and nothing else does: after a link or a press a
  * camera that *arrives* says which way it went, where a camera that jumps leaves you to work
- * out how the board you are now looking at relates to the one you were. a fit stays
+ * out how the card you are now looking at relates to the one you were. a fit stays
  * instant, because a keyboard shortcut is a hand and a chat switch is a change of context.
  */
 export const flyToPages = (boards: Page[], options?: { animate?: boolean }) => {
@@ -37,20 +37,20 @@ export const flyTo = (board: Page) => {
 };
 
 /**
- * Put a board on the canvas and fly to it — **after** the server has said where it landed.
+ * Put a card on the canvas and fly to it — **after** the server has said where it landed.
  *
- * A board joining a canvas is placed beside the boards already on it (`deck/place.ts`), so the
+ * A card joining a canvas is placed beside the cards already on it (`server/canvas/place.ts`), so the
  * place it had a moment ago is not where it will be: on a deck this app has been used on for a
- * while, every board carries a place from the old deck-wide layout, hundreds of thousands of
- * pixels down. Flying to the board as it is *now* would land the camera on empty canvas and
- * leave the board off screen, which is the bug this fixes rather than a race worth ignoring.
+ * while, every card carries a place from the old deck-wide layout, hundreds of thousands of
+ * pixels down. Flying to the card as it is *now* would land the camera on empty canvas and
+ * leave the card off screen, which is the bug this fixes rather than a race worth ignoring.
  *
  * So the flight waits for two frames from the server, in the order they are sent: the deck
- * state, which carries the new place, and the context, which says the board is on the canvas.
+ * state, which carries the new place, and the context, which says the card is on the canvas.
  */
 export function createFraming(onCanvasNow: () => Page[]) {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
-	/** Fly to a board once the server has placed it and put it on the canvas. */
+	/** Fly to a card once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
 	const playAndFrame = (path: string) => {
 		if (!onCanvasNow().some((one) => one.path === path)) void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
@@ -59,7 +59,7 @@ export function createFraming(onCanvasNow: () => Page[]) {
 	createEffect(() => {
 		const wanted = framing();
 		if (!wanted) return;
-		/* Given up on after ten seconds, so a board that never arrives cannot fly the camera
+		/* Given up on after ten seconds, so a card that never arrives cannot fly the camera
 		   somewhere a minute later, when the person is reading something else. */
 		if (Date.now() - wanted.asked > 10_000) {
 			setFraming(undefined);
@@ -75,21 +75,21 @@ export function createFraming(onCanvasNow: () => Page[]) {
 }
 
 /**
- * A link **on a board** that points at another board — the app's half of it.
+ * A link **on a card** that points at another card — the app's half of it.
  *
- * Returns whether the deck had that board, because the board itself cannot open one: the
+ * Returns whether the deck had that card, because the card itself cannot open one: the
  * canvas is the app's to arrange. A path the deck does not hold is a broken link, and the
  * one answer that is any use is saying so.
  *
- * **Placed, not stacked.** A board that arrives on top of the one the reader is reading is
- * a board they then have to drag apart; so it lands to the right of the link's own board.
- * Only when it is not already on the canvas: a board the user put somewhere is theirs, and
+ * **Placed, not stacked.** A card that arrives on top of the one the reader is reading is
+ * a card they then have to drag apart; so it lands to the right of the link's own card.
+ * Only when it is not already on the canvas: a card the user put somewhere is theirs, and
  * following a link is not a reason to move it.
  *
- * **The camera goes to the board that was asked for, and only to it.** It used to frame the
- * pair, on the argument that a board arriving beside another is only useful if you can see
- * that it did. What that costs is the thing the link was followed for: two boards side by
- * side fit at half the zoom of one, which on a laptop is under `LIVE_ZOOM` — the board
+ * **The camera goes to the card that was asked for, and only to it.** It used to frame the
+ * pair, on the argument that a card arriving beside another is only useful if you can see
+ * that it did. What that costs is the thing the link was followed for: two cards side by
+ * side fit at half the zoom of one, which on a laptop is under `LIVE_ZOOM` — the card
  * lands too small to read and too small to click into. Where it sits is answerable by
  * zooming out; text too small to read is not answerable at all.
  */
@@ -121,7 +121,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 		return true;
 	}
 	void call("item.insert", { item: { type: "card", card: path }, ...onScreen() }).then(warnIfFailed);
-	// The server copies the board into the canvas; it is landed when the copy arrives.
+	// The server copies the card into the canvas; it is landed when the copy arrives.
 	const started = performance.now();
 	const wait = () => {
 		const copy = onCanvas();
@@ -133,7 +133,7 @@ export const openLinkedPage = (path: string, from: string): boolean => {
 };
 
 const move = (path: string, x: number, y: number) => {
-	// Optimistic, and in place: the board is already where it was dropped, and the
+	// Optimistic, and in place: the card is already where it was dropped, and the
 	// server's answer confirms it. Replacing the object here would re-create the
 	// row and reload the document that is sitting in it.
 	const index = state.pages.findIndex((board) => board.path === path);

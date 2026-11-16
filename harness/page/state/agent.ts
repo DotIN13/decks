@@ -50,9 +50,9 @@ export interface AgentRecord {
 	/** The Claude subscription it spends. */
 	spending?: string;
 	/**
-	 * The boards it has put on the canvas.
+	 * The cards it has put on the canvas.
 	 *
-	 * Here, while `contexts` — the boards it merely *holds* — stays in the store for now.
+	 * Here, while `contexts` — the cards it merely *holds* — stays in the store for now.
 	 * The difference is not about the data: every use of this one narrows to a single agent
 	 * before reading it, while `contexts` is handed whole to `panelSections`, which indexes
 	 * it itself. Moving that means changing a signature, which is its own change.

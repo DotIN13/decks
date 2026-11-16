@@ -13,7 +13,7 @@ import { For } from "solid-js";
  * *Should I switch to this one?* — so it holds the name, how long ago, the state in words,
  * and the last thing that agent said. Nothing else, and the list of what it deliberately
  * leaves out is longer than what it shows: **no model, no thinking level, no ask-mode, no
- * board counts.** Those belong to the composer and the boards panel, which show them for
+ * card counts.** Those belong to the composer and the panel, which show them for
  * the agent whose window this is; an earlier version of this card had all four, and a
  * tooltip with four settings in it is a settings panel you cannot click.
  *
@@ -184,7 +184,7 @@ export function AgentHoverCard(props: {
 				 *
 				 * Three lines at most: this is the evidence for the decision rather than the
 				 * transcript, and a card that grows with whatever the agent last wrote would be
-				 * a card that covers the boards it is telling you about.
+				 * a card that covers the cards it is telling you about.
 				 */}
 				<Show when={props.chat.lastLine}>
 					{(line) => <div class="line-clamp-3 text-note leading-[1.45] text-faint">“{line()}”</div>}

@@ -11,7 +11,7 @@ import { Icon, onDismiss } from "@decks/ui";
  *
  * The v3 design draws it as a tray of real-looking tools beside the tool column, the way a notes
  * app on a tablet does. It holds what the canvas's ink can do: a pen, a marker, an eraser and a
- * lasso, five colours and three widths (`@decks/canvas`, `state/ink.ts`). Pressing the instrument
+ * lasso, five colours and three widths (`@decks/canvas`, `ink/ink.ts`). Pressing the instrument
  * already in hand, or `⋯`, opens its widths under the tray.
  *
  * Its keys are the ones the old ink bar had, on the window and before the stage: ⌘Z and ⇧⌘Z mean

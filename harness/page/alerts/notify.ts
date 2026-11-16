@@ -17,7 +17,8 @@ export type Availability =
 export function availability(): Availability {
 	if (typeof window === "undefined") return "unsupported";
 	/*
-	 * Read through a widened alias rather than with `"Notification" in window`.
+	 * Read through a widened alias rather than with `"Notification" in window`: the alias lets
+	 * the constructor be missing, so a plain typeof check below says whether it is there.
 	 */
 	const host = window as Window & typeof globalThis & { Notification?: typeof Notification };
 	if (typeof host.Notification !== "function") {
@@ -50,8 +51,8 @@ export interface Banner {
 	title: string;
 	body?: string;
 	/**
-	 * The collapsing key. Two banners with the same tag are one banner showing the newer , 
-	 * so four agents finishing in a row is four, and one agent whose failure is reported
+	 * The collapsing key. Two banners with the same tag are one banner showing the newer one,
+	 * so four agents finishing in a row is four banners, and one agent whose failure is reported
 	 * twice is one.
 	 */
 	tag?: string;

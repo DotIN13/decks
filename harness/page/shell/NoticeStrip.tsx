@@ -2,7 +2,7 @@ import { For, Show } from "solid-js";
 import { state } from "../state/deck.ts";
 
 /**
- * The notice strip: what the app has to say, briefly, over the boards.
+ * The notice strip: what the app has to say, briefly, over the canvas.
  *
  * Top-centre and pointer-transparent, because a notice is not a thing to click — the one
  * thing it must not do is take a gesture meant for the canvas underneath it. `top-[58px]`

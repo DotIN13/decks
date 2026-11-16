@@ -5,7 +5,7 @@
  * module is the whole of the decision, so the label shown beside the bar and the send
  * itself cannot disagree: both ask `destination` and get the same answer.
  *
- * Precedence, highest first: a note target the person picked on a board; an `@Name` in the
+ * Precedence, highest first: a note target the person picked on a card; an `@Name` in the
  * text; then the focused agent, whose stage is on screen. Nobody focused is nowhere to send
  * to, and says so.
  */
@@ -64,7 +64,7 @@ export function destination(text: string, context: BarContext): Destination {
 	return { kind: "nowhere" };
 }
 
-/** The board's own name: the last path segment without its `.html`. */
+/** The card's own name: the last path segment without its `.html`. */
 function pageName(board: string): string {
 	const last = board.split("/").filter(Boolean).at(-1) ?? board;
 	return last.endsWith(".html") ? last.slice(0, -".html".length) : last;

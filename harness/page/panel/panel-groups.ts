@@ -1,12 +1,12 @@
 import type { Page, DeckPen } from "../state/types/index.ts";
 
 /**
- * What the boards panel lists, and which of its three sections each board belongs to.
+ * What the side panel lists, and which of its three sections each card belongs to.
  *
  * Pure on purpose, and tested (`panel-groups.test.ts`). The panel itself is a picture of
  * this: three sentences and a count each, in a fixed order, and the grouping is the whole of
  * what the panel *knows*. Leaving it inside the component would have meant the only way to
- * ask "does a board an agent holds also appear under the deck" is to render one and look —
+ * ask "does a card an agent holds also appear under the deck" is to render one and look —
  * which is how the old rail ended up meaning two different things depending on state nobody
  * was watching.
  *
@@ -14,35 +14,35 @@ import type { Page, DeckPen } from "../state/types/index.ts";
  *
  * 1. **On the canvas** — what the canvas has up. The accent dot, and the only rows at full
  *    strength, because this list is the canvas written down.
- * 2. **Held, not shown** — boards the focused agent has taken off its stage and keeps a
+ * 2. **Held, not shown** — cards the focused agent has taken off its canvas and keeps a
  *    place for (its context); showing one puts it back where it was.
  *    Dimmed: `[data-off-canvas]` in the old rail did this with 45% opacity on a picture,
  *    which made a list look switched off; on a text row it is the muted colour.
  * 3. **In the deck** — everything else there is. Neither dimmed nor marked: browsing the
  *    deck, "held" and "up" are not two states worth telling apart, and the rows above have
- *    already said which boards are which.
+ *    already said which cards are which.
  *
  * ### Why this is one list and not two tabs
  *
  * It was **Context** and **Deck**, a strip over two lists — and the two lists were the same
  * list with a line drawn through it. Everything in Context was also in Deck, so finding a
- * board meant first guessing which tab the app had put it in *this second*, and the answer
+ * card meant first guessing which tab the app had put it in *this second*, and the answer
  * depended on what an agent had done since you last looked. They are not two collections;
  * they are three states of one. So they are three headings in one scroller, in the order
  * that matters — what you are looking at, what the agent is holding for you, then everything
  * else — with one search field over all of it and the counts beside the headings saying the
  * rest.
  *
- * A board the canvas holds appears **once**, in its own section and not again under the deck.
+ * A card the canvas holds appears **once**, in its own section and not again under the deck.
  * A list that shows a thing twice is a list you cannot count.
  */
 
 type SectionKind = "canvas" | "held" | "deck";
 
-/** One board, and the two things a row's appearance depends on. */
+/** One card, and the two things a row's appearance depends on. */
 interface PanelRow {
 	board: Page;
-	/** A `.pen` file listed among the boards (`board` then carries its path and name), placed on the stage by a press. */
+	/** A `.pen` file listed among the cards (`board` then carries its path and name), placed on the canvas by a press. */
 	pen?: DeckPen;
 	/** In play: gets the accent dot. */
 	onCanvas: boolean;
@@ -54,22 +54,22 @@ interface PanelSection {
 	kind: SectionKind;
 	/**
 	 * The whole label, sentence case, without the count: "On the canvas", "Held, not shown",
-	 * "In the deck". Never uppercase — see `.meta` in `styles/chrome.css` for why.
+	 * "In the deck". Never uppercase — see `.meta` in `styles/kit/chrome.css` for why.
 	 */
 	label: string;
 	rows: PanelRow[];
 }
 
 interface PanelInput {
-	/** Every board there is. The third section is this, minus the two above it. */
+	/** Every card there is. The third section is this, minus the two above it. */
 	boards: Page[];
-	/** Boards the canvas took off and keeps a place for, newest first: the second section. */
+	/** Cards the canvas took off and keeps a place for, newest first: the second section. */
 	kept?: string[];
 	/** What is up on the canvas: the first section. */
 	inPlay?: string[];
 	/** What is typed in the search field. Filters the rows; the sections stay in order. */
 	query?: string;
-	/** The `.pen` files in `boards/` and `frames/`: listed in the deck section beside the boards, by path. */
+	/** The `.pen` files in `boards/` and `frames/`: listed in the deck section beside the cards, by path. */
 	pens?: DeckPen[];
 }
 
@@ -79,17 +79,17 @@ interface PanelInput {
  * An empty section is dropped rather than drawn as "Held, not shown · 0": the label is a
  * line *inside* the list, so a zero would be a sentence claiming a group that has no rows
  * under it — and with a search running, most of them are empty most of the time. The one
- * state worth saying out loud is "this deck has no boards at all", and that is a sentence in
+ * state worth saying out loud is "this deck has no cards at all", and that is a sentence in
  * the panel rather than three empty headings.
  *
  * Counts come from `rows.length` *after* filtering, so "On the canvas · 1" while a search is
- * running means one match, not one board. The alternative — the unfiltered count beside a
+ * running means one match, not one card. The alternative — the unfiltered count beside a
  * filtered list — is a number that disagrees with what is under it.
  */
 export function panelSections(input: PanelInput): PanelSection[] {
 	const needle = fold(input.query);
 	const known = new Map(input.boards.map((board) => [board.path, board]));
-	/* Both lists drop anything the deck no longer has: a row for a board that is not there is a row that cannot be picked. */
+	/* Both lists drop anything the deck no longer has: a row for a card that is not there is a row that cannot be picked. */
 	const canvasPaths = (input.inPlay ?? []).filter((path, index, all) => known.has(path) && all.indexOf(path) === index);
 	const up = new Set(canvasPaths);
 	const quietPaths = (input.kept ?? []).filter((path) => known.has(path) && !up.has(path));
@@ -123,7 +123,7 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	 */
 	const copied = new Set(input.boards.flatMap((board) => (/^canvases\/[^/]+\/boards\//.test(board.path) ? [`boards/${board.path.split("/").slice(3).join("/")}`] : [])));
 	const rest: PanelRow[] = input.boards.filter((board) => !claimed.has(board.path) && !copied.has(board.path) && matches(board, needle)).map((board) => ({ board, onCanvas: false, dim: false }));
-	// A pen file stands among the boards, in path order: a row whose `board` is just its path and name.
+	// A pen file stands among the cards, in path order: a row whose `board` is just its path and name.
 	for (const pen of input.pens ?? []) {
 		const board = { path: pen.path, title: pen.title } as Page;
 		if (matches(board, needle)) rest.push({ board, pen, onCanvas: false, dim: false });
@@ -137,12 +137,12 @@ export function panelSections(input: PanelInput): PanelSection[] {
 }
 
 /**
- * Does this board match what was typed?
+ * Does this card match what was typed?
  *
- * Title and **basename**, not the whole path — every board in a deck lives under `boards/`,
- * so matching the path would make "boa" select the entire deck and make the count in the
+ * Title and **basename**, not the whole path — every card in a deck lives under one folder,
+ * so matching the path would make a few letters of it select the entire deck and make the count in the
  * foot say nothing. Substring and case-insensitive rather than fuzzy, for the reason
- * `AllBoards` gives: a deck's boards are named by the person who asked for them, so the
+ * `AllBoards` gives: a deck's cards are named by the person who asked for them, so the
  * thing they type is usually a word that is really in the name.
  */
 export function matches(board: Page, needle: string): boolean {

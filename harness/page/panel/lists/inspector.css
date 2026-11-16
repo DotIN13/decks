@@ -35,7 +35,7 @@
 	 * else about the palette is.
 	 *
 	 * "Default" is the *absence* of `data-tone` — a callout with no tone draws in the
-	 * accent — and the swatch says what the board will draw rather than what the control is
+	 * accent — and the swatch says what the card will draw rather than what the control is
 	 * called. Only a callout has tones at all, which is why there is one default colour
 	 * here and not a rule per family.
 	 */

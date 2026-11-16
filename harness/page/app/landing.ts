@@ -25,11 +25,11 @@ interface LandingInputs {
  * conversations, which it hands here to keep): a view kept per agent and canvas on this device,
  * taken back exactly on arriving there, else the middle of everything on the canvas once its
  * drawing is on screen. An agent with no canvas waits for a deck frame sent after it began, since
- * its boards are the deck's.
+ * its cards are the deck's.
  */
 export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: LandingInputs) {
 	/**
-	 * Everything on the canvas in view, for framing it: its boards and every item drawn round them
+	 * Everything on the canvas in view, for framing it: its cards and every item drawn round them
 	 * (notes, shapes, arrows, ink, frames), so a canvas that is mostly drawing is framed on its drawing.
 	 */
 	const canvasBoxes = (): Array<{ x: number; y: number; w: number; h: number }> => {
@@ -56,8 +56,8 @@ export function createCameraLanding({ views, stagePen, stagePages, deckSeen }: L
 		waitFor: (to, first) => {
 			/*
 			 * The page's first landing has no canvas being left, and its deck frame usually came before it
-			 * began, so it takes any frame at all; it also waits for the canvas's boards themselves, the deck
-			 * frame on hand may not have put them in play yet. A canvas's boards are in its drawing, so a
+			 * began, so it takes any frame at all; it also waits for the canvas's cards themselves, the deck
+			 * frame on hand may not have put them in play yet. A canvas's cards are in its drawing, so a
 			 * switch to a canvas waits for nothing more: a switch by `agent.update` is followed by no deck frame.
 			 */
 			const deckAt = first ? 0 : untrack(deckSeen);

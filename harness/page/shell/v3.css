@@ -6,7 +6,7 @@
  * **The canvas keeps its own look.** The v3 colours are set on `body`, so the chrome and every
  * menu portalled into the body take them; `.stage` sets the old ones back for everything drawn on
  * the canvas (the selection, the pills, the handles, the cursors), and the stage engine reads its
- * accent off the root element, which this sheet leaves alone. Only the ground under the boards,
+ * accent off the root element, which this sheet leaves alone. Only the ground under the cards,
  * `--stage`, is the design's.
  *
  * Last in `index.css`, and in the components layer, so a rule here wins a tie with the sheets it
@@ -75,7 +75,7 @@ body {
 	/*
 	 * In dark the navy wash read as a smudge. The open tab is a clear blue, light enough to read
 	 * as blue on the dark panel, with pale-blue words; a chosen row is a quiet lifted grey, so blue
-	 * marks only which tab you are on. (Board "Five dark-mode highlights…", the 3 + 4 column.)
+	 * marks only which tab you are on. (Card "Five dark-mode highlights…", the 3 + 4 column.)
 	 */
 	--v3-tab-on: rgb(59 130 246 / 22%);
 	--v3-tab-on-fg: #d6e5ff;

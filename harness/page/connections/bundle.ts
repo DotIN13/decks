@@ -10,7 +10,7 @@ import { readZip } from "./zip.ts";
  * finds its files (`public/sw.js`). Reading it as a canvas waits for a backend on the new line:
  * the old socket stand-in went with the old socket.
  *
- * A bundle has no agents, but the app draws a stage as somebody's: the drawing and the boards on
+ * A bundle has no agents, but the app draws a canvas as somebody's: the drawing and the cards on
  * screen are an agent's (`state/pens.ts`). So the backend names one reader, `READER`, with the
  * canvas's title, and says in its greeting that it can neither run agents nor write, which is what
  * keeps the composer and the editing tools off the screen (`BackendInfo`).

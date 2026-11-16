@@ -1,7 +1,7 @@
 import { createSignal, onCleanup, Show } from "solid-js";
 
 /**
- * A frame-rate meter over the canvas, for judging a pan by eye and by number (Settings, Boards).
+ * A frame-rate meter over the canvas, for judging a pan by eye and by number (Settings, Canvas).
  *
  * It counts the page's animation frames, which is what a pan has to keep up with: frames a second
  * over the last second, the slowest frame in it, and the share of frames over 12 ms, which at

@@ -1,14 +1,14 @@
 /*
  * The Decks service worker: one front end, several backends (`connections/connection.ts`).
  *
- * A board's page has to come from the app's own address, because the canvas reaches into it, and a
+ * A card's page has to come from the app's own address, because the canvas reaches into it, and a
  * backend other than the server this page came from is not at that address. So everything for
  * connection `<id>` is asked for under `/c/<id>/...`, and this worker answers it:
  *
  * - a **server** connection is fetched from that server, with its token, and handed back as if it
  *   were this origin's;
  * - a **bundle** connection is read from the files unpacked into Cache Storage when it was opened,
- *   laid out the way a server would lay them out (`server/src/share/bundle.ts`).
+ *   laid out the way a server would lay them out (`server/sharing/bundle/bundle.ts`).
  *
  * An absolute `/api/...` that a page under `/c/<id>/` asks for (card.js does) is routed the same way,
  * by the address of the page that asked. Everything else, which is everything when only this
@@ -26,8 +26,8 @@ let table;
 const manifests = new Map();
 /**
  * The digest of the person token of the Decks page that told this worker its connections. A command
- * passed to another server (anything but a read) must carry that token, as it must to this one
- * (`server/src/auth/guard.ts`). The token stays here; the connection's own goes on.
+ * passed to another server (anything but a read) must carry that token, as it must to this one.
+ * The token stays here; the connection's own goes on.
  */
 let keyDigest;
 

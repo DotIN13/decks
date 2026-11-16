@@ -10,7 +10,7 @@ import { ToolColumn } from "./ToolColumn.tsx";
 import { ZoomBar } from "./ZoomBar.tsx";
 
 /**
- * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `frame/chrome.ts`):
+ * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `host/chrome.ts`):
  * the tool column, the pen tray, the drawing's properties, the zoom and the comment popover (the layers stay in the page's sidebar), the same
  * components the page draws around a canvas it holds itself. A press on any of them stays in the frame;
  * what crosses to the page is a draft for the composer, or opening the apps panel.

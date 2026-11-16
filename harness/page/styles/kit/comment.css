@@ -100,7 +100,7 @@
 	}
 
 	/*
-	 * What goes with the message, as a pill in the words: a comment, a board or card, a drawn item, a
+	 * What goes with the message, as a pill in the words: a comment, a card, a drawn item, a
 	 * file. Picone's pill (its `markdown.css`), in this app's colours: one object, selected whole or not
 	 * at all, never broken across two lines, and sized by the sentence it sits in. The same pill in the
 	 * input bar and in a message you sent (`.stream-bubble`), and a press on either opens its card.

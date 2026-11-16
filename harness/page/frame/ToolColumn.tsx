@@ -42,11 +42,11 @@ import {
 } from "@decks/canvas/tools";
 import { Icon, onDismiss } from "@decks/ui";
 
-/**
+/*
  * The tool column of the v3 harness: select and hand, then what you can put on the canvas
- * (a board, a note, words, a shape, ink, an arrow, a file), then undo and redo.
+ * (a card, a note, words, a shape, ink, an arrow, a file), then undo and redo.
  *
- * Three of the tools are families, and a press opens their menu beside the column: the board
+ * Three of the tools are families, and a press opens their menu beside the column: the card
  * (a document card or an app), the shape (five shapes and a line, with the full library and the
  * icons behind "More"), and the arrow (straight, elbow, curved). What was picked last is what the
  * button shows and what its key arms. The pen opens the pen tray (`PenTray.tsx`).
@@ -74,7 +74,7 @@ export function ToolColumn(props: {
 	/** Select was pressed: the app's browse mode, where a press picks up and the pages are read. */
 	onSelect?: () => void;
 	/**
-	 * The canvas's mode: `edit` outlines what is under the pointer, shows a flow board's block grips
+	 * The canvas's mode: `edit` outlines what is under the pointer, shows a card's block grips
 	 * and Alt's distances; `browse` lights nothing up. The pointer's menu offers both, beside the hand.
 	 */
 	mode: "browse" | "edit";
