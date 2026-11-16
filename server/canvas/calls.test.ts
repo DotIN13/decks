@@ -178,8 +178,10 @@ test("a pass reaches its canvas's folder and what its canvas already places, and
 		[{ op: "update", id: "tx", set: { fill: { type: "image", url: "../other/files/a.png" } } }],
 		[{ op: "insert", item: { type: "note", id: "n9" } }, { op: "update", id: "tx", set: { type: "app", app: "other" } }],
 	]) assert.equal(pass(ops), "refused", JSON.stringify(ops));
+	assert.equal(pass(put({ type: "ref", ref: "canvases/other/frames/x" })), "refused", "a ref to another canvas's frame");
+	assert.equal(pass(put({ type: "ref", ref: "frames/mine" })), "ok", "a ref to its own frame");
 	assert.equal(doc.read().find((i) => i.id === "tx")?.type, "text", "the text is still a text");
-	assert.equal(doc.read().length, 3, "nothing changed but the text");
+	assert.equal(doc.read().length, 4, "nothing changed but the text and its own frame's ref");
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "files/a.png" } })), "ok", "its own files");
 	assert.equal(pass(put({ type: "rectangle", fill: { type: "image", url: "https://example.com/a.png" } })), "ok", "a web address");
 	// What the person placed, a pass may put in again: a copy, a paste back, an undone delete.

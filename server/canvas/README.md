@@ -42,8 +42,8 @@ The kernel and the protocol, and today's `@decks/pen` for parsing, edits and lay
     Every other node is drawn: notes, text, shapes, frames, arrows, refs, kept as pen.dev wrote them.
     Anywhere an item's id is taken, a page's path is too: a card's as its folder or its
     index.html, an older page's as its file, with or without the canvas's folder before it.
-    A pass reaches its canvas's folder and what the canvas already places (a copy, a paste back, an
-    app it shows): any other path or app an item it puts or changes names is refused. Others as today.
+    A pass reaches its canvas's folder and what it already places (a copy, a paste back, an app it
+    shows), nothing else; its undo brings back only what the person's own stack holds. Others as today.
 10. After every change each joined arrow is routed again between its ends, in the same revision,
     so the file holds the path the page draws. Any other item you did not touch keeps its bytes.
 11. `item.clip` keeps a copy of items and the files their kinds name, for a day. `item.paste`

@@ -80,7 +80,7 @@ function pathsIn(node: PenNode, canvas: string, kinds: Kinds): string[] {
 	return out;
 }
 
-/** Every place field in a value, at any depth: card, path, file and url as written, app as its page. */
+/** Every place field in a value, at any depth: card, path, file, url and a ref to a frame file as written, app as its page. */
 function namedIn(value: unknown): string[] {
 	const out: string[] = [];
 	const visit = (one: unknown): void => {
@@ -88,6 +88,7 @@ function namedIn(value: unknown): string[] {
 		else if (one && typeof one === "object") {
 			for (const [key, field] of Object.entries(one)) {
 				if (typeof field === "string" && PATH_FIELDS.has(key)) out.push(field);
+				else if (typeof field === "string" && key === "ref" && field.includes("/")) out.push(field);
 				else if (typeof field === "string" && key === "app") out.push(`/app/${field}/`);
 				else visit(field);
 			}
