@@ -3,8 +3,6 @@
 import { pageFont } from "../../look/look.ts";
 import { type Token, type Tokens } from "marked";
 import { CALLOUTS, cardMarked, sizedAlt, type WikiToken } from "../card-syntax.ts";
-import { sel } from "./markup.ts";
-import { unwrap } from "./style.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 export const ZW = "​";
@@ -15,6 +13,21 @@ export const h = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<s
 	if (text !== undefined) el.textContent = text;
 	return el;
 };
+
+/** The page's selection: the caret, or the words selected. */
+export const sel = () => getSelection()!;
+
+/** The caret at the start of `el`, or all of it selected. */
+export function caretInto(el: Element, all: boolean) {
+	const r = document.createRange();
+	r.selectNodeContents(el);
+	if (!all) r.collapse(true);
+	sel().removeAllRanges();
+	sel().addRange(r);
+}
+
+/** An element taken out, its children left where it was. */
+export const unwrap = (n: Element) => n.replaceWith(...n.childNodes);
 
 /** Something kept as its markdown: shown, never typed into, written back as it came. */
 export const atom = (raw: string, shown: string, cls = "pce-atom", tag: "span" | "div" = "span") => {

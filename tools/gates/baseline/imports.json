@@ -1,12 +1,4 @@
 {
-	"canvas/cards/editor/actions.ts: value import in a cycle": 2,
-	"canvas/cards/editor/markup.ts: value import in a cycle": 1,
-	"canvas/cards/editor/model.ts: value import in a cycle": 2,
-	"canvas/cards/editor/style.ts: value import in a cycle": 3,
-	"canvas/editor/core/gesture-carry.ts: value import in a cycle": 3,
-	"canvas/editor/core/gesture-handle.ts: value import in a cycle": 3,
-	"canvas/editor/core/gesture-press.ts: value import in a cycle": 1,
-	"canvas/editor/core/gesture.ts: value import in a cycle": 3,
 	"canvas/host/inside/studio-line.ts: canvas may not import server (packages/hub)": 1,
 	"canvas/render/engine-doc.ts: value import in a cycle": 1,
 	"canvas/render/engine-frame.ts: value import in a cycle": 1,

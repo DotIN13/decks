@@ -1,7 +1,5 @@
 // Styling what is selected: a style on or off, a block's kind, a table or a rule put in.
-import { STYLES, type Style, ZW, atom, h, splitAround } from "./model.ts";
-import { sel } from "./markup.ts";
-import { caretInto } from "./actions.ts";
+import { STYLES, type Style, ZW, atom, caretInto, h, sel, splitAround, unwrap } from "./model.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 export function style(cx: EditorCtx, event: MouseEvent) {
@@ -139,5 +137,3 @@ export function insertBlock(cx: EditorCtx, kind: "table" | "rule") {
 	else cx.ed.append(made, next);
 	caretInto(kind === "table" ? made.querySelector("td")! : next, false);
 }
-
-export const unwrap = (n: Element) => n.replaceWith(...n.childNodes);

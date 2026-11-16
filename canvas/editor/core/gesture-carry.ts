@@ -7,9 +7,8 @@ import type { PageBox, EditorState, Mods, Offset, Pt, Rect } from "./model.ts";
 import { pageMoves, copyOps, moveOps, type PageMove } from "./ops.ts";
 import type { SceneQuery } from "./scene.ts";
 import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
-import { type Carry, type Effect, type Gesture, type GestureContext, PAGE_HOLD_MS, type PointerInput, SETTLE_MS, type Step, type Tap, ZERO } from "./gesture.ts";
-import { selectMade } from "./gesture-press.ts";
-import { landed, move } from "./gesture-handle.ts";
+import type { Carry, Effect, Gesture, GestureContext, PointerInput, Step, Tap } from "./gesture.ts";
+import { PAGE_HOLD_MS, selectMade, SETTLE_MS, ZERO } from "./gesture-ground.ts";
 
 export const isFree = (mods: Mods) => mods.meta || mods.ctrl;
 export const done = (state: EditorState, effects: Effect[] = [], ops: Op[] = []): Step => ({ state, ops, effects });

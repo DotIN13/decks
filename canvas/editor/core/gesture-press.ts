@@ -5,6 +5,7 @@ import { pickAt, type Picked } from "./pick.ts";
 import type { SceneQuery } from "./scene.ts";
 import { type Effect, type GestureContext, type PointerInput, type Step, type Tap } from "./gesture.ts";
 import { carry, done, isFree } from "./gesture-carry.ts";
+import { withSelection } from "./gesture-ground.ts";
 
 /** A press on the drawing or bare canvas, with the select tool. */
 export function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
@@ -53,14 +54,6 @@ export function pressPage(state: EditorState, path: string, p: PointerInput, sce
 	return done(started.state, [{ do: "select-board", path }, started.effect]);
 }
 
-/** The selection with its items, its boards, or both replaced. */
-export function withSelection(state: EditorState, next: { items?: readonly string[]; boards?: readonly string[] }): EditorState {
-	return { ...state, selection: { ...state.selection, ...(next.items ? { items: next.items } : {}), ...(next.boards ? { boards: next.boards } : {}) } };
-}
-/** Select what was just asked for, which the drawing does not have until the server answers. */
-export function selectMade(state: EditorState, made: readonly string[]): EditorState {
-	return { ...state, selection: { ...state.selection, items: made, awaited: [...new Set([...state.selection.awaited, ...made])] } };
-}
 /** The boards picked up that are no longer on the canvas, let go. */
 export function prunePages(state: EditorState, present: ReadonlySet<string>): EditorState {
 	const picks = state.selection.boards;

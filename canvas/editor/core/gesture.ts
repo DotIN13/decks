@@ -6,22 +6,14 @@ import type { EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeB
 import { type PageMove, type NextId } from "./ops.ts";
 import { type Handle, type RadiusStart } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
-import { pressCanvas, pressPage, withSelection } from "./gesture-press.ts";
+import { pressCanvas, pressPage } from "./gesture-press.ts";
 import { carry, done } from "./gesture-carry.ts";
-import { landed, move, pressHandle, release } from "./gesture-handle.ts";
-export { withSelection, selectMade, prunePages } from "./gesture-press.ts";
+import { move, pressHandle, release } from "./gesture-handle.ts";
+import { landed, withSelection, ZERO } from "./gesture-ground.ts";
+export { HANDLE_TAP_MS, PAGE_HOLD_MS, RADIUS_HOLD_MS, SETTLE_MS, ZERO, selectMade, withSelection } from "./gesture-ground.ts";
+export { prunePages } from "./gesture-press.ts";
 export { landPageResize } from "./gesture-handle.ts";
 export { landPageDrag } from "./gesture-carry.ts";
-
-// How long things wait.
-/** How long a let-go gesture waits for the drawing that answers it before its preview goes anyway. */
-export const SETTLE_MS = 2000;
-/** How long a let-go radius is held for the drawing to have it. */
-export const RADIUS_HOLD_MS = 3000;
-/** How long a let-go board size is held for the board to be at it. */
-export const PAGE_HOLD_MS = 4000;
-/** Two presses on one handle within this long, with no drag: the handle's double-click. */
-export const HANDLE_TAP_MS = 400;
 
 // What goes in, what is in hand, and what comes out.
 /** Where the pointer is and how: in stage coordinates and on the screen, the keys held, its kind, and when. */
@@ -129,7 +121,6 @@ export type GestureContext = {
 export type Step = { state: EditorState; ops: Op[]; preview?: ReadonlyMap<string, PreviewChange> | null; effects: Effect[] };
 
 // The step.
-export const ZERO: Offset = { dx: 0, dy: 0 };
 /** The editor before anything is selected or pressed. */
 export function initialState(mode: EditorState["mode"] = "browse", tool: PenTool = "select"): EditorState {
 	return { mode, tool, selection: { items: [], boards: [], awaited: [] }, hover: { link: false }, drag: ZERO, guides: [], drop: {}, joins: [], sides: [], carryPending: false, settling: [] };

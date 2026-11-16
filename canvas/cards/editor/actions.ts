@@ -3,8 +3,8 @@
 import { isScribbleCatch } from "@decks/ui";
 import { type Tokens } from "marked";
 import { cardMarked } from "../card-syntax.ts";
-import { BLOCKS, INLINE, ZW, h } from "./model.ts";
-import { placeAfter, sel } from "./markup.ts";
+import { BLOCKS, INLINE, ZW, caretInto, h, sel } from "./model.ts";
+import { placeAfter } from "./markup.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 // Typing
@@ -173,14 +173,6 @@ export function onDblClick(cx: EditorCtx, event: MouseEvent) {
 }
 
 /** The caret in an element: at its start, or with all of its words selected. */
-export function caretInto(el: Element, all: boolean) {
-	const r = document.createRange();
-	r.selectNodeContents(el);
-	if (!all) r.collapse(true);
-	sel().removeAllRanges();
-	sel().addRange(r);
-}
-
 // Committing and leaving
 export function commit(cx: EditorCtx) {
 	if (cx.done) return;

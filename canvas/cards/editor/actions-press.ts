@@ -1,11 +1,9 @@
 // Presses, keys and drags: a piece dragged between lines or into a sentence, the keys
 // the editor answers itself, and the effect that wires the document's presses on mount.
 import { onCleanup, onMount } from "solid-js";
-import { type Style, ZW, h } from "./model.ts";
+import { type Style, ZW, caretInto, h, sel } from "./model.ts";
 
-import { sel } from "./markup.ts";
 import { SELECTION_PAUSE_MS } from "./view.tsx";
-import { caretInto } from "./actions.ts";
 import type { EditorCtx } from "./ctx.ts";
 
 /** What the editor does once it is on the page: reads the card in, watches it, and wires the document's presses. */

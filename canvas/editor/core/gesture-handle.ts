@@ -6,9 +6,9 @@ import { marqueePick, marqueeRect } from "./pick.ts";
 import { pageResizeEnd, pageResizeStep, shownPageResize, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, sizeNarrowest } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
 import { SNAP_PX, snapTargets } from "./snapping.ts";
-import { type Effect, type GestureContext, HANDLE_TAP_MS, type Input, PAGE_HOLD_MS, type PointerInput, RADIUS_HOLD_MS, type Step, ZERO, step } from "./gesture.ts";
+import type { Effect, GestureContext, Input, PointerInput, Step } from "./gesture.ts";
 import { done, isFree, moveCarry, releaseCarry, settle } from "./gesture-carry.ts";
-import { withSelection } from "./gesture-press.ts";
+import { HANDLE_TAP_MS, landed, PAGE_HOLD_MS, RADIUS_HOLD_MS, withSelection, ZERO } from "./gesture-ground.ts";
 
 /** A press that starts a gesture on something the overlay drew: a handle, the radius, an arrow's end or middle. */
 export function pressHandle(state: EditorState, input: Input & PointerInput, scene: SceneQuery, ctx: GestureContext): Step | undefined {
@@ -191,8 +191,6 @@ function handleTap(state: EditorState, key: string, time: number): { state: Edit
 	const again = was?.key === key && time - was.at < HANDLE_TAP_MS;
 	return { state: { ...state, handleTap: again ? undefined : { key, at: time } }, again };
 }
-/** The drag's offset and the resized outline gone: the drawing has the change, or has given up waiting. */
-export const landed = (state: EditorState): EditorState => ({ ...state, drag: ZERO, resize: undefined, shownResize: undefined });
 
 /**
  * A board size let go is let go of once the board is at it: the write's revision has come (or the

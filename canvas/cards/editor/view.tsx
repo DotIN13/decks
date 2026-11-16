@@ -24,7 +24,7 @@ import { ScribbleCatch } from "@decks/ui";
 import { pageFont } from "../../look/look.ts";
 import { FONT_GROUPS } from "../card-syntax.ts";
 
-import { sel } from "./markup.ts";
+import { sel } from "./model.ts";
 
 import type { EditorCtx } from "./ctx.ts";
 
