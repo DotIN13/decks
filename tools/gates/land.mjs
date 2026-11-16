@@ -8,7 +8,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { dirname, join, resolve } from "node:path";
 import { LOCK } from "./hold.mjs";
 
-const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+// Paths as they are written, in any script: git quotes non-ASCII names unless told not to.
+const git = (args, cwd) => execFileSync("git", ["-c", "core.quotePath=false", ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
 /** The folders tools/check.mjs checks alone, the longest first so clients/sdk wins over clients. */
 const FOLDERS = ["clients/sdk", "clients/cli", "clients/mcp", "clients/extension", "harness/page", "protocol", "server", "harness", "canvas", "engine", "pen", "ui", "tools"];

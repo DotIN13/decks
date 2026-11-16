@@ -33,7 +33,7 @@ export function context(root = ROOT) {
 /** Every file in the tree, tracked or new, that git does not ignore; a plain walk when root has no git. */
 export function listFiles(root) {
 	if (!existsSync(join(root, ".git"))) return walk(root).sort();
-	const out = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+	const out = execFileSync("git", ["-c", "core.quotePath=false", "ls-files", "-co", "--exclude-standard"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
 	return out.split("\n").filter((f) => f && existsSync(join(root, f))).sort();
 }
 
@@ -90,7 +90,7 @@ const CUT = "c669a67f";
 
 /** Root files as the branch was cut: they count as today's code. */
 function filesAtCut(root) {
-	try { return new Set(execFileSync("git", ["ls-tree", "-r", "--name-only", CUT], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n")); }
+	try { return new Set(execFileSync("git", ["-c", "core.quotePath=false", "ls-tree", "-r", "--name-only", CUT], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n")); }
 	catch { return new Set(); }
 }
 

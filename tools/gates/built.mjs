@@ -23,5 +23,5 @@ export default {
 
 function tracked(root, files) {
 	if (!existsSync(join(root, ".git"))) return files;
-	return execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);
+	return execFileSync("git", ["-c", "core.quotePath=false", "ls-files"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);
 }

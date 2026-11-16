@@ -65,13 +65,13 @@ export function units(pairs) {
 
 /** The renames staged in git, as [old, new] pairs. */
 export function stagedRenames(root) {
-	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
+	const out = execFileSync("git", ["-c", "core.quotePath=false", "diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
 	return out.split("\n").filter((l) => /^R\d*\t/.test(l)).map((l) => l.split("\t").slice(1, 3));
 }
 
 /** The files staged as added and as modified (renames aside), for the growth check's reading of a split. */
 export function stagedSplit(root) {
-	const out = execFileSync("git", ["diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
+	const out = execFileSync("git", ["-c", "core.quotePath=false", "diff", "--cached", "-M", "--name-status"], { cwd: root, encoding: "utf8" });
 	const rows = out.split("\n").filter(Boolean).map((l) => l.split("\t"));
 	return { added: rows.filter((r) => r[0] === "A").map((r) => r[1]), modified: rows.filter((r) => r[0] === "M").map((r) => r[1]) };
 }

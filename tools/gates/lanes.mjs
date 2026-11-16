@@ -42,7 +42,7 @@ export default {
 
 if (process.argv[2] === "--staged") {
 	const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
-	const staged = execFileSync("git", ["diff", "--cached", "--name-only"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+	const staged = execFileSync("git", ["-c", "core.quotePath=false", "diff", "--cached", "--name-only"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
 	const problems = outsideLane(JSON.parse(readFileSync(join(root, LANES), "utf8")), process.env.REWRITE_AGENT, staged);
 	for (const p of problems) console.error(`lanes: ${p}`);
 	if (problems.length) console.error("Commit only your own paths: git commit -m \"...\" -- <your paths>. Set REWRITE_AGENT=<your name>.");
