@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { LOCK_FILE } from "@decks/protocol";
-import { startHarness } from "./host.ts";
+import { readLock, startHarness, type Lock } from "./host.ts";
+export { readLock } from "./host.ts";
 import type { RunKind } from "./runtimes/types/index.ts";
 
 // The harness's entry: node --import tsx harness/main.ts --deck <folder>
@@ -13,24 +13,10 @@ import type { RunKind } from "./runtimes/types/index.ts";
 // runs. A deck with no agent gets one, at home on --canvas when named.
 
 const SERVER = fileURLToPath(new URL("../server/main.ts", import.meta.url));
-type Lock = { url: string; token: string; pid: number };
 
 function flag(argv: string[], name: string): string | undefined {
 	const at = argv.indexOf(`--${name}`);
 	return at >= 0 ? argv[at + 1] : undefined;
-}
-
-/** The running server's lock, when its process is alive. */
-export function readLock(deck: string): Lock | undefined {
-	const file = join(deck, LOCK_FILE);
-	if (!existsSync(file)) return undefined;
-	try {
-		const lock = JSON.parse(readFileSync(file, "utf8")) as Lock;
-		process.kill(lock.pid, 0);
-		return lock;
-	} catch {
-		return undefined;
-	}
 }
 
 /** Start Decks-local on the deck, and wait for its lock file. */
