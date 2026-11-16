@@ -2,8 +2,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Duplex } from "node:stream";
 import { API, LOGIN_PATH, MCP_PATH, PROTOCOL_VERSION, refusal, SOCKET_PATH, type Caller, type Envelope } from "../../../protocol/index.ts";
 import { LOCAL_PERSON } from "../callers.ts";
-import { SERVER_VERSION, type Built } from "../kernel.ts";
+import type { Built } from "../kernel.ts";
 import { PUBLIC, type Route } from "../types.ts";
+import { SERVER_VERSION } from "../version.ts";
 import { mcpAnswer } from "./mcp.ts";
 import { socketDoor, socketParts } from "./socket.ts";
 import { accept } from "./ws.ts";

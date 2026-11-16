@@ -1,5 +1,6 @@
 import { jsonSchemaOf, PROTOCOL_VERSION, type AnyCall, type Caller, type Envelope } from "../../../protocol/index.ts";
-import { SERVER_VERSION, type Built } from "../kernel.ts";
+import type { Built } from "../kernel.ts";
+import { SERVER_VERSION } from "../version.ts";
 
 // The MCP door, POST /mcp: JSON-RPC 2.0 over HTTP. Its tools are the calls
 // this caller may make here, named as the protocol names them, each with its

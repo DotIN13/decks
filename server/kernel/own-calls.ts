@@ -1,8 +1,8 @@
 import { calls, events, PROTOCOL_VERSION, Refused, type Caller } from "../../protocol/index.ts";
 import { LOCAL_PERSON, type Callers } from "./callers.ts";
-import { SERVER_VERSION } from "./kernel.ts";
 import { readJson, writeJson } from "./store.ts";
 import { defineFeature, handleAll, type Feature, type Store } from "./types.ts";
+import { SERVER_VERSION } from "./version.ts";
 
 // The deck's own calls, the kernel's one small feature: its settings, the
 // clock where the person is, pairing other front ends and taking them back.

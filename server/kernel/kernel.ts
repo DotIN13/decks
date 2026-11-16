@@ -14,9 +14,6 @@ import type { CanvasDoc, CanvasSource, Context, Deck, Feature, Kernel, Stop, Sto
 // deck wrapped in history, the callers, the event stream, the canvas source,
 // the router, and every feature started in order before the first call.
 
-/** This server's own version, said by deck.get, the HTTP door and MCP. */
-export const SERVER_VERSION = "0.1.0";
-
 export type KernelOptions = { deck: Deck & { startAt?(rev: number): void; root?: string }; stores: Stores; features: Feature[]; clock?: () => number; checkAnswers?: boolean; relayWaitMs?: number; version?: VersionFile; machine?: string };
 
 export type Built = { kernel: Kernel; router: Router; events: EventBus; callers: Callers; history: HistoryDeck; relay: Relay; features: Feature[]; stop(): Promise<void>; setUrl(url: string): void };
