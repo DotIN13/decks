@@ -99,7 +99,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			} catch {
 				/* a name clash or a canvas gone meanwhile: the agent still works, on a canvas of its own once it needs one */
 			}
-			void app.publishAccounts();
+			void app.accountList.publish();
 			app.publishStages();
 			return { id: agent.id };
 		},
@@ -268,8 +268,8 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		},
 
 		"account.list": async ([options], call) => {
-			void app.publishAccounts(call.tell);
-			if ((options as { limits?: unknown } | undefined)?.limits) void app.refreshLimits();
+			void app.accountList.publish(call.tell);
+			if ((options as { limits?: unknown } | undefined)?.limits) void app.accountList.refreshLimits();
 		},
 		"account.add": async () => {
 			const claude = [agents().focused(), ...agents().all()].find((agent) => agent.kind === "claude");
@@ -281,11 +281,11 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 			if (!agent) throw new Error("That agent is not here any more.");
 			if (!agent.conversation.useAccount(String(id))) throw new Error("That account is not on the list any more.");
 			void agent.conversation.start();
-			void app.warmAccount(String(id)).then(() => app.publishAccounts(undefined, { reread: true }));
+			void app.accountList.warm(String(id)).then(() => app.accountList.publish(undefined, { reread: true }));
 		},
 		"account.forget": async ([id]) => {
 			app.claudeAccounts.forget(String(id));
-			void app.publishAccounts();
+			void app.accountList.publish();
 		},
 
 		"card.move": async ([card, at, options], call) => gesture(call, onCanvas(options, call), "move", [String(card), at]),
@@ -375,9 +375,9 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"agent.dialogs": async ([id]) => ({ dialogs: need(id).conversation.dialogs() }),
 		"agent.settings": async ([id, options]) => {
 			const agent = need(id);
-			if ((options as { limits?: unknown } | undefined)?.limits) void app.refreshLimits();
+			if ((options as { limits?: unknown } | undefined)?.limits) void app.accountList.refreshLimits();
 			let accounts: { accounts?: unknown[]; active?: string } = {};
-			if (agent.kind === "claude") await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
+			if (agent.kind === "claude") await app.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			const runtime = app.runtimes().find((one) => one.kind === agent.kind);
 			return {
 				id: agent.id,
@@ -404,7 +404,7 @@ export function personTable(app: PersonHost): Record<string, Impl> {
 		"deck.get": async () => ({ deck: app.deck.state(), warnings: app.deck.warnings }),
 		"harness.get": async ([], call) => {
 			let accounts: { accounts?: unknown[]; active?: string } = {};
-			await app.publishAccounts((frame) => frame.type === "account.list" && (accounts = frame));
+			await app.accountList.publish((frame) => frame.type === "account.list" && (accounts = frame));
 			const settings = app.settings.get();
 			return {
 				name: app.deck.name,

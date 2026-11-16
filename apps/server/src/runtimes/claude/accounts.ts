@@ -441,7 +441,7 @@ export class ClaudeAccounts {
 
 	/**
 	 * The environment for a process that is about one account and no agent: a usage read for
-	 * the account rows (`App.refreshLimits`). The account's own directory on both variables, as
+	 * the account rows (`AccountList.refreshLimits`). The account's own directory on both variables, as
 	 * a one-off command gets it, except that the CLI's own login goes through its mirror.
 	 */
 	environmentOf(accountId: string): NodeJS.ProcessEnv | undefined {
@@ -454,7 +454,7 @@ export class ClaudeAccounts {
 	/**
 	 * How much of each account's 5-hour window is used, as last seen.
 	 *
-	 * Read by `App.refreshLimits`, every half hour and when the picker or settings opens. Kept
+	 * Read by `AccountList.refreshLimits`, every half hour and when the picker or settings opens. Kept
 	 * in memory only: a figure from before a restart is a guess.
 	 */
 	private readonly fiveHours = new Map<string, FiveHour & { at: number }>();
