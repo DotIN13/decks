@@ -30,6 +30,26 @@ export * from "./layout-kinds.ts";
 export { DEFAULT_FONT, DEFAULT_FONT_SIZE, estimateText, NOTE_PAD, NOTE_WIDTH, textStyleOf, type MeasureText, type TextStyle } from "./layout-text.ts";
 export type { Frame, Placed } from "./layout-sizing.ts";
 
+/**
+ * Lay out the expanded document: every item's box on the stage.
+ *
+ * `nodes` is the output of `expand`, so instances are already copies and every id is unique.
+ */
+export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure?: MeasureText }): Map<string, Placed> {
+	const run: LayoutRun = {
+		doc,
+		measure: options.measure ?? estimateText,
+		placed: new Map(),
+		order: 0,
+		size: (node, theme, forcedW, forcedH) => sizeOf(run, node, theme, forcedW, forcedH),
+	};
+	for (const node of nodes) {
+		if (!visible(doc, node, withTheme(options.theme, node))) continue;
+		place(run, node, { x: node.x ?? 0, y: node.y ?? 0 }, sizeOf(run, node, options.theme), undefined, options.theme);
+	}
+	return run.placed;
+}
+
 /** An item's own size, given what its parent decided for any `fill` dimension. */
 function sizeOf(run: LayoutRun, node: PenNode, theme: ThemeState, forcedW?: number, forcedH?: number): { w: number; h: number } {
 	const { doc } = run;
@@ -129,24 +149,4 @@ function placeGroup(run: LayoutRun, node: PenNode, at: { x: number; y: number },
 	}
 	// A group is the box round what is in it, wherever that starts, not a box from its own corner.
 	if (x1 !== Infinity) run.placed.get(node.id)!.box = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-}
-
-/**
- * Lay out the expanded document: every item's box on the stage.
- *
- * `nodes` is the output of `expand`, so instances are already copies and every id is unique.
- */
-export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure?: MeasureText }): Map<string, Placed> {
-	const run: LayoutRun = {
-		doc,
-		measure: options.measure ?? estimateText,
-		placed: new Map(),
-		order: 0,
-		size: (node, theme, forcedW, forcedH) => sizeOf(run, node, theme, forcedW, forcedH),
-	};
-	for (const node of nodes) {
-		if (!visible(doc, node, withTheme(options.theme, node))) continue;
-		place(run, node, { x: node.x ?? 0, y: node.y ?? 0 }, sizeOf(run, node, options.theme), undefined, options.theme);
-	}
-	return run.placed;
 }

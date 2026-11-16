@@ -28,25 +28,6 @@ interface Entry {
 	parent: string | null;
 }
 
-function index(doc: PenDocument): Map<string, Entry> {
-	const map = new Map<string, Entry>();
-	const visit = (list: readonly PenNode[], parent: string | null) => {
-		for (const node of list) {
-			map.set(node.id, { node, parent });
-			if (Array.isArray(node.children)) visit(node.children, node.id);
-		}
-	};
-	visit(doc.children ?? [], null);
-	return map;
-}
-
-const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
-
-function fieldsOf(node: PenNode): Record<string, unknown> {
-	const { children: _children, ...rest } = node;
-	return rest;
-}
-
 /** The edits that make `prev` into `next`, in an order that applies one after another. */
 export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 	const edits: PenEdit[] = metaEdits(prev, next);
@@ -114,6 +95,37 @@ export function diff(prev: PenDocument, next: PenDocument): PenEdit[] {
 	visit(next.children ?? [], null);
 	edits.push(...removals(before, after), ...emptied);
 	return edits;
+}
+
+/** A copy of a document that copies an item, and the lists above it, only when an edit reaches it. */
+type SharedCopy = {
+	out: PenDocument;
+	/** Where each item is now: the object in `out` (or still `doc`'s) and its parent's id. */
+	where: Map<string, { node: PenNode; parent: string | null }>;
+	/** The items and children lists that are this answer's own, safe to change. */
+	own: Set<object>;
+	ownList(parent: string | null): PenNode[];
+	ownNode(id: string): PenNode;
+	take(id: string): PenNode;
+};
+
+function index(doc: PenDocument): Map<string, Entry> {
+	const map = new Map<string, Entry>();
+	const visit = (list: readonly PenNode[], parent: string | null) => {
+		for (const node of list) {
+			map.set(node.id, { node, parent });
+			if (Array.isArray(node.children)) visit(node.children, node.id);
+		}
+	};
+	visit(doc.children ?? [], null);
+	return map;
+}
+
+const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+function fieldsOf(node: PenNode): Record<string, unknown> {
+	const { children: _children, ...rest } = node;
+	return rest;
 }
 
 /** The document's own fields that changed. */
@@ -231,18 +243,6 @@ export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDo
 	for (const edit of edits) applyShared(copy, edit);
 	return copy.out;
 }
-
-/** A copy of a document that copies an item, and the lists above it, only when an edit reaches it. */
-type SharedCopy = {
-	out: PenDocument;
-	/** Where each item is now: the object in `out` (or still `doc`'s) and its parent's id. */
-	where: Map<string, { node: PenNode; parent: string | null }>;
-	/** The items and children lists that are this answer's own, safe to change. */
-	own: Set<object>;
-	ownList(parent: string | null): PenNode[];
-	ownNode(id: string): PenNode;
-	take(id: string): PenNode;
-};
 
 function sharedCopy(doc: PenDocument): SharedCopy {
 	const out: PenDocument = { ...doc, children: [...(doc.children ?? [])] };

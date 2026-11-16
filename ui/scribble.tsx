@@ -24,26 +24,6 @@ function watchPencil(): void {
 }
 export { pencil };
 
-const CATCH = "data-scribble-catch";
-/** Whether focus went to a catcher: a field's blur handler asks, and waits for `onEnd` instead of finishing. */
-export function isScribbleCatch(el: EventTarget | Element | null | undefined): boolean {
-	return el instanceof Element && el.hasAttribute(CATCH);
-}
-
-/** The field's own words, as context for the handwriting. */
-const wordsOf = (el: HTMLElement): string => (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el.value : (el.textContent ?? "")).replace(/ /g, " ");
-
-/** Words added at the end of a text field, as a person typing them would: the field's own `input` follows. */
-function appendTo(el: HTMLElement, text: string): void {
-	if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
-		el.setRangeText(text, el.value.length, el.value.length, "end");
-		el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-		return;
-	}
-	el.append(document.createTextNode(text));
-	el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-}
-
 /**
  * Pencil handwriting anywhere goes into one field.
  *
@@ -220,4 +200,25 @@ function passCatch(st: CatchState, props: ScribbleCatchProps): void {
 		else if (target) appendTo(target, text);
 	}
 	st.sent = now;
+}
+
+const CATCH = "data-scribble-catch";
+
+/** Whether focus went to a catcher: a field's blur handler asks, and waits for `onEnd` instead of finishing. */
+export function isScribbleCatch(el: EventTarget | Element | null | undefined): boolean {
+	return el instanceof Element && el.hasAttribute(CATCH);
+}
+
+/** The field's own words, as context for the handwriting. */
+const wordsOf = (el: HTMLElement): string => (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el.value : (el.textContent ?? "")).replace(/ /g, " ");
+
+/** Words added at the end of a text field, as a person typing them would: the field's own `input` follows. */
+function appendTo(el: HTMLElement, text: string): void {
+	if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+		el.setRangeText(text, el.value.length, el.value.length, "end");
+		el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+		return;
+	}
+	el.append(document.createTextNode(text));
+	el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
 }

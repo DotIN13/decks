@@ -18,16 +18,6 @@ export interface Rect {
 
 const COMMAND = /([MmLlHhVvCcSsQqTtAaZz])|(-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)/g;
 
-/** Tokens: command letters and numbers, in order. */
-function tokens(d: string): Array<string | number> {
-	const out: Array<string | number> = [];
-	for (const match of d.matchAll(COMMAND)) {
-		if (match[1]) out.push(match[1]);
-		else if (match[2]) out.push(Number(match[2]));
-	}
-	return out;
-}
-
 const ARITY: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
 
 /** Where a path's pen is, where its subpath started, the box seen so far, and the last curve's control point. */
@@ -76,6 +66,16 @@ export function pathBounds(d: string | undefined): Rect | undefined {
 	}
 	if (!Number.isFinite(w.minX)) return undefined;
 	return { x: w.minX, y: w.minY, w: w.maxX - w.minX, h: w.maxY - w.minY };
+}
+
+/** Tokens: command letters and numbers, in order. */
+function tokens(d: string): Array<string | number> {
+	const out: Array<string | number> = [];
+	for (const match of d.matchAll(COMMAND)) {
+		if (match[1]) out.push(match[1]);
+		else if (match[2]) out.push(Number(match[2]));
+	}
+	return out;
 }
 
 /** A moveto or a line; answers the command that further pairs mean, after a moveto. */
@@ -145,7 +145,6 @@ function curveStep(w: Walk, lower: string, n: number[], rel: boolean): void {
 		see(w, w.x, w.y);
 	}
 }
-
 
 /**
  * Every value a cubic bézier takes at its ends and wherever it turns back, on one axis.

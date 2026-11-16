@@ -2,6 +2,8 @@ import type { PenDocument, PenNode, SizeValue } from "./types.ts";
 import { TEXTY, type MeasureText } from "./layout-text.ts";
 import { bool, num, type ThemeState } from "./values.ts";
 
+// The pieces layout shares: a placed box, the run it is laid out in, and how a width or height is read.
+
 export interface Frame {
 	x: number;
 	y: number;

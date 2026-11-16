@@ -5,6 +5,8 @@ import { bool, fillsOf, isVariable, num, resolve, strokeOf, type ThemeState } fr
 import { styleAttr, itemBox, toColour, DEFAULT_INK, escapeAttr, escapeText, cssLength, NOTE_PAPER, px, r2, type Decl, type Writer } from "./html-writer.ts";
 import { strokeOutline, paintBox, svgPaint } from "./html-paint.ts";
 
+// How each kind of item is written as HTML for `toHtml`: icons, text and notes, shapes, paths and pictures.
+
 export function iconOf(doc: PenDocument, node: PenNode, theme: ThemeState): { library: string; name: string; weight: number } | undefined {
 	if (node.type !== "icon" && node.type !== "icon_font") return undefined;
 	const font = node.type === "icon_font";

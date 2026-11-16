@@ -10,27 +10,6 @@ export interface Layer {
 	size?: string;
 }
 
-/**
- * An angular gradient as CSS's `conic-gradient`. pen starts counter-clockwise from up, runs clockwise,
- * and takes its angles on the gradient's ellipse where CSS takes a circle: each stop is put at the
- * circle's angle of the ellipse's, so only the blend of a stretched gradient differs a little.
- */
-function conic(stops: Array<{ at: number; colour: string }>, cx: number, cy: number, sw: number, sh: number, turn: number): string {
-	const start = (turn * Math.PI) / 180;
-	const [rx, ry] = [Math.max(1, sw / 2), Math.max(1, sh / 2)];
-	// The clockwise angle from up, on the page, of the ellipse's angle `e`.
-	const page = (e: number) => Math.atan2(rx * Math.sin(e), ry * Math.cos(e));
-	const from = page(-start);
-	const turnOf = (t: number) => {
-		if (t >= 1) return 1;
-		if (t <= 0) return 0;
-		const d = (page(2 * Math.PI * t - start) - from) / (2 * Math.PI);
-		return d - Math.floor(d);
-	};
-	const fromDeg = ((((from * 180) / Math.PI) % 360) + 360) % 360;
-	return `conic-gradient(from ${r2(fromDeg)}deg at ${r2(cx * 100)}% ${r2(cy * 100)}%, ${stops.map((s) => `${s.colour} ${r2(turnOf(s.at) * 100)}%`).join(", ")})`;
-}
-
 /** Fills, corners and shadows (outer, and inner ones inset) on a box. */
 export function paintBox(w: Writer, node: PenNode, theme: ThemeState, css: Decl[], round = false): void {
 	const box = itemBox(w, node);
@@ -185,4 +164,25 @@ export function svgPaint(w: Writer, fills: Fill[], theme: ThemeState, box: Frame
 		return `url(#${id})`;
 	}
 	return undefined;
+}
+
+/**
+ * An angular gradient as CSS's `conic-gradient`. pen starts counter-clockwise from up, runs clockwise,
+ * and takes its angles on the gradient's ellipse where CSS takes a circle: each stop is put at the
+ * circle's angle of the ellipse's, so only the blend of a stretched gradient differs a little.
+ */
+function conic(stops: Array<{ at: number; colour: string }>, cx: number, cy: number, sw: number, sh: number, turn: number): string {
+	const start = (turn * Math.PI) / 180;
+	const [rx, ry] = [Math.max(1, sw / 2), Math.max(1, sh / 2)];
+	// The clockwise angle from up, on the page, of the ellipse's angle `e`.
+	const page = (e: number) => Math.atan2(rx * Math.sin(e), ry * Math.cos(e));
+	const from = page(-start);
+	const turnOf = (t: number) => {
+		if (t >= 1) return 1;
+		if (t <= 0) return 0;
+		const d = (page(2 * Math.PI * t - start) - from) / (2 * Math.PI);
+		return d - Math.floor(d);
+	};
+	const fromDeg = ((((from * 180) / Math.PI) % 360) + 360) % 360;
+	return `conic-gradient(from ${r2(fromDeg)}deg at ${r2(cx * 100)}% ${r2(cy * 100)}%, ${stops.map((s) => `${s.colour} ${r2(turnOf(s.at) * 100)}%`).join(", ")})`;
 }

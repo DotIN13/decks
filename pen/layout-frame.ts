@@ -2,6 +2,8 @@ import type { PenNode } from "./types.ts";
 import { defaultSizing, layoutOf, sizing, visible, type Frame, type LayoutRun } from "./layout-sizing.ts";
 import { num, paddingOf, type ThemeState, withTheme } from "./values.ts";
 
+// A frame's children laid out: the content box they need, and where each goes, as pen's small flexbox does.
+
 type Content = { w: number; h: number; count: number; locals: Map<string, Frame> };
 type Axis = { row: boolean; pt: number; pr: number; pb: number; pl: number; gap: number; innerMain?: number; innerCross?: number };
 
