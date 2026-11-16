@@ -3,7 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { features } from "../main.ts";
 import { testServer } from "../kernel/testing.ts";
-import { answerBack, itemOp, keyed, turn } from "./args.ts";
+import { penOps } from "../../protocol/index.ts";
+import { answerBack, keyed, turn } from "./args.ts";
+
+const itemOp = penOps.itemOpOf;
 import { DROPPED, GOES, OLD_CALLS, OLD_EVENTS } from "./table.ts";
 import { told } from "./events.ts";
 

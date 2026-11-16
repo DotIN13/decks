@@ -1,9 +1,8 @@
 // Today's tab socket at /ws?decks_token=: the roster as "agents", an agent's drawing as
 // "stage.pen", its cards as "context.changed", and the dozen messages today's checks send.
 // Each message becomes a new call; nothing here keeps state but which agent this socket is on.
-import type { Caller } from "../../protocol/index.ts";
+import { penOps, type Caller } from "../../protocol/index.ts";
 import { toDeckPath, type Client, type Deck, type Peer, type Route, type SocketDoor, type Stop } from "../kernel/index.ts";
-import { itemOp } from "./args.ts";
 import { pagesOf, readDrawing } from "./drawing.ts";
 
 export const TAB_PATH = "/ws";
@@ -141,7 +140,7 @@ async function heard(tab: Tab, m: Said): Promise<void> {
 		case "agent.focus": return void ((tab.focused = String(m.id)), await roster(tab));
 		case "agent.stage": return void (await call(tab, "agent.update", { agent: m.id, change: { canvas: m.stage } }), await roster(tab), await drawingChanged(tab, String(m.stage)));
 		case "stage.pen.get": return stagePen(tab, String(m.agentId ?? tab.focused));
-		case "stage.pen.edit": return void (await call(tab, "item.batch", { ops: (m.ops as unknown[]).map(itemOp), ...(await canvas()) }));
+		case "stage.pen.edit": return void (await call(tab, "item.batch", { ops: (m.ops as unknown[]).map(penOps.itemOpOf), ...(await canvas()) }));
 		case "card.move": return void (await call(tab, "item.move", { id: m.path, at: { x: m.x, y: m.y }, ...(await canvas()) }));
 		case "card.resize": return void (await call(tab, "item.update", { id: m.path, size: { ...(m.w !== undefined ? { w: m.w } : {}), ...(m.h !== undefined ? { h: m.h } : {}) }, ...(await canvas()) }));
 		case "card.play": return void (await call(tab, "item.insert", { item: { type: "card", card: m.path }, ...(await canvas()) }));
