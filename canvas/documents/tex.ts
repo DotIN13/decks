@@ -45,34 +45,7 @@ export const THEOREMS: Record<string, string> = {
 /** Text environments drawn as styled text, their `\begin` and `\end` lines hidden. */
 export const TEXT_ENVS = new Set(["abstract", "quote", "quotation", "center", "flushleft", "flushright", "proof", "verse", ...Object.keys(THEOREMS)]);
 
-/** The index of the brace closing the one at `open`, or -1. */
-export function closeBraceAt(text: string, open: number): number {
-	let depth = 0;
-	for (let i = open; i < text.length; i++) {
-		const c = text[i];
-		if (c === "\\") {
-			i++;
-			continue;
-		}
-		if (c === "{") depth++;
-		else if (c === "}" && --depth === 0) return i;
-	}
-	return -1;
-}
-
-/** The text with every comment blanked out, same length, so offsets still hold. */
-export function blankComments(text: string): string {
-	return text.replace(/(^|[^\\])(%[^\n]*)/g, (_m, lead: string, comment: string) => lead + " ".repeat(comment.length));
-}
-
-/** The argument of the first `\name{…}`, or undefined. */
-function arg(text: string, name: string): string | undefined {
-	const m = new RegExp(`\\\\${name}\\*?(\\[[^\\]]*\\])?\\{`).exec(text);
-	if (!m) return undefined;
-	const open = m.index + m[0].length - 1;
-	const close = closeBraceAt(text, open);
-	return close === -1 ? undefined : text.slice(open + 1, close);
-}
+// --- what the whole file says ---
 
 export function texMeta(source: string): TexMeta {
 	const text = blankComments(source);
@@ -105,7 +78,9 @@ type Numbering = {
 };
 
 const LEVELS: Record<string, number> = { chapter: 0, section: 1, subsection: 2, subsubsection: 3 };
+
 const NUMBERED = ["figure", "table", "equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"];
+
 const TOKEN = /\\(chapter|section|subsection|subsubsection)(\*?)\s*(\[[^\]]*\])?\{|\\begin\{([a-zA-Z*]+)\}|\\end\{([a-zA-Z*]+)\}|\\label\{([^}]*)\}|\\\\(?!\\)|\\item\b|\\(?:no)?(?:cite[a-z]*|nocite)\*?(?:\[[^\]]*\])*\{([^}]*)\}|\\bibitem(?:\[[^\]]*\])?\{([^}]*)\}|\\nonumber|\\notag/g;
 
 /** Labels, citations and numbered environments, in reading order; answers the bibliography's own order. */
@@ -178,6 +153,37 @@ function opened(n: Numbering, begin: string, at: number, numbers: TexMeta["numbe
 	n.stack.push({ env: begin, restore, multi });
 }
 
+/** The argument of the first `\name{…}`, or undefined. */
+function arg(text: string, name: string): string | undefined {
+	const m = new RegExp(`\\\\${name}\\*?(\\[[^\\]]*\\])?\\{`).exec(text);
+	if (!m) return undefined;
+	const open = m.index + m[0].length - 1;
+	const close = closeBraceAt(text, open);
+	return close === -1 ? undefined : text.slice(open + 1, close);
+}
+
+/** The text with every comment blanked out, same length, so offsets still hold. */
+export function blankComments(text: string): string {
+	return text.replace(/(^|[^\\])(%[^\n]*)/g, (_m, lead: string, comment: string) => lead + " ".repeat(comment.length));
+}
+
+/** The index of the brace closing the one at `open`, or -1. */
+export function closeBraceAt(text: string, open: number): number {
+	let depth = 0;
+	for (let i = open; i < text.length; i++) {
+		const c = text[i];
+		if (c === "\\") {
+			i++;
+			continue;
+		}
+		if (c === "{") depth++;
+		else if (c === "}" && --depth === 0) return i;
+	}
+	return -1;
+}
+
+// --- tables ---
+
 export interface TabularCell {
 	text: string;
 	span: number;
@@ -209,6 +215,8 @@ export function readTabular(spec: string, body: string): { rows: TabularCell[][]
 	}
 	return { rows, rules };
 }
+
+// --- macros ---
 
 /**
  * Every `\newcommand`, `\renewcommand`, `\providecommand`, `\def` and `\DeclareMathOperator` in

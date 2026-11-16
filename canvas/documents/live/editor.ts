@@ -10,16 +10,6 @@ import { Builder, h } from "./builder.ts";
 /** The LiveEditor: its state, how it draws the file, where the caret is, and its history. What keys and the toolbar do is in input.ts. */
 
 /** Text nodes of an element that are the file's: not those of drawn maths or pictures. */
-function textNodes(root: Node): Text[] {
-	const out: Text[] = [];
-	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-		acceptNode: (node) => (node.nodeType === Node.ELEMENT_NODE ? ((node as HTMLElement).dataset.widget ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP) : NodeFilter.FILTER_ACCEPT),
-	});
-	for (let node = walker.nextNode(); node; node = walker.nextNode()) out.push(node as Text);
-	return out;
-}
-
-const shown = (node: Text) => (node.parentElement?.getClientRects().length ?? 0) > 0;
 
 export class LiveEditor {
 	readonly root: HTMLElement;
@@ -594,6 +584,17 @@ export class LiveEditor {
 		this.apply(moved, { start: end, end }, "type");
 	}
 }
+
+function textNodes(root: Node): Text[] {
+	const out: Text[] = [];
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+		acceptNode: (node) => (node.nodeType === Node.ELEMENT_NODE ? ((node as HTMLElement).dataset.widget ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP) : NodeFilter.FILTER_ACCEPT),
+	});
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) out.push(node as Text);
+	return out;
+}
+
+const shown = (node: Text) => (node.parentElement?.getClientRects().length ?? 0) > 0;
 
 /** A range moved past splices that landed around it. */
 function shiftRange<T extends Range2>(at: T, applied: readonly Splice[]): T {

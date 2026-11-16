@@ -1,7 +1,7 @@
 import { mountDocPage } from "./page.ts";
 
 /**
- * `lib/live-doc.js`: a `[data-live="doc"]` box on a board, drawn as a document page you type into.
+ * The live-doc module (built into lib/live-doc.js): a `[data-live="doc"]` box on a card, drawn as a document page you type into.
  *
  * The page is `canvas/documents/page.ts`; this is only how it talks. A board has no socket of its own:
  * it hands every message up to the app, which carries it on the connection it already has, and

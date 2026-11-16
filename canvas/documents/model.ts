@@ -1,5 +1,5 @@
 /**
- * `@decks/docs`: a real `.md`, `.tex` or `.docx` file opened as a page, typed into, and kept in
+ * The document protocol: a real `.md`, `.tex` or `.docx` file opened as a page, typed into, and kept in
  * step with whoever else writes it — another page, an agent with its own tools, any program.
  *
  * Four entry points, so each side takes only what it runs:

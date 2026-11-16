@@ -18,7 +18,7 @@ import type { DocPage, DocPageOptions, GComment } from "./page/types.ts";
 export type { DocPage, DocPageOptions } from "./page/types.ts";
 
 /**
- * `canvas/documents/page.ts`: a document drawn as a page you type into, in plain DOM.
+ * A document drawn as a page you type into, in plain DOM.
  *
  * Markdown and LaTeX are typed into as they read (`live.ts`): the file's own characters, styled,
  * with their syntax hidden until the caret reaches it, and a toolbar of the usual styles. A Word

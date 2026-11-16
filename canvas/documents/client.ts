@@ -1,7 +1,7 @@
 import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./model.ts";
 
 /**
- * `@decks/docs/client`: one page's copy of a document, kept in step with the file through the
+ * One page's copy of a document, kept in step with the file through the
  * service in `@decks/docs/server`, over whatever carries messages between them.
  *
  * The page edits its own text at once and hands each change here as a splice. Splices go out

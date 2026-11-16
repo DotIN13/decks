@@ -2,34 +2,15 @@ import { applySplice, transformSplices, type Splice } from "./model.ts";
 import { diffArrays } from "diff";
 
 /**
- * `@decks/docs/merge`: landing a page's edits on a text that may have moved since the page saw
+ * Landing a page's edits on a text that may have moved since the page saw
  * it, and turning one text into another as splices.
  *
  * Pure functions over strings, so the whole of the merge rule can be tested without a file.
  */
 
 /** Apply sequential splices, each checked; throws on the first whose `before` is not there. */
-export function applySplices(text: string, splices: readonly Splice[]): string {
-	let out = text;
-	for (const splice of splices) {
-		if (out.slice(splice.at, splice.at + splice.before.length) !== splice.before) throw new Error(`Splice at ${splice.at} does not match the text`);
-		out = applySplice(out, splice);
-	}
-	return out;
-}
 
-/** Old text no shorter than this may be looked for when the history to move a splice was not kept. */
-export const SEARCH_MIN = 8;
-
-/** The occurrence of `needle` nearest to `near`, or -1. */
-function nearest(text: string, needle: string, near: number): number {
-	let best = -1;
-	for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + 1)) {
-		if (best === -1 || Math.abs(i - near) < Math.abs(best - near)) best = i;
-		if (i > near) break;
-	}
-	return best;
-}
+// --- landing a batch ---
 
 export interface Landed {
 	text: string;
@@ -79,6 +60,19 @@ export function land(text: string, batch: readonly Splice[], concurrent: readonl
 	return { text: current, applied, refused };
 }
 
+/** Old text no shorter than this may be looked for when the history to move a splice was not kept. */
+export const SEARCH_MIN = 8;
+
+/** The occurrence of `needle` nearest to `near`, or -1. */
+function nearest(text: string, needle: string, near: number): number {
+	let best = -1;
+	for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + 1)) {
+		if (best === -1 || Math.abs(i - near) < Math.abs(best - near)) best = i;
+		if (i > near) break;
+	}
+	return best;
+}
+
 function matches(text: string, splice: Splice): boolean {
 	return splice.at <= text.length && text.slice(splice.at, splice.at + splice.before.length) === splice.before;
 }
@@ -87,6 +81,16 @@ function applyAll(text: string, splices: readonly Splice[]): string {
 	return splices.reduce(applySplice, text);
 }
 
+export function applySplices(text: string, splices: readonly Splice[]): string {
+	let out = text;
+	for (const splice of splices) {
+		if (out.slice(splice.at, splice.at + splice.before.length) !== splice.before) throw new Error(`Splice at ${splice.at} does not match the text`);
+		out = applySplice(out, splice);
+	}
+	return out;
+}
+
+// --- the splices between two texts ---
 
 /**
  * The splices that turn `from` into `to`, sequential and in source order.
@@ -150,6 +154,8 @@ function tokens(text: string): string[] {
 export function invert(splices: readonly Splice[]): Splice[] {
 	return [...splices].reverse().map((splice) => ({ at: splice.at, before: splice.text, text: splice.before }));
 }
+
+// --- three ways ---
 
 /**
  * Another writer's edits brought into a text that has its own: `theirs` and `ours` both came from

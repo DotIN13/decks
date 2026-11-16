@@ -3,104 +3,14 @@ import { readTabular, TEXT_ENVS, THEOREMS, withMacros, type TexMeta } from "../t
 
 /** How a document's source is drawn as blocks: the Builder, and the small elements it makes. */
 
-export const PUNCT = /[!-/:-@[-`{-~]/;
-export const isSpace = (c: string | undefined) => c === undefined || /\s/.test(c);
-export const isWord = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}_]/u.test(c);
-
-export function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
-	const node = document.createElement(tag);
-	if (cls) node.className = cls;
-	if (text !== undefined && text !== "") node.append(text);
-	return node;
-}
-
-/** Syntax: hidden until the caret is in what it belongs to. */
-const mk = (text: string) => h("span", "lv-mk", text);
-
-/** An element that stands for a span of source: where it is, and how long its opening and closing syntax are. */
-function inl<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, s: number, e: number, open: number, close: number): HTMLElementTagNameMap[K] {
-	const node = h(tag, `lv-i ${cls}`);
-	node.dataset.s = String(s);
-	node.dataset.e = String(e);
-	node.dataset.o = String(open);
-	node.dataset.c = String(close);
-	return node;
-}
-
-/** Drawn, not typed into: no text of it is the file's. */
-function widget(tag: keyof HTMLElementTagNameMap, cls: string, kind: string): HTMLElement {
-	const node = document.createElement(tag);
-	node.className = `lv-w ${cls}`;
-	node.contentEditable = "false";
-	node.dataset.widget = kind;
-	return node;
-}
-
-/** The index of the brace closing the one at `open`, or -1. */
-function closeBrace(text: string, open: number): number {
-	let depth = 0;
-	for (let i = open; i < text.length; i++) {
-		const c = text[i];
-		if (c === "\\") {
-			i++;
-			continue;
-		}
-		if (c === "{") depth++;
-		else if (c === "}" && --depth === 0) return i;
-	}
-	return -1;
-}
-
-/** `[label](url)` starting at `i`: where its parts are, or undefined. */
-function linkAt(text: string, i: number): { label: [number, number]; url: [number, number]; end: number } | undefined {
-	let depth = 0;
-	let k = i;
-	for (; k < text.length; k++) {
-		const c = text[k];
-		if (c === "\\") {
-			k++;
-			continue;
-		}
-		if (c === "[") depth++;
-		else if (c === "]" && --depth === 0) break;
-	}
-	if (k >= text.length || text[k + 1] !== "(") return undefined;
-	let paren = 0;
-	let m = k + 1;
-	for (; m < text.length; m++) {
-		const c = text[m];
-		if (c === "\\") {
-			m++;
-			continue;
-		}
-		if (c === "(") paren++;
-		else if (c === ")" && --paren === 0) break;
-	}
-	if (m >= text.length) return undefined;
-	return { label: [i + 1, k], url: [k + 2, m], end: m + 1 };
-}
-
-const TEX_STYLE: Record<string, [keyof HTMLElementTagNameMap, string]> = {
-	textbf: ["strong", "lv-b"],
-	textit: ["em", "lv-em"],
-	emph: ["em", "lv-em"],
-	textsl: ["em", "lv-em"],
-	underline: ["u", "lv-u"],
-	texttt: ["code", "lv-code"],
-	textsc: ["span", "lv-sc"],
-	sout: ["s", "lv-s"],
-	footnote: ["span", "lv-fnote"],
-};
-const TEX_REF = /^(cite[a-z]*|ref|eqref|autoref|cref|Cref|label|pageref)$/;
-const TEX_HEADING: Record<string, number> = { part: 1, chapter: 1, title: 1, section: 1, subsection: 2, subsubsection: 3, paragraph: 4, subparagraph: 5 };
 /** Text drawn into its element up to an index; a reader calls it before drawing what it found. */
 type Flush = (to: number) => void;
+
 /** One line of a block: its text, where it starts in the file, and whether a newline ends it. */
 type Line = { text: string; s: number; nl: boolean };
+
 /** What a reader found at an index: drawn up to end, a run to skip, or nothing (plain text). */
 type Step = { end: number } | { skip: number } | undefined;
-
-const MATH_ENV = /^\s*(\\begin\{(equation|align|gather|multline|eqnarray|displaymath|math)\*?\}|\\\[|\$\$)/;
 
 /** Builds one block's elements from its source. */
 export class Builder {
@@ -930,4 +840,105 @@ export class Builder {
 		shown.append(table);
 		return shown;
 	}
+}
+
+// --- LaTeX the Builder knows ---
+
+const TEX_STYLE: Record<string, [keyof HTMLElementTagNameMap, string]> = {
+	textbf: ["strong", "lv-b"],
+	textit: ["em", "lv-em"],
+	emph: ["em", "lv-em"],
+	textsl: ["em", "lv-em"],
+	underline: ["u", "lv-u"],
+	texttt: ["code", "lv-code"],
+	textsc: ["span", "lv-sc"],
+	sout: ["s", "lv-s"],
+	footnote: ["span", "lv-fnote"],
+};
+
+const TEX_REF = /^(cite[a-z]*|ref|eqref|autoref|cref|Cref|label|pageref)$/;
+
+const TEX_HEADING: Record<string, number> = { part: 1, chapter: 1, title: 1, section: 1, subsection: 2, subsubsection: 3, paragraph: 4, subparagraph: 5 };
+
+const MATH_ENV = /^\s*(\\begin\{(equation|align|gather|multline|eqnarray|displaymath|math)\*?\}|\\\[|\$\$)/;
+
+// --- the small elements it makes ---
+
+export const PUNCT = /[!-/:-@[-`{-~]/;
+
+export const isSpace = (c: string | undefined) => c === undefined || /\s/.test(c);
+
+export const isWord = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}_]/u.test(c);
+
+export function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
+	const node = document.createElement(tag);
+	if (cls) node.className = cls;
+	if (text !== undefined && text !== "") node.append(text);
+	return node;
+}
+
+/** Syntax: hidden until the caret is in what it belongs to. */
+const mk = (text: string) => h("span", "lv-mk", text);
+
+/** An element that stands for a span of source: where it is, and how long its opening and closing syntax are. */
+function inl<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, s: number, e: number, open: number, close: number): HTMLElementTagNameMap[K] {
+	const node = h(tag, `lv-i ${cls}`);
+	node.dataset.s = String(s);
+	node.dataset.e = String(e);
+	node.dataset.o = String(open);
+	node.dataset.c = String(close);
+	return node;
+}
+
+/** Drawn, not typed into: no text of it is the file's. */
+function widget(tag: keyof HTMLElementTagNameMap, cls: string, kind: string): HTMLElement {
+	const node = document.createElement(tag);
+	node.className = `lv-w ${cls}`;
+	node.contentEditable = "false";
+	node.dataset.widget = kind;
+	return node;
+}
+
+/** The index of the brace closing the one at `open`, or -1. */
+function closeBrace(text: string, open: number): number {
+	let depth = 0;
+	for (let i = open; i < text.length; i++) {
+		const c = text[i];
+		if (c === "\\") {
+			i++;
+			continue;
+		}
+		if (c === "{") depth++;
+		else if (c === "}" && --depth === 0) return i;
+	}
+	return -1;
+}
+
+/** `[label](url)` starting at `i`: where its parts are, or undefined. */
+function linkAt(text: string, i: number): { label: [number, number]; url: [number, number]; end: number } | undefined {
+	let depth = 0;
+	let k = i;
+	for (; k < text.length; k++) {
+		const c = text[k];
+		if (c === "\\") {
+			k++;
+			continue;
+		}
+		if (c === "[") depth++;
+		else if (c === "]" && --depth === 0) break;
+	}
+	if (k >= text.length || text[k + 1] !== "(") return undefined;
+	let paren = 0;
+	let m = k + 1;
+	for (; m < text.length; m++) {
+		const c = text[m];
+		if (c === "\\") {
+			m++;
+			continue;
+		}
+		if (c === "(") paren++;
+		else if (c === ")" && --paren === 0) break;
+	}
+	if (m >= text.length) return undefined;
+	return { label: [i + 1, k], url: [k + 2, m], end: m + 1 };
 }

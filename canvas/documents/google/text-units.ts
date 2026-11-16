@@ -22,9 +22,88 @@ export interface Unit {
 	cellStyle?: Record<string, unknown>;
 }
 
+/** One undo step: a keystroke's splice, or a style's requests and the ones that undo it. */
+export interface Step {
+	splice?: Splice;
+	requests?: DocsRequest[];
+	inverse?: DocsRequest[];
+	/** A table's shape, done in Docs: what to do to undo it. */
+	table?: TableStep;
+	/** A page break in or out at `at`. */
+	pagebreak?: { at: number; op: "insert" | "delete" };
+	/** Several steps that undo as one: typing and the style it was given, a paste, an autoformat. */
+	group?: Step[];
+	/** Typing more of the same kind may join this step (`join`), when it comes soon after `time`. */
+	typing?: "ins" | "del";
+	time?: number;
+}
+
+/** A row or column in or out at `index`, or a table in or out at `at`, for a table starting at `table`. */
+export interface TableStep {
+	kind: "row" | "col" | "table";
+	op: "insert" | "delete";
+	table: number;
+	index: number;
+	at?: number;
+	/** The words of the cells a deleted row or column had, to put back. */
+	texts?: string[];
+}
+
+// --- the Doc as units ---
+
+/** Every index of the Doc as a unit with the style it reads in. */
+export function buildUnits(doc: DocsDocument): Unit[] {
+	const units: Unit[] = [];
+	const pad = (index: number | undefined, cell?: Unit["cell"]) => {
+		while (index !== undefined && units.length < index) units.push({ ch: STRUCT.other, ...(cell ? { cell } : {}) });
+	};
+	const walk = (content: readonly DocsStructuralElement[] | undefined, cell?: Unit["cell"]) => {
+		for (const element of content ?? []) {
+			pad(element.startIndex, cell);
+			if (element.sectionBreak) units.push({ ch: STRUCT.section });
+			else if (element.paragraph) {
+				const para = { ps: element.paragraph.paragraphStyle ?? {}, ...(element.paragraph.bullet ? { bullet: element.paragraph.bullet } : {}) };
+				for (const part of element.paragraph.elements ?? []) {
+					pad(part.startIndex, cell);
+					if (part.textRun) {
+						const content = part.textRun.content ?? "";
+						for (let i = 0; i < content.length; i++) {
+							const ch = content[i]!;
+							const sug = (part.textRun as { suggestedInsertionIds?: string[] }).suggestedInsertionIds?.length ? "ins" : (part.textRun as { suggestedDeletionIds?: string[] }).suggestedDeletionIds?.length ? "del" : undefined;
+							units.push({ ch, ...(part.textRun.textStyle ? { ts: part.textRun.textStyle } : {}), ...(cell ? { cell } : {}), ...(ch === "\n" ? { para } : {}), ...(sug ? { sug } : {}) });
+						}
+					} else {
+						const span = Math.max(1, (part.endIndex ?? 0) - (part.startIndex ?? 0));
+						for (let i = 0; i < span; i++) units.push({ ch: OBJECT_UNIT, ...(i === 0 ? { obj: part } : {}), ...(cell ? { cell } : {}) });
+					}
+				}
+			} else if (element.table) {
+				const t = units.length;
+				units.push({ ch: STRUCT.table, table: element.table, tid: t, ...(cell ? { cell } : {}) });
+				(element.table.tableRows ?? []).forEach((row, r) => {
+					pad(row.startIndex, { t, r, c: 0 });
+					units.push({ ch: STRUCT.row, cell: { t, r, c: 0 } });
+					(row.tableCells ?? []).forEach((c, k) => {
+						pad(c.startIndex, { t, r, c: k });
+						units.push({ ch: STRUCT.cell, cell: { t, r, c: k }, ...(c.tableCellStyle ? { cellStyle: c.tableCellStyle } : {}) });
+						walk(c.content, { t, r, c: k });
+					});
+				});
+			} else units.push({ ch: STRUCT.other, ...(cell ? { cell } : {}) });
+			pad(element.endIndex, cell);
+		}
+	};
+	walk(doc.body?.content);
+	return units;
+}
+
+// --- sizes, colours and styles ---
+
 export const PT = 96 / 72;
+
 /** The grey between two pages, as Docs draws it. */
 export const GAP = 14;
+
 export const pt = (d: DocsDimension | undefined, fallback = 0) => (d?.magnitude ?? fallback) * (d?.unit === "PX" ? 1 / PT : 1);
 
 /** Google's own defaults, for a Doc that does not state its named styles (a new Doc states them all). */
@@ -56,6 +135,86 @@ export const sameStyle = (a: DocsTextStyle | undefined, b: DocsTextStyle | undef
 	const flat = (t: DocsTextStyle | undefined) => JSON.stringify(Object.entries(t ?? {}).sort(([x], [y]) => (x < y ? -1 : 1)));
 	return flat(a) === flat(b);
 };
+
+/** A run's style as CSS; `base` is what the paragraph already says, so only differences are written. */
+export function applyText(el: HTMLElement, ts: DocsTextStyle, base?: DocsTextStyle): void {
+	const s = el.style;
+	const family = ts.weightedFontFamily?.fontFamily;
+	if (family && family !== base?.weightedFontFamily?.fontFamily) {
+		loadFont(family);
+		s.fontFamily = `"${family}", Arial, sans-serif`;
+	}
+	const weight = ts.bold ? 700 : (ts.weightedFontFamily?.weight ?? 400);
+	if (!base || weight !== (base.bold ? 700 : (base.weightedFontFamily?.weight ?? 400))) s.fontWeight = String(weight);
+	if (!base || !!ts.italic !== !!base.italic) s.fontStyle = ts.italic ? "italic" : "normal";
+	const size = ts.fontSize?.magnitude;
+	const sub = ts.baselineOffset === "SUPERSCRIPT" || ts.baselineOffset === "SUBSCRIPT";
+	if (size && (!base || size !== base.fontSize?.magnitude || sub)) s.fontSize = `${size * PT * (sub ? 0.66 : 1)}px`;
+	if (sub) s.verticalAlign = ts.baselineOffset === "SUPERSCRIPT" ? "super" : "sub";
+	const lines = [ts.underline || ts.link?.url ? "underline" : "", ts.strikethrough ? "line-through" : ""].filter(Boolean).join(" ");
+	if (lines || base) s.textDecoration = lines || "none";
+	const color = cssColor(ts.foregroundColor) ?? (ts.link?.url ? "rgb(17, 85, 204)" : undefined);
+	if (color && (!base || color !== cssColor(base.foregroundColor))) s.color = color;
+	const background = cssColor(ts.backgroundColor);
+	if (background) s.backgroundColor = background;
+	if (ts.smallCaps) s.fontVariant = "small-caps";
+}
+
+export function cellStyle(td: HTMLTableCellElement, style: Record<string, unknown> | undefined): void {
+	const st = (style ?? {}) as { backgroundColor?: DocsColor; paddingTop?: DocsDimension; paddingBottom?: DocsDimension; paddingLeft?: DocsDimension; paddingRight?: DocsDimension; contentAlignment?: string; columnSpan?: number; rowSpan?: number } & Record<string, unknown>;
+	const bg = cssColor(st.backgroundColor);
+	if (bg) td.style.background = bg;
+	const p = (d: DocsDimension | undefined, f: number) => `${pt(d, f) * PT}px`;
+	td.style.padding = `${p(st.paddingTop, 5)} ${p(st.paddingRight, 5)} ${p(st.paddingBottom, 5)} ${p(st.paddingLeft, 5)}`;
+	td.style.verticalAlign = { MIDDLE: "middle", BOTTOM: "bottom" }[st.contentAlignment ?? ""] ?? "top";
+	if (st.columnSpan && st.columnSpan > 1) td.colSpan = st.columnSpan;
+	if (st.rowSpan && st.rowSpan > 1) td.rowSpan = st.rowSpan;
+	for (const side of ["Top", "Bottom", "Left", "Right"] as const) {
+		const border = st[`border${side}`] as { width?: DocsDimension; color?: DocsColor; dashStyle?: string } | undefined;
+		if (!border) continue;
+		// A width Google leaves out is 0: no line.
+		const width = pt(border.width) * PT;
+		td.style.setProperty(`border-${side.toLowerCase()}`, width > 0 ? `${width}px ${border.dashStyle === "DOT" ? "dotted" : border.dashStyle === "DASH" ? "dashed" : "solid"} ${cssColor(border.color) ?? "transparent"}` : "none");
+	}
+}
+
+export function numeral(n: number, type: string): string {
+	if (type === "ALPHA" || type === "UPPER_ALPHA") {
+		let s = "";
+		for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) s = String.fromCharCode(97 + ((k - 1) % 26)) + s;
+		return type === "UPPER_ALPHA" ? s.toUpperCase() : s;
+	}
+	if (type === "ROMAN" || type === "UPPER_ROMAN") {
+		const table: Array<[number, string]> = [[1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"], [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"]];
+		let s = "";
+		let k = n;
+		for (const [v, r] of table) while (k >= v) {
+			s += r;
+			k -= v;
+		}
+		return type === "UPPER_ROMAN" ? s.toUpperCase() : s;
+	}
+	if (type === "ZERO_DECIMAL") return String(n).padStart(2, "0");
+	return String(n);
+}
+
+/** Fonts the Doc uses that this browser may not have, fetched from Google Fonts once each. */
+export const loaded = new Set(["Arial", "Times New Roman", "Courier New", "Georgia", "Verdana", "Trebuchet MS", "Comic Sans MS", "Impact"]);
+
+export function loadFont(family: string): void {
+	if (!family || loaded.has(family)) return;
+	loaded.add(family);
+	const link = document.createElement("link");
+	link.rel = "stylesheet";
+	link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}:ital,wght@0,100..900;1,100..900&display=swap`;
+	// Some families have no variable axes: the plain request is the fallback.
+	link.onerror = () => {
+		link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}&display=swap`;
+	};
+	document.head.append(link);
+}
+
+// --- text ---
 
 /** A straight quote typed, as Docs' smart quotes make it: opening after a space, a line's start or an opening bracket; else closing. */
 export function smartQuote(before: string | undefined, quote: string): string {
@@ -128,20 +287,29 @@ export function runsOf(html: string): Array<{ text: string; ts: DocsTextStyle }>
 	return out.filter((run) => run.text);
 }
 
-/** Fonts the Doc uses that this browser may not have, fetched from Google Fonts once each. */
-export const loaded = new Set(["Arial", "Times New Roman", "Courier New", "Georgia", "Verdana", "Trebuchet MS", "Comic Sans MS", "Impact"]);
-export function loadFont(family: string): void {
-	if (!family || loaded.has(family)) return;
-	loaded.add(family);
-	const link = document.createElement("link");
-	link.rel = "stylesheet";
-	link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}:ital,wght@0,100..900;1,100..900&display=swap`;
-	// Some families have no variable axes: the plain request is the fallback.
-	link.onerror = () => {
-		link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}&display=swap`;
-	};
-	document.head.append(link);
+export const WORD = /[\p{L}\p{N}_'’]/u;
+
+export function wordStart(text: string, at: number): number {
+	let i = at;
+	while (i > 1 && /[ \t]/.test(text[i - 1]!)) i--;
+	while (i > 1 && WORD.test(text[i - 1]!)) i--;
+	return i === at && at > 1 && text[at - 1] !== "\n" && !isStruct(text[at - 1]!) ? at - 1 : i;
 }
+
+export function wordEnd(text: string, at: number): number {
+	let i = at;
+	while (i < text.length && WORD.test(text[i]!)) i++;
+	while (i < text.length && /[ \t]/.test(text[i]!)) i++;
+	return i;
+}
+
+export function lineStart(text: string, at: number): number {
+	let i = at;
+	while (i > 1 && text[i - 1] !== "\n" && !isStruct(text[i - 1]!)) i--;
+	return i;
+}
+
+// --- indices on the page ---
 
 export function firstIndex(node: Node): number | undefined {
 	const el = node as HTMLElement;
@@ -167,159 +335,7 @@ export function lastIndex(node: Node): number | undefined {
 	return undefined;
 }
 
-export const WORD = /[\p{L}\p{N}_'’]/u;
-export function wordStart(text: string, at: number): number {
-	let i = at;
-	while (i > 1 && /[ \t]/.test(text[i - 1]!)) i--;
-	while (i > 1 && WORD.test(text[i - 1]!)) i--;
-	return i === at && at > 1 && text[at - 1] !== "\n" && !isStruct(text[at - 1]!) ? at - 1 : i;
-}
-export function wordEnd(text: string, at: number): number {
-	let i = at;
-	while (i < text.length && WORD.test(text[i]!)) i++;
-	while (i < text.length && /[ \t]/.test(text[i]!)) i++;
-	return i;
-}
-export function lineStart(text: string, at: number): number {
-	let i = at;
-	while (i > 1 && text[i - 1] !== "\n" && !isStruct(text[i - 1]!)) i--;
-	return i;
-}
-
-export function numeral(n: number, type: string): string {
-	if (type === "ALPHA" || type === "UPPER_ALPHA") {
-		let s = "";
-		for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) s = String.fromCharCode(97 + ((k - 1) % 26)) + s;
-		return type === "UPPER_ALPHA" ? s.toUpperCase() : s;
-	}
-	if (type === "ROMAN" || type === "UPPER_ROMAN") {
-		const table: Array<[number, string]> = [[1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"], [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"]];
-		let s = "";
-		let k = n;
-		for (const [v, r] of table) while (k >= v) {
-			s += r;
-			k -= v;
-		}
-		return type === "UPPER_ROMAN" ? s.toUpperCase() : s;
-	}
-	if (type === "ZERO_DECIMAL") return String(n).padStart(2, "0");
-	return String(n);
-}
-
-/** A run's style as CSS; `base` is what the paragraph already says, so only differences are written. */
-export function applyText(el: HTMLElement, ts: DocsTextStyle, base?: DocsTextStyle): void {
-	const s = el.style;
-	const family = ts.weightedFontFamily?.fontFamily;
-	if (family && family !== base?.weightedFontFamily?.fontFamily) {
-		loadFont(family);
-		s.fontFamily = `"${family}", Arial, sans-serif`;
-	}
-	const weight = ts.bold ? 700 : (ts.weightedFontFamily?.weight ?? 400);
-	if (!base || weight !== (base.bold ? 700 : (base.weightedFontFamily?.weight ?? 400))) s.fontWeight = String(weight);
-	if (!base || !!ts.italic !== !!base.italic) s.fontStyle = ts.italic ? "italic" : "normal";
-	const size = ts.fontSize?.magnitude;
-	const sub = ts.baselineOffset === "SUPERSCRIPT" || ts.baselineOffset === "SUBSCRIPT";
-	if (size && (!base || size !== base.fontSize?.magnitude || sub)) s.fontSize = `${size * PT * (sub ? 0.66 : 1)}px`;
-	if (sub) s.verticalAlign = ts.baselineOffset === "SUPERSCRIPT" ? "super" : "sub";
-	const lines = [ts.underline || ts.link?.url ? "underline" : "", ts.strikethrough ? "line-through" : ""].filter(Boolean).join(" ");
-	if (lines || base) s.textDecoration = lines || "none";
-	const color = cssColor(ts.foregroundColor) ?? (ts.link?.url ? "rgb(17, 85, 204)" : undefined);
-	if (color && (!base || color !== cssColor(base.foregroundColor))) s.color = color;
-	const background = cssColor(ts.backgroundColor);
-	if (background) s.backgroundColor = background;
-	if (ts.smallCaps) s.fontVariant = "small-caps";
-}
-
-export function cellStyle(td: HTMLTableCellElement, style: Record<string, unknown> | undefined): void {
-	const st = (style ?? {}) as { backgroundColor?: DocsColor; paddingTop?: DocsDimension; paddingBottom?: DocsDimension; paddingLeft?: DocsDimension; paddingRight?: DocsDimension; contentAlignment?: string; columnSpan?: number; rowSpan?: number } & Record<string, unknown>;
-	const bg = cssColor(st.backgroundColor);
-	if (bg) td.style.background = bg;
-	const p = (d: DocsDimension | undefined, f: number) => `${pt(d, f) * PT}px`;
-	td.style.padding = `${p(st.paddingTop, 5)} ${p(st.paddingRight, 5)} ${p(st.paddingBottom, 5)} ${p(st.paddingLeft, 5)}`;
-	td.style.verticalAlign = { MIDDLE: "middle", BOTTOM: "bottom" }[st.contentAlignment ?? ""] ?? "top";
-	if (st.columnSpan && st.columnSpan > 1) td.colSpan = st.columnSpan;
-	if (st.rowSpan && st.rowSpan > 1) td.rowSpan = st.rowSpan;
-	for (const side of ["Top", "Bottom", "Left", "Right"] as const) {
-		const border = st[`border${side}`] as { width?: DocsDimension; color?: DocsColor; dashStyle?: string } | undefined;
-		if (!border) continue;
-		// A width Google leaves out is 0: no line.
-		const width = pt(border.width) * PT;
-		td.style.setProperty(`border-${side.toLowerCase()}`, width > 0 ? `${width}px ${border.dashStyle === "DOT" ? "dotted" : border.dashStyle === "DASH" ? "dashed" : "solid"} ${cssColor(border.color) ?? "transparent"}` : "none");
-	}
-}
-
-/** Every index of the Doc as a unit with the style it reads in. */
-export function buildUnits(doc: DocsDocument): Unit[] {
-	const units: Unit[] = [];
-	const pad = (index: number | undefined, cell?: Unit["cell"]) => {
-		while (index !== undefined && units.length < index) units.push({ ch: STRUCT.other, ...(cell ? { cell } : {}) });
-	};
-	const walk = (content: readonly DocsStructuralElement[] | undefined, cell?: Unit["cell"]) => {
-		for (const element of content ?? []) {
-			pad(element.startIndex, cell);
-			if (element.sectionBreak) units.push({ ch: STRUCT.section });
-			else if (element.paragraph) {
-				const para = { ps: element.paragraph.paragraphStyle ?? {}, ...(element.paragraph.bullet ? { bullet: element.paragraph.bullet } : {}) };
-				for (const part of element.paragraph.elements ?? []) {
-					pad(part.startIndex, cell);
-					if (part.textRun) {
-						const content = part.textRun.content ?? "";
-						for (let i = 0; i < content.length; i++) {
-							const ch = content[i]!;
-							const sug = (part.textRun as { suggestedInsertionIds?: string[] }).suggestedInsertionIds?.length ? "ins" : (part.textRun as { suggestedDeletionIds?: string[] }).suggestedDeletionIds?.length ? "del" : undefined;
-							units.push({ ch, ...(part.textRun.textStyle ? { ts: part.textRun.textStyle } : {}), ...(cell ? { cell } : {}), ...(ch === "\n" ? { para } : {}), ...(sug ? { sug } : {}) });
-						}
-					} else {
-						const span = Math.max(1, (part.endIndex ?? 0) - (part.startIndex ?? 0));
-						for (let i = 0; i < span; i++) units.push({ ch: OBJECT_UNIT, ...(i === 0 ? { obj: part } : {}), ...(cell ? { cell } : {}) });
-					}
-				}
-			} else if (element.table) {
-				const t = units.length;
-				units.push({ ch: STRUCT.table, table: element.table, tid: t, ...(cell ? { cell } : {}) });
-				(element.table.tableRows ?? []).forEach((row, r) => {
-					pad(row.startIndex, { t, r, c: 0 });
-					units.push({ ch: STRUCT.row, cell: { t, r, c: 0 } });
-					(row.tableCells ?? []).forEach((c, k) => {
-						pad(c.startIndex, { t, r, c: k });
-						units.push({ ch: STRUCT.cell, cell: { t, r, c: k }, ...(c.tableCellStyle ? { cellStyle: c.tableCellStyle } : {}) });
-						walk(c.content, { t, r, c: k });
-					});
-				});
-			} else units.push({ ch: STRUCT.other, ...(cell ? { cell } : {}) });
-			pad(element.endIndex, cell);
-		}
-	};
-	walk(doc.body?.content);
-	return units;
-}
-
-/** One undo step: a keystroke's splice, or a style's requests and the ones that undo it. */
-export interface Step {
-	splice?: Splice;
-	requests?: DocsRequest[];
-	inverse?: DocsRequest[];
-	/** A table's shape, done in Docs: what to do to undo it. */
-	table?: TableStep;
-	/** A page break in or out at `at`. */
-	pagebreak?: { at: number; op: "insert" | "delete" };
-	/** Several steps that undo as one: typing and the style it was given, a paste, an autoformat. */
-	group?: Step[];
-	/** Typing more of the same kind may join this step (`join`), when it comes soon after `time`. */
-	typing?: "ins" | "del";
-	time?: number;
-}
-
-/** A row or column in or out at `index`, or a table in or out at `at`, for a table starting at `table`. */
-export interface TableStep {
-	kind: "row" | "col" | "table";
-	op: "insert" | "delete";
-	table: number;
-	index: number;
-	at?: number;
-	/** The words of the cells a deleted row or column had, to put back. */
-	texts?: string[];
-}
+// --- steps moved past splices ---
 
 /** An index moved past a splice: inside text it replaced, to where that text starts. */
 export function movePoint(p: number, s: Splice, end = false): number {

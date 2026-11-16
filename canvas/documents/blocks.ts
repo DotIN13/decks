@@ -102,7 +102,7 @@ export function texBlocks(source: string): Block[] {
 	return [...head, ...inner.map((b) => ({ ...b, start: b.start + offset, end: b.end + offset }))];
 }
 
-// --- Word ------------------------------------------------------------------------------------
+// --- a Word file into paragraphs ---
 
 /** The opening of a paragraph, and not of `<w:pPr>` or `<w:proofErr>`. */
 const PARAGRAPH = /<w:p(?=[\s>/])[^>]*?(\/>|>)/g;
@@ -130,6 +130,7 @@ export function docxBlocks(xml: string): Block[] {
 }
 
 const ENTITY: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
 const escapeXml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export interface Run {
@@ -217,6 +218,8 @@ export function readParagraph(xml: string): Paragraph {
 	out.xml.push(out.xml.length ? out.xml.at(-1)! + out.width.at(-1)! : lastEnd);
 	return out;
 }
+
+// --- a paragraph typed into, back into the file ---
 
 /**
  * A change to a paragraph's text as splices of its XML, sequential, in the paragraph's own XML.

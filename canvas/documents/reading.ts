@@ -40,8 +40,6 @@ interface Editing {
 	para?: Paragraph;
 }
 
-const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 export class Reading {
 	readonly root: HTMLElement;
 	private editing: Editing | undefined;
@@ -382,3 +380,5 @@ export class Reading {
 		el.ownerDocument.getSelection()?.collapse(el, el.childNodes.length);
 	}
 }
+
+const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
