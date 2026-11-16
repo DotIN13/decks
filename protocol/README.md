@@ -36,6 +36,7 @@ tests (`tsconfig.test.json`) have them.
 7. One geometry: `Box { x1, y1, x2, y2 }`, `Size { w, h }`, `Point { x, y }`. A path starts at the deck's root.
 8. Calls on `chat`, `account` and `runtime` are answered by the harness, for the person; all others by the server.
 9. Within a major version calls, events and optional fields are only added.
+10. A card imports only from the deck's `assets/`, never from outside it or a hidden folder (`deck-files.ts`).
 
 `grammar.test.ts` holds rules 2 to 8 over every declared call and event. `docs/rewrite/calls.md` is the table
 of every old name and what it became; `node tools/gen/table.ts` proves it whole.

@@ -53,7 +53,11 @@ export function importMap(text: string | undefined): Record<string, string> {
 	return out;
 }
 
-/** An address in the map as a deck path under assets/, or undefined when it leaves it. */
+/*
+ * The rule: a card imports only from the deck's assets/, never from outside it or from a hidden
+ * folder. An address that climbs out of assets/ (../x) or names a hidden part (.git/x) is dropped,
+ * as the frame drops it today; every other address is a deck path under assets/.
+ */
 function assetPath(address: string): string | undefined {
 	const parts = ["assets"];
 	for (const part of address.split("/")) {
