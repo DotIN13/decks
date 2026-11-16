@@ -2,6 +2,7 @@ import { calls, Refused, type Handled } from "../../protocol/index.ts";
 import { handleAll, type Context, type Deck, type DeckPath, type Store } from "../kernel/types.ts";
 import type { Documents } from "./doc.ts";
 import { guarded, type GoogleAccount } from "./google.ts";
+import { googleOnMirror } from "./mirror-calls.ts";
 import { editDoc, link, readDoc, type GoogleDocs } from "./links.ts";
 import { fence } from "./path.ts";
 import { skipped } from "./records.ts";
@@ -9,7 +10,7 @@ import { skipped } from "./records.ts";
 // One short handler per call: a document's own file calls, then google.*.
 
 const { file, google } = calls;
-const GOOGLE = { status: google.status, connect: google.connect, disconnect: google.disconnect, list: google.list, link: google.link, read: google.read, edit: google.edit };
+const GOOGLE = { status: google.status, connect: google.connect, disconnect: google.disconnect, list: google.list, link: google.link, read: google.read, edit: google.edit, get: google.get, style: google.style, comments: google.comments, comment: google.comment };
 const DOC = { open: file.open, close: file.close, splice: file.splice, review: file.review, versions: file.versions, restore: file.restore };
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -53,6 +54,7 @@ export function googleCalls(account: GoogleAccount | undefined, docs: GoogleDocs
 		list: async (_ctx, { query }) => guarded(docs, () => docs!.list(query)),
 		read: async (_ctx, { doc }) => guarded(docs, () => readDoc(docs!, doc)),
 		edit: async (ctx, { doc, old, new: next }) => guarded(docs, () => editDoc(docs!, ctx.store, doc, old, next, ctx.caller)),
+		...googleOnMirror(docs),
 		link: async (ctx, { url }) =>
 			guarded(docs, async () => {
 				const { mirror } = await link(docs!, ctx.deck, ctx.store, url);

@@ -10,6 +10,7 @@ const SCOPES = ["https://www.googleapis.com/auth/documents", "https://www.google
 const DRIVE = "https://www.googleapis.com/auth/drive";
 const LOOPBACK = "http://127.0.0.1:8977/";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -140,6 +141,30 @@ export class GoogleApi {
 
 	batchUpdate(id: string, requests: DocsRequest[], writeControl?: DocsWriteControl): Promise<DocsBatchResult> {
 		return this.call(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(id)}:batchUpdate`, { method: "POST", body: { requests, ...(writeControl ? { writeControl } : {}) } });
+	}
+
+	/** A Doc's open comments, as Drive keeps them. */
+	async comments(id: string): Promise<Array<Record<string, unknown> & { id: string; resolved?: boolean }>> {
+		const fields = "comments(id,content,author(displayName,photoLink,me),createdTime,resolved,quotedFileContent,replies(id,content,author(displayName,photoLink,me),createdTime,action)),nextPageToken";
+		const out: Array<Record<string, unknown> & { id: string; resolved?: boolean }> = [];
+		let page: string | undefined;
+		do {
+			const body = await this.call<{ comments?: typeof out; nextPageToken?: string }>(`${DRIVE_FILES}/${encodeURIComponent(id)}/comments?pageSize=100&fields=${encodeURIComponent(fields)}${page ? `&pageToken=${page}` : ""}`);
+			out.push(...(body.comments ?? []));
+			page = body.nextPageToken;
+		} while (page && out.length < 1000);
+		return out.filter((c) => !c.resolved);
+	}
+
+	/** A new comment on quoted words, a reply to one, or resolving one. */
+	async comment(id: string, action: "create" | "reply" | "resolve", fields: { comment?: string; content?: string; quote?: string }): Promise<void> {
+		const content = fields.content?.trim() ?? "";
+		if (action === "create") {
+			await this.call(`${DRIVE_FILES}/${encodeURIComponent(id)}/comments?fields=id`, { method: "POST", body: { content, ...(fields.quote ? { quotedFileContent: { mimeType: "text/plain", value: fields.quote } } : {}) } });
+			return;
+		}
+		if (!fields.comment) throw new Refused("invalid", "Name the comment to reply to or resolve.", "google.comments");
+		await this.call(`${DRIVE_FILES}/${encodeURIComponent(id)}/comments/${encodeURIComponent(fields.comment)}/replies?fields=id`, { method: "POST", body: { content: content || (action === "resolve" ? "Resolved" : ""), ...(action === "resolve" ? { action: "resolve" } : {}) } });
 	}
 
 	/** The person's Docs, by name when a query is given, newest first. */

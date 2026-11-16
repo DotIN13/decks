@@ -16,7 +16,16 @@ export interface GoogleDocs extends DocsRemote {
 	markdown(id: string): Promise<{ text: string; revision: string; title?: string }>;
 	/** Make the Doc read as this markdown, by the smallest Docs edits; a Doc that moved since revision is a conflict. */
 	writeMarkdown(id: string, markdown: string, revision: string): Promise<void>;
+	/** The Doc as Google returned it, for drawing. */
+	document?(id: string): Promise<unknown>;
+	/** Docs requests the page made for styles, applied now. */
+	style?(id: string, requests: unknown[]): Promise<void>;
+	comments?(id: string): Promise<GoogleComment[]>;
+	comment?(id: string, action: "create" | "reply" | "resolve", fields: { comment?: string; content?: string; quote?: string }): Promise<void>;
 }
+
+export type GoogleComment = Record<string, unknown> & { id: string; content?: string; quote?: string; resolved?: boolean };
+export type Remote = { state: "synced" | "syncing" | "signin" | "error"; at?: number; message?: string };
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -50,11 +59,29 @@ export async function links(store: Store): Promise<Link[]> {
 }
 
 /** One round over the linked mirrors a page has open; a failed round waits for the next. */
-export async function tick(docs: GoogleDocs, deck: Deck, store: Store, isOpen: (path: string) => boolean, now = Date.now()): Promise<void> {
+export async function tick(docs: GoogleDocs, deck: Deck, store: Store, isOpen: (path: string) => boolean, tell: (mirror: DeckPath, remote: Remote) => void = () => {}, now = Date.now()): Promise<void> {
 	for (const one of await links(store)) {
 		if (!isOpen(one.mirror)) continue;
-		await syncOnce(one, docs, deck, store, await creditOf(store, one.id, now)).catch(() => undefined);
+		try {
+			await syncOnce(one, docs, deck, store, await creditOf(store, one.id, now));
+			tell(one.mirror, { state: "synced", at: now });
+		} catch (error) {
+			const signin = error instanceof Refused && error.code === "unavailable" && /signed in|sign-in|client/i.test(error.message);
+			tell(one.mirror, { state: signin ? "signin" : "error", message: (error as Error).message });
+		}
 	}
+}
+
+/** The Doc a mirror is linked to, or not_found. */
+export async function linkOf(store: Store, mirror: string): Promise<Link> {
+	const found = (await links(store)).find((one) => one.mirror === mirror);
+	if (!found) throw new Refused("not_found", `${mirror} is not a linked Google Doc's mirror.`, "google.link");
+	return found;
+}
+
+/** Credit the next pull of a Doc to whoever changed it. */
+export async function credit(store: Store, id: string, by: Caller, now = Date.now()): Promise<void> {
+	await store.put(`credit/${id}`, encoder.encode(JSON.stringify({ caller: by, until: now + CREDIT_MS })));
 }
 
 // Rule 13: an agent reads a Doc as its text and edits it by one exact replacement. The edit goes
@@ -83,6 +110,6 @@ export async function editDoc(docs: GoogleDocs, store: Store, url: string, old: 
 	if (count !== 1) throw new Refused("invalid", count === 0 ? "Those exact words are not in the Doc: google.read shows its words as they are now." : `Those words are in the Doc ${count} times: give more of them, so they are found once.`, "google.read");
 	const at = doc.text.indexOf(old);
 	await docs.writeMarkdown(id, doc.text.slice(0, at) + next + doc.text.slice(at + old.length), doc.revision);
-	await store.put(`credit/${id}`, encoder.encode(JSON.stringify({ caller: by, until: now + CREDIT_MS })));
+	await credit(store, id, by, now);
 	return { doc: id, text: (await docs.markdown(id)).text };
 }

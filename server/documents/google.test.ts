@@ -81,6 +81,20 @@ class FakeLibrary extends FakeDocs {
 	async markdown() {
 		return { text: this.text, revision: String(this.revision), title: "Field notes" };
 	}
+	notes: Array<{ id: string; content: string; quote?: string }> = [];
+	async document() {
+		return { documentId: "doc", title: "Field notes" };
+	}
+	async style(_id: string, requests: unknown[]) {
+		if (requests.length) this.text = this.text.replace("Google", "GOOGLE"), this.revision++;
+	}
+	async comments() {
+		return this.notes;
+	}
+	async comment(_id: string, action: string, fields: { content?: string; quote?: string; comment?: string }) {
+		if (action === "create") this.notes.push({ id: `n${this.notes.length + 1}`, content: fields.content ?? "", ...(fields.quote ? { quote: fields.quote } : {}) });
+		if (action === "resolve") this.notes = this.notes.filter((n) => n.id !== fields.comment);
+	}
 	async writeMarkdown(_id: string, markdown: string, revision: string) {
 		if (revision !== String(this.revision)) throw new Refused("conflict", "The Doc moved.");
 		this.text = markdown;
@@ -137,5 +151,25 @@ test("rule 13: an agent reads a Doc and edits one exact piece; the change reache
 	const state = await s.value<{ text: string; changes: { by: string }[] }>("file.open", { path, client: "p" }, "person");
 	assert.equal(state.text, "Alpha beta\nGamma delta\n");
 	assert.deepEqual(state.changes.map((c) => c.by), ["ann"]);
+	await s.close();
+});
+
+test("rule 15: a page's calls by its mirror: the Doc, a style pulled into the mirror, comments, the sync's state", async () => {
+	const remote = new FakeLibrary("From Google\n");
+	const s = await testServer({ features: [documents({ docs: remote, tickMs: 10 })] });
+	const url = "https://docs.google.com/document/d/1abcdefghijklmnopqrstuvwxyz/edit";
+	const { path } = await s.value<{ path: string }>("google.link", { url }, "person");
+	const got = await s.value<{ document: { title: string }; text: string }>("google.get", { path }, "person");
+	assert.deepEqual([got.document.title, got.text], ["Field notes", "From Google\n"]);
+	const styled = await s.value<{ rev: number }>("google.style", { path, requests: [{ updateTextStyle: {} }] }, "person");
+	assert.ok(styled.rev > 0);
+	assert.equal((await s.value<{ text: string }>("file.open", { path, client: "p" }, "person")).text, "From GOOGLE\n");
+	const after = await s.value<{ id: string }[]>("google.comment", { path, action: "create", content: "Why?", quote: "From" }, "person");
+	assert.equal(after.length, 1);
+	assert.deepEqual(await s.value("google.comment", { path, action: "resolve", comment: after[0]!.id }, "person"), []);
+	assert.equal((await s.call("google.get", { path: "docs/other.md" }, "person")).ok, false);
+	await new Promise((r) => setTimeout(r, 40));
+	const told = s.heard.filter((e) => e.name === "file.changed").map((e) => e.payload as { part?: string; remote?: { state: string } }).find((p) => p.part === "remote");
+	assert.equal(told?.remote?.state, "synced");
 	await s.close();
 });

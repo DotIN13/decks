@@ -3,7 +3,8 @@ import { googleFor } from "./google/docs.ts";
 import { documentCalls, googleCalls } from "./calls.ts";
 import { Documents, PAUSE_MS } from "./doc.ts";
 import type { GoogleAccount } from "./google.ts";
-import { tick, TICK_MS, type GoogleDocs } from "./links.ts";
+import { tick, TICK_MS, type GoogleDocs, type Remote } from "./links.ts";
+import { events } from "../../protocol/index.ts";
 import { documentKindWith } from "./place.ts";
 import type { Deck } from "../kernel/types.ts";
 
@@ -28,7 +29,8 @@ export function documents(given: DocumentsOptions = {}): Feature {
 			const open = new Documents(kernel.deck, kernel.events, store, options.pauseMs ?? PAUSE_MS);
 			docs = open;
 			const remote = options.docs;
-			const timer = remote ? setInterval(() => void tick(remote, kernel.deck, store, (path) => open.isOpen(path)), options.tickMs ?? TICK_MS) : undefined;
+			const tell = (mirror: string, state: Remote) => kernel.events.emit(events.fileChanged, { ids: [mirror], by: "google", rev: 0, part: "remote", remote: state });
+			const timer = remote ? setInterval(() => void tick(remote, kernel.deck, store, (path) => open.isOpen(path), tell), options.tickMs ?? TICK_MS) : undefined;
 			timer?.unref?.();
 			return () => {
 				clearInterval(timer);

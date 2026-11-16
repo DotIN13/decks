@@ -9,6 +9,7 @@ import type { Route } from "../../kernel/types.ts";
 import { docToMarkdown } from "./markdown.ts";
 import { plan } from "./plan.ts";
 import { docUnits, segmentEnds, unitRequests } from "./units.ts";
+import type { DocsRequest } from "./types.ts";
 
 // The documents feature's Google parts made from one store: the sign-in, and the Docs API as the
 // mirror's index-aligned text and as agents' markdown. The one maker the server's entry calls.
@@ -45,6 +46,12 @@ export function googleFor(store: Store, fetch: Fetch = globalThis.fetch as unkno
 			const doc = await api.get(id);
 			return { text: docToMarkdown(doc), revision: doc.revisionId ?? "", ...(doc.title ? { title: doc.title } : {}) };
 		},
+		document: (id) => api.get(id),
+		async style(id, requests) {
+			if (requests.length) await api.batchUpdate(id, requests as DocsRequest[]);
+		},
+		comments: async (id) => (await api.comments(id)).map((c) => ({ ...c, ...(typeof (c.quotedFileContent as { value?: string } | undefined)?.value === "string" ? { quote: (c.quotedFileContent as { value: string }).value } : {}) })),
+		comment: (id, action, fields) => api.comment(id, action, fields),
 		async writeMarkdown(id, markdown, revision) {
 			const doc = await api.get(id);
 			if ((doc.revisionId ?? "") !== revision) throw new Refused("conflict", "The Doc changed since it was read.", "google.read");
