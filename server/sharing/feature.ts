@@ -4,6 +4,7 @@ import { forget, readLink, writeLink, type Link } from "./client/link.ts";
 import type { Run } from "./client/asks.ts";
 import { DeckSync, type SyncOptions } from "./client/sync.ts";
 import { bundleRoute } from "./bundle/bundle.ts";
+import { upgradeSharing } from "./upgrade.ts";
 import { networkTransport } from "./client/network.ts";
 import { StudioError, type Transport } from "./client/transport.ts";
 
@@ -49,6 +50,9 @@ export function sharingFeature(given: SharingOptions = {}): Feature {
 				return { connected: false };
 			},
 		}),
+		async upgrade(_deck, _version, parts) {
+			await upgradeSharing(parts.old, parts.stores("sharing"), (line) => console.log(`[upgrade] ${line}`));
+		},
 		async start(kernel: Kernel) {
 			running.kernel = kernel;
 			const store = kernel.store("sharing");
