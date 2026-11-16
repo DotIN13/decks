@@ -95,6 +95,11 @@ test("a canvas pass reaches nothing of another canvas, on any call or route Read
 		const exists = (path: string) => stat(join(s.root, path)).then(() => true, () => false);
 		assert.equal(await exists("assets/planted.txt"), false, `a pass wrote into the deck's assets/ (upload answered ${upload.status})`);
 		if (upload.ok) assert.ok(await exists(`canvases/${A}/files/planted.txt`), "an upload a pass may make lands in its own canvas's files/");
+		const own = await call("item.insert", { item: { type: "text", content: "mine" } });
+		assert.ok(answered(own), `a pass inserts a text on its own canvas: ${own.text.slice(0, 120)}`);
+		const ownId = (JSON.parse(own.text) as { value: { id: string } }).value.id;
+		const turned = await call("item.update", { id: ownId, set: { type: "app", app: "other" } });
+		assert.ok(!answered(turned), `a pass turned its own text into an app: ${turned.text.slice(0, 120)}`);
 		const opened = await fetch(`${s.url}/app-pass/other`, { method: "POST", headers: { authorization: `Bearer ${pass}` } });
 		assert.ok(opened.status >= 400, `a pass opened an app placed on no canvas of its own: ${opened.status}`);
 		const again = await fetch(`${s.url}/api/passes`, { method: "POST", headers: { authorization: `Bearer ${pass}`, "content-type": "application/json" }, body: JSON.stringify({ canvas: "b" }) });
