@@ -435,3 +435,13 @@ presence; cards and the card runtime's verbs; documents. Old types are not copie
 Compat stays, for clients that are not rebuilt yet (an older Studio page, an older iPad app), until
 its date; the frame no longer uses it. A step that cannot pass its checks stays on compat and is
 listed, rather than holding the others.
+
+**Old cards work forever (Mason, 2026-11-15).** A card in a deck is the person's file, and hundreds
+already call `card.decks` in the old shape (`card.decks.canvas.insert(item, { beside })`). They keep
+working with no date: the frame turns an old name and its positional arguments into the new call, by
+one table that lives in `protocol/compat/` and is imported by the frame and by the server's compat.
+`card.decks` also takes the protocol's shape (`card.decks.item.insert({ item, beside })`), which is
+what agents are taught from now on. Old or new is decided per call by the arguments' shape, and a test
+pins the dangerous pairs: an old `canvas.delete("id")` deletes an item, never a canvas. A card may
+only make the calls the protocol lists for a card, whichever shape it uses. Compat's date is for
+programs (an older page or app); it never applies to a deck's files.
