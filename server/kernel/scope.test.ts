@@ -19,9 +19,10 @@ test("a path from an address is decoded once and fenced before any prefix is tes
 	assert.ok(!inside("canvases/ab/cards/x", "canvases/a"));
 });
 
-test("a route that declares scoped holds a pass to what it says, a climb included", async () => {
+test("a pass reaches a route only where it declares scoped, a climb refused; a public GET is open", async () => {
 	const routes: Route[] = [
 		{ method: "GET", prefix: "/open/", answer: async () => ({ type: "text/plain", body: "whole callers only" }) },
+		{ method: "GET", prefix: "/public/", public: true, answer: async () => ({ type: "text/plain", body: "anyone" }) },
 		{
 			method: "GET",
 			prefix: "/files/",
@@ -34,7 +35,8 @@ test("a route that declares scoped holds a pass to what it says, a climb include
 	const pass = server.callers.issue({ ...callers.person, id: "person~frame-9" }, "canvas pass", { canvas: "a", until: Date.now() + 60_000 });
 	const get = async (path: string, token: string) => (await fetch(`${doors.url}${path}`, { headers: { authorization: `Bearer ${token}` } })).status;
 	assert.equal(await get("/open/x", doors.token), 200);
-	assert.equal(await get("/open/x", pass), 200, "until every route declares scoped, one without it lets a pass through");
+	assert.equal(await get("/open/x", pass), 403, "a route that declares nothing for a pass refuses it");
+	assert.equal(await get("/public/x", pass), 200, "a public GET is open to anyone, a pass included");
 	assert.equal(await get("/files/canvases/a/files/x.txt", pass), 200);
 	assert.equal(await get("/files/canvases/b/files/x.txt", pass), 403);
 	assert.equal(await get("/files/canvases/a/files/..%2f..%2fb%2ffiles%2fx.txt", pass), 403);
