@@ -6,7 +6,7 @@ import { appendWords, changed, commit, onClick, onDblClick, onFocusOut, onInput,
 import { EditorView, closeMenus, hideMarks, lineSlot, placeBar, showBar, textSlot, toggleMenu } from "./editor/view.tsx";
 import { insertBlock, restyle, setBlock, style } from "./editor/style.ts";
 import { endDrag, local, mountEditor, onKeyDown, onPointerDown, onPointerMove } from "./editor/actions-press.ts";
-import { bind, type EditorCtx } from "./editor/ctx.ts";
+import { binder, type DrawnElement, type EditorCtx } from "./editor/ctx.ts";
 
 /**
  * The editor over a card (`CanvasView.tsx`): its words as they read, typed into in place, and written back
@@ -44,43 +44,64 @@ export interface CardEditorProps {
 }
 
 export function CardEditor(props: CardEditorProps) {
-	// Its state first, then each part's functions bound to it, which the parts call each other by.
-	const cx = { props, lead: "", trail: "", done: false, past: [], future: [], wanted: false, selecting: false } as unknown as EditorCtx;
-	cx.url = bind(cx, url);
-	cx.piece = bind(cx, piece);
-	cx.inline = bind(cx, inline);
-	cx.list = bind(cx, list);
-	cx.block = bind(cx, block);
-	cx.build = bind(cx, build);
-	cx.serialise = bind(cx, serialise);
-	cx.topOf = bind(cx, topOf);
-	cx.onInput = bind(cx, onInput);
-	cx.changed = bind(cx, changed);
-	cx.travel = bind(cx, travel);
-	cx.onPaste = bind(cx, onPaste);
-	cx.placeBar = bind(cx, placeBar);
-	cx.showBar = bind(cx, showBar);
-	cx.toggleMenu = bind(cx, toggleMenu);
-	cx.closeMenus = bind(cx, closeMenus);
-	cx.insertBlock = bind(cx, insertBlock);
-	cx.cut = bind(cx, cut);
-	cx.restyle = bind(cx, restyle);
-	cx.style = bind(cx, style);
-	cx.blockKind = bind(cx, blockKind);
-	cx.setBlock = bind(cx, setBlock);
-	cx.onClick = bind(cx, onClick);
-	cx.onDblClick = bind(cx, onDblClick);
-	cx.local = bind(cx, local);
-	cx.hideMarks = bind(cx, hideMarks);
-	cx.lineSlot = bind(cx, lineSlot);
-	cx.textSlot = bind(cx, textSlot);
-	cx.onPointerDown = bind(cx, onPointerDown);
-	cx.onPointerMove = bind(cx, onPointerMove);
-	cx.endDrag = bind(cx, endDrag);
-	cx.commit = bind(cx, commit);
-	cx.onKeyDown = bind(cx, onKeyDown);
-	cx.onFocusOut = bind(cx, onFocusOut);
-	cx.appendWords = bind(cx, appendWords);
+	/*
+	 * Its state and each part's functions bound to it, which the parts call each other by, in one
+	 * literal: a field left out does not compile. The elements are filled by the view's refs as it is
+	 * drawn (`EditorView`), so they alone are read only once it is: in mountEditor's onMount and after.
+	 */
+	const by = binder(() => cx);
+	const state: Omit<EditorCtx, DrawnElement> = {
+		props,
+		lead: "",
+		trail: "",
+		done: false,
+		frame: undefined,
+		past: [],
+		future: [],
+		wanted: false,
+		selecting: false,
+		settleBar: undefined,
+		dragging: undefined,
+		ghost: undefined,
+		press: undefined,
+		target: undefined,
+		url: by(url),
+		piece: by(piece),
+		inline: by(inline),
+		list: by(list),
+		block: by(block),
+		build: by(build),
+		serialise: by(serialise),
+		topOf: by(topOf),
+		onInput: by(onInput),
+		changed: by(changed),
+		travel: by(travel),
+		onPaste: by(onPaste),
+		placeBar: by(placeBar),
+		showBar: by(showBar),
+		toggleMenu: by(toggleMenu),
+		closeMenus: by(closeMenus),
+		insertBlock: by(insertBlock),
+		cut: by(cut),
+		restyle: by(restyle),
+		style: by(style),
+		blockKind: by(blockKind),
+		setBlock: by(setBlock),
+		onClick: by(onClick),
+		onDblClick: by(onDblClick),
+		local: by(local),
+		hideMarks: by(hideMarks),
+		lineSlot: by(lineSlot),
+		textSlot: by(textSlot),
+		onPointerDown: by(onPointerDown),
+		onPointerMove: by(onPointerMove),
+		endDrag: by(endDrag),
+		commit: by(commit),
+		onKeyDown: by(onKeyDown),
+		onFocusOut: by(onFocusOut),
+		appendWords: by(appendWords),
+	};
+	const cx = state as EditorCtx;
 	mountEditor(cx);
 	return EditorView(cx);
 }

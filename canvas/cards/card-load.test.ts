@@ -1,7 +1,7 @@
 // Tests of how a card's file is fetched and mounted: a retry once, a stop, a missing file.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cardLoader } from "./card-load.ts";
+import { cardLoader, mountWired } from "./card-load.ts";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -99,4 +99,47 @@ test("a plain 404 is a failure like any other: asked for once more, not said to 
 	await settle();
 	assert.equal(missing, 0);
 	assert.equal(timers.length, 1);
+});
+
+test("a card whose wiring throws while it wakes is disposed, and its error shown", () => {
+	const disposed: string[] = [];
+	const shown: unknown[] = [];
+	const { mounted, forget } = mountWired(
+		() => ({ name: "a", dispose: () => disposed.push("a") }),
+		() => {
+			throw new Error("no snapshot");
+		},
+		(error) => shown.push(error),
+	);
+	assert.equal(mounted, undefined);
+	assert.deepEqual(disposed, ["a"]);
+	assert.match(String(shown[0]), /no snapshot/);
+	forget();
+});
+
+test("a card wired cleanly is answered with what forgets its wiring, and not disposed", () => {
+	let forgotten = 0;
+	const disposed: string[] = [];
+	const { mounted, forget } = mountWired(
+		() => ({ name: "a", dispose: () => disposed.push("a") }),
+		() => () => forgotten++,
+		() => assert.fail("no error"),
+	);
+	assert.equal(mounted?.name, "a");
+	forget();
+	assert.equal(forgotten, 1);
+	assert.deepEqual(disposed, []);
+});
+
+test("a card that could not mount at all is shown failing, with nothing to dispose", () => {
+	const shown: unknown[] = [];
+	const { mounted } = mountWired(
+		(): { dispose(): void } => {
+			throw new Error("bad html");
+		},
+		() => () => {},
+		(error) => shown.push(error),
+	);
+	assert.equal(mounted, undefined);
+	assert.match(String(shown[0]), /bad html/);
 });

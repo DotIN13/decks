@@ -69,3 +69,20 @@ export function cardLoader(options: {
 		},
 	};
 }
+
+/**
+ * A card mounted, then wired to its surface (words and links heard, picture and height told). Wiring
+ * that throws as the card wakes disposes it at once, so nothing of it lives on, and `fail` shows why, as
+ * for a card that could not mount. Answers the card, or none, and what forgets its wiring.
+ */
+export function mountWired<Card extends { dispose(): void }>(mount: () => Card, wire: (card: Card) => () => void, fail: (error: unknown) => void): { mounted: Card | undefined; forget: () => void } {
+	let card: Card | undefined;
+	try {
+		card = mount();
+		return { mounted: card, forget: wire(card) };
+	} catch (error) {
+		card?.dispose();
+		fail(error);
+		return { mounted: undefined, forget: () => {} };
+	}
+}

@@ -5,7 +5,7 @@ import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { isCardSheet, mountCard, type MountedCard } from "./card.ts";
 import { ownInput } from "../input/item-keys.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
-import { cardLoader } from "./card-load.ts";
+import { cardLoader, mountWired } from "./card-load.ts";
 import { scheme } from "../theme.ts";
 import { markMissing } from "../items/missing.ts";
 import { canvasHost, freshAddress, openInTab } from "../host/host.ts";
@@ -106,35 +106,49 @@ export type CardSurfaceProps = {
 };
 
 /** A fresh element for a new file, the card mounted in it, its words and links heard, its picture and extent told. */
-function mountFresh(host: HTMLElement, html: string, props: CardSurfaceProps, stamped: () => string, cardCall: ReturnType<typeof canvasHost>["cardCall"]): { mounted: MountedCard; forget: () => void } {
+function mountFresh(host: HTMLElement, html: string, props: CardSurfaceProps, stamped: () => string, cardCall: ReturnType<typeof canvasHost>["cardCall"]): { mounted: MountedCard | undefined; forget: () => void } {
 	// A closed root is made once per element: a new file gets a new element.
 	const fresh = document.createElement("div");
 	fresh.className = "card-host";
 	// Sized here, not by the card's sheet: a root contained in size with no size of its own is nothing tall.
 	fresh.style.cssText = "width: 100%; height: 100%";
 	host.replaceChildren(fresh);
-	const mounted = mountCard(fresh, {
-		html,
-		url: stamped(),
-		path: props.path,
-		trusted: props.trusted,
-		theme: untrack(scheme),
-		size: untrack(props.size),
-		...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
+	const mount = () =>
+		mountCard(fresh, {
+			html,
+			url: stamped(),
+			path: props.path,
+			trusted: props.trusted,
+			theme: untrack(scheme),
+			size: untrack(props.size),
+			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
+		});
+	const wire = (mounted: MountedCard) => {
+		listenToCard(mounted.root, fresh, props, stamped);
+		const root = mounted.root;
+		const url = stamped();
+		const shot = () => snapshotOfCard(root, { ...untrack(props.size), scheme: untrack(scheme), url, skip: isCardSheet });
+		shots.set(props.path, shot);
+		// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
+		mounted.onHeight((h) => {
+			const w = untrack(props.size).w;
+			props.onExtent?.({ w, h, at: w, page: h, ...mounted.reading() });
+		});
+		return () => shots.get(props.path) === shot && shots.delete(props.path);
+	};
+	return mountWired(mount, wire, (error) => {
+		console.error(`card ${props.path}`, error);
+		host.replaceChildren(cardError(error));
 	});
-	listenToCard(mounted.root, fresh, props, stamped);
-	const root = mounted.root;
-	const url = stamped();
-	const shot = () => snapshotOfCard(root, { ...untrack(props.size), scheme: untrack(scheme), url, skip: isCardSheet });
-	shots.set(props.path, shot);
-	const forget = () => shots.get(props.path) === shot && shots.delete(props.path);
-	// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
-	const card = mounted;
-	mounted.onHeight((h) => {
-		const w = untrack(props.size).w;
-		props.onExtent?.({ w, h, at: w, page: h, ...card.reading() });
-	});
-	return { mounted, forget };
+}
+
+/** What stands where a card that could not start would be: why, in the card's own box. */
+function cardError(error: unknown): HTMLElement {
+	const note = document.createElement("p");
+	note.className = "card-error";
+	note.style.cssText = "margin: 0; padding: 16px; font: 14px/1.4 var(--b-font, system-ui); color: var(--b-danger, #b42318)";
+	note.textContent = `This card could not start: ${error instanceof Error ? error.message : String(error)}`;
+	return note;
 }
 
 /** Load the card's file again when it changes: not when only its size in it did. */

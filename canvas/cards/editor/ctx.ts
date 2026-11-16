@@ -12,6 +12,9 @@ import type * as actionsPress from "./actions-press.ts";
 /** A part's function, as the others call it: with the state already given. */
 type Bound<F> = F extends (cx: EditorCtx, ...args: infer A) => infer R ? (...args: A) => R : never;
 
+/** The elements the view's refs fill as it is drawn: the only fields read only once it is. */
+export type DrawnElement = "wrap" | "ed" | "bar" | "caret" | "tools" | "line";
+
 export interface EditorCtx {
 	props: CardEditorProps;
 	wrap: HTMLDivElement;
@@ -72,7 +75,7 @@ export interface EditorCtx {
 	appendWords: Bound<typeof actions.appendWords>;
 }
 
-/** A part's function with the state given, for the others to call. */
-export function bind<A extends unknown[], R>(cx: EditorCtx, f: (cx: EditorCtx, ...args: A) => R): (...args: A) => R {
-	return (...args) => f(cx, ...args);
+/** A part's function with the state given, for the others to call: the state is read when it is called, so it may be made after. */
+export function binder(cx: () => EditorCtx) {
+	return <A extends unknown[], R>(f: (cx: EditorCtx, ...args: A) => R) => (...args: A): R => f(cx(), ...args);
 }
